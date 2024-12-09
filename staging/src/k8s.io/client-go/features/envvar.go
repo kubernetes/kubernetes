@@ -98,16 +98,21 @@ type envVarFeatureGates struct {
 
 // Enabled returns true if the key is enabled. If the key is not known, this call will panic.
 func (f *envVarFeatureGates) Enabled(key Feature) bool {
+	return f.EnabledWithLogger(klog.Background(), key)
+}
+
+// EnabledWithLogger returns true if the key is enabled. If the key is not known, this call will panic.
+func (f *envVarFeatureGates) EnabledWithLogger(logger klog.Logger, key Feature) bool {
 	if v, ok := f.wasFeatureEnabledViaSetMethod(key); ok {
 		// ensue that the state of all known features
 		// is loaded from environment variables
 		// on the first call to Enabled method.
 		if !f.hasAlreadyReadEnvVar() {
-			_ = f.getEnabledMapFromEnvVar()
+			_ = f.getEnabledMapFromEnvVar(logger)
 		}
 		return v
 	}
-	if v, ok := f.getEnabledMapFromEnvVar()[key]; ok {
+	if v, ok := f.getEnabledMapFromEnvVar(logger)[key]; ok {
 		return v
 	}
 	if v, ok := f.known[key]; ok {
@@ -139,7 +144,7 @@ func (f *envVarFeatureGates) Set(featureName Feature, featureValue bool) error {
 // getEnabledMapFromEnvVar will fill the enabled map on the first call.
 // This is the only time a known feature can be set to a value
 // read from the corresponding environmental variable.
-func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
+func (f *envVarFeatureGates) getEnabledMapFromEnvVar(logger klog.Logger) map[Feature]bool {
 	f.readEnvVarsOnce.Do(func() {
 		featureGatesState := map[Feature]bool{}
 		for feature, featureSpec := range f.known {
@@ -150,10 +155,10 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 			boolVal, boolErr := strconv.ParseBool(featureState)
 			switch {
 			case boolErr != nil:
-				utilruntime.HandleError(fmt.Errorf("cannot set feature gate %q to %q, due to %v", feature, featureState, boolErr))
+				utilruntime.HandleErrorWithLogger(logger, boolErr, "Could not set feature gate", "feature", feature, "desiredState", featureState)
 			case featureSpec.LockToDefault:
 				if boolVal != featureSpec.Default {
-					utilruntime.HandleError(fmt.Errorf("cannot set feature gate %q to %q, feature is locked to %v", feature, featureState, featureSpec.Default))
+					utilruntime.HandleErrorWithLogger(logger, nil, "Could not set feature gate, feature is locked", "feature", feature, "desiredState", featureState, "lockedState", featureSpec.Default)
 					break
 				}
 				featureGatesState[feature] = featureSpec.Default
@@ -166,10 +171,10 @@ func (f *envVarFeatureGates) getEnabledMapFromEnvVar() map[Feature]bool {
 
 		for feature, featureSpec := range f.known {
 			if featureState, ok := featureGatesState[feature]; ok {
-				klog.V(1).InfoS("Feature gate updated state", "feature", feature, "enabled", featureState)
+				logger.V(1).Info("Feature gate updated state", "feature", feature, "enabled", featureState)
 				continue
 			}
-			klog.V(1).InfoS("Feature gate default state", "feature", feature, "enabled", featureSpec.Default)
+			logger.V(1).Info("Feature gate default state", "feature", feature, "enabled", featureSpec.Default)
 		}
 	})
 	return f.enabledViaEnvVar.Load().(map[Feature]bool)

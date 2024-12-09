@@ -105,7 +105,7 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 //
 // The most frequent usage for Until would be a test where you want to verify exact order of events ("edges").
 func Until(ctx context.Context, initialResourceVersion string, watcherClient cache.Watcher, conditions ...ConditionFunc) (*watch.Event, error) {
-	w, err := NewRetryWatcher(initialResourceVersion, watcherClient)
+	w, err := NewRetryWatcherWithContext(ctx, initialResourceVersion, cache.Watcher2Context(watcherClient))
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.
 func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	if timeout < 0 {
 		// This should be handled in validation
-		klog.Errorf("Timeout for context shall not be negative!")
+		klog.FromContext(parent).Error(nil, "Timeout for context shall not be negative")
 		timeout = 0
 	}
 

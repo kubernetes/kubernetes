@@ -22,10 +22,16 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+
+	"k8s.io/klog/v2"
 )
 
 // Config holds various options for establishing a transport.
 type Config struct {
+	// Logger is an optional logger for log output. If nil, the global
+	// logger is used.
+	Logger *klog.Logger
+
 	// UserAgent is an optional field that specifies the caller of this
 	// request.
 	UserAgent string

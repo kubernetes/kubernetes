@@ -121,6 +121,7 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 
 	var streamer streamProtocolHandler
 
+	logger := klog.FromContext(ctx)
 	switch protocol {
 	case remotecommand.StreamProtocolV5Name:
 		streamer = newStreamProtocolV5(options)
@@ -131,10 +132,10 @@ func (e *spdyStreamExecutor) newConnectionAndStream(ctx context.Context, options
 	case remotecommand.StreamProtocolV2Name:
 		streamer = newStreamProtocolV2(options)
 	case "":
-		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
+		logger.V(4).Info("The server did not negotiate a streaming protocol version, falling back", "protocol", remotecommand.StreamProtocolV1Name)
 		fallthrough
 	case remotecommand.StreamProtocolV1Name:
-		streamer = newStreamProtocolV1(options)
+		streamer = newStreamProtocolV1(logger, options)
 	}
 
 	return conn, streamer, nil

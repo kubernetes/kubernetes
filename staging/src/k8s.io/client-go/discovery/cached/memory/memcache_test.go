@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/rest"
 	testutil "k8s.io/client-go/util/testing"
@@ -47,7 +46,10 @@ type resourceMapEntry struct {
 }
 
 type fakeDiscovery struct {
-	*fake.FakeDiscovery
+	// Intentionally limited to discovery.DiscoveryInterface because that is all that this
+	// code knows about and partly overrides. *fake.FakeDiscovery would inherit
+	// e.g. ServerGroupsWithContext which then would have to be overridden.
+	discovery.DiscoveryInterface
 
 	lock         sync.Mutex
 	groupList    *metav1.APIGroupList

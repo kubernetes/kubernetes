@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -93,7 +94,7 @@ type RESTClient struct {
 	content requestClientContentConfigProvider
 
 	// creates BackoffManager that is passed to requests.
-	createBackoffMgr func() BackoffManager
+	createBackoffMgr func() BackoffManagerWithContext
 
 	// rateLimiter is shared among all requests created by this client unless specifically
 	// overridden.
@@ -101,7 +102,7 @@ type RESTClient struct {
 
 	// warningHandler is shared among all requests created by this client.
 	// If not set, defaultWarningHandler is used.
-	warningHandler WarningHandler
+	warningHandler WarningHandlerWithContext
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
@@ -110,6 +111,16 @@ type RESTClient struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.
 func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+	return NewRESTClientWithLogger(klog.Background(), baseURL, versionedAPIPath, config, rateLimiter, client)
+}
+
+// NewRESTClientWithLogger creates a new RESTClient. This client performs generic REST functions
+// such as Get, Put, Post, and Delete on specified paths.
+//
+// The methods of the RESTClient support contextual logging, i.e. they will look for a logger
+// in the context passed to them. The logger here is only used during construction of the
+// client and its configuration.
+func NewRESTClientWithLogger(logger klog.Logger, baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -120,15 +131,15 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 	return &RESTClient{
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: scrubCBORContentConfigIfDisabled(config)},
+		content:          requestClientContentConfigProvider{logger: logger, base: scrubCBORContentConfigIfDisabled(logger, config)},
 		createBackoffMgr: readExpBackoffConfig,
 		rateLimiter:      rateLimiter,
 		Client:           client,
 	}, nil
 }
 
-func scrubCBORContentConfigIfDisabled(content ClientContentConfig) ClientContentConfig {
-	if clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
+func scrubCBORContentConfigIfDisabled(logger klog.Logger, content ClientContentConfig) ClientContentConfig {
+	if clientfeatures.EnabledWithLogger(logger, clientfeatures.FeatureGates(), clientfeatures.ClientsAllowCBOR) {
 		content.Negotiator = clientNegotiatorWithCBORSequenceStreamDecoder{content.Negotiator}
 		return content
 	}
@@ -178,7 +189,7 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 // readExpBackoffConfig handles the internal logic of determining what the
 // backoff policy is.  By default if no information is available, NoBackoff.
 // TODO Generalize this see #17727 .
-func readExpBackoffConfig() BackoffManager {
+func readExpBackoffConfig() BackoffManagerWithContext {
 	backoffBase := os.Getenv(envBackoffBase)
 	backoffDuration := os.Getenv(envBackoffDuration)
 
@@ -250,7 +261,8 @@ func (c *RESTClient) APIVersion() schema.GroupVersion {
 // locked to true, so this path will be rarely taken. Additionally, all generated clients accessing
 // built-in kube resources are forced to protobuf, so those will not degrade to JSON.
 type requestClientContentConfigProvider struct {
-	base ClientContentConfig
+	logger klog.Logger
+	base   ClientContentConfig
 
 	// Becomes permanently true if a server responds with HTTP 415 (Unsupported Media Type) to a
 	// request with "Content-Type" header containing the CBOR media type.
@@ -267,11 +279,11 @@ func (p *requestClientContentConfigProvider) GetClientContentConfig() (ClientCon
 		config.ContentType = "application/json"
 	}
 
-	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
+	if !clientfeatures.EnabledWithLogger(p.logger, clientfeatures.FeatureGates(), clientfeatures.ClientsAllowCBOR) {
 		return config, defaulted
 	}
 
-	if defaulted && clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsPreferCBOR) {
+	if defaulted && clientfeatures.EnabledWithLogger(p.logger, clientfeatures.FeatureGates(), clientfeatures.ClientsPreferCBOR) {
 		config.ContentType = "application/cbor"
 	}
 
@@ -292,7 +304,7 @@ func (p *requestClientContentConfigProvider) GetClientContentConfig() (ClientCon
 // UnsupportedMediaType reports that the server has responded to a request with HTTP 415 Unsupported
 // Media Type.
 func (p *requestClientContentConfigProvider) UnsupportedMediaType(requestContentType string) {
-	if !clientfeatures.FeatureGates().Enabled(clientfeatures.ClientsAllowCBOR) {
+	if !clientfeatures.EnabledWithLogger(p.logger, clientfeatures.FeatureGates(), clientfeatures.ClientsAllowCBOR) {
 		return
 	}
 

@@ -36,7 +36,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/transport/websocket"
+	"k8s.io/klog/v2"
 )
+
+func init() {
+	klog.InitFlags(nil)
+}
 
 func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 	// Stream channel that will receive streams created on upstream SPDY server.
@@ -54,7 +59,7 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 		require.NoError(t, err)
 		defer conn.Close() //nolint:errcheck
 		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
-		tunnelingConn := NewTunnelingConnection("server", conn)
+		tunnelingConn := NewTunnelingConnectionWithLogger(klog.LoggerWithName(klog.Background(), "server"), conn)
 		spdyConn, err := spdy.NewServerConnection(tunnelingConn, justQueueStream(streamChan))
 		require.NoError(t, err)
 		defer spdyConn.Close() //nolint:errcheck

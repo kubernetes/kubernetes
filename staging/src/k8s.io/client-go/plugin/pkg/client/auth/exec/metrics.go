@@ -105,6 +105,7 @@ func incrementCallsMetric(err error) {
 		metrics.ExecPluginCalls.Increment(failureExitCode, pluginNotFoundError)
 
 	default: // We don't know about this error type.
+		//nolint:logcheck // This looks like debug output which shouldn't occur in practice.
 		klog.V(2).InfoS("unexpected exec plugin return error type", "type", reflect.TypeOf(err).String(), "err", err)
 		metrics.ExecPluginCalls.Increment(failureExitCode, clientInternalError)
 	}

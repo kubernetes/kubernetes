@@ -40,6 +40,7 @@ var CertCallbackRefreshDuration = 5 * time.Minute
 type reloadFunc func(*tls.CertificateRequestInfo) (*tls.Certificate, error)
 
 type dynamicClientCert struct {
+	logger     klog.Logger
 	clientCert *tls.Certificate
 	certMtx    sync.RWMutex
 
@@ -50,8 +51,9 @@ type dynamicClientCert struct {
 	queue workqueue.TypedRateLimitingInterface[string]
 }
 
-func certRotatingDialer(reload reloadFunc, dial utilnet.DialFunc) *dynamicClientCert {
+func certRotatingDialer(logger klog.Logger, reload reloadFunc, dial utilnet.DialFunc) *dynamicClientCert {
 	d := &dynamicClientCert{
+		logger:     logger,
 		reload:     reload,
 		connDialer: connrotation.NewDialer(connrotation.DialFunc(dial)),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -88,7 +90,7 @@ func (c *dynamicClientCert) loadClientCert() (*tls.Certificate, error) {
 		return cert, nil
 	}
 
-	klog.V(1).Infof("certificate rotation detected, shutting down client connections to start using new credentials")
+	c.logger.V(1).Info("Certificate rotation detected, shutting down client connections to start using new credentials")
 	c.connDialer.CloseAll()
 
 	return cert, nil
@@ -137,8 +139,8 @@ func (c *dynamicClientCert) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.V(3).Infof("Starting client certificate rotation controller")
-	defer klog.V(3).Infof("Shutting down client certificate rotation controller")
+	c.logger.V(3).Info("Starting client certificate rotation controller")
+	defer c.logger.V(3).Info("Shutting down client certificate rotation controller")
 
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
