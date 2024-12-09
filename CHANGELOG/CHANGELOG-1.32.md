@@ -1066,17 +1066,6 @@ name | architectures
 
 ## Changelog since v1.31.0
 
-## Urgent Upgrade Notes
-
-### (No, really, you MUST read this before you upgrade)
-
- - ACTION REQUIRED for custom scheduler plugin developers:
-  `PodEligibleToPreemptOthers` in the `preemption` interface gets `ctx` in the parameters.
-  Please change your plugins' implementation accordingly. ([#126465](https://github.com/kubernetes/kubernetes/pull/126465), [@googs1025](https://github.com/googs1025)) [SIG Scheduling]
-  - Changed NodeToStatusMap from map to struct and exposed methods to access the entries. Added absentNodesStatus, which inform what is the status of nodes that are absent in the map. 
-  
-  For developers of out-of-tree PostFilter plugins, make sure to update usage of NodeToStatusMap. Additionally, NodeToStatusMap should be eventually renamed to NodeToStatusReader. ([#126022](https://github.com/kubernetes/kubernetes/pull/126022), [@macsko](https://github.com/macsko)) [SIG Node, Scheduling and Testing]
- 
 ## Changes by Kind
 
 ### Deprecation
@@ -1085,6 +1074,11 @@ name | architectures
 
 ### API Change
 
+- **ACTION REQUIRED** for custom scheduler plugin developers:
+  - `PodEligibleToPreemptOthers` in the `preemption` interface gets `ctx` in the parameters.
+  Please change your plugins' implementation accordingly. ([#126465](https://github.com/kubernetes/kubernetes/pull/126465), [@googs1025](https://github.com/googs1025)) [SIG Scheduling]
+  - Changed NodeToStatusMap from map to struct and exposed methods to access the entries. Added absentNodesStatus, which inform what is the status of nodes that are absent in the map.
+  - For developers of out-of-tree PostFilter plugins, make sure to update usage of NodeToStatusMap. Additionally, NodeToStatusMap should be eventually renamed to NodeToStatusReader. ([#126022](https://github.com/kubernetes/kubernetes/pull/126022), [@macsko](https://github.com/macsko)) [SIG Node, Scheduling and Testing]
 - Allow for Pod search domains to be a single dot "." or contain an underscore "_" ([#127167](https://github.com/kubernetes/kubernetes/pull/127167), [@adrianmoisey](https://github.com/adrianmoisey)) [SIG Apps, Network and Testing]
 - Disallow `k8s.io` and `kubernetes.io` namespaced extra key in structured authentication configuration. ([#126553](https://github.com/kubernetes/kubernetes/pull/126553), [@aramase](https://github.com/aramase)) [SIG Auth]
 - Fix the bug where spec.terminationGracePeriodSeconds of the pod will always be overwritten by the MaxPodGracePeriodSeconds of the soft eviction, you can enable the `AllowOverwriteTerminationGracePeriodSeconds` feature gate, which will restore the previous behavior.  If you do need to set this, please file an issue with the Kubernetes project to help contributors understand why you need it. ([#122890](https://github.com/kubernetes/kubernetes/pull/122890), [@HirazawaUi](https://github.com/HirazawaUi)) [SIG API Machinery, Architecture, Node and Testing]
