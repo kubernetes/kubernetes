@@ -1489,6 +1489,7 @@ func TestDoRequestNewWay(t *testing.T) {
 
 // This test assumes that the client implementation backs off exponentially, for an individual request.
 func TestBackoffLifecycle(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	count := 0
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		count++
@@ -1517,17 +1518,33 @@ func TestBackoffLifecycle(t *testing.T) {
 		)}
 
 	for _, sec := range seconds {
-		thisBackoff := request.backoff.CalculateBackoff(request.URL())
+		thisBackoff := request.backoff.CalculateBackoffWithContext(ctx, request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
 		if thisBackoff != time.Duration(sec)*time.Second {
 			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
 		}
-		now := clock.Now()
-		request.DoRaw(context.Background())
-		elapsed := clock.Since(now)
-		if clock.Since(now) != thisBackoff {
-			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			// This is allowed to fail ("the server was unable to return a response in the time allotted, but may still be processing the request").
+			_, _ = request.DoRaw(ctx)
+		}()
+
+		// Poll until DoRaw is sleeping.
+		for {
+			if clock.HasWaiters() {
+				break
+			}
+			time.Sleep(time.Millisecond)
 		}
+
+		// Fast-forward the fake clock to ensure that DoRaw returns.
+		// This will block and eventually time out if the backoff
+		// is more that thisBackoff. We cannot test anymore that the
+		// backoff isn't less than thisBackoff.
+		clock.Step(thisBackoff)
+		<-done
 	}
 }
 
@@ -1535,14 +1552,14 @@ type testBackoffManager struct {
 	sleeps []time.Duration
 }
 
-func (b *testBackoffManager) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (b *testBackoffManager) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 }
 
-func (b *testBackoffManager) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (b *testBackoffManager) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	return time.Duration(0)
 }
 
-func (b *testBackoffManager) Sleep(d time.Duration) {
+func (b *testBackoffManager) SleepWithContext(ctx context.Context, d time.Duration) {
 	b.sleeps = append(b.sleeps, d)
 }
 
@@ -1568,7 +1585,7 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	expectedSleeps := []time.Duration{0, time.Second, time.Second, time.Second, time.Second}
 
 	c := testRESTClient(t, testServer)
-	c.createBackoffMgr = func() BackoffManager { return backoff }
+	c.createBackoffMgr = func() BackoffManagerWithContext { return backoff }
 	_, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
@@ -2434,6 +2451,7 @@ func TestRequestPreflightCheck(t *testing.T) {
 }
 
 func TestThrottledLogger(t *testing.T) {
+	logger := klog.Background()
 	now := time.Now()
 	oldClock := globalThrottledLogger.clock
 	defer func() {
@@ -2448,7 +2466,7 @@ func TestThrottledLogger(t *testing.T) {
 		wg.Add(10)
 		for j := 0; j < 10; j++ {
 			go func() {
-				if _, ok := globalThrottledLogger.attemptToLog(); ok {
+				if _, ok := globalThrottledLogger.attemptToLog(logger); ok {
 					logMessages++
 				}
 				wg.Done()
@@ -2997,7 +3015,6 @@ const retryTestKey retryTestKeyType = iota
 // metric calls are invoked appropriately in right order.
 type withRateLimiterBackoffManagerAndMetrics struct {
 	flowcontrol.RateLimiter
-	*NoBackoff
 	metrics.ResultMetric
 	calculateBackoffSeq int64
 	calculateBackoffFn  func(i int64) time.Duration
@@ -3013,7 +3030,7 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) Wait(ctx context.Context) err
 	return nil
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.CalculateBackoff")
 
 	waitFor := lb.calculateBackoffFn(lb.calculateBackoffSeq)
@@ -3021,11 +3038,11 @@ func (lb *withRateLimiterBackoffManagerAndMetrics) CalculateBackoff(actualUrl *u
 	return waitFor
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.UpdateBackoff")
 }
 
-func (lb *withRateLimiterBackoffManagerAndMetrics) Sleep(d time.Duration) {
+func (lb *withRateLimiterBackoffManagerAndMetrics) SleepWithContext(ctx context.Context, d time.Duration) {
 	lb.invokeOrderGot = append(lb.invokeOrderGot, "BackoffManager.Sleep")
 	lb.sleepsGot = append(lb.sleepsGot, d.String())
 }
@@ -3206,7 +3223,6 @@ func testRetryWithRateLimiterBackoffAndMetrics(t *testing.T, key string, doFunc 
 		t.Run(test.name, func(t *testing.T) {
 			interceptor := &withRateLimiterBackoffManagerAndMetrics{
 				RateLimiter:        flowcontrol.NewFakeAlwaysRateLimiter(),
-				NoBackoff:          &NoBackoff{},
 				calculateBackoffFn: test.calculateBackoffFn,
 			}
 
@@ -4066,15 +4082,24 @@ func TestRequestLogging(t *testing.T) {
 	testcases := map[string]struct {
 		v              int
 		body           any
+		response       *http.Response
 		expectedOutput string
 	}{
 		"no-output": {
 			v:    7,
 			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 		},
 		"output": {
 			v:    8,
 			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
 <location>] "Response Body" logger="TestLogger" body="pong"
 `,
@@ -4082,6 +4107,10 @@ func TestRequestLogging(t *testing.T) {
 		"io-reader": {
 			v:    8,
 			body: strings.NewReader("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			// Cannot log the request body!
 			expectedOutput: `<location>] "Response Body" logger="TestLogger" body="pong"
 `,
@@ -4089,13 +4118,38 @@ func TestRequestLogging(t *testing.T) {
 		"truncate": {
 			v:    8,
 			body: []byte(strings.Repeat("a", 2000)),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader("pong")),
+			},
 			expectedOutput: fmt.Sprintf(`<location>] "Request Body" logger="TestLogger" body="%s [truncated 976 chars]"
 <location>] "Response Body" logger="TestLogger" body="pong"
 `, strings.Repeat("a", 1024)),
 		},
+		"warnings": {
+			v:    8,
+			body: []byte("ping"),
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Header: http.Header{
+					"Warning": []string{
+						`299 request-test "warning 1"`,
+						`299 request-test-2 "warning 2"`,
+						`300 request-test-3 "ignore code 300"`,
+					},
+				},
+				Body: io.NopCloser(strings.NewReader("pong")),
+			},
+			expectedOutput: `<location>] "Request Body" logger="TestLogger" body="ping"
+<location>] "Response Body" logger="TestLogger" body="pong"
+<location>] "Warning" logger="TestLogger" message="warning 1"
+<location>] "Warning" logger="TestLogger" message="warning 2"
+`,
+		},
 	}
 
 	for name, tc := range testcases {
+		//nolint:logcheck // Intentionally testing with plain klog here.
 		t.Run(name, func(t *testing.T) {
 			state := klog.CaptureState()
 			defer state.Restore()
@@ -4106,12 +4160,10 @@ func TestRequestLogging(t *testing.T) {
 			var fs flag.FlagSet
 			klog.InitFlags(&fs)
 			require.NoError(t, fs.Set("v", fmt.Sprintf("%d", tc.v)), "set verbosity")
+			require.NoError(t, fs.Set("one_output", "true"), "set one_output")
 
 			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
-				return &http.Response{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader("pong")),
-				}, nil
+				return tc.response, nil
 			})
 
 			req := NewRequestWithClient(nil, "", defaultContentConfig(), client).
@@ -4135,4 +4187,40 @@ func TestRequestLogging(t *testing.T) {
 			assert.Equal(t, expectedOutput, actualOutput)
 		})
 	}
+}
+
+func TestRequestWarningHandler(t *testing.T) {
+	t.Run("no-context", func(t *testing.T) {
+		request := &Request{}
+		handler := &fakeWarningHandlerWithLogging{}
+		//nolint:logcheck
+		assert.Equal(t, request, request.WarningHandler(handler))
+		assert.NotNil(t, request.warningHandler)
+		request.warningHandler.HandleWarningHeaderWithContext(context.Background(), 0, "", "message")
+		assert.Equal(t, []string{"message"}, handler.messages)
+	})
+
+	t.Run("with-context", func(t *testing.T) {
+		request := &Request{}
+		handler := &fakeWarningHandlerWithContext{}
+		assert.Equal(t, request, request.WarningHandlerWithContext(handler))
+		assert.Equal(t, request.warningHandler, handler)
+	})
+
+	t.Run("nil-no-context", func(t *testing.T) {
+		request := &Request{
+			warningHandler: &fakeWarningHandlerWithContext{},
+		}
+		//nolint:logcheck
+		assert.Equal(t, request, request.WarningHandler(nil))
+		assert.Nil(t, request.warningHandler)
+	})
+
+	t.Run("nil-with-context", func(t *testing.T) {
+		request := &Request{
+			warningHandler: &fakeWarningHandlerWithContext{},
+		}
+		assert.Equal(t, request, request.WarningHandlerWithContext(nil))
+		assert.Nil(t, request.warningHandler)
+	})
 }
