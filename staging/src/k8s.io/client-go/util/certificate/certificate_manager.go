@@ -203,13 +203,16 @@ type Config struct {
 	// certificate renewal failures.
 	CertificateRenewFailure Counter
 	// Name is an optional string that will be used when writing log output
-	// or returning errors from manager methods. If not set, SignerName will
+	// via logger.WithName or returning errors from manager methods.
+	//
+	// If not set, SignerName will
 	// be used, if SignerName is not set, if Usages includes client auth the
 	// name will be "client auth", otherwise the value will be "server".
 	Name string
-	// Logf is an optional function that log output will be sent to from the
-	// certificate manager. If not set it will use klog.V(2)
-	Logf func(format string, args ...interface{})
+	// Ctx is an optional context. Cancelling it is equivalent to
+	// calling Stop. A logger is extracted from it if non-nil, otherwise
+	// klog.Background().V(2) is used.
+	Ctx *context.Context
 }
 
 // Store is responsible for getting and updating the current certificate.
@@ -278,17 +281,18 @@ type manager struct {
 	cert           *tls.Certificate
 	serverHealth   bool
 
+	// Context and cancel function for background goroutines.
+	ctx    context.Context
+	cancel func(err error)
+
 	// the clientFn must only be accessed under the clientAccessLock
 	clientAccessLock sync.Mutex
 	clientsetFn      ClientsetFunc
-	stopCh           chan struct{}
-	stopped          bool
 
 	// Set to time.Now but can be stubbed out for testing
 	now func() time.Time
 
 	name string
-	logf func(format string, args ...interface{})
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -321,7 +325,6 @@ func NewManager(config *Config) (Manager, error) {
 		getUsages = func(interface{}) []certificates.KeyUsage { return config.Usages }
 	}
 	m := manager{
-		stopCh:                       make(chan struct{}),
 		clientsetFn:                  config.ClientsetFn,
 		getTemplate:                  getTemplate,
 		dynamicTemplate:              config.GetTemplate != nil,
@@ -350,11 +353,26 @@ func NewManager(config *Config) (Manager, error) {
 		}
 	}
 
-	m.name = name
-	m.logf = config.Logf
-	if m.logf == nil {
-		m.logf = func(format string, args ...interface{}) { klog.V(2).Infof(format, args...) }
+	// cancel will be called by Stop, ctx.Done is our stop channel.
+	m.ctx, m.cancel = context.WithCancelCause(context.Background())
+
+	if config.Ctx != nil && (*config.Ctx).Done() != nil {
+		ctx := *config.Ctx
+		// If we have been passed a context and it has a Done channel, then
+		// we need to map it's cancellation to our Done method.
+		go func() {
+			<-ctx.Done()
+			m.Stop()
+		}()
 	}
+
+	m.name = name
+	logger := klog.Background().V(2)
+	if config.Ctx != nil {
+		logger = klog.FromContext(*config.Ctx)
+	}
+	logger = klog.LoggerWithName(logger, m.name)
+	m.ctx = klog.NewContext(m.ctx, logger)
 
 	return &m, nil
 }
@@ -367,7 +385,7 @@ func (m *manager) Current() *tls.Certificate {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 	if m.cert != nil && m.cert.Leaf != nil && m.now().After(m.cert.Leaf.NotAfter) {
-		m.logf("%s: Current certificate is expired", m.name)
+		klog.FromContext(m.ctx).Info("Current certificate is expired")
 		return nil
 	}
 	return m.cert
@@ -385,29 +403,26 @@ func (m *manager) ServerHealthy() bool {
 func (m *manager) Stop() {
 	m.clientAccessLock.Lock()
 	defer m.clientAccessLock.Unlock()
-	if m.stopped {
-		return
-	}
-	close(m.stopCh)
-	m.stopped = true
+	m.cancel(errors.New("asked to stop"))
 }
 
 // Start will start the background work of rotating the certificates.
 func (m *manager) Start() {
+	logger := klog.FromContext(m.ctx)
 	// Certificate rotation depends on access to the API server certificate
 	// signing API, so don't start the certificate manager if we don't have a
 	// client.
 	if m.clientsetFn == nil {
-		m.logf("%s: Certificate rotation is not enabled, no connection to the apiserver", m.name)
+		logger.Info("Certificate rotation is not enabled, no connection to the apiserver")
 		return
 	}
-	m.logf("%s: Certificate rotation is enabled", m.name)
+	logger.Info("Certificate rotation is enabled")
 
 	templateChanged := make(chan struct{})
-	go wait.Until(func() {
-		deadline := m.nextRotationDeadline()
+	go wait.UntilWithContext(m.ctx, func(ctx context.Context) {
+		deadline := m.nextRotationDeadline(ctx)
 		if sleepInterval := deadline.Sub(m.now()); sleepInterval > 0 {
-			m.logf("%s: Waiting %v for next certificate rotation", m.name, sleepInterval)
+			logger.Info("Waiting for next certificate rotation", "delay", sleepInterval)
 
 			timer := time.NewTimer(sleepInterval)
 			defer timer.Stop()
@@ -421,7 +436,7 @@ func (m *manager) Start() {
 					// if the template now matches what we last requested, restart the rotation deadline loop
 					return
 				}
-				m.logf("%s: Certificate template changed, rotating", m.name)
+				logger.Info("Certificate template changed, rotating")
 			}
 		}
 
@@ -436,18 +451,18 @@ func (m *manager) Start() {
 			Jitter:   0.1,
 			Steps:    5,
 		}
-		if err := wait.ExponentialBackoff(backoff, m.rotateCerts); err != nil {
-			utilruntime.HandleError(fmt.Errorf("%s: Reached backoff limit, still unable to rotate certs: %v", m.name, err))
-			wait.PollInfinite(32*time.Second, m.rotateCerts)
+		if err := wait.ExponentialBackoffWithContext(ctx, backoff, m.rotateCerts); err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Reached backoff limit, still unable to rotate certs")
+			wait.PollInfiniteWithContext(ctx, 32*time.Second, m.rotateCerts)
 		}
-	}, time.Second, m.stopCh)
+	}, time.Second)
 
 	if m.dynamicTemplate {
-		go wait.Until(func() {
+		go wait.UntilWithContext(m.ctx, func(ctx context.Context) {
 			// check if the current template matches what we last requested
 			lastRequestCancel, lastRequestTemplate := m.getLastRequest()
 
-			if !m.certSatisfiesTemplate() && !reflect.DeepEqual(lastRequestTemplate, m.getTemplate()) {
+			if !m.certSatisfiesTemplate(ctx) && !reflect.DeepEqual(lastRequestTemplate, m.getTemplate()) {
 				// if the template is different, queue up an interrupt of the rotation deadline loop.
 				// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
 				if lastRequestCancel != nil {
@@ -456,10 +471,10 @@ func (m *manager) Start() {
 				}
 				select {
 				case templateChanged <- struct{}{}:
-				case <-m.stopCh:
+				case <-ctx.Done():
 				}
 			}
-		}, time.Second, m.stopCh)
+		}, time.Second)
 	}
 }
 
@@ -519,7 +534,7 @@ func (m *manager) getClientset() (clientset.Interface, error) {
 // Returns true if it changed the cert, false otherwise. Error is only returned in
 // exceptional cases.
 func (m *manager) RotateCerts() (bool, error) {
-	return m.rotateCerts()
+	return m.rotateCerts(m.ctx)
 }
 
 // rotateCerts attempts to request a client cert from the server, wait a reasonable
@@ -528,8 +543,9 @@ func (m *manager) RotateCerts() (bool, error) {
 // This method also keeps track of "server health" by interpreting the responses it gets
 // from the server on the various calls it makes.
 // TODO: return errors, have callers handle and log them correctly
-func (m *manager) rotateCerts() (bool, error) {
-	m.logf("%s: Rotating certificates", m.name)
+func (m *manager) rotateCerts(ctx context.Context) (bool, error) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Rotating certificates")
 
 	template, csrPEM, keyPEM, privateKey, err := m.generateCSR()
 	if err != nil {
@@ -557,7 +573,7 @@ func (m *manager) rotateCerts() (bool, error) {
 	usages := getUsages(privateKey)
 	// Call the Certificate Signing Request API to get a certificate for the
 	// new private key
-	reqName, reqUID, err := csr.RequestCertificate(clientSet, csrPEM, "", m.signerName, m.requestedCertificateLifetime, usages, privateKey)
+	reqName, reqUID, err := csr.RequestCertificateWithContext(ctx, clientSet, csrPEM, "", m.signerName, m.requestedCertificateLifetime, usages, privateKey)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("%s: Failed while requesting a signed certificate from the control plane: %v", m.name, err))
 		if m.certificateRenewFailure != nil {
@@ -566,7 +582,7 @@ func (m *manager) rotateCerts() (bool, error) {
 		return false, m.updateServerError(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), certificateWaitTimeout)
+	ctx, cancel := context.WithTimeout(ctx, certificateWaitTimeout)
 	defer cancel()
 
 	// Once we've successfully submitted a CSR for this template, record that we did so
@@ -606,14 +622,15 @@ func (m *manager) rotateCerts() (bool, error) {
 // the template will not trigger a renewal.
 //
 // Requires certAccessLock to be locked.
-func (m *manager) certSatisfiesTemplateLocked() bool {
+func (m *manager) certSatisfiesTemplateLocked(ctx context.Context) bool {
+	logger := klog.FromContext(ctx)
 	if m.cert == nil {
 		return false
 	}
 
 	if template := m.getTemplate(); template != nil {
 		if template.Subject.CommonName != m.cert.Leaf.Subject.CommonName {
-			m.logf("%s: Current certificate CN (%s) does not match requested CN (%s)", m.name, m.cert.Leaf.Subject.CommonName, template.Subject.CommonName)
+			logger.Info("Current certificate CN does not match requested CN", "currentName", m.cert.Leaf.Subject.CommonName, "requestedName", template.Subject.CommonName)
 			return false
 		}
 
@@ -621,7 +638,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		desiredDNSNames := sets.NewString(template.DNSNames...)
 		missingDNSNames := desiredDNSNames.Difference(currentDNSNames)
 		if len(missingDNSNames) > 0 {
-			m.logf("%s: Current certificate is missing requested DNS names %v", m.name, missingDNSNames.List())
+			logger.Info("Current certificate is missing requested DNS names", "dnsNames", missingDNSNames.List())
 			return false
 		}
 
@@ -635,7 +652,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		}
 		missingIPs := desiredIPs.Difference(currentIPs)
 		if len(missingIPs) > 0 {
-			m.logf("%s: Current certificate is missing requested IP addresses %v", m.name, missingIPs.List())
+			logger.Info("Current certificate is missing requested IP addresses", "IPs", missingIPs.List())
 			return false
 		}
 
@@ -643,7 +660,7 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 		desiredOrgs := sets.NewString(template.Subject.Organization...)
 		missingOrgs := desiredOrgs.Difference(currentOrgs)
 		if len(missingOrgs) > 0 {
-			m.logf("%s: Current certificate is missing requested orgs %v", m.name, missingOrgs.List())
+			logger.Info("Current certificate is missing requested orgs", "orgs", missingOrgs.List())
 			return false
 		}
 	}
@@ -651,16 +668,16 @@ func (m *manager) certSatisfiesTemplateLocked() bool {
 	return true
 }
 
-func (m *manager) certSatisfiesTemplate() bool {
+func (m *manager) certSatisfiesTemplate(ctx context.Context) bool {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
-	return m.certSatisfiesTemplateLocked()
+	return m.certSatisfiesTemplateLocked(ctx)
 }
 
 // nextRotationDeadline returns a value for the threshold at which the
 // current certificate should be rotated, 80%+/-10% of the expiration of the
 // certificate.
-func (m *manager) nextRotationDeadline() time.Time {
+func (m *manager) nextRotationDeadline(ctx context.Context) time.Time {
 	// forceRotation is not protected by locks
 	if m.forceRotation {
 		m.forceRotation = false
@@ -670,7 +687,7 @@ func (m *manager) nextRotationDeadline() time.Time {
 	m.certAccessLock.RLock()
 	defer m.certAccessLock.RUnlock()
 
-	if !m.certSatisfiesTemplateLocked() {
+	if !m.certSatisfiesTemplateLocked(ctx) {
 		return m.now()
 	}
 
@@ -678,7 +695,7 @@ func (m *manager) nextRotationDeadline() time.Time {
 	totalDuration := float64(notAfter.Sub(m.cert.Leaf.NotBefore))
 	deadline := m.cert.Leaf.NotBefore.Add(jitteryDuration(totalDuration))
 
-	m.logf("%s: Certificate expiration is %v, rotation deadline is %v", m.name, notAfter, deadline)
+	klog.FromContext(ctx).Info("Certificate rotation deadline determined", "expiration", notAfter, "deadline", deadline)
 	return deadline
 }
 
