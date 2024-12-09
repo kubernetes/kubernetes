@@ -24,7 +24,6 @@ import (
 	"k8s.io/component-base/featuregate"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -74,7 +73,7 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 	case csilibplugins.VSphereInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		return pm.featureGate.Enabled(features.InTreePluginPortworxUnregister)
+		return true
 	default:
 		return false
 	}
@@ -100,7 +99,7 @@ func (pm PluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
 	case csilibplugins.VSphereInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		return pm.featureGate.Enabled(features.CSIMigrationPortworx)
+		return true
 	default:
 		return false
 	}
