@@ -37,8 +37,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -2012,6 +2015,331 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 					expectNoDiff(t, "incorrect list pods", tt.expectedOut, out.Items)
 				})
 			}
+		})
+	}
+}
+
+// it wraps the ListErrorAggregator in use by the store in order to observe
+// what parameters are passed to the aggregator by the list operation.
+type FakeListErrorAggregator struct {
+	storage.ListErrorAggregator
+	// keep track of the errors encountered by GetList
+	errs []error
+	keys []string
+}
+
+func (f *FakeListErrorAggregator) Aggregate(key string, err error) bool {
+	f.errs = append(f.errs, err)
+	f.keys = append(f.keys, key)
+	return f.ListErrorAggregator.Aggregate(key, err)
+}
+
+const (
+	// if the following annotation is present, the object will become corrupt
+	CorruptErrKey = "testing.transformer.k8s.io/corrupt-error"
+
+	// if the following annotation is present, TransformFromStorage
+	// will fail with an unexpected non-corrupt error
+	UnexpectedErrKey = "testing.transformer.k8s.io/unexpected-error"
+)
+
+// RunTestGetListWithErrorAggregation tests aggregation of errors while the list operation is in progress
+func RunTestGetListWithErrorAggregation(t *testing.T, newStoreFn func(*testing.T) (context.Context, *FakeListErrorAggregator, InterfaceWithCorruptTransformer)) {
+
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		// number of Pod objects to be created at the beginning of the
+		// test the objects are named as "{foo}-i" where 1 <= i <= n
+		n int
+		// the function decides whether the object represented by the
+		// given i should should become corrupt
+		corrupter func(i int) string
+		verifier  func(*testing.T, *FakeListErrorAggregator, *example.PodList, error)
+	}{
+		{
+			name: "feature disabled, should maintain backward compatibility",
+			// when the feature is disabled, we should maintain
+			// backward compatibility, which is to abort on the first error
+			featureEnabled: false,
+			// objects numbered foo-{2|4|6} will become corrupt
+			// objects numbered foo-{1|3|5|7} will stay pristine
+			n: 7,
+			corrupter: func(i int) string {
+				if i%2 == 0 {
+					return CorruptErrKey
+				}
+				return ""
+			},
+			// expected behavior from GetList: [foo-1: success], [foo-2: err1]
+			//  a) GetList aborts on the first error encountered
+			//  b) foo-1 should be collected into the list
+			verifier: func(t *testing.T, aggr *FakeListErrorAggregator, list *example.PodList, listErr error) {
+				// a) the error returned from GetList should not be wrapped
+				// nolint:errorlint // the aggregator in use should return the error as is
+				intErr, ok := listErr.(storage.InternalError)
+				if !ok {
+					t.Errorf("expected the error to be %T, but got: %#v", storage.InternalError{}, listErr)
+				}
+				if want, got := `unable to transform key "/pods/ns/foo-2"`, intErr.Error(); !strings.HasPrefix(got, want) {
+					t.Errorf("expected the error to start with %q, but got: %v", want, got)
+				}
+				if want, got := 1, len(aggr.errs); want != got {
+					t.Fatalf("expected exactly %d error(s), but got: %d", want, got)
+				}
+				// nolint:errorlint // the aggregator in use should return
+				// the error as is, so the test is asserting with identity.
+				if want, got := listErr, aggr.errs[0]; want != got {
+					t.Errorf("expected the aggregator to return the original error as is: %v, but got: %v", want, got)
+				}
+				// b) retrieval of foo-2 results in an expected error, but
+				// foo-1 should be retrieved prior to that
+				if want, got := 1, len(list.Items); want != got {
+					t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
+				}
+				if want, got := "foo-1", list.Items[0].Name; want != got {
+					t.Errorf("expected an object name of %q, but got: %q", want, got)
+				}
+			},
+		},
+		{
+			name:           "feature enabled, first error is unexpected, no aggregation expected",
+			featureEnabled: true,
+			// objects numbered foo-{2} will have have an unexpected non corrupt error
+			// objects numbered foo-{4|6} will become corrupt
+			// objects numbered foo-{1|3|5|7} will stay pristine
+			n: 7,
+			corrupter: func(i int) string {
+				switch {
+				case i == 2:
+					return UnexpectedErrKey
+				case i%2 == 0:
+					return CorruptErrKey
+				default:
+					return ""
+				}
+			},
+			// expected behavior from GetList:
+			// [foo-1: success], [foo-2: unexpectedErr1]
+			//  a) unexpectedErr1 is returned as is,
+			//  b) foo-1 should be collected into the list
+			verifier: func(t *testing.T, aggr *FakeListErrorAggregator, list *example.PodList, listErr error) {
+				// a) the error returned from GetList should not be wrapped
+				if want, got := 1, len(aggr.errs); want != got {
+					t.Fatalf("expected exactly %d error(s), but got: %d", want, got)
+				}
+				// nolint:errorlint // the aggregator in use should return
+				// the error as is, so the test is asserting with identity.
+				if want, got := listErr, aggr.errs[0]; want != got {
+					t.Errorf("expected the aggregator to return the original error as is: %v, but got: %v", want, got)
+				}
+				// b) foo-1 should be retrieved prior to that
+				if want, got := 1, len(list.Items); want != got {
+					t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
+				}
+				if want, got := "foo-1", list.Items[0].Name; want != got {
+					t.Errorf("expected an object name of %q, but got: %q", want, got)
+				}
+			},
+		},
+		{
+			name:           "feature enabled, should aggregate corrupt object errors",
+			featureEnabled: true,
+			// objects numbered foo-{2|4|6} will become corrupt,\
+			// objects numbered foo-{1|3|5|7} will stay pristine
+			n: 7,
+			corrupter: func(i int) string {
+				if i%2 == 0 {
+					return CorruptErrKey
+				}
+				return ""
+			},
+			// expected behavior from GetList:
+			// [foo-1: success], [foo-2: err1], [foo-3: success],
+			// [foo-4: err2], [foo-5: success], [foo-6: err3], [foo-7: success]
+			//  a) {err1, err2, err3} should be aggregated
+			//  b) foo-{1|3|5|7} should be collected into the list
+			verifier: func(t *testing.T, aggr *FakeListErrorAggregator, list *example.PodList, listErr error) {
+				// the error returned from GetList should be an API status object
+				var statusGot apierrors.APIStatus
+				if !errors.As(listErr, &statusGot) {
+					t.Fatalf("expected an API status error object, but got: %v", listErr)
+				}
+				if details := statusGot.Status().Details; details == nil || len(details.Causes) != 3 {
+					t.Errorf("expected the API status to include the corrupt object errors aggregated, but got: %v", details)
+				}
+				// a) error from transforming the foo-{2|4|6} objects should be aggregated
+				if want, got := 3, len(aggr.errs); want != got {
+					t.Fatalf("expected exactly %d error(s), but got: %d", want, got)
+				}
+				for i := range aggr.errs {
+					if want, got := fmt.Sprintf("unable to transform key %q", aggr.keys[i]), aggr.errs[i].Error(); !strings.HasPrefix(got, want) {
+						t.Errorf("expected the error for key %q to start with %q, but got: %v", aggr.keys[i], want, got)
+					}
+				}
+				// b) foo{1|3|5|7} should be collected into the PodList
+				ids := []string{"1", "3", "5", "7"}
+				if want, got := len(ids), len(list.Items); want != got {
+					t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
+				}
+				for i, id := range ids {
+					if want, got := fmt.Sprintf("foo-%s", id), list.Items[i].Name; want != got {
+						t.Errorf("expected an object name of %q, but got: %q", want, got)
+					}
+				}
+			},
+		},
+		{
+			name:           "feature enabled, aggregation should abort as soon as it encounters a non corrupt error",
+			featureEnabled: true,
+			// objects numbered foo-{4} will have an unexpected non corrupt error,
+			// objects numbered foo-{2|6} will become corrupt,
+			// objects numbered foo-{1|3|5|7} will stay pristine
+			n: 7,
+			corrupter: func(i int) string {
+				switch {
+				case i == 4:
+					return UnexpectedErrKey
+				case i%2 == 0:
+					return CorruptErrKey
+				default:
+					return ""
+				}
+			},
+			// expected behavior from GetList:
+			// [foo-1: success], [foo-2: err1], [foo-3: success], [foo-4: unexpectedErr2]
+			// [foo-5: success], [foo-6: err3], [foo-7: success]
+			//  a) err1 is aggregated, and then unexpectedErr2 from foo-4
+			//  should cause GetList to abort.
+			//  b) foo-{1|3} should be collected into the list
+			verifier: func(t *testing.T, aggr *FakeListErrorAggregator, list *example.PodList, err error) {
+				// the error returned from GetList should be an API status object
+				var statusGot apierrors.APIStatus
+				if !errors.As(err, &statusGot) {
+					t.Fatalf("expected an API status error object, but got: %v", err)
+				}
+				// a) only error from transforming the foo-{2} objects should be aggregated
+				if details := statusGot.Status().Details; details == nil || len(details.Causes) != 1 {
+					t.Errorf("expected the API status to include the corrupt object errors aggregated, but got: %v", details)
+				}
+				// the wrapper agregator should see the unexpected error
+				if want, got := 2, len(aggr.errs); want != got {
+					t.Fatalf("expected exactly %d error(s), but got: %d", want, got)
+				}
+				for i := range aggr.errs[0 : len(aggr.errs)-1] {
+					if want, got := fmt.Sprintf("unable to transform key %q", aggr.keys[i]), aggr.errs[i].Error(); !strings.HasPrefix(got, want) {
+						t.Errorf("expected the error for key %q to start with %q, but got: %v", aggr.keys[i], want, got)
+					}
+				}
+				// b) foo{1|3} should be collected into the PodList
+				ids := []string{"1", "3"}
+				if want, got := len(ids), len(list.Items); want != got {
+					t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
+				}
+				for i, id := range ids {
+					if want, got := fmt.Sprintf("foo-%s", id), list.Items[i].Name; want != got {
+						t.Errorf("expected an object name of %q, but got: %q", want, got)
+					}
+				}
+			},
+		},
+		{
+			name:           "feature enabled, error aggregation should not exceed limit",
+			featureEnabled: true,
+			// aggregation limit is 100
+			// foo-{1, 3, 5 ... 195, 197, 199, ... 207, 209} will stay pristine, total: 105
+			// foo-{2, 4, 6 ... 196, 198, 200, ... 208, 210} will become corrupt, total: 105
+			n: 210,
+			corrupter: func(i int) string {
+				if i%2 == 0 {
+					return CorruptErrKey
+				}
+				return ""
+			},
+			// expected behavior from GetList:
+			// foo-{1, 3, 5 ... 197, 199}: success
+			// foo-{2, 4, 6 ... 198, 200}: {err1, err2, ... err100}
+			//  a) {err1, err2, ... err100, sentinelErr} is aggregated
+			//  b) foo-{1, 3 ... 197, 199} should be collected into the list
+			verifier: func(t *testing.T, aggr *FakeListErrorAggregator, list *example.PodList, err error) {
+				// a) aggregation should stop after the max limit of 100 is reached
+				// and the 101th entry should be the 'too many' sentinel error
+				limit := 100
+				if want, got := limit+1, len(aggr.errs); want != got {
+					t.Fatalf("expected exactly %d error(s), but got: %d", want, got)
+				}
+
+				var statusGot apierrors.APIStatus
+				if !errors.As(err, &statusGot) {
+					t.Fatalf("expected an API status error object, but got: %v", err)
+				}
+				details := statusGot.Status().Details
+				if want := limit + 1; details == nil || len(details.Causes) != want {
+					t.Fatalf("aggregation max limit has exceeded, want %d, but got: %d", want, len(details.Causes))
+				}
+				// the 101th entry should be the sentinel error
+				want := metav1.StatusCause{
+					Type:    metav1.CauseTypeTooMany,
+					Message: "too many errors, the list is truncated",
+				}
+				if got := details.Causes[limit]; !cmp.Equal(want, got) {
+					t.Errorf("expected a sentinel error, diff: %s", cmp.Diff(want, got))
+				}
+				// b) before the limit is hit, foo-{1, 3 ... 197, 199} should be collected into the list
+				if want, got := 100, len(list.Items); want != got {
+					t.Errorf("expected the list to have %d item(s), but got: %d", want, got)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AllowUnsafeMalformedObjectDeletion, test.featureEnabled)
+			ctx, aggregator, store := newStoreFn(t)
+
+			// Step 1: add N objects to the store foo-{1 ... n}
+			for i := 1; i <= test.n; i++ {
+				obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("foo-%d", i),
+					Namespace: "ns",
+				}}
+				// add the annotation that causes the object to become corrupt
+				if key := test.corrupter(i); len(key) > 0 {
+					obj.Annotations = map[string]string{
+						key: "",
+					}
+				}
+				testPropagateStore(ctx, t, store, obj)
+			}
+
+			// step 2: list the N objects, we expect no error
+			out := &example.PodList{}
+			storageOpts := storage.ListOptions{
+				Predicate: storage.Everything,
+				Recursive: true,
+			}
+			err := store.GetList(ctx, "/pods/ns/", storageOpts, out)
+			if err != nil {
+				t.Fatalf("GetList failed with unexpected error: %v", err)
+			}
+			if want, got := test.n, len(out.Items); want != got {
+				t.Errorf("Expected length: %d, but got: %d", want, got)
+			}
+
+			// step 3: change the transformer so certain objects become corrupt
+			revertTransformer := store.CorruptTransformer()
+			defer revertTransformer()
+
+			// step 4: invoke GetList again, this time it will encounter corrupt object(s)
+			out = &example.PodList{}
+			err = store.GetList(ctx, "/pods/ns/", storageOpts, out)
+			if err == nil {
+				t.Fatalf("Expected GetList to return error")
+			}
+
+			// step 5: verify what we expect from GetList
+			test.verifier(t, aggregator, out, err)
 		})
 	}
 }
