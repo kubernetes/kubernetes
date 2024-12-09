@@ -213,11 +213,20 @@ func NewOnAddressesWithContext(ctx context.Context, dialer httpstream.Dialer, ad
 
 // NewOnAddressesForStreaming creates a new PortForwarder with custom listen
 // addresses for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
+//
+//logcheck:context // NewOnAddressesForStreamingWithContext should be used instead of NewOnAddressesForStreaming in code which supports contextual logging.
 func NewOnAddressesForStreaming(dialer streamhttp.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
-	return NewOnAddresses(&compatDialerAdapter{delegate: dialer}, addresses, ports, stopChan, readyChan, out, errOut)
+	return NewOnAddressesForStreamingWithContext(wait.ContextForChannel(stopChan), dialer, addresses, ports, readyChan, out, errOut)
+}
+
+// NewOnAddressesForStreamingWithContext creates a new PortForwarder with custom listen
+// addresses for in-tree callers that use k8s.io/streaming/pkg/httpstream types.
+func NewOnAddressesForStreamingWithContext(ctx context.Context, dialer streamhttp.Dialer, addresses []string, ports []string, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+	return NewOnAddressesWithContext(ctx, &compatDialerAdapter{logger: klog.FromContext(ctx), delegate: dialer}, addresses, ports, readyChan, out, errOut)
 }
 
 type compatDialerAdapter struct {
+	logger   klog.Logger
 	delegate streamhttp.Dialer
 }
 
@@ -267,7 +276,8 @@ func (c *compatConnectionAdapter) RemoveStreams(streams ...httpstream.Stream) {
 			streamingStreams = append(streamingStreams, s)
 			continue
 		}
-		klog.V(5).Infof("dropping unadaptable stream %T in portforward RemoveStreams", stream)
+		//nolint:logcheck // Extending the httpstream.Connection API is not worth it for contextual, structured logging of this.
+		klog.V(5).Info("dropping unadaptable stream in portforward RemoveStreams", "streamType", fmt.Sprintf("%T", stream))
 	}
 	c.delegate.RemoveStreams(streamingStreams...)
 }
