@@ -297,6 +297,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 				case <-ctx.Done():
 					// We were asked to terminate. Exit 0.
 					logger.Info("Requested to terminate, exiting")
+					os.Exit(0)
 				default:
 					// We lost the lock.
 					logger.Error(nil, "Leaderelection lost")
@@ -311,13 +312,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 		leaderElector.Run(ctx)
 
-		// return nil if ctx is done because it means we were asked to terminate.
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			return fmt.Errorf("lost lease")
-		}
+		return fmt.Errorf("lost lease")
 	}
 
 	// Leader election is disabled, so runCommand inline until done.
