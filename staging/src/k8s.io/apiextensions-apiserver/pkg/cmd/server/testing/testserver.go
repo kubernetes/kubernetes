@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
@@ -124,15 +125,15 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	featureGate := utilfeature.DefaultMutableFeatureGate
-
-	// Configure the effective version.
+	// configure the local componentGlobalsRegistry
+	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
-	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	componentGlobalsRegistry := featuregate.NewComponentGlobalsRegistry()
+	utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 
-	featuregate.DefaultComponentGlobalsRegistry.Reset()
-	utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 	s := options.NewCustomResourceDefinitionsServerOptions(os.Stdout, os.Stderr)
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	s.ServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	s.AddFlags(fs)
 
 	s.RecommendedOptions.SecureServing.Listener, s.RecommendedOptions.SecureServing.BindPort, err = createLocalhostListenerOnFreePort()
@@ -155,8 +156,17 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 
 	fs.Parse(customFlags)
 
-	if err := featuregate.DefaultComponentGlobalsRegistry.Set(); err != nil {
+	if err := componentGlobalsRegistry.Set(); err != nil {
 		return result, err
+	}
+	// because most feature checks still use the DefaultFeatureGate, we need to copy the flag settings to the DefaultFeatureGate.
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t.(featuregatetesting.TB), utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	}
+	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
+			featuregatetesting.SetFeatureGateDuringTest(t.(featuregatetesting.TB), utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
+		}
 	}
 
 	if err := s.Complete(); err != nil {
