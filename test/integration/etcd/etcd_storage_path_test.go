@@ -91,7 +91,7 @@ func TestEtcdStoragePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	etcdStorageData := GetEtcdStorageData()
+	etcdStorageData := GetServedEtcdStorageDataForNamespace("etcdstoragepathtestnamespace")
 
 	kindSeen := sets.NewString()
 	pathSeen := map[string][]schema.GroupVersionResource{}
