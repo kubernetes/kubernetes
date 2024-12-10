@@ -215,32 +215,32 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
-	reprievePod := func(pi *framework.PodInfo) (bool, error) {
+	reprievePod := func(pi *framework.PodInfo) error {
 		if err := addPod(pi); err != nil {
-			return false, err
+			return err
 		}
 		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
 		fits := status.IsSuccess()
 		if !fits {
 			if err := removePod(pi); err != nil {
-				return false, err
+				return err
 			}
 			rpi := pi.Pod
 			victims = append(victims, rpi)
 			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", klog.KObj(nodeInfo.Node()))
 		}
-		return fits, nil
+		return nil
 	}
 	for _, p := range violatingVictims {
-		if fits, err := reprievePod(p); err != nil {
+		if err := reprievePod(p); err != nil {
 			return nil, 0, framework.AsStatus(err)
-		} else if !fits {
+		} else {
 			numViolatingVictim++
 		}
 	}
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
-		if _, err := reprievePod(p); err != nil {
+		if err := reprievePod(p); err != nil {
 			return nil, 0, framework.AsStatus(err)
 		}
 	}
