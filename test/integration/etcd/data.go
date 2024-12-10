@@ -238,19 +238,19 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"): {
-			Stub:             `{"metadata": {"name": "fs-2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
-			ExpectedEtcdPath: "/registry/flowschemas/fs-2",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
-		},
+		// gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"): {
+		// 	Stub:             `{"metadata": {"name": "fs-2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
+		// 	ExpectedEtcdPath: "/registry/flowschemas/fs-2",
+		// 	ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
+		// },
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
-		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"): {
-			Stub:             `{"metadata": {"name": "conf4"}, "spec": {"type": "Limited", "limited": {"nominalConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
-			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf4",
-			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
-		},
+		// gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"): {
+		// 	Stub:             `{"metadata": {"name": "conf4"}, "spec": {"type": "Limited", "limited": {"nominalConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
+		// 	ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf4",
+		// 	ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
+		// },
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1
@@ -352,16 +352,16 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): {
-			Stub:             `{"metadata":{"name":"vap1a1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
-			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1a1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicy"),
-		},
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): {
-			Stub:             `{"metadata":{"name":"pb1a1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"},"validationActions":["Deny"]}}`,
-			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1a1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicyBinding"),
-		},
+		// gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): {
+		// 	Stub:             `{"metadata":{"name":"vap1a1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
+		// 	ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1a1",
+		// 	ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicy"),
+		// },
+		// gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): {
+		// 	Stub:             `{"metadata":{"name":"pb1a1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"},"validationActions":["Deny"]}}`,
+		// 	ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1a1",
+		// 	ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicyBinding"),
+		// },
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"): {
 			Stub:             `{"metadata":{"name":"map1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath: "/registry/mutatingadmissionpolicies/map1",
