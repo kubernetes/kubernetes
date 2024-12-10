@@ -27,12 +27,6 @@ package version
 // strange. They are modified on the fly by the build process. The
 // in-tree values are dummy values used for "git archive", which also
 // works for GitHub tar downloads.
-//
-// When releasing a new Kubernetes version, this file is updated by
-// build/mark_new_version.sh to reflect the new version, and then a
-// git annotated tag (using format vX.Y where X == Major version and Y
-// == Minor version) is created to point to the commit that updates
-// component-base/version/base.go
 var (
 	// TODO: Deprecate gitMajor and gitMinor, use only gitVersion
 	// instead. First step in deprecation, keep the fields but make
