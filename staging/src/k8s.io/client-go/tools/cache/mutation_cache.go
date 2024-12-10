@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -61,7 +60,7 @@ type ResourceVersionComparator interface {
 // If includeAdds is true, objects in the mutation cache will be returned even if they don't exist
 // in the underlying store. This is only safe if your use of the cache can handle mutation entries
 // remaining in the cache for up to ttl when mutations and deletes occur very closely in time.
-func NewIntegerResourceVersionMutationCache(ctx context.Context, backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
+func NewIntegerResourceVersionMutationCache(logger klog.Logger, backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
 	return &mutationCache{
 		backingCache:  backingCache,
 		indexer:       indexer,
@@ -69,7 +68,7 @@ func NewIntegerResourceVersionMutationCache(ctx context.Context, backingCache St
 		comparator:    etcdObjectVersioner{},
 		ttl:           ttl,
 		includeAdds:   includeAdds,
-		backgroundCtx: ctx,
+		logger:        logger,
 	}
 }
 
@@ -77,7 +76,7 @@ func NewIntegerResourceVersionMutationCache(ctx context.Context, backingCache St
 // since you can't distinguish between, "didn't observe create" and "was deleted after create",
 // if the key is missing from the backing cache, we always return it as missing
 type mutationCache struct {
-	backgroundCtx context.Context
+	logger        klog.Logger
 	lock          sync.Mutex
 	backingCache  Store
 	indexer       Indexer
@@ -160,7 +159,7 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 			}
 			elements, err := fn(updated)
 			if err != nil {
-				klog.FromContext(c.backgroundCtx).V(4).Info("Unable to calculate an index entry for mutation cache entry", "key", key, "err", err)
+				c.logger.V(4).Info("Unable to calculate an index entry for mutation cache entry", "key", key, "err", err)
 				continue
 			}
 			for _, inIndex := range elements {
@@ -207,7 +206,7 @@ func (c *mutationCache) Mutation(obj interface{}) {
 	key, err := DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		// this is a "nice to have", so failures shouldn't do anything weird
-		utilruntime.HandleErrorWithContext(c.backgroundCtx, err, "DeletionHandlingMetaNamespaceKeyFunc")
+		utilruntime.HandleErrorWithLogr(c.logger, err, "DeletionHandlingMetaNamespaceKeyFunc")
 		return
 	}
 

@@ -364,7 +364,7 @@ func TestSyncHandler(t *testing.T) {
 	for _, tc := range tests {
 		// Run sequentially because of global logging and global metrics.
 		t.Run(tc.name, func(t *testing.T) {
-			tCtx := ktesting.Init(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 			tCtx = ktesting.WithCancel(tCtx)
 
 			var objects []runtime.Object
@@ -390,7 +390,7 @@ func TestSyncHandler(t *testing.T) {
 			claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
 			templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
 
-			ec, err := NewController(tCtx, tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
+			ec, err := NewController(logger, tc.adminAccessEnabled, fakeKubeClient, podInformer, claimInformer, templateInformer)
 			if err != nil {
 				t.Fatalf("error creating ephemeral controller : %v", err)
 			}
@@ -454,7 +454,7 @@ func TestSyncHandler(t *testing.T) {
 }
 
 func TestResourceClaimEventHandler(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	tCtx = ktesting.WithCancel(tCtx)
 
 	fakeKubeClient := createTestClient()
@@ -465,7 +465,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	templateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
 	claimClient := fakeKubeClient.ResourceV1beta1().ResourceClaims(testNamespace)
 
-	_, err := NewController(tCtx, false /* admin access */, fakeKubeClient, podInformer, claimInformer, templateInformer)
+	_, err := NewController(logger, false /* admin access */, fakeKubeClient, podInformer, claimInformer, templateInformer)
 	tCtx.ExpectNoError(err, "creating ephemeral controller")
 
 	informerFactory.Start(tCtx.Done())

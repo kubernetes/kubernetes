@@ -323,7 +323,7 @@ func TestSync(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+			logger, _ := ktesting.NewTestContext(t)
 			crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			for _, obj := range tc.existing {
 				if err := crdIndexer.Add(obj); err != nil {
@@ -333,7 +333,7 @@ func TestSync(t *testing.T) {
 
 			c := NamingConditionController{
 				crdLister:        listers.NewCustomResourceDefinitionLister(crdIndexer),
-				crdMutationCache: cache.NewIntegerResourceVersionMutationCache(ctx, crdIndexer, crdIndexer, 60*time.Second, false),
+				crdMutationCache: cache.NewIntegerResourceVersionMutationCache(logger, crdIndexer, crdIndexer, 60*time.Second, false),
 			}
 			actualNames, actualNameConflictCondition, establishedCondition := c.calculateNamesAndConditions(tc.in)
 
