@@ -43,9 +43,22 @@ func TestValidate(t *testing.T) {
 			minCompatibilityVersion: "v1.31.0",
 		},
 		{
-			name:                    "emulation version two minor lower than binary not ok",
+			name:                    "emulation version two minor lower than binary ok",
 			binaryVersion:           "v1.33.2",
 			emulationVersion:        "v1.31.0",
+			minCompatibilityVersion: "v1.31.0",
+			expectErrors:            false,
+		},
+		{
+			name:                    "emulation version three minor lower than binary ok",
+			binaryVersion:           "v1.35.0",
+			emulationVersion:        "v1.32.0",
+			minCompatibilityVersion: "v1.32.0",
+		},
+		{
+			name:                    "emulation version four minor lower than binary not ok",
+			binaryVersion:           "v1.36.0",
+			emulationVersion:        "v1.32.0",
 			minCompatibilityVersion: "v1.32.0",
 			expectErrors:            true,
 		},
@@ -64,22 +77,36 @@ func TestValidate(t *testing.T) {
 			expectErrors:            true,
 		},
 		{
-			name:                    "compatibility version same as binary not ok",
+			name:                    "compatibility version same as binary ok",
 			binaryVersion:           "v1.32.2",
 			emulationVersion:        "v1.32.0",
 			minCompatibilityVersion: "v1.32.0",
-			expectErrors:            true,
+			expectErrors:            false,
 		},
 		{
-			name:                    "compatibility version two minor lower than binary not ok",
+			name:                    "compatibility version two minor lower than binary ok",
 			binaryVersion:           "v1.32.2",
 			emulationVersion:        "v1.32.0",
 			minCompatibilityVersion: "v1.30.0",
-			expectErrors:            true,
+			expectErrors:            false,
+		},
+		{
+			name:                    "compatibility version three minor lower than binary ok",
+			binaryVersion:           "v1.34.2",
+			emulationVersion:        "v1.33.0",
+			minCompatibilityVersion: "v1.31.0",
+			expectErrors:            false,
 		},
 		{
 			name:                    "compatibility version one minor higher than binary not ok",
 			binaryVersion:           "v1.32.2",
+			emulationVersion:        "v1.32.0",
+			minCompatibilityVersion: "v1.33.0",
+			expectErrors:            true,
+		},
+		{
+			name:                    "emulation version lower than compatibility version not ok",
+			binaryVersion:           "v1.34.2",
 			emulationVersion:        "v1.32.0",
 			minCompatibilityVersion: "v1.33.0",
 			expectErrors:            true,
@@ -101,6 +128,57 @@ func TestValidate(t *testing.T) {
 
 			if len(errs) == 0 && test.expectErrors {
 				t.Errorf("expected errors, no errors found")
+			}
+		})
+	}
+}
+
+func TestValidateKubeEffectiveVersion(t *testing.T) {
+	tests := []struct {
+		name                    string
+		emulationVersion        string
+		minCompatibilityVersion string
+		expectErr               bool
+	}{
+		{
+			name:                    "valid versions",
+			emulationVersion:        "v1.31.0",
+			minCompatibilityVersion: "v1.31.0",
+			expectErr:               false,
+		},
+		{
+			name:                    "emulationVersion too low",
+			emulationVersion:        "v1.30.0",
+			minCompatibilityVersion: "v1.31.0",
+			expectErr:               true,
+		},
+		{
+			name:                    "minCompatibilityVersion too low",
+			emulationVersion:        "v1.31.0",
+			minCompatibilityVersion: "v1.29.0",
+			expectErr:               true,
+		},
+		{
+			name:                    "both versions too low",
+			emulationVersion:        "v1.30.0",
+			minCompatibilityVersion: "v1.30.0",
+			expectErr:               true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			effective := NewEffectiveVersion("1.32")
+			effective.SetEmulationVersion(version.MustParseGeneric(test.emulationVersion))
+			effective.SetMinCompatibilityVersion(version.MustParseGeneric(test.minCompatibilityVersion))
+
+			err := ValidateKubeEffectiveVersion(effective)
+			if test.expectErr && err == nil {
+				t.Error("expected error, but got nil")
+			}
+			if !test.expectErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}
