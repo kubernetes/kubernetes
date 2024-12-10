@@ -194,7 +194,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
-	featureGate := utilfeature.DefaultMutableFeatureGate
+	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	featureGate.AddMetrics()
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
 	if instanceOptions.BinaryVersion != "" {
@@ -203,12 +203,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if instanceOptions.EmulationVersion != "" {
 		effectiveVersion.SetEmulationVersion(version.MustParse(instanceOptions.EmulationVersion))
 	}
-	// need to call SetFeatureGateEmulationVersionDuringTest to reset the feature gate emulation version at the end of the test.
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, featureGate, effectiveVersion.EmulationVersion())
-	featuregate.DefaultComponentGlobalsRegistry.Reset()
-	utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	componentGlobalsRegistry := featuregate.NewComponentGlobalsRegistry()
+	utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	s := options.NewServerRunOptions()
+	s.Options.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	if instanceOptions.RequestTimeout > 0 {
 		s.GenericServerRunOptions.RequestTimeout = instanceOptions.RequestTimeout
 	}
@@ -330,7 +330,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 			return result, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
-		if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
+		if featureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 			// TODO: set up a general clean up for testserver
 			if clientgotransport.DialerStopCh == wait.NeverStop {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
@@ -374,8 +374,17 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		s.Authentication.RequestHeader.ExtraHeaderPrefixes = extraHeaders
 	}
 
-	if err := featuregate.DefaultComponentGlobalsRegistry.Set(); err != nil {
+	if err := componentGlobalsRegistry.Set(); err != nil {
 		return result, err
+	}
+	// because most feature checks still use the DefaultFeatureGate, we need to copy the flag settings to the DefaultFeatureGate.
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	}
+	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
+		}
 	}
 
 	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
