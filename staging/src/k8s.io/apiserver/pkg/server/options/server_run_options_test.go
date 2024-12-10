@@ -34,8 +34,8 @@ import (
 func TestServerRunOptionsValidate(t *testing.T) {
 	testRegistry := featuregate.NewComponentGlobalsRegistry()
 	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
-	effectiveVersion := utilversion.NewEffectiveVersion("1.30")
-	effectiveVersion.SetEmulationVersion(version.MajorMinor(1, 32))
+	effectiveVersion := utilversion.NewEffectiveVersion("1.35")
+	effectiveVersion.SetEmulationVersion(version.MajorMinor(1, 31))
 	testComponent := "test"
 	utilruntime.Must(testRegistry.Register(testComponent, effectiveVersion, featureGate))
 
@@ -197,7 +197,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				ComponentName:               testComponent,
 				ComponentGlobalsRegistry:    testRegistry,
 			},
-			expectErr: "emulation version 1.32 is not between [1.29, 1.30.0]",
+			expectErr: "emulation version 1.31 is not between [1.32, 1.35.0]",
 		},
 		{
 			name: "Test when ServerRunOptions is valid",

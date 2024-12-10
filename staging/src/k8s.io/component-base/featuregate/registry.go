@@ -229,7 +229,7 @@ func (r *componentGlobalsRegistry) unsafeVersionFlagOptions(isEmulation bool) []
 			vs = append(vs, fmt.Sprintf("%s=%s..%s (default=%s)", component,
 				binaryVer.SubtractMinor(0).String(), binaryVer.String(), globals.effectiveVersion.EmulationVersion().String()))
 		} else {
-			if globals.dependentMinCompatibilityVersion {
+			if globals.dependentMinCompatibilityVersion || globals.dependentEmulationVersion {
 				continue
 			}
 			// min compatibility version could be between binaryMajor.{binaryMinor-1} and binaryMajor.{binaryMinor}
