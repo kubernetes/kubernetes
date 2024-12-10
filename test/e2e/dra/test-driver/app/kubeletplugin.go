@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -188,10 +189,16 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 				Basic: &resourceapi.BasicDevice{},
 			}
 		}
-		resources := kubeletplugin.Resources{
-			Devices: devices,
+		driverResources := resourceslice.DriverResources{
+			Pools: map[string]resourceslice.Pool{
+				nodeName: {
+					Slices: []resourceslice.Slice{{
+						Devices: devices,
+					}},
+				},
+			},
 		}
-		if err := ex.d.PublishResources(ctx, resources); err != nil {
+		if err := ex.d.PublishResources(ctx, driverResources); err != nil {
 			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
 		}
 	} else if len(ex.fileOps.Devices) > 0 {
@@ -202,10 +209,16 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 				Basic: &resourceapi.BasicDevice{Attributes: ex.fileOps.Devices[deviceName]},
 			}
 		}
-		resources := kubeletplugin.Resources{
-			Devices: devices,
+		driverResources := resourceslice.DriverResources{
+			Pools: map[string]resourceslice.Pool{
+				nodeName: {
+					Slices: []resourceslice.Slice{{
+						Devices: devices,
+					}},
+				},
+			},
 		}
-		if err := ex.d.PublishResources(ctx, resources); err != nil {
+		if err := ex.d.PublishResources(ctx, driverResources); err != nil {
 			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
 		}
 	}
