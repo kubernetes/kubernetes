@@ -140,7 +140,7 @@ func (cache *checkers) getCheckerInternal(rt reflect.Type, parent *path) (c chec
 	var wg sync.WaitGroup
 	wg.Add(1)
 	defer wg.Done()
-	c = checker{
+	placeholder := checker{
 		safe: func() bool {
 			wg.Wait()
 			return c.safe()
@@ -150,7 +150,7 @@ func (cache *checkers) getCheckerInternal(rt reflect.Type, parent *path) (c chec
 			return c.check(rv, depth)
 		},
 	}
-	if actual, loaded := cache.m.LoadOrStore(rt, &c); loaded {
+	if actual, loaded := cache.m.LoadOrStore(rt, &placeholder); loaded {
 		// Someone else stored an entry for this type, use it.
 		return *actual.(*checker)
 	}
