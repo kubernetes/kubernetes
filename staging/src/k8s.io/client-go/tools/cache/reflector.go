@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -119,6 +120,9 @@ type Reflector struct {
 	//
 	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList *bool
+
+	// metrics tracks basic metric information about the reflector.
+	metrics *reflectorMetrics
 }
 
 func (r *Reflector) Name() string {
@@ -245,6 +249,7 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	}
 	r := &Reflector{
 		name:            options.Name,
+		metrics:         newReflectorMetrics(makeValidPromethusMetricName(fmt.Sprintf("reflector_%s_expectedType_%s", options.Name, reflect.TypeOf(expectedType).String()))),
 		resyncPeriod:    options.ResyncPeriod,
 		minWatchTimeout: minWatchTimeout,
 		typeDescription: options.TypeDescription,
@@ -278,6 +283,28 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	}
 
 	return r
+}
+
+func makeValidPromethusMetricName(in string) string {
+	// Prometheus metric names must match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
+	// The first character must be a letter, underscore, or colon
+	// Subsequent characters can also include numbers
+	var validFirstChar = regexp.MustCompile(`[^a-zA-Z_:]`)
+	var validChar = regexp.MustCompile(`[^a-zA-Z0-9_:]`)
+
+	// Handle empty string case
+	if len(in) == 0 {
+		return "_"
+	}
+
+	// Convert first character
+	first := validFirstChar.ReplaceAllString(in[:1], "_")
+	// Convert rest of the string
+	if len(in) > 1 {
+		rest := validChar.ReplaceAllString(in[1:], "_")
+		return first + rest
+	}
+	return first
 }
 
 func getTypeDescriptionFromObject(expectedType interface{}) string {
@@ -490,6 +517,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 				AllowWatchBookmarks: true,
 			}
 
+			r.metrics.numberOfWatches.Inc()
 			w, err = r.listerWatcher.Watch(options)
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
@@ -506,7 +534,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 		}
 
 		err = handleWatch(ctx, start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
-			r.clock, resyncerrc)
+			r.clock, r.metrics, resyncerrc)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
 		w = nil
@@ -545,6 +573,8 @@ func (r *Reflector) list(ctx context.Context) error {
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
+	r.metrics.numberOfLists.Inc()
+	start := r.clock.Now()
 	initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
 	defer initTrace.LogIfLong(10 * time.Second)
 	var list runtime.Object
@@ -606,6 +636,7 @@ func (r *Reflector) list(ctx context.Context) error {
 		panic(r)
 	case <-listCh:
 	}
+	r.metrics.listDuration.Observe(r.clock.Since(start).Seconds())
 	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 	if err != nil {
 		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
@@ -636,6 +667,7 @@ func (r *Reflector) list(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
+	r.metrics.numberOfItemsInList.Set(float64(len(items)))
 	initTrace.Step("Objects extracted")
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
@@ -726,7 +758,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		}
 		watchListBookmarkReceived, err := handleListWatch(ctx, start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
 			func(rv string) { resourceVersion = rv },
-			r.clock, make(chan error))
+			r.clock, r.metrics, make(chan error))
 		if err != nil {
 			w.Stop() // stop and retry with clean state
 			if errors.Is(err, errorStopRequested) {
@@ -784,11 +816,12 @@ func handleListWatch(
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 ) (bool, error) {
 	exitOnWatchListBookmarkReceived := true
 	return handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, metrics, errCh)
 }
 
 // handleListWatch consumes events from w, updates the Store, and records the
@@ -805,11 +838,12 @@ func handleWatch(
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 ) error {
 	exitOnWatchListBookmarkReceived := false
 	_, err := handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, metrics, errCh)
 	return err
 }
 
@@ -834,6 +868,7 @@ func handleAnyWatch(
 	setLastSyncResourceVersion func(string),
 	exitOnWatchListBookmarkReceived bool,
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 ) (bool, error) {
 	watchListBookmarkReceived := false
@@ -841,6 +876,11 @@ func handleAnyWatch(
 	logger := klog.FromContext(ctx)
 	initialEventsEndBookmarkWarningTicker := newInitialEventsEndBookmarkTicker(logger, name, clock, start, exitOnWatchListBookmarkReceived)
 	defer initialEventsEndBookmarkWarningTicker.Stop()
+
+	defer func() {
+		metrics.numberOfItemsInWatch.Set(float64(eventCount))
+		metrics.watchDuration.Observe(clock.Since(start).Seconds())
+	}()
 
 loop:
 	for {
@@ -919,6 +959,7 @@ loop:
 
 	watchDuration := clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
+		metrics.numberOfShortWatches.Inc()
 		return watchListBookmarkReceived, fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
 	}
 	klog.FromContext(ctx).V(4).Info("Watch close", "reflector", name, "type", expectedTypeName, "totalItems", eventCount)

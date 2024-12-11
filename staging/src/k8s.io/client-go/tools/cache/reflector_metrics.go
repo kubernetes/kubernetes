@@ -40,6 +40,11 @@ type SummaryMetric interface {
 	Observe(float64)
 }
 
+// HistogramMetric counts individual observations.
+type HistogramMetric interface {
+	Observe(float64)
+}
+
 type noopMetric struct{}
 
 func (noopMetric) Inc()            {}
@@ -47,43 +52,91 @@ func (noopMetric) Dec()            {}
 func (noopMetric) Observe(float64) {}
 func (noopMetric) Set(float64)     {}
 
-// MetricsProvider generates various metrics used by the reflector.
-type MetricsProvider interface {
+// reflectorMetrics is a struct that holds the metrics for the reflector.
+type reflectorMetrics struct {
+	numberOfLists       CounterMetric
+	listDuration        HistogramMetric
+	numberOfItemsInList GaugeMetric
+
+	numberOfWatches      CounterMetric
+	numberOfShortWatches CounterMetric
+	watchDuration        HistogramMetric
+	numberOfItemsInWatch GaugeMetric
+}
+
+// ReflectorMetricsProvider generates various metrics used by the reflector.
+type ReflectorMetricsProvider interface {
 	NewListsMetric(name string) CounterMetric
-	NewListDurationMetric(name string) SummaryMetric
-	NewItemsInListMetric(name string) SummaryMetric
+	NewListDurationMetric(name string) HistogramMetric
+	NewItemsInListMetric(name string) GaugeMetric
 
 	NewWatchesMetric(name string) CounterMetric
 	NewShortWatchesMetric(name string) CounterMetric
-	NewWatchDurationMetric(name string) SummaryMetric
-	NewItemsInWatchMetric(name string) SummaryMetric
-
-	NewLastResourceVersionMetric(name string) GaugeMetric
+	NewWatchDurationMetric(name string) HistogramMetric
+	NewItemsInWatchMetric(name string) GaugeMetric
 }
 
-type noopMetricsProvider struct{}
+type noopReflectorMetricsProvider struct{}
 
-func (noopMetricsProvider) NewListsMetric(name string) CounterMetric         { return noopMetric{} }
-func (noopMetricsProvider) NewListDurationMetric(name string) SummaryMetric  { return noopMetric{} }
-func (noopMetricsProvider) NewItemsInListMetric(name string) SummaryMetric   { return noopMetric{} }
-func (noopMetricsProvider) NewWatchesMetric(name string) CounterMetric       { return noopMetric{} }
-func (noopMetricsProvider) NewShortWatchesMetric(name string) CounterMetric  { return noopMetric{} }
-func (noopMetricsProvider) NewWatchDurationMetric(name string) SummaryMetric { return noopMetric{} }
-func (noopMetricsProvider) NewItemsInWatchMetric(name string) SummaryMetric  { return noopMetric{} }
-func (noopMetricsProvider) NewLastResourceVersionMetric(name string) GaugeMetric {
+func (noopReflectorMetricsProvider) NewListsMetric(name string) CounterMetric { return noopMetric{} }
+func (noopReflectorMetricsProvider) NewListDurationMetric(name string) HistogramMetric {
+	return noopMetric{}
+}
+func (noopReflectorMetricsProvider) NewItemsInListMetric(name string) GaugeMetric {
+	return noopMetric{}
+}
+func (noopReflectorMetricsProvider) NewWatchesMetric(name string) CounterMetric { return noopMetric{} }
+func (noopReflectorMetricsProvider) NewShortWatchesMetric(name string) CounterMetric {
+	return noopMetric{}
+}
+func (noopReflectorMetricsProvider) NewWatchDurationMetric(name string) HistogramMetric {
+	return noopMetric{}
+}
+func (noopReflectorMetricsProvider) NewItemsInWatchMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
 
-var metricsFactory = struct {
-	metricsProvider MetricsProvider
+// reflectorMetricsFactory is a struct that holds the metrics provider.
+type reflectorMetricsFactory struct {
+	metricsProvider ReflectorMetricsProvider
 	setProviders    sync.Once
-}{
-	metricsProvider: noopMetricsProvider{},
 }
 
-// SetReflectorMetricsProvider sets the metrics provider
-func SetReflectorMetricsProvider(metricsProvider MetricsProvider) {
+var metricsFactory = &reflectorMetricsFactory{
+	metricsProvider: noopReflectorMetricsProvider{},
+}
+
+func (metricsFactory *reflectorMetricsFactory) setMetricsProvider(metricsProvider ReflectorMetricsProvider) {
 	metricsFactory.setProviders.Do(func() {
 		metricsFactory.metricsProvider = metricsProvider
 	})
+}
+
+func (metricsFactory *reflectorMetricsFactory) getMetricsProvider() ReflectorMetricsProvider {
+	return metricsFactory.metricsProvider
+}
+
+// newReflectorMetrics creates a new reflectorMetrics object with the given name.
+// If the name is empty, it returns a noopMetrics object.
+func newReflectorMetrics(name string) *reflectorMetrics {
+	var ret *reflectorMetrics
+	if name == "" {
+		return ret
+	}
+
+	return &reflectorMetrics{
+		numberOfLists:       metricsFactory.getMetricsProvider().NewListsMetric(name),
+		listDuration:        metricsFactory.getMetricsProvider().NewListDurationMetric(name),
+		numberOfItemsInList: metricsFactory.getMetricsProvider().NewItemsInListMetric(name),
+
+		numberOfWatches:      metricsFactory.getMetricsProvider().NewWatchesMetric(name),
+		numberOfShortWatches: metricsFactory.getMetricsProvider().NewShortWatchesMetric(name),
+		watchDuration:        metricsFactory.getMetricsProvider().NewWatchDurationMetric(name),
+		numberOfItemsInWatch: metricsFactory.getMetricsProvider().NewItemsInWatchMetric(name),
+	}
+}
+
+// SetReflectorMetricsProvider sets the metrics provider
+func SetReflectorMetricsProvider(metricsProvider ReflectorMetricsProvider) {
+	metricsFactory.setMetricsProvider(metricsProvider)
 }
