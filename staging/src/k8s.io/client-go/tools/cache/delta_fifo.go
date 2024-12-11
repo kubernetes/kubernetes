@@ -58,6 +58,15 @@ type DeltaFIFOOptions struct {
 
 	// If set, log output will go to this logger instead of klog.Background().
 	Logger *klog.Logger
+
+	// Identifier is used to identify the DeltaFIFO. Name can be a queue name or
+	// a controller name, and Type represents the type of items in the queue.
+	// Both Name and Type are used to create metrics for the DeltaFIFO.
+	Identifier Identifier
+
+	// If set, metricsProvider will be used to create metrics for the DeltaFIFO.
+	// This allows consumers to provide their own metrics implementation.
+	MetricsProvider FIFOMetricsProvider
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -143,6 +152,10 @@ type DeltaFIFO struct {
 	// logger is a per-instance logger. This gets chosen when constructing
 	// the instance, with klog.Background() as default.
 	logger klog.Logger
+
+	// metrics tracks basic metric information about the DeltaFIFO.
+	// It's used to expose queue length and latency metrics.
+	metrics *fifoMetrics
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
@@ -265,6 +278,11 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 	if opts.Logger != nil {
 		f.logger = *opts.Logger
 	}
+
+	if opts.Identifier.Name != "" && opts.Identifier.Type != "" {
+		f.metrics = newFIFOMetrics(opts.Identifier.Name, opts.Identifier.Type, opts.MetricsProvider)
+	}
+
 	f.cond.L = &f.lock
 	return f
 }
@@ -425,6 +443,13 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 // ignore emitDeltaTypeReplaced.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType DeltaType, obj interface{}) error {
+	defer func() {
+		if f.metrics != nil {
+			f.metrics.numberOfQueuedItem.Set(float64(len(f.queue)))
+			f.metrics.numberOfStoredItem.Set(float64(len(f.items)))
+		}
+	}()
+
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}

@@ -17,11 +17,23 @@ limitations under the License.
 package features
 
 import (
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
 
+const (
+	// owner: @xigang
+	//
+	// Enables the collection of metrics for informers.
+	InformerMetrics featuregate.Feature = "InformerMetrics"
+)
+
 func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
-	return map[featuregate.Feature]featuregate.VersionedSpecs{}
+	return map[featuregate.Feature]featuregate.VersionedSpecs{
+		InformerMetrics: {
+			{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+		},
+	}
 }
 
 // AddFeatureGates adds all feature gates used by this package.

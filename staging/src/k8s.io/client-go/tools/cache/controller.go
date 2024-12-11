@@ -19,13 +19,15 @@ package cache
 import (
 	"context"
 	"errors"
-	clientgofeaturegate "k8s.io/client-go/features"
+	"reflect"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/utils/clock"
 )
 
@@ -368,6 +370,10 @@ func DeletionHandlingObjectToName(obj interface{}) (ObjectName, error) {
 
 // InformerOptions configure a Reflector.
 type InformerOptions struct {
+	// Name is the name of the informer, typically derived from the callsite.
+	// It's used for metrics and logging.
+	Name string
+
 	// ListerWatcher implements List and Watch functions for the source of the resource
 	// the informer will be informing about.
 	ListerWatcher ListerWatcher
@@ -596,6 +602,10 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
 
+	if options.Name == "" {
+		options.Name = naming.GetNameFromCallsite(internalPackages...)
+	}
+
 	var fifo Queue
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		fifo = NewRealFIFO(MetaNamespaceKeyFunc, clientState, options.Transform)
@@ -604,6 +614,7 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 			KnownObjects:          clientState,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           options.Transform,
+			Identifier:            Identifier{Name: options.Name, Type: reflect.TypeOf(options.ObjectType).Elem().String()},
 		})
 	}
 

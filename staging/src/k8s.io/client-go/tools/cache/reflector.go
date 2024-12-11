@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -144,6 +145,9 @@ type Reflector struct {
 	//
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/3157-watch-list#design-details
 	useWatchList bool
+
+	// metrics tracks basic metric information about the reflector.
+	metrics *reflectorMetrics
 }
 
 func (r *Reflector) Name() string {
@@ -247,6 +251,11 @@ type ReflectorOptions struct {
 
 	// Clock allows tests to control time. If unset defaults to clock.RealClock{}
 	Clock clock.Clock
+
+	// MetricsProvider is the metrics provider for the reflector. If unset/unspecified,
+	// the global metrics provider is used. This allows for custom metrics collection
+	// for specific reflector instances.
+	MetricsProvider ReflectorMetricsProvider
 }
 
 // NewReflectorWithOptions creates a new Reflector object which will keep the
@@ -297,6 +306,10 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store R
 	}
 
 	r.useWatchList = clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient)
+
+	if r.metrics == nil {
+		r.metrics = newReflectorMetrics(r.name, reflect.TypeOf(expectedType).Elem().String(), options.MetricsProvider)
+	}
 
 	return r
 }
@@ -520,6 +533,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 				AllowWatchBookmarks: true,
 			}
 
+			r.metrics.numberOfWatches.Inc()
 			w, err = r.listerWatcher.WatchWithContext(ctx, options)
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
@@ -536,7 +550,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 		}
 
 		err = handleWatch(ctx, start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
-			r.clock, resyncerrc)
+			r.clock, r.metrics, resyncerrc)
 		// handleWatch always stops the watcher. So we don't need to here.
 		// Just set it to nil to trigger a retry on the next loop.
 		w = nil
@@ -575,7 +589,9 @@ func (r *Reflector) list(ctx context.Context) error {
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
+	start := r.clock.Now()
 	initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
+	r.metrics.numberOfLists.Inc()
 	defer initTrace.LogIfLong(10 * time.Second)
 	var list runtime.Object
 	var paginatedResult bool
@@ -636,7 +652,9 @@ func (r *Reflector) list(ctx context.Context) error {
 		panic(r)
 	case <-listCh:
 	}
+
 	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
+	r.metrics.listDuration.Observe(r.clock.Since(start).Seconds())
 	if err != nil {
 		return fmt.Errorf("failed to list %v: %w", r.typeDescription, err)
 	}
@@ -666,7 +684,9 @@ func (r *Reflector) list(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
+
 	initTrace.Step("Objects extracted")
+	r.metrics.numberOfItemsInList.Set(float64(len(items)))
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
 	}
@@ -761,7 +781,7 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 		}
 		watchListBookmarkReceived, err := handleListWatch(ctx, start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
 			func(rv string) { resourceVersion = rv },
-			r.clock, make(chan error))
+			r.clock, r.metrics, make(chan error))
 		if err != nil {
 			w.Stop() // stop and retry with clean state
 			if errors.Is(err, errorStopRequested) {
@@ -819,11 +839,12 @@ func handleListWatch(
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 ) (bool, error) {
 	exitOnWatchListBookmarkReceived := true
 	return handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, metrics, errCh)
 }
 
 // handleListWatch consumes events from w, updates the Store, and records the
@@ -840,11 +861,12 @@ func handleWatch(
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 ) error {
 	exitOnWatchListBookmarkReceived := false
 	_, err := handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, metrics, errCh)
 	return err
 }
 
@@ -869,6 +891,7 @@ func handleAnyWatch(
 	setLastSyncResourceVersion func(string),
 	exitOnWatchListBookmarkReceived bool,
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 ) (bool, error) {
 	watchListBookmarkReceived := false
@@ -881,6 +904,11 @@ func handleAnyWatch(
 		if stopWatcher {
 			w.Stop()
 		}
+	}()
+
+	defer func() {
+		metrics.numberOfItemsInWatch.Set(float64(eventCount))
+		metrics.watchDuration.Observe(clock.Since(start).Seconds())
 	}()
 
 loop:
@@ -970,6 +998,7 @@ loop:
 
 	watchDuration := clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
+		metrics.numberOfShortWatches.Inc()
 		return watchListBookmarkReceived, &VeryShortWatchError{Name: name}
 	}
 	klog.FromContext(ctx).V(4).Info("Watch close", "reflector", name, "type", expectedTypeName, "totalItems", eventCount)
@@ -988,6 +1017,15 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 	r.lastSyncResourceVersionMutex.Lock()
 	defer r.lastSyncResourceVersionMutex.Unlock()
 	r.lastSyncResourceVersion = v
+
+	r.setLastSyncResourceVersionMetric(v)
+}
+
+func (r *Reflector) setLastSyncResourceVersionMetric(v string) {
+	rv, err := strconv.Atoi(v)
+	if err == nil {
+		r.metrics.lastResourceVersion.Set(float64(rv))
+	}
 }
 
 // relistResourceVersion determines the resource version the reflector should list or relist from.

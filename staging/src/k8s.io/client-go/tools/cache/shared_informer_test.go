@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -1328,5 +1329,289 @@ func numOccurrences(hay, needle string) int {
 		}
 		count++
 		hay = hay[index+len(needle):]
+	}
+}
+
+// mockInformerMetrics is a test implementation of InformerMetricsProvider
+type mockInformerMetricsProvider struct {
+	mu                   sync.Mutex
+	pendingNotifications map[string]float64
+	ringGrowingSizes     map[string]float64
+	processDurations     map[string][]float64
+}
+
+func newMockInformerMetricsProvider() *mockInformerMetricsProvider {
+	return &mockInformerMetricsProvider{
+		pendingNotifications: make(map[string]float64),
+		ringGrowingSizes:     make(map[string]float64),
+		processDurations:     make(map[string][]float64),
+	}
+}
+
+func (p *mockInformerMetricsProvider) NewPendingNotificationsMetric(informerName, resourceType, handlerName string) GaugeMetric {
+	key := fmt.Sprintf("%s/%s/%s", informerName, resourceType, handlerName)
+	return &mockGaugeMetric{
+		key: key,
+		set: func(val float64) {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			p.pendingNotifications[key] = val
+		},
+	}
+}
+
+func (p *mockInformerMetricsProvider) NewRingGrowingMetric(informerName, resourceType, handlerName string) GaugeMetric {
+	key := fmt.Sprintf("%s/%s/%s", informerName, resourceType, handlerName)
+	return &mockGaugeMetric{
+		key: key,
+		set: func(val float64) {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			p.ringGrowingSizes[key] = val
+		},
+	}
+}
+
+func (p *mockInformerMetricsProvider) NewProcessDurationMetric(informerName, resourceType, handlerName string) HistogramMetric {
+	key := fmt.Sprintf("%s/%s/%s", informerName, resourceType, handlerName)
+	return &mockHistogramMetric{
+		key: key,
+		observe: func(val float64) {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			p.processDurations[key] = append(p.processDurations[key], val)
+		},
+	}
+}
+
+type mockGaugeMetric struct {
+	key string
+	set func(float64)
+}
+
+func (m *mockGaugeMetric) Set(val float64) {
+	m.set(val)
+}
+
+type mockHistogramMetric struct {
+	key     string
+	observe func(float64)
+}
+
+func (m *mockHistogramMetric) Observe(val float64) {
+	m.observe(val)
+}
+
+func TestSharedInformerMetrics(t *testing.T) {
+	source := newFakeControllerSource(t)
+	metrics := newMockInformerMetricsProvider()
+
+	informer := NewSharedIndexInformerWithOptions(
+		source,
+		&v1.Pod{},
+		SharedIndexInformerOptions{
+			Name:            "informer",
+			MetricsProvider: metrics,
+		},
+	)
+
+	fakeEventHandler := ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			time.Sleep(50 * time.Millisecond) // Simulate processing time
+		},
+	}
+	_, err := informer.AddEventHandlerWithOptions(fakeEventHandler, HandlerOptions{Name: "FakeEventHandlerName"})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go informer.RunWithContext(ctx)
+
+	require.Eventually(t, informer.HasSynced, time.Second, 10*time.Millisecond)
+
+	// Add pods to generate metrics
+	numPods := 200
+	for i := 1; i <= numPods; i++ {
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod%d", i)}})
+		// Add a delay every 10 pods to simulate event handler processing lag
+		if i%10 == 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	time.Sleep(6 * time.Second)
+
+	metrics.mu.Lock()
+	defer metrics.mu.Unlock()
+
+	key := fmt.Sprintf("informer/%s/FakeEventHandlerName", reflect.TypeOf(&v1.Pod{}).Elem().String())
+	pendingNotifs := metrics.pendingNotifications[key]
+	if pendingNotifs < 0 {
+		t.Errorf("Expected pending notifications to be >= 0, got %v", pendingNotifs)
+	}
+
+	// Verify ring buffer capacity metrics
+	// The ring buffer is initialized with initialBufferSize=1024 and doubles in size when full.
+	// With 200 pods being added and artificial processing delays (50ms per event + 10ms every 10 pods),
+	// the event handler will lag behind, causing notifications to accumulate in the ring buffer.
+	// This should result in the buffer maintaining at least its initial capacity of 1024,
+	// and potentially growing larger (2048, 4096, etc.) if backpressure occurs.
+	ringSize := metrics.ringGrowingSizes[key]
+	if ringSize < float64(1024) {
+		t.Errorf("Expected ring buffer size to be >= 1024 (initialBufferSize), got %v", ringSize)
+	}
+
+	durations := metrics.processDurations[key]
+	if len(durations) == 0 {
+		t.Error("Expected process durations to be recorded, got none")
+	}
+
+	// Validate that each recorded duration meets our expectations
+	// Since we intentionally added a 50ms sleep in the event handler,
+	// every recorded duration should be at least 0.05 seconds
+	for i, duration := range durations {
+		if duration < 0.05 { // We slept for 50ms
+			t.Errorf("Duration %d: Expected >= 0.05 seconds, got %v", i, duration)
+		}
+	}
+}
+
+func TestSharedInformerMetricsLabel(t *testing.T) {
+	source := newFakeControllerSource(t)
+	metrics := newMockInformerMetricsProvider()
+
+	// Test 1: Create two informers with different names - should create separate metrics
+	informer1 := NewSharedIndexInformerWithOptions(
+		source,
+		&v1.Pod{},
+		SharedIndexInformerOptions{
+			Name:            "pod-informer-1",
+			MetricsProvider: metrics,
+		},
+	)
+
+	informer2 := NewSharedIndexInformerWithOptions(
+		source,
+		&v1.Pod{},
+		SharedIndexInformerOptions{
+			Name:            "pod-informer-2",
+			MetricsProvider: metrics,
+		},
+	)
+
+	handler := ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			time.Sleep(50 * time.Millisecond)
+		},
+	}
+
+	_, err := informer1.AddEventHandlerWithOptions(handler, HandlerOptions{Name: "TestHandler"})
+	require.NoError(t, err)
+	_, err = informer2.AddEventHandlerWithOptions(handler, HandlerOptions{Name: "TestHandler"})
+	require.NoError(t, err)
+
+	// Test 2: Add handlers without specifying Name - should generate default names
+	_, err = informer1.AddEventHandlerWithOptions(handler, HandlerOptions{})
+	require.NoError(t, err)
+	_, err = informer2.AddEventHandlerWithOptions(handler, HandlerOptions{})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go informer1.RunWithContext(ctx)
+	go informer2.RunWithContext(ctx)
+
+	require.Eventually(t, informer1.HasSynced, time.Second, 10*time.Millisecond)
+	require.Eventually(t, informer2.HasSynced, time.Second, 10*time.Millisecond)
+
+	// More than metricsUpdateBatch (100) to trigger metrics
+	numPods := 110
+	for i := 1; i <= numPods; i++ {
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod%d", i)}})
+		if i%10 == 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	time.Sleep(6 * time.Second) // Wait for metricsUpdateInterval (5 seconds) + buffer
+
+	metrics.mu.Lock()
+	defer metrics.mu.Unlock()
+
+	resourceType := reflect.TypeOf(&v1.Pod{}).Elem().String()
+
+	// Test specified handler names
+	key1 := fmt.Sprintf("pod-informer-1/%s/TestHandler", resourceType)
+	key2 := fmt.Sprintf("pod-informer-2/%s/TestHandler", resourceType)
+
+	if _, exists := metrics.pendingNotifications[key1]; !exists {
+		t.Errorf("Expected metrics key %s to exist in pendingNotifications", key1)
+	}
+	if _, exists := metrics.pendingNotifications[key2]; !exists {
+		t.Errorf("Expected metrics key %s to exist in pendingNotifications", key2)
+	}
+
+	// Test default handler names (should be generated automatically)
+	expectedDefaultHandlerName1 := generateDefaultHandlerName("pod-informer-1", resourceType, handler)
+	expectedDefaultHandlerName2 := generateDefaultHandlerName("pod-informer-2", resourceType, handler)
+
+	expectedDefaultKey1 := fmt.Sprintf("pod-informer-1/%s/%s", resourceType, expectedDefaultHandlerName1)
+	expectedDefaultKey2 := fmt.Sprintf("pod-informer-2/%s/%s", resourceType, expectedDefaultHandlerName2)
+
+	defaultKey1Found := false
+	defaultKey2Found := false
+	var allKeys []string
+
+	for key := range metrics.pendingNotifications {
+		allKeys = append(allKeys, key)
+		if key == expectedDefaultKey1 {
+			defaultKey1Found = true
+		}
+		if key == expectedDefaultKey2 {
+			defaultKey2Found = true
+		}
+	}
+
+	if !defaultKey1Found {
+		t.Errorf("Expected to find metrics key %s in pendingNotifications, but found: %v", expectedDefaultKey1, allKeys)
+	}
+	if !defaultKey2Found {
+		t.Errorf("Expected to find metrics key %s in pendingNotifications, but found: %v", expectedDefaultKey2, allKeys)
+	}
+
+	// Also verify process durations contain the expected keys
+	defaultKey1FoundInDurations := false
+	defaultKey2FoundInDurations := false
+
+	for key := range metrics.processDurations {
+		if key == expectedDefaultKey1 {
+			defaultKey1FoundInDurations = true
+		}
+		if key == expectedDefaultKey2 {
+			defaultKey2FoundInDurations = true
+		}
+	}
+
+	if !defaultKey1FoundInDurations {
+		var durationKeys []string
+		for key := range metrics.processDurations {
+			durationKeys = append(durationKeys, key)
+		}
+		t.Errorf("Expected to find metrics key %s in processDurations, but found: %v", expectedDefaultKey1, durationKeys)
+	}
+	if !defaultKey2FoundInDurations {
+		var durationKeys []string
+		for key := range metrics.processDurations {
+			durationKeys = append(durationKeys, key)
+		}
+		t.Errorf("Expected to find metrics key %s in processDurations, but found: %v", expectedDefaultKey2, durationKeys)
+	}
+
+	if _, exists := metrics.processDurations[key1]; !exists {
+		t.Errorf("Expected metrics key %s to exist in processDurations", key1)
+	}
+	if _, exists := metrics.processDurations[key2]; !exists {
+		t.Errorf("Expected metrics key %s to exist in processDurations", key2)
 	}
 }
