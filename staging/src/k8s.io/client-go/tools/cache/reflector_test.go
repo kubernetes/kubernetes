@@ -55,6 +55,8 @@ import (
 
 var nevererrc chan error
 
+var testMetrics = newReflectorMetrics("reflector_test", "pod", globalReflectorMetricsProvider)
+
 func TestCloseWatchChannelOnError(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	r := NewReflector(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
@@ -231,7 +233,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -264,7 +266,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -290,7 +292,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	}
 	// Simulate the result channel being closed by the producer before handleWatch is called.
 	close(resultCh)
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -321,7 +323,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -351,7 +353,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		// Stop means that the consumer is done reading events.
 		// So let handleWatch call fw.Stop, after the Context is cancelled.
 	}()
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 
 	mkPod := func(id string, rv string) *v1.Pod {
@@ -394,7 +396,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
 	cancel(errors.New("don't run"))
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 }
 
@@ -778,6 +780,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 				}
 				r := &Reflector{
 					name:              "test-reflector",
+					metrics:           testMetrics,
 					listerWatcher:     lw,
 					store:             NewFIFO(MetaNamespaceKeyFunc),
 					backoffManager:    bm,
@@ -839,6 +842,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -880,6 +884,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -955,6 +960,7 @@ func TestRetryInternalError(t *testing.T) {
 
 		r := &Reflector{
 			name:              "test-reflector",
+			metrics:           testMetrics,
 			listerWatcher:     lw,
 			store:             NewFIFO(MetaNamespaceKeyFunc),
 			backoffManager:    bm,

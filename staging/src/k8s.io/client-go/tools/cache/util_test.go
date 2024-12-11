@@ -21,6 +21,9 @@ import (
 	"sync"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	fcache "k8s.io/client-go/tools/cache/testing"
 )
 
@@ -46,4 +49,82 @@ func (b *threadSafeBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buffer.String()
+}
+
+func TestGetObjectTypeName(t *testing.T) {
+	tests := []struct {
+		name     string
+		obj      runtime.Object
+		expected string
+	}{
+		{
+			name: "Unstructured with group",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+				},
+			},
+			expected: "apps_v1_Deployment",
+		},
+		{
+			name: "Unstructured without group",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+				},
+			},
+			expected: "v1_Pod",
+		},
+		{
+			name: "PartialObjectMetadata with group",
+			obj: &metav1.PartialObjectMetadata{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+				},
+			},
+			expected: "apps_v1_Deployment",
+		},
+		{
+			name: "PartialObjectMetadata without group",
+			obj: &metav1.PartialObjectMetadata{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+			},
+			expected: "v1_Pod",
+		},
+		{
+			name: "Regular runtime.Object Pod",
+			obj: &metav1.PartialObjectMetadata{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+			},
+			expected: "v1_Pod",
+		},
+		{
+			name: "Regular runtime.Object Deployment",
+			obj: &metav1.PartialObjectMetadata{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+				},
+			},
+			expected: "apps_v1_Deployment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getObjectTypeName(tt.obj)
+			if got != tt.expected {
+				t.Errorf("getObjectTypeName() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
 }
