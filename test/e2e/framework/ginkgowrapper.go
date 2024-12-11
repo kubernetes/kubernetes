@@ -41,11 +41,6 @@ type Feature string
 // "Linux" or "Windows".
 type Environment string
 
-// NodeFeature is the name of a feature that a node must support. To be
-// removed, see
-// https://github.com/kubernetes/enhancements/tree/master/keps/sig-testing/3041-node-conformance-and-features#nodefeature.
-type NodeFeature string
-
 type Valid[T comparable] struct {
 	items  sets.Set[T]
 	frozen bool
@@ -76,14 +71,13 @@ func (v *Valid[T]) Freeze() {
 	v.frozen = true
 }
 
-// These variables contain the parameters that [WithFeature], [WithEnvironment]
-// and [WithNodeFeatures] accept. The framework itself has no pre-defined
+// These variables contain the parameters that [WithFeature] and [WithEnvironment] accept.
+// The framework itself has no pre-defined
 // constants. Test suites and tests may define their own and then add them here
 // before calling these With functions.
 var (
 	ValidFeatures     Valid[Feature]
 	ValidEnvironments Valid[Environment]
-	ValidNodeFeatures Valid[NodeFeature]
 )
 
 var errInterface = reflect.TypeOf((*error)(nil)).Elem()
@@ -419,28 +413,6 @@ func withEnvironment(name Environment) interface{} {
 		RecordBug(NewBug(fmt.Sprintf("WithEnvironment: unknown environment %q", name), 2))
 	}
 	return newLabel("Environment", string(name))
-}
-
-// WithNodeFeature specifies that a certain test or group of tests only works
-// if the node supports a certain feature. The return value must be passed as
-// additional argument to [framework.It], [framework.Describe],
-// [framework.Context].
-//
-// The environment must be listed in ValidNodeFeatures.
-func WithNodeFeature(name NodeFeature) interface{} {
-	return withNodeFeature(name)
-}
-
-// WithNodeFeature is a shorthand for the corresponding package function.
-func (f *Framework) WithNodeFeature(name NodeFeature) interface{} {
-	return withNodeFeature(name)
-}
-
-func withNodeFeature(name NodeFeature) interface{} {
-	if !ValidNodeFeatures.items.Has(name) {
-		RecordBug(NewBug(fmt.Sprintf("WithNodeFeature: unknown environment %q", name), 2))
-	}
-	return newLabel("NodeFeature", string(name))
 }
 
 // WithConformace specifies that a certain test or group of tests must pass in
