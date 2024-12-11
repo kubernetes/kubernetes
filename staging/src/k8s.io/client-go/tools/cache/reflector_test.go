@@ -52,6 +52,8 @@ import (
 
 var nevererrc chan error
 
+var testMetrics = newReflectorMetrics(makeValidPromethusMetricName("reflector_test"))
+
 func TestCloseWatchChannelOnError(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	r := NewReflector(&ListWatch{}, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), 0)
@@ -228,7 +230,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -265,7 +267,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -294,7 +296,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	}
 	// Simulate the result channel being closed by the producer before handleWatch is called.
 	close(resultCh)
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -328,7 +330,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -363,7 +365,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	// TODO(karlkfi): Fix FakeWatcher to avoid race condition between watcher.Stop() & close(stopCh)
 	if err != nil && !errors.Is(err, errorStopRequested) {
 		t.Errorf("unexpected error %v", err)
@@ -409,7 +411,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
 	cancel(errors.New("don't run"))
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, testMetrics, nevererrc)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
@@ -637,6 +639,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 				}
 				r := &Reflector{
 					name:              "test-reflector",
+					metrics:           testMetrics,
 					listerWatcher:     lw,
 					store:             NewFIFO(MetaNamespaceKeyFunc),
 					backoffManager:    bm,
@@ -698,6 +701,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -739,6 +743,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 
 	r := &Reflector{
 		name:              "test-reflector",
+		metrics:           testMetrics,
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
 		backoffManager:    bm,
@@ -814,6 +819,7 @@ func TestRetryInternalError(t *testing.T) {
 
 		r := &Reflector{
 			name:              "test-reflector",
+			metrics:           testMetrics,
 			listerWatcher:     lw,
 			store:             NewFIFO(MetaNamespaceKeyFunc),
 			backoffManager:    bm,
@@ -2102,6 +2108,64 @@ func BenchmarkReflectorList(b *testing.B) {
 				}
 			}
 			b.StopTimer()
+		})
+	}
+}
+
+func TestMakeValidPromethusMetricName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "valid input",
+			input:    "abc_123",
+			expected: "abc_123",
+		},
+		{
+			name:     "invalid first char",
+			input:    "123abc",
+			expected: "_23abc",
+		},
+		{
+			name:     "special chars",
+			input:    "test/path.with-special@chars",
+			expected: "test_path_with_special_chars",
+		},
+		{
+			name:     "single char input",
+			input:    "@",
+			expected: "_",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "_",
+		},
+		{
+			name:     "colons allowed",
+			input:    "namespace:name",
+			expected: "namespace:name",
+		},
+		{
+			name:     "spaces",
+			input:    "metric name with spaces",
+			expected: "metric_name_with_spaces",
+		},
+		{
+			name:     "type names",
+			input:    "*v1.Pod",
+			expected: "_v1_Pod",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := makeValidPromethusMetricName(tt.input)
+			if result != tt.expected {
+				t.Errorf("makeValidPromethusMetricName(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
 		})
 	}
 }
