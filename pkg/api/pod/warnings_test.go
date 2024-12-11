@@ -1520,6 +1520,21 @@ func TestWarnings(t *testing.T) {
 				`spec.containers[1].ports[1]: duplicate port definition with spec.containers[1].ports[0]`,
 			},
 		},
+		{
+			name: "dubious IP address formats",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Nameservers: []string{"1.2.3.4", "05.06.07.08"},
+				},
+				HostAliases: []api.HostAlias{
+					{IP: "::ffff:1.2.3.4"},
+				},
+			}},
+			expected: []string{
+				`spec.dnsConfig.nameservers[1]: non-standard IP address "05.06.07.08" will be considered invalid in a future Kubernetes release: use "5.6.7.8"`,
+				`spec.hostAliases[0].ip: non-standard IP address "::ffff:1.2.3.4" will be considered invalid in a future Kubernetes release: use "1.2.3.4"`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
