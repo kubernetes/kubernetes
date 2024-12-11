@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -93,7 +94,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		})
 	})
 
-	f.It("should provide podname as non-root with fsgroup [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
+	f.It("should provide podname as non-root with fsgroup [LinuxOnly]", nodefeature.FSGroup, feature.FSGroup, func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
@@ -108,7 +109,7 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		})
 	})
 
-	f.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly]", nodefeature.FSGroup, func(ctx context.Context) {
+	f.It("should provide podname as non-root with fsgroup and defaultMode [LinuxOnly]", nodefeature.FSGroup, feature.FSGroup, func(ctx context.Context) {
 		// Windows does not support RunAsUser / FSGroup SecurityContext options, and it does not support setting file permissions.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podName := "metadata-volume-" + string(uuid.NewUUID())
