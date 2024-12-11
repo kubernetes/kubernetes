@@ -61,6 +61,8 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	informermetrics "k8s.io/component-base/metrics/prometheus/informer"
+	reflectormetrics "k8s.io/component-base/metrics/prometheus/reflector"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
@@ -668,6 +670,11 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	}
 
 	controllersmetrics.Register()
+	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.InformerMetrics) {
+		informermetrics.Register()
+		reflectormetrics.Register()
+	}
+
 	return controllerContext, nil
 }
 
