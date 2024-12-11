@@ -22,99 +22,130 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// We are deprecating this.
+// These features will be kept around for a short period so we can switch over test-infra to use WithFeature.
 var (
 	// Please keep the list in alphabetical order.
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	CheckpointContainer = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CheckpointContainer"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	CriticalPod = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("CriticalPod"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	DeviceManager = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DeviceManager"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	DevicePlugin = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DevicePlugin"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	DownwardAPIHugePages = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DownwardAPIHugePages"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// not used anywhere
 	DynamicResourceAllocation = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DynamicResourceAllocation"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	Eviction = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("Eviction"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	FSGroup = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("FSGroup"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	GarbageCollect = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GarbageCollect"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	GracefulNodeShutdown = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GracefulNodeShutdown"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	GracefulNodeShutdownBasedOnPodPriority = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GracefulNodeShutdownBasedOnPodPriority"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	HostAccess = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("HostAccess"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	ImageID = framework.WithNodeFeature(framework.ValidNodeFeatures.Add(" ImageID"))
 
 	// ImageVolume is used for testing the image volume source feature (https://kep.k8s.io/4639).
+	// converted
 	ImageVolume = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ImageVolume"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	KubeletConfigDropInDir = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletConfigDropInDir"))
 
 	// KubeletSeparateDiskGC (SIG-node, used for testing separate image filesystem <https://kep.k8s.io/4191>)
 	// The tests need separate disk settings on nodes and separate filesystems in storage.conf
+	// converted
 	KubeletSeparateDiskGC = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("KubeletSeparateDiskGC"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	LSCIQuotaMonitoring = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("LSCIQuotaMonitoring"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	NodeAllocatable = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeAllocatable"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	NodeProblemDetector = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeProblemDetector"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	OOMScoreAdj = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("OOMScoreAdj"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	PodResources = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("PodResources"))
 
 	// ResourceHealthStatus (SIG-node, resource health Status for device plugins and DRA <https://kep.k8s.io/4680>)
+	// converted
 	ResourceHealthStatus = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceHealthStatus"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	ProcMountType = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ProcMountType"))
 
 	// RecursiveReadOnlyMounts (SIG-node, used for testing recursive read-only mounts <https://kep.k8s.io/3857>)
+	// converted
 	RecursiveReadOnlyMounts = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RecursiveReadOnlyMounts"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	ResourceMetrics = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("ResourceMetrics"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// converted
 	RuntimeHandler = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("RuntimeHandler"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Converted
 	SidecarContainers = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SidecarContainers"))
 
 	// Added to test Swap Feature
 	// This label should be used when testing KEP-2400 (Node Swap Support)
+	// Converted
 	Swap = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("NodeSwap"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Converted
 	SystemNodeCriticalPod = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("SystemNodeCriticalPod"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Converted
 	UserNamespacesSupport = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("UserNamespacesSupport"))
 	// Please keep the list in alphabetical order.
 )

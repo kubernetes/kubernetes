@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -130,7 +131,7 @@ func getCheckpointContainerErrorMetric(ctx context.Context, f *framework.Framewo
 	return 0, nil
 }
 
-var _ = SIGDescribe("Checkpoint Container", nodefeature.CheckpointContainer, func() {
+var _ = SIGDescribe("Checkpoint Container", nodefeature.CheckpointContainer, feature.CheckpointContainer, func() {
 	f := framework.NewDefaultFramework("checkpoint-container-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	ginkgo.It("will checkpoint a container out of a pod", func(ctx context.Context) {

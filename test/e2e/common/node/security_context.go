@@ -541,7 +541,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("should run the container as privileged when true [LinuxOnly]", nodefeature.HostAccess, func(ctx context.Context) {
+		f.It("should run the container as privileged when true [LinuxOnly]", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
 			podName := createAndWaitUserPod(ctx, true)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
