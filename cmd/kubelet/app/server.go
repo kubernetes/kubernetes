@@ -263,17 +263,17 @@ is checked every 20 seconds (also configurable with a flag).`,
 				KubeletConfiguration: *kubeletConfig,
 			}
 
-			if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-				if cleanFlagSet != nil {
-					namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
-					kubeletServer.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
-				}
-			}
-
 			// use kubeletServer to construct the default KubeletDeps
 			kubeletDeps, err := UnsecuredDependencies(kubeletServer, utilfeature.DefaultFeatureGate)
 			if err != nil {
 				return fmt.Errorf("failed to construct kubelet dependencies: %w", err)
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+				if cleanFlagSet != nil {
+					namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
+					kubeletDeps.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
+				}
 			}
 
 			if err := checkPermissions(); err != nil {
@@ -1342,8 +1342,7 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.RegisterSchedulable,
 		kubeServer.NodeLabels,
 		kubeServer.NodeStatusMaxImages,
-		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault,
-		kubeServer.Flagz)
+		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault)
 	if err != nil {
 		return nil, err
 	}

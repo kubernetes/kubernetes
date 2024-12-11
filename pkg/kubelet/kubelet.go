@@ -291,6 +291,7 @@ type Dependencies struct {
 	Options []Option
 
 	// Injected Dependencies
+	Flagz                     flagz.Reader
 	Auth                      server.AuthInterface
 	CAdvisorInterface         cadvisor.Interface
 	Cloud                     cloudprovider.Interface
@@ -411,7 +412,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	nodeStatusMaxImages int32,
 	seccompDefault bool,
-	flagz flagz.Reader,
 ) (*Kubelet, error) {
 	ctx := context.Background()
 	logger := klog.TODO()
@@ -616,7 +616,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
 		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
-		flagz:                          flagz,
+		flagz:                          kubeDeps.Flagz,
 	}
 
 	if klet.cloud != nil {
