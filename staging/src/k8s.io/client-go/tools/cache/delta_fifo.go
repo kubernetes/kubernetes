@@ -55,6 +55,9 @@ type DeltaFIFOOptions struct {
 	// If set, will be called for objects before enqueueing them. Please
 	// see the comment on TransformFunc for details.
 	Transformer TransformFunc
+
+	// metrics tracks basic metric information about the informer.
+	Metrics *informerMetrics
 }
 
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
@@ -136,6 +139,9 @@ type DeltaFIFO struct {
 
 	// Called with every object if non-nil.
 	transformer TransformFunc
+
+	// metrics tracks basic metric information about the informer.
+	metrics *informerMetrics
 }
 
 // TransformFunc allows for transforming an object before it will be processed.
@@ -253,6 +259,7 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 
 		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
 		transformer:           opts.Transformer,
+		metrics:               opts.Metrics,
 	}
 	f.cond.L = &f.lock
 	return f
@@ -446,6 +453,11 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 // ignore emitDeltaTypeReplaced.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionInternalLocked(actionType, internalActionType DeltaType, obj interface{}) error {
+	defer func() {
+		f.metrics.numberOfQueuedItem.Set(float64(len(f.queue)))
+		f.metrics.numberOfStoredItem.Set(float64(len(f.items)))
+	}()
+
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
