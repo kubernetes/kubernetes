@@ -573,6 +573,7 @@ func TestAuthzCoverage(t *testing.T) {
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()

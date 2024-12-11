@@ -35,6 +35,8 @@ var (
 	errUnsupportedMediaType = fmt.Errorf("media type not acceptable, must be: text/plain")
 )
 
+const DefaultStatuszPath = "/statusz"
+
 const (
 	headerFmt = `
 %s statusz
@@ -73,7 +75,7 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 		klog.Errorf("error while parsing gotemplates: %v", err)
 		return
 	}
-	m.Handle("/statusz", handleStatusz(componentName, dataTmpl, reg))
+	m.Handle(DefaultStatuszPath, handleStatusz(componentName, dataTmpl, reg))
 }
 
 func initializeTemplates() (*template.Template, error) {
