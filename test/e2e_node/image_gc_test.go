@@ -26,6 +26,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -41,7 +42,7 @@ const (
 	checkGCFreq  time.Duration = 30 * time.Second
 )
 
-var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), framework.WithNodeFeature("GarbageCollect"), func() {
+var _ = SIGDescribe("ImageGarbageCollect", framework.WithSerial(), feature.GarbageCollect, func() {
 	f := framework.NewDefaultFramework("image-garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var is internalapi.ImageManagerService
