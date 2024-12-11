@@ -28,10 +28,9 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 )
 
-var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), nodefeature.KubeletConfigDropInDir, feature.KubeletConfigDropInDir, func() {
+var _ = SIGDescribe("Kubelet Config", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.KubeletConfigDropInDir, func() {
 	f := framework.NewDefaultFramework("kubelet-config-drop-in-dir-test")
 	ginkgo.Context("when merging drop-in configs", func() {
 		var oldcfg *kubeletconfig.KubeletConfiguration

@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 )
 
 // Helper for makeCPUManagerPod().
@@ -710,7 +709,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		runSMTAlignmentPositiveTests(ctx, f, smtLevel)
 	})
 
-	f.It("should not reuse CPUs of restartable init containers", nodefeature.SidecarContainers, feature.SidecarContainers, func(ctx context.Context) {
+	f.It("should not reuse CPUs of restartable init containers", feature.SidecarContainers, func(ctx context.Context) {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
 
 		// Skip rest of the tests if CPU capacity < 3.

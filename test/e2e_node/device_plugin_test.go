@@ -54,7 +54,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 )
 
 var (
@@ -63,7 +62,7 @@ var (
 )
 
 // Serial because the test restarts Kubelet
-var _ = SIGDescribe("Device Plugin", nodefeature.DevicePlugin, framework.WithSerial(), feature.DevicePlugin, func() {
+var _ = SIGDescribe("Device Plugin", framework.WithSerial(), feature.DevicePlugin, func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
@@ -694,7 +693,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 		})
 
-		f.It("Can schedule a pod with a restartable init container", nodefeature.SidecarContainers, feature.SidecarContainers, func(ctx context.Context) {
+		f.It("Can schedule a pod with a restartable init container", feature.SidecarContainers, func(ctx context.Context) {
 			podRECMD := "devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s"
 			sleepOneSecond := "1s"
 			rl := v1.ResourceList{v1.ResourceName(SampleDeviceResourceName): *resource.NewQuantity(1, resource.DecimalSI)}

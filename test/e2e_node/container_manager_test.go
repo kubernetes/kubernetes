@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -102,7 +101,7 @@ func dumpRunningContainer(ctx context.Context) error {
 var _ = SIGDescribe("Container Manager Misc", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	f.Describe("Validate OOM score adjustments", nodefeature.OOMScoreAdj, feature.OOMScoreAdj, func() {
+	f.Describe("Validate OOM score adjustments", feature.OOMScoreAdj, func() {
 		ginkgo.Context("once the node is setup", func() {
 			ginkgo.It("container runtime's oom-score-adj should be -999", func(ctx context.Context) {
 				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
