@@ -2,13 +2,15 @@
 
 reviewers:
   - gjtempleton
-  - mwielgus
+  - raywainman
 approvers:
-  - mwielgus
+  - gjtempleton
+  - raywainman
 emeritus_approvers:
   - jszczepkowski
   - piosz
   - MaciekPytel
   - josephburnett
+  - mwielgus
 labels:
   - sig/autoscaling
