@@ -47,3 +47,61 @@ func (b *threadSafeBuffer) String() string {
 	defer b.mu.Unlock()
 	return b.buffer.String()
 }
+
+func TestMakeValidPromethusMetricName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "valid input",
+			input:    "abc_123",
+			expected: "abc_123",
+		},
+		{
+			name:     "invalid first char",
+			input:    "123abc",
+			expected: "_23abc",
+		},
+		{
+			name:     "special chars",
+			input:    "test/path.with-special@chars",
+			expected: "test_path_with_special_chars",
+		},
+		{
+			name:     "single char input",
+			input:    "@",
+			expected: "_",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "_",
+		},
+		{
+			name:     "colons allowed",
+			input:    "namespace:name",
+			expected: "namespace:name",
+		},
+		{
+			name:     "spaces",
+			input:    "metric name with spaces",
+			expected: "metric_name_with_spaces",
+		},
+		{
+			name:     "type names",
+			input:    "*v1.Pod",
+			expected: "_v1_Pod",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := makeValidPromethusMetricName(tt.input)
+			if result != tt.expected {
+				t.Errorf("makeValidPromethusMetricName(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
