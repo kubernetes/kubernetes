@@ -175,3 +175,45 @@ func testStoreIndexers() *cache.Indexers {
 	indexers["by_val"] = testStoreIndexFunc
 	return &indexers
 }
+
+func TestStoreSnapshotter(t *testing.T) {
+	cache := newStoreSnapshotter(10)
+	cache.Set(20, fakeOrderedLister{})
+	cache.Set(30, fakeOrderedLister{})
+	cache.Set(40, fakeOrderedLister{})
+	assert.Len(t, cache.snapshots, 3)
+	assert.Equal(t, 3, cache.revisions.Len())
+	_, rv := cache.FindEqualOrLower(19)
+	assert.Equal(t, uint64(0), rv)
+	_, rv = cache.FindEqualOrLower(20)
+	assert.Equal(t, 20, int(rv))
+	_, rv = cache.FindEqualOrLower(21)
+	assert.Equal(t, 20, int(rv))
+	_, rv = cache.FindEqualOrLower(32)
+	assert.Equal(t, 30, int(rv))
+	_, rv = cache.FindEqualOrLower(43)
+	assert.Equal(t, 40, int(rv))
+
+	cache.Clean(20)
+	assert.Len(t, cache.snapshots, 2)
+	assert.Equal(t, 2, cache.revisions.Len())
+	_, rv = cache.FindEqualOrLower(21)
+	assert.Equal(t, uint64(0), rv)
+
+	cache.Clean(40)
+	assert.Empty(t, cache.snapshots)
+	assert.Empty(t, cache.revisions.Len())
+	_, rv = cache.FindEqualOrLower(43)
+	assert.Equal(t, uint64(0), rv)
+}
+
+type fakeOrderedLister struct{}
+
+func (f fakeOrderedLister) Add(obj interface{}) error    { return nil }
+func (f fakeOrderedLister) Update(obj interface{}) error { return nil }
+func (f fakeOrderedLister) Delete(obj interface{}) error { return nil }
+func (f fakeOrderedLister) Clone() mutableOrderedStore   { return f }
+func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string, limit int) ([]interface{}, bool) {
+	return nil, false
+}
+func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }
