@@ -18,10 +18,13 @@ package cache
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/utils/clock"
@@ -579,6 +582,12 @@ func processDeltas(
 //   - clientState is the store you want to populate
 //   - options contain the options to configure the controller
 func newInformer(clientState Store, options InformerOptions) Controller {
+	informerName := naming.GetNameFromCallsite(internalPackages...)
+	informerName = makeValidPromethusMetricName(fmt.Sprintf("informer_%s_type_%s_%d",
+		informerName,
+		fmt.Sprintf("%T", options.ObjectType),
+		rand.Intn(1000000)))
+
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
@@ -586,6 +595,7 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		KnownObjects:          clientState,
 		EmitDeltaTypeReplaced: true,
 		Transformer:           options.Transform,
+		Metrics:               newInformerMetrics(informerName),
 	})
 
 	cfg := &Config{

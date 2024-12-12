@@ -19,11 +19,13 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache/synctrack"
@@ -268,7 +270,15 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 
+	informerName := naming.GetNameFromCallsite(internalPackages...)
+	informerName = makeValidPromethusMetricName(fmt.Sprintf("informer_%s_type_%s_%d",
+		informerName,
+		fmt.Sprintf("%T", exampleObject),
+		rand.Intn(1000000)))
+
 	return &sharedIndexInformer{
+		name:                            informerName,
+		metrics:                         newInformerMetrics(informerName),
 		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
 		listerWatcher:                   lw,
@@ -356,6 +366,8 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 // sharedProcessor, which is responsible for relaying those
 // notifications to each of the informer's clients.
 type sharedIndexInformer struct {
+	name string
+
 	indexer    Indexer
 	controller Controller
 
@@ -392,6 +404,9 @@ type sharedIndexInformer struct {
 	watchErrorHandler WatchErrorHandler
 
 	transform TransformFunc
+
+	// metrics tracks basic metric information about the informer.
+	metrics *informerMetrics
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -472,6 +487,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 			KnownObjects:          s.indexer,
 			EmitDeltaTypeReplaced: true,
 			Transformer:           s.transform,
+			Metrics:               s.metrics,
 		})
 
 		cfg := &Config{
@@ -606,7 +622,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 		}
 	}
 
-	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
+	listener := newProcessListener(s.name, handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSynced)
 
 	if !s.started {
 		return s.processor.addListener(listener), nil
@@ -867,6 +883,8 @@ func (p *sharedProcessor) resyncCheckPeriodChanged(resyncCheckPeriod time.Durati
 // processorListener also keeps track of the adjusted requested resync
 // period of the listener.
 type processorListener struct {
+	name string
+
 	nextCh chan interface{}
 	addCh  chan interface{}
 
@@ -902,6 +920,9 @@ type processorListener struct {
 	nextResync time.Time
 	// resyncLock guards access to resyncPeriod and nextResync
 	resyncLock sync.Mutex
+
+	// metrics tracks basic metric information about the listener.
+	metrics *eventHandlerMetrics
 }
 
 // HasSynced returns true if the source informer has synced, and all
@@ -910,8 +931,20 @@ func (p *processorListener) HasSynced() bool {
 	return p.syncTracker.HasSynced()
 }
 
-func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced func() bool) *processorListener {
+func newProcessListener(name string, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced func() bool) *processorListener {
+	listenerName := makeValidPromethusMetricName(fmt.Sprintf("listener_%s_%s_%d",
+		name,
+		fmt.Sprintf("%T", handler),
+		rand.Intn(1000000)))
+
+	metrics := &eventHandlerMetrics{
+		numberOfPendingNotifications: sharedInformerMetricsFactory.getMetricsProvider().NewPendingNotificationsTotalMetric(listenerName),
+		sizeOfRingGrowing:            sharedInformerMetricsFactory.getMetricsProvider().NewRingGrowingCapacityMetric(listenerName),
+		processDuration:              sharedInformerMetricsFactory.getMetricsProvider().NewEventProcessingDurationMetric(listenerName),
+	}
+
 	ret := &processorListener{
+		name:                  listenerName,
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		handler:               handler,
@@ -919,6 +952,7 @@ func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, res
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
+		metrics:               metrics,
 	}
 
 	ret.determineNextResync(now)
@@ -971,6 +1005,7 @@ func (p *processorListener) run() {
 	stopCh := make(chan struct{})
 	wait.Until(func() {
 		for next := range p.nextCh {
+			startTime := time.Now()
 			switch notification := next.(type) {
 			case updateNotification:
 				p.handler.OnUpdate(notification.oldObj, notification.newObj)
@@ -984,6 +1019,10 @@ func (p *processorListener) run() {
 			default:
 				utilruntime.HandleError(fmt.Errorf("unrecognized notification: %T", next))
 			}
+			p.metrics.processDuration.Observe(time.Since(startTime).Seconds())
+			//TODO: This requires implementing Len() and Capacity() for ring growing
+			// p.metrics.numberOfPendingNotifications.Set(float64(p.pendingNotifications.Len()))
+			// p.metrics.sizeOfRingGrowing.Set(float64(p.pendingNotifications.Capacity()))
 		}
 		// the only way to get here is if the p.nextCh is empty and closed
 		close(stopCh)

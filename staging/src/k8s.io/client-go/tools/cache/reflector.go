@@ -119,6 +119,9 @@ type Reflector struct {
 	//
 	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList *bool
+
+	// metrics tracks basic metric information about the reflector.
+	metrics *reflectorMetrics
 }
 
 func (r *Reflector) Name() string {
@@ -232,7 +235,9 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 		minWatchTimeout = options.MinWatchTimeout
 	}
 	r := &Reflector{
-		name:            options.Name,
+		name: options.Name,
+		// we need this to be unique per process (some names are still the same)but obvious who it belongs to
+		metrics:         newReflectorMetrics(makeValidPromethusMetricName(fmt.Sprintf("reflector_"+options.Name+"_expectedType_"+reflect.TypeOf(expectedType).String()+"_%07d", rand.Intn(1000000)))),
 		resyncPeriod:    options.ResyncPeriod,
 		minWatchTimeout: minWatchTimeout,
 		typeDescription: options.TypeDescription,
@@ -266,6 +271,11 @@ func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store S
 	}
 
 	return r
+}
+
+func makeValidPromethusMetricName(in string) string {
+	// this isn't perfect, but it removes our common characters
+	return strings.NewReplacer("/", "_", ".", "_", "-", "_").Replace(in)
 }
 
 func getTypeDescriptionFromObject(expectedType interface{}) string {
@@ -448,6 +458,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 				AllowWatchBookmarks: true,
 			}
 
+			r.metrics.numberOfWatches.Inc()
 			w, err = r.listerWatcher.Watch(options)
 			if err != nil {
 				if canRetry := isWatchErrorRetriable(err); canRetry {
@@ -464,7 +475,7 @@ func (r *Reflector) watch(w watch.Interface, stopCh <-chan struct{}, resyncerrc 
 		}
 
 		err = handleWatch(start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
-			r.clock, resyncerrc, stopCh)
+			r.clock, r.metrics, resyncerrc, stopCh)
 		// Ensure that watch will not be reused across iterations.
 		w.Stop()
 		w = nil
@@ -503,6 +514,8 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
+	r.metrics.numberOfLists.Inc()
+	start := r.clock.Now()
 	initTrace := trace.New("Reflector ListAndWatch", trace.Field{Key: "name", Value: r.name})
 	defer initTrace.LogIfLong(10 * time.Second)
 	var list runtime.Object
@@ -564,6 +577,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 		panic(r)
 	case <-listCh:
 	}
+	r.metrics.listDuration.Observe(r.clock.Since(start).Seconds())
 	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 	if err != nil {
 		klog.Warningf("%s: failed to list %v: %v", r.name, r.typeDescription, err)
@@ -595,6 +609,7 @@ func (r *Reflector) list(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("unable to understand list result %#v (%v)", list, err)
 	}
+	r.metrics.numberOfItemsInList.Set(float64(len(items)))
 	initTrace.Step("Objects extracted")
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("unable to sync list result: %v", err)
@@ -683,7 +698,7 @@ func (r *Reflector) watchList(stopCh <-chan struct{}) (watch.Interface, error) {
 		}
 		watchListBookmarkReceived, err := handleListWatch(start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
 			func(rv string) { resourceVersion = rv },
-			r.clock, make(chan error), stopCh)
+			r.clock, r.metrics, make(chan error), stopCh)
 		if err != nil {
 			w.Stop() // stop and retry with clean state
 			if errors.Is(err, errorStopRequested) {
@@ -740,12 +755,13 @@ func handleListWatch(
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 	stopCh <-chan struct{},
 ) (bool, error) {
 	exitOnWatchListBookmarkReceived := true
 	return handleAnyWatch(start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh, stopCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, metrics, errCh, stopCh)
 }
 
 // handleListWatch consumes events from w, updates the Store, and records the
@@ -761,12 +777,13 @@ func handleWatch(
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 	stopCh <-chan struct{},
 ) error {
 	exitOnWatchListBookmarkReceived := false
 	_, err := handleAnyWatch(start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh, stopCh)
+		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, metrics, errCh, stopCh)
 	return err
 }
 
@@ -789,6 +806,7 @@ func handleAnyWatch(start time.Time,
 	setLastSyncResourceVersion func(string),
 	exitOnWatchListBookmarkReceived bool,
 	clock clock.Clock,
+	metrics *reflectorMetrics,
 	errCh chan error,
 	stopCh <-chan struct{},
 ) (bool, error) {
@@ -796,6 +814,11 @@ func handleAnyWatch(start time.Time,
 	eventCount := 0
 	initialEventsEndBookmarkWarningTicker := newInitialEventsEndBookmarkTicker(name, clock, start, exitOnWatchListBookmarkReceived)
 	defer initialEventsEndBookmarkWarningTicker.Stop()
+
+	defer func() {
+		metrics.numberOfItemsInWatch.Set(float64(eventCount))
+		metrics.watchDuration.Observe(clock.Since(start).Seconds())
+	}()
 
 loop:
 	for {
@@ -874,6 +897,7 @@ loop:
 
 	watchDuration := clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
+		metrics.numberOfShortWatches.Inc()
 		return watchListBookmarkReceived, fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
 	}
 	klog.V(4).Infof("%s: Watch close - %v total %v items received", name, expectedTypeName, eventCount)
