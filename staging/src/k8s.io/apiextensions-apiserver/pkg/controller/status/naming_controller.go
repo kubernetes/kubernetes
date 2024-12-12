@@ -62,9 +62,11 @@ type NamingConditionController struct {
 }
 
 func NewNamingConditionController(
+	ctx context.Context,
 	crdInformer informers.CustomResourceDefinitionInformer,
 	crdClient client.CustomResourceDefinitionsGetter,
 ) *NamingConditionController {
+	logger := klog.FromContext(ctx)
 	c := &NamingConditionController{
 		crdClient: crdClient,
 		crdLister: crdInformer.Lister(),
@@ -76,13 +78,17 @@ func NewNamingConditionController(
 	}
 
 	informerIndexer := crdInformer.Informer().GetIndexer()
-	c.crdMutationCache = cache.NewIntegerResourceVersionMutationCache(informerIndexer, informerIndexer, 60*time.Second, false)
+	c.crdMutationCache = cache.NewIntegerResourceVersionMutationCache(logger, informerIndexer, informerIndexer, 60*time.Second, false)
 
-	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	crdInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc:    c.addCustomResourceDefinition,
 		UpdateFunc: c.updateCustomResourceDefinition,
 		DeleteFunc: c.deleteCustomResourceDefinition,
-	})
+	},
+		cache.HandlerOptions{
+			Logger: &logger,
+		},
+	)
 
 	c.syncFn = c.sync
 
