@@ -43,7 +43,6 @@ import (
 
 	// define and freeze constants
 	_ "k8s.io/kubernetes/test/e2e/feature"
-	_ "k8s.io/kubernetes/test/e2e/nodefeature"
 
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
