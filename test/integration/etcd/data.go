@@ -272,6 +272,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			ExpectedEtcdPath:  "/registry/networkpolicies/" + namespace + "/np2",
 			IntroducedVersion: "1.7",
 		},
+		gvr("networking.k8s.io", "v1", "ipaddresses"): {
+			Stub:             `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath: "/registry/ipaddresses/192.168.2.3",
+		},
+		gvr("networking.k8s.io", "v1", "servicecidrs"): {
+			Stub:             `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
+			ExpectedEtcdPath: "/registry/servicecidrs/range-b2",
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/networking/v1beta1
