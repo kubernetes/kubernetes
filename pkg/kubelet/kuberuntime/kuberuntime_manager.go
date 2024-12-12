@@ -1120,6 +1120,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(ctx, pod, podStatus)
 	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
+	klog.V(3).InfoS("kenneth kiang was here.")
 	if podContainerChanges.CreateSandbox {
 		ref, err := ref.GetReference(legacyscheme.Scheme, pod)
 		if err != nil {

@@ -144,6 +144,10 @@ func (fk *fakeKubelet) CheckpointContainer(_ context.Context, podUID types.UID, 
 	return nil
 }
 
+func (fk *fakeKubelet) GetCheckpoint(podFullName, containerName string) ([]byte, error) {
+	return nil, nil
+}
+
 func (fk *fakeKubelet) ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error) {
 	return nil, nil
 }
