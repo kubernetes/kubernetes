@@ -222,7 +222,7 @@ func checkErr(err error, handleErr func(string, int)) {
 
 func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 	errs := make([]error, 0, len(scs))
-	errorMsgs := sets.NewString()
+	errorMsgs := sets.New[string]()
 	for _, sc := range scs {
 		// check for duplicate error messages and skip them
 		msg := fmt.Sprintf("%s: %s", sc.Field, sc.Message)

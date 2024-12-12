@@ -188,7 +188,7 @@ func (flags *EventsFlags) ToOptions() (*EventsOptions, error) {
 	}
 
 	if len(o.FilterTypes) > 0 {
-		o.FilterTypes = sets.NewString(o.FilterTypes...).List()
+		o.FilterTypes = sets.List(sets.New[string](o.FilterTypes...))
 	}
 
 	var printer printers.ResourcePrinter

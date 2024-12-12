@@ -193,7 +193,7 @@ func (o *DescribeOptions) Run() error {
 		allErrs = append(allErrs, err)
 	}
 
-	errs := sets.NewString()
+	errs := sets.New[string]()
 	first := true
 	for _, info := range infos {
 		mapping := info.ResourceMapping()
