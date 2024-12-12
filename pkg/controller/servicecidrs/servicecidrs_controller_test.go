@@ -24,7 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
-	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingapiv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -44,12 +44,12 @@ type testController struct {
 	ipaddressesStore  cache.Store
 }
 
-func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1beta1.ServiceCIDR, ips []*networkingapiv1beta1.IPAddress) (*fake.Clientset, *testController) {
+func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1.ServiceCIDR, ips []*networkingapiv1.IPAddress) (*fake.Clientset, *testController) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
-	serviceCIDRInformer := informerFactory.Networking().V1beta1().ServiceCIDRs()
+	serviceCIDRInformer := informerFactory.Networking().V1().ServiceCIDRs()
 	cidrStore := serviceCIDRInformer.Informer().GetStore()
 	for _, obj := range cidrs {
 		err := cidrStore.Add(obj)
@@ -57,7 +57,7 @@ func newController(ctx context.Context, t *testing.T, cidrs []*networkingapiv1be
 			t.Fatal(err)
 		}
 	}
-	ipAddressInformer := informerFactory.Networking().V1beta1().IPAddresses()
+	ipAddressInformer := informerFactory.Networking().V1().IPAddresses()
 	ipStore := ipAddressInformer.Informer().GetStore()
 	for _, obj := range ips {
 		err := ipStore.Add(obj)
@@ -97,8 +97,8 @@ func TestControllerSync(t *testing.T) {
 
 	testCases := []struct {
 		name       string
-		cidrs      []*networkingapiv1beta1.ServiceCIDR
-		ips        []*networkingapiv1beta1.IPAddress
+		cidrs      []*networkingapiv1.ServiceCIDR
+		ips        []*networkingapiv1.IPAddress
 		cidrSynced string
 		actions    [][]string // verb and resource and subresource
 	}{
@@ -107,7 +107,7 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "default service CIDR must have finalizer",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			},
 			cidrSynced: defaultservicecidr.DefaultServiceCIDRName,
@@ -115,7 +115,7 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR must have finalizer",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR("no-finalizer", "192.168.0.0/24", "2001:db2::/64"),
 			},
 			cidrSynced: "no-finalizer",
@@ -123,7 +123,7 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted must remove the finalizer",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -131,7 +131,7 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted but within the grace period must be requeued not remove the finalizer", // TODO: assert is actually requeued
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletingServiceCIDR,
 			},
 			cidrSynced: deletingServiceCIDR.Name,
@@ -139,10 +139,10 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted with IPv4 addresses should update the status",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -150,11 +150,11 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted and overlapping same range and IPv4 addresses should remove the finalizer",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -162,11 +162,11 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted and overlapping and IPv4 addresses should remove the finalizer",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -174,11 +174,11 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted and not overlapping and IPv4 addresses should update the status",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.255.0/26", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -186,10 +186,10 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted with IPv6 addresses should update the status",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -197,11 +197,11 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted and overlapping same range and IPv6 addresses should remove the finalizer",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -209,11 +209,11 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted and overlapping and IPv6 addresses should remove the finalizer",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/48"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -221,11 +221,11 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			name: "service CIDR being deleted and not overlapping and IPv6 addresses should update the status",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				deletedServiceCIDR,
 				makeServiceCIDR("overlapping", "192.168.255.0/26", "2001:db2:a:b::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("2001:db2::1"),
 			},
 			cidrSynced: deletedServiceCIDR.Name,
@@ -247,12 +247,12 @@ func TestControllerSync(t *testing.T) {
 	}
 }
 
-func makeServiceCIDR(name, primary, secondary string) *networkingapiv1beta1.ServiceCIDR {
-	serviceCIDR := &networkingapiv1beta1.ServiceCIDR{
+func makeServiceCIDR(name, primary, secondary string) *networkingapiv1.ServiceCIDR {
+	serviceCIDR := &networkingapiv1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: networkingapiv1beta1.ServiceCIDRSpec{},
+		Spec: networkingapiv1.ServiceCIDRSpec{},
 	}
 	serviceCIDR.Spec.CIDRs = append(serviceCIDR.Spec.CIDRs, primary)
 	if secondary != "" {
@@ -261,17 +261,17 @@ func makeServiceCIDR(name, primary, secondary string) *networkingapiv1beta1.Serv
 	return serviceCIDR
 }
 
-func makeIPAddress(name string) *networkingapiv1beta1.IPAddress {
+func makeIPAddress(name string) *networkingapiv1.IPAddress {
 	family := string(v1.IPv4Protocol)
 	if netutils.IsIPv6String(name) {
 		family = string(v1.IPv6Protocol)
 	}
-	return &networkingapiv1beta1.IPAddress{
+	return &networkingapiv1.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				networkingapiv1beta1.LabelIPAddressFamily: family,
-				networkingapiv1beta1.LabelManagedBy:       ipallocator.ControllerName,
+				networkingapiv1.LabelIPAddressFamily: family,
+				networkingapiv1.LabelManagedBy:       ipallocator.ControllerName,
 			},
 		},
 	}
@@ -302,9 +302,9 @@ func expectAction(t *testing.T, actions []k8stesting.Action, expected [][]string
 func TestController_canDeleteCIDR(t *testing.T) {
 	tests := []struct {
 		name       string
-		cidrs      []*networkingapiv1beta1.ServiceCIDR
-		ips        []*networkingapiv1beta1.IPAddress
-		cidrSynced *networkingapiv1beta1.ServiceCIDR
+		cidrs      []*networkingapiv1.ServiceCIDR
+		ips        []*networkingapiv1.IPAddress
+		cidrSynced *networkingapiv1.ServiceCIDR
 		want       bool
 	}{
 		{
@@ -314,7 +314,7 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR and no IPs",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -322,10 +322,10 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with IPs",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.24"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -333,10 +333,10 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR without IPs",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.1.24"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -344,10 +344,10 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with IPv4 address referencing the subnet address",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.0"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -355,10 +355,10 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with IPv4 address referencing the broadcast address",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.255"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -366,10 +366,10 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with IPv6 address referencing the broadcast address",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("2001:0db2::ffff:ffff:ffff:ffff"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -377,11 +377,11 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with same range overlapping and IPs",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.23"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -389,11 +389,11 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with smaller range overlapping and IPs",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/26", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.23"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -401,11 +401,11 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with smaller range overlapping but IPs orphan",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/28", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.23"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -413,11 +413,11 @@ func TestController_canDeleteCIDR(t *testing.T) {
 		},
 		{
 			name: "CIDR with larger range overlapping and IPs",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/16", "2001:db2::/64"),
 			},
-			ips: []*networkingapiv1beta1.IPAddress{
+			ips: []*networkingapiv1.IPAddress{
 				makeIPAddress("192.168.0.23"),
 			},
 			cidrSynced: makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
@@ -442,8 +442,8 @@ func TestController_canDeleteCIDR(t *testing.T) {
 func TestController_ipToCidrs(t *testing.T) {
 	tests := []struct {
 		name  string
-		cidrs []*networkingapiv1beta1.ServiceCIDR
-		ip    *networkingapiv1beta1.IPAddress
+		cidrs []*networkingapiv1.ServiceCIDR
+		ip    *networkingapiv1.IPAddress
 		want  []string
 	}{
 		{
@@ -452,7 +452,7 @@ func TestController_ipToCidrs(t *testing.T) {
 			want: []string{},
 		}, {
 			name: "one CIDR",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("unrelated", "10.0.0.0/24", ""),
 				makeServiceCIDR("unrelated2", "10.0.0.0/16", ""),
@@ -461,7 +461,7 @@ func TestController_ipToCidrs(t *testing.T) {
 			want: []string{defaultservicecidr.DefaultServiceCIDRName},
 		}, {
 			name: "two equal CIDR",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/96"),
 				makeServiceCIDR("unrelated", "10.0.0.0/24", ""),
@@ -471,7 +471,7 @@ func TestController_ipToCidrs(t *testing.T) {
 			want: []string{defaultservicecidr.DefaultServiceCIDRName, "overlapping"},
 		}, {
 			name: "three CIDR - two same and one larger",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping2", "192.168.0.0/26", "2001:db2::/96"),
@@ -482,7 +482,7 @@ func TestController_ipToCidrs(t *testing.T) {
 			want: []string{defaultservicecidr.DefaultServiceCIDRName, "overlapping", "overlapping2"},
 		}, {
 			name: "three CIDR - two same and one larger - IPv4 subnet address",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping2", "192.168.0.0/26", "2001:db2::/96"),
@@ -493,7 +493,7 @@ func TestController_ipToCidrs(t *testing.T) {
 			want: []string{},
 		}, {
 			name: "three CIDR - two same and one larger - IPv4 broadcast address",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping2", "192.168.0.0/26", "2001:db2::/96"),
@@ -504,7 +504,7 @@ func TestController_ipToCidrs(t *testing.T) {
 			want: []string{defaultservicecidr.DefaultServiceCIDRName, "overlapping"},
 		}, {
 			name: "three CIDR - two same and one larger - IPv6 subnet address",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping2", "192.168.0.0/26", "2001:db2::/96"),
@@ -515,7 +515,7 @@ func TestController_ipToCidrs(t *testing.T) {
 			want: []string{},
 		}, {
 			name: "three CIDR - two same and one larger - IPv6 broadcast address",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping2", "192.168.0.0/26", "2001:db2::/96"),
@@ -539,8 +539,8 @@ func TestController_ipToCidrs(t *testing.T) {
 func TestController_cidrToCidrs(t *testing.T) {
 	tests := []struct {
 		name  string
-		cidrs []*networkingapiv1beta1.ServiceCIDR
-		cidr  *networkingapiv1beta1.ServiceCIDR
+		cidrs []*networkingapiv1.ServiceCIDR
+		cidr  *networkingapiv1.ServiceCIDR
 		want  []string
 	}{
 		{
@@ -549,7 +549,7 @@ func TestController_cidrToCidrs(t *testing.T) {
 			want: []string{},
 		}, {
 			name: "one CIDR",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("unrelated", "10.0.0.0/24", ""),
 				makeServiceCIDR("unrelated2", "10.0.0.0/16", ""),
@@ -558,7 +558,7 @@ func TestController_cidrToCidrs(t *testing.T) {
 			want: []string{defaultservicecidr.DefaultServiceCIDRName},
 		}, {
 			name: "two equal CIDR",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/96"),
 				makeServiceCIDR("unrelated", "10.0.0.0/24", ""),
@@ -568,7 +568,7 @@ func TestController_cidrToCidrs(t *testing.T) {
 			want: []string{defaultservicecidr.DefaultServiceCIDRName, "overlapping"},
 		}, {
 			name: "three CIDR - two same and one larger",
-			cidrs: []*networkingapiv1beta1.ServiceCIDR{
+			cidrs: []*networkingapiv1.ServiceCIDR{
 				makeServiceCIDR(defaultservicecidr.DefaultServiceCIDRName, "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping", "192.168.0.0/24", "2001:db2::/64"),
 				makeServiceCIDR("overlapping2", "192.168.0.0/26", "2001:db2::/96"),
