@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package structured contains code for working with structured parameters.
-package structured
+package structured // import "k8s.io/dynamic-resource-allocation/structured"

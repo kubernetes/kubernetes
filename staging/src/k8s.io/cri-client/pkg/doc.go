@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package remote contains gRPC implementation of internalapi.RuntimeService
 // and internalapi.ImageManagerService.
-package cri
+package cri // import "k8s.io/cri-client/pkg"

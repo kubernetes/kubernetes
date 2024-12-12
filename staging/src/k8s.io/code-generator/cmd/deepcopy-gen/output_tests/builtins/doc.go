@@ -17,7 +17,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 
 // This is a test package.
-package builtins
+package builtins // import "k8s.io/code-generator/cmd/deepcopy-gen/output_tests/builtins"
 
 type Ttest struct {
 	Byte byte

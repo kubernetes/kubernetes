@@ -17,7 +17,7 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 
 // This is a test package.
-package maps
+package maps // import "k8s.io/code-generator/cmd/deepcopy-gen/output_tests/maps"
 
 type Ttest struct {
 	Byte map[string]byte

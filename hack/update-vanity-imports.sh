@@ -24,9 +24,8 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::verify_go_version
+kube::golang::internal::verify_go_version
 
 go -C "${KUBE_ROOT}/hack/tools" install github.com/jcchavezs/porto/cmd/porto
 
 porto --restrict-to-dirs="staging" --restrict-to-files="doc\\.go$" -w "${KUBE_ROOT}"
-

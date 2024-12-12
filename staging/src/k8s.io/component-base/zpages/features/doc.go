@@ -19,4 +19,4 @@ limitations under the License.
 // availability and behavior of various zpages within Kubernetes components.
 // New zpages added to Kubernetes components should utilize this feature set
 // to ensure proper management of their availability.
-package features
+package features // import "k8s.io/component-base/zpages/features"

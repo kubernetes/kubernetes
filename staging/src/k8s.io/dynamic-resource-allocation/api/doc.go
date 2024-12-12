@@ -19,4 +19,4 @@ limitations under the License.
 // a map.
 //
 // +k8s:conversion-gen=k8s.io/api/resource/v1beta1
-package api
+package api // import "k8s.io/dynamic-resource-allocation/api"

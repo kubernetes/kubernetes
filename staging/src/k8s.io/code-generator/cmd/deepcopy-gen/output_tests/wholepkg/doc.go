@@ -17,4 +17,4 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 
 // This is a test package.
-package wholepkg
+package wholepkg // import "k8s.io/code-generator/cmd/deepcopy-gen/output_tests/wholepkg"
