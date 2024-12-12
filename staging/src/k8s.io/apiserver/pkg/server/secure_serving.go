@@ -236,8 +236,11 @@ func RunServer(
 		defer close(serverShutdownCh)
 		<-stopCh
 		ctx, cancel := context.WithTimeout(context.Background(), shutDownTimeout)
-		server.Shutdown(ctx)
-		cancel()
+		defer cancel()
+		err := server.Shutdown(ctx)
+		if err != nil {
+			klog.Errorf("Failed to shutdown server: %v", err)
+		}
 	}()
 
 	go func() {
