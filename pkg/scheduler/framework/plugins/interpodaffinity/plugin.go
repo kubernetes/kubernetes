@@ -211,7 +211,7 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 }
 
 func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	_, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
+	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
 		return framework.Queue, err
 	}
@@ -221,11 +221,35 @@ func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod
 		return framework.Queue, err
 	}
 
+	// When queuing this Pod:
+	// - 1. A new node is added with the pod affinity topologyKey, the pod may become schedulable.
+	// - 2. The original node does not have the pod affinity topologyKey but the modified node does, the pod may become schedulable.
+	// - 3. Both the original and modified nodes have the pod affinity topologyKey and they differ, the pod may become schedulable.
 	for _, term := range terms {
-		if _, ok := modifiedNode.Labels[term.TopologyKey]; ok {
-			logger.V(5).Info("a node with matched pod affinity topologyKey was added/updated and it may make pod schedulable",
+		if originalNode == nil {
+			if _, ok := modifiedNode.Labels[term.TopologyKey]; ok {
+				// Case 1: A new node is added with the pod affinity topologyKey.
+				logger.V(5).Info("A node with a matched pod affinity topologyKey was added and it may make the pod schedulable",
+					"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+				return framework.Queue, nil
+			}
+			continue
+		}
+		originalTopologyValue, originalHasKey := originalNode.Labels[term.TopologyKey]
+		modifiedTopologyValue, modifiedHasKey := modifiedNode.Labels[term.TopologyKey]
+
+		if !originalHasKey && modifiedHasKey {
+			// Case 2: Original node does not have the pod affinity topologyKey, but the modified node does.
+			logger.V(5).Info("A node got updated to have the topology key of pod affinity, which may make the pod schedulable",
 				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-			return framework.Queue, err
+			return framework.Queue, nil
+		}
+
+		if originalHasKey && modifiedHasKey && (originalTopologyValue != modifiedTopologyValue) {
+			// Case 3: Both nodes have the pod affinity topologyKey, but the values differ.
+			logger.V(5).Info("A node is moved to a different domain of pod affinity, which may make the pod schedulable",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return framework.Queue, nil
 		}
 	}
 
@@ -234,11 +258,39 @@ func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod
 		return framework.Queue, err
 	}
 
+	// When queuing this Pod:
+	// - 1. A new node is added, the pod may become schedulable.
+	// - 2. The original node have the pod anti-affinity topologyKey but the modified node does not, the pod may become schedulable.
+	// - 3. Both the original and modified nodes have the pod anti-affinity topologyKey and they differ, the pod may become schedulable.
 	for _, term := range antiTerms {
-		if _, ok := modifiedNode.Labels[term.TopologyKey]; ok {
-			logger.V(5).Info("a node with matched pod anti-affinity topologyKey was added/updated and it may make pod schedulable",
+		if originalNode == nil {
+			// Case 1: A new node is added.
+			// We always requeue the Pod with anti-affinity because:
+			// - the node without the topology key is always allowed to have a Pod with anti-affinity.
+			// - the addition of a node with the topology key makes Pods schedulable only when the topology it joins doesn't have any Pods that the Pod hates.
+			//   But, it's out-of-scope of this QHint to check which Pods are in the topology this Node is in.
+			logger.V(5).Info("A node was added and it may make the pod schedulable",
 				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-			return framework.Queue, err
+			return framework.Queue, nil
+		}
+
+		originalTopologyValue, originalHasKey := originalNode.Labels[term.TopologyKey]
+		modifiedTopologyValue, modifiedHasKey := modifiedNode.Labels[term.TopologyKey]
+
+		if originalHasKey && !modifiedHasKey {
+			// Case 2: The original node have the pod anti-affinity topologyKey but the modified node does not.
+			// Note that we don't need to check the opposite case (!originalHasKey && modifiedHasKey)
+			// because the node without the topology label can always accept pods with pod anti-affinity.
+			logger.V(5).Info("A node got updated to not have the topology key of pod anti-affinity, which may make the pod schedulable",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return framework.Queue, nil
+		}
+
+		if originalHasKey && modifiedHasKey && (originalTopologyValue != modifiedTopologyValue) {
+			// Case 3: Both nodes have the pod anti-affinity topologyKey, but the values differ.
+			logger.V(5).Info("A node is moved to a different domain of pod anti-affinity, which may make the pod schedulable",
+				"pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
+			return framework.Queue, nil
 		}
 	}
 	logger.V(5).Info("a node is added/updated but doesn't have any topologyKey which matches pod affinity/anti-affinity",
