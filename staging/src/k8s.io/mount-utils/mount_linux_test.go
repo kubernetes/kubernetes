@@ -823,7 +823,7 @@ func mkStatfsFlags[T1 constraints.Integer, T2 constraints.Integer](orig T1, add 
 	return orig | T1(add)
 }
 
-func TestGetUserNSBindMountOptions(t *testing.T) {
+func TestGetBindMountOptions(t *testing.T) {
 	var testCases = map[string]struct {
 		flags        int32 // smallest size used by any platform we care about
 		mountoptions string
@@ -845,9 +845,9 @@ func TestGetUserNSBindMountOptions(t *testing.T) {
 		return nil
 	}
 
-	testGetUserNSBindMountOptionsSingleCase := func(t *testing.T) {
+	testGetBindMountOptionsSingleCase := func(t *testing.T) {
 		path := strings.Split(t.Name(), "/")[1]
-		options, _ := getUserNSBindMountOptions(path, statfsMock)
+		options, _ := getBindMountOptions(path, statfsMock)
 		sort.Strings(options)
 		optionString := strings.Join(options, ",")
 		mountOptions := testCases[path].mountoptions
@@ -857,7 +857,7 @@ func TestGetUserNSBindMountOptions(t *testing.T) {
 	}
 
 	for k := range testCases {
-		t.Run(k, testGetUserNSBindMountOptionsSingleCase)
+		t.Run(k, testGetBindMountOptionsSingleCase)
 	}
 }
 
