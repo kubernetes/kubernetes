@@ -104,6 +104,9 @@ aliases:
     - saschagrunert
     - Verolop
     - xmudrii
+  release-team-subproject-leads:
+    - gracenng # Release Team subproject lead
+    - katcosgrove # Release Team subproject lead
   build-image-approvers:
     - BenTheElder
     - cblecker
