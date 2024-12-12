@@ -72,7 +72,7 @@ type PodSandboxManager interface {
 	RunPodSandbox(ctx context.Context, config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error)
 	// StopPodSandbox stops the sandbox. If there are any running containers in the
 	// sandbox, they should be force terminated.
-	StopPodSandbox(pctx context.Context, odSandboxID string) error
+	StopPodSandbox(ctx context.Context, podSandboxID string) error
 	// RemovePodSandbox removes the sandbox. If there are running containers in the
 	// sandbox, they should be forcibly removed.
 	RemovePodSandbox(ctx context.Context, podSandboxID string) error
