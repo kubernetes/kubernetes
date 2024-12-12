@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -272,17 +273,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoint belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /*endpoint controller works on primary ip*/)
-
-			return true, nil
-		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
-		}
+		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv4 cluster ip", func(ctx context.Context) {
@@ -318,22 +309,12 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
-			return true, nil
-		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
-		}
+		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv6 cluster ip", func(ctx context.Context) {
 		serviceName := "ipv6clusterip"
 		ns := f.Namespace.Name
-		ipv6 := v1.IPv6Protocol
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 
@@ -363,16 +344,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, ipv6)
-			return true, nil
-		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
-		}
+		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv4,v6 cluster ip", func(ctx context.Context) {
@@ -408,16 +380,7 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
-			return true, nil
-		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
-		}
+		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
 
 	ginkgo.It("should create service with ipv6,v4 cluster ip", func(ctx context.Context) {
@@ -453,19 +416,8 @@ var _ = common.SIGDescribe(feature.IPv6DualStack, func() {
 		validateServiceAndClusterIPFamily(svc, expectedFamilies, &expectedPolicy)
 
 		// ensure endpoints belong to same ipfamily as service
-		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
-			endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, nil
-			}
-			validateEndpointsBelongToIPFamily(svc, endpoint, expectedFamilies[0] /* endpoint controller operates on primary ip */)
-			return true, nil
-		}); err != nil {
-			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
-		}
+		validateEndpointsAndEndpointSlices(ctx, f, svc, expectedFamilies)
 	})
-	// TODO (khenidak add slice validation logic, since endpoint controller only operates
-	// on primary ClusterIP
 
 	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
 	// but using the secondary IP, so we run the same tests for each ClusterIP family
@@ -765,6 +717,33 @@ func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.
 	}
 }
 
+func validateEndpointsAndEndpointSlices(ctx context.Context, f *framework.Framework, svc *v1.Service, expectedIPFamilies []v1.IPFamily) {
+	var endpoint *v1.Endpoints
+	if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		var err error
+		endpoint, err = f.ClientSet.CoreV1().Endpoints(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+		return err == nil, nil
+	}); err != nil {
+		framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+	}
+	framework.Logf("Got endpoint %#v", endpoint)
+	validateEndpointsBelongToIPFamily(svc, endpoint, expectedIPFamilies[0] /* endpoint controller works on primary IP */)
+
+	var slices *discoveryv1.EndpointSliceList
+	if err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		var err error
+		slices, err = f.ClientSet.DiscoveryV1().EndpointSlices(svc.Namespace).List(ctx, metav1.ListOptions{LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name})
+		if err != nil || len(slices.Items) < len(expectedIPFamilies) {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		framework.Failf("List EndpointSlices for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+	}
+	framework.Logf("Got endpointslices %#v", slices)
+	validateEndpointSlicesBelongToIPFamilies(svc, slices.Items, expectedIPFamilies)
+}
+
 func validateEndpointsBelongToIPFamily(svc *v1.Service, endpoint *v1.Endpoints, expectedIPFamily v1.IPFamily) {
 	if len(endpoint.Subsets) == 0 {
 		framework.Failf("Endpoint has no subsets, cannot determine service ip family matches endpoints ip family for service %s/%s", svc.Namespace, svc.Name)
@@ -775,6 +754,41 @@ func validateEndpointsBelongToIPFamily(svc *v1.Service, endpoint *v1.Endpoints, 
 				framework.Failf("service endpoint %s doesn't belong to %s ip family", e.IP, expectedIPFamily)
 			}
 		}
+	}
+}
+
+func validateEndpointSlicesBelongToIPFamilies(svc *v1.Service, slices []discoveryv1.EndpointSlice, expectedIPFamilies []v1.IPFamily) {
+	var wantIPv4, wantIPv6 bool
+	for _, family := range expectedIPFamilies {
+		if family == v1.IPv4Protocol {
+			wantIPv4 = true
+		} else if family == v1.IPv6Protocol {
+			wantIPv6 = true
+		}
+	}
+
+	for _, slice := range slices {
+		ip := "(none)"
+		if len(slice.Endpoints) > 0 && len(slice.Endpoints[0].Addresses) > 0 {
+			ip = slice.Endpoints[0].Addresses[0]
+		}
+		if slice.AddressType == discoveryv1.AddressTypeIPv4 {
+			if !wantIPv4 {
+				framework.Failf("did not want IPv4 slice but got slice %s with IP %s", slice.Name, ip)
+			}
+			wantIPv4 = false
+		} else if slice.AddressType == discoveryv1.AddressTypeIPv6 {
+			if !wantIPv6 {
+				framework.Failf("did not want IPv6 slice but got slice %s with IP %s", slice.Name, ip)
+			}
+			wantIPv6 = false
+		}
+	}
+	if wantIPv4 {
+		framework.Failf("wanted an IPv4 slice but did not get one")
+	}
+	if wantIPv6 {
+		framework.Failf("wanted an IPv6 slice but did not get one")
 	}
 }
 
