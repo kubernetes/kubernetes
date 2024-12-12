@@ -121,9 +121,9 @@ func TestGetsSelfAttributes(t *testing.T) {
 			response = tc.userInfo
 			respMu.Unlock()
 
-			res, err := kubeClient.AuthenticationV1alpha1().
+			res, err := kubeClient.AuthenticationV1().
 				SelfSubjectReviews().
-				Create(tCtx, &authenticationv1alpha1.SelfSubjectReview{}, metav1.CreateOptions{})
+				Create(tCtx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
