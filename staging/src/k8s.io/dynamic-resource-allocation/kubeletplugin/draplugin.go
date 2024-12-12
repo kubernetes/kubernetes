@@ -59,7 +59,7 @@ type DRAPlugin interface {
 	//
 	// Returns an error if KubeClient or NodeName options were not
 	// set in Start() to create the DRAPlugin instance.
-	PublishResources(ctx context.Context, resources Resources) error
+	PublishResources(ctx context.Context, resourcesList []Resources) error
 
 	// This unexported method ensures that we can modify the interface
 	// without causing an API break of the package
@@ -407,7 +407,7 @@ func (d *draPlugin) Stop() {
 
 // PublishResources implements [DRAPlugin.PublishResources]. Returns en error if
 // kubeClient or nodeName are unset.
-func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) error {
+func (d *draPlugin) PublishResources(_ context.Context, resourcesList []Resources) error {
 	if d.kubeClient == nil {
 		return errors.New("no KubeClient found to publish resources")
 	}
@@ -427,12 +427,27 @@ func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) e
 	driverResources := &resourceslice.DriverResources{
 		Pools: map[string]resourceslice.Pool{
 			d.nodeName: {
-				Slices: []resourceslice.Slice{{
-					Devices: resources.Devices,
-				}},
+				Slices: make([]resourceslice.Slice, 0),
 			},
 		},
 	}
+
+	nodePool := driverResources.Pools[d.nodeName]
+
+	// Add each resources.Devices to the node's pool slices, including empty ones
+	for _, resources := range resourcesList {
+		nodePool.Slices = append(nodePool.Slices, resourceslice.Slice{
+			Devices: resources.Devices,
+		})
+	}
+
+	// Ensure that at least one empty slice is added if resourcesList is empty
+	if len(resourcesList) == 0 {
+		nodePool.Slices = append(nodePool.Slices, resourceslice.Slice{
+			Devices: []resourceapi.Device{},
+		})
+	}
+
 	if d.resourceSliceController == nil {
 		// Start publishing the information. The controller is using
 		// our background context, not the one passed into this
