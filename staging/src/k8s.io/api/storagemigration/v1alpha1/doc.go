@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:prerelease-lifecycle-gen=true
 // +groupName=storagemigration.k8s.io
 
-package v1alpha1 // import "k8s.io/api/storagemigration/v1alpha1"
+package v1alpha1

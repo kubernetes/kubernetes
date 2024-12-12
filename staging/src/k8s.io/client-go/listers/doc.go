@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package listers provides generated listers for Kubernetes APIs.
-package listers // import "k8s.io/client-go/listers"
+package listers

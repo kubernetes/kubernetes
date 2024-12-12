@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package winkernel implements the Windows-kernel-based proxy
-package winkernel // import "k8s.io/kubernetes/pkg/proxy/winkernel"
+package winkernel

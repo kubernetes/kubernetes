@@ -66,4 +66,4 @@ limitations under the License.
 //	WRITE []byte{0, 102, 111, 111, 10} # send "foo\n" on channel 0 (STDIN)
 //	WRITE []byte{255, 0}               # send CLOSE signal (STDIN)
 //	CLOSE
-package wsstream // import "k8s.io/apimachinery/pkg/util/httpstream/wsstream"
+package wsstream

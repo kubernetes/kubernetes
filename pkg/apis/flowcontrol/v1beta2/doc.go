@@ -21,4 +21,4 @@ limitations under the License.
 
 // +groupName=flowcontrol.apiserver.k8s.io
 
-package v1beta2 // import "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
+package v1beta2

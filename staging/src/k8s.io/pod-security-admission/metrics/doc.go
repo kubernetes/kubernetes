@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package metrics contains metrics interfaces and implementations for PodSecurity admission
-package metrics // import "k8s.io/pod-security-admission/metrics"
+package metrics

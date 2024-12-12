@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:openapi-gen=true
 
 // Package v1beta1 is the v1beta1 version of the custom_metrics API.
-package v1beta1 // import "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+package v1beta1
