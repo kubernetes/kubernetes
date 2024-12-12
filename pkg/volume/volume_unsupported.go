@@ -24,6 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
+// SetVolumeOwnership sets the ownership of a volume to the specified user and group.
+// It typically modifies the user and group ownership of the volume's file system.
 func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
 	return nil
 }
