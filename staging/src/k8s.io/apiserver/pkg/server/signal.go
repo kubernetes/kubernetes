@@ -20,6 +20,9 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"runtime"
+
+	"k8s.io/klog/v2"
 )
 
 var onlyOneSignalHandler = make(chan struct{})
@@ -66,4 +69,36 @@ func RequestShutdown() bool {
 	}
 
 	return false
+}
+
+func dumpStacks(writeToFile bool, path string) {
+	var (
+		buf       []byte
+		stackSize int
+	)
+	bufferLen := 16384
+	for stackSize == len(buf) {
+		buf = make([]byte, bufferLen)
+		stackSize = runtime.Stack(buf, true)
+		bufferLen *= 2
+	}
+	buf = buf[:stackSize]
+	if writeToFile {
+		f, err := os.Create(path)
+		if err != nil {
+			klog.Errorf("failed to create %s err is:%v", path, err)
+			return
+		}
+
+		defer func() {
+			_ = f.Close()
+		}()
+
+		_, err = f.WriteString(string(buf))
+		if err != nil {
+			klog.Errorf("writeString err:%v", err)
+			return
+		}
+		klog.Infof("goroutine stack dump written to %s", path)
+	}
 }
