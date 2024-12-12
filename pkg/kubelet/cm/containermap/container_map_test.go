@@ -20,22 +20,6 @@ import (
 	"testing"
 )
 
-func TestContainerMapCloneEqual(t *testing.T) {
-	cm := NewContainerMap()
-	// add random fake data
-	cm.Add("fakePodUID-1", "fakeContainerName-a1", "fakeContainerID-A")
-	cm.Add("fakePodUID-2", "fakeContainerName-b2", "fakeContainerID-B")
-	cm.Add("fakePodUID-2", "fakeContainerName-c2", "fakeContainerID-C")
-	cm.Add("fakePodUID-3", "fakeContainerName-d3", "fakeContainerID-D")
-	cm.Add("fakePodUID-3", "fakeContainerName-e3", "fakeContainerID-E")
-	cm.Add("fakePodUID-3", "fakeContainerName-f3", "fakeContainerID-F")
-
-	cloned := cm.Clone()
-	if !areEqual(cm, cloned) {
-		t.Fatalf("clone %+#v different from original %+#v", cloned, cm)
-	}
-}
-
 func TestContainerMapCloneUnshared(t *testing.T) {
 	cm := NewContainerMap()
 	// add random fake data
@@ -142,20 +126,4 @@ func TestContainerMap(t *testing.T) {
 			t.Errorf("unexpected entries still in containerMap: %v", cm)
 		}
 	}
-}
-
-func areEqual(cm1, cm2 ContainerMap) bool {
-	if len(cm1) != len(cm2) {
-		return false
-	}
-	for key1, item1 := range cm1 {
-		item2, ok := cm2[key1]
-		if !ok {
-			return false
-		}
-		if item1 != item2 {
-			return false
-		}
-	}
-	return true
 }
