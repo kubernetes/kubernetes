@@ -142,21 +142,6 @@ func getTestResourceInfo(tcInfo ResizableContainerInfo) (res v1.ResourceRequirem
 	return res, resizePol
 }
 
-func InitDefaultResizePolicy(containers []ResizableContainerInfo) {
-	noRestart := v1.NotRequired
-	setDefaultPolicy := func(ci *ResizableContainerInfo) {
-		if ci.CPUPolicy == nil {
-			ci.CPUPolicy = &noRestart
-		}
-		if ci.MemPolicy == nil {
-			ci.MemPolicy = &noRestart
-		}
-	}
-	for i := range containers {
-		setDefaultPolicy(&containers[i])
-	}
-}
-
 func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
 	res, resizePol := getTestResourceInfo(tcInfo)

@@ -182,29 +182,6 @@ func SetDefaults_Pod(obj *v1.Pod) {
 				}
 			}
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) &&
-			obj.Spec.Containers[i].Resources.Requests != nil {
-			// For normal containers, set resize restart policy to default value (NotRequired), if not specified.
-			resizePolicySpecified := make(map[v1.ResourceName]bool)
-			for _, p := range obj.Spec.Containers[i].ResizePolicy {
-				resizePolicySpecified[p.ResourceName] = true
-			}
-			setDefaultResizePolicy := func(resourceName v1.ResourceName) {
-				if _, found := resizePolicySpecified[resourceName]; !found {
-					obj.Spec.Containers[i].ResizePolicy = append(obj.Spec.Containers[i].ResizePolicy,
-						v1.ContainerResizePolicy{
-							ResourceName:  resourceName,
-							RestartPolicy: v1.NotRequired,
-						})
-				}
-			}
-			if _, exists := obj.Spec.Containers[i].Resources.Requests[v1.ResourceCPU]; exists {
-				setDefaultResizePolicy(v1.ResourceCPU)
-			}
-			if _, exists := obj.Spec.Containers[i].Resources.Requests[v1.ResourceMemory]; exists {
-				setDefaultResizePolicy(v1.ResourceMemory)
-			}
-		}
 	}
 	for i := range obj.Spec.InitContainers {
 		if obj.Spec.InitContainers[i].Resources.Limits != nil {

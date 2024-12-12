@@ -138,8 +138,6 @@ func doPodResizeAdmissionPluginsTests() {
 			tc.enableAdmissionPlugin(ctx, f)
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			e2epod.InitDefaultResizePolicy(containers)
-			e2epod.InitDefaultResizePolicy(expected)
 			testPod1 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
 			testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
 			testPod2 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
@@ -267,8 +265,6 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 			}`, testPod2CPUQuantityResized.MilliValue(), testPod2CPUQuantityResized.MilliValue())
 
 		tStamp := strconv.Itoa(time.Now().Nanosecond())
-		e2epod.InitDefaultResizePolicy(c1)
-		e2epod.InitDefaultResizePolicy(c2)
 		testPod1 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, c1)
 		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
 		testPod2 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, c2)
@@ -324,7 +320,6 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 			}`, testPod1CPUQuantityResized.MilliValue(), testPod1CPUQuantityResized.MilliValue())
 
 		tStamp = strconv.Itoa(time.Now().Nanosecond())
-		e2epod.InitDefaultResizePolicy(c3)
 		testPod3 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod3", tStamp, c3)
 		testPod3 = e2epod.MustMixinRestrictedPodSecurity(testPod3)
 		e2epod.SetNodeAffinity(&testPod3.Spec, node.Name)

@@ -941,8 +941,6 @@ func doPodResizeTests(f *framework.Framework) {
 			var pErr error
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			e2epod.InitDefaultResizePolicy(tc.containers)
-			e2epod.InitDefaultResizePolicy(tc.expected)
 			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, tc.containers)
 			testPod.GenerateName = "resize-test-"
 			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
@@ -1128,8 +1126,6 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			var pErr error
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			e2epod.InitDefaultResizePolicy(tc.containers)
-			e2epod.InitDefaultResizePolicy(tc.expected)
 			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
 			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
 
