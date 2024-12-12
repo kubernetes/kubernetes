@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/utils/integer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -712,6 +713,30 @@ func GetAvailableReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) int3
 		}
 	}
 	return totalAvailableReplicas
+}
+
+// GetTerminatingReplicaCountForReplicaSets returns the number of terminating pods for all replica sets
+// or returns an error if the number of terminating pods is unknown.
+func GetTerminatingReplicaCountForReplicaSets(replicaSets []*apps.ReplicaSet) (*int32, error) {
+	var replicaSetsWithUnknownTerminatingReplicas []string
+	terminatingReplicas := int32(0)
+	for _, rs := range replicaSets {
+		if rs != nil {
+			if rs.Status.ObservedGeneration != 0 && rs.Status.TerminatingReplicas == nil {
+				// We cannot sum TerminatingReplicas from replica sets that have been synced by the replicaset
+				// controller but do not have TerminatingReplicas set.
+				replicaSetsWithUnknownTerminatingReplicas = append(replicaSetsWithUnknownTerminatingReplicas, rs.Name)
+				continue
+			}
+			// Sum TerminatingReplicas reported by the replicaset controller (or 0 for replica sets never synced by
+			// the controller)
+			terminatingReplicas += ptr.Deref(rs.Status.TerminatingReplicas, 0)
+		}
+	}
+	if len(replicaSetsWithUnknownTerminatingReplicas) > 0 {
+		return nil, fmt.Errorf("found ReplicaSets with unknown .status.terminatingReplicas: %v", strings.Join(replicaSetsWithUnknownTerminatingReplicas, ","))
+	}
+	return &terminatingReplicas, nil
 }
 
 // IsRollingUpdate returns true if the strategy type is a rolling update.

@@ -605,6 +605,9 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
+	if status.TerminatingReplicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.TerminatingReplicas), fldPath.Child("terminatingReplicas"))...)
+	}
 	if status.CollisionCount != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fldPath.Child("collisionCount"))...)
 	}
@@ -701,6 +704,9 @@ func ValidateReplicaSetStatus(status apps.ReplicaSetStatus, fldPath *field.Path)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ReadyReplicas), fldPath.Child("readyReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ObservedGeneration), fldPath.Child("observedGeneration"))...)
+	if status.TerminatingReplicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.TerminatingReplicas), fldPath.Child("terminatingReplicas"))...)
+	}
 	msg := "cannot be greater than status.replicas"
 	if status.FullyLabeledReplicas > status.Replicas {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("fullyLabeledReplicas"), status.FullyLabeledReplicas, msg))
