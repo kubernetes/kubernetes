@@ -1004,11 +1004,17 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 						Used: v1.ResourceList{v1.ResourceName(resourceName): resource.MustParse("1")},
 					})})))
 
-			// Now creating another claim should fail.
-			claim2 := claim.DeepCopy()
-			claim2.Name = "claim-1"
-			_, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim2, metav1.CreateOptions{})
-			gomega.Expect(err).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
+			// Now creating another claim should eventually fail. The quota may not be enforced immediately if
+			// it hasn't yet landed in the API server's cache.
+			//
+			// If creating a claim erroneously succeeds, we don't want to immediately fail on the next try
+			// with an "already exists" error, so use a new name each time.
+			claim.GenerateName = "claim-1-"
+			claim.Name = ""
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				_, err := f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
+				return err
+			}).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
 		})
 
 		f.It("DaemonSet with admin access", feature.DRAAdminAccess, func(ctx context.Context) {
