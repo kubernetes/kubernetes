@@ -444,9 +444,11 @@ func WaitForPendingFSResizeCondition(ctx context.Context, pvc *v1.PersistentVolu
 		if len(inProgressConditions) == 0 {
 			return true, nil
 		}
-		conditionType := inProgressConditions[0].Type
-		if conditionType == v1.PersistentVolumeClaimFileSystemResizePending {
-			return true, nil
+		for _, condition := range inProgressConditions {
+			conditionType := condition.Type
+			if conditionType == v1.PersistentVolumeClaimFileSystemResizePending {
+				return true, nil
+			}
 		}
 		return false, nil
 	})
