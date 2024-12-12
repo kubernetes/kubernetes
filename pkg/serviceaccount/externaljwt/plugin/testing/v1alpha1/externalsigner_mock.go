@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -226,7 +227,7 @@ func (m *MockSigner) start(t *testing.T) error {
 
 	klog.Infof("Starting Mock Signer at socketPath %s", m.socketPath)
 	go func() {
-		if err := m.server.Serve(m.listener); err != nil {
+		if err := m.server.Serve(m.listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			t.Error(err)
 		}
 	}()
@@ -265,7 +266,7 @@ func (m *MockSigner) waitForMockServerToStart() error {
 
 // CleanUp stops gRPC server and the underlying listener.
 func (m *MockSigner) CleanUp() {
-	m.server.Stop()
+	m.server.GracefulStop()
 	_ = m.listener.Close()
 	_ = os.Remove(m.socketPath)
 }
