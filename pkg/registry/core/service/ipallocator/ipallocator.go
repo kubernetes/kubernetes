@@ -27,13 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	networkingv1beta1informers "k8s.io/client-go/informers/networking/v1beta1"
-	networkingv1beta1client "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
-	networkingv1beta1listers "k8s.io/client-go/listers/networking/v1beta1"
+	networkingv1informers "k8s.io/client-go/informers/networking/v1"
+	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
+	networkingv1listers "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -56,8 +56,8 @@ type Allocator struct {
 	rangeOffset int    // subdivides the assigned IP range to prefer dynamic allocation from the upper range
 	size        uint64 // cap the total number of IPs available to maxInt64
 
-	client          networkingv1beta1client.NetworkingV1beta1Interface
-	ipAddressLister networkingv1beta1listers.IPAddressLister
+	client          networkingv1client.NetworkingV1Interface
+	ipAddressLister networkingv1listers.IPAddressLister
 	ipAddressSynced cache.InformerSynced
 	// ready indicates if the allocator is able to allocate new IP addresses.
 	// This is required because it depends on the ServiceCIDR to be ready.
@@ -77,8 +77,8 @@ var _ Interface = &Allocator{}
 // using an informer cache as storage.
 func NewIPAllocator(
 	cidr *net.IPNet,
-	client networkingv1beta1client.NetworkingV1beta1Interface,
-	ipAddressInformer networkingv1beta1informers.IPAddressInformer,
+	client networkingv1client.NetworkingV1Interface,
+	ipAddressInformer networkingv1informers.IPAddressInformer,
 ) (*Allocator, error) {
 	prefix, err := netip.ParsePrefix(cidr.String())
 	if err != nil {
@@ -139,15 +139,15 @@ func NewIPAllocator(
 }
 
 func (a *Allocator) createIPAddress(name string, svc *api.Service, scope string) error {
-	ipAddress := networkingv1beta1.IPAddress{
+	ipAddress := networkingv1.IPAddress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				networkingv1beta1.LabelIPAddressFamily: string(a.IPFamily()),
-				networkingv1beta1.LabelManagedBy:       ControllerName,
+				networkingv1.LabelIPAddressFamily: string(a.IPFamily()),
+				networkingv1.LabelManagedBy:       ControllerName,
 			},
 		},
-		Spec: networkingv1beta1.IPAddressSpec{
+		Spec: networkingv1.IPAddressSpec{
 			ParentRef: serviceToRef(svc),
 		},
 	}
@@ -379,8 +379,8 @@ func (a *Allocator) release(ip net.IP, dryRun bool) error {
 // This is required to satisfy the Allocator Interface only
 func (a *Allocator) ForEach(f func(net.IP)) {
 	ipLabelSelector := labels.Set(map[string]string{
-		networkingv1beta1.LabelIPAddressFamily: string(a.IPFamily()),
-		networkingv1beta1.LabelManagedBy:       ControllerName,
+		networkingv1.LabelIPAddressFamily: string(a.IPFamily()),
+		networkingv1.LabelManagedBy:       ControllerName,
 	}).AsSelectorPreValidated()
 	ips, err := a.ipAddressLister.List(ipLabelSelector)
 	if err != nil {
@@ -413,8 +413,8 @@ func (a *Allocator) IPFamily() api.IPFamily {
 // for testing, it assumes this is the allocator is unique for the ipFamily
 func (a *Allocator) Used() int {
 	ipLabelSelector := labels.Set(map[string]string{
-		networkingv1beta1.LabelIPAddressFamily: string(a.IPFamily()),
-		networkingv1beta1.LabelManagedBy:       ControllerName,
+		networkingv1.LabelIPAddressFamily: string(a.IPFamily()),
+		networkingv1.LabelManagedBy:       ControllerName,
 	}).AsSelectorPreValidated()
 	ips, err := a.ipAddressLister.List(ipLabelSelector)
 	if err != nil {
@@ -568,12 +568,12 @@ func broadcastAddress(subnet netip.Prefix) (netip.Addr, error) {
 }
 
 // serviceToRef obtain the Service Parent Reference
-func serviceToRef(svc *api.Service) *networkingv1beta1.ParentReference {
+func serviceToRef(svc *api.Service) *networkingv1.ParentReference {
 	if svc == nil {
 		return nil
 	}
 
-	return &networkingv1beta1.ParentReference{
+	return &networkingv1.ParentReference{
 		Group:     "",
 		Resource:  "services",
 		Namespace: svc.Namespace,
