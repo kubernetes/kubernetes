@@ -1711,6 +1711,62 @@ func TestWarnings(t *testing.T) {
 				`spec.containers[0].ports[1]: duplicate port name "test" with spec.initContainers[0].ports[0], services and probes that select ports by name will use spec.initContainers[0].ports[0]`,
 			},
 		},
+		{
+			name: "creating pod with invalid value in nodeaffinity",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Affinity: &api.Affinity{NodeAffinity: &api.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{{
+						Weight: 10,
+						Preference: api.NodeSelectorTerm{
+							MatchExpressions: []api.NodeSelectorRequirement{{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"-1"},
+							}},
+						},
+					}},
+				}},
+			}},
+			expected: []string{
+				`spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].preference.matchExpressions[0].values[0]: -1 is invalid, a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')`,
+			},
+		},
+		{
+			name: "updating pod with invalid value in nodeaffinity",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Affinity: &api.Affinity{NodeAffinity: &api.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{{
+						Weight: 10,
+						Preference: api.NodeSelectorTerm{
+							MatchExpressions: []api.NodeSelectorRequirement{{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"-1"},
+							}},
+						},
+					}},
+				}},
+				SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
+			}},
+			oldTemplate: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Affinity: &api.Affinity{NodeAffinity: &api.NodeAffinity{
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{{
+						Weight: 10,
+						Preference: api.NodeSelectorTerm{
+							MatchExpressions: []api.NodeSelectorRequirement{{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"bar"},
+							}},
+						},
+					}},
+				}},
+				SchedulingGates: []api.PodSchedulingGate{{Name: "foo"}},
+			}},
+			expected: []string{
+				`spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].preference.matchExpressions[0].values[0]: -1 is invalid, a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
