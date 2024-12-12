@@ -15512,16 +15512,15 @@ func TestValidateServiceCreate(t *testing.T) {
 		},
 		numErrs: 0,
 	}, {
-		// For now we open firewalls, and its insecure if we open 10250, remove this
-		// when we have better protections in place.
-		name: "invalid port type=LoadBalancer",
+		// Remove the limitation on exposing port 10250 externally
+		name: "valid port type=LoadBalancer",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
-		numErrs: 1,
+		numErrs: 0,
 	}, {
 		name: "valid LoadBalancer source range annotation",
 		tweakSvc: func(s *core.Service) {
