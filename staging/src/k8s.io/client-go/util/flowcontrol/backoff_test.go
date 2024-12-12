@@ -23,6 +23,12 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
+var NewFakeBackOff = NewBackOffWithClock
+
+func NewFakeBackOffWithJitter(initial, max time.Duration, tc *testingclock.FakeClock, maxJitterFactor float64) *Backoff {
+	return newBackoff(tc, initial, max, maxJitterFactor)
+}
+
 func TestSlowBackoff(t *testing.T) {
 	id := "_idSlow"
 	tc := testingclock.NewFakeClock(time.Now())
