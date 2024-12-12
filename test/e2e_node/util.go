@@ -577,7 +577,7 @@ func getPidFromPidFile(pidFile string) (int, error) {
 func WaitForPodInitContainerRestartCount(ctx context.Context, c clientset.Interface, namespace, podName string, initContainerIndex int, desiredRestartCount int32, timeout time.Duration) error {
 	conditionDesc := fmt.Sprintf("init container %d started", initContainerIndex)
 	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
-		if initContainerIndex > len(pod.Status.InitContainerStatuses)-1 {
+		if initContainerIndex >= len(pod.Status.InitContainerStatuses) {
 			return false, nil
 		}
 		containerStatus := pod.Status.InitContainerStatuses[initContainerIndex]
@@ -590,7 +590,7 @@ func WaitForPodInitContainerRestartCount(ctx context.Context, c clientset.Interf
 func WaitForPodContainerRestartCount(ctx context.Context, c clientset.Interface, namespace, podName string, containerIndex int, desiredRestartCount int32, timeout time.Duration) error {
 	conditionDesc := fmt.Sprintf("container %d started", containerIndex)
 	return e2epod.WaitForPodCondition(ctx, c, namespace, podName, conditionDesc, timeout, func(pod *v1.Pod) (bool, error) {
-		if containerIndex > len(pod.Status.ContainerStatuses)-1 {
+		if containerIndex >= len(pod.Status.ContainerStatuses) {
 			return false, nil
 		}
 		containerStatus := pod.Status.ContainerStatuses[containerIndex]
