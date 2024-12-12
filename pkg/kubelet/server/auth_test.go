@@ -125,6 +125,7 @@ func AuthzTestCases(fineGrained bool) []AuthzTestCase {
 		"/attach/{podNamespace}/{podID}/{uid}/{containerName}": {"proxy"},
 		"/checkpoint/{podNamespace}/{podID}/{containerName}":   {"checkpoint"},
 		"/configz": {"proxy"},
+		"/statusz": {"proxy"},
 		"/containerLogs/{podNamespace}/{podID}/{containerName}": {"proxy"},
 		"/debug/flags/v":                                     {"proxy"},
 		"/debug/pprof/{subpath:*}":                           {"proxy"},
@@ -159,6 +160,7 @@ func AuthzTestCases(fineGrained bool) []AuthzTestCase {
 		testPaths["/pods/"] = append([]string{"pods"}, testPaths["/pods/"]...)
 		testPaths["/runningpods/"] = append([]string{"pods"}, testPaths["/runningpods/"]...)
 		testPaths["/configz"] = append([]string{"configz"}, testPaths["/configz"]...)
+		testPaths["/statusz"] = append([]string{"statusz"}, testPaths["/statusz"]...)
 	}
 
 	testCases := []AuthzTestCase{}
