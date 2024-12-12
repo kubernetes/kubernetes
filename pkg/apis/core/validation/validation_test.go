@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -2757,7 +2756,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: core.ClaimBound,
 	})
 	validClaimEmptyVolumeAttributesClass := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
-		VolumeAttributesClassName: utilpointer.String(""),
+		VolumeAttributesClassName: ptr.To(""),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
@@ -2771,7 +2770,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: core.ClaimBound,
 	})
 	validClaimVolumeAttributesClass1 := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
-		VolumeAttributesClassName: utilpointer.String("vac1"),
+		VolumeAttributesClassName: ptr.To("vac1"),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
@@ -2785,7 +2784,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		Phase: core.ClaimBound,
 	})
 	validClaimVolumeAttributesClass2 := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
-		VolumeAttributesClassName: utilpointer.String("vac2"),
+		VolumeAttributesClassName: ptr.To("vac2"),
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
 			core.ReadOnlyMany,
@@ -3127,7 +3126,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			},
 		},
 		"volume attributes class allowed because feature enable": {
-			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
+			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure: true,
@@ -3135,7 +3134,7 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			},
 		},
 		"volume attributes class validated because used and feature disabled": {
-			oldPvc:                      pvcWithVolumeAttributesClassName(utilpointer.String("foo")),
+			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableRecoverFromExpansionFailure: true,
@@ -3167,7 +3166,7 @@ func TestValidationOptionsForPersistentVolumeClaimTemplate(t *testing.T) {
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{},
 		},
 		"volume attributes class allowed because feature enable": {
-			oldPvcTemplate:              pvcTemplateWithVolumeAttributesClassName(utilpointer.String("foo")),
+			oldPvcTemplate:              pvcTemplateWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				EnableVolumeAttributesClass: true,
@@ -3202,7 +3201,7 @@ func TestValidateKeyToPath(t *testing.T) {
 		kp: core.KeyToPath{Key: "k", Path: "p/..p/p../p..p"},
 		ok: true,
 	}, {
-		kp: core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32(0644)},
+		kp: core.KeyToPath{Key: "k", Path: "p", Mode: ptr.To(int32(0644))},
 		ok: true,
 	}, {
 		kp:      core.KeyToPath{Key: "", Path: "p"},
@@ -3229,11 +3228,11 @@ func TestValidateKeyToPath(t *testing.T) {
 		ok:      false,
 		errtype: field.ErrorTypeInvalid,
 	}, {
-		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32(01000)},
+		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: ptr.To(int32(01000))},
 		ok:      false,
 		errtype: field.ErrorTypeInvalid,
 	}, {
-		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: utilpointer.Int32(-1)},
+		kp:      core.KeyToPath{Key: "k", Path: "p", Mode: ptr.To(int32(-1))},
 		ok:      false,
 		errtype: field.ErrorTypeInvalid,
 	},
@@ -4190,7 +4189,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "my-secret",
-						DefaultMode: utilpointer.Int32(0644),
+						DefaultMode: ptr.To(int32(0644)),
 					},
 				},
 			},
@@ -4204,7 +4203,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: utilpointer.Int32(0644),
+							Mode: ptr.To(int32(0644)),
 						}},
 					},
 				},
@@ -4275,7 +4274,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: utilpointer.Int32(01000),
+						DefaultMode: ptr.To(int32(01000)),
 					},
 				},
 			},
@@ -4290,7 +4289,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
 						SecretName:  "s",
-						DefaultMode: utilpointer.Int32(-1),
+						DefaultMode: ptr.To(int32(-1)),
 					},
 				},
 			},
@@ -4321,7 +4320,7 @@ func TestValidateVolumes(t *testing.T) {
 						LocalObjectReference: core.LocalObjectReference{
 							Name: "my-cfgmap",
 						},
-						DefaultMode: utilpointer.Int32(0644),
+						DefaultMode: ptr.To(int32(0644)),
 					},
 				},
 			},
@@ -4336,7 +4335,7 @@ func TestValidateVolumes(t *testing.T) {
 						Items: []core.KeyToPath{{
 							Key:  "key",
 							Path: "filename",
-							Mode: utilpointer.Int32(0644),
+							Mode: ptr.To(int32(0644)),
 						}},
 					},
 				},
@@ -4408,7 +4407,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          utilpointer.Int32(01000),
+						DefaultMode:          ptr.To(int32(01000)),
 					},
 				},
 			},
@@ -4423,7 +4422,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					ConfigMap: &core.ConfigMapVolumeSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "c"},
-						DefaultMode:          utilpointer.Int32(-1),
+						DefaultMode:          ptr.To(int32(-1)),
 					},
 				},
 			},
@@ -4765,7 +4764,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32(0644),
+						DefaultMode: ptr.To(int32(0644)),
 					},
 				},
 			},
@@ -4776,7 +4775,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32(0644),
+							Mode: ptr.To(int32(0644)),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -4793,7 +4792,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32(01000),
+							Mode: ptr.To(int32(01000)),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -4814,7 +4813,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
 						Items: []core.DownwardAPIVolumeFile{{
-							Mode: utilpointer.Int32(-1),
+							Mode: ptr.To(int32(-1)),
 							Path: "path",
 							FieldRef: &core.ObjectFieldSelector{
 								APIVersion: "v1",
@@ -4962,7 +4961,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32(01000),
+						DefaultMode: ptr.To(int32(01000)),
 					},
 				},
 			},
@@ -4976,7 +4975,7 @@ func TestValidateVolumes(t *testing.T) {
 				Name: "downapi",
 				VolumeSource: core.VolumeSource{
 					DownwardAPI: &core.DownwardAPIVolumeSource{
-						DefaultMode: utilpointer.Int32(-1),
+						DefaultMode: ptr.To(int32(-1)),
 					},
 				},
 			},
@@ -4993,7 +4992,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        utilpointer.Int32(1),
+						Lun:        ptr.To(int32(1)),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -5018,7 +5017,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{},
-						Lun:        utilpointer.Int32(1),
+						Lun:        ptr.To(int32(1)),
 						WWIDs:      []string{},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -5037,7 +5036,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"some_wwn"},
-						Lun:        utilpointer.Int32(1),
+						Lun:        ptr.To(int32(1)),
 						WWIDs:      []string{"some_wwid"},
 						FSType:     "ext4",
 						ReadOnly:   false,
@@ -5074,7 +5073,7 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: core.VolumeSource{
 					FC: &core.FCVolumeSource{
 						TargetWWNs: []string{"wwn"},
-						Lun:        utilpointer.Int32(256),
+						Lun:        ptr.To(int32(256)),
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
@@ -7580,7 +7579,7 @@ func Test_validateProbe(t *testing.T) {
 		args: args{
 			probe: &core.Probe{
 				ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 			},
 			fldPath: fldPath,
 		},
@@ -7589,7 +7588,7 @@ func Test_validateProbe(t *testing.T) {
 		args: args{
 			probe: &core.Probe{
 				ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
-				TerminationGracePeriodSeconds: utilpointer.Int64(0),
+				TerminationGracePeriodSeconds: ptr.To(int64(0)),
 			},
 			fldPath: fldPath,
 		},
@@ -7598,7 +7597,7 @@ func Test_validateProbe(t *testing.T) {
 		args: args{
 			probe: &core.Probe{
 				ProbeHandler:                  core.ProbeHandler{Exec: &core.ExecAction{Command: []string{"echo"}}},
-				TerminationGracePeriodSeconds: utilpointer.Int64(1),
+				TerminationGracePeriodSeconds: ptr.To(int64(1)),
 			},
 			fldPath: fldPath,
 		},
@@ -7887,7 +7886,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				EnvFrom: []core.EnvFromSource{{
 					ConfigMapRef: &core.ConfigMapEnvSource{
 						LocalObjectReference: core.LocalObjectReference{Name: "dummy"},
-						Optional:             &[]bool{true}[0],
+						Optional:             ptr.To(true),
 					},
 				}},
 				Env: []core.EnvVar{
@@ -8276,7 +8275,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 }
 
 func TestValidateWindowsPodSecurityContext(t *testing.T) {
-	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}
+	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("dummy")}}
 	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
 	cases := map[string]struct {
 		podSec      *core.PodSpec
@@ -8324,7 +8323,7 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 		RunAsUser: &runAsUser,
 	}
 	invalidLinuxSC := &core.PodSecurityContext{
-		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("myUser")},
 	}
 
 	cases := map[string]struct {
@@ -8759,7 +8758,7 @@ func TestValidateContainers(t *testing.T) {
 						Port: intstr.FromInt32(80),
 					},
 				},
-				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+				TerminationGracePeriodSeconds: ptr.To(int64(10)),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8848,7 +8847,7 @@ func TestValidateContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8879,7 +8878,7 @@ func TestValidateContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -8913,7 +8912,7 @@ func TestValidateContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
@@ -9419,7 +9418,7 @@ func TestValidateInitContainers(t *testing.T) {
 				PeriodSeconds:                 -1,
 				SuccessThreshold:              -1,
 				FailureThreshold:              -1,
-				TerminationGracePeriodSeconds: utilpointer.Int64(-1),
+				TerminationGracePeriodSeconds: ptr.To(int64(-1)),
 			},
 		}},
 		field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
@@ -9499,10 +9498,10 @@ func TestValidateInitContainers(t *testing.T) {
 						Port: intstr.FromInt32(80),
 					},
 				},
-				TerminationGracePeriodSeconds: utilpointer.Int64(10),
+				TerminationGracePeriodSeconds: ptr.To(int64(10)),
 			},
 		}},
-		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: utilpointer.Int64(10)}},
+		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe.terminationGracePeriodSeconds", BadValue: ptr.To(int64(10))}},
 	}, {
 		"invalid liveness probe, successThreshold != 1",
 		line(),
@@ -10145,7 +10144,7 @@ func TestValidatePodSpec(t *testing.T) {
 		),
 		"populate ShareProcessNamespace": podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
-				ShareProcessNamespace: &[]bool{true}[0],
+				ShareProcessNamespace: ptr.To(true),
 			}),
 		),
 		"populate RuntimeClassName": podtest.MakePod("",
@@ -10263,7 +10262,7 @@ func TestValidatePodSpec(t *testing.T) {
 		"ShareProcessNamespace and HostPID both set": *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				HostPID:               true,
-				ShareProcessNamespace: &[]bool{true}[0],
+				ShareProcessNamespace: ptr.To(true),
 			}),
 		),
 		"bad RuntimeClassName": *podtest.MakePod("",
@@ -10497,10 +10496,10 @@ func TestValidatePod(t *testing.T) {
 				}),
 		),
 		"populate forgiveness tolerations with exists operator in annotations.": *podtest.MakePod("123",
-			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Exists", Value: "", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}),
+			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Exists", Value: "", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(60))}),
 		),
 		"populate forgiveness tolerations with equal operator in annotations.": *podtest.MakePod("123",
-			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoExecute", TolerationSeconds: &[]int64{60}[0]}),
+			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(60))}),
 		),
 		"populate tolerations equal operator in annotations.": *podtest.MakePod("123",
 			podtest.SetTolerations(core.Toleration{Key: "foo", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}),
@@ -10519,7 +10518,7 @@ func TestValidatePod(t *testing.T) {
 		),
 		"negative tolerationSeconds is OK for toleration.": *podtest.MakePod("123",
 			podtest.SetTolerations(
-				core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}),
+				core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(-2))}),
 		),
 		"runtime default seccomp profile": *podtest.MakePod("123",
 			podtest.SetAnnotations(map[string]string{
@@ -10582,7 +10581,7 @@ func TestValidatePod(t *testing.T) {
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SeccompProfile: &core.SeccompProfile{
 					Type:             core.SeccompProfileTypeLocalhost,
-					LocalhostProfile: utilpointer.String("filename.json"),
+					LocalhostProfile: ptr.To("filename.json"),
 				},
 			}),
 		),
@@ -10591,7 +10590,7 @@ func TestValidatePod(t *testing.T) {
 				podtest.SetContainerSecurityContext(core.SecurityContext{
 					SeccompProfile: &core.SeccompProfile{
 						Type:             core.SeccompProfileTypeLocalhost,
-						LocalhostProfile: utilpointer.String("filename.json"),
+						LocalhostProfile: ptr.To("filename.json"),
 					},
 				}),
 			)),
@@ -10752,7 +10751,7 @@ func TestValidatePod(t *testing.T) {
 							{
 								ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 									Path: "foo-path",
-									Name: utilpointer.String("foo"),
+									Name: ptr.To("foo"),
 								},
 							},
 						},
@@ -10769,7 +10768,7 @@ func TestValidatePod(t *testing.T) {
 							{
 								ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 									Path:       "foo-path",
-									SignerName: utilpointer.String("example.com/foo"),
+									SignerName: ptr.To("example.com/foo"),
 									LabelSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{
 											"version": "live",
@@ -11784,7 +11783,7 @@ func TestValidatePod(t *testing.T) {
 		"effect must be 'NoExecute' when `TolerationSeconds` is set": {
 			expectedError: "spec.tolerations[0].effect",
 			spec: *podtest.MakePod("pod-forgiveness-invalid",
-				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}),
+				podtest.SetTolerations(core.Toleration{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: ptr.To(int64(20))}),
 			),
 		},
 		"must be a valid pod seccomp profile": {
@@ -12168,13 +12167,13 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path:       "foo-path",
-										SignerName: utilpointer.String("example.com/foo"),
+										SignerName: ptr.To("example.com/foo"),
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"version": "live",
 											},
 										},
-										Name: utilpointer.String("foo"),
+										Name: ptr.To("foo"),
 									},
 								},
 							},
@@ -12194,7 +12193,7 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path: "foo-path",
-										Name: utilpointer.String(""),
+										Name: ptr.To(""),
 									},
 								},
 							},
@@ -12214,7 +12213,7 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path:       "foo-path",
-										SignerName: utilpointer.String(""),
+										SignerName: ptr.To(""),
 										LabelSelector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"foo": "bar",
@@ -12239,7 +12238,7 @@ func TestValidatePod(t *testing.T) {
 								{
 									ClusterTrustBundle: &core.ClusterTrustBundleProjection{
 										Path:       "foo-path",
-										SignerName: utilpointer.String("example.com/foo/invalid"),
+										SignerName: ptr.To("example.com/foo/invalid"),
 									},
 								},
 							},
@@ -12827,18 +12826,18 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			old: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),
-				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(10))}),
 			),
 			err:  "spec.tolerations: Forbidden",
 			test: "existing toleration value modified in pod spec updates with modified tolerationSeconds",
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),
-				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(10))}),
 			),
 			old: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),
-				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(20))}),
 			),
 			err:  "",
 			test: "modified tolerationSeconds in existing toleration value in pod spec updates",
@@ -12867,13 +12866,13 @@ func TestValidatePodUpdate(t *testing.T) {
 			new: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),
 				podtest.SetTolerations(
-					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
-					core.Toleration{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]}),
+					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(20))},
+					core.Toleration{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(30))}),
 			),
 			old: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),
 				podtest.SetTolerations(
-					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(10))}),
 			),
 			err:  "",
 			test: "added valid new toleration to existing tolerations in pod spec updates",
@@ -12881,13 +12880,13 @@ func TestValidatePodUpdate(t *testing.T) {
 			new: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),
 				podtest.SetTolerations(
-					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]},
-					core.Toleration{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
+					core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(20))},
+					core.Toleration{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: ptr.To(int64(30))},
 				),
 			),
 			old: *podtest.MakePod("foo",
 				podtest.SetNodeName("node1"),
-				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}),
+				podtest.SetTolerations(core.Toleration{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: ptr.To(int64(10))}),
 			),
 			err:  "spec.tolerations[1].effect",
 			test: "added invalid new toleration to existing tolerations in pod spec updates",
@@ -14291,7 +14290,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		*podtest.MakePod("foo",
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "no-such-claim", ResourceClaimName: utilpointer.String("my-claim")},
+					{Name: "no-such-claim", ResourceClaimName: ptr.To("my-claim")},
 				},
 			}),
 		),
@@ -14303,7 +14302,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			podtest.SetResourceClaims(core.PodResourceClaim{Name: "my-claim"}),
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "my-claim", ResourceClaimName: utilpointer.String("%$!#")},
+					{Name: "my-claim", ResourceClaimName: ptr.To("%$!#")},
 				},
 			}),
 		),
@@ -14320,7 +14319,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-claim", ResourceClaimName: ptr.To("foo-my-claim-12345")},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
@@ -14339,7 +14338,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			),
 			podtest.SetStatus(core.PodStatus{
 				ResourceClaimStatuses: []core.PodResourceClaimStatus{
-					{Name: "my-claim", ResourceClaimName: utilpointer.String("foo-my-claim-12345")},
+					{Name: "my-claim", ResourceClaimName: ptr.To("foo-my-claim-12345")},
 					{Name: "my-other-claim", ResourceClaimName: nil},
 				},
 			}),
@@ -15286,7 +15285,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports[0].Protocol = "UDP"
 		},
 		numErrs: 0,
@@ -15295,7 +15294,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports[0] = core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt32(12345)}
 		},
 		numErrs: 0,
@@ -15304,7 +15303,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15352,7 +15351,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 0,
 	}, {
@@ -15360,7 +15359,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 		},
 		numErrs: 0,
 	}, {
@@ -15375,7 +15374,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15384,7 +15383,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15442,7 +15441,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 0,
 	}, {
@@ -15450,7 +15449,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15459,7 +15458,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", NodePort: 12345, TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15507,7 +15506,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 0,
@@ -15518,7 +15517,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "kubelet", Port: 10250, Protocol: "TCP", TargetPort: intstr.FromInt32(12345)})
 		},
 		numErrs: 1,
@@ -15527,7 +15526,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.0/24,  5.6.0.0/16"
 		},
 		numErrs: 0,
@@ -15536,7 +15535,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = ""
 		},
 		numErrs: 0,
@@ -15545,7 +15544,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "  "
 		},
 		numErrs: 0,
@@ -15554,7 +15553,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
 		},
 		numErrs: 1,
@@ -15563,7 +15562,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
 		},
 		numErrs: 1,
@@ -15584,7 +15583,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "5.6.0.0/16"}
 		},
 		numErrs: 0,
@@ -15593,7 +15592,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24  ", " 5.6.0.0/16"}
 		},
 		numErrs: 0,
@@ -15602,7 +15601,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"   "}
 		},
 		numErrs: 1,
@@ -15611,7 +15610,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"foo.bar"}
 		},
 		numErrs: 1,
@@ -15620,7 +15619,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.4/33"}
 		},
 		numErrs: 1,
@@ -15635,7 +15634,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
 			s.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "5.6.0.0/16"}
 		},
@@ -15686,7 +15685,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			s.Spec.ClusterIPs = []string{"None"}
 			s.Spec.Type = core.ServiceTypeLoadBalancer
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 1,
 	}, {
@@ -15705,7 +15704,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "invalid externalTraffic field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.ExternalTrafficPolicy = "invalid"
 			},
 			numErrs: 1,
@@ -15761,7 +15760,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "negative healthCheckNodePort field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = -1
 			},
@@ -15770,7 +15769,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			name: "negative healthCheckNodePort field",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 				s.Spec.HealthCheckNodePort = 31100
 			},
@@ -15784,7 +15783,7 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.SessionAffinity = core.ServiceAffinityClientIP
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: utilpointer.Int32(-1),
+						TimeoutSeconds: ptr.To(int32(-1)),
 					},
 				}
 			},
@@ -15794,11 +15793,11 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				s.Spec.SessionAffinity = core.ServiceAffinityNone
 				s.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 					ClientIP: &core.ClientIPConfig{
-						TimeoutSeconds: utilpointer.Int32(90),
+						TimeoutSeconds: ptr.To(int32(90)),
 					},
 				}
 			},
@@ -16152,7 +16151,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					Port:        12345,
 					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
-					AppProtocol: utilpointer.String("HTTP"),
+					AppProtocol: ptr.To("HTTP"),
 				}}
 			},
 			numErrs: 0,
@@ -16163,7 +16162,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					Port:        12345,
 					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
-					AppProtocol: utilpointer.String("example.com/protocol"),
+					AppProtocol: ptr.To("example.com/protocol"),
 				}}
 			},
 			numErrs: 0,
@@ -16174,7 +16173,7 @@ func TestValidateServiceCreate(t *testing.T) {
 					Port:        12345,
 					TargetPort:  intstr.FromInt32(12345),
 					Protocol:    "TCP",
-					AppProtocol: utilpointer.String("example.com/protocol_with{invalid}[characters]"),
+					AppProtocol: ptr.To("example.com/protocol_with{invalid}[characters]"),
 				}}
 			},
 			numErrs: 1,
@@ -16198,7 +16197,7 @@ func TestValidateServiceCreate(t *testing.T) {
 		}, {
 			name: "Use AllocateLoadBalancerNodePorts when type is not LoadBalancer",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			},
 			numErrs: 1,
 		}, {
@@ -16206,8 +16205,8 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				s.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 0,
 		}, {
@@ -16215,15 +16214,15 @@ func TestValidateServiceCreate(t *testing.T) {
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				s.Spec.LoadBalancerClass = utilpointer.String("Bad/LoadBalancerClass")
+				s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				s.Spec.LoadBalancerClass = ptr.To("Bad/LoadBalancerClass")
 			},
 			numErrs: 1,
 		}, {
 			name: "invalid: set LoadBalancerClass when type is not LoadBalancer",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeClusterIP
-				s.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				s.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 1,
 		}, {
@@ -16236,13 +16235,13 @@ func TestValidateServiceCreate(t *testing.T) {
 		}, {
 			name: "valid: trafficDistribution field set to PreferClose",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.TrafficDistribution = utilpointer.String("PreferClose")
+				s.Spec.TrafficDistribution = ptr.To("PreferClose")
 			},
 			numErrs: 0,
 		}, {
 			name: "invalid: trafficDistribution field set to Random",
 			tweakSvc: func(s *core.Service) {
-				s.Spec.TrafficDistribution = utilpointer.String("Random")
+				s.Spec.TrafficDistribution = ptr.To("Random")
 			},
 			numErrs: 1,
 		},
@@ -16272,7 +16271,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 		name: "valid loadBalancer service with externalTrafficPolicy and healthCheckNodePort set",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyLocal
 			s.Spec.HealthCheckNodePort = 34567
 		},
@@ -16294,7 +16293,7 @@ func TestValidateServiceExternalTrafficPolicy(t *testing.T) {
 		name: "cannot set healthCheckNodePort field on loadBalancer service with externalTrafficPolicy!=Local",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Type = core.ServiceTypeLoadBalancer
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.HealthCheckNodePort = 34567
 		},
@@ -17783,7 +17782,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			newSvc.Spec.SessionAffinity = "ClientIP"
 			newSvc.Spec.SessionAffinityConfig = &core.SessionAffinityConfig{
 				ClientIP: &core.ClientIPConfig{
-					TimeoutSeconds: utilpointer.Int32(90),
+					TimeoutSeconds: ptr.To(int32(90)),
 				},
 			}
 		},
@@ -17799,7 +17798,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 0,
 	}, {
@@ -17819,10 +17818,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 		name: "add loadBalancerSourceRanges",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
 			oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-			oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 		},
 		numErrs: 0,
@@ -17830,11 +17829,11 @@ func TestValidateServiceUpdate(t *testing.T) {
 		name: "update loadBalancerSourceRanges",
 		tweakSvc: func(oldSvc, newSvc *core.Service) {
 			oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-			oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			oldSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			newSvc.Spec.LoadBalancerSourceRanges = []string{"10.100.0.0/16"}
 		},
 		numErrs: 0,
@@ -17845,7 +17844,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			newSvc.Spec.ClusterIPs = []string{"None"}
 			newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 			newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-			newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+			newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		},
 		numErrs: 1,
 	}, {
@@ -17942,7 +17941,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -17957,7 +17956,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -17970,20 +17969,20 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its AllocateLoadBalancerNodePorts from true to false",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 			},
 			numErrs: 0,
 		}, {
 			name: "Service with LoadBalancer type can change its AllocateLoadBalancerNodePorts from false to true",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			},
 			numErrs: 0,
 		}, {
@@ -18046,7 +18045,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -18061,7 +18060,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -18074,10 +18073,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type cannot change its set ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
 				oldSvc.Spec.ClusterIPs = []string{"1.2.3.4"}
@@ -18090,10 +18089,10 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its empty ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 
 				oldSvc.Spec.ClusterIP = ""
 				oldSvc.Spec.ClusterIPs = nil
@@ -18106,7 +18105,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type cannot change its set ClusterIP when changing type to ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = "1.2.3.4"
@@ -18120,7 +18119,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its empty ClusterIP when changing type to ClusterIP",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				oldSvc.Spec.ClusterIP = ""
@@ -18134,7 +18133,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type cannot change its set ClusterIP when changing type to NodePort",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
@@ -18149,7 +18148,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "Service with LoadBalancer type can change its empty ClusterIP when changing type to NodePort",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 
@@ -18597,58 +18596,58 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "update to valid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: utilpointer.String("https")}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: ptr.To("https")}}
 			},
 			numErrs: 0,
 		}, {
 			name: "update to invalid app protocol",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP"}}
-				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: utilpointer.String("~https")}}
+				newSvc.Spec.Ports = []core.ServicePort{{Name: "a", Port: 443, TargetPort: intstr.FromInt32(3000), Protocol: "TCP", AppProtocol: ptr.To("~https")}}
 			},
 			numErrs: 1,
 		}, {
 			name: "Set AllocateLoadBalancerNodePorts when type is not LoadBalancer",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 			},
 			numErrs: 1,
 		}, {
 			name: "update LoadBalancer type of service without change LoadBalancerClass",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 			},
 			numErrs: 0,
 		}, {
 			name: "invalid: change LoadBalancerClass when update service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-new")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-new")
 			},
 			numErrs: 1,
 		}, {
 			name: "invalid: unset LoadBalancerClass when update service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-old")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-old")
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
 			numErrs: 1,
@@ -18656,13 +18655,13 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "invalid: set LoadBalancerClass when update service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				oldSvc.Spec.LoadBalancerClass = nil
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-new")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-new")
 			},
 			numErrs: 1,
 		}, {
@@ -18672,8 +18671,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 0,
 		}, {
@@ -18683,7 +18682,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 				newSvc.Spec.LoadBalancerClass = nil
 			},
 			numErrs: 0,
@@ -18694,8 +18693,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("Bad/LoadBalancerclass")
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerClass = ptr.To("Bad/LoadBalancerclass")
 			},
 			numErrs: 2,
 		}, {
@@ -18704,7 +18703,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeClusterIP
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
@@ -18713,7 +18712,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = core.ServiceTypeExternalName
 
 				newSvc.Spec.Type = core.ServiceTypeExternalName
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 3,
 		}, {
@@ -18723,41 +18722,41 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
 			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeClusterIP
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
 			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeExternalName
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 3,
 		}, {
 			name: "invalid: set LoadBalancerClass when update from LoadBalancer service to non LoadBalancer type of service",
 			tweakSvc: func(oldSvc, newSvc *core.Service) {
 				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
-				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
-				oldSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 
 				newSvc.Spec.Type = core.ServiceTypeNodePort
 				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
-				newSvc.Spec.LoadBalancerClass = utilpointer.String("test.com/test-load-balancer-class")
+				newSvc.Spec.LoadBalancerClass = ptr.To("test.com/test-load-balancer-class")
 			},
 			numErrs: 2,
 		}, {
@@ -20631,7 +20630,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []core.EndpointSubset{{
 					Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
-					Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.String("HTTP")}},
+					Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP", AppProtocol: ptr.To("HTTP")}},
 				}},
 			},
 		},
@@ -20799,7 +20798,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []core.EndpointSubset{{
 					Addresses: []core.EndpointAddress{{IP: "10.10.1.1"}},
-					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP", AppProtocol: utilpointer.String("lots-of[invalid]-{chars}")}},
+					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP", AppProtocol: ptr.To("lots-of[invalid]-{chars}")}},
 				}},
 			},
 			errorType:   "FieldValueInvalid",
@@ -20834,7 +20833,7 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.String("https")}}
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: ptr.To("https")}}
 			},
 			numExpectedErrors: 0,
 		},
@@ -20843,7 +20842,7 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}}
 			},
 			tweakNewEndpoints: func(ep *core.Endpoints) {
-				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: utilpointer.String("~https")}}
+				ep.Subsets[0].Ports = []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP", AppProtocol: ptr.To("~https")}}
 			},
 			numExpectedErrors: 1,
 		},
@@ -20880,7 +20879,7 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorType:   "FieldValueForbidden",
 	}, {
 		name:        "pod with SeccompProfile",
-		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: ptr.To("dummy")}}}}},
 		expectError: true,
 		errorMsg:    "cannot be set for a windows pod",
 		errorType:   "FieldValueForbidden",
@@ -20892,7 +20891,7 @@ func TestValidateWindowsSecurityContext(t *testing.T) {
 		errorType:   "FieldValueForbidden",
 	}, {
 		name:        "pod with WindowsOptions, no error",
-		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
+		sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("dummy")}}}}},
 		expectError: false,
 	},
 	}
@@ -21256,7 +21255,7 @@ func TestValidateTLSSecret(t *testing.T) {
 func TestValidateLinuxSecurityContext(t *testing.T) {
 	runAsUser := int64(1)
 	validLinuxSC := &core.SecurityContext{
-		Privileged: utilpointer.Bool(false),
+		Privileged: ptr.To(false),
 		Capabilities: &core.Capabilities{
 			Add:  []core.Capability{"foo"},
 			Drop: []core.Capability{"bar"},
@@ -21270,7 +21269,7 @@ func TestValidateLinuxSecurityContext(t *testing.T) {
 		RunAsUser: &runAsUser,
 	}
 	invalidLinuxSC := &core.SecurityContext{
-		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("myUser")},
 	}
 	cases := map[string]struct {
 		sc          *core.PodSpec
@@ -21310,7 +21309,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	runAsUser := int64(1)
 	fullValidSC := func() *core.SecurityContext {
 		return &core.SecurityContext{
-			Privileged: utilpointer.Bool(false),
+			Privileged: ptr.To(false),
 			Capabilities: &core.Capabilities{
 				Add:  []core.Capability{"foo"},
 				Drop: []core.Capability{"bar"},
@@ -21366,19 +21365,19 @@ func TestValidateSecurityContext(t *testing.T) {
 	}
 
 	privRequestWithGlobalDeny := fullValidSC()
-	privRequestWithGlobalDeny.Privileged = utilpointer.Bool(true)
+	privRequestWithGlobalDeny.Privileged = ptr.To(true)
 
 	negativeRunAsUser := fullValidSC()
 	negativeUser := int64(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
 	privWithoutEscalation := fullValidSC()
-	privWithoutEscalation.Privileged = utilpointer.Bool(true)
-	privWithoutEscalation.AllowPrivilegeEscalation = utilpointer.Bool(false)
+	privWithoutEscalation.Privileged = ptr.To(true)
+	privWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
 
 	capSysAdminWithoutEscalation := fullValidSC()
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
-	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = utilpointer.Bool(false)
+	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
 
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
@@ -22034,17 +22033,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 	successCases := map[string]*core.SessionAffinityConfig{
 		"non-empty config, valid timeout: 1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(1),
+				TimeoutSeconds: ptr.To(int32(1)),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds-1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(core.MaxClientIPServiceAffinitySeconds - 1),
+				TimeoutSeconds: ptr.To(int32(core.MaxClientIPServiceAffinitySeconds - 1)),
 			},
 		},
 		"non-empty config, valid timeout: core.MaxClientIPServiceAffinitySeconds": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(core.MaxClientIPServiceAffinitySeconds),
+				TimeoutSeconds: ptr.To(int32(core.MaxClientIPServiceAffinitySeconds)),
 			},
 		},
 	}
@@ -22067,17 +22066,17 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 		},
 		"non-empty config, invalid timeout: core.MaxClientIPServiceAffinitySeconds+1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(core.MaxClientIPServiceAffinitySeconds + 1),
+				TimeoutSeconds: ptr.To(int32(core.MaxClientIPServiceAffinitySeconds + 1)),
 			},
 		},
 		"non-empty config, invalid timeout: -1": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(-1),
+				TimeoutSeconds: ptr.To(int32(-1)),
 			},
 		},
 		"non-empty config, invalid timeout: 0": {
 			ClientIP: &core.ClientIPConfig{
-				TimeoutSeconds: utilpointer.Int32(0),
+				TimeoutSeconds: ptr.To(int32(0)),
 			},
 		},
 	}
@@ -22521,19 +22520,19 @@ func TestVolumeAttributesClass(t *testing.T) {
 			testName:                    "Feature gate enabled and an empty volumeAttributesClassName specified",
 			expectedFail:                false,
 			enableVolumeAttributesClass: true,
-			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("")),
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(ptr.To("")),
 		},
 		{
 			testName:                    "Feature gate enabled and valid volumeAttributesClassName specified",
 			expectedFail:                false,
 			enableVolumeAttributesClass: true,
-			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("foo")),
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(ptr.To("foo")),
 		},
 		{
 			testName:                    "Feature gate enabled and invalid volumeAttributesClassName specified",
 			expectedFail:                true,
 			enableVolumeAttributesClass: true,
-			claimSpec:                   pvcSpecWithVolumeAttributesClassName(utilpointer.String("-invalid-")),
+			claimSpec:                   pvcSpecWithVolumeAttributesClassName(ptr.To("-invalid-")),
 		},
 	}
 	for _, tc := range testCases {
@@ -22579,7 +22578,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.DoNotSchedule,
-			MinDomains:        utilpointer.Int32(3),
+			MinDomains:        ptr.To(int32(3)),
 		}},
 		wantFieldErrors: field.ErrorList{},
 	}, {
@@ -22609,29 +22608,29 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.DoNotSchedule,
-			MinDomains:        utilpointer.Int32(-1),
+			MinDomains:        ptr.To(int32(-1)),
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg)},
+		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, ptr.To(int32(-1)), isNotPositiveErrorMsg)},
 	}, {
 		name: "cannot use non-nil MinDomains with ScheduleAnyway",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.ScheduleAnyway,
-			MinDomains:        utilpointer.Int32(10),
+			MinDomains:        ptr.To(int32(10)),
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
+		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, ptr.To(int32(10)), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
 	}, {
 		name: "use negative MinDomains with ScheduleAnyway(invalid)",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
 			WhenUnsatisfiable: core.ScheduleAnyway,
-			MinDomains:        utilpointer.Int32(-1),
+			MinDomains:        ptr.To(int32(-1)),
 		}},
 		wantFieldErrors: []*field.Error{
-			field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg),
-			field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
+			field.Invalid(fieldPathMinDomains, ptr.To(int32(-1)), isNotPositiveErrorMsg),
+			field.Invalid(fieldPathMinDomains, ptr.To(int32(-1)), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
 		},
 	}, {
 		name: "missing TopologyKey",
@@ -23374,7 +23373,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 	}, {
 		description:     "localhost/test.json annotation and SeccompProfileTypeLocalhost with correct profile should return empty",
 		annotationValue: "localhost/test.json",
-		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: utilpointer.String("test.json")},
+		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("test.json")},
 		expectedErr:     nil,
 	}, {
 		description:     "localhost/test.json annotation and SeccompProfileTypeLocalhost without profile should error",
@@ -23385,7 +23384,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 	}, {
 		description:     "localhost/test.json annotation and SeccompProfileTypeLocalhost with different profile should error",
 		annotationValue: "localhost/test.json",
-		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: utilpointer.String("different.json")},
+		seccompField:    &core.SeccompProfile{Type: core.SeccompProfileTypeLocalhost, LocalhostProfile: ptr.To("different.json")},
 		fldPath:         rootFld,
 		expectedErr:     field.Forbidden(rootFld.Child("localhostProfile"), "seccomp profile in annotation and field must match"),
 	}, {
