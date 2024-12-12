@@ -60,7 +60,7 @@ else
 $(error Both KUBE_GOFLAGS and GOFLAGS are set. Please use just GOFLAGS)
 endif
 endif
-
+GOFLAGS += "-buildvcs=false"
 # This controls the verbosity of the build.  Higher numbers mean more output.
 KUBE_VERBOSE ?= 1
 

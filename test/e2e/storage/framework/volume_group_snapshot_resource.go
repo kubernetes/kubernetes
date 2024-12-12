@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo/v2"
-
+	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -64,7 +64,7 @@ type VolumeGroupSnapshotResource struct {
 // CreateVolumeGroupSnapshot creates a VolumeGroupSnapshotClass with given SnapshotDeletionPolicy and a VolumeGroupSnapshot
 // from the VolumeGroupSnapshotClass using a dynamic client.
 // Returns the unstructured VolumeGroupSnapshotClass and VolumeGroupSnapshot objects.
-func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VoulmeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, groupName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) (*unstructured.Unstructured, *unstructured.Unstructured) {
+func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VoulmeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, groupName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured) {
 	defer ginkgo.GinkgoRecover()
 	var err error
 	if pattern.SnapshotType != VolumeGroupSnapshot {
@@ -99,8 +99,15 @@ func CreateVolumeGroupSnapshot(ctx context.Context, sDriver VoulmeGroupSnapshott
 	ginkgo.By("Getting group snapshot and content")
 	volumeGroupSnapshot, err = dc.Resource(utils.VolumeGroupSnapshotGVR).Namespace(volumeGroupSnapshot.GetNamespace()).Get(ctx, volumeGroupSnapshot.GetName(), metav1.GetOptions{})
 	framework.ExpectNoError(err, "Failed to get volume group snapshot after creation")
-
-	return gsclass, volumeGroupSnapshot
+	status := volumeGroupSnapshot.Object["status"]
+	err = framework.Gomega().Expect(status).NotTo(gomega.BeNil())
+	framework.ExpectNoError(err, "Failed to get status of volume group snapshot")
+	vgsc_name := status.(map[string]interface{})["boundVolumeGroupSnapshotContentName"].(string)
+	err = framework.Gomega().Expect(vgsc_name).NotTo(gomega.BeNil())
+	framework.ExpectNoError(err, "Failed to get content name of volume group snapshot")
+	vgsc, err := dc.Resource(utils.VolumeGroupSnapshotContentGVR).Get(ctx, vgsc_name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get content of group snapshot")
+	return gsclass, volumeGroupSnapshot, vgsc
 }
 
 // CleanupResource deletes the VolumeGroupSnapshotClass and VolumeGroupSnapshot objects using a dynamic client.
@@ -114,13 +121,13 @@ func (r *VolumeGroupSnapshotResource) CleanupResource(ctx context.Context, timeo
 
 // CreateVolumeGroupSnapshotResource creates a VolumeGroupSnapshotResource object with the given parameters.
 func CreateVolumeGroupSnapshotResource(ctx context.Context, sDriver VoulmeGroupSnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) *VolumeGroupSnapshotResource {
-	vgsclass, snapshot := CreateVolumeGroupSnapshot(ctx, sDriver, config, pattern, pvcName, pvcNamespace, timeouts, parameters)
+	vgsclass, snapshot, vgsc := CreateVolumeGroupSnapshot(ctx, sDriver, config, pattern, pvcName, pvcNamespace, timeouts, parameters)
 	vgs := &VolumeGroupSnapshotResource{
 		Config:     config,
 		Pattern:    pattern,
 		Vgs:        snapshot,
 		Vgsclass:   vgsclass,
-		Vgscontent: nil,
+		Vgscontent: vgsc,
 	}
 	return vgs
 }

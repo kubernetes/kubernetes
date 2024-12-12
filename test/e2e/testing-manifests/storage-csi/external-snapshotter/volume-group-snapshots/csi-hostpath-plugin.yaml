@@ -354,11 +354,11 @@ spec:
               name: socket-dir
 
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.0.1
+          image: quay.io/madhupr001/csi-snapshotter:use-owner-ref
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
-            - --enable-volume-group-snapshots=true
+            - --feature-gates=CSIVolumeGroupSnapshot=true
           securityContext:
             # This is necessary only for systems with SELinux, where
             # non-privileged sidecar containers cannot access unix domain socket

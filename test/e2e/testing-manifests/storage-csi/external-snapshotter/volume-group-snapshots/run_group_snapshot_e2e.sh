@@ -279,16 +279,16 @@ run_tests() {
   kubectl apply -f test/e2e/testing-manifests/storage-csi/external-snapshotter/groupsnapshot.storage.k8s.io_volumegroupsnapshots.yaml || exit 1
 
 
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.0.0/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || exit 1
-  curl -s https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/release-8.1/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | \
-awk '/--leader-election=true/ {print; print "            - \"--enable-volume-group-snapshots=true\""; next}1' | \
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/master/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || exit 1
+  cat setup-snapshot-controller.yaml | \
+awk '/--leader-election=true/ {print; print "            - \"--feature-gates=CSIVolumeGroupSnapshot=true\""; next}1' | \
  kubectl apply -f - || exit 1
 
 
   ./hack/ginkgo-e2e.sh \
     '--provider=skeleton' "--num-nodes=${NUM_NODES}" \
     "--ginkgo.focus=${FOCUS}" "--ginkgo.skip=${SKIP}" "--ginkgo.label-filter=${LABEL_FILTER}" \
-    "--report-dir=${ARTIFACTS}" '--disable-log-dump=true' &
+    "--report-dir=${ARTIFACTS}"  &
   GINKGO_PID=$!
   wait "$GINKGO_PID"
 }

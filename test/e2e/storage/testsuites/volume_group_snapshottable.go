@@ -18,6 +18,10 @@ package testsuites
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
+
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -172,6 +176,7 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				init(ctx)
 				createPodsAndVolumes(ctx)
 				ginkgo.DeferCleanup(cleanup)
+				dc := groupTest.config.Framework.DynamicClient
 
 				snapshot := storageframework.CreateVolumeGroupSnapshotResource(ctx, snapshottableDriver, groupTest.config, pattern, labelValue, groupTest.volumeGroup[0][0].Pvc.GetNamespace(), f.Timeouts, map[string]string{"deletionPolicy": pattern.SnapshotDeletionPolicy.String()})
 				groupTest.snapshots = append(groupTest.snapshots, snapshot)
@@ -179,15 +184,34 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 				status := snapshot.Vgs.Object["status"]
 				err := framework.Gomega().Expect(status).NotTo(gomega.BeNil())
 				framework.ExpectNoError(err, "failed to get status of group snapshot")
-				volumes := status.(map[string]interface{})["pvcVolumeSnapshotRefList"]
-				err = framework.Gomega().Expect(volumes).NotTo(gomega.BeNil())
+
+				volumeListMap := snapshot.Vgscontent.Object["status"].(map[string]interface{})
+				err = framework.Gomega().Expect(volumeListMap).NotTo(gomega.BeNil())
 				framework.ExpectNoError(err, "failed to get volume snapshot list")
-				volumeList := volumes.([]interface{})
-				err = framework.Gomega().Expect(len(volumeList)).To(gomega.Equal(groupTest.numVolumes))
+				volumeSnapshotHandlePairList := volumeListMap["volumeSnapshotHandlePairList"].([]interface{})
+				err = framework.Gomega().Expect(volumeSnapshotHandlePairList).NotTo(gomega.BeNil())
+				framework.ExpectNoError(err, "failed to get volume snapshot list")
+				err = framework.Gomega().Expect(len(volumeSnapshotHandlePairList)).To(gomega.Equal(groupTest.numVolumes))
 				framework.ExpectNoError(err, "failed to get volume snapshot list")
 				claimSize := groupTest.volumeGroup[0][0].Pvc.Spec.Resources.Requests.Storage().String()
-				for _, volume := range volumeList {
+				for _, volume := range volumeSnapshotHandlePairList {
 					// Create a PVC from the snapshot
+					volumeHandle := volume.(map[string]interface{})["volumeHandle"].(string)
+					err = framework.Gomega().Expect(volumeHandle).NotTo(gomega.BeNil())
+					framework.ExpectNoError(err, "failed to get volume handle from volume")
+					uid := snapshot.Vgscontent.Object["metadata"].(map[string]interface{})["uid"].(string)
+					err = framework.Gomega().Expect(volumeHandle).NotTo(gomega.BeNil())
+					framework.ExpectNoError(err, "failed to get uuid from content")
+					volumeSnapshotName := fmt.Sprintf("snapshot-%x", sha256.Sum256([]byte(
+						uid+volumeHandle)))
+					volumeSnapshot, err := dc.Resource(utils.SnapshotGVR).Namespace(snapshot.Vgs.GetNamespace()).Get(
+						ctx,
+						volumeSnapshotName,
+						metav1.GetOptions{},
+					)
+					framework.ExpectNoError(err, "Failed to get volume snapshot from group snapshot")
+					pvcName := volumeSnapshot.Object["spec"].(map[string]interface{})["source"].(map[string]interface{})["persistentVolumeClaimName"].(string)
+					_ = pvcName
 					pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 						StorageClassName: &groupTest.volumeGroup[0][0].Sc.Name,
 						ClaimSize:        claimSize,
@@ -198,19 +222,20 @@ func (s *VolumeGroupSnapshottableTestSuite) DefineTests(driver storageframework.
 					pvc.Spec.DataSource = &v1.TypedLocalObjectReference{
 						APIGroup: &group,
 						Kind:     "VolumeSnapshot",
-						Name:     volume.(map[string]interface{})["volumeSnapshotRef"].(map[string]interface{})["name"].(string),
+						Name:     volumeSnapshotName,
 					}
 
-					volSrc := v1.VolumeSource{
-						Ephemeral: &v1.EphemeralVolumeSource{
-							VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
-								Spec: pvc.Spec,
-							},
-						},
-					}
-					pvc, err := cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
+					// volSrc := v1.VolumeSource{
+					// 	Ephemeral: &v1.EphemeralVolumeSource{
+					// 		VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{
+					// 			Spec: pvc.Spec,
+					// 		},
+					// 	},
+					// }
+					pvc, err = cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(ctx, pvc, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "failed to create PVC from snapshot")
-					pod := StartInPodWithVolumeSource(ctx, cs, volSrc, pvc.Namespace, "snapshot-pod", "sleep 300", groupTest.config.ClientNodeSelection)
+
+					pod := StartInPodWithVolume(ctx, cs, pvc.Namespace, pvc.Name, "tester", "sleep 300", groupTest.config.ClientNodeSelection)
 					ginkgo.DeferCleanup(e2epod.DeletePodWithWait, cs, pod)
 					framework.ExpectNoError(e2epod.WaitTimeoutForPodRunningInNamespace(ctx, cs, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow), "Pod did not start in expected time")
 				}
