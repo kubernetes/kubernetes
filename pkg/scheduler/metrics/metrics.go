@@ -102,9 +102,6 @@ var (
 	InFlightEvents             *metrics.GaugeVec
 	Goroutines                 *metrics.GaugeVec
 
-	// PodSchedulingDuration is deprecated as of Kubernetes v1.28, and will be removed
-	// in v1.31. Please use PodSchedulingSLIDuration instead.
-	PodSchedulingDuration           *metrics.HistogramVec
 	PodSchedulingSLIDuration        *metrics.HistogramVec
 	PodSchedulingAttempts           *metrics.Histogram
 	FrameworkExtensionPointDuration *metrics.HistogramVec
@@ -222,20 +219,6 @@ func InitMetrics() {
 			Help:           "Number of running goroutines split by the work they do such as binding.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"operation"})
-
-	// PodSchedulingDuration is deprecated as of Kubernetes v1.28, and will be removed
-	// in v1.31. Please use PodSchedulingSLIDuration instead.
-	PodSchedulingDuration = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
-			Subsystem: SchedulerSubsystem,
-			Name:      "pod_scheduling_duration_seconds",
-			Help:      "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
-			// Start with 10ms with the last bucket being [~88m, Inf).
-			Buckets:           metrics.ExponentialBuckets(0.01, 2, 20),
-			StabilityLevel:    metrics.STABLE,
-			DeprecatedVersion: "1.29.0",
-		},
-		[]string{"attempts"})
 
 	PodSchedulingSLIDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -371,7 +354,6 @@ func InitMetrics() {
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
-		PodSchedulingDuration,
 		PodSchedulingSLIDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
