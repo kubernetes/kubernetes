@@ -51,6 +51,33 @@ func TestIsUnixDomainSocket(t *testing.T) {
 			expectSocket:   false,
 			expectError:    false,
 		},
+		{
+			label:       "Empty file path",
+			invalidFile: true,
+			expectError: true,
+		},
+		{
+			label:          "Socket on different path",
+			listenOnSocket: true,
+			expectSocket:   true,
+			expectError:    false,
+		},
+		{
+			label:       "Directory instead of file",
+			invalidFile: true,
+			expectError: true,
+		},
+		{
+			label:       "Regular file with socket name",
+			invalidFile: true,
+			expectError: true,
+		},
+		{
+			label:          "Multiple Unix Domain Sockets",
+			listenOnSocket: true,
+			expectSocket:   true,
+			expectError:    false,
+		},
 	}
 	for _, test := range tests {
 		f, err := os.CreateTemp("", "test-domain-socket")
