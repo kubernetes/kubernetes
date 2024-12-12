@@ -644,6 +644,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: KubeletEnsureSecretPulledImages
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: KubeletFineGrainedAuthz
   versionedSpecs:
   - default: false
