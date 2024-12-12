@@ -18,11 +18,13 @@ package plugin
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"os"
-
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kube-openapi/pkg/util/sets"
+	credentialproviderv1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -70,7 +72,7 @@ func decode(data []byte) (*kubeletconfig.CredentialProviderConfig, error) {
 }
 
 // validateCredentialProviderConfig validates CredentialProviderConfig.
-func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderConfig) field.ErrorList {
+func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderConfig, saTokenForCredentialProviders bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(config.Providers) == 0 {
@@ -98,11 +100,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		if provider.APIVersion == "" {
 			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), "apiVersion is required"))
 		} else if _, ok := apiVersions[provider.APIVersion]; !ok {
-			validAPIVersions := []string{}
-			for apiVersion := range apiVersions {
-				validAPIVersions = append(validAPIVersions, apiVersion)
-			}
-
+			validAPIVersions := sets.StringKeySet(apiVersions).List()
 			allErrs = append(allErrs, field.NotSupported(fieldPath.Child("apiVersion"), provider.APIVersion, validAPIVersions))
 		}
 
@@ -122,6 +120,32 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 
 		if provider.DefaultCacheDuration != nil && provider.DefaultCacheDuration.Duration < 0 {
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("defaultCacheDuration"), provider.DefaultCacheDuration.Duration, "defaultCacheDuration must be greater than or equal to 0"))
+		}
+
+		if provider.TokenAttributes != nil {
+			fldPath := fieldPath.Child("tokenAttributes")
+			if !saTokenForCredentialProviders {
+				allErrs = append(allErrs, field.Invalid(fldPath, provider.TokenAttributes, "tokenAttributes is not supported when KubeletServiceAccountTokenForCredentialProviders feature gate is disabled"))
+			}
+			if len(provider.TokenAttributes.ServiceAccountTokenAudience) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("serviceAccountTokenAudience"), "serviceAccountTokenAudience is required"))
+			}
+			if provider.APIVersion != credentialproviderv1.SchemeGroupVersion.String() {
+				allErrs = append(allErrs, field.Invalid(fldPath, provider.TokenAttributes, fmt.Sprintf("tokenAttributes is only supported for %s API version", credentialproviderv1.SchemeGroupVersion.String())))
+			}
+
+			seenAnnotationKeys := sets.NewString()
+			// Using the validation logic for keys from https://github.com/kubernetes/kubernetes/blob/69dbc74417304328a9fd3c161643dc4f0a057f41/staging/src/k8s.io/apimachinery/pkg/api/validation/objectmeta.go#L46-L51
+			for _, k := range provider.TokenAttributes.ServiceAccountAnnotationKeys {
+				// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
+				for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("serviceAccountAnnotationKeys"), k, msg))
+				}
+				if seenAnnotationKeys.Has(k) {
+					allErrs = append(allErrs, field.Duplicate(fldPath.Child("serviceAccountAnnotationKeys"), k))
+				}
+				seenAnnotationKeys.Insert(k)
+			}
 		}
 	}
 

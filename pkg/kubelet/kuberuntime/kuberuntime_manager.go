@@ -28,8 +28,12 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/trace"
 	grpcstatus "google.golang.org/grpc/status"
+
 	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/kubelet/serviceaccount"
+	"k8s.io/kubernetes/pkg/kubelet/token"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,7 +51,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -168,7 +171,7 @@ type kubeGenericRuntimeManager struct {
 	// MemorySwapBehavior defines how swap is used
 	memorySwapBehavior string
 
-	//Function to get node allocatable resources
+	// Function to get node allocatable resources
 	getNodeAllocatable func() v1.ResourceList
 
 	// Memory throttling factor for MemoryQoS
@@ -219,6 +222,8 @@ func NewKubeGenericRuntimeManager(
 	memoryThrottlingFactor float64,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
+	tokenManager *token.Manager,
+	serviceAccountManager serviceaccount.Manager,
 ) (KubeGenericRuntime, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
@@ -272,12 +277,12 @@ func NewKubeGenericRuntimeManager(
 		"apiVersion", typedVersion.RuntimeApiVersion)
 
 	if imageCredentialProviderConfigFile != "" || imageCredentialProviderBinDir != "" {
-		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigFile, imageCredentialProviderBinDir); err != nil {
+		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigFile, imageCredentialProviderBinDir, tokenManager.GetServiceAccountToken, serviceAccountManager.GetServiceAccount); err != nil {
 			klog.ErrorS(err, "Failed to register CRI auth plugins")
 			os.Exit(1)
 		}
 	}
-	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
+	kubeRuntimeManager.keyring = credentialprovider.NewDefaultDockerKeyring()
 
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
@@ -675,7 +680,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 
 func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerChanges podActions, result *kubecontainer.PodSyncResult) {
 	pcm := m.containerManager.NewPodContainerManager()
-	//TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
+	// TODO(vinaykul,InPlacePodVerticalScaling): Figure out best way to get enforceMemoryQoS value (parameter #4 below) in platform-agnostic way
 	podResources := cm.ResourceConfigForPod(pod, m.cpuCFSQuota, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
 	if podResources == nil {
 		klog.ErrorS(nil, "Unable to get resource configuration", "pod", pod.Name)
