@@ -473,8 +473,8 @@ type containerResources struct {
 
 // containerToUpdateInfo contains necessary information to update a container's resources.
 type containerToUpdateInfo struct {
-	// Index of the container in pod.Spec.Containers that needs resource update
-	apiContainerIdx int
+	// The spec of the container.
+	container *v1.Container
 	// ID of the runtime container that needs resource update
 	kubeContainerID kubecontainer.ContainerID
 	// Desired resources for the running container
@@ -560,8 +560,14 @@ func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
 
 // computePodResizeAction determines the actions required (if any) to resize the given container.
 // Returns whether to keep (true) or restart (false) the container.
-func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
-	container := pod.Spec.Containers[containerIdx]
+// TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
+func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, isRestartableInitContainer bool, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
+	var container v1.Container
+	if isRestartableInitContainer {
+		container = pod.Spec.InitContainers[containerIdx]
+	} else {
+		container = pod.Spec.Containers[containerIdx]
+	}
 
 	// Determine if the *running* container needs resource update by comparing v1.Spec.Resources (desired)
 	// with v1.Status.Resources / runtime.Status.Resources (last known actual).
@@ -632,7 +638,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	}
 	markContainerForUpdate := func(rName v1.ResourceName, specValue, statusValue int64) {
 		cUpdateInfo := containerToUpdateInfo{
-			apiContainerIdx:           containerIdx,
+			container:                 &container,
 			kubeContainerID:           kubeContainerStatus.ID,
 			desiredContainerResources: desiredResources,
 			currentContainerResources: &currentResources,
@@ -654,10 +660,14 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		// resize policy requires this container to restart
 		changes.ContainersToKill[kubeContainerStatus.ID] = containerToKillInfo{
 			name:      kubeContainerStatus.Name,
-			container: &pod.Spec.Containers[containerIdx],
+			container: &container,
 			message:   fmt.Sprintf("Container %s resize requires restart", container.Name),
 		}
-		changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
+		if isRestartableInitContainer {
+			changes.InitContainersToStart = append(changes.InitContainersToStart, containerIdx)
+		} else {
+			changes.ContainersToStart = append(changes.ContainersToStart, containerIdx)
+		}
 		changes.UpdatePodResources = true
 		return false
 	} else {
@@ -806,7 +816,7 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 	klog.V(5).InfoS("Updating container resources", "pod", klog.KObj(pod))
 
 	for _, cInfo := range containersToUpdate {
-		container := pod.Spec.Containers[cInfo.apiContainerIdx].DeepCopy()
+		container := cInfo.container.DeepCopy()
 		// If updating memory limit, use most recently configured CPU request and limit values.
 		// If updating CPU request and limit, use most recently configured memory request and limit values.
 		switch resourceName {
@@ -975,6 +985,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
+	if IsInPlacePodVerticalScalingAllowed(pod) {
+		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
+	}
+
 	// Check initialization progress.
 	if !handleRestartableInitContainers {
 		initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
@@ -1008,10 +1022,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// containers.
 			return changes
 		}
-	}
-
-	if IsInPlacePodVerticalScalingAllowed(pod) {
-		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
 	}
 
 	// Number of running containers to keep.
@@ -1068,7 +1078,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			// If the container failed the startup probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 			reason = reasonStartupProbe
-		} else if IsInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, containerStatus, &changes) {
+		} else if IsInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, idx, false, containerStatus, &changes) {
 			// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 			continue
 		} else {

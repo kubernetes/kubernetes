@@ -6674,6 +6674,8 @@ func TestResolveRecursiveReadOnly(t *testing.T) {
 }
 
 func TestAllocatedResourcesMatchStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 	tests := []struct {
 		name               string
 		allocatedResources v1.ResourceRequirements
@@ -6888,6 +6890,11 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 						Name:      "c",
 						Resources: test.allocatedResources,
 					}},
+					InitContainers: []v1.Container{{
+						Name:          "c1-init",
+						Resources:     test.allocatedResources,
+						RestartPolicy: &containerRestartPolicyAlways,
+					}},
 				},
 			}
 			state := kubecontainer.ContainerStateRunning
@@ -6902,9 +6909,13 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 						State:     state,
 						Resources: test.statusResources,
 					},
+					{
+						Name:      "c1-init",
+						State:     state,
+						Resources: test.statusResources,
+					},
 				},
 			}
-
 			match := allocatedResourcesMatchStatus(&allocatedPod, podStatus)
 			assert.Equal(t, test.expectMatch, match)
 		})
