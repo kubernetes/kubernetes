@@ -181,7 +181,7 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 				continue
 			}
 			framework.Logf("Deleting pod: %s", p.Name)
-			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		}
 	})
 }

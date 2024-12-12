@@ -1007,7 +1007,7 @@ func doPodResizeTests(f *framework.Framework) {
 			}
 
 			ginkgo.By("deleting pod")
-			framework.ExpectNoError(podClient.Delete(ctx, newPod.Name, metav1.DeleteOptions{}))
+			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		})
 	}
 }
@@ -1118,8 +1118,6 @@ func doPodResizeErrorTests(f *framework.Framework) {
 		},
 	}
 
-	timeouts := f.Timeouts
-
 	for idx := range tests {
 		tc := tests[idx]
 		ginkgo.It(tc.name, func(ctx context.Context) {
@@ -1161,7 +1159,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPod, tc.expected))
 
 			ginkgo.By("deleting pod")
-			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
+			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		})
 	}
 }
