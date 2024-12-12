@@ -59,6 +59,8 @@
       "github.com/mitchellh/cli": "MPL license not in CNCF allowlist",
       "github.com/mitchellh/gox": "MPL license not in CNCF allowlist",
       "github.com/mndrix/tap-go": "unmaintained",
+      "github.com/modern-go/concurrent": "problematic reliance on golang internals, e.g. https://github.com/modern-go/reflect2/issues/24",
+      "github.com/modern-go/reflect2": "problematic reliance on golang internals, e.g. https://github.com/modern-go/reflect2/issues/24",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/pkg/errors": "unmaintained, archive mode",
       "github.com/smartystreets/goconvey": "MPL license not in CNCF allowlist",
@@ -204,6 +206,23 @@
         "sigs.k8s.io/kustomize/kustomize/v5",
         "sigs.k8s.io/kustomize/kyaml"
       ],
+      "github.com/modern-go/concurrent": [
+        "github.com/json-iterator/go",
+        "github.com/prometheus/client_golang",
+        "go.etcd.io/etcd/client/v2",
+        "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+        "k8s.io/kube-openapi",
+        "sigs.k8s.io/structured-merge-diff/v4"
+      ],
+      "github.com/modern-go/reflect2": [
+        "github.com/json-iterator/go",
+        "github.com/prometheus/client_golang",
+        "go.etcd.io/etcd/client/v2",
+        "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+        "k8s.io/kube-openapi"
+      ],
       "github.com/pkg/errors": [
         "github.com/Microsoft/hnslib",
         "github.com/google/cadvisor",
@@ -248,6 +267,8 @@
       "github.com/grpc-ecosystem/grpc-gateway",
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
+      "github.com/modern-go/concurrent",
+      "github.com/modern-go/reflect2",
       "github.com/pkg/errors",
       "golang.org/x/exp",
       "google.golang.org/genproto"
