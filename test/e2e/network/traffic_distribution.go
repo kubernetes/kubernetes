@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -42,7 +43,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = common.SIGDescribe(feature.TrafficDistribution, func() {
+var _ = common.SIGDescribe(feature.TrafficDistribution, framework.WithFeatureGate(features.ServiceTrafficDistribution), func() {
 	f := framework.NewDefaultFramework("traffic-distribution")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
