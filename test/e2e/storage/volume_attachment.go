@@ -51,8 +51,8 @@ var _ = utils.SIGDescribe("VolumeAttachment", func() {
 			succeed with its new label found. Listing VolumeAttachment with a labelSelector
 			MUST succeed with a single item retrieved. Deleting a VolumeAttachment MUST succeed
 			and it MUST be confirmed. Creating a second VolumeAttachment MUST succeed. Updating
-			the second VolumentAttachment with a new label MUST succeed with its new label
-			found. Creating a third VolumeAttachment MUST succeed. Updating the third VolumentAttachment
+			the second VolumeAttachment with a new label MUST succeed with its new label
+			found. Creating a third VolumeAttachment MUST succeed. Updating the third VolumeAttachment
 			with a new label MUST succeed with its new label found. Deleting both VolumeAttachments
 			via deleteCollection MUST succeed and it MUST be confirmed.
 		*/

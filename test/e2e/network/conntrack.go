@@ -176,7 +176,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
-		// Additionally take into account that UDP conntract entries timeout is
+		// Additionally take into account that UDP conntrack entries timeout is
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
@@ -252,7 +252,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
-		// Additionally take into account that UDP conntract entries timeout is
+		// Additionally take into account that UDP conntrack entries timeout is
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
@@ -424,7 +424,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
-		// Additionally take into account that UDP conntract entries timeout is
+		// Additionally take into account that UDP conntrack entries timeout is
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
@@ -520,7 +520,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Note that the fact that Endpoints object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
-		// Additionally take into account that UDP conntract entries timeout is
+		// Additionally take into account that UDP conntrack entries timeout is
 		// 30 seconds by default.
 		// Based on the above check if the pod receives the traffic.
 		ginkgo.By("checking client pod connected to the backend on Node IP " + serverNodeInfo.nodeIP)

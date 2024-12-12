@@ -61,7 +61,7 @@ You might be wondering, why are there multiple namespaces used for each test cas
 
 These tests are based on "truth tables" that compare the expected and actual connectivity of each pair of pods.
 Since network policies live in namespaces, and peers can be selected by namespace,
-howing the connectivity of pods in other namespaces is key information to show whether a network policy is working as intended or not.
+having the connectivity of pods in other namespaces is key information to show whether a network policy is working as intended or not.
 
 We use 3 namespaces each with 3 pods, and probe all combinations ( 9 pods x 9 pods = 81 data points ) -- including cross-namespace calls.
 
@@ -522,7 +522,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 			nsX, _, _ := getK8sNamespaces(k8s)
 			CreatePolicy(ctx, k8s, policy, nsX)
 
-			ginkgo.By("Blocking all ports other then 81 in the entire namespace")
+			ginkgo.By("Blocking all ports other than 81 in the entire namespace")
 
 			reachabilityPort81 := NewReachability(k8s.AllPodStrings(), true)
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})

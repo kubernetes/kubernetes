@@ -1320,7 +1320,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	})
 })
 
-// builder contains a running counter to make objects unique within thir
+// builder contains a running counter to make objects unique within this
 // namespace.
 type builder struct {
 	f      *framework.Framework
