@@ -110,8 +110,11 @@ var (
 	FrameworkExtensionPointDuration *metrics.HistogramVec
 	PluginExecutionDuration         *metrics.HistogramVec
 
-	PermitWaitDuration    *metrics.HistogramVec
-	CacheSize             *metrics.GaugeVec
+	PermitWaitDuration *metrics.HistogramVec
+	CacheSize          *metrics.GaugeVec
+	// Deprecated: SchedulerCacheSize is deprecated,
+	// and will be removed at v1.33. Please use CacheSize instead.
+	SchedulerCacheSize    *metrics.GaugeVec
 	unschedulableReasons  *metrics.GaugeVec
 	PluginEvaluationTotal *metrics.CounterVec
 
@@ -308,10 +311,19 @@ func InitMetrics() {
 		},
 		[]string{"result"})
 
+	SchedulerCacheSize = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:         SchedulerSubsystem,
+			Name:              "scheduler_cache_size",
+			Help:              "Number of nodes, pods, and assumed (bound) pods in the scheduler cache.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.33.0",
+		}, []string{"type"})
+
 	CacheSize = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduler_cache_size",
+			Name:           "cache_size",
 			Help:           "Number of nodes, pods, and assumed (bound) pods in the scheduler cache.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"type"})
@@ -368,6 +380,7 @@ func InitMetrics() {
 		Goroutines,
 		PermitWaitDuration,
 		CacheSize,
+		SchedulerCacheSize,
 		unschedulableReasons,
 		PluginEvaluationTotal,
 	}
