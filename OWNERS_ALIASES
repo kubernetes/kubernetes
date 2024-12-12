@@ -94,6 +94,7 @@ aliases:
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - xmudrii # RelEng subproject lead / Release Manager
   release-managers:
     - cpanato
     - jeremyrickard
@@ -114,7 +115,7 @@ aliases:
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - xmudrii # Release Manager
+    - xmudrii # RelEng subproject lead / Release Manager
   build-image-reviewers:
     - BenTheElder
     - cblecker
@@ -126,7 +127,7 @@ aliases:
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - Verolop # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - xmudrii # Release Manager
+    - xmudrii # RelEng subproject lead / Release Manager
   sig-storage-approvers:
     - gnufied
     - jsafrane
