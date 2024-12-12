@@ -132,6 +132,7 @@ func setupQuotaController(t *testing.T, kubeClient kubernetes.Interface, lister 
 	}
 	stop := make(chan struct{})
 	informerFactory.Start(stop)
+	informerFactory.WaitForCacheSync(stop)
 	return quotaController{qc, stop}
 }
 
@@ -778,7 +779,7 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 
 	for testName, testCase := range testCases {
-		kubeClient := fake.NewSimpleClientset(&testCase.quota)
+		kubeClient := fake.NewClientset(&testCase.quota)
 		listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
 			testCase.gvr:      newGenericLister(testCase.gvr.GroupResource(), testCase.items),
 			testCase.errorGVR: newErrorLister(),
@@ -841,7 +842,7 @@ func TestSyncResourceQuota(t *testing.T) {
 }
 
 func TestAddQuota(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
+	kubeClient := fake.NewClientset()
 	gvr := v1.SchemeGroupVersion.WithResource("pods")
 	listersForResourceConfig := map[schema.GroupVersionResource]cache.GenericLister{
 		gvr: newGenericLister(gvr.GroupResource(), newTestPods()),
