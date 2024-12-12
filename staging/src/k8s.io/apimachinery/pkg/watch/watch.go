@@ -103,21 +103,32 @@ func (w emptyWatch) ResultChan() <-chan Event {
 
 // FakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type FakeWatcher struct {
+	logger  klog.Logger
 	result  chan Event
 	stopped bool
 	sync.Mutex
 }
 
+var _ Interface = &FakeWatcher{}
+
 func NewFake() *FakeWatcher {
 	return &FakeWatcher{
+		logger: klog.Background(),
 		result: make(chan Event),
 	}
 }
 
 func NewFakeWithChanSize(size int, blocking bool) *FakeWatcher {
 	return &FakeWatcher{
+		logger: klog.Background(),
 		result: make(chan Event, size),
 	}
+}
+
+// WithLogger sets the logger in the FakeWatcher instance and returns the same instance.
+func (f *FakeWatcher) WithLogger(logger klog.Logger) *FakeWatcher {
+	f.logger = logger
+	return f
 }
 
 // Stop implements Interface.Stop().
@@ -125,7 +136,7 @@ func (f *FakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
 	if !f.stopped {
-		klog.V(4).Infof("Stopping fake watcher.")
+		f.logger.V(4).Info("Stopping fake watcher")
 		close(f.result)
 		f.stopped = true
 	}
@@ -176,15 +187,25 @@ func (f *FakeWatcher) Action(action EventType, obj runtime.Object) {
 
 // RaceFreeFakeWatcher lets you test anything that consumes a watch.Interface; threadsafe.
 type RaceFreeFakeWatcher struct {
+	logger  klog.Logger
 	result  chan Event
 	Stopped bool
 	sync.Mutex
 }
 
+var _ Interface = &RaceFreeFakeWatcher{}
+
 func NewRaceFreeFake() *RaceFreeFakeWatcher {
 	return &RaceFreeFakeWatcher{
+		logger: klog.Background(),
 		result: make(chan Event, DefaultChanSize),
 	}
+}
+
+// WithLogger sets the logger in the RaceFreeFakeWatcher instance and returns the same instance.
+func (f *RaceFreeFakeWatcher) WithLogger(logger klog.Logger) *RaceFreeFakeWatcher {
+	f.logger = logger
+	return f
 }
 
 // Stop implements Interface.Stop().
@@ -192,7 +213,7 @@ func (f *RaceFreeFakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
-		klog.V(4).Infof("Stopping fake watcher.")
+		f.logger.V(4).Info("Stopping fake watcher")
 		close(f.result)
 		f.Stopped = true
 	}

@@ -95,6 +95,9 @@ func AddFeaturesToExistingFeatureGates(registry Registry) error {
 // exposed by this library, such as allowing consumers of a binary
 // to interact with the features via a command line flag.
 //
+// If the [Gates] implementation logs anything, it should implement
+// [GatesWithLogger] to let the caller influence the logging.
+//
 // For example:
 //
 //	// first, register client-go's features to your registry.
@@ -103,6 +106,7 @@ func AddFeaturesToExistingFeatureGates(registry Registry) error {
 //	clientgofeaturegate.ReplaceFeatureGates(utilfeature.DefaultMutableFeatureGate)
 func ReplaceFeatureGates(newFeatureGates Gates) {
 	if replaceFeatureGatesWithWarningIndicator(newFeatureGates) {
+		//nolint:logcheck // Not worth adding a new API for.
 		utilruntime.HandleError(errors.New("the default feature gates implementation has already been used and now it's being overwritten. This might lead to unexpected behaviour. Check your initialization order"))
 	}
 }
