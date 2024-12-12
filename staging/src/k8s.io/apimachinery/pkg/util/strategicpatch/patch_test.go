@@ -4318,6 +4318,142 @@ mergingList:
 		},
 	},
 	{
+		Description: "removing element from a merging list with duplicate",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+`),
+			Current: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+`),
+			Modified: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup2
+- name: 3
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+- name: 1
+- name: 2
+- name: 3
+mergingList:
+- name: 2
+  value: dup2
+- $patch: delete
+  name: 2
+`),
+			TwoWayResult: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup2
+- name: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: 1
+- name: 2
+- name: 3
+mergingList:
+- name: 2
+  value: dup2
+- $patch: delete
+  name: 2
+`),
+			Result: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup2
+- name: 3
+`),
+		},
+	},
+	// This test case has wrong ordering in ThreeWayMerge result because of side effect in mergeSliceWithSpecialElements
+	// function, same as in the next case ('behavior of set element order for a merging int list with duplicate')
+	{
+		Description: "removing one duplicate element and updating another in merging list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+`),
+			Current: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: dup1
+- name: 3
+- name: 2
+  value: dup2
+- name: 4
+`),
+			Modified: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: newValue
+- name: 3
+`),
+			TwoWay: []byte(`
+$setElementOrder/mergingList:
+- name: 1
+- name: 2
+- name: 3
+mergingList:
+- name: 2
+  value: newValue
+- $patch: delete
+  name: 2
+`),
+			TwoWayResult: []byte(`
+mergingList:
+- name: 1
+- name: 2
+  value: newValue
+- name: 3
+`),
+			ThreeWay: []byte(`
+$setElementOrder/mergingList:
+- name: 1
+- name: 2
+- name: 3
+mergingList:
+- name: 2
+  value: newValue
+- $patch: delete
+  name: 2
+`),
+			Result: []byte(`
+mergingList:
+- name: 1
+- name: 4
+- name: 2
+  value: newValue
+- name: 3
+`),
+		},
+	},
+	{
 		// This test case is used just to demonstrate the behavior when dealing with a list with duplicate
 		Description: "behavior of set element order for a merging int list with duplicate",
 		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
