@@ -143,9 +143,9 @@ func NewCommandStartWardleServer(ctx context.Context, defaults *WardleServerOpti
 	// These specifications, together with the effective version, determine if the feature is enabled.
 	utilruntime.Must(wardleFeatureGate.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 		"BanFlunder": {
-			{Version: version.MustParse("1.2"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-			{Version: version.MustParse("1.1"), Default: true, PreRelease: featuregate.Beta},
 			{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.1"), Default: true, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.2"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 		},
 	}))
 
