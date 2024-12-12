@@ -430,6 +430,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: DRAPrioritizedList
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: DRAResourceClaimDeviceStatus
   versionedSpecs:
   - default: false
@@ -954,10 +960,10 @@
     version: "1.32"
 - name: PodLogsQuerySplitStreams
   versionedSpecs:
-    - default: false
-      lockToDefault: false
-      preRelease: Alpha
-      version: "1.32"
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: PodReadyToStartContainersCondition
   versionedSpecs:
   - default: false

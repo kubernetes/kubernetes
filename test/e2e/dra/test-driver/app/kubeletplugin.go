@@ -102,7 +102,8 @@ var _ drapb.DRAPluginServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *ExamplePlugin) getJSONFilePath(claimUID string, requestName string) string {
-	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s-%s.json", ex.driverName, claimUID, requestName))
+	segments := strings.Split(requestName, "/")
+	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s-%s.json", ex.driverName, claimUID, segments[0]))
 }
 
 // FileOperations defines optional callbacks for handling CDI files
@@ -315,7 +316,9 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 
 	var devices []Device
 	for _, result := range claim.Status.Allocation.Devices.Results {
-		requestName := result.Request
+		fullRequestName := result.Request
+		segments := strings.Split(fullRequestName, "/")
+		baseRequestName := segments[0]
 
 		// The driver joins all env variables in the order in which
 		// they appear in results (last one wins).
@@ -323,7 +326,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 		for i, config := range claim.Status.Allocation.Devices.Config {
 			if config.Opaque == nil ||
 				config.Opaque.Driver != ex.driverName ||
-				len(config.Requests) > 0 && !slices.Contains(config.Requests, requestName) {
+				len(config.Requests) > 0 && !slices.Contains(config.Requests, baseRequestName) && !slices.Contains(config.Requests, fullRequestName) {
 				continue
 			}
 			if err := extractParameters(config.Opaque.Parameters, &env, config.Source == resourceapi.AllocationConfigSourceClass); err != nil {
@@ -333,11 +336,11 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 
 		// It also sets a claim_<claim name>_<request name>=true env variable.
 		// This can be used to identify which devices where mapped into a container.
-		claimReqName := "claim_" + claim.Name + "_" + requestName
+		claimReqName := "claim_" + claim.Name + "_" + baseRequestName
 		claimReqName = regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(claimReqName, "_")
 		env[claimReqName] = "true"
 
-		deviceName := "claim-" + claimReq.UID + "-" + requestName
+		deviceName := "claim-" + claimReq.UID + "-" + baseRequestName
 		vendor := ex.driverName
 		class := "test"
 		cdiDeviceID := vendor + "/" + class + "=" + deviceName
@@ -372,7 +375,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 				},
 			},
 		}
-		filePath := ex.getJSONFilePath(claimReq.UID, requestName)
+		filePath := ex.getJSONFilePath(claimReq.UID, baseRequestName)
 		buffer, err := json.Marshal(spec)
 		if err != nil {
 			return nil, fmt.Errorf("marshal spec: %w", err)
@@ -383,7 +386,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 		device := Device{
 			PoolName:    result.Pool,
 			DeviceName:  result.Device,
-			RequestName: requestName,
+			RequestName: baseRequestName,
 			CDIDeviceID: cdiDeviceID,
 		}
 		devices = append(devices, device)

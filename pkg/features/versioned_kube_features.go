@@ -178,6 +178,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	DRAPrioritizedList: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha}, // Update this to 1.33 before merge
+	},
+
 	DynamicResourceAllocation: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
