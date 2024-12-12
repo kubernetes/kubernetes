@@ -79,6 +79,7 @@ var (
 		},
 		ContainerRuntimeEndpoint:    "unix:///run/containerd/containerd.sock",
 		ContainerLogMaxWorkers:      1,
+		ContainerLogMaxFiles:        5,
 		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
 		SingleProcessOOMKill:        ptr.To(!kubeletutil.IsCgroup2UnifiedMode()),
 		CrashLoopBackOff: kubeletconfig.CrashLoopBackOffConfig{
@@ -700,6 +701,13 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return config
 			},
 			errMsg: `invalid configuration: pod logs path "/🧪" mut contains ASCII characters only`,
+		}, {
+			name: "invalid containerLogMaxFiles",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.ContainerLogMaxFiles = 1
+				return conf
+			},
+			errMsg: "invalid configuration: containerLogMaxFiles must be greater than 1",
 		}, {
 			name: "invalid ContainerRuntimeEndpoint",
 			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
