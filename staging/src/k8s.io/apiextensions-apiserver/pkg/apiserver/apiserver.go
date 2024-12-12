@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -258,14 +259,14 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// we don't want to report healthy until we can handle all CRDs that have already been registered.  Waiting for the informer
 	// to sync makes sure that the lister will be valid before we begin.  There may still be races for CRDs added after startup,
 	// but we won't go healthy until we can handle the ones already present.
-	s.GenericAPIServer.AddPostStartHookOrDie("crd-informer-synced", func(context genericapiserver.PostStartHookContext) error {
-		return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+	s.GenericAPIServer.AddPostStartHookOrDie("crd-informer-synced", func(ctx genericapiserver.PostStartHookContext) error {
+		return wait.PollUntilContextCancel(ctx.Context, 100*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 			if s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced() {
 				close(hasCRDInformerSyncedSignal)
 				return true, nil
 			}
 			return false, nil
-		}, context.Done())
+		})
 	})
 
 	return s, nil
