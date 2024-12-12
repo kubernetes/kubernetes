@@ -32,7 +32,7 @@ const kubeProxySubsystem = "kubeproxy"
 var (
 	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy
 	// rules. (With the iptables proxy, this includes both full and partial syncs.)
-	SyncProxyRulesLatency = metrics.NewHistogram(
+	SyncProxyRulesLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_duration_seconds",
@@ -40,10 +40,11 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// SyncFullProxyRulesLatency is the latency of one round of full rule syncing.
-	SyncFullProxyRulesLatency = metrics.NewHistogram(
+	SyncFullProxyRulesLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_full_proxy_rules_duration_seconds",
@@ -51,10 +52,11 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// SyncPartialProxyRulesLatency is the latency of one round of partial rule syncing.
-	SyncPartialProxyRulesLatency = metrics.NewHistogram(
+	SyncPartialProxyRulesLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_partial_proxy_rules_duration_seconds",
@@ -62,17 +64,19 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// SyncProxyRulesLastTimestamp is the timestamp proxy rules were last
 	// successfully synced.
-	SyncProxyRulesLastTimestamp = metrics.NewGauge(
+	SyncProxyRulesLastTimestamp = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_last_timestamp_seconds",
 			Help:           "The last time proxy rules were successfully synced",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// NetworkProgrammingLatency is defined as the time it took to program the network - from the time
@@ -82,7 +86,7 @@ var (
 	// Note that the metrics is partially based on the time exported by the endpoints controller on
 	// the master machine. The measurement may be inaccurate if there is a clock drift between the
 	// node and master machine.
-	NetworkProgrammingLatency = metrics.NewHistogram(
+	NetworkProgrammingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: kubeProxySubsystem,
 			Name:      "network_programming_duration_seconds",
@@ -95,6 +99,7 @@ var (
 			),
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// EndpointChangesPending is the number of pending endpoint changes that
@@ -151,24 +156,26 @@ var (
 
 	// IPTablesRestoreFailuresTotal is the number of iptables restore failures that the proxy has
 	// seen.
-	IPTablesRestoreFailuresTotal = metrics.NewCounter(
+	IPTablesRestoreFailuresTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_restore_failures_total",
 			Help:           "Cumulative proxy iptables restore failures",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// IPTablesPartialRestoreFailuresTotal is the number of iptables *partial* restore
 	// failures (resulting in a fall back to a full restore) that the proxy has seen.
-	IPTablesPartialRestoreFailuresTotal = metrics.NewCounter(
+	IPTablesPartialRestoreFailuresTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_iptables_partial_restore_failures_total",
 			Help:           "Cumulative proxy iptables partial restore failures",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// IPTablesRulesTotal is the total number of iptables rules that the iptables
@@ -180,7 +187,7 @@ var (
 			Help:           "Total number of iptables rules owned by kube-proxy",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"table"},
+		[]string{"table", "ip_family"},
 	)
 
 	// IPTablesRulesLastSync is the number of iptables rules that the iptables proxy
@@ -192,29 +199,31 @@ var (
 			Help:           "Number of iptables rules written by kube-proxy in last sync",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"table"},
+		[]string{"table", "ip_family"},
 	)
 
 	// NFTablesSyncFailuresTotal is the number of nftables sync failures that the
 	// proxy has seen.
-	NFTablesSyncFailuresTotal = metrics.NewCounter(
+	NFTablesSyncFailuresTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_nftables_sync_failures_total",
 			Help:           "Cumulative proxy nftables sync failures",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// NFTablesCleanupFailuresTotal is the number of nftables stale chain cleanup
 	// failures that the proxy has seen.
-	NFTablesCleanupFailuresTotal = metrics.NewCounter(
+	NFTablesCleanupFailuresTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_nftables_cleanup_failures_total",
 			Help:           "Cumulative proxy nftables cleanup failures",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// ProxyHealthzTotal is the number of returned HTTP Status for each
@@ -244,13 +253,14 @@ var (
 	// SyncProxyRulesLastQueuedTimestamp is the last time a proxy sync was
 	// requested. If this is much larger than
 	// kubeproxy_sync_proxy_rules_last_timestamp_seconds, then something is hung.
-	SyncProxyRulesLastQueuedTimestamp = metrics.NewGauge(
+	SyncProxyRulesLastQueuedTimestamp = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_last_queued_timestamp_seconds",
 			Help:           "The last time a sync of proxy rules was queued",
 			StabilityLevel: metrics.ALPHA,
 		},
+		[]string{"ip_family"},
 	)
 
 	// SyncProxyRulesNoLocalEndpointsTotal is the total number of rules that do
@@ -263,7 +273,7 @@ var (
 			Help:           "Number of services with a Local traffic policy and no endpoints",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"traffic_policy"},
+		[]string{"traffic_policy", "ip_family"},
 	)
 
 	// localhostNodePortsAcceptedPacketsDescription describe the metrics for the number of packets accepted
