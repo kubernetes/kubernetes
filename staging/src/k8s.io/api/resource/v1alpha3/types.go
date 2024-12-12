@@ -1031,6 +1031,8 @@ type AllocatedDeviceStatus struct {
 	// If the device has been configured according to the class and claim
 	// config references, the `Ready` condition should be True.
 	//
+	// Must not contain more than 8 entries.
+	//
 	// +optional
 	// +listType=map
 	// +listMapKey=type
@@ -1067,6 +1069,8 @@ type NetworkDeviceData struct {
 	// The IPs are in the CIDR notation, which includes both the address and the
 	// associated subnet mask.
 	// e.g.: "192.0.2.5/24" for IPv4 and "2001:db8::5/64" for IPv6.
+	//
+	// Must not contain more than 16 entries.
 	//
 	// +optional
 	// +listType=atomic
