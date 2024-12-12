@@ -220,7 +220,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
-			return map[framework.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: framework.UpdatePodTolerations}: 1}, nil
+			return map[framework.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: framework.UpdatePodToleration}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
 	},
