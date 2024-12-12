@@ -219,9 +219,6 @@ var (
 	LoadBalancer = framework.WithFeature(framework.ValidFeatures.Add("LoadBalancer"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	LocalStorageCapacityIsolation = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolation"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
