@@ -577,7 +577,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
-			svcTracker := NewServiceChangeTracker(nil, tc.ipFamily, nil, nil)
+			svcTracker := NewServiceChangeTracker(tc.ipFamily, nil, nil)
 			// outputs
 			newServices := svcTracker.serviceToServiceMap(tc.service)
 
@@ -621,20 +621,16 @@ type FakeProxier struct {
 	serviceChanges   *ServiceChangeTracker
 	svcPortMap       ServicePortMap
 	endpointsMap     EndpointsMap
-	hostname         string
 }
 
 func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
+	ect := NewEndpointsChangeTracker(ipFamily, testHostname, nil, nil)
+	ect.trackerStartTime = t
 	return &FakeProxier{
-		svcPortMap:     make(ServicePortMap),
-		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
-		endpointsMap:   make(EndpointsMap),
-		endpointsChanges: &EndpointsChangeTracker{
-			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
-			trackerStartTime:          t,
-			processEndpointsMapChange: nil,
-			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, nil),
-		},
+		svcPortMap:       make(ServicePortMap),
+		serviceChanges:   NewServiceChangeTracker(ipFamily, nil, nil),
+		endpointsMap:     make(EndpointsMap),
+		endpointsChanges: ect,
 	}
 }
 

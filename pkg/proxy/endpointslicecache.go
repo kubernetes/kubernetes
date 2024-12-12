@@ -22,15 +22,12 @@ import (
 	"sort"
 	"sync"
 
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -49,8 +46,6 @@ type EndpointSliceCache struct {
 
 	makeEndpointInfo makeEndpointFunc
 	hostname         string
-	ipFamily         v1.IPFamily
-	recorder         events.EventRecorder
 }
 
 // endpointSliceTracker keeps track of EndpointSlices as they have been applied
@@ -72,16 +67,14 @@ type endpointSliceData struct {
 }
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, ipFamily v1.IPFamily, recorder events.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(hostname string, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
 	return &EndpointSliceCache{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
 		hostname:            hostname,
-		ipFamily:            ipFamily,
 		makeEndpointInfo:    makeEndpointInfo,
-		recorder:            recorder,
 	}
 }
 
@@ -210,15 +203,6 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 	for _, endpoint := range endpoints {
 		if len(endpoint.Addresses) == 0 {
 			klog.ErrorS(nil, "Ignoring invalid endpoint port with empty address", "endpoint", endpoint)
-			continue
-		}
-
-		// Filter out the incorrect IP version case. Any endpoint port that
-		// contains incorrect IP version will be ignored.
-		if (cache.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(endpoint.Addresses[0]) {
-			// Emit event on the corresponding service which had a different IP
-			// version than the endpoint.
-			proxyutil.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], svcPortName.NamespacedName.Namespace, svcPortName.NamespacedName.Name, "")
 			continue
 		}
 
