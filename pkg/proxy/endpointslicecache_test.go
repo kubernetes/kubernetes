@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -557,5 +558,109 @@ func (cmc *cacheMutationCheck) Check(t *testing.T) {
 			// copied before changed in any way.
 			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
 		}
+	}
+}
+
+func TestEndpointSliceCacheClearedCorrectly(t *testing.T) {
+	initEndpointsPorts := func(eps *discovery.EndpointSlice) {
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+			NodeName:  ptr.To(testHostname),
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To("n1"),
+			Port:     ptr.To[int32](11),
+			Protocol: ptr.To(v1.ProtocolUDP),
+		}}
+	}
+
+	testCases := []struct {
+		name               string
+		currEndpointSlices []*discovery.EndpointSlice
+	}{
+		{
+			name: "one endpoint slice",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+			},
+		},
+		{
+			name: "two endpoint slices, same namespace",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+				makeTestEndpointSlice("ns1", "ep2", 2, initEndpointsPorts),
+			},
+		},
+		{
+			name: "two endpoint slices, same service",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+				makeTestEndpointSlice("ns1", "ep1", 2, initEndpointsPorts),
+			},
+		},
+		{
+			name: "two endpoint slices, different namespace",
+			currEndpointSlices: []*discovery.EndpointSlice{
+				makeTestEndpointSlice("ns1", "ep1", 1, initEndpointsPorts),
+				makeTestEndpointSlice("ns2", "ep1", 2, initEndpointsPorts),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+			fp.hostname = testHostname
+
+			for _, epSlice := range tc.currEndpointSlices {
+				fp.addEndpointSlice(epSlice)
+			}
+			fp.endpointsMap.Update(fp.endpointsChanges)
+
+			for _, epSlice := range tc.currEndpointSlices {
+				fp.deleteEndpointSlice(epSlice)
+			}
+			fp.endpointsMap.Update(fp.endpointsChanges)
+
+			if len(fp.endpointsChanges.endpointSliceCache.trackerByServiceMap) != 0 {
+				t.Errorf("expected: endpointSliceCache does not have any entries, got: %v", fp.endpointsChanges.endpointSliceCache.trackerByServiceMap)
+			}
+		})
+	}
+}
+
+func TestSameServiceEndpointSliceCacheClearedCorrectly(t *testing.T) {
+	initEndpointsPorts := func(eps *discovery.EndpointSlice) {
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"1.1.1.1"},
+			NodeName:  ptr.To(testHostname),
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To("n1"),
+			Port:     ptr.To[int32](11),
+			Protocol: ptr.To(v1.ProtocolUDP),
+		}}
+	}
+
+	currEndpointSlices := []*discovery.EndpointSlice{
+		makeTestEndpointSlice("ns1", "svc1", 1, initEndpointsPorts),
+		makeTestEndpointSlice("ns1", "svc1", 2, initEndpointsPorts),
+	}
+
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+	fp.hostname = testHostname
+
+	for _, epSlice := range currEndpointSlices {
+		fp.addEndpointSlice(epSlice)
+	}
+	fp.endpointsMap.Update(fp.endpointsChanges)
+
+	// only delete the first endpoint slice
+	fp.deleteEndpointSlice(currEndpointSlices[0])
+
+	fp.endpointsMap.Update(fp.endpointsChanges)
+
+	if len(fp.endpointsChanges.endpointSliceCache.trackerByServiceMap) != 1 {
+		t.Errorf("expected: endpointSliceCache to have one entries, got: %v", fp.endpointsChanges.endpointSliceCache.trackerByServiceMap)
 	}
 }
