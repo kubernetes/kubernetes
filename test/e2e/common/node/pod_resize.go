@@ -30,6 +30,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -931,6 +932,34 @@ func doPodResizeTests(f *framework.Framework) {
 				},
 			},
 		},
+		{
+			name: "Burstable QoS pod, two containers - no change for c1 (no resource config), increase c2 resources",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name: "c1",
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "200Mi", MemLim: "300Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c2", "resources":{"requests":{"memory":"250Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name: "c1",
+				},
+				{
+					Name:      "c2",
+					Resources: &e2epod.ContainerResources{CPUReq: "200m", CPULim: "300m", MemReq: "250Mi", MemLim: "300Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+		},
 	}
 
 	for idx := range tests {
@@ -944,8 +973,8 @@ func doPodResizeTests(f *framework.Framework) {
 			e2epod.InitDefaultResizePolicy(tc.containers)
 			e2epod.InitDefaultResizePolicy(tc.expected)
 			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "", tStamp, tc.containers)
+			e2epod.ConfigureHostPathForPodCgroup(testPod)
 			testPod.GenerateName = "resize-test-"
-			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
 
 			if tc.addExtendedResource {
 				nodes, err := e2enode.GetReadySchedulableNodes(context.Background(), f.ClientSet)
@@ -1131,7 +1160,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			e2epod.InitDefaultResizePolicy(tc.containers)
 			e2epod.InitDefaultResizePolicy(tc.expected)
 			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
-			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+			e2epod.ConfigureHostPathForPodCgroup(testPod)
 
 			ginkgo.By("creating pod")
 			newPod := podClient.CreateSync(ctx, testPod)
@@ -1176,6 +1205,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 
 var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), feature.InPlacePodVerticalScaling, "[NodeAlphaFeature:InPlacePodVerticalScaling]", func() {
 	f := framework.NewDefaultFramework("pod-resize-tests")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged // for using HostPath
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
