@@ -317,6 +317,8 @@ type PodStatus struct {
 	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*Status
+	// Statuses of containers in the pod by podSandBoxID.
+	ContainerStatusesMap map[string][]*Status
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
@@ -421,6 +423,23 @@ func (podStatus *PodStatus) GetRunningContainerStatuses() []*Status {
 		}
 	}
 	return runningContainerStatuses
+}
+
+func (podStatus *PodStatus) getActiveContainerStatuses() []*Status {
+	if len(podStatus.SandboxStatuses) == 0 {
+		return nil
+	}
+
+	currentSandboxStatus := podStatus.SandboxStatuses[0]
+	if currentSandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
+		return nil
+	}
+
+	if podStatus.ContainerStatusesMap == nil {
+		return nil
+	}
+
+	return podStatus.ContainerStatusesMap[currentSandboxStatus.Id]
 }
 
 // Image contains basic information about a container image.

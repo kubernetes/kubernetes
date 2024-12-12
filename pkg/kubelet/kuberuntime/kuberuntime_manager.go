@@ -1605,6 +1605,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 
 	sandboxStatuses := []*runtimeapi.PodSandboxStatus{}
 	containerStatuses := []*kubecontainer.Status{}
+	containerStatusesMap := make(map[string][]*kubecontainer.Status)
 	timestamp := time.Now()
 
 	podIPs := []string{}
@@ -1639,7 +1640,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 				// features gate enabled, which includes Evented PLEG, but uses the
 				// runtime without Evented PLEG support.
 				klog.V(4).InfoS("Runtime does not set pod status timestamp", "pod", klog.KObj(pod))
-				containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
+				containerStatuses, containerStatusesMap, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
 				if err != nil {
 					if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
 						klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
@@ -1660,7 +1661,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
 		// Get statuses of all containers visible in the pod.
-		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
+		containerStatuses, containerStatusesMap, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
 		if err != nil {
 			if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
 				klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
@@ -1671,13 +1672,14 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 
 	m.logReduction.ClearID(podFullName)
 	return &kubecontainer.PodStatus{
-		ID:                uid,
-		Name:              name,
-		Namespace:         namespace,
-		IPs:               podIPs,
-		SandboxStatuses:   sandboxStatuses,
-		ContainerStatuses: containerStatuses,
-		TimeStamp:         timestamp,
+		ID:                   uid,
+		Name:                 name,
+		Namespace:            namespace,
+		IPs:                  podIPs,
+		SandboxStatuses:      sandboxStatuses,
+		ContainerStatuses:    containerStatuses,
+		ContainerStatusesMap: containerStatusesMap,
+		TimeStamp:            timestamp,
 	}, nil
 }
 
