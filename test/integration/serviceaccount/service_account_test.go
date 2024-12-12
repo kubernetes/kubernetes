@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -393,6 +394,7 @@ func startServiceAccountTestServerAndWaitForCaches(ctx context.Context, t *testi
 		return rootClientset, clientConfig, stop, informers, err
 	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
+		klog.FromContext(ctx),
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
 		rootClientset,
