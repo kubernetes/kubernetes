@@ -18,6 +18,7 @@ package healthcheck
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -34,6 +36,14 @@ const (
 	// https://github.com/kubernetes/autoscaler/blob/e80ab518340f88f364fe3ef063f8303755125971/cluster-autoscaler/utils/deletetaint/delete.go#L36
 	ToBeDeletedTaint = "ToBeDeletedByClusterAutoscaler"
 )
+
+// healthCheck represents the JSON output of a health check.
+type healthCheck struct {
+	LastUpdate   time.Time            `json:"lastUpdated"`
+	CurrentTime  time.Time            `json:"currentTime"`
+	NodeEligible *bool                `json:"nodeEligible,omitempty"`
+	Status       map[v1.IPFamily]bool `json:"status,omitempty"` // status of the health check per IP family
+}
 
 // ProxierHealthServer allows callers to:
 //  1. run a http server with /healthz and /livez endpoint handlers.
@@ -104,23 +114,32 @@ func (hs *ProxierHealthServer) QueuedUpdate(ipFamily v1.IPFamily) {
 // IsHealthy returns only the proxier's health state, following the same
 // definition the HTTP server defines, but ignoring the state of the Node.
 func (hs *ProxierHealthServer) IsHealthy() bool {
-	isHealthy, _ := hs.isHealthy()
-	return isHealthy
+	hc := hs.isHealthy()
+	// the status is an AND of each IP family status
+	for _, state := range hc.Status {
+		if !state {
+			return false
+		}
+	}
+	return true
 }
 
-func (hs *ProxierHealthServer) isHealthy() (bool, time.Time) {
+func (hs *ProxierHealthServer) isHealthy() healthCheck {
 	hs.lock.RLock()
 	defer hs.lock.RUnlock()
 
 	var lastUpdated time.Time
 	currentTime := hs.clock.Now()
-
+	hc := healthCheck{
+		Status: make(map[v1.IPFamily]bool),
+	}
 	for ipFamily, proxierLastUpdated := range hs.lastUpdatedMap {
-
 		if proxierLastUpdated.After(lastUpdated) {
 			lastUpdated = proxierLastUpdated
 		}
-
+		// the proxier is healthy while it's starting up
+		// or the proxier is fully synced.
+		hc.Status[ipFamily] = true
 		if _, set := hs.oldestPendingQueuedMap[ipFamily]; !set {
 			// the proxier is healthy while it's starting up
 			// or the proxier is fully synced.
@@ -131,9 +150,13 @@ func (hs *ProxierHealthServer) isHealthy() (bool, time.Time) {
 			// there's an unprocessed update queued for this proxier, but it's not late yet.
 			continue
 		}
-		return false, proxierLastUpdated
+		hc.Status[ipFamily] = false
+		hc.LastUpdate = proxierLastUpdated
 	}
-	return true, lastUpdated
+	if lastUpdated.After(hc.LastUpdate) {
+		hc.LastUpdate = lastUpdated
+	}
+	return hc
 }
 
 // SyncNode syncs the node and determines if it is eligible or not. Eligible is
@@ -187,11 +210,13 @@ type healthzHandler struct {
 }
 
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	nodeEligible := h.hs.NodeEligible()
-	healthy, lastUpdated := h.hs.isHealthy()
-	currentTime := h.hs.clock.Now()
+	healthCheck := h.hs.isHealthy()
 
-	healthy = healthy && nodeEligible
+	healthCheck.CurrentTime = h.hs.clock.Now()
+	nodeEligible := h.hs.NodeEligible()
+	healthCheck.NodeEligible = ptr.To(nodeEligible)
+
+	healthy := h.hs.IsHealthy() && nodeEligible
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !healthy {
@@ -205,9 +230,16 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		// preserve compatibility, we use the same semantics: the returned
 		// lastUpdated value is "recent" if the server is healthy. The kube-proxy
 		// metrics provide more detailed information.
-		lastUpdated = currentTime
+		healthCheck.LastUpdate = healthCheck.CurrentTime
 	}
-	fmt.Fprintf(resp, `{"lastUpdated": %q,"currentTime": %q, "nodeEligible": %v}`, lastUpdated, currentTime, nodeEligible)
+	output, err := json.Marshal(healthCheck)
+	if err != nil {
+		klog.ErrorS(err, "unexpected error serializing JSON")
+		fmt.Fprintf(resp, `{"lastUpdated": %q,"currentTime": %q, "nodeEligible": %v}`,
+			healthCheck.LastUpdate, healthCheck.CurrentTime, healthCheck.NodeEligible)
+		return
+	}
+	fmt.Fprintf(resp, string(output))
 }
 
 type livezHandler struct {
@@ -215,8 +247,9 @@ type livezHandler struct {
 }
 
 func (h livezHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	healthy, lastUpdated := h.hs.isHealthy()
-	currentTime := h.hs.clock.Now()
+	healthy := h.hs.IsHealthy()
+	healthCheck := h.hs.isHealthy()
+	healthCheck.CurrentTime = h.hs.clock.Now()
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	if !healthy {
@@ -230,7 +263,13 @@ func (h livezHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		// preserve compatibility, we use the same semantics: the returned
 		// lastUpdated value is "recent" if the server is healthy. The kube-proxy
 		// metrics provide more detailed information.
-		lastUpdated = currentTime
+		healthCheck.LastUpdate = healthCheck.CurrentTime
 	}
-	fmt.Fprintf(resp, `{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime)
+	output, err := json.Marshal(healthCheck)
+	if err != nil {
+		klog.ErrorS(err, "unexpected error serializing JSON")
+		fmt.Fprintf(resp, `{"lastUpdated": %q,"currentTime": %q}`, healthCheck.LastUpdate, healthCheck.CurrentTime)
+		return
+	}
+	fmt.Fprintf(resp, string(output))
 }
