@@ -490,7 +490,7 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 
 			if err != nil {
 				if ctx.Err() != nil {
-					framework.Failf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
+					return false, fmt.Errorf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
 				} else {
 					framework.Logf("Unable to read %s from pod %s/%s: %v", fileName, pod.Namespace, pod.Name, err)
 				}
