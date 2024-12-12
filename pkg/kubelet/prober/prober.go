@@ -43,7 +43,7 @@ const maxProbeRetries = 3
 // Prober helps to check the liveness/readiness/startup of a container.
 type prober struct {
 	exec   execprobe.Prober
-	http   httpprobe.Prober
+	http   *httpprobe.HttpProber
 	tcp    tcpprobe.Prober
 	grpc   grpcprobe.Prober
 	runner kubecontainer.CommandRunner
@@ -142,7 +142,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		return pb.exec.Probe(pb.newExecInContainer(ctx, container, containerID, command, timeout))
 
 	case p.HTTPGet != nil:
-		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
+		req, err := pb.http.GetRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
 		if err != nil {
 			return probe.Unknown, "", err
 		}
