@@ -79,6 +79,33 @@ while getopts "r:t:b:" o; do
 done
 shift $((OPTIND - 1))
 
+# default from prow env if unset from args
+# https://docs.prow.k8s.io/docs/jobs/#job-environment-variables
+# TODO: handle batch PR testing
+
+if [[ -z "${target:-}" && -n "${PULL_PULL_SHA:-}" ]]; then
+    target="${PULL_PULL_SHA}"
+fi
+# target must be a something that git can resolve to a commit.
+# "git rev-parse --verify" checks that and prints a detailed
+# error.
+if [[ -n "${target}" ]]; then
+    target="$(git rev-parse --verify "${target}")"
+fi
+
+if [[ -z "${base}" && -n "${PULL_BASE_SHA:-}" && -n "${PULL_PULL_SHA:-}" ]]; then
+    if ! base="$(git merge-base "${PULL_BASE_SHA}" "${PULL_PULL_SHA}")"; then
+        echo >&2 "Failed to detect base revision correctly with prow environment variables."
+        exit 1
+    fi
+elif [[ -z "${base}" ]]; then
+    if ! base="$(git merge-base origin/master "${target:-HEAD}")"; then
+        echo >&2 "Could not determine default base revision. -r must be used explicitly."
+        exit 1
+    fi
+fi
+base="$(git rev-parse --verify "${base}")"
+
 # Check specific directory or everything.
 targets=("$@")
 if [ ${#targets[@]} -eq 0 ]; then
@@ -92,22 +119,6 @@ if [ ${#targets[@]} -eq 0 ]; then
         targets+=("$module")
     done
 fi
-
-# Must be a something that git can resolve to a commit.
-# "git rev-parse --verify" checks that and prints a detailed
-# error.
-if [ -n "${target}" ]; then
-    target="$(git rev-parse --verify "${target}")"
-fi
-
-# Determine defaults.
-if [ -z "${base}" ]; then
-    if ! base="$(git merge-base origin/master "${target:-HEAD}")"; then
-        echo >&2 "Could not determine default base revision. -r must be used explicitly."
-        exit 1
-    fi
-fi
-base="$(git rev-parse --verify "${base}")"
 
 # Give some information about what's happening. Failures from "git describe" are ignored
 # silently, that's optional information.
