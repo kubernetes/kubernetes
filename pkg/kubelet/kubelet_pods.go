@@ -1144,7 +1144,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 		pcm := kl.containerManager.NewPodContainerManager()
 		cgroupPods, err = pcm.GetAllPodsFromCgroups()
 		if err != nil {
-			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
+			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %w", err)
 		}
 	}
 
@@ -1523,7 +1523,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 	// caught up yet). Just assume the pod is not ready yet.
 	name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
 	if err != nil {
-		return fmt.Errorf("unable to parse pod full name %q: %v", podFullName, err)
+		return fmt.Errorf("unable to parse pod full name %q: %w", podFullName, err)
 	}
 
 	pod, ok := kl.GetPodByName(namespace, name)
