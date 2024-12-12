@@ -46,4 +46,7 @@ const (
 	errInvalidResourceName = "the ResourceName %q is invalid"
 	// errBadSocket is the error raised when the registry socket path is not absolute
 	errBadSocket = "bad socketPath, must be an absolute path:"
+	// maxMsgSize use 16MB as the default message size limit.
+	// grpc library default is 4MB
+	maxMsgSize = 1024 * 1024 * 16
 )
