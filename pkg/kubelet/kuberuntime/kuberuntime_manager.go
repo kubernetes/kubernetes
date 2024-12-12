@@ -1567,6 +1567,7 @@ func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.Containe
 		IPs:               podIPs,
 		SandboxStatuses:   []*runtimeapi.PodSandboxStatus{event.PodSandboxStatus},
 		ContainerStatuses: kubeContainerStatuses,
+		TimeStamp:         time.Unix(0, event.GetCreatedAt()),
 	}, nil
 }
 
