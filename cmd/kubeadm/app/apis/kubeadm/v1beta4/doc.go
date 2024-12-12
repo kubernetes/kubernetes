@@ -60,7 +60,7 @@ limitations under the License.
 //
 // # Basics
 //
-// The preferred way to configure kubeadm is to pass an YAML configuration file with the --config option. Some of the
+// The preferred way to configure kubeadm is to pass a YAML configuration file with the --config option. Some of the
 // configuration options defined in the kubeadm config file are also available as command line flags, but only
 // the most common/simple use case are supported with this approach.
 //
