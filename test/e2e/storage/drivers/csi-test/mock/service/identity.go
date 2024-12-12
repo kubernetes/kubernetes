@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func (s *service) GetPluginInfo(
@@ -41,7 +41,7 @@ func (s *service) Probe(
 	*csi.ProbeResponse, error) {
 
 	return &csi.ProbeResponse{
-		Ready: &wrappers.BoolValue{Value: true},
+		Ready: &wrapperspb.BoolValue{Value: true},
 	}, nil
 }
 
