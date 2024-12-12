@@ -45,36 +45,15 @@ var (
 	CloudProvider = framework.WithFeature(framework.ValidFeatures.Add("CloudProvider"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability1 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability1"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability2 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability2"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability3 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability3"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability4 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability4"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability5 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability5"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability6 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability6"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterDowngrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterDowngrade"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterScaleUpBypassScheduler = framework.WithFeature(framework.ValidFeatures.Add("ClusterScaleUpBypassScheduler"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterSizeAutoscalingGpu = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingGpu"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-autoscaling
 	ClusterSizeAutoscalingScaleDown = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleDown"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-autoscaling
 	ClusterSizeAutoscalingScaleUp = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -198,6 +177,10 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
+
+	// Owner: sig-network
+	// Marks tests that require kube-dns-autoscaler
+	KubeDNSAutoscaler = framework.WithFeature(framework.ValidFeatures.Add("KubeDNSAutoscaler"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
