@@ -41,11 +41,6 @@ const (
 	IPv6ZeroCIDR = "::/0"
 )
 
-// isValidEndpoint checks that the given host / port pair are valid endpoint
-func isValidEndpoint(host string, port int) bool {
-	return host != "" && port > 0
-}
-
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
 func IsZeroCIDR(cidr string) bool {
