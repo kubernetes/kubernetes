@@ -82,23 +82,16 @@ shift $((OPTIND - 1))
 # Check specific directory or everything.
 targets=("$@")
 if [ ${#targets[@]} -eq 0 ]; then
-    # This lists all entries in the go.work file as absolute directory paths.
-    kube::util::read-array targets < <(go list -f '{{.Dir}}' -m)
+    shopt -s globstar
+    # Modules are discovered by looking for go.mod rather than asking go
+    # to ensure that modules that aren't part of the workspace and/or are
+    # not dependencies are checked too.
+    # . and staging are listed explicitly here to avoid _output
+    for module in ./go.mod ./staging/**/go.mod; do
+        module="${module%/go.mod}"
+        targets+=("$module")
+    done
 fi
-
-# Sanitize paths:
-# - We need relative paths because we will invoke apidiff in
-#   different work trees.
-# - Must start with a dot.
-for (( i=0; i<${#targets[@]}; i++ )); do
-    d="${targets[i]}"
-    d=$(realpath -s --relative-to="$(pwd)" "${d}")
-    if [ "${d}" != "." ]; then
-        # sub-directories have to have a leading dot.
-        d="./${d}"
-    fi
-    targets[i]="${d}"
-done
 
 # Must be a something that git can resolve to a commit.
 # "git rev-parse --verify" checks that and prints a detailed
@@ -156,8 +149,18 @@ run () {
     out="$1"
     mkdir -p "$out"
     for d in "${targets[@]}"; do
-        apidiff -m -w "${out}/$(output_name "${d}")" "${d}"
+        if ! [ -d "${d}" ]; then
+            echo "module ${d} does not exist, skipping ..."
+            continue
+        fi
+        # cd to the path for modules that are intree but not part of the go workspace
+        # per example staging/src/k8s.io/code-generator/examples
+        (
+            cd "${d}"
+            apidiff -m -w "${out}/$(output_name "${d}")" .
+        ) &
     done
+    wait
 }
 
 # inWorktree checks out a specific revision, then invokes the given
@@ -204,12 +207,16 @@ inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
 # be non-zero if there are incompatible changes.
 #
 # The report is Markdown-formatted and can be copied into a PR comment verbatim.
-res=0
+failures=()
 echo
 compare () {
     what="$1"
     before="$2"
     after="$3"
+    if [ ! -f "${before}" ] || [ ! -f "${after}" ]; then
+        echo "can not compare changes, module didn't exist before or after"
+        return
+    fi
     changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
     echo "## ${what}"
     if [ -z "$changes" ]; then
@@ -218,9 +225,9 @@ compare () {
         echo "$changes"
         echo
     fi
-    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1) || true
+    incompatible=$(apidiff -incompatible -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
     if [ -n "$incompatible" ]; then
-        res=1
+        failures+=("${what}")
     fi
 }
 
@@ -257,7 +264,11 @@ tryBuild () {
     )
 }
 
-if [ $res -ne 0 ]; then
+res=0
+if [ ${#failures[@]} -gt 0 ]; then
+    res=1
+    echo "Detected incompatible changes on modules:"
+    printf '%s\n' "${failures[@]}"
     cat <<EOF
 
 Some notes about API differences:
