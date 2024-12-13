@@ -66,7 +66,7 @@ if [ "${remote}" = true ] && [ -n "${debug_tool}" ]; then
 fi
 
 # Parse the flags to pass to ginkgo
-ginkgoflags="-timeout=24h"
+ginkgoflags=${GINKGO_FLAGS:-"-timeout=24h"}
 if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
