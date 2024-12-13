@@ -452,7 +452,6 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Metrics.Validate()...)
-	errs = append(errs, utilversion.ValidateKubeEffectiveVersion(s.ComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)))
 
 	// in-tree cloud providers are disabled since v1.31 (KEP-2395)
 	if len(s.KubeCloudShared.CloudProvider.Name) > 0 && !cloudprovider.IsExternal(s.KubeCloudShared.CloudProvider.Name) {
