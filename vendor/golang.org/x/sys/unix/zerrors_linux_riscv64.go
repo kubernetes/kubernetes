@@ -108,6 +108,7 @@ const (
 	HIDIOCGRAWINFO                   = 0x80084803
 	HIDIOCGRDESC                     = 0x90044802
 	HIDIOCGRDESCSIZE                 = 0x80044801
+	HIDIOCREVOKE                     = 0x4004480d
 	HUPCL                            = 0x400
 	ICANON                           = 0x2
 	IEXTEN                           = 0x8000
@@ -234,6 +235,20 @@ const (
 	PPPIOCUNBRIDGECHAN               = 0x7434
 	PPPIOCXFERUNIT                   = 0x744e
 	PR_SET_PTRACER_ANY               = 0xffffffffffffffff
+	PTP_CLOCK_GETCAPS                = 0x80503d01
+	PTP_CLOCK_GETCAPS2               = 0x80503d0a
+	PTP_ENABLE_PPS                   = 0x40043d04
+	PTP_ENABLE_PPS2                  = 0x40043d0d
+	PTP_EXTTS_REQUEST                = 0x40103d02
+	PTP_EXTTS_REQUEST2               = 0x40103d0b
+	PTP_MASK_CLEAR_ALL               = 0x3d13
+	PTP_MASK_EN_SINGLE               = 0x40043d14
+	PTP_PEROUT_REQUEST               = 0x40383d03
+	PTP_PEROUT_REQUEST2              = 0x40383d0c
+	PTP_PIN_SETFUNC                  = 0x40603d07
+	PTP_PIN_SETFUNC2                 = 0x40603d10
+	PTP_SYS_OFFSET                   = 0x43403d05
+	PTP_SYS_OFFSET2                  = 0x43403d0e
 	PTRACE_GETFDPIC                  = 0x21
 	PTRACE_GETFDPIC_EXEC             = 0x0
 	PTRACE_GETFDPIC_INTERP           = 0x1
@@ -273,6 +288,8 @@ const (
 	RTC_WIE_ON                       = 0x700f
 	RTC_WKALM_RD                     = 0x80287010
 	RTC_WKALM_SET                    = 0x4028700f
+	SCM_DEVMEM_DMABUF                = 0x4f
+	SCM_DEVMEM_LINEAR                = 0x4e
 	SCM_TIMESTAMPING                 = 0x25
 	SCM_TIMESTAMPING_OPT_STATS       = 0x36
 	SCM_TIMESTAMPING_PKTINFO         = 0x3a
@@ -311,6 +328,9 @@ const (
 	SO_CNX_ADVICE                    = 0x35
 	SO_COOKIE                        = 0x39
 	SO_DETACH_REUSEPORT_BPF          = 0x44
+	SO_DEVMEM_DMABUF                 = 0x4f
+	SO_DEVMEM_DONTNEED               = 0x50
+	SO_DEVMEM_LINEAR                 = 0x4e
 	SO_DOMAIN                        = 0x27
 	SO_DONTROUTE                     = 0x5
 	SO_ERROR                         = 0x4
