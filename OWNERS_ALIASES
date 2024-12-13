@@ -316,6 +316,7 @@ aliases:
     - serathius
     - dgrisonnet
     - rexagod
+    - richabanker
   sig-instrumentation-reviewers:
     - dashpole
     - s-urbaniak
@@ -327,6 +328,7 @@ aliases:
     - pohly
     - mengjiao-liu
     - rexagod
+    - richabanker
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
@@ -530,6 +532,7 @@ aliases:
     - mrunalp # Node
     - msau42 # Storage
     - rexagod # Instrumentation
+    - richabanker # Instrumentation
     - saad-ali # Storage
     - sergeykanzhelev # Node
     - shaneutt # Network
