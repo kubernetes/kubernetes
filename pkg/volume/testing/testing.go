@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -155,7 +156,7 @@ func makeFakeOutput(output string, rc int) testingexec.FakeAction {
 	}
 }
 
-func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
+func ProbeVolumePlugins(t *testing.T, config volume.VolumeConfig) []volume.VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []volume.VolumePlugin{
 			&FakeVolumePlugin{
@@ -165,7 +166,7 @@ func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 			},
 		}
 	}
-	return []volume.VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin"}}
+	return []volume.VolumePlugin{&FakeVolumePlugin{PluginName: "fake-plugin", WorkDir: t.TempDir()}}
 }
 
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
@@ -175,6 +176,7 @@ func ProbeVolumePlugins(config volume.VolumeConfig) []volume.VolumePlugin {
 //	volume.RegisterPlugin(&FakePlugin{"fake-name"})
 type FakeVolumePlugin struct {
 	sync.RWMutex
+	WorkDir                string
 	PluginName             string
 	Host                   volume.VolumeHost
 	Config                 volume.VolumeConfig
@@ -229,6 +231,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 		}
 	}
 	volume := &FakeVolume{
+		DevicePath:        filepath.Join(plugin.WorkDir, "fake"),
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
 	}
@@ -669,9 +672,10 @@ func NewFakeFileVolumePlugin() []volume.VolumePlugin {
 
 type FakeVolume struct {
 	sync.RWMutex
-	PodUID  types.UID
-	VolName string
-	Plugin  *FakeVolumePlugin
+	PodUID     types.UID
+	VolName    string
+	DevicePath string
+	Plugin     *FakeVolumePlugin
 	volume.MetricsNil
 	VolumesAttached  map[string]sets.Set[string]
 	DeviceMountState map[string]string
@@ -716,7 +720,7 @@ func getUniqueVolumeName(spec *volume.Spec) (string, error) {
 	return volumeName, nil
 }
 
-func (_ *FakeVolume) GetAttributes() volume.Attributes {
+func (*FakeVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
 		ReadOnly:       false,
 		Managed:        true,
@@ -998,10 +1002,11 @@ func (fv *FakeVolume) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	if err != nil {
 		return "", err
 	}
+
 	volumeNodes, exist := fv.VolumesAttached[volumeName]
 	if exist {
 		if nodeName == UncertainAttachNode {
-			return "/dev/vdb-test", nil
+			return fv.DevicePath, nil
 		}
 		// even if volume was previously attached to time out, we need to keep returning error
 		// so as reconciler can not confirm this volume as attached.
@@ -1010,7 +1015,7 @@ func (fv *FakeVolume) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		}
 		if volumeNodes.Has(string(nodeName)) || volumeNodes.Has(MultiAttachNode) || nodeName == MultiAttachNode {
 			volumeNodes.Insert(string(nodeName))
-			return "/dev/vdb-test", nil
+			return fv.DevicePath, nil
 		}
 		return "", fmt.Errorf("volume %q trying to attach to node %q is already attached to node %q", volumeName, nodeName, volumeNodes)
 	}
@@ -1019,7 +1024,14 @@ func (fv *FakeVolume) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	if nodeName == UncertainAttachNode || nodeName == TimeoutAttachNode {
 		return "", fmt.Errorf("timed out to attach volume %q to node %q", volumeName, nodeName)
 	}
-	return "/dev/vdb-test", nil
+
+	fakeDeviceFile, err := os.Create(fv.DevicePath)
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		return "", fmt.Errorf("failed to mock attach volume %q to node %q: %w", volumeName, nodeName, err)
+	}
+	fakeDeviceFile.Close()
+
+	return fv.DevicePath, nil
 }
 
 func (fv *FakeVolume) GetAttachCallCount() int {
@@ -1035,7 +1047,7 @@ func (fv *FakeVolume) WaitForAttach(spec *volume.Spec, devicePath string, pod *v
 	if fv.WaitForAttachHook != nil {
 		return fv.WaitForAttachHook(spec, devicePath, pod, spectimeout)
 	}
-	return "/dev/sdb", nil
+	return devicePath, nil
 }
 
 func (fv *FakeVolume) GetWaitForAttachCallCount() int {
@@ -1122,6 +1134,10 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	fv.DetachCallCount++
 	if nodeName == FailDetachNode {
 		return fmt.Errorf("fail to detach volume %q to node %q", volumeName, nodeName)
+	}
+
+	if err := os.Remove(fv.DevicePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to mock detach volume: %w", err)
 	}
 
 	volumeNodes.Delete(node)
@@ -1649,7 +1665,7 @@ func VerifyGetMapPodDeviceCallCount(
 // GetTestVolumePluginMgr creates, initializes, and returns a test volume plugin
 // manager and fake volume plugin using a fake volume host.
 func GetTestVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *FakeVolumePlugin) {
-	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
+	plugins := ProbeVolumePlugins(t, volume.VolumeConfig{})
 	v := NewFakeVolumeHost(
 		t,
 		t.TempDir(), /* rootDir */
@@ -1660,7 +1676,7 @@ func GetTestVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *FakeVolumeP
 }
 
 func GetTestKubeletVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *FakeVolumePlugin) {
-	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
+	plugins := ProbeVolumePlugins(t, volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
 		t.TempDir(), /* rootDir */
@@ -1671,7 +1687,7 @@ func GetTestKubeletVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *Fake
 }
 
 func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*volume.VolumePluginMgr, *FakeVolumePlugin) {
-	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
+	plugins := ProbeVolumePlugins(t, volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
 		t.TempDir(), /* rootDir */
@@ -1684,7 +1700,7 @@ func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*volume
 }
 
 func GetTestKubeletVolumePluginMgrWithNodeAndRoot(t *testing.T, node *v1.Node, rootDir string) (*volume.VolumePluginMgr, *FakeVolumePlugin) {
-	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
+	plugins := ProbeVolumePlugins(t, volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
 		rootDir, /* rootDir */

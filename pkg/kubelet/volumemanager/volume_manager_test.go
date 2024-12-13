@@ -19,6 +19,7 @@ package volumemanager
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -94,7 +95,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 			}()
 			podManager := kubepod.NewBasicPodManager()
 
-			node, pod, pv, claim := createObjects(test.pvMode, test.podMode)
+			node, pod, pv, claim := createObjects(t, test.pvMode, test.podMode)
 			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
@@ -250,7 +251,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	podManager := kubepod.NewBasicPodManager()
 
-	node, pod, pv, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
+	node, pod, pv, claim := createObjects(t, v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 	claim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimPending,
 	}
@@ -297,7 +298,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	podManager := kubepod.NewBasicPodManager()
 
-	node, pod, _, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
+	node, pod, _, claim := createObjects(t, v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
 
 	existingGid := pod.Spec.SecurityContext.SupplementalGroups[0]
 
@@ -435,14 +436,25 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 
 // createObjects returns objects for making a fake clientset. The pv is
 // already attached to the node and bound to the claim used by the pod.
-func createObjects(pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+func createObjects(t *testing.T, pvMode, podMode v1.PersistentVolumeMode) (*v1.Node, *v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	devicePath := filepath.Join(t.TempDir(), "fake", "path")
+	err := os.MkdirAll(filepath.Dir(devicePath), 0755)
+	if err != nil {
+		panic(err)
+	}
+	file, err := os.Create(devicePath)
+	if err != nil {
+		panic(err)
+	}
+	file.Close()
+
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testHostname},
 		Status: v1.NodeStatus{
 			VolumesAttached: []v1.AttachedVolume{
 				{
 					Name:       "fake/fake-device",
-					DevicePath: "fake/path",
+					DevicePath: devicePath,
 				},
 			}},
 	}
@@ -581,7 +593,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			podManager := kubepod.NewBasicPodManager()
 
-			node, pod, pv, claim := createObjects(test.podMode, test.podMode)
+			node, pod, pv, claim := createObjects(t, test.podMode, test.podMode)
 			kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
