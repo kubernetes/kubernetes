@@ -130,11 +130,13 @@ func TestMain(m *testing.M) {
 
 	framework.AfterReadingAllFlags(&framework.TestContext)
 
-	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
-	// Right now it is still needed, for example by
-	// test/e2e/framework/ingress/ingress_utils.go
-	// for providing the optional secret.yaml file and by
-	// test/e2e/framework/util.go for cluster/log-dump.
+	// TODO: Deprecating repo-root over time... instead just use go:embed , see #23987.
+	// Right now it is still needed by
+	// test/e2e/cloud/gcp/ha_master.go and test/e2e/framework/providers/gcp.go.
+	// Those tests must run in a job which explicitly sets -repo-root.
+	//
+	// CSI developers running the in-tree storage suites might also rely on it (to
+	// be checked with SIG Storage before the final removal).
 	if framework.TestContext.RepoRoot != "" {
 		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}

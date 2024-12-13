@@ -18,7 +18,8 @@ package common
 
 import (
 	"fmt"
-	"path"
+	"io"
+	"net/http"
 	"strings"
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -77,13 +78,28 @@ func GetUpgradeContext(c discovery.DiscoveryInterface) (*upgrades.UpgradeContext
 }
 
 // realVersion turns a version constants into a version string deployable on
-// GKE.  See hack/get-build.sh for more information.
+// GKE. This corresponds to "hack/get-build.sh -v", which is implemented by:
+// https://github.com/kubernetes/kubernetes/blob/e61430919e9655aa6f798609458a0d9f0850c005/cluster/common.sh#L278-L296
 func realVersion(s string) (string, error) {
 	framework.Logf("Getting real version for %q", s)
-	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
-	if err != nil {
-		return v, fmt.Errorf("error getting real version for %q: %w", s, err)
+	v := s
+	if strings.Contains(s, "/") {
+		url := fmt.Sprintf("https://dl.k8s.io/%s.txt", s)
+		resp, err := http.Get(url)
+		if err != nil {
+			return "", fmt.Errorf("GET %s: %v", url, err)
+		}
+		if resp.Body == nil {
+			return "", fmt.Errorf("%s: no response", url)
+		}
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("%s: read response: %v", url, err)
+		}
+		s = string(data)
 	}
+
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
 	framework.Logf("Version for %q is %q", s, v)
-	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
+	return v, nil
 }

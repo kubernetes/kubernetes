@@ -26,7 +26,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
+	logdump "k8s.io/kubernetes/cluster/log-dump"
 )
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
@@ -563,13 +563,15 @@ func CoreDump(dir string) {
 		Logf("Skipping dumping logs from cluster")
 		return
 	}
-	var cmd *exec.Cmd
+
+	// bash gets the log-dump.sh on stdin.
+	cmd := exec.Command("/usr/bin/env", "bash", dir)
+	cmd.Stdin = bytes.NewBuffer(logdump.Script)
 	if TestContext.LogexporterGCSPath != "" {
 		Logf("Dumping logs from nodes to GCS directly at path: %s", TestContext.LogexporterGCSPath)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir, TestContext.LogexporterGCSPath)
+		cmd.Args = append(cmd.Args, TestContext.LogexporterGCSPath)
 	} else {
 		Logf("Dumping logs locally to: %s", dir)
-		cmd = exec.Command(path.Join(TestContext.RepoRoot, "cluster", "log-dump", "log-dump.sh"), dir)
 	}
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("LOG_DUMP_SYSTEMD_SERVICES=%s", parseSystemdServices(TestContext.SystemdServices)))
