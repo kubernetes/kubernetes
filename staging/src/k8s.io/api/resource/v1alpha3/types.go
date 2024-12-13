@@ -999,6 +999,14 @@ type ResourceClaimTemplateList struct {
 	Items []ResourceClaimTemplate `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+const (
+	AllocatedDeviceStatusMaxConditions        int = 8
+	AllocatedDeviceStatusDataMaxLength        int = OpaqueParametersMaxLength
+	NetworkDeviceDataMaxIPs                   int = 16
+	NetworkDeviceDataInterfaceNameMaxLength   int = 256
+	NetworkDeviceDataHardwareAddressMaxLength int = 128
+)
+
 // AllocatedDeviceStatus contains the status of an allocated device, if the
 // driver chooses to report it. This may include driver-specific information.
 type AllocatedDeviceStatus struct {
@@ -1030,6 +1038,8 @@ type AllocatedDeviceStatus struct {
 	// Conditions contains the latest observation of the device's state.
 	// If the device has been configured according to the class and claim
 	// config references, the `Ready` condition should be True.
+	//
+	// Must not contain more than 8 entries.
 	//
 	// +optional
 	// +listType=map
@@ -1067,6 +1077,8 @@ type NetworkDeviceData struct {
 	// The IPs are in the CIDR notation, which includes both the address and the
 	// associated subnet mask.
 	// e.g.: "192.0.2.5/24" for IPv4 and "2001:db8::5/64" for IPv6.
+	//
+	// Must not contain more than 16 entries.
 	//
 	// +optional
 	// +listType=atomic

@@ -988,6 +988,14 @@ type ResourceClaimTemplateList struct {
 	Items []ResourceClaimTemplate
 }
 
+const (
+	AllocatedDeviceStatusMaxConditions        int = 8
+	AllocatedDeviceStatusDataMaxLength        int = OpaqueParametersMaxLength
+	NetworkDeviceDataMaxIPs                   int = 16
+	NetworkDeviceDataInterfaceNameMaxLength   int = 256
+	NetworkDeviceDataHardwareAddressMaxLength int = 128
+)
+
 // AllocatedDeviceStatus contains the status of an allocated device, if the
 // driver chooses to report it. This may include driver-specific information.
 type AllocatedDeviceStatus struct {

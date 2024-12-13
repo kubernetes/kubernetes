@@ -1055,8 +1055,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-network-device-status": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", interfaceNameMaxLength),
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", hardwareAddressMaxLength),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength),
 				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(0), "300.9.8.0/24", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
@@ -1067,8 +1067,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Pool:   goodName,
 						Device: goodName,
 						NetworkData: &resource.NetworkDeviceData{
-							InterfaceName:   strings.Repeat("x", interfaceNameMaxLength+1),
-							HardwareAddress: strings.Repeat("x", hardwareAddressMaxLength+1),
+							InterfaceName:   strings.Repeat("x", resource.NetworkDeviceDataInterfaceNameMaxLength+1),
+							HardwareAddress: strings.Repeat("x", resource.NetworkDeviceDataHardwareAddressMaxLength+1),
 							IPs: []string{
 								"300.9.8.0/24",
 							},
@@ -1101,9 +1101,9 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-data-device-status-limits": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), maxConditions+1, maxConditions),
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
-				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), maxIPs+1, maxIPs),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), resource.AllocatedDeviceStatusMaxConditions+1, resource.AllocatedDeviceStatusMaxConditions),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.AllocatedDeviceStatusDataMaxLength),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), resource.NetworkDeviceDataMaxIPs+1, resource.NetworkDeviceDataMaxIPs),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1112,7 +1112,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Driver: goodName,
 						Pool:   goodName,
 						Device: goodName,
-						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.AllocatedDeviceStatusDataMaxLength-9-2+1 /* too large by one */) + `"}`)},
 						Conditions: []metav1.Condition{
 							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
 							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
@@ -1184,8 +1184,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-network-device-status-disabled-feature-gate": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", interfaceNameMaxLength),
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", hardwareAddressMaxLength),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "interfaceName"), "", resource.NetworkDeviceDataInterfaceNameMaxLength),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("networkData", "hardwareAddress"), "", resource.NetworkDeviceDataHardwareAddressMaxLength),
 				field.Invalid(field.NewPath("status", "devices").Index(0).Child("networkData", "ips").Index(0), "300.9.8.0/24", "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
@@ -1196,8 +1196,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Pool:   goodName,
 						Device: goodName,
 						NetworkData: &resource.NetworkDeviceData{
-							InterfaceName:   strings.Repeat("x", interfaceNameMaxLength+1),
-							HardwareAddress: strings.Repeat("x", hardwareAddressMaxLength+1),
+							InterfaceName:   strings.Repeat("x", resource.NetworkDeviceDataInterfaceNameMaxLength+1),
+							HardwareAddress: strings.Repeat("x", resource.NetworkDeviceDataHardwareAddressMaxLength+1),
 							IPs: []string{
 								"300.9.8.0/24",
 							},
@@ -1230,9 +1230,9 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 		},
 		"invalid-data-device-status-limits-feature-gate": {
 			wantFailures: field.ErrorList{
-				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), maxConditions+1, maxConditions),
-				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.OpaqueParametersMaxLength),
-				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), maxIPs+1, maxIPs),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("conditions"), resource.AllocatedDeviceStatusMaxConditions+1, resource.AllocatedDeviceStatusMaxConditions),
+				field.TooLong(field.NewPath("status", "devices").Index(0).Child("data"), "" /* unused */, resource.AllocatedDeviceStatusDataMaxLength),
+				field.TooMany(field.NewPath("status", "devices").Index(0).Child("networkData", "ips"), resource.NetworkDeviceDataMaxIPs+1, resource.NetworkDeviceDataMaxIPs),
 			},
 			oldClaim: func() *resource.ResourceClaim { return validAllocatedClaim }(),
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
@@ -1241,7 +1241,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 						Driver: goodName,
 						Pool:   goodName,
 						Device: goodName,
-						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.OpaqueParametersMaxLength-9-2+1 /* too large by one */) + `"}`)},
+						Data:   runtime.RawExtension{Raw: []byte(`{"str": "` + strings.Repeat("x", resource.AllocatedDeviceStatusDataMaxLength-9-2+1 /* too large by one */) + `"}`)},
 						Conditions: []metav1.Condition{
 							{Type: "test-0", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
 							{Type: "test-1", Status: metav1.ConditionTrue, Reason: "test_reason", LastTransitionTime: metav1.Now(), ObservedGeneration: 0},
