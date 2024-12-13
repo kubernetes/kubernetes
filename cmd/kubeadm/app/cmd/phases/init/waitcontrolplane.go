@@ -49,7 +49,7 @@ var (
 		- 'journalctl -xeu kubelet'
 
 	Additionally, a control plane component may have crashed or exited when started by the container runtime.
-	To troubleshoot, list all containers using your preferred container runtimes CLI.
+	To troubleshoot, list all containers using your preferred container runtime's CLI.
 	Here is one example how you may list all running Kubernetes containers by using crictl:
 		- 'crictl --runtime-endpoint {{ .Socket }} ps -a | grep kube | grep -v pause'
 		Once you have found the failing container, you can inspect its logs with:
