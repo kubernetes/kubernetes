@@ -1029,7 +1029,10 @@ func (fv *FakeVolume) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	if err != nil && !errors.Is(err, os.ErrExist) {
 		return "", fmt.Errorf("failed to mock attach volume %q to node %q: %w", volumeName, nodeName, err)
 	}
-	fakeDeviceFile.Close()
+	err = fakeDeviceFile.Close()
+	if err != nil {
+		return "", fmt.Errorf("failed to mock attach volume %q to node %q: %w", volumeName, nodeName, err)
+	}
 
 	return fv.DevicePath, nil
 }

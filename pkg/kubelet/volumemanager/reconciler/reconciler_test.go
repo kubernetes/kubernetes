@@ -804,7 +804,10 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fakeDevice.Close()
+	err = fakeDevice.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1034,7 +1037,10 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fakeDevice.Close()
+	err = fakeDevice.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1323,7 +1329,10 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			fakeDevice.Close()
+			err = fakeDevice.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1587,7 +1596,10 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				fakeDevice.Close()
+				err = fakeDevice.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1818,7 +1830,10 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				fakeDevice.Close()
+				err = fakeDevice.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2111,7 +2126,10 @@ func createtestClientWithPVPVC(t *testing.T, pv *v1.PersistentVolume, pvc *v1.Pe
 		if err != nil {
 			t.Fatal(err)
 		}
-		fakeDevice.Close()
+		err = fakeDevice.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 		attachedVolumes = append(attachedVolumes, v1.AttachedVolume{
 			Name:       "fake-plugin/pv",
 			DevicePath: fakeDevicePath,

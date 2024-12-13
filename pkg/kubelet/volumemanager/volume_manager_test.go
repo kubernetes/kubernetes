@@ -440,13 +440,16 @@ func createObjects(t *testing.T, pvMode, podMode v1.PersistentVolumeMode) (*v1.N
 	devicePath := filepath.Join(t.TempDir(), "fake", "path")
 	err := os.MkdirAll(filepath.Dir(devicePath), 0755)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	file, err := os.Create(devicePath)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	file.Close()
+	err = file.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: testHostname},
