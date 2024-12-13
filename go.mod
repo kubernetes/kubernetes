@@ -36,7 +36,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cadvisor v0.51.0
 	github.com/google/cel-go v0.22.0
-	github.com/google/gnostic-models v0.6.8
+	github.com/google/gnostic-models v0.6.9
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.6.0
@@ -109,7 +109,7 @@ require (
 	k8s.io/kms v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
+	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
