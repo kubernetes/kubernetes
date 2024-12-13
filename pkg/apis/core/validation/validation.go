@@ -58,7 +58,6 @@ import (
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
@@ -5772,16 +5771,6 @@ func ValidateService(service *core.Service) field.ErrorList {
 	}
 	switch service.Spec.Type {
 	case core.ServiceTypeLoadBalancer:
-		for ix := range service.Spec.Ports {
-			port := &service.Spec.Ports[ix]
-			// This is a workaround for broken cloud environments that
-			// over-open firewalls.  Hopefully it can go away when more clouds
-			// understand containers better.
-			if port.Port == ports.KubeletPort {
-				portPath := specPath.Child("ports").Index(ix)
-				allErrs = append(allErrs, field.Invalid(portPath, port.Port, fmt.Sprintf("may not expose port %v externally since it is used by kubelet", ports.KubeletPort)))
-			}
-		}
 		if isHeadlessService(service) {
 			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIPs").Index(0), service.Spec.ClusterIPs[0], "may not be set to 'None' for LoadBalancer services"))
 		}
