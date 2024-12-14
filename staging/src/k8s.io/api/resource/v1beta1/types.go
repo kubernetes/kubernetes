@@ -1054,7 +1054,7 @@ type AllocatedDeviceStatus struct {
 	// The length of the raw data must be smaller or equal to 10 Ki.
 	//
 	// +optional
-	Data runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,5,opt,name=data"`
+	Data *runtime.RawExtension `json:"data,omitempty" protobuf:"bytes,5,opt,name=data"`
 
 	// NetworkData contains network-related information specific to the device.
 	//

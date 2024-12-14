@@ -1040,7 +1040,7 @@ type AllocatedDeviceStatus struct {
 	// The length of the raw data must be smaller or equal to 10 Ki.
 	//
 	// +optional
-	Data runtime.RawExtension
+	Data *runtime.RawExtension
 
 	// NetworkData contains network-related information specific to the device.
 	//

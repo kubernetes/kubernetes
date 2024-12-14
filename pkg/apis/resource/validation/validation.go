@@ -752,8 +752,8 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("conditions"), len(device.Conditions), resource.AllocatedDeviceStatusMaxConditions))
 	}
 	allErrs = append(allErrs, metav1validation.ValidateConditions(device.Conditions, fldPath.Child("conditions"))...)
-	if len(device.Data.Raw) > 0 { // Data is an optional field.
-		allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"), false, resource.AllocatedDeviceStatusDataMaxLength)...)
+	if device.Data != nil && len(device.Data.Raw) > 0 { // Data is an optional field.
+		allErrs = append(allErrs, validateRawExtension(*device.Data, fldPath.Child("data"), false, resource.AllocatedDeviceStatusDataMaxLength)...)
 	}
 	allErrs = append(allErrs, validateNetworkDeviceData(device.NetworkData, fldPath.Child("networkData"))...)
 	return allErrs
