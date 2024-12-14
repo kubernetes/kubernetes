@@ -210,15 +210,15 @@ func TestListTypes(t *testing.T) {
 
 	t.Logf("Updating again with invalid values, eventually successfully due to ratcheting logic")
 	err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		_, err = fooClient.Update(ctx, modifiedInstance, metav1.UpdateOptions{})
-		if err == nil {
-			return true, err
+		_, updateErr := fooClient.Update(ctx, modifiedInstance, metav1.UpdateOptions{})
+		if updateErr == nil {
+			return true, nil
 		}
-		if errors.IsInvalid(err) {
+		if errors.IsInvalid(updateErr) {
 			// wait until modifiedInstance becomes valid again
 			return false, nil
 		}
-		return false, err
+		return false, updateErr
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

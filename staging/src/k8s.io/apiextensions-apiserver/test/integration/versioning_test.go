@@ -92,14 +92,14 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err = noxuNamespacedResourceClientV1beta1.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-			if err != nil {
+			_, patchErr := noxuNamespacedResourceClientV1beta1.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			if patchErr != nil {
 				// work around "grpc: the client connection is closing" error
 				// TODO: fix the grpc error
-				if err, ok := err.(*errors.StatusError); ok && err.Status().Code == http.StatusInternalServerError {
+				if statusErr, ok := patchErr.(*errors.StatusError); ok && statusErr.Status().Code == http.StatusInternalServerError {
 					return false, nil
 				}
-				return false, err
+				return false, patchErr
 			}
 			return true, nil
 		})
@@ -115,16 +115,16 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err = noxuNamespacedResourceClientV1beta2.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-			assert.Error(t, err)
+			_, patchErr := noxuNamespacedResourceClientV1beta2.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			assert.Error(t, patchErr)
 
 			// work around "grpc: the client connection is closing" error
 			// TODO: fix the grpc error
-			if err, ok := err.(*errors.StatusError); ok && err.Status().Code == http.StatusInternalServerError {
+			if statusErr, ok := patchErr.(*errors.StatusError); ok && statusErr.Status().Code == http.StatusInternalServerError {
 				return false, nil
 			}
 
-			assert.ErrorContains(t, err, "apiVersion")
+			assert.ErrorContains(t, patchErr, "apiVersion")
 			return true, nil
 		})
 		assert.NoError(t, err)
