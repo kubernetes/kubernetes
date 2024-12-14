@@ -28,9 +28,6 @@ import (
 const (
 	// Name prefix for the temporary files.
 	tmpPrefix = "."
-
-	// The default permission bits to set on the filestore directory.
-	directoryPerm = 0700
 )
 
 // FileStore is an implementation of the Store interface which stores data in files.
@@ -44,7 +41,7 @@ type FileStore struct {
 
 // NewFileStore returns an instance of FileStore.
 func NewFileStore(path string, fs utilfs.Filesystem) (Store, error) {
-	if err := fs.MkdirAll(path, directoryPerm); err != nil {
+	if err := fs.MkdirAll(path, 0755); err != nil {
 		return nil, err
 	}
 	return &FileStore{directoryPath: path, filesystem: fs}, nil
@@ -55,7 +52,7 @@ func (f *FileStore) Write(key string, data []byte) error {
 	if err := ValidateKey(key); err != nil {
 		return err
 	}
-	if err := f.filesystem.MkdirAll(f.directoryPath, directoryPerm); err != nil {
+	if err := f.filesystem.MkdirAll(f.directoryPath, 0755); err != nil {
 		return err
 	}
 
