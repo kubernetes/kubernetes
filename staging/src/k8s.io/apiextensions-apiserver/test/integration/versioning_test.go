@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -96,7 +98,8 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			if patchErr != nil {
 				// work around "grpc: the client connection is closing" error
 				// TODO: fix the grpc error
-				if statusErr, ok := patchErr.(*errors.StatusError); ok && statusErr.Status().Code == http.StatusInternalServerError {
+				var statusErr *errors.StatusError
+				if stderrors.As(patchErr, &statusErr) && statusErr.Status().Code == http.StatusInternalServerError {
 					return false, nil
 				}
 				return false, patchErr
@@ -116,11 +119,12 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 			i++
 
 			_, patchErr := noxuNamespacedResourceClientV1beta2.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-			assert.Error(t, patchErr)
+			require.Error(t, patchErr)
 
 			// work around "grpc: the client connection is closing" error
 			// TODO: fix the grpc error
-			if statusErr, ok := patchErr.(*errors.StatusError); ok && statusErr.Status().Code == http.StatusInternalServerError {
+			var statusErr *errors.StatusError
+			if stderrors.As(patchErr, &statusErr) && statusErr.Status().Code == http.StatusInternalServerError {
 				return false, nil
 			}
 
