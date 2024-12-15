@@ -5743,14 +5743,6 @@ func isPodResizeRequestSupported(pod core.Pod) bool {
 func validateContainerResize(newRequirements, oldRequirements *core.ResourceRequirements, resizePolicies []core.ContainerResizePolicy, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// Removing resource requirements is not supported.
-	if resourcesRemoved(newRequirements.Requests, oldRequirements.Requests) {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("requests"), "resource requests cannot be removed"))
-	}
-	if resourcesRemoved(newRequirements.Limits, oldRequirements.Limits) {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("limits"), "resource limits cannot be removed"))
-	}
-
 	// Special case: memory limits may not be decreased if resize policy is NotRequired.
 	var memRestartPolicy core.ResourceResizeRestartPolicy
 	for _, policy := range resizePolicies {
@@ -5779,19 +5771,6 @@ func validateContainerResize(newRequirements, oldRequirements *core.ResourceRequ
 	// TODO(tallclair): Move resizable resource checks here.
 
 	return allErrs
-}
-
-func resourcesRemoved(resourceList, oldResourceList core.ResourceList) bool {
-	if len(oldResourceList) > len(resourceList) {
-		return true
-	}
-	for name := range oldResourceList {
-		if _, ok := resourceList[name]; !ok {
-			return true
-		}
-	}
-
-	return false
 }
 
 // ValidatePodBinding tests if required fields in the pod binding are legal.
