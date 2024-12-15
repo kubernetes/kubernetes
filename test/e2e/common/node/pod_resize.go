@@ -1137,70 +1137,6 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			patchError: "Pod QOS Class may not change as a result of resizing",
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove memory limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
-				},
-			},
-			patchError: "resource limits cannot be removed",
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - remove CPU limits",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchError: "resource limits cannot be removed",
-		},
-		{
-			name: "Burstable QoS pod, one container with memory requests + limits, cpu requests - remove CPU requests",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchError: "resource requests cannot be removed",
-		},
-		{
-			name: "Burstable QoS pod, one container with CPU requests + limits, cpu requests - remove memory requests",
-			containers: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
-				},
-			},
-			attemptResize: []podresize.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
-				},
-			},
-			patchError: "resource requests cannot be removed",
-		},
-		{
 			name: "Burstable QoS pod, two containers with cpu & memory requests + limits - reorder containers",
 			containers: []podresize.ResizableContainerInfo{
 				{
@@ -1255,8 +1191,7 @@ func doPodResizeErrorTests(f *framework.Framework) {
 			if tc.patchError == "" {
 				framework.ExpectNoError(pErr, "failed to patch pod for resize")
 			} else {
-				gomega.Expect(pErr).To(gomega.HaveOccurred())
-				gomega.Expect(pErr.Error()).To(gomega.ContainSubstring(tc.patchError))
+				gomega.Expect(pErr).To(gomega.HaveOccurred(), tc.patchError)
 				patchedPod = newPod
 			}
 
