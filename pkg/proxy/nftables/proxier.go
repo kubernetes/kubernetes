@@ -19,10 +19,6 @@ limitations under the License.
 
 package nftables
 
-//
-// NOTE: this needs to be tested in e2e since it uses nftables for everything.
-//
-
 import (
 	"context"
 	"crypto/sha256"
@@ -143,7 +139,7 @@ func NewDualStackProxier(
 	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
-// Proxier is an nftables based proxy
+// Proxier is an nftables-based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
@@ -211,9 +207,7 @@ type Proxier struct {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new nftables Proxier. Once a proxier is created, it will keep
-// nftables up to date in the background and will not terminate if a particular nftables
-// call fails.
+// NewProxier returns a new single-stack NFTables proxier.
 func NewProxier(ctx context.Context,
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,

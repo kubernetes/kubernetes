@@ -623,8 +623,7 @@ func (network hnsNetworkInfo) findRemoteSubnetProviderAddress(ip string) string 
 
 type endPointsReferenceCountMap map[string]*uint16
 
-// Proxier is an hns based proxy for connections between a localhost:lport
-// and services that provide the actual backends.
+// Proxier is an HNS-based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
@@ -701,7 +700,7 @@ type closeable interface {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new Proxier
+// NewProxier returns a new single-stack winkernel proxier.
 func NewProxier(
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,

@@ -159,8 +159,7 @@ func NewDualStackProxier(
 	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
-// Proxier is an ipvs based proxy for connections between a localhost:lport
-// and services that provide the actual backends.
+// Proxier is an ipvs-based proxy
 type Proxier struct {
 	// the ipfamily on which this proxy is operating on.
 	ipFamily v1.IPFamily
@@ -254,11 +253,7 @@ type Proxier struct {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new Proxier given an iptables and ipvs Interface instance.
-// Because of the iptables and ipvs logic, it is assumed that there is only a single Proxier active on a machine.
-// An error will be returned if it fails to update or acquire the initial lock.
-// Once a proxier is created, it will keep iptables and ipvs rules up to date in the background and
-// will not terminate if a particular iptables or ipvs call fails.
+// NewProxier returns a new single-stack IPVS proxier.
 func NewProxier(
 	ctx context.Context,
 	ipFamily v1.IPFamily,
