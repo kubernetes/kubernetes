@@ -14,10 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script checks the coding style for the Go language files using
-# golangci-lint. Which checks are enabled depends on command line flags. The
-# default is a minimal set of checks that all existing code passes without
-# issues.
+# This script analyzes API changes between specified revisions this repository.
+# It uses the apidiff tool to detect differences, reports incompatible changes, and optionally
+# builds downstream projects to assess the impact of those changes. 
 
 usage () {
   cat <<EOF >&2
