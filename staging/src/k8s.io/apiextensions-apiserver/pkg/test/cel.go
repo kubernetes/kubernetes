@@ -33,17 +33,16 @@ import (
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
-// FieldValidatorsFromFile extracts the CEL validators by version and JSONPath from a CRD file and returns
-// a validator func for testing against samples.
-func FieldValidatorsFromFile(t *testing.T, crdFilePath string) (validatorsByVersionByJSONPath map[string]map[string]CELValidateFunc) {
-	data, err := os.ReadFile(crdFilePath)
+// MustLoadManifest loads a CRD from a file and panics on error.
+func MustLoadManifest[T any](t *testing.T, pth string) *T {
+	data, err := os.ReadFile(pth)
 	require.NoError(t, err)
 
-	var crd apiextensionsv1.CustomResourceDefinition
+	var crd T
 	err = yaml.Unmarshal(data, &crd)
 	require.NoError(t, err)
 
-	return FieldValidators(t, &crd)
+	return &crd
 }
 
 // FieldValidators extracts the CEL validators by version and JSONPath from a CRD and returns

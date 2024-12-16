@@ -18,7 +18,6 @@ package test
 
 import (
 	"errors"
-	"os"
 	"regexp"
 	"testing"
 
@@ -28,21 +27,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/yaml"
 )
-
-// PatternValidatorsFromFile extracts the pattern validators by version and JSONPath from a CRD file and returns
-// a validator func for testing against samples.
-func PatternValidatorsFromFile(t *testing.T, crdFilePath string) (validatorsByVersionByJSONPath map[string]map[string]PatternValidateFunc) {
-	data, err := os.ReadFile(crdFilePath)
-	require.NoError(t, err)
-
-	var crd apiextensionsv1.CustomResourceDefinition
-	err = yaml.Unmarshal(data, &crd)
-	require.NoError(t, err)
-
-	return PatternValidators(t, &crd)
-}
 
 // PatternValidators extracts the pattern validators by version and JSONPath from a CRD and returns
 // a validator func for testing against samples.

@@ -21,6 +21,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apitest "k8s.io/apiextensions-apiserver/pkg/test"
 )
 
@@ -126,7 +127,7 @@ func TestAPIExportPermissionClaimCELValidation(t *testing.T) {
 		},
 	}
 
-	validators := apitest.FieldValidatorsFromFile(t, "apiexports_crd.yaml")
+	validators := apitest.FieldValidators(t, apitest.MustLoadManifest[apiextensionsv1.CustomResourceDefinition](t, "apiexports_crd.yaml"))
 
 	for _, tc := range testCases {
 		pth := "openAPIV3Schema.properties.spec.properties.permissionClaims.items"
@@ -191,7 +192,7 @@ func TestResourceSelectorCELValidation(t *testing.T) {
 		},
 	}
 
-	validators := apitest.FieldValidatorsFromFile(t, "apiexports_crd.yaml")
+	validators := apitest.FieldValidators(t, apitest.MustLoadManifest[apiextensionsv1.CustomResourceDefinition](t, "apiexports_crd.yaml"))
 
 	for _, tc := range testCases {
 		pth := "openAPIV3Schema.properties.spec.properties.permissionClaims.items.properties.resourceSelector.items"
@@ -272,7 +273,7 @@ func TestAPIExportPermissionClaimPattern(t *testing.T) {
 		},
 	}
 
-	validators := apitest.PatternValidatorsFromFile(t, "apiexports_crd.yaml")
+	validators := apitest.PatternValidators(t, apitest.MustLoadManifest[apiextensionsv1.CustomResourceDefinition](t, "apiexports_crd.yaml"))
 
 	for _, tc := range testCases {
 		pth := "openAPIV3Schema.properties.spec.properties.permissionClaims.items.properties.resourceSelector.items.properties.name"
