@@ -24,6 +24,7 @@
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/gogo/protobuf": "unmaintained",
       "github.com/golang/mock": "unmaintained, archive mode",
+      "github.com/golang/protobuf": "replace with google.golang.org/protobuf",
       "github.com/golang/groupcache": "unmaintained",
       "github.com/google/gofuzz": "unmaintained, archive mode",
       "github.com/google/s2a-go": "cloud dependency, unstable",
@@ -160,6 +161,28 @@
       "github.com/golang/groupcache": [
         "go.etcd.io/etcd/server/v3"
       ],
+      "github.com/golang/protobuf": [
+        "github.com/container-storage-interface/spec",
+        "github.com/containerd/containerd/api",
+        "github.com/containerd/errdefs",
+        "github.com/containerd/ttrpc",
+        "github.com/google/cadvisor",
+        "github.com/grpc-ecosystem/go-grpc-middleware",
+        "github.com/grpc-ecosystem/grpc-gateway",
+        "github.com/prometheus/client_golang",
+        "go.etcd.io/etcd/api/v3",
+        "go.etcd.io/etcd/client/v3",
+        "go.etcd.io/etcd/pkg/v3",
+        "go.etcd.io/etcd/raft/v3",
+        "go.etcd.io/etcd/server/v3",
+        "google.golang.org/genproto",
+        "google.golang.org/grpc",
+        "google.golang.org/protobuf",
+        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client",
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v5",
+        "sigs.k8s.io/kustomize/kyaml"
+      ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go",
         "k8s.io/apiextensions-apiserver",
@@ -260,6 +283,7 @@
     "unwantedVendored": [
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
+      "github.com/golang/protobuf",
       "github.com/google/gofuzz",
       "github.com/google/shlex",
       "github.com/gregjones/httpcache",
