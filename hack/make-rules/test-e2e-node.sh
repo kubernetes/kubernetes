@@ -30,6 +30,7 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 focus=${FOCUS:-""}
 skip=${SKIP-"\[Flaky\]|\[Slow\]|\[Serial\]"}
+label_filter=${LABEL_FILTER:=-""}
 # The number of tests that can run in parallel depends on what tests
 # are running and on the size of the node. Too many, and tests will
 # fail due to resource contention. 8 is a reasonable default for a
@@ -66,7 +67,7 @@ if [ "${remote}" = true ] && [ -n "${debug_tool}" ]; then
 fi
 
 # Parse the flags to pass to ginkgo
-ginkgoflags=${GINKGO_FLAGS:-"-timeout=24h"}
+ginkgoflags="-timeout=24h"
 if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
@@ -77,6 +78,10 @@ fi
 
 if [[ ${skip} != "" ]]; then
   ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
+fi
+
+if [[ ${label_filter} != "" ]]; then
+  ginkgoflags="${ginkgoflags} --label-filter=\"${label_filter}\" "
 fi
 
 if [[ ${run_until_failure} == "true" ]]; then
