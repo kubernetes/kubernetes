@@ -18,6 +18,7 @@ package integration
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -88,18 +90,19 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 	{
 		t.Logf("patch of handler version v1beta1 (non-storage version) should succeed")
 		i := 0
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta1.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-			if err != nil {
+			_, patchErr := noxuNamespacedResourceClientV1beta1.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			if patchErr != nil {
 				// work around "grpc: the client connection is closing" error
 				// TODO: fix the grpc error
-				if err, ok := err.(*errors.StatusError); ok && err.Status().Code == http.StatusInternalServerError {
+				var statusErr *errors.StatusError
+				if stderrors.As(patchErr, &statusErr) && statusErr.Status().Code == http.StatusInternalServerError {
 					return false, nil
 				}
-				return false, err
+				return false, patchErr
 			}
 			return true, nil
 		})
@@ -111,20 +114,21 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 		t.Logf("patch of handler version v1beta2 (storage version) should fail")
 		i := 0
 		noxuNamespacedResourceClientV1beta2 := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, "v1beta2") // use the storage version v1beta2
-		err = wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
-			_, err := noxuNamespacedResourceClientV1beta2.Patch(context.TODO(), "foo", types.MergePatchType, patch, metav1.PatchOptions{})
-			assert.Error(t, err)
+			_, patchErr := noxuNamespacedResourceClientV1beta2.Patch(ctx, "foo", types.MergePatchType, patch, metav1.PatchOptions{})
+			require.Error(t, patchErr)
 
 			// work around "grpc: the client connection is closing" error
 			// TODO: fix the grpc error
-			if err, ok := err.(*errors.StatusError); ok && err.Status().Code == http.StatusInternalServerError {
+			var statusErr *errors.StatusError
+			if stderrors.As(patchErr, &statusErr) && statusErr.Status().Code == http.StatusInternalServerError {
 				return false, nil
 			}
 
-			assert.ErrorContains(t, err, "apiVersion")
+			assert.ErrorContains(t, patchErr, "apiVersion")
 			return true, nil
 		})
 		assert.NoError(t, err)
