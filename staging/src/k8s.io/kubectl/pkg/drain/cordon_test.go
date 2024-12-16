@@ -19,6 +19,7 @@ package drain
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,6 +45,10 @@ func TestNewCordonHelperFromRuntimeObject(t *testing.T) {
 			expectError: false,
 			expected: &CordonHelper{
 				node: &corev1.Node{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Node",
+						APIVersion: "v1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-node",
 					},
@@ -82,8 +87,8 @@ func TestNewCordonHelperFromRuntimeObject(t *testing.T) {
 				t.Error("Expected non-nil helper")
 			}
 			if tt.expected != nil && helper != nil {
-				if helper.node.Name != tt.expected.node.Name {
-					t.Errorf("Expected node name %s, got %s", tt.expected.node.Name, helper.node.Name)
+				if diff := cmp.Diff(tt.expected.node, helper.node); diff != "" {
+					t.Errorf("Node mismatch (-want +got):\n%s", diff)
 				}
 			}
 		})
