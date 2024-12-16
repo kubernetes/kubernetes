@@ -446,6 +446,8 @@ github.com/onsi/ginkgo/v2/types
 github.com/onsi/gomega
 github.com/onsi/gomega/format
 github.com/onsi/gomega/gcustom
+github.com/onsi/gomega/gmeasure
+github.com/onsi/gomega/gmeasure/table
 github.com/onsi/gomega/gstruct
 github.com/onsi/gomega/gstruct/errors
 github.com/onsi/gomega/internal
