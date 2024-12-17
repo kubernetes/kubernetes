@@ -30,7 +30,7 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 focus=${FOCUS:-""}
 skip=${SKIP-"\[Flaky\]|\[Slow\]|\[Serial\]"}
-label_filter=${LABEL_FILTER:=-""}
+label_filter=${LABEL_FILTER:-""}
 # The number of tests that can run in parallel depends on what tests
 # are running and on the size of the node. Too many, and tests will
 # fail due to resource contention. 8 is a reasonable default for a
