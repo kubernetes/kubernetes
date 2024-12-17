@@ -175,7 +175,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerScope (--topology-manager-scope) %q must be one of: %q, or %q", kc.TopologyManagerScope, kubeletconfig.ContainerTopologyManagerScope, kubeletconfig.PodTopologyManagerScope))
 	}
 
-	if localFeatureGate.Enabled(features.GracefulNodeShutdown) {
+	gracefulNodeShutdownEnabled := localFeatureGate.Enabled(features.GracefulNodeShutdown) || localFeatureGate.Enabled(features.WindowsGracefulNodeShutdown)
+	if gracefulNodeShutdownEnabled {
 		if kc.ShutdownGracePeriodCriticalPods.Duration > kc.ShutdownGracePeriod.Duration {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: shutdownGracePeriodCriticalPods %v must be <= shutdownGracePeriod %v", kc.ShutdownGracePeriodCriticalPods, kc.ShutdownGracePeriod))
 		}
@@ -186,8 +187,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: shutdownGracePeriodCriticalPods %v must be either zero or otherwise >= 1 sec", kc.ShutdownGracePeriodCriticalPods))
 		}
 	}
-	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !localFeatureGate.Enabled(features.GracefulNodeShutdown) {
-		allErrors = append(allErrors, fmt.Errorf("invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown"))
+	if (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) && !gracefulNodeShutdownEnabled {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: specifying shutdownGracePeriod or shutdownGracePeriodCriticalPods requires feature gate GracefulNodeShutdown or WindowsGracefulNodeShutdown"))
 	}
 	if localFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 		if len(kc.ShutdownGracePeriodByPodPriority) != 0 && (kc.ShutdownGracePeriod.Duration > 0 || kc.ShutdownGracePeriodCriticalPods.Duration > 0) {
