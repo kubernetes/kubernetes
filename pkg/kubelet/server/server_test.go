@@ -1619,6 +1619,8 @@ func TestServePortForward(t *testing.T) {
 }
 
 func TestMetricBuckets(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+
 	tests := map[string]struct {
 		url    string
 		bucket string
@@ -1654,7 +1656,6 @@ func TestMetricBuckets(t *testing.T) {
 		"invalid path":                    {url: "/junk", bucket: "other"},
 		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
