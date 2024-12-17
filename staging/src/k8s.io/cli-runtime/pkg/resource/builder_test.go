@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/restmapper"
+
 	// TODO we need to remove this linkage and create our own scheme
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -259,6 +260,20 @@ var aPodBadAnnotations string = `
         "restartPolicy": "Always"
     }
 }
+`
+
+var aPodNullAnnotations string = `
+kind: Pod,
+apiVersion: v1
+metadata:
+  name: busybox
+  annotations:
+    foo: test
+    bar:
+spec:
+  containers:
+  - name: busybox
+    image: busybox
 `
 
 var aRC string = `
@@ -1900,6 +1915,7 @@ func TestUnstructured(t *testing.T) {
 	// create test files
 	writeTestFile(t, fmt.Sprintf("%s/pod.json", tmpDir), aPod)
 	writeTestFile(t, fmt.Sprintf("%s/badpod.json", tmpDir), aPodBadAnnotations)
+	writeTestFile(t, fmt.Sprintf("%s/nullpod.json", tmpDir), aPodNullAnnotations)
 
 	tests := []struct {
 		name          string
@@ -1916,11 +1932,17 @@ func TestUnstructured(t *testing.T) {
 			file:          "badpod.json",
 			expectedError: "ObjectMeta.",
 		},
+		{
+			name:          "nullpod",
+			file:          "nullpod.json",
+			expectedError: "metadata.annotations",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := newUnstructuredDefaultBuilder().
+				Local().
 				ContinueOnError().
 				FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{fmt.Sprintf("%s/%s", tmpDir, tc.file)}}).
 				Flatten().
@@ -1933,13 +1955,13 @@ func TestUnstructured(t *testing.T) {
 
 			if len(tc.expectedError) == 0 {
 				if err != nil {
-					t.Errorf("unexpected error: %v", err)
+					t.Fatalf("unexpected error: %v", err)
 				}
 			} else {
 				if err == nil {
-					t.Errorf("expected error, got none")
+					t.Fatalf("expected error, got none")
 				} else if !strings.Contains(err.Error(), tc.expectedError) {
-					t.Errorf("expected error with '%s', got: %v", tc.expectedError, err)
+					t.Fatalf("expected error with '%s', got: %v", tc.expectedError, err)
 				}
 			}
 

@@ -18,6 +18,7 @@ package resource
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
@@ -37,7 +38,8 @@ func (m *metadataValidatingDecoder) Decode(data []byte, defaults *schema.GroupVe
 	}
 
 	// if we're not unstructured, return
-	if _, isUnstructured := obj.(runtime.Unstructured); !isUnstructured {
+	u, isUnstructured := obj.(runtime.Unstructured)
+	if !isUnstructured {
 		return obj, gvk, err
 	}
 
@@ -47,6 +49,17 @@ func (m *metadataValidatingDecoder) Decode(data []byte, defaults *schema.GroupVe
 	if typedErr := utiljson.Unmarshal(data, v); typedErr != nil {
 		return obj, gvk, typedErr
 	}
+
+	// make sure label and annotation accessors don't error before we return,
+	// so we don't silently drop labels / annotations in metadata later with accesser get/set calls
+	content := u.UnstructuredContent()
+	if _, _, err := unstructured.NestedStringMap(content, "metadata", "labels"); err != nil {
+		return obj, gvk, err
+	}
+	if _, _, err := unstructured.NestedStringMap(content, "metadata", "annotations"); err != nil {
+		return obj, gvk, err
+	}
+
 	return obj, gvk, err
 }
 
