@@ -6877,44 +6877,59 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			allocatedPod := v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test",
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Name:      "c",
-						Resources: test.allocatedResources,
-					}},
-					InitContainers: []v1.Container{{
-						Name:          "c1-init",
-						Resources:     test.allocatedResources,
-						RestartPolicy: &containerRestartPolicyAlways,
-					}},
-				},
-			}
-			state := kubecontainer.ContainerStateRunning
-			if test.statusTerminated {
-				state = kubecontainer.ContainerStateExited
-			}
-			podStatus := &kubecontainer.PodStatus{
-				Name: "test",
-				ContainerStatuses: []*kubecontainer.Status{
-					{
-						Name:      "c",
-						State:     state,
-						Resources: test.statusResources,
+		for _, isSidecarContainer := range []bool{false, true} {
+			t.Run(test.name, func(t *testing.T) {
+				var podStatus *kubecontainer.PodStatus
+				state := kubecontainer.ContainerStateRunning
+				if test.statusTerminated {
+					state = kubecontainer.ContainerStateExited
+				}
+
+				allocatedPod := v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test",
 					},
-					{
-						Name:      "c1-init",
-						State:     state,
-						Resources: test.statusResources,
-					},
-				},
-			}
-			match := allocatedResourcesMatchStatus(&allocatedPod, podStatus)
-			assert.Equal(t, test.expectMatch, match)
-		})
+				}
+
+				if isSidecarContainer {
+					allocatedPod.Spec = v1.PodSpec{
+						InitContainers: []v1.Container{{
+							Name:          "c1-init",
+							Resources:     test.allocatedResources,
+							RestartPolicy: &containerRestartPolicyAlways,
+						}},
+					}
+					podStatus = &kubecontainer.PodStatus{
+						Name: "test",
+						ContainerStatuses: []*kubecontainer.Status{
+							{
+								Name:      "c1-init",
+								State:     state,
+								Resources: test.statusResources,
+							},
+						},
+					}
+				} else {
+					allocatedPod.Spec = v1.PodSpec{
+						Containers: []v1.Container{{
+							Name:      "c",
+							Resources: test.allocatedResources,
+						}},
+					}
+					podStatus = &kubecontainer.PodStatus{
+						Name: "test",
+						ContainerStatuses: []*kubecontainer.Status{
+							{
+								Name:      "c",
+								State:     state,
+								Resources: test.statusResources,
+							},
+						},
+					}
+				}
+				match := allocatedResourcesMatchStatus(&allocatedPod, podStatus)
+				assert.Equal(t, test.expectMatch, match)
+			})
+		}
 	}
 }

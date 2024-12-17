@@ -5649,22 +5649,29 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	originalCPUMemPodSpec.Containers = newContainers
 
 	// Ensure that only CPU and memory resources are mutable for restartable init containers.
+	// Also ensure that resources are immutable for non-restartable init containers.
 	var newInitContainers []core.Container
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for ix, container := range originalCPUMemPodSpec.InitContainers {
 			if isRestartableInitContainer(&container) { // restartable init container
 				dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
+				if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
+					// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
+					specDiff := cmp.Diff(oldPod.Spec.InitContainers[ix], container)
+					errs := field.Forbidden(specPath, fmt.Sprintf("only cpu and memory resources for sidecar containers are mutable\n%v", specDiff))
+					allErrs = append(allErrs, errs)
+					return allErrs
+				}
+			} else if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) { // non-restartable init container
+				// This likely means that the user has modified resources of non-sidecar init container.
+				specDiff := cmp.Diff(oldPod.Spec.InitContainers[ix], container)
+				errs := field.Forbidden(specPath, fmt.Sprintf("resources for non-sidecar init containers are immutable\n%v", specDiff))
+				allErrs = append(allErrs, errs)
+				return allErrs
 			}
 			newInitContainers = append(newInitContainers, container)
 		}
 		originalCPUMemPodSpec.InitContainers = newInitContainers
-		if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec.InitContainers, oldPod.Spec.InitContainers) {
-			// This likely means that the user has modified non-sidecar container resources.
-			specDiff := cmp.Diff(oldPod.Spec.InitContainers, originalCPUMemPodSpec.InitContainers)
-			errs := field.Forbidden(specPath, fmt.Sprintf("cpu and memory resources for only sidecar containers are mutable\n%v", specDiff))
-			allErrs = append(allErrs, errs)
-			return allErrs
-		}
 	}
 
 	if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec, oldPod.Spec) {
