@@ -72,11 +72,11 @@ if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
 
-if [[ ${focus} != "" ]]; then
+if [[ ${focus} != "" && ${label_filter} == "" ]]; then
   ginkgoflags="${ginkgoflags} -focus=\"${focus}\" "
 fi
 
-if [[ ${skip} != "" ]]; then
+if [[ ${skip} != "" && ${label_filter} == "" ]]; then
   ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
 fi
 
