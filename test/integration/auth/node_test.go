@@ -625,8 +625,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// clean up node2
 	expectAllowed(t, deleteNode2(superuserClient))
 
-	// TODO(mikedanese): integration test node restriction of TokenRequest
-
 	// node1 allowed to operate on its own lease
 	expectAllowed(t, createNode1Lease(node1Client))
 	expectAllowed(t, getNode1Lease(node1Client))
