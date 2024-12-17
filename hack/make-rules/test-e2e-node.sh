@@ -76,7 +76,7 @@ if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
 
-if [[ ${focus} != "" && ${label_filter} == "" ]]; then
+if [[ ${focus} != "" ]]; then
   ginkgoflags="${ginkgoflags} -focus=\"${focus}\" "
 fi
 
