@@ -129,7 +129,7 @@ func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {
 func (c *EndpointSliceConfig) handleUpdateEndpointSlice(oldObj, newObj interface{}) {
 	oldEndpointSlice, ok := oldObj.(*discoveryv1.EndpointSlice)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", newObj))
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %T", oldObj))
 		return
 	}
 	newEndpointSlice, ok := newObj.(*discoveryv1.EndpointSlice)
