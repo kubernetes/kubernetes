@@ -79,7 +79,7 @@ type managerImpl struct {
 
 // NewManager returns a new node shutdown manager.
 func NewManager(conf *Config) Manager {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LinuxGracefulNodeShutdown) {
 		m := managerStub{}
 		return m
 	}
