@@ -470,18 +470,19 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 	}
 
 	config := Config{
-		Storage:        wrappedStorage,
-		Versioner:      storage.APIObjectVersioner{},
-		GroupResource:  schema.GroupResource{Resource: "pods"},
-		ResourcePrefix: setupOpts.resourcePrefix,
-		KeyFunc:        setupOpts.keyFunc,
-		GetAttrsFunc:   GetPodAttrs,
-		NewFunc:        newPod,
-		NewListFunc:    newPodList,
-		IndexerFuncs:   setupOpts.indexerFuncs,
-		Indexers:       &setupOpts.indexers,
-		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:          setupOpts.clock,
+		Storage:             wrappedStorage,
+		Versioner:           storage.APIObjectVersioner{},
+		GroupResource:       schema.GroupResource{Resource: "pods"},
+		EventsHistoryWindow: DefaultEventFreshDuration,
+		ResourcePrefix:      setupOpts.resourcePrefix,
+		KeyFunc:             setupOpts.keyFunc,
+		GetAttrsFunc:        GetPodAttrs,
+		NewFunc:             newPod,
+		NewListFunc:         newPodList,
+		IndexerFuncs:        setupOpts.indexerFuncs,
+		Indexers:            &setupOpts.indexers,
+		Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:               setupOpts.clock,
 	}
 	cacher, err := NewCacherFromConfig(config)
 	if err != nil {
