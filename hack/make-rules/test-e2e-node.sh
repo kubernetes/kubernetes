@@ -80,7 +80,7 @@ if [[ ${focus} != "" ]]; then
   ginkgoflags="${ginkgoflags} -focus=\"${focus}\" "
 fi
 
-if [[ ${skip} != "" && ${label_filter} == "" ]]; then
+if [[ ${skip} != "" ]]; then
   ginkgoflags="${ginkgoflags} -skip=\"${skip}\" "
 fi
 
