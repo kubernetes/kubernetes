@@ -515,7 +515,7 @@ func checkVolumeMappingForOverlap(paths []pathAndSource) []string {
 }
 
 func checkForOverlap(haystack []pathAndSource, needle pathAndSource) []pathAndSource {
-	pathSeparator := string(os.PathSeparator)
+	pathSeparator := `/` // this check runs in the API server, use the OS-agnostic separator
 
 	if needle.path == "" {
 		return nil
