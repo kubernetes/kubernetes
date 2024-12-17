@@ -1419,6 +1419,7 @@ func doPodResizeErrorTests() {
 	for idx := range tests {
 		tc := tests[idx]
 		f := framework.NewDefaultFramework("pod-resize-error-tests")
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged // for using HostPath
 
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			podClient := e2epod.NewPodClient(f)
