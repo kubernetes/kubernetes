@@ -1176,6 +1176,9 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// is running, not only the first ones in the list.
 			timer := c.timer
 			for _, watcher := range c.blockedWatchers {
+				if !watcher.initEventDone {
+					continue
+				}
 				if !watcher.add(event, timer) {
 					// fired, clean the timer by set it to nil.
 					timer = nil

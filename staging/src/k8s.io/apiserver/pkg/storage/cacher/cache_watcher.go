@@ -51,13 +51,15 @@ const (
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
-	input     chan *watchCacheEvent
-	result    chan watch.Event
-	done      chan struct{}
-	filter    filterWithAttrsFunc
-	stopped   bool
-	forget    func(bool)
-	versioner storage.Versioner
+	input         chan *watchCacheEvent
+	result        chan watch.Event
+	once          sync.Once
+	initEventDone bool
+	done          chan struct{}
+	filter        filterWithAttrsFunc
+	stopped       bool
+	forget        func(bool)
+	versioner     storage.Versioner
 	// The watcher will be closed by server after the deadline,
 	// save it here to send bookmark events before that.
 	deadline            time.Time
@@ -525,7 +527,9 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	//   the initialization signal proportionally to the number of events to
 	//   process, but we're leaving this to the tuning phase.
 	utilflowcontrol.WatchInitialized(ctx)
-
+	c.once.Do(func() {
+		c.initEventDone = true
+	})
 	for {
 		select {
 		case event, ok := <-c.input:
