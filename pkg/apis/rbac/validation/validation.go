@@ -150,9 +150,14 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 		}
 	}
 
+	// subjects is required
 	subjectsPath := field.NewPath("subjects")
+	if len(roleBinding.Subjects) == 0 {
+		allErrs = append(allErrs, field.Required(subjectsPath, ""))
+	}
+
 	for i, subject := range roleBinding.Subjects {
-		allErrs = append(allErrs, ValidateRoleBindingSubject(subject, true, subjectsPath.Index(i))...)
+		allErrs = append(allErrs, ValidateRoleBindingSubject(subject, subjectsPath.Index(i))...)
 	}
 
 	return allErrs
@@ -194,9 +199,14 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 		}
 	}
 
+	// subjects is required
 	subjectsPath := field.NewPath("subjects")
+	if len(roleBinding.Subjects) == 0 {
+		allErrs = append(allErrs, field.Required(subjectsPath, ""))
+	}
+
 	for i, subject := range roleBinding.Subjects {
-		allErrs = append(allErrs, ValidateRoleBindingSubject(subject, false, subjectsPath.Index(i))...)
+		allErrs = append(allErrs, ValidateRoleBindingSubject(subject, subjectsPath.Index(i))...)
 	}
 
 	return allErrs
@@ -214,7 +224,7 @@ func ValidateClusterRoleBindingUpdate(roleBinding *rbac.ClusterRoleBinding, oldR
 }
 
 // ValidateRoleBindingSubject is exported to allow types outside of the RBAC API group to embed a rbac.Subject and reuse this validation logic
-func ValidateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath *field.Path) field.ErrorList {
+func ValidateRoleBindingSubject(subject rbac.Subject, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(subject.Name) == 0 {
@@ -231,7 +241,9 @@ func ValidateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 		if len(subject.APIGroup) > 0 {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{""}))
 		}
-		if !isNamespaced && len(subject.Namespace) == 0 {
+
+		// SA namespace in both RoleBinding and ClusterRoleBinding is required
+		if len(subject.Namespace) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), ""))
 		}
 
