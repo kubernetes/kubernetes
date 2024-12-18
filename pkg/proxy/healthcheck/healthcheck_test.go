@@ -138,11 +138,11 @@ type healthzPayload struct {
 	NodeHealthy bool
 }
 
-type fakeProxierHealthChecker struct {
+type fakeProxyHealthChecker struct {
 	healthy bool
 }
 
-func (fake fakeProxierHealthChecker) IsHealthy() bool {
+func (fake fakeProxyHealthChecker) IsHealthy() bool {
 	return fake.healthy
 }
 
@@ -150,7 +150,7 @@ func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
-	proxyChecker := &fakeProxierHealthChecker{true}
+	proxyChecker := &fakeProxyHealthChecker{true}
 
 	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
@@ -469,7 +469,7 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
 	server := hs.httpFactory.New(healthzHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -479,7 +479,7 @@ func TestHealthzServer(t *testing.T) {
 		tracking503: 0,
 	}
 
-	testProxierHealthUpdater(hs, hsTest, fakeClock, t)
+	testProxyHealthUpdater(hs, hsTest, fakeClock, t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
 	hs.SyncNode(makeNode(tweakTainted("other")))
@@ -504,7 +504,7 @@ func TestLivezServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
 	server := hs.httpFactory.New(livezHandler{hs: hs})
 
 	hsTest := &serverTest{
@@ -514,7 +514,7 @@ func TestLivezServer(t *testing.T) {
 		tracking503: 0,
 	}
 
-	testProxierHealthUpdater(hs, hsTest, fakeClock, t)
+	testProxyHealthUpdater(hs, hsTest, fakeClock, t)
 
 	// Should return 200 "OK" irrespective of node syncs
 	hs.SyncNode(makeNode(tweakTainted("other")))
@@ -540,7 +540,7 @@ var (
 	livezURL   url = "/livez"
 )
 
-func testProxierHealthUpdater(hs *ProxierHealthServer, hsTest *serverTest, fakeClock *testingclock.FakeClock, t *testing.T) {
+func testProxyHealthUpdater(hs *ProxyHealthServer, hsTest *serverTest, fakeClock *testingclock.FakeClock, t *testing.T) {
 	// Should return 200 "OK" by default.
 	testHTTPHandler(hsTest, http.StatusOK, t)
 
@@ -659,7 +659,7 @@ func testMetricEquals(metric basemetrics.CounterMetric, expected float64, t *tes
 func TestServerWithSelectiveListeningAddress(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	proxyChecker := &fakeProxierHealthChecker{true}
+	proxyChecker := &fakeProxyHealthChecker{true}
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
