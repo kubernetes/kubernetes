@@ -18,6 +18,7 @@ package resource
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -1818,5 +1819,55 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 			}
 			t.Errorf("Expected equal: %v, %v (cbor was '%s')", initial, final, diag)
 		}
+	}
+}
+
+func TestMilliChecked(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		q           *Quantity
+		expectError bool
+	}{
+		{
+			name:        "peta overflow",
+			q:           func() *Quantity { q := MustParse("16Pi"); return &q }(),
+			expectError: true,
+		},
+		{
+			name:        "exa overflow",
+			q:           func() *Quantity { q := MustParse("42Ei"); return &q }(),
+			expectError: true,
+		},
+		{
+			name:        "tera overflow",
+			q:           func() *Quantity { q := MustParse("420000Ti"); return &q }(),
+			expectError: true,
+		},
+		{
+			name:        "1 SI",
+			q:           NewQuantity(1, BinarySI),
+			expectError: false,
+		},
+		{
+			name:        "0 SI",
+			q:           NewQuantity(0, BinarySI),
+			expectError: false,
+		},
+		{
+			name:        "-1 SI",
+			q:           NewQuantity(-1, BinarySI),
+			expectError: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.q.CheckedMilliValue()
+			if err == nil && tc.expectError {
+				t.Error("expected error but got none")
+			} else if err != nil && !tc.expectError {
+				t.Errorf("expected no error error but got %v", err)
+			} else if tc.expectError && !errors.Is(err, ErrOverflow) {
+				t.Errorf("expected overflow error but got %v", err)
+			}
+		})
 	}
 }

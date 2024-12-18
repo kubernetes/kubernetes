@@ -816,8 +816,26 @@ func (q *Quantity) Value() int64 {
 
 // MilliValue returns the value of ceil(q * 1000); this could overflow an int64;
 // if that's a concern, call Value() first to verify the number is small enough.
+//
+// Deprecated: Prefer CheckedMilliValue which will error on overflow instead of
+// silently overflowing.
 func (q *Quantity) MilliValue() int64 {
 	return q.ScaledValue(Milli)
+}
+
+var (
+	ErrOverflow = errors.New("cannot convert without overflow")
+)
+
+// CheckedMilliValue returns the value of ceil(q * 1000);
+// This may not fit in an int64 this could overflow an int64, in which case an error will be returned.
+// You can check errors.Is(err, ErrOverflow)
+func (q *Quantity) CheckedMilliValue() (int64, error) {
+	// TODO: check underflow?
+	if q.Value() > MaxMilliValue {
+		return 0, fmt.Errorf("value %v overflows MilliValue: %w", q.Value(), ErrOverflow)
+	}
+	return q.ScaledValue(Milli), nil
 }
 
 // ScaledValue returns the value of ceil(q / 10^scale).
