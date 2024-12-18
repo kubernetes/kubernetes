@@ -325,7 +325,7 @@ func (c *Controller) initInformer(ctx context.Context) error {
 	}, func(options *metav1.ListOptions) {
 		options.FieldSelector = selector.String()
 	})
-	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
+	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(logger, informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
 	handler, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)

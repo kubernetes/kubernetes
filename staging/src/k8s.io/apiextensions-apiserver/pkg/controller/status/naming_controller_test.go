@@ -27,6 +27,7 @@ import (
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 )
 
 type crdBuilder struct {
@@ -321,25 +322,30 @@ func TestSync(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		for _, obj := range tc.existing {
-			crdIndexer.Add(obj)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			crdIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+			for _, obj := range tc.existing {
+				if err := crdIndexer.Add(obj); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
 
-		c := NamingConditionController{
-			crdLister:        listers.NewCustomResourceDefinitionLister(crdIndexer),
-			crdMutationCache: cache.NewIntegerResourceVersionMutationCache(crdIndexer, crdIndexer, 60*time.Second, false),
-		}
-		actualNames, actualNameConflictCondition, establishedCondition := c.calculateNamesAndConditions(tc.in)
+			c := NamingConditionController{
+				crdLister:        listers.NewCustomResourceDefinitionLister(crdIndexer),
+				crdMutationCache: cache.NewIntegerResourceVersionMutationCache(logger, crdIndexer, crdIndexer, 60*time.Second, false),
+			}
+			actualNames, actualNameConflictCondition, establishedCondition := c.calculateNamesAndConditions(tc.in)
 
-		if e, a := tc.expectedNames, actualNames; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v expected %v, got %#v", tc.name, e, a)
-		}
-		if e, a := tc.expectedNameConflictCondition, actualNameConflictCondition; !apiextensionshelpers.IsCRDConditionEquivalent(&e, &a) {
-			t.Errorf("%v expected %v, got %v", tc.name, e, a)
-		}
-		if e, a := tc.expectedEstablishedCondition, establishedCondition; !apiextensionshelpers.IsCRDConditionEquivalent(&e, &a) {
-			t.Errorf("%v expected %v, got %v", tc.name, e, a)
-		}
+			if e, a := tc.expectedNames, actualNames; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %v, got %#v", e, a)
+			}
+			if e, a := tc.expectedNameConflictCondition, actualNameConflictCondition; !apiextensionshelpers.IsCRDConditionEquivalent(&e, &a) {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+			if e, a := tc.expectedEstablishedCondition, establishedCondition; !apiextensionshelpers.IsCRDConditionEquivalent(&e, &a) {
+				t.Errorf("expected %v, got %v", e, a)
+			}
+		})
 	}
 }
