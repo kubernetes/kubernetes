@@ -28,18 +28,30 @@
     version: "1.30"
 - name: AllowDNSOnlyNodeCSR
   versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
   - default: false
     lockToDefault: false
     preRelease: Deprecated
     version: "1.31"
 - name: AllowInsecureKubeletCertificateSigningRequests
   versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
   - default: false
     lockToDefault: false
     preRelease: Deprecated
     version: "1.31"
 - name: AllowOverwriteTerminationGracePeriodSeconds
   versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
   - default: false
     lockToDefault: false
     preRelease: Deprecated
@@ -52,6 +64,10 @@
     version: "1.33"
 - name: AllowServiceLBStatusOnNonLB
   versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
   - default: false
     lockToDefault: false
     preRelease: Deprecated
@@ -622,6 +638,10 @@
   versionedSpecs:
   - default: true
     lockToDefault: false
+    preRelease: GA
+    version: "1.0"
+  - default: true
+    lockToDefault: false
     preRelease: Deprecated
     version: "1.28"
   - default: false
@@ -670,6 +690,10 @@
     version: "1.27"
 - name: KubeletRegistrationGetOnExistsOnly
   versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
   - default: false
     lockToDefault: false
     preRelease: Deprecated
