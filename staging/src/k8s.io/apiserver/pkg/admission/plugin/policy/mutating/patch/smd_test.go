@@ -113,6 +113,33 @@ func TestApplyConfiguration(t *testing.T) {
 			}},
 		},
 		{
+			name: "apply configuration delete from listType=map",
+			expression: `Object{
+					spec: Object.spec{
+						template: Object.spec.template{
+							spec: Object.spec.template.spec{
+								volumes: object.spec.template.spec.volumes.filter(c, c.name != "y") 
+							}
+						}
+					}
+				}`,
+			gvr: deploymentGVR,
+			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Volumes: []corev1.Volume{{Name: "x"}, {Name: "y"}},
+					},
+				},
+			}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						Volumes: []corev1.Volume{{Name: "x"}},
+					},
+				},
+			}},
+		},
+		{
 			name: "apply configuration with conditionals",
 			expression: `Object{
 					spec: Object.spec{
