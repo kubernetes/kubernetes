@@ -16,11 +16,8 @@ limitations under the License.
 
 package main
 
-import (
-	"k8s.io/kubernetes/cmd/kubeadm/app"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-)
+import "os"
 
 func main() {
-	kubeadmutil.CheckErr(app.Run())
+	os.Exit(1)
 }
