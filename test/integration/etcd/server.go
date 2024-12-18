@@ -66,7 +66,8 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
 	tCtx := ktesting.Init(t)
 
-	certDir, err := os.MkdirTemp("", t.Name())
+	// Strip out "/" from test names as they are not allowed in file names
+	certDir, err := os.MkdirTemp("", strings.Replace(t.Name(), "/", "", -1))
 	if err != nil {
 		t.Fatal(err)
 	}

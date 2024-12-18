@@ -62,7 +62,7 @@ func TestNamespaceCondition(t *testing.T) {
 	informers.WaitForCacheSync(ctx.Done())
 	go nsController.Run(ctx, 5)
 
-	data := etcd.GetEtcdStorageDataForNamespace(nsName)
+	data := etcd.GetEtcdStorageDataForNamespaceAtLatestVersion(nsName)
 	podJSON, err := jsonToUnstructured(data[corev1.SchemeGroupVersion.WithResource("pods")].Stub, "v1", "Pod")
 	if err != nil {
 		t.Fatal(err)

@@ -235,7 +235,7 @@ func TestDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dryrunData := etcd.GetEtcdStorageData()
+	dryrunData := etcd.GetEtcdStorageDataAtLatestVersion()
 
 	// dry run specific stub overrides
 	for resource, stub := range map[schema.GroupVersionResource]string{

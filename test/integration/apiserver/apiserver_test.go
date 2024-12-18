@@ -3402,7 +3402,7 @@ func TestDefaultStorageEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	storageDataByResource := etcd.GetEtcdStorageDataForNamespace(NamespaceName)
+	storageDataByResource := etcd.GetEtcdStorageDataForNamespaceAtLatestVersion(NamespaceName)
 
 	_, lists, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {

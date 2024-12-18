@@ -130,7 +130,7 @@ func testApplyStatus(t *testing.T, reconfigureClient func(testing.TB, *rest.Conf
 		t.Fatal(err)
 	}
 
-	createData := etcd.GetEtcdStorageData()
+	createData := etcd.GetEtcdStorageDataAtLatestVersion()
 
 	// gather resources to test
 	_, resourceLists, err := client.Discovery().ServerGroupsAndResources()

@@ -38,7 +38,7 @@ func TestCrossGroupStorage(t *testing.T) {
 	apiServer := StartRealAPIServerOrDie(t)
 	defer apiServer.Cleanup()
 
-	etcdStorageData := GetEtcdStorageData()
+	etcdStorageData := GetEtcdStorageDataAtLatestVersion()
 
 	crossGroupResources := map[schema.GroupVersionKind][]Resource{}
 

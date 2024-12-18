@@ -41,7 +41,7 @@ import (
 func TestOverlappingBuiltInResources(t *testing.T) {
 	// Verify built-in resources that overlap with computed CRD storage paths are listed in OverlappingBuiltInResources()
 	detectedOverlappingResources := map[schema.GroupResource]bool{}
-	for gvr, gvrData := range GetEtcdStorageData() {
+	for gvr, gvrData := range GetEtcdStorageDataAtLatestVersion() {
 		if !strings.HasSuffix(gvr.Group, ".k8s.io") {
 			// only fully-qualified group names can exist as CRDs
 			continue
