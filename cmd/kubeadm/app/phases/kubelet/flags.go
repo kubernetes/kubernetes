@@ -74,7 +74,12 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 		flagOpts.criSocket = ""
 	}
 	stringMap := buildKubeletArgs(flagOpts)
-	argList := kubeadmutil.ArgumentsToCommand(stringMap, nodeReg.KubeletExtraArgs)
+	return WriteKubeletArgsToFile(stringMap, nodeReg.KubeletExtraArgs, kubeletDir)
+}
+
+// WriteKubeletArgsToFile writes combined kubelet flags to KubeletEnvFile file in kubeletDir.
+func WriteKubeletArgsToFile(kubeletFlags, overridesFlags []kubeadmapi.Arg, kubeletDir string) error {
+	argList := kubeadmutil.ArgumentsToCommand(kubeletFlags, overridesFlags)
 	envFileContent := fmt.Sprintf("%s=%q\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
 
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
