@@ -52,11 +52,22 @@ var _ = Describe("nodes", func() {
 			List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading nodes")
 
+		var nodeLocalCRISocketEnabled bool
+		cc := getClusterConfiguration(f.ClientSet)
+		if _, ok := cc["featureGates"]; ok {
+			fgCC := cc["featureGates"].(map[interface{}]interface{})
+			if fg, ok := fgCC["NodeLocalCRISocket"]; ok {
+				nodeLocalCRISocketEnabled = fg.(bool)
+			}
+		}
+
 		// Checks that the nodes have the CRI socket annotation
 		// and that it is prefixed with a URL scheme
 		for _, node := range nodes.Items {
-			gomega.Expect(node.Annotations).To(gomega.HaveKey(nodesCRISocketAnnotation))
-			gomega.Expect(node.Annotations[nodesCRISocketAnnotation]).To(gomega.HavePrefix("unix://"))
+			if !nodeLocalCRISocketEnabled {
+				gomega.Expect(node.Annotations).To(gomega.HaveKey(nodesCRISocketAnnotation))
+				gomega.Expect(node.Annotations[nodesCRISocketAnnotation]).To(gomega.HavePrefix("unix://"))
+			}
 		}
 	})
 
