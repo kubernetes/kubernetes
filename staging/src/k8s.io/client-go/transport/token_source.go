@@ -182,6 +182,8 @@ func (ts *cachingTokenSource) Token() (*oauth2.Token, error) {
 		if ts.tok == nil {
 			return nil, err
 		}
+		// TODO: avoid logging here - but not sure how.
+		//nolint:logcheck // Opt-out of contextual logging, this call shouldn't be here at all.
 		klog.Errorf("Unable to rotate token: %v", err)
 		return ts.tok, nil
 	}

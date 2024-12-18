@@ -141,6 +141,7 @@ func (c channelContext) Value(key any) any           { return nil }
 //
 // Deprecated: Will be removed when the legacy polling methods are removed.
 func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
+	//nolint:logcheck // Already deprecated.
 	defer runtime.HandleCrash()
 	return condition()
 }
@@ -150,7 +151,7 @@ func runConditionWithCrashProtection(condition ConditionFunc) (bool, error) {
 //
 // Deprecated: Will be removed when the legacy polling methods are removed.
 func runConditionWithCrashProtectionWithContext(ctx context.Context, condition ConditionWithContextFunc) (bool, error) {
-	defer runtime.HandleCrash()
+	defer runtime.HandleCrashWithContext(ctx)
 	return condition(ctx)
 }
 
