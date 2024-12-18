@@ -445,26 +445,26 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
 			}
 
-			var containerUid, containerGid int
+			var containerUID, containerGID int
 			if container.SecurityContext != nil && container.SecurityContext.RunAsUser != nil {
-				containerUid = int(*container.SecurityContext.RunAsUser)
+				containerUID = int(*container.SecurityContext.RunAsUser)
 			} else if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.RunAsUser != nil {
-				containerUid = int(*pod.Spec.SecurityContext.RunAsUser)
+				containerUID = int(*pod.Spec.SecurityContext.RunAsUser)
 			} else {
-				containerUid = 0
+				containerUID = 0
 			}
 
 			if container.SecurityContext != nil && container.SecurityContext.RunAsGroup != nil {
-				containerGid = int(*container.SecurityContext.RunAsGroup)
+				containerGID = int(*container.SecurityContext.RunAsGroup)
 			} else if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.RunAsGroup != nil {
-				containerGid = int(*pod.Spec.SecurityContext.RunAsGroup)
+				containerGID = int(*pod.Spec.SecurityContext.RunAsGroup)
 			} else {
-				containerGid = 0
+				containerGID = 0
 			}
 
 			if goruntime.GOOS != "windows" {
-				if err := os.Chown(containerLogPath, containerUid, containerGid); err != nil {
-					utilruntime.HandleError(fmt.Errorf("unable to chown termination-log file: %q: %v", containerLogPath, err))
+				if err := os.Chown(containerLogPath, containerUID, containerGID); err != nil {
+					utilruntime.HandleError(fmt.Errorf("unable to chown termination-log file: %q: %w", containerLogPath, err))
 				}
 			}
 
