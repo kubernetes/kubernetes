@@ -242,7 +242,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		go leaseCandidate.Run(ctx)
 	}
 
-	// Start up the healthz server.
+	// Start up the server for endpoints.
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(newEndpointsHandler(&cc.ComponentConfig, cc.InformerFactory, isLeader, checks, readyzChecks, cc.Flagz), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
 		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve

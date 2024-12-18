@@ -24,16 +24,21 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"testing"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func TestHealthEndpoints(t *testing.T) {
+func TestEndpointHandlers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver server: %v", err)
@@ -64,52 +69,64 @@ func TestHealthEndpoints(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name             string
-		path             string
-		useBrokenConfig  bool
-		wantResponseCode int
+		name                 string
+		path                 string
+		useBrokenConfig      bool
+		requestHeader        map[string]string
+		wantResponseCode     int
+		wantResponseBodyRegx string
 	}{
 		{
-			"/healthz",
-			"/healthz",
-			false,
-			http.StatusOK,
+			name:             "/healthz",
+			path:             "/healthz",
+			useBrokenConfig:  false,
+			wantResponseCode: http.StatusOK,
 		},
 		{
-			"/livez",
-			"/livez",
-			false,
-			http.StatusOK,
+			name:             "/livez",
+			path:             "/livez",
+			useBrokenConfig:  false,
+			wantResponseCode: http.StatusOK,
 		},
 		{
-			"/livez with ping check",
-			"/livez/ping",
-			false,
-			http.StatusOK,
+			name:             "/livez with ping check",
+			path:             "/livez/ping",
+			useBrokenConfig:  false,
+			wantResponseCode: http.StatusOK,
 		},
 		{
-			"/readyz",
-			"/readyz",
-			false,
-			http.StatusOK,
+			name:             "/readyz",
+			path:             "/readyz",
+			useBrokenConfig:  false,
+			wantResponseCode: http.StatusOK,
 		},
 		{
-			"/readyz with sched-handler-sync",
-			"/readyz/sched-handler-sync",
-			false,
-			http.StatusOK,
+			name:             "/readyz with sched-handler-sync",
+			path:             "/readyz/sched-handler-sync",
+			useBrokenConfig:  false,
+			wantResponseCode: http.StatusOK,
 		},
 		{
-			"/readyz with shutdown",
-			"/readyz/shutdown",
-			false,
-			http.StatusOK,
+			name:             "/readyz with shutdown",
+			path:             "/readyz/shutdown",
+			useBrokenConfig:  false,
+			wantResponseCode: http.StatusOK,
 		},
 		{
-			"/readyz with broken apiserver",
-			"/readyz",
-			true,
-			http.StatusInternalServerError,
+			name:             "/readyz with broken apiserver",
+			path:             "/readyz",
+			useBrokenConfig:  true,
+			wantResponseCode: http.StatusInternalServerError,
+		},
+		{
+			name:             "/flagz",
+			path:             "/flagz",
+			requestHeader:    map[string]string{"Accept": "text/plain"},
+			wantResponseCode: http.StatusOK,
+			wantResponseBodyRegx: `^\n` +
+				`kube-scheduler flags\n` +
+				`Warning: This endpoint is not meant to be machine parseable, ` +
+				`has no formatting compatibility guarantees and is for debugging purposes only.`,
 		},
 	}
 
@@ -141,6 +158,11 @@ func TestHealthEndpoints(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to request: %v", err)
 			}
+			if tt.requestHeader != nil {
+				for k, v := range tt.requestHeader {
+					req.Header.Set(k, v)
+				}
+			}
 			r, err := client.Do(req)
 			if err != nil {
 				t.Fatalf("failed to GET %s from component: %v", tt.path, err)
@@ -155,6 +177,15 @@ func TestHealthEndpoints(t *testing.T) {
 			}
 			if got, expected := r.StatusCode, tt.wantResponseCode; got != expected {
 				t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
+			}
+			if tt.wantResponseBodyRegx != "" {
+				matched, err := regexp.MatchString(tt.wantResponseBodyRegx, string(body))
+				if err != nil {
+					t.Fatalf("failed to compile regex: %v", err)
+				}
+				if !matched {
+					t.Fatalf("response body does not match regex.\nExpected:\n%s\n\nGot:\n%s", tt.wantResponseBodyRegx, string(body))
+				}
 			}
 		})
 	}
