@@ -101,14 +101,8 @@ func (hs *ProxyHealthServer) QueuedUpdate(ipFamily v1.IPFamily) {
 	}
 }
 
-// IsHealthy returns only the proxier's health state, following the same
-// definition the HTTP server defines, but ignoring the state of the Node.
-func (hs *ProxyHealthServer) IsHealthy() bool {
-	isHealthy, _ := hs.isHealthy()
-	return isHealthy
-}
-
-func (hs *ProxyHealthServer) isHealthy() (bool, time.Time) {
+// Health returns only the proxier's health state and last updated time.
+func (hs *ProxyHealthServer) Health() (bool, time.Time) {
 	hs.lock.RLock()
 	defer hs.lock.RUnlock()
 
@@ -188,7 +182,7 @@ type healthzHandler struct {
 
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, _ *http.Request) {
 	nodeEligible := h.hs.NodeEligible()
-	healthy, lastUpdated := h.hs.isHealthy()
+	healthy, lastUpdated := h.hs.Health()
 	currentTime := h.hs.clock.Now()
 
 	healthy = healthy && nodeEligible
@@ -215,7 +209,7 @@ type livezHandler struct {
 }
 
 func (h livezHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	healthy, lastUpdated := h.hs.isHealthy()
+	healthy, lastUpdated := h.hs.Health()
 	currentTime := h.hs.clock.Now()
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")

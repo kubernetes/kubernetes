@@ -143,8 +143,9 @@ type fakeProxyHealthChecker struct {
 	healthy bool
 }
 
-func (fake fakeProxyHealthChecker) IsHealthy() bool {
-	return fake.healthy
+func (fake fakeProxyHealthChecker) Health() (bool, time.Time) {
+	// we only need "healthy" field for testing service healthchecks.
+	return fake.healthy, time.Time{}
 }
 
 func TestServer(t *testing.T) {
