@@ -131,6 +131,7 @@ func TestAdmissionNamespaceDoesNotExist(t *testing.T) {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
 	informerFactory.Start(wait.NeverStop)
+	informerFactory.WaitForCacheSync(wait.NeverStop)
 
 	pod := newPod(namespace)
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -173,6 +174,7 @@ func TestAdmissionNamespaceActive(t *testing.T) {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
 	informerFactory.Start(wait.NeverStop)
+	informerFactory.WaitForCacheSync(wait.NeverStop)
 
 	pod := newPod(namespace)
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
@@ -193,6 +195,7 @@ func TestAdmissionNamespaceTerminating(t *testing.T) {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
 	informerFactory.Start(wait.NeverStop)
+	informerFactory.WaitForCacheSync(wait.NeverStop)
 
 	pod := newPod(namespace)
 	// verify create operations in the namespace cause an error
@@ -252,6 +255,7 @@ func TestAdmissionNamespaceForceLiveLookup(t *testing.T) {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
 	informerFactory.Start(wait.NeverStop)
+	informerFactory.WaitForCacheSync(wait.NeverStop)
 
 	pod := newPod(namespace)
 	// verify create operations in the namespace is allowed
