@@ -253,13 +253,11 @@ type KubeletConfiguration struct {
 	// a group. It means that if true, the behavior aligns with the behavior of cgroups v1.
 	SingleProcessOOMKill *bool
 	// CPUManagerPolicy is the name of the policy to use.
-	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerPolicy string
 	// CPUManagerPolicyOptions is a set of key=value which 	allows to set extra options
 	// to fine tune the behaviour of the cpu manager policies.
 	CPUManagerPolicyOptions map[string]string
 	// CPU Manager reconciliation period.
-	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
 	// MemoryManagerPolicy is the name of the policy to use.
 	// Requires the MemoryManager feature gate to be enabled.
