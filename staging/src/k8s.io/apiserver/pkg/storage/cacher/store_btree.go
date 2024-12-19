@@ -44,6 +44,18 @@ type threadedStoreIndexer struct {
 	indexer indexer
 }
 
+func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
+	si.lock.RLock()
+	defer si.lock.RUnlock()
+	return si.store.Count(prefix, continueKey)
+}
+
+func (si *threadedStoreIndexer) Clone() immutableOrderedStore {
+	si.lock.RLock()
+	defer si.lock.RUnlock()
+	return si.store.Clone()
+}
+
 func (si *threadedStoreIndexer) Add(obj interface{}) error {
 	return si.addOrUpdate(obj)
 }
@@ -281,6 +293,12 @@ func (s *btreeStore) Count(prefix, continueKey string) (count int) {
 	return count
 }
 
+func (s *btreeStore) Clone() mutableOrderedStore {
+	return &btreeStore{
+		tree: s.tree.Clone(),
+	}
+}
+
 // newIndexer returns a indexer similar to storeIndex from client-go/tools/cache.
 // TODO: Unify the indexer code with client-go/cache package.
 // Major differences is type of values stored and their mutability:
@@ -390,4 +408,73 @@ func (i *indexer) delete(key, value string, index map[string]map[string]*storeEl
 	if len(set) == 0 {
 		delete(index, value)
 	}
+}
+
+// storeSnapshotter caches snapshots of store created by cloning the store.
+type storeSnapshotter struct {
+	sync.RWMutex
+	snapshots      map[uint64]immutableOrderedStore
+	revisions      *btree.BTree
+	snapshotPeriod uint64
+}
+
+func newStoreSnapshotter(snapshotPeriod uint64) *storeSnapshotter {
+	return &storeSnapshotter{
+		revisions:      btree.New(32),
+		snapshots:      make(map[uint64]immutableOrderedStore),
+		snapshotPeriod: snapshotPeriod,
+	}
+}
+
+func (c *storeSnapshotter) FindEqualOrLower(rv uint64) (immutableOrderedStore, uint64) {
+	c.RLock()
+	defer c.RUnlock()
+
+	var equalOrLower uint64
+	c.revisions.DescendLessOrEqual(rev(rv), func(i btree.Item) bool {
+		equalOrLower = uint64(i.(rev))
+		return false
+	})
+	if equalOrLower == 0 {
+		return nil, 0
+	}
+	return c.snapshots[equalOrLower], equalOrLower
+}
+
+func (c *storeSnapshotter) Includes(rv uint64) bool {
+	c.RLock()
+	defer c.RUnlock()
+
+	minRV := c.revisions.Min()
+	if minRV == nil {
+		return false
+	}
+
+	return uint64(minRV.(rev)) <= rv
+}
+
+func (c *storeSnapshotter) Set(rv uint64, indexer immutableOrderedStore) {
+	c.Lock()
+	defer c.Unlock()
+	c.revisions.ReplaceOrInsert(rev(rv))
+	c.snapshots[rv] = indexer.Clone()
+}
+
+func (c *storeSnapshotter) Clean(rv uint64) {
+	c.Lock()
+	defer c.Unlock()
+	for c.revisions.Len() > 0 {
+		minRV := uint64(c.revisions.Min().(rev))
+		if rv < minRV {
+			break
+		}
+		delete(c.snapshots, minRV)
+		c.revisions.DeleteMin()
+	}
+}
+
+type rev uint64
+
+func (r1 rev) Less(r2 btree.Item) bool {
+	return r1 < r2.(rev)
 }
