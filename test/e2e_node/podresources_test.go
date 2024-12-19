@@ -904,7 +904,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					podresourcesGetAllocatableResourcesTests(ctx, cli, sd, onlineCPUs, reservedSystemCPUs)
 				})
 
-				framework.It("should return the expected responses", nodefeature.SidecarContainers, func(ctx context.Context) {
+				framework.It("should return the expected responses", nodefeature.SidecarContainers, feature.SidecarContainers, func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
 
@@ -1008,7 +1008,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					podresourcesGetTests(ctx, f, cli, false)
 				})
 
-				framework.It("should return the expected responses", nodefeature.SidecarContainers, func(ctx context.Context) {
+				framework.It("should return the expected responses", nodefeature.SidecarContainers, feature.SidecarContainers, func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
 

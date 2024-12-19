@@ -38,13 +38,14 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, framework.WithSerial(), func() {
+var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, feature.NodeProblemDetector, framework.WithSerial(), func() {
 	const (
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
