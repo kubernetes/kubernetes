@@ -125,7 +125,7 @@ func TestVersionFlagOptionsWithMapping(t *testing.T) {
 		t.Errorf("wanted emulation version flag options to be: %s, got %s", expectedEmuVers, emuVers)
 	}
 	minCompVers := strings.Join(r.unsafeVersionFlagOptions(false), "\n")
-	expectedMinCompVers := "kube=1.30..1.31 (default=1.30)\ntest=2.7..2.8 (default=2.7)"
+	expectedMinCompVers := "test=2.7..2.8 (default=2.7)"
 	if minCompVers != expectedMinCompVers {
 		t.Errorf("wanted min compatibility version flag options to be: %s, got %s", expectedMinCompVers, minCompVers)
 	}

@@ -618,9 +618,6 @@ resources:
         endpoint: unix:///@encrypt-all-kms-provider.sock
 `
 
-	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
-	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
-
 	t.Run("encrypt all resources", func(t *testing.T) {
 		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 		// To ensure we are checking all REST resources
@@ -686,7 +683,11 @@ resources:
 		}
 		// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
 		// close the client (which we can do by closing rawClient).
-		defer rawClient.Close()
+		defer func() {
+			if err := rawClient.Close(); err != nil {
+				t.Errorf("error closing rawClient: %v", err)
+			}
+		}()
 
 		response, err := etcdClient.Get(context.TODO(), "/"+test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Prefix, clientv3.WithPrefix())
 		if err != nil {
