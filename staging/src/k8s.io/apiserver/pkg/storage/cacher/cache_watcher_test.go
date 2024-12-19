@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/tools/cache"
 	"reflect"
 	"sync"
 	"testing"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
-	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
