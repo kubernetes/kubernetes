@@ -26,11 +26,15 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/component-base/zpages/flagz"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 // Config has all the context to run a Scheduler
 type Config struct {
+	// Flagz is the Reader interface to get flags for flagz page.
+	Flagz flagz.Reader
+
 	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
