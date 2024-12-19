@@ -988,49 +988,6 @@ func TestJobStrategy_ValidateUpdate(t *testing.T) {
 				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
 			},
 		},
-		"preserving tracking annotation": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-					},
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: ptr.To(true),
-					Parallelism:    ptr.To[int32](1),
-				},
-			},
-			update: func(job *batch.Job) {
-				job.Annotations["foo"] = "bar"
-			},
-		},
-		"deleting user annotation": {
-			job: &batch.Job{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "myjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Annotations: map[string]string{
-						batch.JobTrackingFinalizer: "",
-						"foo":                      "bar",
-					},
-				},
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: ptr.To(true),
-					Parallelism:    ptr.To[int32](1),
-				},
-			},
-			update: func(job *batch.Job) {
-				delete(job.Annotations, "foo")
-			},
-		},
 		"updating node selector for unsuspended job disallowed": {
 			job: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{
