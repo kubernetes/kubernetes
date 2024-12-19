@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kmsapi "k8s.io/kms/apis/v1beta1"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -145,7 +147,7 @@ resources:
 `
 	providerName := "kms-provider"
 	pluginMock := mock.NewBase64Plugin(t, "@kms-provider.sock")
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -329,7 +331,7 @@ resources:
 	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	var restarted bool
-	test, err := newTransformTest(t, encryptionConfig, true, "", storageConfig)
+	test, err := newTransformTest(t, encryptionConfig, true, "", storageConfig, nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -550,7 +552,7 @@ resources:
 	previousConfigDir := test.configDir
 	test.shutdownAPIServer()
 	restarted = true
-	test, err = newTransformTest(t, test.transformerConfig, true, previousConfigDir, storageConfig)
+	test, err = newTransformTest(t, test.transformerConfig, true, previousConfigDir, storageConfig, nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -618,110 +620,117 @@ resources:
         endpoint: unix:///@encrypt-all-kms-provider.sock
 `
 
-	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
-	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
-
 	t.Run("encrypt all resources", func(t *testing.T) {
-		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
-		// To ensure we are checking all REST resources
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
-		// Need to enable this explicitly as the feature is deprecated
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
+		supportedVersions := etcd.GetSupportedEmulatedVersions()
+		for _, v := range supportedVersions {
+			t.Run(v, func(t *testing.T) {
+				_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse(v))
+				// To ensure we are checking all REST resources
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+				// Need to enable this explicitly as the feature is deprecated
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
-		test, err := newTransformTest(t, encryptionConfig, false, "", nil)
-		if err != nil {
-			t.Fatalf("failed to start KUBE API Server with encryptionConfig")
-		}
-		defer test.cleanUp()
-
-		etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.kubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
-
-		_, serverResources, err := test.restClient.Discovery().ServerGroupsAndResources()
-		if err != nil {
-			t.Fatal(err)
-		}
-		resources := etcd.GetResources(t, serverResources)
-		client := dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
-
-		etcdStorageData := etcd.GetEtcdStorageDataForNamespace(testNamespace)
-		restResourceSet := sets.New[schema.GroupVersionResource]()
-		stubResourceSet := sets.New[schema.GroupVersionResource]()
-		for _, resource := range resources {
-			gvr := resource.Mapping.Resource
-			stub := etcdStorageData[gvr].Stub
-
-			// continue if stub is empty
-			if stub == "" {
-				t.Errorf("skipping resource %s because stub is empty", gvr)
-				continue
-			}
-			restResourceSet.Insert(gvr)
-			dynamicClient, obj, err := etcd.JSONToUnstructured(stub, testNamespace, &meta.RESTMapping{
-				Resource:         gvr,
-				GroupVersionKind: gvr.GroupVersion().WithKind(resource.Mapping.GroupVersionKind.Kind),
-				Scope:            resource.Mapping.Scope,
-			}, client)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			_, err = dynamicClient.Create(context.TODO(), obj, metav1.CreateOptions{})
-			if err != nil {
-				t.Fatal(err)
-			}
-		}
-		for gvr, data := range etcdStorageData {
-			if data.Stub == "" {
-				continue
-			}
-			stubResourceSet.Insert(gvr)
-		}
-		if !restResourceSet.Equal(stubResourceSet) {
-			t.Errorf("failed to check all REST resources: %q", restResourceSet.SymmetricDifference(stubResourceSet).UnsortedList())
-		}
-		rawClient, etcdClient, err := integration.GetEtcdClients(test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
-		if err != nil {
-			t.Fatalf("failed to create etcd client: %v", err)
-		}
-		// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
-		// close the client (which we can do by closing rawClient).
-		defer rawClient.Close()
-
-		response, err := etcdClient.Get(context.TODO(), "/"+test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Prefix, clientv3.WithPrefix())
-		if err != nil {
-			t.Fatalf("failed to retrieve secret from etcd %v", err)
-		}
-
-		// assert that total key values in response in greater than 0
-		if len(response.Kvs) == 0 {
-			t.Fatalf("expected total number of keys to be greater than 0, but got %d", len(response.Kvs))
-		}
-
-		// assert that total response keys are greater or equal to total resources
-		if len(response.Kvs) < len(resources) {
-			t.Fatalf("expected total number of keys to be greater or equal to total resources, but got %d", len(response.Kvs))
-		}
-
-		wantPrefix := "k8s:enc:kms:v1:encrypt-all-kms-provider:"
-		for _, kv := range response.Kvs {
-			// the following resources are not encrypted as they are not REST APIs and hence are not expected
-			// to be encrypted because it would be impossible to perform a storage migration on them
-			if strings.Contains(kv.String(), "masterleases") ||
-				strings.Contains(kv.String(), "peerserverleases") ||
-				strings.Contains(kv.String(), "serviceips") ||
-				strings.Contains(kv.String(), "servicenodeports") {
-				// assert that these resources are not encrypted with any provider
-				if bytes.HasPrefix(kv.Value, []byte("k8s:enc:")) {
-					t.Errorf("expected resource %s to not be prefixed with %s, but got %s", kv.Key, "k8s:enc:", kv.Value)
+				test, err := newTransformTest(t, encryptionConfig, false, "", nil, &kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: v})
+				if err != nil {
+					t.Fatalf("failed to start KUBE API Server with encryptionConfig")
 				}
-				continue
-			}
+				defer test.cleanUp()
 
-			// assert that all other resources are encrypted
-			if !bytes.HasPrefix(kv.Value, []byte(wantPrefix)) {
-				t.Errorf("expected resource %s to be prefixed with %s, but got %s", kv.Key, wantPrefix, kv.Value)
-			}
+				etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(test.kubeAPIServer.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+
+				_, serverResources, err := test.restClient.Discovery().ServerGroupsAndResources()
+				if err != nil {
+					t.Fatal(err)
+				}
+				resources := etcd.GetResources(t, serverResources)
+				client := dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
+
+				etcdStorageData := etcd.GetEtcdStorageDataForNamespaceAtVersion(testNamespace, v)
+				restResourceSet := sets.New[schema.GroupVersionResource]()
+				stubResourceSet := sets.New[schema.GroupVersionResource]()
+				for _, resource := range resources {
+					gvr := resource.Mapping.Resource
+					stub := etcdStorageData[gvr].Stub
+
+					// continue if stub is empty
+					if stub == "" {
+						t.Errorf("skipping resource %s because stub is empty", gvr)
+						continue
+					}
+					restResourceSet.Insert(gvr)
+					dynamicClient, obj, err := etcd.JSONToUnstructured(stub, testNamespace, &meta.RESTMapping{
+						Resource:         gvr,
+						GroupVersionKind: gvr.GroupVersion().WithKind(resource.Mapping.GroupVersionKind.Kind),
+						Scope:            resource.Mapping.Scope,
+					}, client)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					_, err = dynamicClient.Create(context.TODO(), obj, metav1.CreateOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
+				for gvr, data := range etcdStorageData {
+					if data.Stub == "" {
+						continue
+					}
+					stubResourceSet.Insert(gvr)
+				}
+				if !restResourceSet.Equal(stubResourceSet) {
+					t.Errorf("failed to check all REST resources: %q", restResourceSet.SymmetricDifference(stubResourceSet).UnsortedList())
+				}
+				rawClient, etcdClient, err := integration.GetEtcdClients(test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+				if err != nil {
+					t.Fatalf("failed to create etcd client: %v", err)
+				}
+				// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+				// close the client (which we can do by closing rawClient).
+				defer func() {
+					if err := rawClient.Close(); err != nil {
+						t.Errorf("error closing rawClient: %v", err)
+					}
+				}()
+
+				response, err := etcdClient.Get(context.TODO(), "/"+test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Prefix, clientv3.WithPrefix())
+				if err != nil {
+					t.Fatalf("failed to retrieve secret from etcd %v", err)
+				}
+
+				// assert that total key values in response in greater than 0
+				if len(response.Kvs) == 0 {
+					t.Fatalf("expected total number of keys to be greater than 0, but got %d", len(response.Kvs))
+				}
+
+				// assert that total response keys are greater or equal to total resources
+				if len(response.Kvs) < len(resources) {
+					t.Fatalf("expected total number of keys to be greater or equal to total resources, but got %d", len(response.Kvs))
+				}
+
+				wantPrefix := "k8s:enc:kms:v1:encrypt-all-kms-provider:"
+				for _, kv := range response.Kvs {
+					// the following resources are not encrypted as they are not REST APIs and hence are not expected
+					// to be encrypted because it would be impossible to perform a storage migration on them
+					if strings.Contains(kv.String(), "masterleases") ||
+						strings.Contains(kv.String(), "peerserverleases") ||
+						strings.Contains(kv.String(), "serviceips") ||
+						strings.Contains(kv.String(), "servicenodeports") {
+						// assert that these resources are not encrypted with any provider
+						if bytes.HasPrefix(kv.Value, []byte("k8s:enc:")) {
+							t.Errorf("expected resource %s to not be prefixed with %s, but got %s", kv.Key, "k8s:enc:", kv.Value)
+						}
+						continue
+					}
+
+					// assert that all other resources are encrypted
+					if !bytes.HasPrefix(kv.Value, []byte(wantPrefix)) {
+						t.Errorf("expected resource %s to be prefixed with %s, but got %s", kv.Key, wantPrefix, kv.Value)
+					}
+				}
+			})
 		}
 	})
 }
@@ -755,7 +764,7 @@ resources:
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -902,7 +911,7 @@ resources:
 `
 			_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-			test, err := newTransformTest(t, encryptionConfig, true, "", nil)
+			test, err := newTransformTest(t, encryptionConfig, true, "", nil, nil)
 			if err != nil {
 				t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 			}
@@ -1114,7 +1123,7 @@ resources:
 	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("failed to start kube-apiserver, error: %v", err)
 	}
@@ -1177,7 +1186,7 @@ resources:
 	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, true, "", nil)
+	test, err := newTransformTest(t, encryptionConfig, true, "", nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}

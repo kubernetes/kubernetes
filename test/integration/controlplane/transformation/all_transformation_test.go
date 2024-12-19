@@ -53,7 +53,7 @@ func createResources(t *testing.T, test *transformTest,
 		t.Cleanup(cancel)
 
 		gvr := schema.GroupVersionResource{Group: group, Version: version, Resource: resource}
-		data := etcd.GetEtcdStorageData()[gvr]
+		data := etcd.GetEtcdStorageDataAtLatestVersion()[gvr]
 		stub := data.Stub
 		dynamicClient, obj, err := etcd.JSONToUnstructured(stub, namespace, &meta.RESTMapping{
 			Resource:         gvr,
@@ -94,7 +94,7 @@ resources:
       - name: key1
         secret: c2VjcmV0IGlzIHNlY3VyZQ==
 `
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, encryptionConfig, false, "", nil, nil)
 	if err != nil {
 		t.Fatalf("failed to start Kube API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}

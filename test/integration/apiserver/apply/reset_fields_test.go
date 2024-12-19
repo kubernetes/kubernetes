@@ -188,7 +188,7 @@ func TestApplyResetFields(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	createData := etcd.GetEtcdStorageDataForNamespace(resetFieldsNamespace)
+	createData := etcd.GetEtcdStorageDataForNamespaceAtLatestVersion(resetFieldsNamespace)
 	// gather resources to test
 	_, resourceLists, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {

@@ -2976,20 +2976,6 @@ func TestEmulatedStorageVersion(t *testing.T) {
 	}
 	cases := []testCase{
 		{
-			name:            "vap first ga release",
-			emulatedVersion: "1.30",
-			gvr: schema.GroupVersionResource{
-				Group:    "admissionregistration.k8s.io",
-				Version:  "v1",
-				Resource: "validatingadmissionpolicies",
-			},
-			object: validVap,
-			expectedStorageVersion: schema.GroupVersion{
-				Group:   "admissionregistration.k8s.io",
-				Version: "v1beta1",
-			},
-		},
-		{
 			name:            "vap after ga release",
 			emulatedVersion: "1.31",
 			gvr: schema.GroupVersionResource{
@@ -3416,7 +3402,7 @@ func TestDefaultStorageEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	storageDataByResource := etcd.GetEtcdStorageDataForNamespace(NamespaceName)
+	storageDataByResource := etcd.GetEtcdStorageDataForNamespaceAtLatestVersion(NamespaceName)
 
 	_, lists, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {

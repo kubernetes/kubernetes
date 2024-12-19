@@ -88,7 +88,7 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config, instanceOptions *kubeapiservertesting.TestServerInstanceOptions) (*transformTest, error) {
 	tCtx := ktesting.Init(tb)
 	if storageConfig == nil {
 		storageConfig = framework.SharedEtcd()
@@ -118,7 +118,7 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 	}
 
 	if e.kubeAPIServer, err = startTestServerLocked(
-		tb, nil,
+		tb, instanceOptions,
 		e.getEncryptionOptions(reload), e.storageConfig); err != nil {
 		e.cleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
@@ -470,7 +470,7 @@ func inplaceUpdateResource(client dynamic.Interface, gvr schema.GroupVersionReso
 
 func getStubObj(gvr schema.GroupVersionResource) (*unstructured.Unstructured, error) {
 	stub := ""
-	if data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]; ok {
+	if data, ok := etcd.GetEtcdStorageDataForNamespaceAtLatestVersion(testNamespace)[gvr]; ok {
 		stub = data.Stub
 	}
 	if len(stub) == 0 {

@@ -451,7 +451,7 @@ func getTestFunc(gvr schema.GroupVersionResource, verb string) testFunc {
 
 func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
 	stub := ""
-	if data, ok := etcd.GetEtcdStorageDataForNamespace(testNamespace)[gvr]; ok {
+	if data, ok := etcd.GetEtcdStorageDataForNamespaceAtLatestVersion(testNamespace)[gvr]; ok {
 		stub = data.Stub
 	}
 	if data, ok := stubDataOverrides[gvr]; ok {
