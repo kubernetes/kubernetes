@@ -208,6 +208,20 @@ func waitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaS
 	}
 }
 
+// Verify .Status.TerminatingPods is equal to terminatingPods.
+func waitForTerminatingPods(clientSet clientset.Interface, ctx context.Context, rs *apps.ReplicaSet, terminatingPods *int32) error {
+	if err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(c context.Context) (bool, error) {
+		newRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Get(c, rs.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		return ptr.Equal(newRS.Status.TerminatingReplicas, terminatingPods), nil
+	}); err != nil {
+		return fmt.Errorf("failed to verify .Status.TerminatingPods is equal to %d for replicaset %q: %w", ptr.Deref(terminatingPods, -1), rs.Name, err)
+	}
+	return nil
+}
+
 // Update .Spec.Replicas to replicas and verify .Status.Replicas is changed accordingly
 func scaleRS(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas int32) {
 	rsClient := c.AppsV1().ReplicaSets(rs.Namespace)
@@ -1055,4 +1069,73 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 	})
 
 	_ = rsClient.Delete(tCtx, rs.Name, metav1.DeleteOptions{})
+}
+
+func TestTerminatingReplicas(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+
+	tCtx, closeFn, rm, informers, c := rmSetup(t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(c, "test-terminating-replicas", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
+
+	rs := newRS("rs", ns.Name, 5)
+	rs.Spec.Template.Spec.NodeName = "fake-node"
+	rs.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(300))
+	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rs = rss[0]
+	waitRSStable(t, c, rs)
+	if err := waitForTerminatingPods(c, tCtx, rs, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	podClient := c.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap())
+	if len(pods.Items) != 5 {
+		t.Fatalf("len(pods) = %d, want 5", len(pods.Items))
+	}
+	setPodsReadyCondition(t, c, pods, v1.ConditionTrue, time.Now())
+
+	// should not update terminating pods when feature gate is disabled
+	if err := podClient.Delete(tCtx, pods.Items[0].Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	waitRSStable(t, c, rs)
+	if err := waitForTerminatingPods(c, tCtx, rs, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// should update terminating pods when feature gate is enabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, true)
+	if err := podClient.Delete(tCtx, pods.Items[1].Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	waitRSStable(t, c, rs)
+	if err := waitForTerminatingPods(c, tCtx, rs, ptr.To[int32](2)); err != nil {
+		t.Fatal(err)
+	}
+	// should update status when the pod is removed
+	if err := podClient.Delete(tCtx, pods.Items[0].Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}); err != nil {
+		t.Fatal(err)
+	}
+	if err := waitForTerminatingPods(c, tCtx, rs, ptr.To[int32](1)); err != nil {
+		t.Fatal(err)
+	}
+
+	// should revert terminating pods to 0 when feature gate is disabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+	if err := podClient.Delete(tCtx, pods.Items[2].Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	waitRSStable(t, c, rs)
+	if err := waitForTerminatingPods(c, tCtx, rs, nil); err != nil {
+		t.Fatal(err)
+	}
+	pods = getPods(t, podClient, labelMap())
+	// 5 non-terminating, 2 terminating
+	if len(pods.Items) != 7 {
+		t.Fatalf("len(pods) = %d, want 7", len(pods.Items))
+	}
 }
