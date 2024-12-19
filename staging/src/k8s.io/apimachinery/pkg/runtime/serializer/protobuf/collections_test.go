@@ -23,21 +23,26 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestCollectionsEncoding(t *testing.T) {
 	t.Run("Normal", func(t *testing.T) {
-		testCollectionsEncoding(t, NewSerializer(nil, nil))
+		testCollectionsEncoding(t, NewSerializer(nil, nil), false)
 	})
-	// Leave place for testing streaming collection serializer proposed as part of KEP-5116
+	t.Run("Streaming", func(t *testing.T) {
+		testCollectionsEncoding(t, NewSerializerWithOptions(nil, nil, SerializerOptions{StreamingCollectionsEncoding: true}), true)
+	})
 }
 
-func testCollectionsEncoding(t *testing.T, s *Serializer) {
+func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool) {
 	var remainingItems int64 = 1
 	testCases := []struct {
 		name string
@@ -191,7 +196,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
+			var buf writeCountingBuffer
 			if err := s.Encode(tc.in, &buf); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -201,8 +206,25 @@ func testCollectionsEncoding(t *testing.T, s *Serializer) {
 				t.Fatal(err)
 			}
 			if !bytes.Equal(expectBytes, actualBytes) {
-				t.Errorf("expected:\n%s\ngot:\n%s", tc.expect, base64.StdEncoding.EncodeToString(actualBytes))
-				t.Log(cmp.Diff(dumpProto(t, actualBytes[4:]), dumpProto(t, expectBytes[4:])))
+				expectedBytes, err := base64.StdEncoding.DecodeString(tc.expect)
+				if err == nil {
+					t.Errorf("expected:\n%v\ngot:\n%v", expectedBytes, actualBytes)
+				} else {
+					t.Errorf("expected:\n%v\ngot:\n%v", tc.expect, base64.StdEncoding.EncodeToString(actualBytes))
+				}
+				actualProto := dumpProto(t, actualBytes[4:])
+				expectedProto := dumpProto(t, expectBytes[4:])
+				if actualProto != "" && expectedProto != "" {
+					t.Log(cmp.Diff(actualProto, expectedProto))
+				} else {
+					t.Log(cmp.Diff(actualBytes, expectBytes))
+				}
+			}
+			if streamingEnabled && buf.writeCount <= 1 {
+				t.Errorf("expected streaming but Write was called only: %d", buf.writeCount)
+			}
+			if !streamingEnabled && buf.writeCount > 1 {
+				t.Errorf("expected non-streaming but Write was called more than once: %d", buf.writeCount)
 			}
 		})
 	}
@@ -225,4 +247,87 @@ func dumpProto(t *testing.T, data []byte) string {
 		return ""
 	}
 	return string(d)
+}
+
+type writeCountingBuffer struct {
+	writeCount int
+	bytes.Buffer
+}
+
+func (b *writeCountingBuffer) Write(data []byte) (int, error) {
+	b.writeCount++
+	return b.Buffer.Write(data)
+}
+
+func (b *writeCountingBuffer) Reset() {
+	b.writeCount = 0
+	b.Buffer.Reset()
+}
+
+func TestFuzzCollection(t *testing.T) {
+	f := randfill.New()
+	streamingEncoder := NewSerializerWithOptions(nil, nil, SerializerOptions{StreamingCollectionsEncoding: true})
+	streamingBuffer := &bytes.Buffer{}
+	normalEncoder := NewSerializerWithOptions(nil, nil, SerializerOptions{StreamingCollectionsEncoding: false})
+	normalBuffer := &bytes.Buffer{}
+	for i := 0; i < 1000; i++ {
+		list := &testapigroupv1.CarpList{}
+		f.FillNoCustom(list)
+		streamingBuffer.Reset()
+		normalBuffer.Reset()
+		if err := streamingEncoder.Encode(list, streamingBuffer); err != nil {
+			t.Fatal(err)
+		}
+		if err := normalEncoder.Encode(list, normalBuffer); err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(streamingBuffer.String(), normalBuffer.String()); diff != "" {
+			t.Logf("normal: %s", normalBuffer.String())
+			t.Logf("streaming: %s", streamingBuffer.String())
+			t.Fatalf("unexpected output:\n%s", diff)
+		}
+	}
+}
+
+func TestCallsToSize(t *testing.T) {
+	counter := &countingSizer{data: []byte("abba")}
+	listMeta := metav1.ListMeta{}
+	listData := streamingListData{
+		totalSize:    14,
+		listMeta:     listMeta,
+		listMetaSize: listMeta.Size(),
+		itemsSizes:   []int{counter.Size()},
+		items:        []runtime.Object{counter},
+	}
+	err := streamingEncodeUnknownList(io.Discard, runtime.Unknown{}, listData, &runtime.Allocator{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counter.count != 1 {
+		t.Errorf("Expected only 1 call to sizer, got %d", counter.count)
+	}
+}
+
+type countingSizer struct {
+	data  []byte
+	count int
+}
+
+var _ proto.Sizer = (*countingSizer)(nil)
+var _ runtime.ProtobufMarshaller = (*countingSizer)(nil)
+
+func (s *countingSizer) MarshalTo(data []byte) (int, error) {
+	return copy(data, s.data), nil
+}
+func (s *countingSizer) Size() int {
+	s.count++
+	return len(s.data)
+}
+
+func (s *countingSizer) DeepCopyObject() runtime.Object {
+	return nil
+}
+
+func (s *countingSizer) GetObjectKind() schema.ObjectKind {
+	return nil
 }

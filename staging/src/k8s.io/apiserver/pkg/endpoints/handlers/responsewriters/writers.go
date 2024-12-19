@@ -157,9 +157,9 @@ const (
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
 	defaultGzipThresholdBytes = 128 * 1024
-	// Use the length of the first write of streaming implementations.
-	// TODO: Update when streaming proto is implemented
-	firstWriteStreamingThresholdBytes = 1
+	// Use the length of the first write to recognize streaming implementations.
+	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
+	firstWriteStreamingThresholdBytes = 4
 )
 
 // negotiateContentEncoding returns a supported client-requested content encoding for the
