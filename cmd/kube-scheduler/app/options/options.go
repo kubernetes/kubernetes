@@ -280,11 +280,6 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
 
-	effectiveVersion := o.ComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent)
-	if err := utilversion.ValidateKubeEffectiveVersion(effectiveVersion); err != nil {
-		errs = append(errs, err)
-	}
-
 	return errs
 }
 
