@@ -36,14 +36,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration"
@@ -89,6 +94,14 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
+
+	featureGate := feature.DefaultMutableFeatureGate
+	featureGate.AddMetrics()
+
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, featureGate, effectiveVersion.EmulationVersion())
+	featuregate.DefaultComponentGlobalsRegistry.Reset()
+	utilruntime.Must(featuregate.DefaultComponentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 
 	opts := options.NewServerRunOptions()
 	opts.Options.SecureServing.Listener = listener
