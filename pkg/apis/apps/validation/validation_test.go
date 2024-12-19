@@ -544,7 +544,7 @@ func TestValidateStatefulSet(t *testing.T) {
 }
 
 // generateStatefulSetSpec generates a valid StatefulSet spec
-func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
+func generateStatefulSetSpec(minSeconds, revisionHistoryLimit int32) *apps.StatefulSetSpec {
 	labels := map[string]string{"a": "b"}
 	podTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -559,12 +559,13 @@ func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
 		},
 	}
 	ss := &apps.StatefulSetSpec{
-		PodManagementPolicy: "OrderedReady",
-		Selector:            &metav1.LabelSelector{MatchLabels: labels},
-		Template:            podTemplate.Template,
-		Replicas:            3,
-		UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-		MinReadySeconds:     minSeconds,
+		PodManagementPolicy:  "OrderedReady",
+		Selector:             &metav1.LabelSelector{MatchLabels: labels},
+		Template:             podTemplate.Template,
+		Replicas:             3,
+		UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+		MinReadySeconds:      minSeconds,
+		RevisionHistoryLimit: &revisionHistoryLimit,
 	}
 	return ss
 }
@@ -576,19 +577,19 @@ func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
 		expectErr bool
 	}{
 		"valid : minReadySeconds enabled, zero": {
-			ss:        generateStatefulSetSpec(0),
+			ss:        generateStatefulSetSpec(0, 10),
 			expectErr: false,
 		},
 		"invalid : minReadySeconds enabled, negative": {
-			ss:        generateStatefulSetSpec(-1),
+			ss:        generateStatefulSetSpec(-1, 10),
 			expectErr: true,
 		},
 		"valid : minReadySeconds enabled, very large value": {
-			ss:        generateStatefulSetSpec(2147483647),
+			ss:        generateStatefulSetSpec(2147483647, 10),
 			expectErr: false,
 		},
 		"invalid : minReadySeconds enabled, large negative": {
-			ss:        generateStatefulSetSpec(-2147483648),
+			ss:        generateStatefulSetSpec(-2147483648, 10),
 			expectErr: true,
 		},
 	}
@@ -596,6 +597,201 @@ func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
 		t.Run(tcName, func(t *testing.T) {
 			errs := ValidateStatefulSetSpec(tc.ss, field.NewPath("spec", "minReadySeconds"),
 				corevalidation.PodValidationOptions{})
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+// TestValidateStatefulSetRevisionHistoryLimit tests the StatefulSet's revisionHistoryLimit field on Create
+func TestValidateStatefulSetRevisionHistoryLimit(t *testing.T) {
+	testCases := map[string]struct {
+		sts       *apps.StatefulSet
+		expectErr bool
+	}{
+		"valid : revisionHistoryLimit enabled, zero": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-sts",
+					Namespace: "test-ns",
+				},
+				Spec: *generateStatefulSetSpec(10, 0),
+			},
+			expectErr: false,
+		},
+		"invalid : revisionHistoryLimit enabled, negative": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-sts",
+					Namespace: "test-ns",
+				},
+				Spec: *generateStatefulSetSpec(10, -1),
+			},
+			expectErr: true,
+		},
+		"valid : revisionHistoryLimit enabled, very large value": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-sts",
+					Namespace: "test-ns",
+				},
+				Spec: *generateStatefulSetSpec(10, 2147483647),
+			},
+			expectErr: false,
+		},
+		"invalid : revisionHistoryLimit enabled, large negative": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-sts",
+					Namespace: "test-ns",
+				},
+				Spec: *generateStatefulSetSpec(10, -2147483647),
+			},
+			expectErr: true,
+		},
+	}
+	for tcName, tc := range testCases {
+		t.Run(tcName, func(t *testing.T) {
+			errs := ValidateStatefulSet(tc.sts, corevalidation.PodValidationOptions{})
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+// TestValidateStatefulSetRevisionHistoryLimitOnUpdate tests the StatefulSet's revisionHistoryLimit field on Update
+func TestValidateStatefulSetRevisionHistoryLimitOnUpdate(t *testing.T) {
+	testCases := map[string]struct {
+		sts       *apps.StatefulSet
+		oldSts    *apps.StatefulSet
+		expectErr bool
+	}{
+		"valid : revisionHistoryLimit enabled, zero": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "2",
+				},
+				Spec: *generateStatefulSetSpec(10, 0),
+			},
+			oldSts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: *generateStatefulSetSpec(10, 0),
+			},
+			expectErr: false,
+		},
+		"invalid : revisionHistoryLimit enabled, negative": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "2",
+				},
+				Spec: *generateStatefulSetSpec(10, -1),
+			},
+			oldSts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: *generateStatefulSetSpec(10, 10),
+			},
+			expectErr: true,
+		},
+		"valid : revisionHistoryLimit enabled, very large value": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "2",
+				},
+				Spec: *generateStatefulSetSpec(10, 2147483647),
+			},
+			oldSts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: *generateStatefulSetSpec(10, 2147483647),
+			},
+			expectErr: false,
+		},
+		"invalid : revisionHistoryLimit enabled, large negative": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "2",
+				},
+				Spec: *generateStatefulSetSpec(10, -2147483647),
+			},
+			oldSts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: *generateStatefulSetSpec(10, 10),
+			},
+			expectErr: true,
+		},
+		"invalid : revisionHistoryLimit enabled, negative, old positive": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "2",
+				},
+				Spec: *generateStatefulSetSpec(10, -1),
+			},
+			oldSts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: *generateStatefulSetSpec(10, 1),
+			},
+			expectErr: true,
+		},
+		"no failure : revisionHistoryLimit enabled, negative, old negative": {
+			sts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "2",
+				},
+				Spec: *generateStatefulSetSpec(10, -1),
+			},
+			oldSts: &apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "test-sts",
+					Namespace:       "test-ns",
+					ResourceVersion: "1",
+				},
+				Spec: *generateStatefulSetSpec(10, -1),
+			},
+			expectErr: false,
+		},
+	}
+	for tcName, tc := range testCases {
+		t.Run(tcName, func(t *testing.T) {
+			errs := ValidateStatefulSetUpdate(tc.sts, tc.oldSts, corevalidation.PodValidationOptions{})
 			if tc.expectErr && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}

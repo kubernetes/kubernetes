@@ -165,6 +165,12 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 func ValidateStatefulSet(statefulSet *apps.StatefulSet, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&statefulSet.ObjectMeta, true, ValidateStatefulSetName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts)...)
+
+	if statefulSet.Spec.RevisionHistoryLimit != nil {
+		// zero is a valid RevisionHistoryLimit
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.RevisionHistoryLimit), field.NewPath("spec", "revisionHistoryLimit"))...)
+	}
+
 	return allErrs
 }
 
@@ -178,6 +184,15 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	// would need to pass update validation.  Name can't change anyway.
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateStatefulSetSpec(&statefulSet.Spec, field.NewPath("spec"), opts)...)
+
+	if statefulSet.Spec.RevisionHistoryLimit != nil {
+		// For backwards compatibility, we skip the non-negative-field validation for revisionHistoryLimit,
+		// if the previous object has negative value.
+		if oldStatefulSet.Spec.RevisionHistoryLimit == nil || *oldStatefulSet.Spec.RevisionHistoryLimit >= 0 {
+			// zero is a valid RevisionHistoryLimit
+			allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.RevisionHistoryLimit), field.NewPath("spec", "revisionHistoryLimit"))...)
+		}
+	}
 
 	// statefulset updates aren't super common and general updates are likely to be touching spec, so we'll do this
 	// deep copy right away.  This avoids mutating our inputs
