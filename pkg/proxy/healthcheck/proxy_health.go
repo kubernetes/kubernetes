@@ -171,13 +171,13 @@ func (hs *ProxyHealthServer) Run(ctx context.Context) error {
 
 	listener, err := hs.listener.Listen(ctx, hs.addr)
 	if err != nil {
-		return fmt.Errorf("failed to start proxy healthz on %s: %v", hs.addr, err)
+		return fmt.Errorf("failed to start proxy healthz on %s: %w", hs.addr, err)
 	}
 
 	klog.V(3).InfoS("Starting healthz HTTP server", "address", hs.addr)
 
 	if err := server.Serve(listener); err != nil {
-		return fmt.Errorf("proxy healthz closed with error: %v", err)
+		return fmt.Errorf("proxy healthz closed with error: %w", err)
 	}
 	return nil
 }
@@ -186,7 +186,7 @@ type healthzHandler struct {
 	hs *ProxyHealthServer
 }
 
-func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, _ *http.Request) {
 	nodeEligible := h.hs.NodeEligible()
 	healthy, lastUpdated := h.hs.isHealthy()
 	currentTime := h.hs.clock.Now()
