@@ -127,6 +127,89 @@ func TestTypeResolver(t *testing.T) {
 			expression:         "Invalid{}",
 			expectCompileError: "undeclared reference to 'Invalid'",
 		},
+		{
+			name:          "logic around JSONPatch",
+			expression:    `true ? JSONPatch{op: "add", path: "/spec/replicas", value: 3} : JSONPatch{op: "remove", path: "/spec/replicas"}`,
+			expectedValue: &JSONPatchVal{Op: "add", Path: "/spec/replicas", Val: types.Int(3)},
+		},
+		{
+			name:          "JSONPatch add",
+			expression:    `JSONPatch{op: "add", path: "/spec/replicas", value: 3}`,
+			expectedValue: &JSONPatchVal{Op: "add", Path: "/spec/replicas", Val: types.Int(3)},
+		},
+		{
+			name:          "JSONPatch remove",
+			expression:    `JSONPatch{op: "remove", path: "/spec/replicas"}`,
+			expectedValue: &JSONPatchVal{Op: "remove", Path: "/spec/replicas"},
+		},
+		{
+			name:          "JSONPatch replace",
+			expression:    `JSONPatch{op: "replace", path: "/spec/replicas", value: 3}`,
+			expectedValue: &JSONPatchVal{Op: "replace", Path: "/spec/replicas", Val: types.Int(3)},
+		},
+		{
+			name:          "JSONPatch move",
+			expression:    `JSONPatch{op: "move", from: "/spec/replicas", path: "/spec/replicas"}`,
+			expectedValue: &JSONPatchVal{Op: "move", From: "/spec/replicas", Path: "/spec/replicas"},
+		},
+		{
+			name:          "JSONPatch copy",
+			expression:    `JSONPatch{op: "copy", from: "/spec/replicas", path: "/spec/replicas"}`,
+			expectedValue: &JSONPatchVal{Op: "copy", From: "/spec/replicas", Path: "/spec/replicas"},
+		},
+		{
+			name:          "JSONPatch test",
+			expression:    `JSONPatch{op: "test", path: "/spec/replicas", value: 3}`,
+			expectedValue: &JSONPatchVal{Op: "test", Path: "/spec/replicas", Val: types.Int(3)},
+		},
+		{
+			name:          "JSONPatch invalid op",
+			expression:    `JSONPatch{op: "invalid", path: "/spec/replicas", value: 3}`,
+			expectedValue: &JSONPatchVal{Op: "invalid", Path: "/spec/replicas", Val: types.Int(3)},
+			// no error because the values are not checked in compilation.
+		},
+		{
+			name:          "JSONPatch missing path",
+			expression:    `JSONPatch{op: "add", value: 3}`,
+			expectedValue: &JSONPatchVal{Op: "add", Val: types.Int(3)},
+			// no error because the values are not checked in compilation.
+		},
+		{
+			name:          "JSONPatch missing value",
+			expression:    `JSONPatch{op: "add", path: "/spec/replicas"}`,
+			expectedValue: &JSONPatchVal{Op: "add", Path: "/spec/replicas"},
+			// no error because the values are not checked in compilation.
+		},
+		{
+			name:               "JSONPatch invalid value",
+			expression:         `JSONPatch{op: "add", path: "/spec/replicas", value: Invalid{}}`,
+			expectCompileError: "undeclared reference to 'Invalid'",
+		},
+		{
+			name:               "JSONPatch invalid path",
+			expression:         `JSONPatch{op: "add", path: Invalid{}, value: 3}`,
+			expectCompileError: "undeclared reference to 'Invalid'",
+		},
+		{
+			name:               "JSONPatch invalid from",
+			expression:         `JSONPatch{op: "move", from: Invalid{}, path: "/spec/replicas"}`,
+			expectCompileError: "undeclared reference to 'Invalid'",
+		},
+		{
+			name:               "JSONPatch invalid op type",
+			expression:         `JSONPatch{op: 1, path: "/spec/replicas", value: 3}`,
+			expectCompileError: "expected type of field 'op' is 'string' but provided type is 'int'",
+		},
+		{
+			name:               "JSONPatch invalid path type",
+			expression:         `JSONPatch{op: "add", path: 1, value: 3}`,
+			expectCompileError: "expected type of field 'path' is 'string' but provided type is 'int'",
+		},
+		{
+			name:               "JSONPatch invalid from type",
+			expression:         `JSONPatch{op: "move", from: 1, path: "/spec/replicas"}`,
+			expectCompileError: "expected type of field 'from' is 'string' but provided type is 'int'",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, option := common.NewResolverTypeProviderAndEnvOption(&DynamicTypeResolver{})
@@ -154,7 +237,7 @@ func TestTypeResolver(t *testing.T) {
 				t.Fatalf("unexpected error during evaluation: %v", err)
 			}
 			if v := r.Value(); !reflect.DeepEqual(v, tc.expectedValue) {
-				t.Errorf("expected %v but got %v", tc.expectedValue, v)
+				t.Errorf("expected %#v but got %#v", tc.expectedValue, v)
 			}
 		})
 	}
