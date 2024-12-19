@@ -49,6 +49,7 @@ func TestPodAdmission(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informerFactory.Start(stopCh)
+	informerFactory.WaitForCacheSync(stopCh)
 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: "testNamespace"},
