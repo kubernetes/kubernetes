@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,14 +53,31 @@ func TestBeforeDelete(t *testing.T) {
 		options  *metav1.DeleteOptions
 	}
 
-	makePod := func(deletionGracePeriodSeconds int64) *v1.Pod {
+	// snapshot and restore real metav1Now function
+	originalMetav1Now := metav1Now
+	t.Cleanup(func() {
+		metav1Now = originalMetav1Now
+	})
+
+	// make now refer to a fixed point in time
+	now := metav1.Time{Time: time.Now().Truncate(time.Second)}
+	metav1Now = func() metav1.Time {
+		return now
+	}
+
+	makePodWithDeletionTimestamp := func(deletionTimestamp *metav1.Time, deletionGracePeriodSeconds int64) *v1.Pod {
 		return &v1.Pod{
 			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 			ObjectMeta: metav1.ObjectMeta{
-				DeletionTimestamp:          &metav1.Time{},
+				DeletionTimestamp:          deletionTimestamp,
 				DeletionGracePeriodSeconds: &deletionGracePeriodSeconds,
 			},
 		}
+	}
+	makePod := func(deletionGracePeriodSeconds int64) *v1.Pod {
+		deletionTimestamp := now
+		deletionTimestamp.Time = deletionTimestamp.Time.Add(time.Duration(deletionGracePeriodSeconds) * time.Second)
+		return makePodWithDeletionTimestamp(&deletionTimestamp, deletionGracePeriodSeconds)
 	}
 	makeOption := func(gracePeriodSeconds int64) *metav1.DeleteOptions {
 		return &metav1.DeleteOptions{
