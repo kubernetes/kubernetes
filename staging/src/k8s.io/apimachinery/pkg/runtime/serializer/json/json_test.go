@@ -18,14 +18,17 @@ package json_test
 
 import (
 	"bytes"
+	json2 "encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	fuzz "github.com/google/gofuzz"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -1040,6 +1043,271 @@ func TestEncode(t *testing.T) {
 				t.Errorf("unexpected output:\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestStreamingCollectionsEncoding(t *testing.T) {
+	var streamingBuffer bytes.Buffer
+	streamingSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{StreamingCollectionsEncoding: true})
+	var normalBuffer bytes.Buffer
+	normalSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{StreamingCollectionsEncoding: false})
+	var remainingItems int64 = 1
+	for _, tc := range []struct {
+		name       string
+		in         runtime.Object
+		exactMatch bool
+	}{
+		{
+			name:       "List empty",
+			exactMatch: true,
+			in:         &testapigroupv1.CarpList{},
+		},
+		{
+			name:       "List just kind",
+			exactMatch: true,
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "List",
+				},
+			},
+		},
+		{
+			name:       "List just apiVersion",
+			exactMatch: true,
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+				},
+			},
+		},
+		{
+			name:       "List no elements",
+			exactMatch: true,
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "2345",
+				},
+				Items: []testapigroupv1.Carp{},
+			},
+		},
+		{
+			name:       "List one element with continue",
+			exactMatch: true,
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "2345",
+					Continue:           "abc",
+					RemainingItemCount: &remainingItems,
+				},
+				Items: []testapigroupv1.Carp{
+					{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Carp"}, ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod",
+						Namespace: "default",
+					}},
+				},
+			},
+		},
+		{
+			name:       "List two elements",
+			exactMatch: true,
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "2345",
+				},
+				Items: []testapigroupv1.Carp{
+					{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Carp"}, ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod",
+						Namespace: "default",
+					}},
+					{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Carp"}, ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod2",
+						Namespace: "default2",
+					}},
+				},
+			},
+		},
+		{
+			name:       "UnstructuredList empty",
+			exactMatch: true,
+			in:         &unstructured.UnstructuredList{},
+		},
+		{
+			name: "UnstructuredList just kind",
+			in: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{"kind": "List"},
+			},
+		},
+		{
+			name: "UnstructuredList just apiVersion",
+			in: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{"apiVersion": "v1"},
+			},
+		},
+		{
+			name: "UnstructuredList no elements",
+			in: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{"resourceVersion": "2345"}},
+				Items:  []unstructured.Unstructured{},
+			},
+		},
+		{
+			name: "UnstructuredList one element with continue",
+			in: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{
+					"resourceVersion":    "2345",
+					"continue":           "abc",
+					"remainingItemCount": "1",
+				}},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "Carp",
+							"metadata": map[string]interface{}{
+								"name":      "pod",
+								"namespace": "default",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "UnstructuredList two elements",
+			in: &unstructured.UnstructuredList{
+				Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{
+					"resourceVersion": "2345",
+				}},
+				Items: []unstructured.Unstructured{
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "Carp",
+							"metadata": map[string]interface{}{
+								"name":      "pod",
+								"namespace": "default",
+							},
+						},
+					},
+					{
+						Object: map[string]interface{}{
+							"apiVersion": "v1",
+							"kind":       "Carp",
+							"metadata": map[string]interface{}{
+								"name":      "pod2",
+								"namespace": "default",
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			normalBuffer.Reset()
+			streamingBuffer.Reset()
+			if err := streamingSerializer.Encode(tc.in, &streamingBuffer); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if err := normalSerializer.Encode(tc.in, &normalBuffer); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			matchEncodedJSON(t, streamingBuffer.Bytes(), normalBuffer.Bytes(), tc.exactMatch)
+		})
+	}
+}
+
+func TestFuzzStreamingCollectionsEncoding(t *testing.T) {
+	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c fuzz.Continue) {}
+	fuzzUnstructuredList := func(list *unstructured.UnstructuredList, c fuzz.Continue) {
+		list.Object = map[string]interface{}{
+			"kind":         "List",
+			"apiVersion":   "v1",
+			c.RandString(): c.RandString(),
+			c.RandString(): c.RandUint64(),
+			c.RandString(): c.RandBool(),
+			"metadata": map[string]interface{}{
+				"resourceVersion":    fmt.Sprintf("%d", c.RandUint64()),
+				"continue":           c.RandString(),
+				"remainingItemCount": fmt.Sprintf("%d", c.RandUint64()),
+				c.RandString():       c.RandString(),
+			}}
+		c.Fuzz(&list.Items)
+	}
+	fuzzMap := func(kvs map[string]interface{}, c fuzz.Continue) {
+		kvs[c.RandString()] = c.RandBool()
+		kvs[c.RandString()] = c.RandUint64()
+		kvs[c.RandString()] = c.RandString()
+	}
+	f := fuzz.New().Funcs(disableFuzzFieldsV1, fuzzUnstructuredList, fuzzMap)
+	streamingSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{StreamingCollectionsEncoding: true})
+	streamingBuffer := &bytes.Buffer{}
+	normalSerializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{StreamingCollectionsEncoding: false})
+	normalBuffer := &bytes.Buffer{}
+	t.Run("CarpList", func(t *testing.T) {
+		for i := 0; i < 1000; i++ {
+			list := &testapigroupv1.CarpList{}
+			f.Fuzz(list)
+			streamingBuffer.Reset()
+			normalBuffer.Reset()
+			if err := streamingSerializer.Encode(list, streamingBuffer); err != nil {
+				t.Fatal(err)
+			}
+			if err := normalSerializer.Encode(list, normalBuffer); err != nil {
+				t.Fatal(err)
+			}
+			matchEncodedJSON(t, streamingBuffer.Bytes(), normalBuffer.Bytes(), true)
+		}
+	})
+	t.Run("UnstructuredList", func(t *testing.T) {
+		for i := 0; i < 1000; i++ {
+			list := &unstructured.UnstructuredList{}
+			f.Fuzz(list)
+			streamingBuffer.Reset()
+			normalBuffer.Reset()
+			if err := streamingSerializer.Encode(list, streamingBuffer); err != nil {
+				t.Fatal(err)
+			}
+			if err := normalSerializer.Encode(list, normalBuffer); err != nil {
+				t.Fatal(err)
+			}
+			matchEncodedJSON(t, streamingBuffer.Bytes(), normalBuffer.Bytes(), false)
+		}
+	})
+}
+
+func matchEncodedJSON(t *testing.T, first, second []byte, exactMatch bool) {
+	t.Helper()
+	if exactMatch {
+		if diff := cmp.Diff(string(first), string(second)); diff != "" {
+			t.Errorf("not matching:\n%s", diff)
+		}
+	} else {
+		decodedFirst := map[string]interface{}{}
+		err := json2.Unmarshal(first, &decodedFirst)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		decodedSecond := map[string]interface{}{}
+		err = json2.Unmarshal(second, &decodedSecond)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if diff := cmp.Diff(decodedSecond, decodedFirst); diff != "" {
+			t.Errorf("not matching:\n%s", diff)
+		}
 	}
 }
 

@@ -24,6 +24,9 @@ import (
 	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
@@ -36,7 +39,7 @@ import (
 // is not nil, the object has the group, version, and kind fields set.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{false, pretty, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{false, pretty, false, false})
 }
 
 // NewYAMLSerializer creates a YAML serializer that handles encoding versioned objects into the proper YAML form. If typer
@@ -44,7 +47,7 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
 // Deprecated: use NewSerializerWithOptions instead.
 func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
-	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{true, false, false})
+	return NewSerializerWithOptions(meta, creater, typer, SerializerOptions{true, false, false, false})
 }
 
 // NewSerializerWithOptions creates a JSON/YAML serializer that handles encoding versioned objects into the proper JSON/YAML
@@ -93,6 +96,9 @@ type SerializerOptions struct {
 	// Strict: configures the Serializer to return strictDecodingError's when duplicate fields are present decoding JSON or YAML.
 	// Note that enabling this option is not as performant as the non-strict variant, and should not be used in fast paths.
 	Strict bool
+
+	// StreamingCollectionsEncoding enables encoding collection, one item at the time, drastically reducing memory needed.
+	StreamingCollectionsEncoding bool
 }
 
 // Serializer handles encoding versioned objects into the proper JSON form
@@ -242,8 +248,126 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		_, err = w.Write(data)
 		return err
 	}
+	if s.options.StreamingCollectionsEncoding {
+		typeMeta, listMeta, items, err := meta.GetListMeta(obj)
+		if err == nil {
+			return streamingEncodeList(w, typeMeta, listMeta, items)
+		}
+		list, ok := obj.(*unstructured.UnstructuredList)
+		if ok {
+			return streamingEncodeUnstructured(w, list)
+		}
+	}
 	encoder := json.NewEncoder(w)
 	return encoder.Encode(obj)
+}
+
+func streamingEncodeUnstructured(w io.Writer, list *unstructured.UnstructuredList) error {
+	_, err := w.Write([]byte(`{`))
+	if err != nil {
+		return err
+	}
+	for k, v := range list.Object {
+		err := encodeValue(w, nil, k, []byte(":"))
+		if err != nil {
+			return err
+		}
+		err = encodeValue(w, nil, v, []byte(","))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = w.Write([]byte(`"items":`))
+	if err != nil {
+		return err
+	}
+	if len(list.Items) == 0 {
+		_, err = w.Write([]byte("[]}\n"))
+		return err
+	}
+	suffix := []byte(",")
+	prefix := []byte("[")
+	for i, item := range list.Items {
+		if i == len(list.Items)-1 {
+			suffix = nil
+		}
+		err = encodeValue(w, prefix, item.Object, suffix)
+		if err != nil {
+			return err
+		}
+		if i == 0 {
+			prefix = nil
+		}
+	}
+	_, err = w.Write([]byte("]}\n"))
+	return err
+}
+
+func streamingEncodeList(w io.Writer, typeMeta v1.TypeMeta, listMeta v1.ListMeta, items []runtime.Object) error {
+	_, err := w.Write([]byte(`{`))
+	if err != nil {
+		return err
+	}
+	if typeMeta.Kind != "" {
+		err := encodeValue(w, []byte(`"kind":`), typeMeta.Kind, []byte(","))
+		if err != nil {
+			return err
+		}
+	}
+	if typeMeta.APIVersion != "" {
+		err := encodeValue(w, []byte(`"apiVersion":`), typeMeta.APIVersion, []byte(","))
+		if err != nil {
+			return err
+		}
+	}
+	err = encodeValue(w, []byte(`"metadata":`), listMeta, []byte(`,"items":`))
+	if err != nil {
+		return err
+	}
+	if items == nil {
+		_, err = w.Write([]byte("null}\n"))
+		return err
+	}
+	if len(items) == 0 {
+		_, err = w.Write([]byte("[]}\n"))
+		return err
+	}
+	suffix := []byte(",")
+	prefix := []byte("[")
+	for i, item := range items {
+		if i == len(items)-1 {
+			suffix = nil
+		}
+		err = encodeValue(w, prefix, item, suffix)
+		if err != nil {
+			return err
+		}
+		if i == 0 {
+			prefix = nil
+		}
+	}
+	_, err = w.Write([]byte("]}\n"))
+	return err
+}
+
+func encodeValue(w io.Writer, prefix []byte, value any, suffix []byte) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(prefix)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(suffix)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // IsStrict indicates whether the serializer
