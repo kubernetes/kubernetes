@@ -19,8 +19,10 @@ package protobuf
 import (
 	"bytes"
 	"encoding/base64"
-	"github.com/google/go-cmp/cmp"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
@@ -29,16 +31,19 @@ import (
 
 func TestCollectionsEncoding(t *testing.T) {
 	t.Run("Normal", func(t *testing.T) {
-		testCollectionsEncoding(t, NewSerializer(nil, nil))
+		testCollectionsEncoding(t, NewSerializer(nil, nil), false)
 	})
-	// Leave place for testing streaming collection serializer proposed as part of KEP-5116
+	t.Run("Streaming", func(t *testing.T) {
+		testCollectionsEncoding(t, NewSerializerWithOptions(nil, nil, SerializerOptions{StreamingCollectionsEncoding: true}), true)
+	})
 }
 
-func testCollectionsEncoding(t *testing.T, s *Serializer) {
+func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool) {
 	var remainingItems int64 = 1
 	testCases := []struct {
-		name string
-		in   runtime.Object
+		name         string
+		in           runtime.Object
+		cannotStream bool
 		// expect is base64 encoded protobuf bytes
 		expect string
 	}{
@@ -188,13 +193,60 @@ func testCollectionsEncoding(t *testing.T, s *Serializer) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
+			var buf writeCountingBuffer
 			if err := s.Encode(tc.in, &buf); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if diff := cmp.Diff(base64.StdEncoding.EncodeToString(buf.Bytes()), tc.expect); diff != "" {
 				t.Errorf("not matching:\n%s", diff)
 			}
+			expectStreaming := !tc.cannotStream && streamingEnabled
+			if expectStreaming && buf.writeCount <= 1 {
+				t.Errorf("expected streaming but Write was called only: %d", buf.writeCount)
+			}
+			if !expectStreaming && buf.writeCount > 1 {
+				t.Errorf("expected non-streaming but Write was called more than once: %d", buf.writeCount)
+			}
 		})
+	}
+}
+
+type writeCountingBuffer struct {
+	writeCount int
+	bytes.Buffer
+}
+
+func (b *writeCountingBuffer) Write(data []byte) (int, error) {
+	b.writeCount++
+	return b.Buffer.Write(data)
+}
+
+func (b *writeCountingBuffer) Reset() {
+	b.writeCount = 0
+	b.Buffer.Reset()
+}
+
+func TestFuzzCollection(t *testing.T) {
+	f := fuzz.New()
+	streamingEncoder := NewSerializerWithOptions(nil, nil, SerializerOptions{StreamingCollectionsEncoding: true})
+	streamingBuffer := &bytes.Buffer{}
+	normalEncoder := NewSerializerWithOptions(nil, nil, SerializerOptions{StreamingCollectionsEncoding: false})
+	normalBuffer := &bytes.Buffer{}
+	for i := 0; i < 1000; i++ {
+		list := &testapigroupv1.CarpList{}
+		f.Fuzz(list)
+		streamingBuffer.Reset()
+		normalBuffer.Reset()
+		if err := streamingEncoder.Encode(list, streamingBuffer); err != nil {
+			t.Fatal(err)
+		}
+		if err := normalEncoder.Encode(list, normalBuffer); err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(streamingBuffer.String(), normalBuffer.String()); diff != "" {
+			t.Logf("normal: %s", normalBuffer.String())
+			t.Logf("streaming: %s", streamingBuffer.String())
+			t.Fatalf("unexpected output:\n%s", diff)
+		}
 	}
 }
