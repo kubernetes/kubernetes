@@ -154,6 +154,12 @@ type ContainerManager interface {
 	// Updates returns a channel that receives an Update when the device changed its status.
 	Updates() <-chan resourceupdates.Update
 
+	// PodHasExclusiveCPUs returns true if the provided pod has containers with exclusive cpu
+	PodHasExclusiveCPUs(pod *v1.Pod) bool
+
+	// ContainerHasExclusiveCPUs returns true if the provided container in the pod has exclusive cpu
+	ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool
+
 	// Implements the PodResources Provider API
 	podresources.CPUsProvider
 	podresources.DevicesProvider
