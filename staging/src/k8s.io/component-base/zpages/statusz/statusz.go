@@ -36,6 +36,8 @@ var (
 )
 
 const (
+	DefaultStatuszPath = "/statusz"
+
 	headerFmt = `
 %s statusz
 Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
@@ -73,7 +75,7 @@ func Install(m mux, componentName string, reg statuszRegistry) {
 		klog.Errorf("error while parsing gotemplates: %v", err)
 		return
 	}
-	m.Handle("/statusz", handleStatusz(componentName, dataTmpl, reg))
+	m.Handle(DefaultStatuszPath, handleStatusz(componentName, dataTmpl, reg))
 }
 
 func initializeTemplates() (*template.Template, error) {
