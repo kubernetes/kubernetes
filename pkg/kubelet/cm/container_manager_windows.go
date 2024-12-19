@@ -168,10 +168,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 		klog.InfoS("Creating memory manager")
 		cm.memoryManager, err = memorymanager.NewManager(
-			nodeConfig.ExperimentalMemoryManagerPolicy,
+			nodeConfig.MemoryManagerPolicy,
 			machineInfo,
 			cm.GetNodeAllocatableReservation(),
-			nodeConfig.ExperimentalMemoryManagerReservedMemory,
+			nodeConfig.MemoryManagerReservedMemory,
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,
 		)
