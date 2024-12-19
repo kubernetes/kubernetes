@@ -318,6 +318,8 @@ type Cacher struct {
 	watchersBuffer []*cacheWatcher
 	// blockedWatchers is a list of watchers whose buffer is currently full.
 	blockedWatchers []*cacheWatcher
+	// blockedWatchers is a list of watchers whose init event not done.
+	initBlockedWatchers []*cacheWatcher
 	// watchersToStop is a list of watchers that were supposed to be stopped
 	// during current dispatching, but stopping was deferred to the end of
 	// dispatching that event to avoid race with closing channels in watchers.
@@ -1154,10 +1156,21 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		wcEvent := *event
 		setCachingObjects(&wcEvent, c.versioner)
 		event = &wcEvent
-
+		c.initBlockedWatchers = c.initBlockedWatchers[:0]
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
 			if !watcher.nonblockingAdd(event) {
+				if !watcher.initEventDone {
+					c.initBlockedWatchers = append(c.initBlockedWatchers, watcher)
+				} else {
+					c.blockedWatchers = append(c.blockedWatchers, watcher)
+				}
+			}
+		}
+
+		//if init event is done,move to blockedWatchers
+		for _, watcher := range c.initBlockedWatchers {
+			if !watcher.appendWaitInitEventTemporary(event) {
 				c.blockedWatchers = append(c.blockedWatchers, watcher)
 			}
 		}

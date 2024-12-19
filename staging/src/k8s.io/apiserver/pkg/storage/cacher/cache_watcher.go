@@ -51,15 +51,16 @@ const (
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
-	input         chan *watchCacheEvent
-	result        chan watch.Event
-	once          sync.Once
-	initEventDone bool
-	done          chan struct{}
-	filter        filterWithAttrsFunc
-	stopped       bool
-	forget        func(bool)
-	versioner     storage.Versioner
+	input                  chan *watchCacheEvent
+	result                 chan watch.Event
+	initEventMutex         sync.Mutex
+	initEventDone          bool
+	waitInitEventTemporary []*watchCacheEvent
+	done                   chan struct{}
+	filter                 filterWithAttrsFunc
+	stopped                bool
+	forget                 func(bool)
+	versioner              storage.Versioner
 	// The watcher will be closed by server after the deadline,
 	// save it here to send bookmark events before that.
 	deadline            time.Time
@@ -519,6 +520,39 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 	c.process(ctx, resourceVersion)
 }
 
+func (c *cacheWatcher) appendWaitInitEventTemporary(event *watchCacheEvent) bool {
+	c.initEventMutex.Lock()
+	defer c.initEventMutex.Unlock()
+	if c.initEventDone {
+		return false
+	}
+	c.waitInitEventTemporary = append(c.waitInitEventTemporary, event)
+	return true
+}
+
+func (c *cacheWatcher) makeUpInitEvent(ctx context.Context) {
+	c.initEventMutex.Lock()
+	defer c.initEventMutex.Unlock()
+	c.initEventDone = true
+	//TODO other timer
+	makeUpTimer := time.NewTimer(time.Millisecond * 500)
+	defer func() {
+		if !makeUpTimer.Stop() {
+			<-makeUpTimer.C
+		}
+		c.waitInitEventTemporary = nil
+	}()
+	for _, event := range c.waitInitEventTemporary {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			if !c.add(event, makeUpTimer) {
+				return
+			}
+		}
+	}
+}
 func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	// At this point we already start processing incoming watch events.
 	// However, the init event can still be processed because their serialization
@@ -527,9 +561,8 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	//   the initialization signal proportionally to the number of events to
 	//   process, but we're leaving this to the tuning phase.
 	utilflowcontrol.WatchInitialized(ctx)
-	c.once.Do(func() {
-		c.initEventDone = true
-	})
+	//set init event done and make up temporary event
+	go c.makeUpInitEvent(ctx)
 	for {
 		select {
 		case event, ok := <-c.input:
