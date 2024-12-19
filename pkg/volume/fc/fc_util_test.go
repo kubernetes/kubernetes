@@ -116,6 +116,10 @@ func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.Fi
 	return nil
 }
 
+func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
+	return nil, nil
+}
+
 func TestSearchDisk(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -164,7 +168,7 @@ func TestSearchDisk(t *testing.T) {
 					lun:  test.lun,
 					io:   &fakeIOHandler{},
 				},
-				deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+				deviceUtil: util.NewDeviceHandler(&fakeIOHandler{}),
 			}
 			devicePath, err := searchDisk(fakeMounter)
 			if test.expectError && err == nil {
