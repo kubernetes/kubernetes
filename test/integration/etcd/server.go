@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/pflag"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -38,12 +39,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration"
@@ -63,7 +68,7 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 -----END EC PRIVATE KEY-----`
 
 // StartRealAPIServerOrDie starts an API server that is appropriate for use in tests that require one of every resource
-func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
+func StartRealAPIServerOrDie(t *testing.T, customFlags []string, configFuncs ...func(*options.ServerRunOptions)) *APIServer {
 	tCtx := ktesting.Init(t)
 
 	certDir, err := os.MkdirTemp("", t.Name())
@@ -90,7 +95,24 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 
+	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
+
 	opts := options.NewServerRunOptions()
+	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+	featureGate.AddMetrics()
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	componentGlobalsRegistry := featuregate.NewComponentGlobalsRegistry()
+	if err := componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
+		t.Fatal(err)
+	}
+	opts.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
+
+	for _, f := range opts.Flags().FlagSets {
+		fs.AddFlagSet(f)
+	}
+
 	opts.Options.SecureServing.Listener = listener
 	opts.Options.SecureServing.ServerCert.CertDirectory = certDir
 	opts.Options.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
@@ -106,6 +128,23 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	for _, f := range configFuncs {
 		f(opts)
 	}
+
+	if err := fs.Parse(customFlags); err != nil {
+		t.Fatal(err)
+	}
+	if err := componentGlobalsRegistry.Set(); err != nil {
+		t.Fatal(err)
+	}
+	// because most feature checks still use the DefaultFeatureGate, we need to copy the flag settings to the DefaultFeatureGate.
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	}
+	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
+		}
+	}
+
 	completedOptions, err := opts.Complete(tCtx)
 	if err != nil {
 		t.Fatal(err)

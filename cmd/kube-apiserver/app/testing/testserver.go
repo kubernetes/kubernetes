@@ -196,6 +196,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if instanceOptions.BinaryVersion != "" {
 		effectiveVersion = utilversion.NewEffectiveVersion(instanceOptions.BinaryVersion)
 	}
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
 	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
 	componentGlobalsRegistry := featuregate.NewComponentGlobalsRegistry()
 	utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))

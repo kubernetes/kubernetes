@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/pflag"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,9 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	netutils "k8s.io/utils/net"
 
@@ -67,7 +72,7 @@ type TearDownFunc func()
 
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
 // TODO (pohly): convert to ktesting contexts
-func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (client.Interface, *rest.Config, TearDownFunc) {
+func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup, customFlags ...string) (client.Interface, *rest.Config, TearDownFunc) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	certDir, err := os.MkdirTemp("", "test-integration-"+strings.ReplaceAll(t.Name(), "/", "_"))
@@ -135,7 +140,24 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 
+	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
+
 	opts := options.NewServerRunOptions()
+	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+	featureGate.AddMetrics()
+	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	componentGlobalsRegistry := featuregate.NewComponentGlobalsRegistry()
+	if err := componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
+		t.Fatal(err)
+	}
+	opts.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
+
+	for _, f := range opts.Flags().FlagSets {
+		fs.AddFlagSet(f)
+	}
+
 	opts.SecureServing.Listener = listener
 	opts.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 	opts.SecureServing.ServerCert.CertDirectory = certDir
@@ -156,6 +178,22 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 
 	if setup.ModifyServerRunOptions != nil {
 		setup.ModifyServerRunOptions(opts)
+	}
+
+	if err := fs.Parse(customFlags); err != nil {
+		t.Fatal(err)
+	}
+	if err := componentGlobalsRegistry.Set(); err != nil {
+		t.Fatal(err)
+	}
+	// because most feature checks still use the DefaultFeatureGate, we need to copy the flag settings to the DefaultFeatureGate.
+	if !featureGate.EmulationVersion().EqualTo(utilfeature.DefaultMutableFeatureGate.EmulationVersion()) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion())
+	}
+	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, featureGate.Enabled(f))
+		}
 	}
 
 	completedOptions, err := opts.Complete(ctx)

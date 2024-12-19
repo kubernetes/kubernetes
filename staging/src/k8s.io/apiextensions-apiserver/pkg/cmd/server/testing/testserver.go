@@ -128,6 +128,7 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 	// configure the local componentGlobalsRegistry
 	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
 	componentGlobalsRegistry := featuregate.NewComponentGlobalsRegistry()
 	utilruntime.Must(componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate))
 
