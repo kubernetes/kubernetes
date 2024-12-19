@@ -79,6 +79,9 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 				updateKubeletConfig(ctx, f, oldCfg, true)
 			})
 
+			// polling and timeout values determined by trial and error
+			gomega.Eventually(countPodsPendingDeletionOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)).WithPolling(2*time.Second).WithTimeout(2*time.Minute).Should(gomega.BeZero(), "found pods pending deletion on %q", framework.TestContext.NodeName)
+
 			count := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
 			gomega.Expect(count).To(gomega.BeZero(), "unexpected pods on %q, please check output above", framework.TestContext.NodeName)
 		})
@@ -209,6 +212,32 @@ func validateMetrics(values e2emetrics.KubeletMetrics, totalKey, errorKey string
 		}
 	}
 	return nil
+}
+
+func countPodsPendingDeletionOnNode(ctx context.Context, c clientset.Interface, nodeName string) int {
+	nodeSelector := fields.Set{
+		"spec.nodeName": nodeName,
+	}.AsSelector().String()
+
+	podList, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
+		FieldSelector: nodeSelector,
+	})
+	if err != nil {
+		framework.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
+		return 0
+	}
+	count := 0
+	framework.Logf("begin listing pods pending deletion: %d pods running on %q", len(podList.Items), nodeName)
+	for _, p := range podList.Items {
+		if p.DeletionTimestamp == nil {
+			continue
+		}
+		framework.Logf("%s/%s node %s (expected: %s) status %v deletionTimestamp %v)",
+			p.Namespace, p.Name, p.Spec.NodeName, nodeName, p.Status.Phase, *p.DeletionTimestamp)
+		count++
+	}
+	framework.Logf("end listing pods pending deletion: %d found", len(podList.Items))
+	return count
 }
 
 // printAllPodsOnNode outputs status of all kubelet pods into log.
