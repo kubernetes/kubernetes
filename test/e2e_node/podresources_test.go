@@ -1034,7 +1034,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					pod := makePodResourcesTestPod(pd)
 					pod.Spec.Containers[0].Command = []string{"sh", "-c", "/bin/true"}
 					pod = e2epod.NewPodClient(f).Create(ctx, pod)
-					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, time.Minute)
+					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
 					framework.ExpectNoError(err)
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
