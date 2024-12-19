@@ -80,6 +80,9 @@ func (c *GenericConfig) NewRESTStorage(apiResourceConfigSource serverstorage.API
 	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToJSON) {
 		opts = append(opts, serializer.WithStreamingCollectionEncodingToJSON())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToProtobuf) {
+		opts = append(opts, serializer.WithStreamingCollectionEncodingToProtobuf())
+	}
 	if len(opts) != 0 {
 		apiGroupInfo.NegotiatedSerializer = serializer.NewCodecFactory(legacyscheme.Scheme, opts...)
 	}
