@@ -113,6 +113,10 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 			return errors.Wrap(err, "error writing CRISocket for this node")
 		}
+	} else {
+		if err := patchnodephase.RemoveCRISocketAnnotation(client, cfg.NodeRegistration.Name); err != nil {
+			return err
+		}
 	}
 
 	return nil
