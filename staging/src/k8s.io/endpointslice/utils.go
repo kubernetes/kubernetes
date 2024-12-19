@@ -392,6 +392,17 @@ func findPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 				}
 			}
 		}
+		// also support sidecar container (initContainer with restartPolicy=Always)
+		for _, container := range pod.Spec.InitContainers {
+			if container.RestartPolicy == nil || *container.RestartPolicy != v1.ContainerRestartPolicyAlways {
+				continue
+			}
+			for _, port := range container.Ports {
+				if port.Name == name && port.Protocol == svcPort.Protocol {
+					return int(port.ContainerPort), nil
+				}
+			}
+		}
 	case intstr.Int:
 		return portName.IntValue(), nil
 	}
