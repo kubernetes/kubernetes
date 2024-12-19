@@ -566,6 +566,7 @@ func TestDeploymentController_cleanupDeploymentOrder(t *testing.T) {
 		stopCh := make(chan struct{})
 		defer close(stopCh)
 		informers.Start(stopCh)
+		informers.WaitForCacheSync(stopCh)
 
 		d := newDeployment("foo", 1, &test.revisionHistoryLimit, nil, nil, map[string]string{"foo": "bar"})
 		controller.cleanupDeployment(ctx, test.oldRSs, d)
