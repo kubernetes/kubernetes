@@ -55,11 +55,5 @@ func chunkSizeFor(n, parallelism int) int {
 // A given operation will be a label that is recorded in the goroutine metric.
 func (p Parallelizer) Until(ctx context.Context, pieces int, doWorkPiece workqueue.DoWorkPieceFunc, operation string) {
 	goroutinesMetric := metrics.Goroutines.WithLabelValues(operation)
-	withMetrics := func(piece int) {
-		goroutinesMetric.Inc()
-		doWorkPiece(piece)
-		goroutinesMetric.Dec()
-	}
-
-	workqueue.ParallelizeUntil(ctx, p.parallelism, pieces, withMetrics, workqueue.WithChunkSize(chunkSizeFor(pieces, p.parallelism)))
+	workqueue.ParallelizeUntil(ctx, p.parallelism, pieces, doWorkPiece, workqueue.WithChunkSize(chunkSizeFor(pieces, p.parallelism)), workqueue.WithWorkerMetric(goroutinesMetric))
 }
