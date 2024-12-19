@@ -689,7 +689,11 @@ resources:
 				}
 				// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
 				// close the client (which we can do by closing rawClient).
-				defer rawClient.Close()
+				defer func() {
+					if err := rawClient.Close(); err != nil {
+						t.Errorf("error closing rawClient: %v", err)
+					}
+				}()
 
 				response, err := etcdClient.Get(context.TODO(), "/"+test.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Prefix, clientv3.WithPrefix())
 				if err != nil {
