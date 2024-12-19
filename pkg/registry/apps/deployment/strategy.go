@@ -31,10 +31,12 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -192,6 +194,7 @@ func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	oldDeployment := old.(*apps.Deployment)
 	newDeployment.Spec = oldDeployment.Spec
 	newDeployment.Labels = oldDeployment.Labels
+	dropDisabledStatusFields(&newDeployment.Status, &oldDeployment.Status)
 }
 
 // ValidateUpdate is the default update validation for an end user updating status
@@ -202,4 +205,12 @@ func (deploymentStatusStrategy) ValidateUpdate(ctx context.Context, obj, old run
 // WarningsOnUpdate returns warnings for the given update.
 func (deploymentStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropDisabledStatusFields removes disabled fields from the deployment status.
+func dropDisabledStatusFields(deploymentStatus, oldDeploymentStatus *apps.DeploymentStatus) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) &&
+		(oldDeploymentStatus == nil || oldDeploymentStatus.TerminatingReplicas == nil) {
+		deploymentStatus.TerminatingReplicas = nil
+	}
 }
