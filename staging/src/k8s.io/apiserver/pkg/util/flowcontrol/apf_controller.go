@@ -367,13 +367,6 @@ func newTestableController(config TestableConfig) *configController {
 }
 
 func (cfgCtlr *configController) Start(ctx context.Context) error {
-	go func() {
-		<-ctx.Done()
-		// Let the config worker stop when we are done
-		klog.Info("Shutting down API Priority and Fairness config worker")
-		cfgCtlr.configQueue.ShutDown()
-	}()
-
 	klog.Info("Starting API Priority and Fairness config controller")
 	if ok := cache.WaitForCacheSync(ctx.Done(), cfgCtlr.plInformerSynced, cfgCtlr.fsInformerSynced); !ok {
 		return fmt.Errorf("never achieved initial sync")
@@ -384,6 +377,13 @@ func (cfgCtlr *configController) Start(ctx context.Context) error {
 
 	klog.Info("Running API Priority and Fairness periodic rebalancing process")
 	go wait.UntilWithContext(ctx, cfgCtlr.updateBorrowing, borrowingAdjustmentPeriod)
+
+	go func() {
+		<-ctx.Done()
+		// Let the config worker stop when we are done
+		klog.Info("Shutting down API Priority and Fairness config worker")
+		cfgCtlr.configQueue.ShutDown()
+	}()
 
 	return nil
 }

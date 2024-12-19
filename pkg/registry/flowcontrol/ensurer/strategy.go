@@ -279,15 +279,11 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 		logger.V(5).Info(fmt.Sprintf("Something created the %T concurrently", bootstrap))
 	}
 
-	logger.V(5).Info(fmt.Sprintf("The %T already exists, checking whether it is up to date", bootstrap))
 	newObject, update, err := strategy.ReviseIfNeeded(ops, current, bootstrap)
 	if err != nil {
 		return fmt.Errorf("failed to determine whether auto-update is required for %T type=%s name=%q error=%w", bootstrap, configurationType, name, err)
 	}
 	if !update {
-		if loggerV := logger.V(5); loggerV.Enabled() {
-			loggerV.Info("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind)
-		}
 		return nil
 	}
 
