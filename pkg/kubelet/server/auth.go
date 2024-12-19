@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/zpages/statusz"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -68,6 +69,7 @@ func isSubpath(subpath, path string) bool {
 //	/metrics/*		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=metrics
 //	/logs/*			=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=log
 //	/checkpoint/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=checkpoint
+//	/statusz 		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=statusz
 //	/pods/*			=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=pods,proxy
 //	/runningPods/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=pods,proxy
 //	/healthz/* 		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=healthz,proxy
@@ -116,6 +118,8 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 		subresources = append(subresources, "log")
 	case isSubpath(requestPath, checkpointPath):
 		subresources = append(subresources, "checkpoint")
+	case isSubpath(requestPath, statusz.DefaultStatuszPath):
+		subresources = append(subresources, "statusz")
 	default:
 		subresources = append(subresources, "proxy")
 	}
