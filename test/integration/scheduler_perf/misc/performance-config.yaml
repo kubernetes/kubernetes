@@ -383,10 +383,13 @@
       measurePods: 5000
 
 # Measure throughput of regular schedulable pods that are interleaved by unschedulable pods injected at 5/s rate.
+# Note that the scheduling performance depends on the number of Pods, as preemption plugin needs to loop over all Pods in attempt to preempt them.
 - name: Unschedulable
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
+  - opcode: createPods
+    countParam: $initPods
   - opcode: churn
     mode: create
     templatePaths:
@@ -397,45 +400,67 @@
     podTemplatePath: ../templates/pod-default.yaml
     collectMetrics: true
   workloads:
-  - name: 5Nodes/10Pods
+  - name: 5Nodes/1Init/10Pods
     featureGates:
       SchedulerQueueingHints: false
     labels: [integration-test, short]
     params:
       initNodes: 5
+      initPods: 1
       measurePods: 10
-  - name: 5Nodes/10Pods_QueueingHintsEnabled
+  - name: 5Nodes/1Init/10Pods_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 5
+      initPods: 1
       measurePods: 10
-  - name: 500Nodes/1kPods
+  - name: 500Nodes/10Init/1kPods
     labels: [performance, short]
     params:
       initNodes: 500
+      initPods: 10
       measurePods: 1000
-  - name: 5kNodes/1kPods
+  - name: 5kNodes/100Init/1kPods
     labels: [performance, short]
     params:
       initNodes: 5000
+      initPods: 100
       measurePods: 1000
-  - name: 5kNodes/10kPods
+  - name: 5kNodes/100Init/10kPods
     featureGates:
       SchedulerQueueingHints: false
     labels: [performance]
     threshold: 140
     params:
       initNodes: 5000
+      initPods: 100
       measurePods: 10000
-  - name: 5kNodes/10kPods_QueueingHintsEnabled
+  - name: 5kNodes/100Init/10kPods_QueueingHintsEnabled
     featureGates:
       SchedulerQueueingHints: true
     labels: [performance]
     threshold: 170
     params:
       initNodes: 5000
+      initPods: 100
+      measurePods: 10000
+  - name: 5kNodes/20kInit/10kPods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 20000
+      measurePods: 10000
+  - name: 5kNodes/20kInit/10kPods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 20000
       measurePods: 10000
 
 - name: SchedulingWithMixedChurn
