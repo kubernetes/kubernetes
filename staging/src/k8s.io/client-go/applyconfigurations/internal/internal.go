@@ -7649,6 +7649,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: replicas
       type:
         scalar: numeric
+      default: 1
     - name: selector
       type:
         map:
