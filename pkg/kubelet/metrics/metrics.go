@@ -1091,7 +1091,7 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.CustomMustRegister(collector)
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) &&
+		if (utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) || utilfeature.DefaultFeatureGate.Enabled(features.WindowsGracefulNodeShutdown)) &&
 			utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdownBasedOnPodPriority) {
 			legacyregistry.MustRegister(GracefulShutdownStartTime)
 			legacyregistry.MustRegister(GracefulShutdownEndTime)

@@ -257,6 +257,8 @@ const (
 
 	// owner: @bobbypage
 	// Adds support for kubelet to detect node shutdown and gracefully terminate pods prior to the node being shutdown.
+	// The feature only works on Linux nodes. For Windows nodes, the feature is controlled with the WindowsGracefulNodeShutdown
+	// feature gate since v1.32. So the feature gate is misnamed and ought to be treated as if it were named LinuxGracefulNodeShutdown.
 	GracefulNodeShutdown featuregate.Feature = "GracefulNodeShutdown"
 
 	// owner: @wzshiming
