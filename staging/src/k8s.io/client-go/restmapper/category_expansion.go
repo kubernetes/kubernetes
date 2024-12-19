@@ -71,13 +71,19 @@ func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResour
 		}
 		// Collect GroupVersions by categories
 		for _, apiResource := range apiResourceList.APIResources {
+			groupResource := schema.GroupResource{
+				Group:    gv.Group,
+				Resource: apiResource.Name,
+			}
 			if categories := apiResource.Categories; len(categories) > 0 {
 				for _, category := range categories {
-					groupResource := schema.GroupResource{
-						Group:    gv.Group,
-						Resource: apiResource.Name,
-					}
 					discoveredExpansions[category] = append(discoveredExpansions[category], groupResource)
+				}
+			} else {
+				// if there is no categories ,then add it to "none" category
+				if apiResource.StorageVersionHash != "" {
+			        category := "none"
+				    discoveredExpansions[category]=append(discoveredExpansions[category], groupResource)
 				}
 			}
 		}
