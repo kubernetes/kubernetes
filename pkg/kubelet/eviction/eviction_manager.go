@@ -224,6 +224,13 @@ func (m *managerImpl) IsUnderMemoryPressure() bool {
 	return hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure)
 }
 
+// IsUnderSwapPressure returns true if the node is under swap pressure.
+func (m *managerImpl) IsUnderSwapPressure() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return hasNodeCondition(m.nodeConditions, v1.NodeSwapPressure)
+}
+
 // IsUnderDiskPressure returns true if the node is under disk pressure.
 func (m *managerImpl) IsUnderDiskPressure() bool {
 	m.RLock()
