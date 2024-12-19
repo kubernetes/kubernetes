@@ -902,12 +902,11 @@ func runMultisyncTests(t *testing.T, ctx context.Context, tests []controllerTest
 			time.Sleep(600 * time.Millisecond)
 
 			// There were some changes, process them
-			switch obj.(type) {
+			switch obj := obj.(type) {
 			case *v1.PersistentVolumeClaim:
-				claim := obj.(*v1.PersistentVolumeClaim)
 				// Simulate "claim updated" event
-				ctrl.claims.Update(claim)
-				err = ctrl.syncClaim(context.TODO(), claim)
+				ctrl.claims.Update(obj)
+				err = ctrl.syncClaim(context.TODO(), obj)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
@@ -921,10 +920,9 @@ func runMultisyncTests(t *testing.T, ctx context.Context, tests []controllerTest
 				// Process generated changes
 				continue
 			case *v1.PersistentVolume:
-				volume := obj.(*v1.PersistentVolume)
 				// Simulate "volume updated" event
-				ctrl.volumes.store.Update(volume)
-				err = ctrl.syncVolume(context.TODO(), volume)
+				ctrl.volumes.store.Update(obj)
+				err = ctrl.syncVolume(context.TODO(), obj)
 				if err != nil {
 					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
