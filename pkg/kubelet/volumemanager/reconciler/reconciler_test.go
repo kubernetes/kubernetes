@@ -19,6 +19,7 @@ package reconciler
 import (
 	"crypto/md5"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -703,7 +704,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
+	kubeClient := createtestClientWithPVPVC(t, gcepv, gcepvc)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -797,6 +798,17 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	volumeSpec := &volume.Spec{
 		PersistentVolume: gcepv,
 	}
+
+	fakeDevicePath := filepath.Join(t.TempDir(), "fake")
+	fakeDevice, err := os.Create(fakeDevicePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fakeDevice.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(nodeName),
@@ -805,7 +817,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 			VolumesAttached: []v1.AttachedVolume{
 				{
 					Name:       "fake-plugin/fake-device1",
-					DevicePath: "fake/path",
+					DevicePath: fakeDevicePath,
 				},
 			},
 		},
@@ -816,9 +828,9 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
+	kubeClient := createtestClientWithPVPVC(t, gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
-		DevicePath: "/fake/path",
+		DevicePath: fakeDevicePath,
 	})
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
@@ -917,7 +929,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
+	kubeClient := createtestClientWithPVPVC(t, gcepv, gcepvc)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1020,6 +1032,16 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		PersistentVolume: gcepv,
 	}
 
+	fakeDevicePath := filepath.Join(t.TempDir(), "fake")
+	fakeDevice, err := os.Create(fakeDevicePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = fakeDevice.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(nodeName),
@@ -1028,7 +1050,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 			VolumesAttached: []v1.AttachedVolume{
 				{
 					Name:       "fake-plugin/fake-device1",
-					DevicePath: "/fake/path",
+					DevicePath: fakeDevicePath,
 				},
 			},
 		},
@@ -1039,9 +1061,9 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
+	kubeClient := createtestClientWithPVPVC(t, gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
-		DevicePath: "/fake/path",
+		DevicePath: fakeDevicePath,
 	})
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
@@ -1301,6 +1323,17 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 
 			// deep copy before reconciler runs to avoid data race.
 			pvWithSize := pv.DeepCopy()
+
+			fakeDevicePath := filepath.Join(t.TempDir(), "fake")
+			fakeDevice, err := os.Create(fakeDevicePath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = fakeDevice.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: string(nodeName),
@@ -1310,7 +1343,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 					VolumesAttached: []v1.AttachedVolume{
 						{
 							Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.pvName)),
-							DevicePath: "fake/path",
+							DevicePath: fakeDevicePath,
 						},
 					},
 				},
@@ -1319,9 +1352,9 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 			dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-			kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+			kubeClient := createtestClientWithPVPVC(t, pv, pvc, v1.AttachedVolume{
 				Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.pvName)),
-				DevicePath: "fake/path",
+				DevicePath: fakeDevicePath,
 			})
 			fakeRecorder := &record.FakeRecorder{}
 			fakeHandler := volumetesting.NewBlockVolumePathHandler()
@@ -1558,6 +1591,16 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					},
 				}
 
+				fakeDevicePath := filepath.Join(t.TempDir(), "fake")
+				fakeDevice, err := os.Create(fakeDevicePath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = fakeDevice.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: string(nodeName),
@@ -1567,7 +1610,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 						VolumesAttached: []v1.AttachedVolume{
 							{
 								Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
-								DevicePath: "fake/path",
+								DevicePath: fakeDevicePath,
 							},
 						},
 					},
@@ -1578,9 +1621,9 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+				kubeClient := createtestClientWithPVPVC(t, pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
-					DevicePath: "fake/path",
+					DevicePath: fakeDevicePath,
 				})
 				fakeRecorder := &record.FakeRecorder{}
 				fakeHandler := volumetesting.NewBlockVolumePathHandler()
@@ -1782,6 +1825,16 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					},
 				}
 
+				fakeDevicePath := filepath.Join(t.TempDir(), "fake")
+				fakeDevice, err := os.Create(fakeDevicePath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = fakeDevice.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+
 				node := &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: string(nodeName),
@@ -1790,7 +1843,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 						VolumesAttached: []v1.AttachedVolume{
 							{
 								Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
-								DevicePath: "fake/path",
+								DevicePath: fakeDevicePath,
 							},
 						},
 					},
@@ -1801,9 +1854,9 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+				kubeClient := createtestClientWithPVPVC(t, pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
-					DevicePath: "fake/path",
+					DevicePath: fakeDevicePath,
 				})
 				fakeRecorder := &record.FakeRecorder{}
 				fakeHandler := volumetesting.NewBlockVolumePathHandler()
@@ -2065,14 +2118,24 @@ func runReconciler(reconciler Reconciler) {
 	go reconciler.Run(wait.NeverStop)
 }
 
-func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
+func createtestClientWithPVPVC(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 	if len(attachedVolumes) == 0 {
+		fakeDevicePath := filepath.Join(t.TempDir(), "fake")
+		fakeDevice, err := os.Create(fakeDevicePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = fakeDevice.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
 		attachedVolumes = append(attachedVolumes, v1.AttachedVolume{
 			Name:       "fake-plugin/pv",
-			DevicePath: "fake/path",
+			DevicePath: fakeDevicePath,
 		})
 	}
+
 	fakeClient.AddReactor("get", "nodes",
 		func(action core.Action) (bool, runtime.Object, error) {
 			return true, &v1.Node{
