@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	tracingapi "k8s.io/component-base/tracing/api/v1"
+	v1alphav1 "k8s.io/kubelet/config/v1alpha1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -210,6 +211,10 @@ type KubeletConfiguration struct {
 	// Default: 10
 	// +optional
 	RegistryBurst int32 `json:"registryBurst,omitempty"`
+	// +optional
+	ImagePullCredentialsVerificationPolicy v1alphav1.ImagePullCredentialsVerificationPolicy `json:"imagePullCredentialsVerificationPolicy,omitempty"`
+	// +optional
+	PreloadedImagesVerificationAllowlist []string `json:"preloadImagesVerificationAllowlist,omitempty"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced. The value cannot be a negative number.
 	// Default: 50
