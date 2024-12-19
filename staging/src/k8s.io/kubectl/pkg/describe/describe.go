@@ -2397,19 +2397,19 @@ func capIndexesListOrNone(indexes string, softLimit int) string {
 
 // CronJobDescriber generates information about a cron job and the jobs it has created.
 type CronJobDescriber struct {
-	client clientset.Interface
+	clientset.Interface
 }
 
 func (d *CronJobDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	cronJob, err := d.client.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	cronJob, err := d.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
 
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(d.client.CoreV1(), cronJob, describerSettings.ChunkSize)
+		events, _ = searchEvents(d.CoreV1(), cronJob, describerSettings.ChunkSize)
 	}
 	return describeCronJob(cronJob, events)
 }
@@ -2594,24 +2594,24 @@ func describeSecret(secret *corev1.Secret) (string, error) {
 }
 
 type IngressDescriber struct {
-	client clientset.Interface
+	 clientset.Interface
 }
 
 func (i *IngressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
 	// try ingress/v1 first (v1.19) and fallback to ingress/v1beta if an err occurs
-	netV1, err := i.client.NetworkingV1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	netV1, err := i.NetworkingV1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
+			events, _ = searchEvents(i.CoreV1(), netV1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressV1(netV1, events)
 	}
-	netV1beta1, err := i.client.NetworkingV1beta1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	netV1beta1, err := i.NetworkingV1beta1().Ingresses(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
+			events, _ = searchEvents(i.CoreV1(), netV1beta1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressV1beta1(netV1beta1, events)
 	}
@@ -2619,13 +2619,13 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings De
 }
 
 func (i *IngressDescriber) describeBackendV1beta1(ns string, backend *networkingv1beta1.IngressBackend) string {
-	endpointSliceList, err := i.client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{
+	endpointSliceList, err := i.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, backend.ServiceName),
 	})
 	if err != nil {
 		return fmt.Sprintf("<error: %v>", err)
 	}
-	service, err := i.client.CoreV1().Services(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
+	service, err := i.CoreV1().Services(ns).Get(context.TODO(), backend.ServiceName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Sprintf("<error: %v>", err)
 	}
@@ -2650,13 +2650,13 @@ func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.In
 
 	if backend.Service != nil {
 		sb := serviceBackendStringer(backend.Service)
-		endpointSliceList, err := i.client.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{
+		endpointSliceList, err := i.DiscoveryV1().EndpointSlices(ns).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, backend.Service.Name),
 		})
 		if err != nil {
 			return fmt.Sprintf("%v (<error: %v>)", sb, err)
 		}
-		service, err := i.client.CoreV1().Services(ns).Get(context.TODO(), backend.Service.Name, metav1.GetOptions{})
+		service, err := i.CoreV1().Services(ns).Get(context.TODO(), backend.Service.Name, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Sprintf("%v (<error: %v>)", sb, err)
 		}
@@ -2682,6 +2682,7 @@ func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.In
 	}
 	return ""
 }
+
 
 func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
@@ -2809,29 +2810,31 @@ func describeIngressTLSV1(w PrefixWriter, ingTLS []networkingv1.IngressTLS) {
 	}
 }
 
+
 type IngressClassDescriber struct {
-	client clientset.Interface
+	clientset.Interface
 }
 
 func (i *IngressClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 	// try IngressClass/v1 first (v1.19) and fallback to IngressClass/v1beta if an err occurs
-	netV1, err := i.client.NetworkingV1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	netV1, err := i.NetworkingV1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1, describerSettings.ChunkSize)
+			events, _ = searchEvents(i.CoreV1(), netV1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressClassV1(netV1, events)
 	}
-	netV1beta1, err := i.client.NetworkingV1beta1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
+	netV1beta1, err := i.NetworkingV1beta1().IngressClasses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(i.client.CoreV1(), netV1beta1, describerSettings.ChunkSize)
+			events, _ = searchEvents(i.CoreV1(), netV1beta1, describerSettings.ChunkSize)
 		}
 		return i.describeIngressClassV1beta1(netV1beta1, events)
 	}
 	return "", err
 }
+
 
 func (i *IngressClassDescriber) describeIngressClassV1beta1(ic *networkingv1beta1.IngressClass, events *corev1.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
@@ -2881,16 +2884,16 @@ func (i *IngressClassDescriber) describeIngressClassV1(ic *networkingv1.IngressC
 
 // ServiceCIDRDescriber generates information about a ServiceCIDR.
 type ServiceCIDRDescriber struct {
-	client clientset.Interface
+	clientset.Interface
 }
 
 func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	svcV1beta1, err := c.client.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	svcV1beta1, err := c.NetworkingV1beta1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), svcV1beta1, describerSettings.ChunkSize)
+			events, _ = searchEvents(c.CoreV1(), svcV1beta1, describerSettings.ChunkSize)
 		}
 		return c.describeServiceCIDRV1beta1(svcV1beta1, events)
 	}
@@ -2928,18 +2931,19 @@ func (c *ServiceCIDRDescriber) describeServiceCIDRV1beta1(svc *networkingv1beta1
 	})
 }
 
+
 // IPAddressDescriber generates information about an IPAddress.
 type IPAddressDescriber struct {
-	client clientset.Interface
+	clientset.Interface
 }
 
 func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
 	var events *corev1.EventList
 
-	ipV1beta1, err := c.client.NetworkingV1beta1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	ipV1beta1, err := c.NetworkingV1beta1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(c.client.CoreV1(), ipV1beta1, describerSettings.ChunkSize)
+			events, _ = searchEvents(c.CoreV1(), ipV1beta1, describerSettings.ChunkSize)
 		}
 		return c.describeIPAddressV1beta1(ipV1beta1, events)
 	}
@@ -3692,7 +3696,7 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 }
 
 type LeaseDescriber struct {
-	client clientset.Interface
+	clientset.Interface
 }
 
 func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList,
@@ -3712,7 +3716,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		w.Write(LEVEL_0, "Unschedulable:\t%v\n", node.Spec.Unschedulable)
 
 		if ld != nil {
-			if lease, err := ld.client.CoordinationV1().Leases(corev1.NamespaceNodeLease).Get(context.TODO(), node.Name, metav1.GetOptions{}); err == nil {
+			if lease, err := ld.CoordinationV1().Leases(corev1.NamespaceNodeLease).Get(context.TODO(), node.Name, metav1.GetOptions{}); err == nil {
 				describeNodeLease(lease, w)
 			} else {
 				w.Write(LEVEL_0, "Lease:\tFailed to get lease: %s\n", err)
@@ -3814,15 +3818,15 @@ func describeNodeLease(lease *coordinationv1.Lease, w PrefixWriter) {
 }
 
 type StatefulSetDescriber struct {
-	client clientset.Interface
+	clientset.Interface
 }
 
 func (p *StatefulSetDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
-	ps, err := p.client.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	ps, err := p.AppsV1().StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
-	pc := p.client.CoreV1().Pods(namespace)
+	pc := p.CoreV1().Pods(namespace)
 
 	selector, err := metav1.LabelSelectorAsSelector(ps.Spec.Selector)
 	if err != nil {
@@ -3836,7 +3840,7 @@ func (p *StatefulSetDescriber) Describe(namespace, name string, describerSetting
 
 	var events *corev1.EventList
 	if describerSettings.ShowEvents {
-		events, _ = searchEvents(p.client.CoreV1(), ps, describerSettings.ChunkSize)
+		events, _ = searchEvents(p.CoreV1(), ps, describerSettings.ChunkSize)
 	}
 
 	return describeStatefulSet(ps, selector, events, running, waiting, succeeded, failed)
@@ -3875,7 +3879,7 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 }
 
 type CertificateSigningRequestDescriber struct {
-	client clientset.Interface
+	 clientset.Interface
 }
 
 func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
@@ -3890,7 +3894,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		events            *corev1.EventList
 	)
 
-	if csr, err := p.client.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+	if csr, err := p.CertificatesV1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 		crBytes = csr.Spec.Request
 		metadata = csr.ObjectMeta
 		conditionTypes := []string{}
@@ -3902,9 +3906,9 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		expirationSeconds = csr.Spec.ExpirationSeconds
 		username = csr.Spec.Username
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
+			events, _ = searchEvents(p.CoreV1(), csr, describerSettings.ChunkSize)
 		}
-	} else if csr, err := p.client.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
+	} else if csr, err := p.CertificatesV1beta1().CertificateSigningRequests().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 		crBytes = csr.Spec.Request
 		metadata = csr.ObjectMeta
 		conditionTypes := []string{}
@@ -3918,7 +3922,7 @@ func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, de
 		expirationSeconds = csr.Spec.ExpirationSeconds
 		username = csr.Spec.Username
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(p.client.CoreV1(), csr, describerSettings.ChunkSize)
+			events, _ = searchEvents(p.CoreV1(), csr, describerSettings.ChunkSize)
 		}
 	} else {
 		return "", err
@@ -3994,7 +3998,7 @@ func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string,
 
 // HorizontalPodAutoscalerDescriber generates information about a horizontal pod autoscaler.
 type HorizontalPodAutoscalerDescriber struct {
-	client clientset.Interface
+	clientset.Interface
 }
 
 func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
@@ -4003,24 +4007,25 @@ func (d *HorizontalPodAutoscalerDescriber) Describe(namespace, name string, desc
 	// autoscaling/v2 is introduced since v1.23 and autoscaling/v1 does not have full backward compatibility
 	// with autoscaling/v2, so describer will try to get and describe hpa v2 object firstly, if it fails,
 	// describer will fall back to do with hpa v1 object
-	hpaV2, err := d.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV2, err := d.AutoscalingV2().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), hpaV2, describerSettings.ChunkSize)
+			events, _ = searchEvents(d.CoreV1(), hpaV2, describerSettings.ChunkSize)
 		}
 		return describeHorizontalPodAutoscalerV2(hpaV2, events, d)
 	}
 
-	hpaV1, err := d.client.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	hpaV1, err := d.AutoscalingV1().HorizontalPodAutoscalers(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err == nil {
 		if describerSettings.ShowEvents {
-			events, _ = searchEvents(d.client.CoreV1(), hpaV1, describerSettings.ChunkSize)
+			events, _ = searchEvents(d.CoreV1(), hpaV1, describerSettings.ChunkSize)
 		}
 		return describeHorizontalPodAutoscalerV1(hpaV1, events, d)
 	}
 
 	return "", err
 }
+
 
 func describeHorizontalPodAutoscalerV2(hpa *autoscalingv2.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
