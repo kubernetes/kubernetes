@@ -333,7 +333,7 @@ func TestManager(t *testing.T) {
 			systemDbus = func() (dbusInhibiter, error) {
 				return fakeDbus, nil
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.LinuxGracefulNodeShutdown, true)
 
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
@@ -439,7 +439,7 @@ func TestFeatureEnabled(t *testing.T) {
 			killPodsFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 				return nil
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.LinuxGracefulNodeShutdown, tc.featureGateEnabled)
 
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
