@@ -18,12 +18,17 @@ package json
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
@@ -51,12 +56,17 @@ func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer ru
 // form. If typer is not nil, the object has the group, version, and kind fields set. Options are copied into the Serializer
 // and are immutable.
 func NewSerializerWithOptions(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, options SerializerOptions) *Serializer {
+	return newSerializerWithOptions(meta, creater, typer, options, utilfeature.DefaultFeatureGate.Enabled(features.StreamingJSONListEncoding))
+}
+
+func newSerializerWithOptions(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, options SerializerOptions, streamingEncoder bool) *Serializer {
 	return &Serializer{
-		meta:       meta,
-		creater:    creater,
-		typer:      typer,
-		options:    options,
-		identifier: identifier(options),
+		meta:             meta,
+		creater:          creater,
+		typer:            typer,
+		options:          options,
+		identifier:       identifier(options),
+		streamingEncoder: streamingEncoder,
 	}
 }
 
@@ -103,6 +113,8 @@ type Serializer struct {
 	typer   runtime.ObjectTyper
 
 	identifier runtime.Identifier
+
+	streamingEncoder bool
 }
 
 // Serializer implements Serializer
@@ -242,8 +254,68 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		_, err = w.Write(data)
 		return err
 	}
+
+	if s.streamingEncoder {
+		typeMeta, listMeta, items, err := meta.GetListMeta(obj)
+		if err == nil {
+			return streamingEncodeList(w, typeMeta, listMeta, items)
+		}
+	}
 	encoder := json.NewEncoder(w)
 	return encoder.Encode(obj)
+}
+
+func streamingEncodeList(w io.Writer, typeMeta v1.TypeMeta, listMeta v1.ListMeta, items []runtime.Object) error {
+	_, err := w.Write([]byte(`{`))
+	if err != nil {
+		return err
+	}
+	if typeMeta.Kind != "" {
+		_, err = w.Write([]byte(fmt.Sprintf(`"kind":%q,`, typeMeta.Kind)))
+		if err != nil {
+			return err
+		}
+	}
+	if typeMeta.APIVersion != "" {
+		_, err = w.Write([]byte(fmt.Sprintf(`"apiVersion":%q,`, typeMeta.APIVersion)))
+		if err != nil {
+			return err
+		}
+	}
+	_, err = w.Write([]byte(`"metadata":`))
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(listMeta)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte(`,"items":[`))
+	if err != nil {
+		return err
+	}
+	for i, item := range items {
+		data, err := json.Marshal(item)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data)
+		if err != nil {
+			return err
+		}
+		if i != len(items)-1 {
+			_, err = w.Write([]byte(","))
+			if err != nil {
+				return err
+			}
+		}
+	}
+	_, err = w.Write([]byte("]}\n"))
+	return err
 }
 
 // IsStrict indicates whether the serializer
