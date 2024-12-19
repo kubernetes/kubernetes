@@ -496,7 +496,7 @@ func ignoreFile(path string, extensions []string) bool {
 func FileVisitorForSTDIN(mapper *mapper, schema ContentValidator) Visitor {
 	return &FileVisitor{
 		Path:          constSTDINstr,
-		StreamVisitor: NewStreamVisitor(nil, mapper, constSTDINstr, schema),
+		StreamVisitor: NewStreamVisitor(nil, mapper, constSTDINstr, schema, WithStrictStreamVisitor()),
 	}
 }
 
@@ -523,7 +523,7 @@ func ExpandPathsToFileVisitors(mapper *mapper, paths string, recursive bool, ext
 
 		visitor := &FileVisitor{
 			Path:          path,
-			StreamVisitor: NewStreamVisitor(nil, mapper, path, schema),
+			StreamVisitor: NewStreamVisitor(nil, mapper, path, schema, WithStrictStreamVisitor()),
 		}
 
 		visitors = append(visitors, visitor)
@@ -571,24 +571,43 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 type StreamVisitor struct {
 	io.Reader
 	*mapper
+	strict bool
 
 	Source string
 	Schema ContentValidator
 }
 
+type streamVisitorOption func(*StreamVisitor)
+
+// WithStrictStreamVisitor will set the stream visitor to be strict
+func WithStrictStreamVisitor() streamVisitorOption {
+	return func(visitor *StreamVisitor) {
+		visitor.strict = true
+	}
+}
+
 // NewStreamVisitor is a helper function that is useful when we want to change the fields of the struct but keep calls the same.
-func NewStreamVisitor(r io.Reader, mapper *mapper, source string, schema ContentValidator) *StreamVisitor {
-	return &StreamVisitor{
+func NewStreamVisitor(r io.Reader, mapper *mapper, source string, schema ContentValidator, opts ...streamVisitorOption) *StreamVisitor {
+	visitor := &StreamVisitor{
 		Reader: r,
 		mapper: mapper,
 		Source: source,
 		Schema: schema,
 	}
+	for _, opt := range opts {
+		opt(visitor)
+	}
+	return visitor
 }
 
 // Visit implements Visitor over a stream. StreamVisitor is able to distinct multiple resources in one stream.
 func (v *StreamVisitor) Visit(fn VisitorFunc) error {
-	d := yaml.NewYAMLOrJSONDecoder(v.Reader, 4096)
+	var d *yaml.YAMLOrJSONDecoder
+	if v.strict {
+		d = yaml.NewYAMLOrJSONDecoder(v.Reader, 4096, yaml.WithStrict())
+	} else {
+		d = yaml.NewYAMLOrJSONDecoder(v.Reader, 4096)
+	}
 	for {
 		ext := runtime.RawExtension{}
 		if err := d.Decode(&ext); err != nil {
