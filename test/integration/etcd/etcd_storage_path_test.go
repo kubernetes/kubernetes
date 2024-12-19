@@ -39,9 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	componentbaseversion "k8s.io/component-base/version"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -75,196 +77,204 @@ var allowMissingTestdataFixtures = map[schema.GroupVersionKind]bool{
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
-	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
-
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
-
-	apiServer := StartRealAPIServerOrDie(t)
-	defer apiServer.Cleanup()
-	defer dumpEtcdKVOnFailure(t, apiServer.KV)
-
-	client := &allClient{dynamicClient: apiServer.Dynamic}
-
-	if _, err := apiServer.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
-		t.Fatal(err)
-	}
-
-	etcdStorageData := GetServedEtcdStorageDataForNamespace("etcdstoragepathtestnamespace")
-
-	kindSeen := sets.NewString()
-	pathSeen := map[string][]schema.GroupVersionResource{}
-	etcdSeen := map[schema.GroupVersionResource]empty{}
-	cohabitatingResources := map[string]map[schema.GroupVersionKind]empty{}
-
-	for _, resourceToPersist := range apiServer.Resources {
-		t.Run(resourceToPersist.Mapping.Resource.String(), func(t *testing.T) {
-			mapping := resourceToPersist.Mapping
-			gvk := resourceToPersist.Mapping.GroupVersionKind
-			gvResource := resourceToPersist.Mapping.Resource
-			kind := gvk.Kind
-
-			if kindAllowList.Has(kind) {
-				kindSeen.Insert(kind)
-				t.Skip("allowlisted")
-			}
-
-			etcdSeen[gvResource] = empty{}
-			testData, hasTest := etcdStorageData[gvResource]
-
-			if !hasTest {
-				t.Fatalf("no test data for %s.  Please add a test for your new type to GetEtcdStorageData().", gvResource)
-			}
-
-			if len(testData.ExpectedEtcdPath) == 0 {
-				t.Fatalf("empty test data for %s", gvResource)
-			}
-
-			shouldCreate := len(testData.Stub) != 0 // try to create only if we have a stub
-
-			var (
-				input *metaObject
-				err   error
-			)
-			if shouldCreate {
-				input = new(metaObject)
-				if err = utiljson.Unmarshal([]byte(testData.Stub), input); err != nil || input.isEmpty() {
-					t.Fatalf("invalid test data for %s: %v", gvResource, err)
-				}
-				// unset type meta fields - we only set these in the CRD test data and it makes
-				// any CRD test with an expectedGVK override fail the DeepDerivative test
-				input.Kind = ""
-				input.APIVersion = ""
-			}
-
-			all := &[]cleanupData{}
-			defer func() {
-				if !t.Failed() { // do not cleanup if test has already failed since we may need things in the etcd dump
-					if err := client.cleanup(all); err != nil {
-						t.Fatalf("failed to clean up etcd: %#v", err)
-					}
-				}
-			}()
-
-			if err := client.createPrerequisites(apiServer.Mapper, testNamespace, testData.Prerequisites, all); err != nil {
-				t.Fatalf("failed to create prerequisites for %s: %#v", gvResource, err)
-			}
-
-			if shouldCreate { // do not try to create items with no stub
-				if err := client.create(testData.Stub, testNamespace, mapping, all); err != nil {
-					t.Fatalf("failed to create stub for %s: %#v", gvResource, err)
-				}
-			}
-
-			// Build a decoder that can decode JSON and CBOR from storage.
-			scheme := runtime.NewScheme()
-			if testData.ExpectedGVK != nil {
-				scheme.AddKnownTypeWithName(*testData.ExpectedGVK, &metaObject{})
+	supportedVersions := GetSupportedEmulatedVersions()
+	for _, v := range supportedVersions {
+		t.Run(v, func(t *testing.T) {
+			if v == componentbaseversion.DefaultKubeBinaryVersion {
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
 			} else {
-				scheme.AddKnownTypeWithName(gvk, &metaObject{})
-
-			}
-			decoder := recognizer.NewDecoder(
-				cbor.NewSerializer(scheme, scheme),
-				json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{}),
-			)
-
-			output, err := getFromEtcd(decoder, apiServer.KV, testData.ExpectedEtcdPath)
-			if err != nil {
-				t.Fatalf("failed to get from etcd for %s: %#v", gvResource, err)
+				// Only test for beta and GA APIs with emulated version.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse(v))
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
 			}
 
-			expectedGVK := gvk
-			if testData.ExpectedGVK != nil {
-				if gvk == *testData.ExpectedGVK {
-					t.Errorf("GVK override %s for %s is unnecessary or something was changed incorrectly", testData.ExpectedGVK, gvk)
-				}
-				expectedGVK = *testData.ExpectedGVK
+			apiServer := StartRealAPIServerOrDie(t)
+			defer apiServer.Cleanup()
+			defer dumpEtcdKVOnFailure(t, apiServer.KV)
+
+			client := &allClient{dynamicClient: apiServer.Dynamic}
+
+			if _, err := apiServer.Client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
 			}
 
-			// if previous releases had a non-alpha version of this group/kind, make sure the storage version is understood by a previous release
-			fixtureFilenameGroup := expectedGVK.Group
-			if fixtureFilenameGroup == "" {
-				fixtureFilenameGroup = "core"
-			}
-			// find all versions of this group/kind in all versions of the serialization fixture testdata
-			releaseGroupKindFiles, err := filepath.Glob("../../../staging/src/k8s.io/api/testdata/*/" + fixtureFilenameGroup + ".*." + expectedGVK.Kind + ".yaml")
-			if err != nil {
-				t.Error(err)
-			}
-			if len(releaseGroupKindFiles) == 0 && !allowMissingTestdataFixtures[expectedGVK] {
-				// We should at least find the HEAD fixtures
-				t.Errorf("No testdata serialization files found for %#v, cannot determine if previous releases could read this group/kind. Add this group-version to k8s.io/api/roundtrip_test.go", expectedGVK)
-			}
+			etcdStorageData := GetEtcdStorageDataForNamespaceAtVersion("etcdstoragepathtestnamespace", v)
 
-			// find non-alpha versions of this group/kind understood by current and previous releases
-			currentNonAlphaVersions := sets.NewString()
-			previousNonAlphaVersions := sets.NewString()
-			for _, previousReleaseGroupKindFile := range releaseGroupKindFiles {
-				parts := strings.Split(filepath.Base(previousReleaseGroupKindFile), ".")
-				version := parts[len(parts)-3]
-				if !strings.Contains(version, "alpha") {
-					if serverVersion := filepath.Base(filepath.Dir(previousReleaseGroupKindFile)); serverVersion == "HEAD" {
-						currentNonAlphaVersions.Insert(version)
-					} else {
-						previousNonAlphaVersions.Insert(version)
+			kindSeen := sets.NewString()
+			pathSeen := map[string][]schema.GroupVersionResource{}
+			etcdSeen := map[schema.GroupVersionResource]empty{}
+			cohabitatingResources := map[string]map[schema.GroupVersionKind]empty{}
+
+			for _, resourceToPersist := range apiServer.Resources {
+				t.Run(resourceToPersist.Mapping.Resource.String(), func(t *testing.T) {
+					mapping := resourceToPersist.Mapping
+					gvk := resourceToPersist.Mapping.GroupVersionKind
+					gvResource := resourceToPersist.Mapping.Resource
+					kind := gvk.Kind
+
+					if kindAllowList.Has(kind) {
+						kindSeen.Insert(kind)
+						t.Skip("allowlisted")
 					}
+
+					etcdSeen[gvResource] = empty{}
+					testData, hasTest := etcdStorageData[gvResource]
+
+					if !hasTest {
+						t.Fatalf("no test data for %s.  Please add a test for your new type to GetEtcdStorageData().", gvResource)
+					}
+
+					if len(testData.ExpectedEtcdPath) == 0 {
+						t.Fatalf("empty test data for %s", gvResource)
+					}
+
+					shouldCreate := len(testData.Stub) != 0 // try to create only if we have a stub
+
+					var (
+						input *metaObject
+						err   error
+					)
+					if shouldCreate {
+						input = new(metaObject)
+						if err = utiljson.Unmarshal([]byte(testData.Stub), input); err != nil || input.isEmpty() {
+							t.Fatalf("invalid test data for %s: %v", gvResource, err)
+						}
+						// unset type meta fields - we only set these in the CRD test data and it makes
+						// any CRD test with an expectedGVK override fail the DeepDerivative test
+						input.Kind = ""
+						input.APIVersion = ""
+					}
+
+					all := &[]cleanupData{}
+					defer func() {
+						if !t.Failed() { // do not cleanup if test has already failed since we may need things in the etcd dump
+							if err := client.cleanup(all); err != nil {
+								t.Fatalf("failed to clean up etcd: %#v", err)
+							}
+						}
+					}()
+
+					if err := client.createPrerequisites(apiServer.Mapper, testNamespace, testData.Prerequisites, all); err != nil {
+						t.Fatalf("failed to create prerequisites for %s: %#v", gvResource, err)
+					}
+
+					if shouldCreate { // do not try to create items with no stub
+						if err := client.create(testData.Stub, testNamespace, mapping, all); err != nil {
+							t.Fatalf("failed to create stub for %s: %#v", gvResource, err)
+						}
+					}
+
+					// Build a decoder that can decode JSON and CBOR from storage.
+					scheme := runtime.NewScheme()
+					if testData.ExpectedGVK != nil {
+						scheme.AddKnownTypeWithName(*testData.ExpectedGVK, &metaObject{})
+					} else {
+						scheme.AddKnownTypeWithName(gvk, &metaObject{})
+
+					}
+					decoder := recognizer.NewDecoder(
+						cbor.NewSerializer(scheme, scheme),
+						json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{}),
+					)
+
+					output, err := getFromEtcd(decoder, apiServer.KV, testData.ExpectedEtcdPath)
+					if err != nil {
+						t.Fatalf("failed to get from etcd for %s: %#v", gvResource, err)
+					}
+
+					expectedGVK := gvk
+					if testData.ExpectedGVK != nil {
+						if gvk == *testData.ExpectedGVK {
+							t.Errorf("GVK override %s for %s is unnecessary or something was changed incorrectly", testData.ExpectedGVK, gvk)
+						}
+						expectedGVK = *testData.ExpectedGVK
+					}
+
+					// if previous releases had a non-alpha version of this group/kind, make sure the storage version is understood by a previous release
+					fixtureFilenameGroup := expectedGVK.Group
+					if fixtureFilenameGroup == "" {
+						fixtureFilenameGroup = "core"
+					}
+					// find all versions of this group/kind in all versions of the serialization fixture testdata
+					releaseGroupKindFiles, err := filepath.Glob("../../../staging/src/k8s.io/api/testdata/*/" + fixtureFilenameGroup + ".*." + expectedGVK.Kind + ".yaml")
+					if err != nil {
+						t.Error(err)
+					}
+					if len(releaseGroupKindFiles) == 0 && !allowMissingTestdataFixtures[expectedGVK] {
+						// We should at least find the HEAD fixtures
+						t.Errorf("No testdata serialization files found for %#v, cannot determine if previous releases could read this group/kind. Add this group-version to k8s.io/api/roundtrip_test.go", expectedGVK)
+					}
+
+					// find non-alpha versions of this group/kind understood by current and previous releases
+					currentNonAlphaVersions := sets.NewString()
+					previousNonAlphaVersions := sets.NewString()
+					for _, previousReleaseGroupKindFile := range releaseGroupKindFiles {
+						parts := strings.Split(filepath.Base(previousReleaseGroupKindFile), ".")
+						version := parts[len(parts)-3]
+						if !strings.Contains(version, "alpha") {
+							if serverVersion := filepath.Base(filepath.Dir(previousReleaseGroupKindFile)); serverVersion == "HEAD" {
+								currentNonAlphaVersions.Insert(version)
+							} else {
+								previousNonAlphaVersions.Insert(version)
+							}
+						}
+					}
+					if len(currentNonAlphaVersions) > 0 && strings.Contains(expectedGVK.Version, "alpha") {
+						t.Errorf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
+							currentNonAlphaVersions.List(),
+							expectedGVK.Version,
+						)
+					}
+					if !strings.Contains(expectedGVK.Version, "alpha") && len(previousNonAlphaVersions) > 0 && !previousNonAlphaVersions.Has(expectedGVK.Version) {
+						t.Errorf("Previous releases understand non-alpha versions %q, but do not understand the expected current non-alpha storage version %q. "+
+							"This means a current server will store data in etcd that is not understood by a previous version.",
+							previousNonAlphaVersions.List(),
+							expectedGVK.Version,
+						)
+					}
+
+					actualGVK := output.GroupVersionKind()
+					if actualGVK != expectedGVK {
+						t.Errorf("GVK for %s does not match, expected %s got %s", kind, expectedGVK, actualGVK)
+					}
+
+					if !apiequality.Semantic.DeepDerivative(input, output) {
+						t.Errorf("Test stub for %s does not match: %s", kind, cmp.Diff(input, output))
+					}
+
+					addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.ExpectedEtcdPath))
+					pathSeen[testData.ExpectedEtcdPath] = append(pathSeen[testData.ExpectedEtcdPath], mapping.Resource)
+				})
+			}
+
+			if inEtcdData, inEtcdSeen := diffMaps(etcdStorageData, etcdSeen); len(inEtcdData) != 0 || len(inEtcdSeen) != 0 {
+				t.Errorf("etcd data does not match the types we saw:\nin etcd data but not seen:\n%s\nseen but not in etcd data:\n%s", inEtcdData, inEtcdSeen)
+			}
+			if inKindData, inKindSeen := diffMaps(kindAllowList, kindSeen); len(inKindData) != 0 || len(inKindSeen) != 0 {
+				t.Errorf("kind allowlist data does not match the types we saw:\nin kind allowlist but not seen:\n%s\nseen but not in kind allowlist:\n%s", inKindData, inKindSeen)
+			}
+
+			for bucket, gvks := range cohabitatingResources {
+				if len(gvks) != 1 {
+					gvkStrings := []string{}
+					for key := range gvks {
+						gvkStrings = append(gvkStrings, keyStringer(key))
+					}
+					t.Errorf("cohabitating resources in etcd bucket %s have inconsistent GVKs\nyou may need to use DefaultStorageFactory.AddCohabitatingResources to sync the GVK of these resources:\n%s", bucket, gvkStrings)
 				}
 			}
-			if len(currentNonAlphaVersions) > 0 && strings.Contains(expectedGVK.Version, "alpha") {
-				t.Errorf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
-					currentNonAlphaVersions.List(),
-					expectedGVK.Version,
-				)
-			}
-			if !strings.Contains(expectedGVK.Version, "alpha") && len(previousNonAlphaVersions) > 0 && !previousNonAlphaVersions.Has(expectedGVK.Version) {
-				t.Errorf("Previous releases understand non-alpha versions %q, but do not understand the expected current non-alpha storage version %q. "+
-					"This means a current server will store data in etcd that is not understood by a previous version.",
-					previousNonAlphaVersions.List(),
-					expectedGVK.Version,
-				)
-			}
 
-			actualGVK := output.GroupVersionKind()
-			if actualGVK != expectedGVK {
-				t.Errorf("GVK for %s does not match, expected %s got %s", kind, expectedGVK, actualGVK)
+			for path, gvrs := range pathSeen {
+				if len(gvrs) != 1 {
+					gvrStrings := []string{}
+					for _, key := range gvrs {
+						gvrStrings = append(gvrStrings, keyStringer(key))
+					}
+					t.Errorf("invalid test data, please ensure all expectedEtcdPath are unique, path %s has duplicate GVRs:\n%s", path, gvrStrings)
+				}
 			}
-
-			if !apiequality.Semantic.DeepDerivative(input, output) {
-				t.Errorf("Test stub for %s does not match: %s", kind, cmp.Diff(input, output))
-			}
-
-			addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.ExpectedEtcdPath))
-			pathSeen[testData.ExpectedEtcdPath] = append(pathSeen[testData.ExpectedEtcdPath], mapping.Resource)
 		})
-	}
-
-	if inEtcdData, inEtcdSeen := diffMaps(etcdStorageData, etcdSeen); len(inEtcdData) != 0 || len(inEtcdSeen) != 0 {
-		t.Errorf("etcd data does not match the types we saw:\nin etcd data but not seen:\n%s\nseen but not in etcd data:\n%s", inEtcdData, inEtcdSeen)
-	}
-	if inKindData, inKindSeen := diffMaps(kindAllowList, kindSeen); len(inKindData) != 0 || len(inKindSeen) != 0 {
-		t.Errorf("kind allowlist data does not match the types we saw:\nin kind allowlist but not seen:\n%s\nseen but not in kind allowlist:\n%s", inKindData, inKindSeen)
-	}
-
-	for bucket, gvks := range cohabitatingResources {
-		if len(gvks) != 1 {
-			gvkStrings := []string{}
-			for key := range gvks {
-				gvkStrings = append(gvkStrings, keyStringer(key))
-			}
-			t.Errorf("cohabitating resources in etcd bucket %s have inconsistent GVKs\nyou may need to use DefaultStorageFactory.AddCohabitatingResources to sync the GVK of these resources:\n%s", bucket, gvkStrings)
-		}
-	}
-
-	for path, gvrs := range pathSeen {
-		if len(gvrs) != 1 {
-			gvrStrings := []string{}
-			for _, key := range gvrs {
-				gvrStrings = append(gvrStrings, keyStringer(key))
-			}
-			t.Errorf("invalid test data, please ensure all expectedEtcdPath are unique, path %s has duplicate GVRs:\n%s", path, gvrStrings)
-		}
 	}
 }
 
