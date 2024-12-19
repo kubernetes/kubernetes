@@ -74,6 +74,14 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage,
 	}, nil
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"va", "vattach"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a VolumeAttachment
 type StatusREST struct {
 	store *genericregistry.Store

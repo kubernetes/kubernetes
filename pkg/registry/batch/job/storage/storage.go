@@ -97,6 +97,14 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"jo"}
+}
+
 func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	//nolint:staticcheck // SA1019 backwards compatibility
 	//nolint: staticcheck

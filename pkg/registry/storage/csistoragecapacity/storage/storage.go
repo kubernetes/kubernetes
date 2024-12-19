@@ -58,3 +58,11 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) (*CSIStorageCapacityStorag
 		CSIStorageCapacity: &REST{store},
 	}, nil
 }
+
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"csc", "csisc"}
+}
