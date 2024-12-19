@@ -194,7 +194,7 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	}
 	historyLen := len(history)
 	historyLimit := int(*set.Spec.RevisionHistoryLimit)
-	if historyLen <= historyLimit {
+	if historyLimit < 0 || historyLen <= historyLimit {
 		return nil
 	}
 	// delete any non-live history to maintain the revision limit.
