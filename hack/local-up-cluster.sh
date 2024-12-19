@@ -134,11 +134,12 @@ ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRa
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
-# START_MODE can be 'all', 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
+# START_MODE can be 'all', 'control-plane', 'worker', 'kubelet', 'kubeproxy'
+# legacy options: 'kubeletonly', 'nokubelet', 'nokubeproxy', or 'nokubelet,nokubeproxy'
 if [[ -z "${START_MODE:-}" ]]; then
     case "$(uname -s)" in
       Darwin)
-        START_MODE=nokubelet,nokubeproxy
+        START_MODE=control-plane
         ;;
       Linux)
         START_MODE=all
@@ -149,6 +150,38 @@ if [[ -z "${START_MODE:-}" ]]; then
         ;;
     esac
 fi
+
+declare -A COMPONENTS
+for mode in ${START_MODE//,/ }; do
+    case "${mode}" in
+    all)
+        COMPONENTS["control-plane"]=true
+        ;&
+    worker)
+        COMPONENTS["kubelet"]=true
+        COMPONENTS["kube-proxy"]=true
+        ;;
+    control-plane)
+        COMPONENTS["control-plane"]=true
+        ;;
+    kubelet|kubeletonly)
+        COMPONENTS["kubelet"]=true
+        ;;
+    kubeproxy)
+        COMPONENTS["kube-proxy"]=true
+        ;;
+    nokubelet)
+        COMPONENTS["kubelet"]=false
+        COMPONENTS["control-plane"]="${COMPONENTS["control-plane"]:-true}"
+        COMPONENTS["kube-proxy"]="${COMPONENTS["kube-proxy"]:-true}"
+        ;;
+    nokubeproxy)
+        COMPONENTS["kube-proxy"]=false
+        COMPONENTS["control-plane"]="${COMPONENTS["control-plane"]:-true}"
+        COMPONENTS["kubelet"]="${COMPONENTS["kubelet"]:-true}"
+        ;;
+    esac
+done
 
 # A list of controllers to enable
 KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
@@ -175,6 +208,21 @@ function usage {
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
             echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi --system-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi\" \\"
             echo "           hack/local-up-cluster.sh (build a local copy of the source with full-pcpus-only CPU Management policy)"
+}
+
+function sudo {
+    if [ "$UID" = "0" ]; then
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --) shift; break;;
+                -*) shift;;
+                *) break;;
+            esac
+        done
+        "$@"
+    else
+        command sudo "$@"
+    fi
 }
 
 # This function guesses where the existing cached binary build is for the `-O`
@@ -217,12 +265,18 @@ do
 done
 
 if [ -z "${GO_OUT}" ]; then
-    binaries_to_build="cmd/kubectl cmd/kube-apiserver cmd/kube-controller-manager cmd/cloud-controller-manager cmd/kube-scheduler"
-    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
-      binaries_to_build="${binaries_to_build} cmd/kubelet"
+    binaries_to_build="cmd/kubectl"
+    if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
+        binaries_to_build+=" cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler"
+        if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]] && [ -z "${EXTERNAL_CLOUD_PROVIDER_BINARY}" ]; then
+            binaries_to_build+=" cmd/cloud-controller-manager"
+        fi
     fi
-    if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
-      binaries_to_build="${binaries_to_build} cmd/kube-proxy"
+    if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
+        binaries_to_build="${binaries_to_build} cmd/kubelet"
+    fi
+    if [[ "${COMPONENTS["kube-proxy"]:-}" == "true" ]]; then
+        binaries_to_build="${binaries_to_build} cmd/kube-proxy"
     fi
     make -C "${KUBE_ROOT}" WHAT="${binaries_to_build}"
 else
@@ -383,15 +437,15 @@ cleanup()
 
   # Check if the API server is still running
   [[ -n "${APISERVER_PID-}" ]] && kube::util::read-array APISERVER_PIDS < <(pgrep -P "${APISERVER_PID}" ; ps -o pid= -p "${APISERVER_PID}")
-  [[ -n "${APISERVER_PIDS-}" ]] && sudo kill "${APISERVER_PIDS[@]}" 2>/dev/null
+  [[ -n "${APISERVER_PIDS-}" ]] && ${CONTROLPLANE_SUDO} kill "${APISERVER_PIDS[@]}" 2>/dev/null
 
   # Check if the controller-manager is still running
   [[ -n "${CTLRMGR_PID-}" ]] && kube::util::read-array CTLRMGR_PIDS < <(pgrep -P "${CTLRMGR_PID}" ; ps -o pid= -p "${CTLRMGR_PID}")
-  [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill "${CTLRMGR_PIDS[@]}" 2>/dev/null
+  [[ -n "${CTLRMGR_PIDS-}" ]] && ${CONTROLPLANE_SUDO} kill "${CTLRMGR_PIDS[@]}" 2>/dev/null
 
   # Check if the cloud-controller-manager is still running
   [[ -n "${CLOUD_CTLRMGR_PID-}" ]] && kube::util::read-array CLOUD_CTLRMGR_PIDS < <(pgrep -P "${CLOUD_CTLRMGR_PID}" ; ps -o pid= -p "${CLOUD_CTLRMGR_PID}")
-  [[ -n "${CLOUD_CTLRMGR_PIDS-}" ]] && sudo kill "${CLOUD_CTLRMGR_PIDS[@]}" 2>/dev/null
+  [[ -n "${CLOUD_CTLRMGR_PIDS-}" ]] && ${CONTROLPLANE_SUDO} kill "${CLOUD_CTLRMGR_PIDS[@]}" 2>/dev/null
 
   # Check if the kubelet is still running
   [[ -n "${KUBELET_PID-}" ]] && kube::util::read-array KUBELET_PIDS < <(pgrep -P "${KUBELET_PID}" ; ps -o pid= -p "${KUBELET_PID}")
@@ -403,7 +457,7 @@ cleanup()
 
   # Check if the scheduler is still running
   [[ -n "${SCHEDULER_PID-}" ]] && kube::util::read-array SCHEDULER_PIDS < <(pgrep -P "${SCHEDULER_PID}" ; ps -o pid= -p "${SCHEDULER_PID}")
-  [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill "${SCHEDULER_PIDS[@]}" 2>/dev/null
+  [[ -n "${SCHEDULER_PIDS-}" ]] && ${CONTROLPLANE_SUDO} kill "${SCHEDULER_PIDS[@]}" 2>/dev/null
 
   # Check if the etcd is still running
   [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
@@ -417,12 +471,12 @@ cleanup()
 # Check if all processes are still running. Prints a warning once each time
 # a process dies unexpectedly.
 function healthcheck {
-  if [[ -n "${APISERVER_PID-}" ]] && ! sudo kill -0 "${APISERVER_PID}" 2>/dev/null; then
+  if [[ -n "${APISERVER_PID-}" ]] && ! ${CONTROLPLANE_SUDO} kill -0 "${APISERVER_PID}" 2>/dev/null; then
     warning_log "API server terminated unexpectedly, see ${APISERVER_LOG}"
     APISERVER_PID=
   fi
 
-  if [[ -n "${CTLRMGR_PID-}" ]] && ! sudo kill -0 "${CTLRMGR_PID}" 2>/dev/null; then
+  if [[ -n "${CTLRMGR_PID-}" ]] && ! ${CONTROLPLANE_SUDO} kill -0 "${CTLRMGR_PID}" 2>/dev/null; then
     warning_log "kube-controller-manager terminated unexpectedly, see ${CTLRMGR_LOG}"
     CTLRMGR_PID=
   fi
@@ -437,12 +491,12 @@ function healthcheck {
     PROXY_PID=
   fi
 
-  if [[ -n "${SCHEDULER_PID-}" ]] && ! sudo kill -0 "${SCHEDULER_PID}" 2>/dev/null; then
+  if [[ -n "${SCHEDULER_PID-}" ]] && ! ${CONTROLPLANE_SUDO} kill -0 "${SCHEDULER_PID}" 2>/dev/null; then
     warning_log "scheduler terminated unexpectedly, see ${SCHEDULER_LOG}"
     SCHEDULER_PID=
   fi
 
-  if [[ -n "${ETCD_PID-}" ]] && ! sudo kill -0 "${ETCD_PID}" 2>/dev/null; then
+  if [[ -n "${ETCD_PID-}" ]] && ! ${CONTROLPLANE_SUDO} kill -0 "${ETCD_PID}" 2>/dev/null; then
     warning_log "etcd terminated unexpectedly"
     ETCD_PID=
   fi
@@ -986,7 +1040,7 @@ EOF
 function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
-    if [[ "${START_MODE}" != *"nokubelet"* ]]; then
+    if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
       # wait for kubelet collect node information
       echo "wait kubelet ready"
       wait_node_ready
@@ -1106,7 +1160,7 @@ function create_storage_class {
 }
 
 function print_success {
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   if [[ "${ENABLE_DAEMON}" = false ]]; then
     echo "Local Kubernetes cluster is running. Press Ctrl-C to shut it down."
   else
@@ -1126,20 +1180,22 @@ Logs:
   ${APISERVER_LOG:-}
   ${CTLRMGR_LOG:-}
   ${CLOUD_CTLRMGR_LOG:-}
-  ${PROXY_LOG:-}
   ${SCHEDULER_LOG:-}
 EOF
 fi
 
-if [[ "${START_MODE}" == "all" ]]; then
+if [[ "${COMPONENTS["kube-proxy"]:-}" == "true" ]]; then
+  echo "  ${PROXY_LOG}"
+fi
+if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
   echo "  ${KUBELET_LOG}"
-elif [[ "${START_MODE}" == *"nokubelet"* ]]; then
+else
   echo
-  echo "No kubelet was started because you set START_MODE=nokubelet"
-  echo "Run this script again with START_MODE=kubeletonly to run a kubelet"
+  echo "No kubelet was enabled in START_MODE"
+  echo "Run this script again with START_MODE=worker to run a kubelet"
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   echo
   if [[ "${ENABLE_DAEMON}" = false ]]; then
     echo "To start using your cluster, you can open up another terminal/tab and run:"
@@ -1202,7 +1258,6 @@ function parse_eviction {
 }
 
 function update_packages {
-  apt-get update && apt-get install -y sudo
   apt-get remove -y systemd
 
   # Do not update docker / containerd / runc
@@ -1360,11 +1415,11 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
 fi
 
 # validate that etcd is: not running, in path, and has minimum required version.
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   kube::etcd::validate
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   test_apiserver_off
 fi
 
@@ -1386,7 +1441,7 @@ fi
 KUBECTL=$(kube::util::find-binary "kubectl")
 
 echo "Starting services now!"
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
+if [[ "${COMPONENTS["control-plane"]:-}" == "true" ]]; then
   start_etcd
   set_service_accounts
   start_apiserver
@@ -1402,7 +1457,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   start_csi_snapshotter
 fi
 
-if [[ "${START_MODE}" != *"nokubelet"* ]]; then
+if [[ "${COMPONENTS["kubelet"]:-}" == "true" ]]; then
   ## TODO remove this check if/when kubelet is supported on darwin
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1420,8 +1475,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
     esac
 fi
 
-if [[ "${START_MODE}" != "kubeletonly" ]]; then
-  if [[ "${START_MODE}" != *"nokubeproxy"* ]]; then
+if [[ "${COMPONENTS["kube-proxy"]:-}" == "true" ]]; then
     ## TODO remove this check if/when kubelet is supported on darwin
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
@@ -1438,7 +1492,6 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kube-proxy aborted."
         ;;
     esac
-  fi
 fi
 
 if [[ "${DEFAULT_STORAGE_CLASS}" = "true" ]]; then
