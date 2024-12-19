@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/lithammer/dedent"
 
@@ -55,7 +54,7 @@ type ServiceHealthServer interface {
 
 type proxyHealthChecker interface {
 	// Health returns the proxy's health state and last updated time.
-	Health() (bool, time.Time)
+	Health() ProxyHealthCheckStatus
 }
 
 func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
@@ -231,13 +230,13 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 	count := svc.endpoints
 	h.hcs.lock.RUnlock()
-	kubeProxyHealthy, _ := h.hcs.healthzServer.Health()
+	status := h.hcs.healthzServer.Health()
 
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	resp.Header().Set("X-Load-Balancing-Endpoint-Weight", strconv.Itoa(count))
 
-	if count != 0 && kubeProxyHealthy {
+	if count != 0 && status.Healthy {
 		resp.WriteHeader(http.StatusOK)
 	} else {
 		resp.WriteHeader(http.StatusServiceUnavailable)
@@ -251,7 +250,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 			"localEndpoints": %d,
 			"serviceProxyHealthy": %v
 		}
-		`, h.name.Namespace, h.name.Name, count, kubeProxyHealthy)), "\n"))
+		`, h.name.Namespace, h.name.Name, count, status.Healthy)), "\n"))
 }
 
 func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {

@@ -142,8 +142,11 @@ type fakeProxyHealthChecker struct {
 	healthy bool
 }
 
-func (fake fakeProxyHealthChecker) Health() (bool, time.Time) {
-	return fake.healthy, time.Now()
+func (fake fakeProxyHealthChecker) Health() ProxyHealthCheckStatus {
+	return ProxyHealthCheckStatus{
+		Healthy:     fake.healthy,
+		LastUpdated: time.Now(),
+	}
 }
 
 func TestServer(t *testing.T) {
