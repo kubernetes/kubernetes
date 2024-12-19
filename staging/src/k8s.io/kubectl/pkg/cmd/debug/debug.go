@@ -131,6 +131,7 @@ type DebugOptions struct {
 	Namespace          string
 	TargetNames        []string
 	PullPolicy         corev1.PullPolicy
+	ImagePullSecret    string
 	Quiet              bool
 	SameNode           bool
 	SetImages          map[string]string
@@ -205,6 +206,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.KeepInitContainers, "keep-init-containers", o.KeepInitContainers, i18n.T("Run the init containers for the pod. Defaults to true.(This flag only works when used with '--copy-to')"))
 	cmd.Flags().StringToStringVar(&o.SetImages, "set-image", o.SetImages, i18n.T("When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works."))
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server."))
+	cmd.Flags().StringVar(&o.ImagePullSecret, "image-pull-secret", o.ImagePullSecret, i18n.T("The image pull secret to use for pulling image of the debug container."))
 	cmd.Flags().BoolVarP(&o.Interactive, "stdin", "i", o.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
 	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, i18n.T("If true, suppress informational messages."))
 	cmd.Flags().BoolVar(&o.SameNode, "same-node", o.SameNode, i18n.T("When used with '--copy-to', schedule the copy of target Pod on the same node."))
@@ -709,6 +711,14 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 		},
 	}
 
+	if len(o.ImagePullSecret) > 0 {
+		p.Spec.ImagePullSecrets = []corev1.LocalObjectReference{
+			{
+				Name: o.ImagePullSecret,
+			},
+		}
+	}
+
 	if o.ArgsOnly {
 		p.Spec.Containers[0].Args = o.Args
 	} else {
@@ -800,6 +810,12 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	}
 	if len(o.PullPolicy) > 0 {
 		c.ImagePullPolicy = o.PullPolicy
+	}
+	if len(o.ImagePullSecret) > 0 {
+		copied.Spec.ImagePullSecrets = append(copied.Spec.ImagePullSecrets,
+			corev1.LocalObjectReference{
+				Name: o.ImagePullSecret,
+			})
 	}
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
