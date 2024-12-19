@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,13 +41,13 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 	client := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0*time.Second)
-	serviceCIDRInformer := informerFactory.Networking().V1beta1().ServiceCIDRs()
+	serviceCIDRInformer := informerFactory.Networking().V1().ServiceCIDRs()
 	serviceCIDRStore := serviceCIDRInformer.Informer().GetIndexer()
-	ipInformer := informerFactory.Networking().V1beta1().IPAddresses()
+	ipInformer := informerFactory.Networking().V1().IPAddresses()
 	ipStore := ipInformer.Informer().GetIndexer()
 
 	client.PrependReactor("create", "servicecidrs", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
-		cidr := action.(k8stesting.CreateAction).GetObject().(*networkingv1beta1.ServiceCIDR)
+		cidr := action.(k8stesting.CreateAction).GetObject().(*networkingv1.ServiceCIDR)
 		_, exists, err := serviceCIDRStore.GetByKey(cidr.Name)
 		if exists && err != nil {
 			return false, nil, fmt.Errorf("cidr already exist")
@@ -59,16 +59,16 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 	client.PrependReactor("delete", "servicecidrs", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		name := action.(k8stesting.DeleteAction).GetName()
 		obj, exists, err := serviceCIDRStore.GetByKey(name)
-		cidr := &networkingv1beta1.ServiceCIDR{}
+		cidr := &networkingv1.ServiceCIDR{}
 		if exists && err == nil {
-			cidr = obj.(*networkingv1beta1.ServiceCIDR)
+			cidr = obj.(*networkingv1.ServiceCIDR)
 			err = serviceCIDRStore.Delete(cidr)
 		}
 		return false, cidr, err
 	}))
 
 	client.PrependReactor("create", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
-		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1beta1.IPAddress)
+		ip := action.(k8stesting.CreateAction).GetObject().(*networkingv1.IPAddress)
 		_, exists, err := ipStore.GetByKey(ip.Name)
 		if exists && err != nil {
 			return false, nil, fmt.Errorf("ip already exist")
@@ -80,15 +80,15 @@ func newTestMetaAllocator() (*MetaAllocator, error) {
 	client.PrependReactor("delete", "ipaddresses", k8stesting.ReactionFunc(func(action k8stesting.Action) (bool, runtime.Object, error) {
 		name := action.(k8stesting.DeleteAction).GetName()
 		obj, exists, err := ipStore.GetByKey(name)
-		ip := &networkingv1beta1.IPAddress{}
+		ip := &networkingv1.IPAddress{}
 		if exists && err == nil {
-			ip = obj.(*networkingv1beta1.IPAddress)
+			ip = obj.(*networkingv1.IPAddress)
 			err = ipStore.Delete(ip)
 		}
 		return false, ip, err
 	}))
 
-	c := newMetaAllocator(client.NetworkingV1beta1(), serviceCIDRInformer, ipInformer, false, nil)
+	c := newMetaAllocator(client.NetworkingV1(), serviceCIDRInformer, ipInformer, false, nil)
 
 	c.serviceCIDRSynced = func() bool { return true }
 	c.ipAddressSynced = func() bool { return true }
@@ -602,18 +602,18 @@ func TestCIDRAllocateDualWriteCollision(t *testing.T) {
 }
 
 // TODO: add IPv6 and dual stack test cases
-func newServiceCIDR(name, cidr string) *networkingv1beta1.ServiceCIDR {
-	return &networkingv1beta1.ServiceCIDR{
+func newServiceCIDR(name, cidr string) *networkingv1.ServiceCIDR {
+	return &networkingv1.ServiceCIDR{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: networkingv1beta1.ServiceCIDRSpec{
+		Spec: networkingv1.ServiceCIDRSpec{
 			CIDRs: []string{cidr},
 		},
-		Status: networkingv1beta1.ServiceCIDRStatus{
+		Status: networkingv1.ServiceCIDRStatus{
 			Conditions: []metav1.Condition{
 				{
-					Type:   string(networkingv1beta1.ServiceCIDRConditionReady),
+					Type:   string(networkingv1.ServiceCIDRConditionReady),
 					Status: metav1.ConditionTrue,
 				},
 			},
