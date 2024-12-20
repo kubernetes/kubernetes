@@ -78,14 +78,14 @@ const (
 	// borrowingAdjustmentPeriod is that period.
 	borrowingAdjustmentPeriod = 10 * time.Second
 
-	// The input to the seat borrowing is smoothed seat demand figures.
+	// The input to the seat borrowing is exponentially smoothed seat demand figures.
 	// This constant controls the decay rate of that smoothing,
 	// as described in the comment on the `seatDemandStats` field of `priorityLevelState`.
 	// The particular number appearing here has the property that half-life
-	// of that decay is 5 minutes.
-	// This is a very preliminary guess at a good value and is likely to be tweaked
-	// once we get some experience with borrowing.
-	seatDemandSmoothingCoefficient = 0.977
+	// of that decay is about 100 seconds.
+	// For a given half-life L, the value here would be 0.5 ** (borrowingAdjustmentPeriod / L).
+	// The half-life was originally set to 5 minutes.
+	seatDemandSmoothingCoefficient = 0.933
 )
 
 // The funcs in this package follow the naming convention that the suffix
