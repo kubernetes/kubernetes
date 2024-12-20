@@ -1168,7 +1168,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			}
 		}
 
-		//if init event is done,move to blockedWatchers
+		// if init event is done,move to blockedWatchers
 		for _, watcher := range c.initBlockedWatchers {
 			if !watcher.appendWaitInitEventTemporary(event) {
 				c.blockedWatchers = append(c.blockedWatchers, watcher)

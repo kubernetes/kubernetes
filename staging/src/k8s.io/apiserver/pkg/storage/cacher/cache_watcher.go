@@ -534,7 +534,7 @@ func (c *cacheWatcher) makeUpInitEvent(ctx context.Context) {
 	c.initEventMutex.Lock()
 	defer c.initEventMutex.Unlock()
 	c.initEventDone = true
-	//TODO other timer
+	// TODO other timer
 	makeUpTimer := time.NewTimer(time.Millisecond * 500)
 	defer func() {
 		if !makeUpTimer.Stop() {
@@ -561,7 +561,7 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 	//   the initialization signal proportionally to the number of events to
 	//   process, but we're leaving this to the tuning phase.
 	utilflowcontrol.WatchInitialized(ctx)
-	//set init event done and make up temporary event
+	// set init event done and make up temporary event
 	go c.makeUpInitEvent(ctx)
 	for {
 		select {
