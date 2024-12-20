@@ -119,7 +119,7 @@ func TestAPIServerMetrics(t *testing.T) {
 	}
 
 	// Make a request to a deprecated API to ensure there's at least one data point
-	if _, err := client.FlowcontrolV1beta3().FlowSchemas().List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if _, err := client.AdmissionregistrationV1beta1().ValidatingAdmissionPolicies().List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
