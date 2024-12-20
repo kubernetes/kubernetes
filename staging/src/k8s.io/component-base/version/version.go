@@ -136,13 +136,13 @@ func (m *effectiveVersion) Validate() []error {
 
 	// emulationVersion can only be 1.{binaryMinor-1}...1.{binaryMinor}.
 	maxEmuVer := binaryVersion
-	minEmuVer := binaryVersion.SubtractMinor(1)
+	minEmuVer := binaryVersion.SubtractMinor(2)
 	if emulationVersion.GreaterThan(maxEmuVer) || emulationVersion.LessThan(minEmuVer) {
 		errs = append(errs, fmt.Errorf("emulation version %s is not between [%s, %s]", emulationVersion.String(), minEmuVer.String(), maxEmuVer.String()))
 	}
 	// minCompatibilityVersion can only be 1.{binaryMinor-1} for alpha.
 	maxCompVer := binaryVersion.SubtractMinor(1)
-	minCompVer := binaryVersion.SubtractMinor(1)
+	minCompVer := binaryVersion.SubtractMinor(2)
 	if minCompatibilityVersion.GreaterThan(maxCompVer) || minCompatibilityVersion.LessThan(minCompVer) {
 		errs = append(errs, fmt.Errorf("minCompatibilityVersion version %s is not between [%s, %s]", minCompatibilityVersion.String(), minCompVer.String(), maxCompVer.String()))
 	}

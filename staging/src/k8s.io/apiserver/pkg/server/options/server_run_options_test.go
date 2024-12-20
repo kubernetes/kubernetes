@@ -197,7 +197,7 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				ComponentName:               testComponent,
 				ComponentGlobalsRegistry:    testRegistry,
 			},
-			expectErr: "emulation version 1.32 is not between [1.29, 1.30.0]",
+			expectErr: "emulation version 1.32 is not between [1.28, 1.30.0]",
 		},
 		{
 			name: "Test when ServerRunOptions is valid",
