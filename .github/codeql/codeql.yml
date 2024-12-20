@@ -2,6 +2,8 @@ name: "CodeQL Advanced"
 
 on:
   # TODO: remove after testing
+  pull_request:
+    branches: ["master"]
   push:
     branches: [ "codeql_onboarding" ]
   schedule:
