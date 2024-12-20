@@ -106,9 +106,13 @@ func (c *client) PathsWithContext(ctx context.Context) (map[string]GroupVersionW
 		return nil, err
 	}
 
+	// Calculate the client-side prefix for a "root" request
+	rootPrefix := strings.TrimSuffix(c.restClient.Get().AbsPath("/").URL().Path, "/")
 	// Create GroupVersions for each element of the result
 	result := make(map[string]GroupVersionWithContext, len(discoMap.Paths))
 	for k, v := range discoMap.Paths {
+		// Trim off the prefix that will always be added in client-side
+		v.ServerRelativeURL = strings.TrimPrefix(v.ServerRelativeURL, rootPrefix)
 		// If the server returned a URL rooted at /openapi/v3, preserve any additional client-side prefix.
 		// If the server returned a URL not rooted at /openapi/v3, treat it as an actual server-relative URL.
 		// See https://github.com/kubernetes/kubernetes/issues/117463 for details

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -176,7 +177,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 	}
 
 	podName := "pod-" + string(uuid.NewUUID())
-	if podConfig.FsGroup == nil && !NodeOSDistroIs("windows") {
+	if podConfig.FsGroup == nil && !framework.NodeOSDistroIs("windows") {
 		podConfig.FsGroup = func(i int64) *int64 {
 			return &i
 		}(1000)

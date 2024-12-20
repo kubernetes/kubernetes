@@ -17,7 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -44,8 +43,7 @@ func TestCreateSparseCerts(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			pkiutiltesting.Reset()
 
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			certstestutil.WritePKIFiles(t, tmpdir, test.Files)
 

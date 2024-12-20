@@ -302,6 +302,14 @@
                 },
                 "optional": true,
                 "path": "pathValue"
+              },
+              "podCertificate": {
+                "signerName": "signerNameValue",
+                "keyType": "keyTypeValue",
+                "maxExpirationSeconds": 3,
+                "credentialBundlePath": "credentialBundlePathValue",
+                "keyPath": "keyPathValue",
+                "certificateChainPath": "certificateChainPathValue"
               }
             }
           ],
@@ -496,6 +504,12 @@
                 "name": "nameValue",
                 "key": "keyValue",
                 "optional": true
+              },
+              "fileKeyRef": {
+                "volumeName": "volumeNameValue",
+                "path": "pathValue",
+                "key": "keyValue",
+                "optional": true
               }
             }
           }
@@ -521,6 +535,17 @@
           }
         ],
         "restartPolicy": "restartPolicyValue",
+        "restartPolicyRules": [
+          {
+            "action": "actionValue",
+            "exitCodes": {
+              "operator": "operatorValue",
+              "values": [
+                2
+              ]
+            }
+          }
+        ],
         "volumeMounts": [
           {
             "name": "nameValue",
@@ -689,7 +714,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -792,6 +818,12 @@
                 "name": "nameValue",
                 "key": "keyValue",
                 "optional": true
+              },
+              "fileKeyRef": {
+                "volumeName": "volumeNameValue",
+                "path": "pathValue",
+                "key": "keyValue",
+                "optional": true
               }
             }
           }
@@ -817,6 +849,17 @@
           }
         ],
         "restartPolicy": "restartPolicyValue",
+        "restartPolicyRules": [
+          {
+            "action": "actionValue",
+            "exitCodes": {
+              "operator": "operatorValue",
+              "values": [
+                2
+              ]
+            }
+          }
+        ],
         "volumeMounts": [
           {
             "name": "nameValue",
@@ -985,7 +1028,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1088,6 +1132,12 @@
                 "name": "nameValue",
                 "key": "keyValue",
                 "optional": true
+              },
+              "fileKeyRef": {
+                "volumeName": "volumeNameValue",
+                "path": "pathValue",
+                "key": "keyValue",
+                "optional": true
               }
             }
           }
@@ -1113,6 +1163,17 @@
           }
         ],
         "restartPolicy": "restartPolicyValue",
+        "restartPolicyRules": [
+          {
+            "action": "actionValue",
+            "exitCodes": {
+              "operator": "operatorValue",
+              "values": [
+                2
+              ]
+            }
+          }
+        ],
         "volumeMounts": [
           {
             "name": "nameValue",
@@ -1281,7 +1342,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1722,13 +1784,16 @@
           "request": "requestValue"
         }
       ]
-    }
+    },
+    "hostnameOverride": "hostnameOverrideValue"
   },
   "status": {
+    "observedGeneration": 17,
     "phase": "phaseValue",
     "conditions": [
       {
         "type": "typeValue",
+        "observedGeneration": 7,
         "status": "statusValue",
         "lastProbeTime": "2003-01-01T01:01:01Z",
         "lastTransitionTime": "2004-01-01T01:01:01Z",
@@ -1841,7 +1906,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "containerStatuses": [
@@ -1933,7 +1999,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "qosClass": "qosClassValue",
@@ -2026,7 +2093,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "resize": "resizeValue",
@@ -2035,6 +2103,16 @@
         "name": "nameValue",
         "resourceClaimName": "resourceClaimNameValue"
       }
-    ]
+    ],
+    "extendedResourceClaimStatus": {
+      "requestMappings": [
+        {
+          "containerName": "containerNameValue",
+          "resourceName": "resourceNameValue",
+          "requestName": "requestNameValue"
+        }
+      ],
+      "resourceClaimName": "resourceClaimNameValue"
+    }
   }
 }

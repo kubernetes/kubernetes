@@ -94,6 +94,8 @@ coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
 discovery.k8s.io/v1 \
 discovery.k8s.io/v1beta1 \
+resource.k8s.io/v1 \
+resource.k8s.io/v1beta2 \
 resource.k8s.io/v1beta1 \
 resource.k8s.io/v1alpha3 \
 extensions/v1beta1 \
@@ -101,7 +103,6 @@ events.k8s.io/v1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
-networking.k8s.io/v1alpha1 \
 networking.k8s.io/v1beta1 \
 node.k8s.io/v1 \
 node.k8s.io/v1alpha1 \

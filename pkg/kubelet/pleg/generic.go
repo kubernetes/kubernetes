@@ -76,8 +76,6 @@ type GenericPLEG struct {
 	runningMu sync.Mutex
 	// Indicates relisting related parameters
 	relistDuration *RelistDuration
-	// Mutex to serialize updateCache called by relist vs UpdateCache interface
-	podCacheMutex sync.Mutex
 	// logger is used for contextual logging
 	logger klog.Logger
 	// watchConditions tracks pod watch conditions, guarded by watchConditionsLock
@@ -444,8 +442,6 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		return nil, true, nil
 	}
 
-	g.podCacheMutex.Lock()
-	defer g.podCacheMutex.Unlock()
 	timestamp := g.clock.Now()
 
 	status, err := g.runtime.GetPodStatus(ctx, pod.ID, pod.Name, pod.Namespace)

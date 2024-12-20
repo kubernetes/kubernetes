@@ -46,7 +46,7 @@ func (g *Group) done() {
 // returns a non-nil error or the first time Wait returns, whichever occurs
 // first.
 func WithContext(ctx context.Context) (*Group, context.Context) {
-	ctx, cancel := withCancelCause(ctx)
+	ctx, cancel := context.WithCancelCause(ctx)
 	return &Group{cancel: cancel}, ctx
 }
 
@@ -118,6 +118,7 @@ func (g *Group) TryGo(f func() error) bool {
 
 // SetLimit limits the number of active goroutines in this group to at most n.
 // A negative value indicates no limit.
+// A limit of zero will prevent any new goroutines from being added.
 //
 // Any subsequent call to the Go method will block until it can add an active
 // goroutine without exceeding the configured limit.

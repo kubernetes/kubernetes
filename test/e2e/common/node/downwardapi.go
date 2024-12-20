@@ -20,18 +20,21 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Downward API", func() {
@@ -412,6 +415,164 @@ var _ = SIGDescribe("Downward API", framework.WithSerial(), framework.WithDisrup
 		})
 	})
 
+})
+
+var _ = SIGDescribe("Downward API", feature.PodLevelResources, framework.WithFeatureGate(features.PodLevelResources), func() {
+	f := framework.NewDefaultFramework("downward-api")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+	ginkgo.Context("Downward API tests for pod level resources", func() {
+		ginkgo.It("should provide default limits.cpu/memory from pod level resources", func(ctx context.Context) {
+			podName := "downward-api-" + string(uuid.NewUUID())
+			env := []v1.EnvVar{
+				{
+					Name: "CPU_LIMIT",
+					ValueFrom: &v1.EnvVarSource{
+						ResourceFieldRef: &v1.ResourceFieldSelector{
+							Resource: "limits.cpu",
+						},
+					},
+				},
+				{
+					Name: "MEMORY_LIMIT",
+					ValueFrom: &v1.EnvVarSource{
+						ResourceFieldRef: &v1.ResourceFieldSelector{
+							Resource: "limits.memory",
+						},
+					},
+				},
+			}
+
+			expectations := []string{
+				// Although the CPU limit for Pod Level Resources is set to 1250m (which would be 1.25),
+				// the Downward API uses convertResourceCPUToString to convert the value to a string,
+				// and this function rounds up the decimal, resulting in 2 here.
+				// https://github.com/kubernetes/kubernetes/blob/49cd87182cac80a4f3d29e2e65e80c8f88e890da/pkg/api/v1/resource/helpers.go#L148-L153
+				"CPU_LIMIT=2",
+				"MEMORY_LIMIT=67108864",
+			}
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   podName,
+					Labels: map[string]string{"name": podName},
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("1250m"),
+							v1.ResourceMemory: resource.MustParse("64Mi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "dapi-container",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"sh", "-c", "env"},
+							Env:     env,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+			testDownwardAPIUsingPod(ctx, f, pod, env, expectations)
+		})
+
+		ginkgo.It("should provide default limits.cpu/memory from pod level resources or node allocatable", func(ctx context.Context) {
+			podName := "downward-api-" + string(uuid.NewUUID())
+			cName := "dapi-container"
+			env := []v1.EnvVar{
+				{
+					Name: "CPU_LIMIT",
+					ValueFrom: &v1.EnvVarSource{
+						ResourceFieldRef: &v1.ResourceFieldSelector{
+							Resource: "limits.cpu",
+						},
+					},
+				},
+				{
+					Name: "MEMORY_LIMIT",
+					ValueFrom: &v1.EnvVarSource{
+						ResourceFieldRef: &v1.ResourceFieldSelector{
+							Resource: "limits.memory",
+						},
+					},
+				},
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   podName,
+					Labels: map[string]string{"name": podName},
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("1250m"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name:    cName,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+							Command: []string{"sh", "-c", "env"},
+							Env:     env,
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+
+			// Before the Pod Level Resources feature was introduced, if container-level
+			// resource limits were not set, the Downward API would return the node's
+			// allocatable resources instead of 0. So, it was sufficient to simply check
+			// that the value set in the environment variable was non-zero.
+			// However, after the Pod Level Resources feature was introduced, the node's
+			// allocatable resources are used as a fallback when pod-level resource limits
+			// are not specified. Therefore, we now need to verify that the value
+			// in the environment variable matches the node's allocatable resources.
+			// Because we need to dynamically retrieve the node's allocatable resources,
+			// we cannot simply use e2epodoutput.TestContainerOutputRegexp here.
+			podClient := e2epod.NewPodClient(f)
+			createdPod := podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				ginkgo.By("delete the pods")
+				podClient.DeleteSync(ctx, createdPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			})
+
+			// Wait for client pod to complete.
+			err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
+			framework.ExpectNoError(err)
+
+			// Grab its logs.  Get host first.
+			podStatus, err := podClient.Get(ctx, createdPod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			// Get the node allocatable resources
+			nodeName := podStatus.Spec.NodeName
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			// Prepare expectations based on node allocatable resources
+			expectations := []string{
+				// Although the CPU limit for Pod Level Resources is set to 1250m (which would be 1.25),
+				// the Downward API uses convertResourceCPUToString to convert the value to a string,
+				// and this function rounds up the decimal, resulting in 2 here.
+				// https://github.com/kubernetes/kubernetes/blob/49cd87182cac80a4f3d29e2e65e80c8f88e890da/pkg/api/v1/resource/helpers.go#L148-L153
+				"CPU_LIMIT=2",
+				fmt.Sprintf("MEMORY_LIMIT=%d", node.Status.Allocatable.Memory().Value()),
+			}
+
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, cName)
+			framework.ExpectNoError(err)
+
+			ginkgo.By(fmt.Sprintf("Checking logs from node %s pod %s container %s", nodeName, podStatus.Name, cName))
+			for _, expected := range expectations {
+				m := gomega.MatchRegexp(expected)
+				matches, err := m.Match(logs)
+				framework.ExpectNoError(err)
+				gomega.Expect(matches).To(gomega.BeTrueBecause("expected %q in container output: %s", expected, logs))
+			}
+		})
+	})
 })
 
 func testDownwardAPI(ctx context.Context, f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {

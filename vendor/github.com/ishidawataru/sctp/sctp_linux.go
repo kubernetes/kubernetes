@@ -1,4 +1,6 @@
+//go:build linux && !386
 // +build linux,!386
+
 // Copyright 2019 Wataru Ishida. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,10 +21,10 @@ package sctp
 import (
 	"io"
 	"net"
+	"runtime"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
-	"runtime"
 )
 
 func setsockopt(fd int, optname, optval, optlen uintptr) (uintptr, uintptr, error) {
@@ -172,11 +174,11 @@ func ListenSCTP(net string, laddr *SCTPAddr) (*SCTPListener, error) {
 
 // ListenSCTPExt - start listener on specified address/port with given SCTP options
 func ListenSCTPExt(network string, laddr *SCTPAddr, options InitMsg) (*SCTPListener, error) {
-	return listenSCTPExtConfig(network, laddr, options, nil)
+	return listenSCTPExtConfig(network, laddr, options, nil, nil)
 }
 
 // listenSCTPExtConfig - start listener on specified address/port with given SCTP options and socket configuration
-func listenSCTPExtConfig(network string, laddr *SCTPAddr, options InitMsg, control func(network, address string, c syscall.RawConn) error) (*SCTPListener, error) {
+func listenSCTPExtConfig(network string, laddr *SCTPAddr, options InitMsg, control func(network, address string, c syscall.RawConn) error, notificationHandler NotificationHandler) (*SCTPListener, error) {
 	af, ipv6only := favoriteAddrFamily(network, laddr, nil, "listen")
 	sock, err := syscall.Socket(
 		af,
@@ -198,7 +200,11 @@ func listenSCTPExtConfig(network string, laddr *SCTPAddr, options InitMsg, contr
 	}
 	if control != nil {
 		rc := rawConn{sockfd: sock}
-		if err = control(network, laddr.String(), rc); err != nil {
+		var localAddressString string
+		if laddr != nil {
+			localAddressString = laddr.String()
+		}
+		if err = control(network, localAddressString, rc); err != nil {
 			return nil, err
 		}
 	}
@@ -226,14 +232,16 @@ func listenSCTPExtConfig(network string, laddr *SCTPAddr, options InitMsg, contr
 		return nil, err
 	}
 	return &SCTPListener{
-		fd: sock,
-	}, nil
+			fd:                  sock,
+			notificationHandler: notificationHandler,
+		},
+		nil
 }
 
 // AcceptSCTP waits for and returns the next SCTP connection to the listener.
 func (ln *SCTPListener) AcceptSCTP() (*SCTPConn, error) {
 	fd, _, err := syscall.Accept4(ln.fd, 0)
-	return NewSCTPConn(fd, nil), err
+	return NewSCTPConn(fd, ln.notificationHandler), err
 }
 
 // Accept waits for and returns the next connection connection to the listener.
@@ -253,11 +261,11 @@ func DialSCTP(net string, laddr, raddr *SCTPAddr) (*SCTPConn, error) {
 
 // DialSCTPExt - same as DialSCTP but with given SCTP options
 func DialSCTPExt(network string, laddr, raddr *SCTPAddr, options InitMsg) (*SCTPConn, error) {
-	return dialSCTPExtConfig(network, laddr, raddr, options, nil)
+	return dialSCTPExtConfig(network, laddr, raddr, options, nil, nil)
 }
 
 // dialSCTPExtConfig - same as DialSCTP but with given SCTP options and socket configuration
-func dialSCTPExtConfig(network string, laddr, raddr *SCTPAddr, options InitMsg, control func(network, address string, c syscall.RawConn) error) (*SCTPConn, error) {
+func dialSCTPExtConfig(network string, laddr, raddr *SCTPAddr, options InitMsg, control func(network, address string, c syscall.RawConn) error, notificationHandler NotificationHandler) (*SCTPConn, error) {
 	af, ipv6only := favoriteAddrFamily(network, laddr, raddr, "dial")
 	sock, err := syscall.Socket(
 		af,
@@ -279,7 +287,11 @@ func dialSCTPExtConfig(network string, laddr, raddr *SCTPAddr, options InitMsg, 
 	}
 	if control != nil {
 		rc := rawConn{sockfd: sock}
-		if err = control(network, laddr.String(), rc); err != nil {
+		var localAddressString string
+		if laddr != nil {
+			localAddressString = laddr.String()
+		}
+		if err = control(network, localAddressString, rc); err != nil {
 			return nil, err
 		}
 	}
@@ -305,5 +317,5 @@ func dialSCTPExtConfig(network string, laddr, raddr *SCTPAddr, options InitMsg, 
 	if err != nil {
 		return nil, err
 	}
-	return NewSCTPConn(sock, nil), nil
+	return NewSCTPConn(sock, notificationHandler), nil
 }

@@ -25,15 +25,20 @@ import (
 	"net"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/Microsoft/hnslib/hcn"
+	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	fakehcn "k8s.io/kubernetes/pkg/proxy/winkernel/testing"
 	netutils "k8s.io/utils/net"
@@ -41,7 +46,7 @@ import (
 )
 
 const (
-	testHostName      = "test-hostname"
+	testNodeName      = "test-node"
 	testNetwork       = "TestNetwork"
 	ipAddress         = "10.0.0.1"
 	prefixLen         = 24
@@ -83,8 +88,38 @@ func newHnsNetwork(networkInfo *hnsNetworkInfo) *hcn.HostComputeNetwork {
 	return network
 }
 
-func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, hostname string, nodeIP net.IP, networkType string) *Proxier {
+func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType string, enableDSR bool) *Proxier {
 	sourceVip := "192.168.1.2"
+
+	// enable `WinDSR` feature gate
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WinDSR, true)
+
+	config := config.KubeProxyWinkernelConfiguration{
+		SourceVip:             sourceVip,
+		EnableDSR:             enableDSR,
+		NetworkName:           testNetwork,
+		ForwardHealthCheckVip: true,
+	}
+
+	hcnMock := getHcnMock(networkType)
+
+	proxier, _ := newProxierInternal(
+		v1.IPv4Protocol,
+		nodeName,
+		nodeIP,
+		healthcheck.NewFakeServiceHealthServer(),
+		nil,
+		0,
+		hcnMock,
+		&testHostMacProvider{macAddress: macAddress},
+		config,
+		false,
+	)
+
+	return proxier
+}
+
+func getHcnMock(networkType string) *fakehcn.HcnMock {
 	var remoteSubnets []*remoteSubnetInfo
 	rs := &remoteSubnetInfo{
 		destinationPrefix: destinationPrefix,
@@ -101,37 +136,11 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, hostn
 	}
 	hnsNetwork := newHnsNetwork(hnsNetworkInfo)
 	hcnMock := fakehcn.NewHcnMock(hnsNetwork)
-	proxier := &Proxier{
-		svcPortMap:          make(proxy.ServicePortMap),
-		endpointsMap:        make(proxy.EndpointsMap),
-		hostname:            testHostName,
-		nodeIP:              nodeIP,
-		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
-		network:             *hnsNetworkInfo,
-		sourceVip:           sourceVip,
-		hostMac:             macAddress,
-		isDSR:               false,
-		hns: &hns{
-			hcn: hcnMock,
-		},
-		hcn:                   hcnMock,
-		endPointsRefCount:     make(endPointsReferenceCountMap),
-		forwardHealthCheckVip: true,
-		mapStaleLoadbalancers: make(map[string]bool),
-		terminatedEndpoints:   make(map[string]bool),
-	}
-
-	serviceChanges := proxy.NewServiceChangeTracker(v1.IPv4Protocol, proxier.newServiceInfo, proxier.serviceMapChange)
-	endpointChangeTracker := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, hostname, proxier.newEndpointInfo, proxier.endpointsMapChange)
-	proxier.endpointsChanges = endpointChangeTracker
-	proxier.serviceChanges = serviceChanges
-
-	return proxier
+	return hcnMock
 }
 
 func TestCreateServiceVip(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -184,8 +193,7 @@ func TestCreateServiceVip(t *testing.T) {
 }
 
 func TestCreateRemoteEndpointOverlay(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -249,8 +257,7 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 }
 
 func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -310,9 +317,104 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 }
+
+func TestDsrEndpointsAreCreatedCorrectly(t *testing.T) {
+	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "ClusterIP"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointInfo)
+	if !ok {
+		t.Errorf("Failed to cast endpointInfo %q", svcPortName.String())
+	}
+
+	if epInfo.hnsID == "" {
+		t.Errorf("Expected HNS ID to be set for endpoint %s, but got empty value", epIpAddressRemote)
+	}
+}
+
+func TestDsrNotAppliedToClusterTrafficPolicy(t *testing.T) {
+	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "ClusterIP"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyCluster
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	}
+
+	if svcInfo.localTrafficDSR {
+		t.Errorf("Expected localTrafficDSR to be false for ExternalTrafficPolicy=Cluster, but got true")
+	}
+}
+
 func TestSharedRemoteEndpointDelete(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -453,8 +555,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	}
 }
 func TestSharedRemoteEndpointUpdate(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -626,9 +727,9 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[endpointGuid1], *epInfo.refCount)
 	}
 }
-func TestCreateLoadBalancer(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+
+func TestCreateLoadBalancerWithoutDSR(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -676,16 +777,97 @@ func TestCreateLoadBalancer(t *testing.T) {
 	if !ok {
 		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
 
-	} else {
-		if svcInfo.hnsID != loadbalancerGuid1 {
-			t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
-		}
+	}
+
+	if svcInfo.hnsID != loadbalancerGuid1 {
+		t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
+	}
+
+	lb, err := proxier.hcn.GetLoadBalancerByID(svcInfo.hnsID)
+	if err != nil {
+		t.Errorf("Failed to fetch loadbalancer: %v", err)
+	}
+
+	if lb == nil {
+		t.Errorf("Failed to fetch loadbalancer: %v", err)
+	}
+
+	if lb.Flags != hcn.LoadBalancerFlagsNone {
+		t.Errorf("Incorrect loadbalancer flags. Current value: %v", lb.Flags)
+	}
+}
+
+func TestCreateLoadBalancerWithDSR(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	if proxier == nil {
+		t.Error()
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+		}),
+	)
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName.Port),
+				Port:     ptr.To(int32(svcPort)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	}
+
+	if svcInfo.hnsID != loadbalancerGuid1 {
+		t.Errorf("%v does not match %v", svcInfo.hnsID, loadbalancerGuid1)
+	}
+
+	lb, err := proxier.hcn.GetLoadBalancerByID(svcInfo.hnsID)
+	if err != nil {
+		t.Errorf("Failed to fetch loadbalancer: %v", err)
+	}
+
+	if lb == nil {
+		t.Errorf("Failed to fetch loadbalancer: %v", err)
+	}
+
+	if lb.Flags != hcn.LoadBalancerFlagsDSR {
+		t.Errorf("Incorrect loadbalancer flags. Current value: %v", lb.Flags)
 	}
 }
 
 func TestUpdateLoadBalancerWhenSupported(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -826,8 +1008,7 @@ func TestUpdateLoadBalancerWhenSupported(t *testing.T) {
 }
 
 func TestUpdateLoadBalancerWhenUnsupported(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -969,8 +1150,7 @@ func TestUpdateLoadBalancerWhenUnsupported(t *testing.T) {
 }
 
 func TestCreateDsrLoadBalancer(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1006,7 +1186,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIpAddressRemote},
-				NodeName:  ptr.To("testhost"),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -1037,7 +1217,8 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		}
 		if len(svcInfo.loadBalancerIngressIPs) == 0 {
 			t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
-		} else if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != "LBID-4" {
+		}
+		if svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID != "LBID-4" {
 			t.Errorf("The Hns Loadbalancer HealthCheck Id %v does not match %v. ServicePortName %q", svcInfo.loadBalancerIngressIPs[0].healthCheckHnsID, loadbalancerGuid1, svcPortName.String())
 		}
 	}
@@ -1047,8 +1228,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 // syncproxyrules only creates ClusterIP Loadbalancer and no NodePort, External IP or IngressIP
 // loadbalancers will be created.
 func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 
 	if proxier == nil {
 		t.Error()
@@ -1127,9 +1307,76 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 	}
 }
 
+func TestEndpointSliceWithInternalPortDifferentFromServicePort(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	assert.NotNil(t, proxier, "Failed to create proxier")
+
+	proxier.servicesSynced = true
+	proxier.endpointSlicesSynced = true
+
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	svcSpec := v1.ServiceSpec{
+		ClusterIP: "172.20.1.1",
+		Selector:  map[string]string{"foo": "bar"},
+		Ports: []v1.ServicePort{
+			{Name: svcPortName.Port, Port: 80, TargetPort: intstr.FromInt32(80), Protocol: v1.ProtocolTCP}, // Mocking TargetPort as to same as service port (80)
+		},
+	}
+
+	proxier.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: svcPortName.Name, Namespace: svcPortName.Namespace},
+		Spec:       svcSpec,
+	})
+
+	// Add initial endpoint slice
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", svcPortName.Name),
+			Namespace: svcPortName.Namespace,
+			Labels:    map[string]string{discovery.LabelServiceName: svcPortName.Name},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     &svcPortName.Port,
+			Port:     ptr.To[int32](8080), // Using container port 8080 which is different from service port 80
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"192.168.2.3"},
+			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
+			NodeName:   ptr.To("testhost2"),
+		}},
+	}
+
+	proxier.OnEndpointSliceAdd(endpointSlice)
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Failed to cast serviceInfo %q", svcPortName.String())
+	assert.Equal(t, svcInfo.hnsID, loadbalancerGuid1, "The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, loadbalancerGuid1, svcPortName.String())
+
+	lb, err := proxier.hcn.GetLoadBalancerByID(svcInfo.hnsID)
+	assert.Equal(t, nil, err, "Failed to fetch loadbalancer: %v", err)
+	assert.NotEqual(t, nil, lb, "Loadbalancer object should not be nil")
+	assert.Equal(t, len(lb.PortMappings), 1, "PortMappings should have one and only one entry")
+	assert.Equal(t, lb.PortMappings[0].InternalPort, uint16(8080), "InternalPort should be 8080")
+	assert.Equal(t, lb.PortMappings[0].ExternalPort, uint16(80), "ExternalPort should be 80")
+
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointInfo)
+	assert.True(t, ok, "Failed to cast endpointInfo %q", svcPortName.String())
+	assert.Equal(t, epInfo.hnsID, "EPID-3", "Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, endpointGuid1, svcPortName.String())
+}
+
 func TestEndpointSlice(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1201,6 +1448,7 @@ func TestEndpointSlice(t *testing.T) {
 
 func TestNoopEndpointSlice(t *testing.T) {
 	p := Proxier{}
+	p.endpointsChanges = proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "", nil, nil)
 	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
 	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
 	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
@@ -1208,8 +1456,7 @@ func TestNoopEndpointSlice(t *testing.T) {
 }
 
 func TestFindRemoteSubnetProviderAddress(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1231,6 +1478,49 @@ func TestFindRemoteSubnetProviderAddress(t *testing.T) {
 
 	if len(pa) != 0 {
 		t.Errorf("Provider address is not empty as expected")
+	}
+}
+
+func TestWinDSRWithOverlayEnabled(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	if proxier == nil {
+		t.Error("Failed to create proxier")
+	}
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3001
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "ClusterIP"
+			svc.Spec.ClusterIP = svcIP
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(svcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc := proxier.svcPortMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	}
+
+	if !svcInfo.localTrafficDSR {
+		t.Errorf("Expected localTrafficDSR to be enabled but got false")
 	}
 }
 
@@ -1297,4 +1587,12 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 	}
 	epsFunc(eps)
 	return eps
+}
+
+type testHostMacProvider struct {
+	macAddress string
+}
+
+func (r *testHostMacProvider) GetHostMac(nodeIP net.IP) string {
+	return r.macAddress
 }

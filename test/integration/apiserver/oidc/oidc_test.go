@@ -22,6 +22,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -33,6 +34,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,16 +49,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	authenticationconfigmetrics "k8s.io/apiserver/pkg/server/options/authenticationconfig/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -78,6 +77,12 @@ const (
 	defaultStubAccessToken  = "_fake_access_token_"
 
 	rsaKeyBitSize = 2048
+)
+
+var (
+	// testServerMutex serializes test server starts to prevent data races
+	// in admission plugin flag registration
+	testServerMutex sync.Mutex
 )
 
 var (
@@ -121,6 +126,7 @@ type apiServerOIDCConfig struct {
 	oidcUsernamePrefix       string
 	oidcUsernameClaim        string
 	authenticationConfigYAML string
+	needsEgressProxyOnStart  bool
 }
 
 func TestOIDC(t *testing.T) {
@@ -129,8 +135,6 @@ func TestOIDC(t *testing.T) {
 }
 
 func TestStructuredAuthenticationConfig(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	t.Log("Testing OIDC authenticator with authentication config")
 	runTests(t, true)
 }
@@ -152,7 +156,7 @@ func runTests(t *testing.T, useAuthenticationConfig bool) {
 
 				if useAuthenticationConfig {
 					authenticationConfig := fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1beta1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -285,7 +289,7 @@ jwt:
 
 				if useAuthenticationConfig {
 					authenticationConfig := fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -349,7 +353,7 @@ jwt:
 
 				if useAuthenticationConfig {
 					authenticationConfig := fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -472,7 +476,7 @@ func singleTestRunner[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](
 		if useAuthenticationConfig {
 			fn = func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -572,8 +576,6 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 }
 
 func TestStructuredAuthenticationConfigCEL(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	type testRun[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey] struct {
 		name                    string
 		authConfigFn            authenticationConfigFunc
@@ -602,7 +604,7 @@ func TestStructuredAuthenticationConfigCEL(t *testing.T) {
 			name: "username CEL expression is ok",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -652,7 +654,7 @@ jwt:
 			name: "groups CEL expression is ok",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -701,7 +703,7 @@ jwt:
 			name: "claim validation rule fails",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -746,7 +748,7 @@ jwt:
 			name: "extra mapping CEL expressions are ok",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -807,7 +809,7 @@ jwt:
 			name: "uid CEL expression is ok",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -856,7 +858,7 @@ jwt:
 			name: "user validation rule fails",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -905,7 +907,7 @@ jwt:
 			name: "multiple audiences check with claim validation rule is ok",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -957,7 +959,7 @@ jwt:
 			name: "non-string jti claim doesn't result in authentication error",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -985,6 +987,52 @@ jwt:
 						"aud": defaultOIDCClientID,
 						"exp": time.Now().Add(idTokenLifetime).Unix(),
 						"jti": 1234,
+					},
+					defaultStubAccessToken,
+					defaultStubRefreshToken,
+				)).Times(1)
+			},
+			configureClient: configureClientFetchingOIDCCredentials,
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+		},
+		{
+			name: "egress proxy is ok",
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    egressSelectorType: cluster
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			configureInfrastructure: configureTestInfrastructureWithEgressProxy[*rsa.PrivateKey, *rsa.PublicKey],
+			configureOIDCServerBehaviour: func(t *testing.T, oidcServer *utilsoidc.TestServer, signingPrivateKey *rsa.PrivateKey) {
+				idTokenLifetime := time.Second * 1200
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+					t,
+					signingPrivateKey,
+					map[string]interface{}{
+						"iss": oidcServer.URL(),
+						"sub": defaultOIDCClaimedUsername,
+						"aud": defaultOIDCClientID,
+						"exp": time.Now().Add(idTokenLifetime).Unix(),
 					},
 					defaultStubAccessToken,
 					defaultStubRefreshToken,
@@ -1036,11 +1084,10 @@ func TestStructuredAuthenticationConfigReload(t *testing.T) {
 	t.Cleanup(func() { options.UpdateAuthenticationConfigTimeout = origUpdateAuthenticationConfigTimeout })
 	options.UpdateAuthenticationConfigTimeout = 2 * hardCodedTokenCacheTTLAndPollInterval // needs to be large enough for polling to run multiple times
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	tests := []struct {
 		name                          string
 		authConfigFn, newAuthConfigFn authenticationConfigFunc
+		configureTestInfrastructure   func(t *testing.T, fn authenticationConfigFunc) (*utilsoidc.TestServer, *kubeapiserverapptesting.TestServer, []byte, string)
 		assertErrFn, newAssertErrFn   func(t *testing.T, errorToCheck error)
 		wantUser, newWantUser         *authenticationv1.UserInfo
 		ignoreTransitionErrFn         func(error) bool
@@ -1051,7 +1098,7 @@ func TestStructuredAuthenticationConfigReload(t *testing.T) {
 			name: "old valid config to new valid config",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1069,7 +1116,7 @@ jwt:
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1107,19 +1154,104 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
+			},
+		},
+		{
+			name: "old to new config with egress", // both configs are valid, but need to keep the test name short otherwise the UDS name can get too long on macOS
+			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'k8s-' + claims.sub"
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
+				return fmt.Sprintf(`
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: %s
+    egressSelectorType: cluster   # this is a new part of the config
+    audiences:
+    - %s
+    - another-audience
+    audienceMatchPolicy: MatchAny
+    certificateAuthority: |
+        %s
+  claimMappings:
+    username:
+      expression: "'panda-' + claims.sub"   # this is a new part of the config
+`, issuerURL, defaultOIDCClientID, indentCertificateAuthority(caCert))
+			},
+			configureTestInfrastructure: func(t *testing.T, fn authenticationConfigFunc) (*utilsoidc.TestServer, *kubeapiserverapptesting.TestServer, []byte, string) {
+				t.Helper()
+
+				oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath := configureTestInfrastructureWithEgressProxy(t, fn, ecdsaGenerateKey)
+
+				oidcServer.TokenHandler().EXPECT().Token().RunAndReturn(utilsoidc.TokenHandlerBehaviorReturningPredefinedJWT(
+					t,
+					signingPrivateKey,
+					map[string]interface{}{
+						"iss": oidcServer.URL(),
+						"sub": defaultOIDCClaimedUsername,
+						"aud": defaultOIDCClientID,
+						"exp": time.Now().Add(10 * time.Minute).Unix(),
+					},
+					defaultStubAccessToken,
+					defaultStubRefreshToken,
+				)).Times(1)
+
+				return oidcServer, apiServer, caCertContent, caFilePath
+			},
+			assertErrFn: func(t *testing.T, errorToCheck error) {
+				assert.NoError(t, errorToCheck)
+			},
+			wantUser: &authenticationv1.UserInfo{
+				Username: "k8s-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			newAssertErrFn: func(t *testing.T, errorToCheck error) {
+				_ = assert.True(t, apierrors.IsForbidden(errorToCheck)) &&
+					assert.Equal(
+						t,
+						`pods is forbidden: User "panda-john_doe" cannot list resource "pods" in API group "" in the namespace "default"`,
+						errorToCheck.Error(),
+					)
+			},
+			newWantUser: &authenticationv1.UserInfo{
+				Username: "panda-john_doe",
+				Groups:   []string{"system:authenticated"},
+			},
+			wantMetricStrings: []string{
+				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
+				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
 			name: "old empty config to new valid config",
 			authConfigFn: func(t *testing.T, _, _ string) string {
 				return `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 `
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1155,13 +1287,14 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
 			name: "old invalid config to new valid config",
 			authConfigFn: func(t *testing.T, issuerURL, _ string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1178,7 +1311,7 @@ jwt:
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1210,13 +1343,14 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
 			name: "old valid config to new structurally invalid config (should be ignored)",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1234,7 +1368,7 @@ jwt:
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1268,13 +1402,14 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_old_config_hash"} 1`,
 			},
 		},
 		{
 			name: "old valid config to new valid empty config (should cause tokens to stop working)",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1292,7 +1427,7 @@ jwt:
 			},
 			newAuthConfigFn: func(t *testing.T, _, _ string) string {
 				return `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 `
 			},
@@ -1311,13 +1446,14 @@ kind: AuthenticationConfiguration
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="success"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_new_config_hash"} 1`,
 			},
 		},
 		{
 			name: "old valid config to new valid config with typo (should be ignored)",
 			authConfigFn: func(t *testing.T, issuerURL, caCert string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1335,7 +1471,7 @@ jwt:
 			},
 			newAuthConfigFn: func(t *testing.T, issuerURL, _ string) string {
 				return fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1368,6 +1504,7 @@ jwt:
 			wantMetricStrings: []string{
 				`apiserver_authentication_config_controller_automatic_reload_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} FP`,
 				`apiserver_authentication_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",status="failure"} 1`,
+				`apiserver_authentication_config_controller_last_config_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="replace_with_old_config_hash"} 1`,
 			},
 		},
 	}
@@ -1380,7 +1517,11 @@ jwt:
 
 			ctx := testContext(t)
 
-			oidcServer, apiServer, caCert, certPath := configureBasicTestInfrastructureWithRandomKeyType(t, tt.authConfigFn)
+			configureTestInfrastructureFunc := tt.configureTestInfrastructure
+			if configureTestInfrastructureFunc == nil {
+				configureTestInfrastructureFunc = configureBasicTestInfrastructureWithRandomKeyType
+			}
+			oidcServer, apiServer, caCert, certPath := configureTestInfrastructureFunc(t, tt.authConfigFn)
 
 			tokenURL, err := oidcServer.TokenURL()
 			require.NoError(t, err)
@@ -1403,8 +1544,9 @@ jwt:
 				_ = tempFile.Close()
 			}()
 
+			newAuthConfig := tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))
 			// Write the new content to the temporary file
-			_, err = tempFile.Write([]byte(tt.newAuthConfigFn(t, oidcServer.URL(), string(caCert))))
+			_, err = tempFile.Write([]byte(newAuthConfig))
 			require.NoError(t, err)
 
 			// Atomically replace the original file with the temporary file
@@ -1438,6 +1580,16 @@ jwt:
 
 			_, err = client.CoreV1().Pods(defaultNamespace).List(ctx, metav1.ListOptions{})
 			tt.newAssertErrFn(t, err)
+
+			oldAuthConfigHash := getHash(tt.authConfigFn(t, oidcServer.URL(), string(caCert)))
+			newAuthConfigHash := getHash(newAuthConfig)
+			for i := range tt.wantMetricStrings {
+				if strings.Contains(tt.wantMetricStrings[i], "replace_with_new_config_hash") {
+					tt.wantMetricStrings[i] = strings.ReplaceAll(tt.wantMetricStrings[i], "replace_with_new_config_hash", newAuthConfigHash)
+				} else if strings.Contains(tt.wantMetricStrings[i], "replace_with_old_config_hash") {
+					tt.wantMetricStrings[i] = strings.ReplaceAll(tt.wantMetricStrings[i], "replace_with_old_config_hash", oldAuthConfigHash)
+				}
+			}
 
 			adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 			body, err := adminClient.RESTClient().Get().AbsPath("/metrics").DoRaw(ctx)
@@ -1503,8 +1655,6 @@ func configureBasicTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.Jo
 // TestStructuredAuthenticationDiscoveryURL tests that the discovery URL configured in jwt.issuer.discoveryURL is used to
 // fetch the discovery document and the issuer in jwt.issuer.url is used to validate the ID token.
 func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	tests := []struct {
 		name         string
 		issuerURL    string
@@ -1547,7 +1697,7 @@ func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
 			discoveryURL := strings.TrimSuffix(tt.discoveryURL(oidcServer.URL()), "/") + "/.well-known/openid-configuration"
 
 			authenticationConfig := fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1601,8 +1751,6 @@ jwt:
 }
 
 func TestMultipleJWTAuthenticators(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	caCertContent1, _, caFilePath1, caKeyFilePath1 := generateCert(t)
 	signingPrivateKey1, publicKey1 := rsaGenerateKey(t)
 	oidcServer1 := utilsoidc.BuildAndRunTestServer(t, caFilePath1, caKeyFilePath1, "")
@@ -1612,7 +1760,7 @@ func TestMultipleJWTAuthenticators(t *testing.T) {
 	oidcServer2 := utilsoidc.BuildAndRunTestServer(t, caFilePath2, caKeyFilePath2, "https://example.com")
 
 	authenticationConfig := fmt.Sprintf(`
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1725,7 +1873,7 @@ func ecdsaGenerateKey(t *testing.T) (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	return privateKey, &privateKey.PublicKey
 }
 
-func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L)) (
+func configureTestInfrastructureAndEgressProxy[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L), needsEgressProxyOnStart bool) (
 	oidcServer *utilsoidc.TestServer,
 	apiServer *kubeapiserverapptesting.TestServer,
 	signingPrivateKey K,
@@ -1742,7 +1890,7 @@ func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePub
 
 	authenticationConfig := fn(t, oidcServer.URL(), string(caCertContent))
 	if len(authenticationConfig) > 0 {
-		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig}, publicKey)
+		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{authenticationConfigYAML: authenticationConfig, needsEgressProxyOnStart: needsEgressProxyOnStart}, publicKey)
 	} else {
 		apiServer = startTestAPIServerForOIDC(t, apiServerOIDCConfig{oidcURL: oidcServer.URL(), oidcClientID: defaultOIDCClientID, oidcCAFilePath: caFilePath, oidcUsernamePrefix: defaultOIDCUsernamePrefix}, publicKey)
 	}
@@ -1753,6 +1901,30 @@ func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePub
 	configureRBAC(t, adminClient, defaultRole, defaultRoleBinding)
 
 	return oidcServer, apiServer, signingPrivateKey, caCertContent, caFilePath
+}
+
+func configureTestInfrastructure[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L)) (
+	oidcServer *utilsoidc.TestServer,
+	apiServer *kubeapiserverapptesting.TestServer,
+	signingPrivateKey K,
+	caCertContent []byte,
+	caFilePath string,
+) {
+	t.Helper()
+
+	return configureTestInfrastructureAndEgressProxy[K, L](t, fn, keyFunc, false)
+}
+
+func configureTestInfrastructureWithEgressProxy[K utilsoidc.JosePrivateKey, L utilsoidc.JosePublicKey](t *testing.T, fn authenticationConfigFunc, keyFunc func(t *testing.T) (K, L)) (
+	oidcServer *utilsoidc.TestServer,
+	apiServer *kubeapiserverapptesting.TestServer,
+	signingPrivateKey K,
+	caCertContent []byte,
+	caFilePath string,
+) {
+	t.Helper()
+
+	return configureTestInfrastructureAndEgressProxy[K, L](t, fn, keyFunc, true)
 }
 
 func configureClientFetchingOIDCCredentials(t *testing.T, restCfg *rest.Config, caCert []byte, certPath, oidcServerURL, oidcServerTokenURL string) kubernetes.Interface {
@@ -1802,6 +1974,29 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 	var customFlags []string
 	if len(c.authenticationConfigYAML) > 0 {
 		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
+		if c.needsEgressProxyOnStart {
+			udsName := filepath.Join(t.TempDir(), "uds")
+			ready := make(chan struct{})
+			go runEgressProxy(t, udsName, ready)
+			select {
+			case <-ready:
+				// egress proxy is ready
+			case <-time.After(time.Minute):
+				t.Fatalf("timeout waiting for uds server to start")
+			}
+			egressConfig := fmt.Sprintf(`
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: cluster
+  connection:
+    proxyProtocol: HTTPConnect
+    transport:
+      uds:
+        udsName: %s
+`, udsName)
+			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", writeTempFile(t, egressConfig)))
+		}
 	} else {
 		customFlags = []string{
 			fmt.Sprintf("--oidc-issuer-url=%s", c.oidcURL),
@@ -1816,12 +2011,15 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 	}
 	customFlags = append(customFlags, "--authorization-mode=RBAC")
 
+	// Serialize test server starts to prevent data races in admission plugin flag registration
+	testServerMutex.Lock()
 	server, err := kubeapiserverapptesting.StartTestServer(
 		t,
 		kubeapiserverapptesting.NewDefaultTestServerOptions(),
 		customFlags,
 		framework.SharedEtcd(),
 	)
+	testServerMutex.Unlock()
 	require.NoError(t, err)
 
 	t.Cleanup(server.TearDownFn)
@@ -1944,4 +2142,11 @@ func testContext(t *testing.T) context.Context {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	t.Cleanup(cancel)
 	return ctx
+}
+
+func getHash(data string) string {
+	if len(data) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(data)))
 }

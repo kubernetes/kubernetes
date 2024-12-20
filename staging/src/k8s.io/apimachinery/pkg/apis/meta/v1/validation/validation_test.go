@@ -132,10 +132,6 @@ func TestInvalidDryRun(t *testing.T) {
 
 }
 
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 func TestValidateDeleteOptionsWithIgnoreStoreReadError(t *testing.T) {
 	fieldPath := field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential")
 	tests := []struct {
@@ -232,7 +228,7 @@ func TestValidPatchOptions(t *testing.T) {
 		patchType types.PatchType
 	}{{
 		opts: metav1.PatchOptions{
-			Force:        boolPtr(true),
+			Force:        ptr.To(true),
 			FieldManager: "kubectl",
 		},
 		patchType: types.ApplyYAMLPatchType,
@@ -243,7 +239,7 @@ func TestValidPatchOptions(t *testing.T) {
 		patchType: types.ApplyYAMLPatchType,
 	}, {
 		opts: metav1.PatchOptions{
-			Force:        boolPtr(true),
+			Force:        ptr.To(true),
 			FieldManager: "kubectl",
 		},
 		patchType: types.ApplyCBORPatchType,
@@ -290,7 +286,7 @@ func TestInvalidPatchOptions(t *testing.T) {
 		// force on non-apply
 		{
 			opts: metav1.PatchOptions{
-				Force: boolPtr(true),
+				Force: ptr.To(true),
 			},
 			patchType: types.MergePatchType,
 		},
@@ -298,7 +294,7 @@ func TestInvalidPatchOptions(t *testing.T) {
 		{
 			opts: metav1.PatchOptions{
 				FieldManager: "kubectl",
-				Force:        boolPtr(false),
+				Force:        ptr.To(false),
 			},
 			patchType: types.MergePatchType,
 		},
@@ -442,7 +438,7 @@ func TestValidateConditions(t *testing.T) {
 			if !hasError(errs, needle) {
 				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
 			}
-			needle = `status.conditions[0].lastTransitionTime: Required value: must be set`
+			needle = `status.conditions[0].lastTransitionTime: Required value`
 			if !hasError(errs, needle) {
 				t.Errorf("missing %q in\n%v", needle, errorsAsString(errs))
 			}

@@ -19,30 +19,43 @@ package node
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
 )
 
 var (
 	// non-root UID used in tests.
 	nonRootTestUserID = int64(1000)
+
+	// kubelet user used for userns mapping.
+	kubeletUserForUsernsMapping = "kubelet"
+	getsubuidsBinary            = "getsubids"
 )
 
 var _ = SIGDescribe("Security Context", func() {
@@ -54,6 +67,10 @@ var _ = SIGDescribe("Security Context", func() {
 	})
 
 	ginkgo.Context("When creating a pod with HostUsers", func() {
+		ginkgo.BeforeEach(func() {
+			e2eskipper.SkipIfNodeOSDistroIs("windows")
+		})
+
 		containerName := "userns-test"
 		makePod := func(hostUsers bool) *v1.Pod {
 			return &v1.Pod{
@@ -74,7 +91,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		}
 
-		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("must create the user namespace if set to false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// with hostUsers=false the pod must use a new user namespace
 			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
@@ -86,7 +103,7 @@ var _ = SIGDescribe("Security Context", func() {
 				podClient.DeleteSync(ctx, createdPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			})
 			getLogs := func(pod *v1.Pod) (string, error) {
-				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)
+				err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart)
 				if err != nil {
 					return "", err
 				}
@@ -112,7 +129,75 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+			// We need to check with the binary "getsubuids" the mappings for the kubelet.
+			// If something is not present, we skip the test as the node wasn't configured to run this test.
+			id, length, err := kubeletUsernsMappings(getsubuidsBinary)
+			if err != nil {
+				e2eskipper.Skipf("node is not setup for userns with kubelet mappings: %v", err)
+			}
+
+			for i := 0; i < 4; i++ {
+				// makePod(false) creates the pod with user namespace
+				podClient := e2epod.PodClientNS(f, f.Namespace.Name)
+				createdPod := podClient.Create(ctx, makePod(false))
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					ginkgo.By("delete the pods")
+					podClient.DeleteSync(ctx, createdPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+				})
+				getLogs := func(pod *v1.Pod) (string, error) {
+					err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
+					if err != nil {
+						return "", err
+					}
+					podStatus, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return "", err
+					}
+					return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, containerName)
+				}
+
+				logs, err := getLogs(createdPod)
+				framework.ExpectNoError(err)
+
+				// The hostUID is the second field in the /proc/self/uid_map file.
+				hostMap := strings.Fields(logs)
+				if len(hostMap) != 3 {
+					framework.Failf("can't detect hostUID for container, is the format of /proc/self/uid_map correct?")
+				}
+
+				tmp, err := strconv.ParseUint(hostMap[1], 10, 32)
+				if err != nil {
+					framework.Failf("can't convert hostUID to int: %v", err)
+				}
+				hostUID := uint32(tmp)
+
+				// Here we check the pod got a userns mapping within the range
+				// configured for the kubelet.
+				// To make sure the pod mapping doesn't fall within range by chance,
+				// we do the following:
+				// * The configured kubelet range as small as possible (enough to
+				// fit 110 pods, the default of the kubelet) to minimize the chance
+				// of this range being used "by chance" in the node configuration.
+				// * We also run this in a loop, so it is less likely to get lucky
+				// several times in a row.
+				//
+				// There are 65536 ranges possible and we configured the kubelet to
+				// use 110 of them. The chances of this test passing by chance 4
+				// times in a row and the kubelet not using only the configured
+				// range are:
+				//
+				//	(110/65536) ^ 4 = 4.73e-12. IOW, less than 1 in a trillion.
+				//
+				// Furthermore, the unit tests would also need to be buggy and not
+				// detect the bug. We expect to catch off-by-one errors there.
+				if hostUID < id || hostUID > id+length {
+					framework.Failf("user namespace created outside of the configured range. Expected range: %v-%v, got: %v", id, id+length, hostUID)
+				}
+			}
+		})
+
+		f.It("must not create the user namespace if set to true [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// with hostUsers=true the pod must use the host user namespace
 			pod := makePod(true)
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
@@ -123,9 +208,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
-			// Create all volume types supported: configmap, secret, downwardAPI, projected.
-
+		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -247,7 +330,7 @@ var _ = SIGDescribe("Security Context", func() {
 			})
 		})
 
-		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+		f.It("should set FSGroup to user inside the container with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
@@ -305,6 +388,38 @@ var _ = SIGDescribe("Security Context", func() {
 			e2epodoutput.TestContainerOutput(ctx, f, "check FSGroup is mapped correctly", pod, 0, []string{
 				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
 			})
+		})
+		f.It("metrics should report count of started and failed user namespaced pods [LinuxOnly]", feature.UserNamespacesSupport, framework.WithFeatureGate(features.UserNamespacesSupport), func(ctx context.Context) {
+			targetNode, err := findLinuxNode(ctx, f)
+			framework.ExpectNoError(err, "Error finding Linux node")
+			framework.Logf("Using node: %v", targetNode.Name)
+
+			ginkgo.By("Getting initial kubelet metrics values")
+			beforeMetrics, err := getCurrentUserNamespacedPodsMetrics(ctx, f, targetNode.Name)
+			framework.ExpectNoError(err, "Error getting initial kubelet metrics for node")
+			framework.Logf("Initial UserNamespaced pods metrics -- StartedPods: %v, StartedPodsErrors: %v", beforeMetrics.StartedPods, beforeMetrics.StartedPodsErrors)
+
+			ginkgo.By("Scheduling a pod with a UserNamespace that will fail")
+
+			createdPod := makePod(false)
+			createdPod.Spec.NodeName = targetNode.Name
+			createdPod.Spec.Containers[0].Command = []string{"bogus"}
+
+			createdPod = e2epod.NewPodClient(f).Create(ctx, createdPod)
+			ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(ctx, createdPod)
+			framework.ExpectNoError(err)
+			gomega.Expect(ev).NotTo(gomega.BeNil())
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
+
+			ginkgo.By("Getting subsequent kubelet metrics values")
+
+			afterMetrics, err := getCurrentUserNamespacedPodsMetrics(ctx, f, targetNode.Name)
+			framework.ExpectNoError(err, "Error getting subsequent kubelet metrics for node")
+			framework.Logf("Subsequent UserNamespaced pods metrics -- StartedPods: %v, StartedPodsErrors: %v", afterMetrics.StartedPods, afterMetrics.StartedPodsErrors)
+
+			ginkgo.By("Ensuring metrics were updated")
+			gomega.Expect(beforeMetrics.StartedPods).To(gomega.BeNumerically("<", afterMetrics.StartedPods), "Count of started UserNamespaced pods should increase")
+			gomega.Expect(beforeMetrics.StartedPodsErrors).To(gomega.BeNumerically("<", afterMetrics.StartedPodsErrors), "Count of started UserNamespaced pods errors should increase")
 		})
 	})
 
@@ -378,7 +493,7 @@ var _ = SIGDescribe("Security Context", func() {
 							Name:    podName,
 							Command: []string{"id", "-u"}, // Print UID and exit
 							SecurityContext: &v1.SecurityContext{
-								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsNonRoot: ptr.To(true),
 								RunAsUser:    userid,
 							},
 						},
@@ -391,7 +506,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
-			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
+			pod := makeNonRootPod(name, rootImage, ptr.To[int64](nonRootTestUserID))
 			podClient.Create(ctx, pod)
 
 			podClient.WaitForSuccess(ctx, name, framework.PodStartTimeout)
@@ -401,7 +516,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
-			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
+			pod := makeNonRootPod(name, nonRootImage, ptr.To[int64](0))
 			pod = podClient.Create(ctx, pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(ctx, pod)
@@ -633,14 +748,261 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 	})
+
+	f.Context("SupplementalGroupsPolicy [LinuxOnly]", feature.SupplementalGroupsPolicy, framework.WithFeatureGate(features.SupplementalGroupsPolicy), func() {
+		timeout := 1 * time.Minute
+
+		agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
+		uidInImage := int64(1000)
+		gidDefinedInImage := int64(50000)
+		supplementalGroup := int64(60000)
+
+		mkPod := func(policy *v1.SupplementalGroupsPolicy) *v1.Pod {
+			// In specified image(agnhost E2E image),
+			// - user-defined-in-image(uid=1000) is defined
+			// - user-defined-in-image belongs to group-defined-in-image(gid=50000)
+			// thus, resultant supplementary group of the container processes should be
+			// - 1000 : self
+			// - 50000: pre-defined groups defined in the container image(/etc/group) of self(uid=1000)
+			// - 60000: specified in SupplementalGroups
+			// $ id -G
+			// 1000 50000 60000 (if SupplementalGroupsPolicy=Merge or not set)
+			// 1000 60000       (if SupplementalGroupsPolicy=Strict)
+			podName := "sppl-grp-plcy-" + string(uuid.NewUUID())
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        podName,
+					Labels:      map[string]string{"name": podName},
+					Annotations: map[string]string{},
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser:                &uidInImage,
+						SupplementalGroups:       []int64{supplementalGroup},
+						SupplementalGroupsPolicy: policy,
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "test-container",
+							Image:   agnhostImage,
+							Command: []string{"sh", "-c", "id -G; while :; do sleep 1; done"},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+		}
+
+		nodeSupportsSupplementalGroupsPolicy := func(ctx context.Context, f *framework.Framework, nodeName string) bool {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(node).NotTo(gomega.BeNil())
+			if node.Status.Features != nil {
+				supportsSupplementalGroupsPolicy := node.Status.Features.SupplementalGroupsPolicy
+				if supportsSupplementalGroupsPolicy != nil && *supportsSupplementalGroupsPolicy {
+					return true
+				}
+			}
+			return false
+		}
+		waitForContainerUser := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedContainerUser *v1.ContainerUser) error {
+			return framework.Gomega().Eventually(ctx,
+				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
+				WithTimeout(timeout).
+				Should(gcustom.MakeMatcher(func(p *v1.Pod) (bool, error) {
+					for _, s := range p.Status.ContainerStatuses {
+						if s.Name == containerName {
+							return reflect.DeepEqual(s.User, expectedContainerUser), nil
+						}
+					}
+					return false, nil
+				}))
+		}
+		waitForPodLogs := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedLog string) error {
+			return framework.Gomega().Eventually(ctx,
+				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
+				WithTimeout(timeout).
+				Should(gcustom.MakeMatcher(func(p *v1.Pod) (bool, error) {
+					podLogs, err := e2epod.GetPodLogs(ctx, f.ClientSet, p.Namespace, p.Name, containerName)
+					if err != nil {
+						return false, err
+					}
+					return podLogs == expectedLog, nil
+				}))
+		}
+		expectMergePolicyInEffect := func(ctx context.Context, f *framework.Framework, podName string, containerName string, featureSupportedOnNode bool) {
+			expectedOutput := fmt.Sprintf("%d %d %d", uidInImage, gidDefinedInImage, supplementalGroup)
+			expectedContainerUser := &v1.ContainerUser{
+				Linux: &v1.LinuxContainerUser{
+					UID:                uidInImage,
+					GID:                uidInImage,
+					SupplementalGroups: []int64{uidInImage, gidDefinedInImage, supplementalGroup},
+				},
+			}
+
+			if featureSupportedOnNode {
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+			}
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+
+			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
+			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
+		}
+		expectStrictPolicyInEffect := func(ctx context.Context, f *framework.Framework, podName string, containerName string, featureSupportedOnNode bool) {
+			expectedOutput := fmt.Sprintf("%d %d", uidInImage, supplementalGroup)
+			expectedContainerUser := &v1.ContainerUser{
+				Linux: &v1.LinuxContainerUser{
+					UID:                uidInImage,
+					GID:                uidInImage,
+					SupplementalGroups: []int64{uidInImage, supplementalGroup},
+				},
+			}
+
+			if featureSupportedOnNode {
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+			}
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+
+			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
+			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
+		}
+		expectRejectionEventIssued := func(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
+			framework.ExpectNoError(
+				framework.Gomega().Eventually(ctx,
+					framework.HandleRetry(framework.ListObjects(
+						f.ClientSet.CoreV1().Events(pod.Namespace).List,
+						metav1.ListOptions{
+							FieldSelector: fields.Set{
+								"type":                      core.EventTypeWarning,
+								"reason":                    lifecycle.SupplementalGroupsPolicyNotSupported,
+								"involvedObject.kind":       "Pod",
+								"involvedObject.apiVersion": v1.SchemeGroupVersion.String(),
+								"involvedObject.name":       pod.Name,
+								"involvedObject.uid":        string(pod.UID),
+							}.AsSelector().String(),
+						},
+					))).
+					WithTimeout(timeout).
+					Should(gcustom.MakeMatcher(func(eventList *v1.EventList) (bool, error) {
+						return len(eventList.Items) == 1, nil
+					})),
+			)
+		}
+
+		ginkgo.When("SupplementalGroupsPolicy nil in SecurityContext", func() {
+			ginkgo.When("if the container's primary UID belongs to some groups in the image", func() {
+				var pod *v1.Pod
+				ginkgo.BeforeEach(func(ctx context.Context) {
+					ginkgo.By("creating a pod", func() {
+						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyMerge)))
+					})
+				})
+				ginkgo.When("scheduled node does not support SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does not support SupplementalGroupsPolicy
+						if nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, false)
+					})
+				})
+				ginkgo.When("scheduled node supports SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does support SupplementalGroupsPolicy
+						if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
+					})
+				})
+			})
+		})
+		ginkgo.When("SupplementalGroupsPolicy was set to Merge in PodSpec", func() {
+			ginkgo.When("the container's primary UID belongs to some groups in the image", func() {
+				var pod *v1.Pod
+				ginkgo.BeforeEach(func(ctx context.Context) {
+					ginkgo.By("creating a pod", func() {
+						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(nil))
+					})
+				})
+				ginkgo.When("scheduled node does not support SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does not support SupplementalGroupsPolicy
+						if nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, false)
+					})
+				})
+				ginkgo.When("scheduled node supports SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does support SupplementalGroupsPolicy
+						if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
+					})
+				})
+			})
+		})
+		ginkgo.When("SupplementalGroupsPolicy was set to Strict in PodSpec", func() {
+			ginkgo.When("the container's primary UID belongs to some groups in the image", func() {
+				var pod *v1.Pod
+				ginkgo.BeforeEach(func(ctx context.Context) {
+					ginkgo.By("creating a pod", func() {
+						pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
+						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
+						var err error
+						pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err)
+					})
+				})
+				ginkgo.When("scheduled node does not support SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does not support SupplementalGroupsPolicy
+						if nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should reject the pod [LinuxOnly]", func(ctx context.Context) {
+						expectRejectionEventIssued(ctx, f, pod)
+					})
+				})
+				ginkgo.When("scheduled node supports SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does support SupplementalGroupsPolicy
+						if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+						}
+						framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+					})
+					ginkgo.It("it should NOT add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectStrictPolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
+					})
+				})
+			})
+		})
+	})
 })
 
 var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", func() {
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+	})
+
 	f := framework.NewDefaultFramework("user-namespaces-pss-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
 	ginkgo.Context("with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled", func() {
-		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, func(ctx context.Context) {
+		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, framework.WithFeatureGate(features.UserNamespacesSupport), framework.WithFeatureGate(features.UserNamespacesPodSecurityStandards), func(ctx context.Context) {
 			name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -682,4 +1044,86 @@ func waitForFailure(ctx context.Context, f *framework.Framework, name string, ti
 			}
 		},
 	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
+}
+
+// parseGetSubIdsOutput parses the output from the `getsubids` tool, which is used to query subordinate user or group ID ranges for
+// a given user or group. getsubids produces a line for each mapping configured.
+// Here we expect that there is a single mapping, and the same values are used for the subordinate user and group ID ranges.
+// The output is something like:
+// $ getsubids kubelet
+// 0: kubelet 65536 2147483648
+// $ getsubids -g kubelet
+// 0: kubelet 65536 2147483648
+// XXX: this is a c&p from pkg/kubelet/kubelet_pods.go. It is simpler to c&p than to try to reuse it.
+func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
+	lines := strings.Split(strings.Trim(input, "\n"), "\n")
+	if len(lines) != 1 {
+		return 0, 0, fmt.Errorf("error parsing line %q: it must contain only one line", input)
+	}
+
+	parts := strings.Fields(lines[0])
+	if len(parts) != 4 {
+		return 0, 0, fmt.Errorf("invalid line %q", input)
+	}
+
+	// Parsing the numbers
+	num1, err := strconv.ParseUint(parts[2], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	num2, err := strconv.ParseUint(parts[3], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	return uint32(num1), uint32(num2), nil
+}
+
+func kubeletUsernsMappings(subuidBinary string) (uint32, uint32, error) {
+	cmd, err := exec.LookPath(getsubuidsBinary)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getsubids binary not found in PATH")
+	}
+	outUids, err := exec.Command(cmd, kubeletUserForUsernsMapping).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("no additional uids for user %q: %w", kubeletUserForUsernsMapping, err)
+	}
+	outGids, err := exec.Command(cmd, "-g", kubeletUserForUsernsMapping).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("no additional gids for user %q", kubeletUserForUsernsMapping)
+	}
+	if string(outUids) != string(outGids) {
+		return 0, 0, fmt.Errorf("mismatched subuids and subgids for user %q", kubeletUserForUsernsMapping)
+	}
+
+	return parseGetSubIdsOutput(string(outUids))
+}
+
+// getCurrentUserNamespacedPodsMetrics returns a UserNamespacedPodsMetrics object. Any metrics that do not have any
+// values reported will be set to 0.
+func getCurrentUserNamespacedPodsMetrics(ctx context.Context, f *framework.Framework, nodeName string) (UserNamespacedPodsMetrics, error) {
+	var result UserNamespacedPodsMetrics
+
+	m, err := e2emetrics.GetKubeletMetrics(ctx, f.ClientSet, nodeName)
+	if err != nil {
+		return result, err
+	}
+
+	samples := m[metrics.StartedUserNamespacedPodsTotalKey]
+	for _, v := range samples {
+		result.StartedPods += int(v.Value)
+	}
+
+	samples = m[metrics.StartedUserNamespacedPodsErrorsTotalKey]
+	for _, v := range samples {
+		result.StartedPodsErrors += int(v.Value)
+	}
+
+	return result, nil
+}
+
+type UserNamespacedPodsMetrics struct {
+	StartedPods       int
+	StartedPodsErrors int
 }

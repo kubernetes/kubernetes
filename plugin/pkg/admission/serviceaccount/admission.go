@@ -38,7 +38,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -485,7 +485,7 @@ func (s *Plugin) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount,
 func TokenVolumeSource() *api.ProjectedVolumeSource {
 	return &api.ProjectedVolumeSource{
 		// explicitly set default value, see #104464
-		DefaultMode: pointer.Int32(corev1.ProjectedVolumeSourceDefaultMode),
+		DefaultMode: ptr.To[int32](corev1.ProjectedVolumeSourceDefaultMode),
 		Sources: []api.VolumeProjection{
 			{
 				ServiceAccountToken: &api.ServiceAccountTokenProjection{

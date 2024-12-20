@@ -62,11 +62,11 @@ func (t *ServiceUpgradeTest) Setup(ctx context.Context, f *framework.Framework) 
 	svcPort := int(tcpService.Spec.Ports[0].Port)
 
 	ginkgo.By("creating pod to be part of service " + serviceName)
-	rc, err := jig.Run(ctx, jig.AddRCAntiAffinity)
+	deployment, err := jig.Run(ctx, jig.AddDeploymentAntiAffinity)
 	framework.ExpectNoError(err)
 
-	ginkgo.By("creating a PodDisruptionBudget to cover the ReplicationController")
-	_, err = jig.CreatePDB(ctx, rc)
+	ginkgo.By("creating a PodDisruptionBudget to cover the Deployment")
+	_, err = jig.CreatePDB(ctx, deployment)
 	framework.ExpectNoError(err)
 
 	// Hit it once before considering ourselves ready

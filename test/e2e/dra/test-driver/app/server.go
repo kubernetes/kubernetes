@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/component-base/metrics"
 
+	resourceapi "k8s.io/api/resource/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 )
 
@@ -178,9 +180,8 @@ func NewCommand() *cobra.Command {
 	}
 	kubeletPluginFlagSets := cliflag.NamedFlagSets{}
 	fs = kubeletPluginFlagSets.FlagSet("kubelet")
-	pluginRegistrationPath := fs.String("plugin-registration-path", "/var/lib/kubelet/plugins_registry", "The directory where kubelet looks for plugin registration sockets, in the filesystem of the driver.")
-	endpoint := fs.String("endpoint", "/var/lib/kubelet/plugins/test-driver/dra.sock", "The Unix domain socket where the driver will listen for kubelet requests, in the filesystem of the driver.")
-	draAddress := fs.String("dra-address", "/var/lib/kubelet/plugins/test-driver/dra.sock", "The Unix domain socket that kubelet will connect to for dynamic resource allocation requests, in the filesystem of kubelet.")
+	kubeletRegistryDir := fs.String("plugin-registration-path", kubeletplugin.KubeletRegistryDir, "The directory where kubelet looks for plugin registration sockets.")
+	kubeletPluginsDir := fs.String("datadir", kubeletplugin.KubeletPluginsDir, "The per-driver directory where the DRA Unix domain socket will be created.")
 	fs = kubeletPluginFlagSets.FlagSet("CDI")
 	cdiDir := fs.String("cdi-dir", "/var/run/cdi", "directory for dynamically created CDI JSON files")
 	nodeName := fs.String("node-name", "", "name of the node that the kubelet plugin is responsible for")
@@ -196,7 +197,8 @@ func NewCommand() *cobra.Command {
 		if err := os.MkdirAll(*cdiDir, os.FileMode(0750)); err != nil {
 			return fmt.Errorf("create CDI directory: %w", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(*endpoint), 0750); err != nil {
+		datadir := path.Join(*kubeletPluginsDir, *driverName)
+		if err := os.MkdirAll(filepath.Dir(datadir), 0750); err != nil {
 			return fmt.Errorf("create socket directory: %w", err)
 		}
 
@@ -204,10 +206,26 @@ func NewCommand() *cobra.Command {
 			return errors.New("--node-name not set")
 		}
 
-		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{NumDevices: *numDevices},
-			kubeletplugin.PluginSocketPath(*endpoint),
-			kubeletplugin.RegistrarSocketPath(path.Join(*pluginRegistrationPath, *driverName+"-reg.sock")),
-			kubeletplugin.KubeletPluginSocketPath(*draAddress),
+		devices := make([]resourceapi.Device, *numDevices)
+		for i := 0; i < *numDevices; i++ {
+			devices[i] = resourceapi.Device{
+				Name: fmt.Sprintf("device-%02d", i),
+			}
+		}
+		driverResources := resourceslice.DriverResources{
+			Pools: map[string]resourceslice.Pool{
+				*nodeName: {
+					Slices: []resourceslice.Slice{{
+						Devices: devices,
+					}},
+				},
+			},
+		}
+
+		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{DriverResources: &driverResources},
+			Options{EnableHealthService: true},
+			kubeletplugin.PluginDataDirectoryPath(datadir),
+			kubeletplugin.RegistrarDirectoryPath(*kubeletRegistryDir),
 		)
 		if err != nil {
 			return fmt.Errorf("start example plugin: %w", err)

@@ -23,8 +23,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -36,6 +39,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 
 	testCases := map[string]struct {
 		expectedErrors int
+		legacyIPs      bool
 		endpointSlice  *discovery.EndpointSlice
 	}{
 		"good-slice": {
@@ -231,7 +235,24 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Addresses: generateIPAddresses(1),
 					Hints: &discovery.EndpointHints{
 						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						ForNodes: []discovery.ForNode{{Name: "node-1"}},
 					},
+				}},
+			},
+		},
+		"legacy-ip-with-legacy-validation": {
+			expectedErrors: 0,
+			legacyIPs:      true,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"012.034.056.078"},
+					Hostname:  ptr.To("valid-123"),
 				}},
 			},
 		},
@@ -408,7 +429,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ip": {
-			expectedErrors: 2,
+			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -422,8 +443,23 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
+		"legacy-ip-with-strict-validation": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"012.034.056.078"},
+					Hostname:  ptr.To("valid-123"),
+				}},
+			},
+		},
 		"bad-ipv4": {
-			expectedErrors: 3,
+			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -438,7 +474,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv6": {
-			expectedErrors: 4,
+			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,
@@ -483,7 +519,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
-		"invalid-hints": {
+		"invalid-zone-hint": {
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -500,7 +536,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
-		"overlapping-hints": {
+		"overlapping-zone-hints": {
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -521,7 +557,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
-		"too-many-hints": {
+		"too-many-zone-hints": {
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -543,6 +579,74 @@ func TestValidateEndpointSlice(t *testing.T) {
 							{Name: "zone-g"},
 							{Name: "zone-h"},
 							{Name: "zone-i"},
+						},
+					},
+				}},
+			},
+		},
+		"invalid-node-hints": {
+			expectedErrors: 2,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForNodes: []discovery.ForNode{
+							{Name: "!@#$!@"},
+							{Name: ""},
+						},
+					},
+				}},
+			},
+		},
+		"overlapping-node-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForNodes: []discovery.ForNode{
+							{Name: "node-1"},
+							{Name: "node-2"},
+							{Name: "node-1"},
+						},
+					},
+				}},
+			},
+		},
+		"too-many-node-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForNodes: []discovery.ForNode{
+							{Name: "node-1"},
+							{Name: "node-2"},
+							{Name: "node-3"},
+							{Name: "node-4"},
+							{Name: "node-5"},
+							{Name: "node-6"},
+							{Name: "node-7"},
+							{Name: "node-8"},
+							{Name: "node-9"},
 						},
 					},
 				}},
@@ -601,7 +705,8 @@ func TestValidateEndpointSlice(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateEndpointSlice(testCase.endpointSlice)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
+			errs := ValidateEndpointSlice(testCase.endpointSlice, nil)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
 			}
@@ -701,6 +806,7 @@ func TestValidateEndpointSliceCreate(t *testing.T) {
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointSliceCreate(testCase.endpointSlice)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
@@ -726,6 +832,23 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 			newEndpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,
+			},
+			expectedErrors: 0,
+		},
+		"unchanged IPs are not revalidated": {
+			oldEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.04"},
+				}},
+			},
+			newEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.04"},
+				}},
 			},
 			expectedErrors: 0,
 		},
@@ -787,10 +910,28 @@ func TestValidateEndpointSliceUpdate(t *testing.T) {
 			},
 			expectedErrors: 1,
 		},
+		"changed IPs are revalidated": {
+			oldEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3"},
+				}},
+			},
+			newEndpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.03"},
+				}},
+			},
+			expectedErrors: 1,
+		},
 	}
 
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointSliceUpdate(testCase.newEndpointSlice, testCase.oldEndpointSlice)
 			if len(errs) != testCase.expectedErrors {
 				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)

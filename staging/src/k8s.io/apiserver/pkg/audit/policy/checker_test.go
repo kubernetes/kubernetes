@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -359,10 +360,6 @@ func TestOmitManagedFields(t *testing.T) {
 		},
 	}
 
-	boolPtr := func(v bool) *bool {
-		return &v
-	}
-
 	tests := []struct {
 		name   string
 		policy func() audit.Policy
@@ -395,7 +392,7 @@ func TestOmitManagedFields(t *testing.T) {
 			name: "global policy default is true, rule overrides to false",
 			policy: func() audit.Policy {
 				rule := matchingPolicyRule.DeepCopy()
-				rule.OmitManagedFields = boolPtr(false)
+				rule.OmitManagedFields = ptr.To(false)
 				return audit.Policy{
 					OmitManagedFields: true,
 					Rules:             []audit.PolicyRule{*rule},
@@ -407,7 +404,7 @@ func TestOmitManagedFields(t *testing.T) {
 			name: "global policy default is false, rule overrides to true",
 			policy: func() audit.Policy {
 				rule := matchingPolicyRule.DeepCopy()
-				rule.OmitManagedFields = boolPtr(true)
+				rule.OmitManagedFields = ptr.To(true)
 				return audit.Policy{
 					OmitManagedFields: false,
 					Rules:             []audit.PolicyRule{*rule},

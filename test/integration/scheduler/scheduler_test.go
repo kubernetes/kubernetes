@@ -40,7 +40,7 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
@@ -248,13 +248,13 @@ func TestMultipleSchedulers(t *testing.T) {
 	// 5. create and start a scheduler with name "foo-scheduler"
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(fooScheduler),
+			SchedulerName: ptr.To(fooScheduler),
 			PluginConfig: []configv1.PluginConfig{
 				{
 					Name: "VolumeBinding",
 					Args: runtime.RawExtension{
 						Object: &configv1.VolumeBindingArgs{
-							BindTimeoutSeconds: pointer.Int64(30),
+							BindTimeoutSeconds: ptr.To[int64](30),
 						},
 					},
 				},
@@ -278,8 +278,8 @@ func TestMultipleSchedulers(t *testing.T) {
 func TestMultipleSchedulingProfiles(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
-			{SchedulerName: pointer.String("default-scheduler")},
-			{SchedulerName: pointer.String("custom-scheduler")},
+			{SchedulerName: ptr.To("default-scheduler")},
+			{SchedulerName: ptr.To("custom-scheduler")},
 		},
 	})
 
@@ -637,4 +637,390 @@ func TestNodeEvents(t *testing.T) {
 		t.Errorf("Pod %s didn't schedule: %v", pod2.Name, err)
 	}
 
+}
+
+func TestHostPorts(t *testing.T) {
+	type podPorts struct {
+		container                   []v1.ContainerPort
+		restartableInitContainer    []v1.ContainerPort
+		nonRestartableInitContainer []v1.ContainerPort
+	}
+
+	// Tests run with one node for scheduling. The first pod must always be scheduable.
+	tests := []struct {
+		name                string
+		firstPorts          podPorts
+		secondPorts         podPorts
+		wantSecondScheduled bool
+	}{
+		{
+			name: "Containers using same non-host port",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "non-restartable initContainer and container using same non-host port",
+			firstPorts: podPorts{
+				nonRestartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "restartable initContainer and container using same non-host port",
+			firstPorts: podPorts{
+				restartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "container and non-restartable initContainer using same non-host port",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				nonRestartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "container and restartable initContainer using same non-host port",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				restartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "containers using same host port",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: false,
+		},
+		{
+			name: "non-restartable initContainer and container using same host port",
+			firstPorts: podPorts{
+				nonRestartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "restartable initContainer and container using same host port",
+			firstPorts: podPorts{
+				restartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: false,
+		},
+		{
+			name: "container and non-restartable initContainer using same host port",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				nonRestartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "container and restartable initContainer using same host port",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				restartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: false,
+		},
+		{
+			name: "containers using different host ports",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "non-restartable initContainer and container using different host ports",
+			firstPorts: podPorts{
+				nonRestartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "restartable initContainer and container using different host ports",
+			firstPorts: podPorts{
+				restartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "container and non-restartable initContainer using different host ports",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				nonRestartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+		{
+			name: "container and restartable initContainer using different host ports",
+			firstPorts: podPorts{
+				container: []v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			secondPorts: podPorts{
+				restartableInitContainer: []v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						HostPort:      8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				},
+			},
+			wantSecondScheduled: true,
+		},
+	}
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "conflicting-host-ports")
+	node, err := testutils.CreateNode(testCtx.ClientSet, st.MakeNode().
+		Name("conflicting-host-ports-node").Obj())
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", node.Name, err)
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p1, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+				Name:                             "p1",
+				Namespace:                        testCtx.NS.Name,
+				ContainerPorts:                   tc.firstPorts.container,
+				RestartableInitContainerPorts:    tc.firstPorts.restartableInitContainer,
+				NonRestartableInitContainerPorts: tc.firstPorts.nonRestartableInitContainer,
+			}))
+			if err != nil {
+				t.Fatalf("Failed to create Pod p1: %v", err)
+			}
+			err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, p1, 5*time.Second)
+			if err != nil {
+				t.Errorf("Pod %s didn't schedule: %v", p1.Name, err)
+			}
+
+			p2, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+				Name:                             "p2",
+				Namespace:                        testCtx.NS.Name,
+				ContainerPorts:                   tc.secondPorts.container,
+				RestartableInitContainerPorts:    tc.secondPorts.restartableInitContainer,
+				NonRestartableInitContainerPorts: tc.secondPorts.nonRestartableInitContainer,
+			}))
+			if err != nil {
+				t.Fatalf("Failed to create Pod p2: %v", err)
+			}
+
+			if tc.wantSecondScheduled {
+				err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, p2, 5*time.Second)
+				if err != nil {
+					t.Errorf("Pod %s didn't schedule: %v", p2.Name, err)
+				}
+			} else {
+				if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, p2); err != nil {
+					t.Errorf("Pod %v got scheduled: %v", p2.Name, err)
+				}
+			}
+
+			testutils.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*v1.Pod{p1, p2})
+		})
+	}
 }

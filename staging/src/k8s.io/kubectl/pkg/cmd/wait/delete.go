@@ -113,7 +113,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 		return err
 	})
 	if err != nil {
-		if errors.Is(err, wait.ErrWaitTimeout) { // nolint:staticcheck // SA1019
+		if wait.Interrupted(err) { // nolint:staticcheck // SA1019
 			return gottenObj, false, errWaitTimeoutWithName
 		}
 		return gottenObj, false, err

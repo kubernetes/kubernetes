@@ -54,13 +54,13 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 		podDefault := runAsUserNamePod(nil)
 		e2eoutput.TestContainerOutput(ctx, f, "check default user", podDefault, 0, []string{"ContainerUser"})
 
-		podUserName := runAsUserNamePod(toPtr("ContainerAdministrator"))
+		podUserName := runAsUserNamePod(ptr.To("ContainerAdministrator"))
 		e2eoutput.TestContainerOutput(ctx, f, "check set user", podUserName, 0, []string{"ContainerAdministrator"})
 	})
 
 	ginkgo.It("should not be able to create pods with unknown usernames at Pod level", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with an invalid username")
-		podInvalid := e2epod.NewPodClient(f).Create(ctx, runAsUserNamePod(toPtr("FooLish")))
+		podInvalid := e2epod.NewPodClient(f).Create(ctx, runAsUserNamePod(ptr.To("FooLish")))
 
 		failedSandboxEventSelector := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -107,8 +107,8 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 
 	ginkgo.It("should not be able to create pods with unknown usernames at Container level", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with an invalid username at container level and pod running as ContainerUser")
-		p := runAsUserNamePod(toPtr("FooLish"))
-		p.Spec.SecurityContext.WindowsOptions.RunAsUserName = toPtr("ContainerUser")
+		p := runAsUserNamePod(ptr.To("FooLish"))
+		p.Spec.SecurityContext.WindowsOptions.RunAsUserName = ptr.To("ContainerUser")
 		podInvalid := e2epod.NewPodClient(f).Create(ctx, p)
 
 		framework.Logf("Waiting for pod %s to enter the error state.", podInvalid.Name)
@@ -124,8 +124,8 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 	ginkgo.It("should override SecurityContext username if set", func(ctx context.Context) {
 		ginkgo.By("Creating a pod with 2 containers with different username configurations.")
 
-		pod := runAsUserNamePod(toPtr("ContainerAdministrator"))
-		pod.Spec.Containers[0].SecurityContext.WindowsOptions.RunAsUserName = toPtr("ContainerUser")
+		pod := runAsUserNamePod(ptr.To("ContainerAdministrator"))
+		pod.Spec.Containers[0].SecurityContext.WindowsOptions.RunAsUserName = ptr.To("ContainerUser")
 		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
 			Name:    "run-as-username-new-container",
 			Image:   imageutils.GetE2EImage(imageutils.NonRoot),
@@ -163,7 +163,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 	ginkgo.It("should not be able to create pods with containers running as ContainerAdministrator when runAsNonRoot is true", func(ctx context.Context) {
 		ginkgo.By("Creating a pod")
 
-		p := runAsUserNamePod(toPtr("ContainerAdministrator"))
+		p := runAsUserNamePod(ptr.To("ContainerAdministrator"))
 		p.Spec.SecurityContext.RunAsNonRoot = &trueVar
 
 		podInvalid, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, p, metav1.CreateOptions{})
@@ -181,7 +181,7 @@ var _ = sigDescribe(feature.Windows, "SecurityContext", skipUnlessWindows(func()
 	ginkgo.It("should not be able to create pods with containers running as CONTAINERADMINISTRATOR when runAsNonRoot is true", func(ctx context.Context) {
 		ginkgo.By("Creating a pod")
 
-		p := runAsUserNamePod(toPtr("CONTAINERADMINISTRATOR"))
+		p := runAsUserNamePod(ptr.To("CONTAINERADMINISTRATOR"))
 		p.Spec.SecurityContext.RunAsNonRoot = &trueVar
 
 		podInvalid, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, p, metav1.CreateOptions{})
@@ -286,10 +286,6 @@ func runAsUserNamePod(username *string) *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
-}
-
-func toPtr(s string) *string {
-	return &s
 }
 
 func eventOccurred(ctx context.Context, c clientset.Interface, namespace, eventSelector, msg string) (bool, error) {

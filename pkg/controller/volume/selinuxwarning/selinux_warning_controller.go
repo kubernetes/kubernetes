@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -74,7 +75,7 @@ type Controller struct {
 	vpm               *volume.VolumePluginMgr
 	cmpm              csimigration.PluginManager
 	csiTranslator     csimigration.InTreeToCSITranslator
-	seLinuxTranslator volumeutil.SELinuxLabelTranslator
+	seLinuxTranslator *translator.ControllerSELinuxTranslator
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
 	queue             workqueue.TypedRateLimitingInterface[cache.ObjectName]
@@ -95,6 +96,8 @@ func NewController(
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "selinux_warning"})
+	seLinuxTranslator := &translator.ControllerSELinuxTranslator{}
+
 	c := &Controller{
 		kubeClient:        kubeClient,
 		podLister:         podInformer.Lister(),
@@ -107,7 +110,7 @@ func NewController(
 		csiDriverLister:   csiDriverInformer.Lister(),
 		csiDriversSynced:  csiDriverInformer.Informer().HasSynced,
 		vpm:               &volume.VolumePluginMgr{},
-		seLinuxTranslator: volumeutil.NewSELinuxLabelTranslator(),
+		seLinuxTranslator: seLinuxTranslator,
 
 		eventBroadcaster: eventBroadcaster,
 		eventRecorder:    recorder,
@@ -117,7 +120,7 @@ func NewController(
 				Name: "selinux_warning",
 			},
 		),
-		labelCache: volumecache.NewVolumeLabelCache(),
+		labelCache: volumecache.NewVolumeLabelCache(seLinuxTranslator),
 	}
 
 	err := c.vpm.InitPlugins(plugins, prober, c)
@@ -347,6 +350,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	c.eventBroadcaster.StartStructuredLogging(3) // verbosity level 3 is used by the other KCM controllers
 	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.kubeClient.CoreV1().Events("")})
+	defer c.eventBroadcaster.Shutdown()
 
 	if !cache.WaitForNamedCacheSync("selinux_warning", ctx.Done(), c.podsSynced, c.pvcsSynced, c.pvsSynced, c.csiDriversSynced) {
 		return
@@ -448,10 +452,9 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 			continue
 		}
 
-		// Ignore how the volume is going to be mounted.
-		// Report any errors when a volume is used by two pods with different SELinux labels regardless of their
-		// SELinuxChangePolicy
-		seLinuxLabel := mountInfo.SELinuxProcessLabel
+		// Use the same label as kubelet will use for mount -o context.
+		// If the Pod has opted in to Recursive policy, it will be empty string here and no conflicts will be reported for it.
+		seLinuxLabel := mountInfo.SELinuxMountLabel
 
 		err = c.syncVolume(logger, pod, spec, seLinuxLabel, mountInfo.PluginSupportsSELinuxContextMount)
 		if err != nil {

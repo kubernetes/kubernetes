@@ -392,6 +392,7 @@ Starts a HTTP(S) server on given port with the following endpoints:
 
 - `/`: Returns the request's timestamp.
 - `/clientip`: Returns the request's IP address.
+- `/serverport`: Returns the server port.
 - `/dial`: Creates a given number of requests to the given host and port using the given protocol,
   and returns a JSON with the fields `responses` (successful request responses) and `errors` (
   failed request responses). Returns `200 OK` status code if the last request succeeded,
@@ -527,6 +528,21 @@ Usage:
 
 ```console
     kubectl exec test-agnhost -- /agnhost pause
+```
+
+
+### podcertificatesigner
+
+Runs a controller that signs PodCertificateRequests addressed to the signer name specified in the `--signer-name` flag.  It generates a CA hierarchy in-memory at startup.
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
+      --restart=Always \
+      -- \
+      podcertificatesigner \
+      --signer-name=agnhost.k8s.io/testsigner
 ```
 
 

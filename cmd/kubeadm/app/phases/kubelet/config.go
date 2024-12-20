@@ -22,8 +22,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
 
@@ -110,7 +109,7 @@ func ApplyPatchesToConfig(cfg *kubeadmapi.ClusterConfiguration, patchesDir strin
 		}
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(kubeletBytes)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(kubeletBytes)
 	if err != nil {
 		return err
 	}

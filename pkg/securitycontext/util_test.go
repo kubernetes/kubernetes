@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	utilptr "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestAddNoNewPrivileges(t *testing.T) {
@@ -73,11 +73,11 @@ func TestConvertToRuntimeMaskedPaths(t *testing.T) {
 	}{
 		"procMount nil": {
 			pm:     nil,
-			expect: defaultMaskedPaths,
+			expect: defaultMaskedPaths(),
 		},
 		"procMount default": {
 			pm:     &dPM,
-			expect: defaultMaskedPaths,
+			expect: defaultMaskedPaths(),
 		},
 		"procMount unmasked": {
 			pm:     &uPM,
@@ -188,10 +188,10 @@ func TestDetermineEffectiveRunAsUser(t *testing.T) {
 			},
 			container: &v1.Container{
 				SecurityContext: &v1.SecurityContext{
-					RunAsUser: utilptr.Int64Ptr(1),
+					RunAsUser: ptr.To[int64](1),
 				},
 			},
-			wantRunAsUser: utilptr.Int64Ptr(1),
+			wantRunAsUser: ptr.To[int64](1),
 		},
 	}
 

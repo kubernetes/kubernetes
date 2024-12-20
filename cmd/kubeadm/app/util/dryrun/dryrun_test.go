@@ -36,7 +36,7 @@ func TestPrintDryRunFiles(t *testing.T) {
 	}()
 	fileContents := "apiVersion: kubeadm.k8s.io/unknownVersion"
 	filename := "testfile"
-	cfgPath := filepath.Join(tmpdir, filename)
+	cfgPath := filepath.ToSlash(filepath.Join(tmpdir, filename))
 	err = os.WriteFile(cfgPath, []byte(fileContents), 0644)
 	if err != nil {
 		t.Fatalf("Couldn't write context to file: %v", err)

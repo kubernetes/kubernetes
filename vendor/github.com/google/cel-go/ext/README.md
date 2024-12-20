@@ -356,6 +356,23 @@ Examples:
     math.isFinite(0.0/0.0)  // returns false
     math.isFinite(1.2)      // returns true
 
+### Math.Sqrt
+
+Introduced at version: 2
+
+Returns the square root of the given input as double
+Throws error for negative or non-numeric inputs
+
+    math.sqrt(<double>) -> <double>
+    math.sqrt(<int>) -> <double>
+    math.sqrt(<uint>) -> <double>
+
+Examples:
+
+    math.sqrt(81) // returns 9.0
+    math.sqrt(985.25)   // returns 31.388692231439016
+    math.sqrt(-15)  // returns NaN
+
 ## Protos
 
 Protos configure extended macros and functions for proto manipulation.
@@ -395,7 +412,7 @@ zero-based.
 
 ### Distinct
 
-**Introduced in version 2**
+**Introduced in version 2 (cost support in version 3)**
 
 Returns the distinct elements of a list.
 
@@ -409,7 +426,7 @@ Examples:
 
 ### Flatten
 
-**Introduced in version 1**
+**Introduced in version 1 (cost support in version 3)**
 
 Flattens a list recursively.
 If an optional depth is provided, the list is flattened to a the specificied level.
@@ -428,7 +445,7 @@ Examples:
 
 ### Range
 
-**Introduced in version 2**
+**Introduced in version 2 (cost support in version 3)**
 
 Returns a list of integers from 0 to n-1.
 
@@ -441,7 +458,7 @@ Examples:
 
 ### Reverse
 
-**Introduced in version 2**
+**Introduced in version 2 (cost support in version 3)**
 
 Returns the elements of a list in reverse order.
 
@@ -454,6 +471,7 @@ Examples:
 
 ### Slice
 
+**Introduced in version 0 (cost support in version 3)**
 
 Returns a new sub-list using the indexes provided.
 
@@ -466,7 +484,7 @@ Examples:
 
 ### Sort
 
-**Introduced in version 2**
+**Introduced in version 2 (cost support in version 3)**
 
 Sorts a list with comparable elements. If the element type is not comparable
 or the element types are not the same, the function will produce an error.
@@ -483,7 +501,7 @@ Examples:
 
 ### SortBy
 
-**Introduced in version 2**
+**Introduced in version 2 (cost support in version 3)**
 
 Sorts a list by a key value, i.e., the order is determined by the result of
 an expression applied to each element of the list.

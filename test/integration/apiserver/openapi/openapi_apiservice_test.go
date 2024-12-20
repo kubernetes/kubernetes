@@ -69,7 +69,9 @@ func TestSlowAPIServiceOpenAPIDoesNotBlockHealthCheck(t *testing.T) {
 		http.ServeContent(w, r, "/openapi/v2", time.Now(), bytes.NewReader(data))
 	}))
 	go func() {
-		require.NoError(t, service.Run(ctx))
+		if err := service.Run(ctx); err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}()
 	require.NoError(t, service.WaitForReady(ctx))
 
@@ -131,7 +133,9 @@ func TestFetchingOpenAPIBeforeReady(t *testing.T) {
 		http.ServeContent(w, r, "/openapi/v2", time.Now(), bytes.NewReader(data))
 	}))
 	go func() {
-		require.NoError(t, service.Run(ctx))
+		if err := service.Run(ctx); err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}()
 	require.NoError(t, service.WaitForReady(ctx))
 

@@ -31,11 +31,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // EntryMap holds a map of user or group entries.

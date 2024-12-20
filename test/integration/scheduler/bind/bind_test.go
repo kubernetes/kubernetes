@@ -17,53 +17,70 @@ limitations under the License.
 package bind
 
 import (
+	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestDefaultBinder tests the binding process in the scheduler.
 func TestDefaultBinder(t *testing.T) {
-	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, "", nil), 0)
-	testutil.SyncSchedulerInformerFactory(testCtx)
+	for _, asyncAPICallsEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("Async API calls enabled: %v", asyncAPICallsEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncAPICalls, asyncAPICallsEnabled)
 
-	// Add a node.
-	node, err := testutil.CreateNode(testCtx.ClientSet, st.MakeNode().Name("testnode").Obj())
-	if err != nil {
-		t.Fatal(err)
-	}
+			testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, "", nil), 0)
+			testutil.SyncSchedulerInformerFactory(testCtx)
+			if testCtx.Scheduler.APIDispatcher != nil {
+				logger, _ := ktesting.NewTestContext(t)
+				testCtx.Scheduler.APIDispatcher.Run(logger)
+				defer testCtx.Scheduler.APIDispatcher.Close()
+			}
 
-	tests := map[string]struct {
-		anotherUID     bool
-		wantStatusCode framework.Code
-	}{
-		"same UID": {
-			wantStatusCode: framework.Success,
-		},
-		"different UID": {
-			anotherUID:     true,
-			wantStatusCode: framework.Error,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			pod, err := testutil.CreatePausePodWithResource(testCtx.ClientSet, "fixed-name", testCtx.NS.Name, nil)
+			// Add a node.
+			node, err := testutil.CreateNode(testCtx.ClientSet, st.MakeNode().Name("testnode").Obj())
 			if err != nil {
-				t.Fatalf("Failed to create pod: %v", err)
-			}
-			defer testutil.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*corev1.Pod{pod})
-
-			podCopy := pod.DeepCopy()
-			if tc.anotherUID {
-				podCopy.UID = "another"
+				t.Fatal(err)
 			}
 
-			status := testCtx.Scheduler.Profiles["default-scheduler"].RunBindPlugins(testCtx.Ctx, nil, podCopy, node.Name)
-			if code := status.Code(); code != tc.wantStatusCode {
-				t.Errorf("Bind returned code %s, want %s", code, tc.wantStatusCode)
+			tests := map[string]struct {
+				anotherUID     bool
+				wantStatusCode fwk.Code
+			}{
+				"same UID": {
+					wantStatusCode: fwk.Success,
+				},
+				"different UID": {
+					anotherUID:     true,
+					wantStatusCode: fwk.Error,
+				},
+			}
+			for name, tc := range tests {
+				t.Run(name, func(t *testing.T) {
+					pod, err := testutil.CreatePausePodWithResource(testCtx.ClientSet, "fixed-name", testCtx.NS.Name, nil)
+					if err != nil {
+						t.Fatalf("Failed to create pod: %v", err)
+					}
+					defer testutil.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*corev1.Pod{pod})
+
+					podCopy := pod.DeepCopy()
+					if tc.anotherUID {
+						podCopy.UID = "another"
+					}
+
+					status := testCtx.Scheduler.Profiles["default-scheduler"].RunBindPlugins(testCtx.Ctx, framework.NewCycleState(), podCopy, node.Name)
+					if code := status.Code(); code != tc.wantStatusCode {
+						t.Errorf("Bind returned code %s, want %s", code, tc.wantStatusCode)
+					}
+				})
 			}
 		})
 	}

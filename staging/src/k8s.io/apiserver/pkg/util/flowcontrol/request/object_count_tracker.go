@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -55,7 +56,7 @@ var (
 type StorageObjectCountTracker interface {
 	// Set is invoked to update the current number of total
 	// objects for the given resource
-	Set(string, int64)
+	Set(string, storage.Stats)
 
 	// Get returns the total number of objects for the given resource.
 	// The following errors are returned:
@@ -63,7 +64,7 @@ type StorageObjectCountTracker interface {
 	//    failures ObjectCountStaleErr is returned.
 	//  - if the given resource is not being tracked then
 	//    ObjectCountNotFoundErr is returned.
-	Get(string) (int64, error)
+	Get(string) (storage.Stats, error)
 
 	// RunUntil starts all the necessary maintenance.
 	RunUntil(stopCh <-chan struct{})
@@ -75,14 +76,14 @@ type StorageObjectCountTracker interface {
 func NewStorageObjectCountTracker() StorageObjectCountTracker {
 	return &objectCountTracker{
 		clock:  &clock.RealClock{},
-		counts: map[string]*timestampedCount{},
+		counts: map[string]*timestampedStats{},
 	}
 }
 
-// timestampedCount stores the count of a given resource with a last updated
+// timestampedStats stores the count of a given resource with a last updated
 // timestamp so we can prune it after it goes stale for certain threshold.
-type timestampedCount struct {
-	count         int64
+type timestampedStats struct {
+	storage.Stats
 	lastUpdatedAt time.Time
 }
 
@@ -92,21 +93,10 @@ type objectCountTracker struct {
 	clock clock.PassiveClock
 
 	lock   sync.RWMutex
-	counts map[string]*timestampedCount
+	counts map[string]*timestampedStats
 }
 
-func (t *objectCountTracker) Set(groupResource string, count int64) {
-	if count <= -1 {
-		// a value of -1 indicates that the 'Count' call failed to contact
-		// the storage layer, in most cases this error can be transient.
-		// we will continue to work with the count that is in the cache
-		// up to a certain threshold defined by staleTolerationThreshold.
-		// in case this becomes a non transient error then the count for
-		// the given resource will will eventually be removed from
-		// the cache by the pruner.
-		return
-	}
-
+func (t *objectCountTracker) Set(groupResource string, stats storage.Stats) {
 	now := t.clock.Now()
 
 	// lock for writing
@@ -114,18 +104,18 @@ func (t *objectCountTracker) Set(groupResource string, count int64) {
 	defer t.lock.Unlock()
 
 	if item, ok := t.counts[groupResource]; ok {
-		item.count = count
+		item.Stats = stats
 		item.lastUpdatedAt = now
 		return
 	}
 
-	t.counts[groupResource] = &timestampedCount{
-		count:         count,
+	t.counts[groupResource] = &timestampedStats{
+		Stats:         stats,
 		lastUpdatedAt: now,
 	}
 }
 
-func (t *objectCountTracker) Get(groupResource string) (int64, error) {
+func (t *objectCountTracker) Get(groupResource string) (storage.Stats, error) {
 	staleThreshold := t.clock.Now().Add(-staleTolerationThreshold)
 
 	t.lock.RLock()
@@ -133,11 +123,11 @@ func (t *objectCountTracker) Get(groupResource string) (int64, error) {
 
 	if item, ok := t.counts[groupResource]; ok {
 		if item.lastUpdatedAt.Before(staleThreshold) {
-			return item.count, ObjectCountStaleErr
+			return item.Stats, ObjectCountStaleErr
 		}
-		return item.count, nil
+		return item.Stats, nil
 	}
-	return 0, ObjectCountNotFoundErr
+	return storage.Stats{}, ObjectCountNotFoundErr
 }
 
 // RunUntil runs all the necessary maintenance.

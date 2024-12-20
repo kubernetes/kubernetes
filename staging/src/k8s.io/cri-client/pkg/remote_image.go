@@ -72,8 +72,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOpts = append(dialOpts,
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
 
 	connParams := grpc.ConnectParams{
@@ -165,7 +164,7 @@ func (r *remoteImageService) imageStatusV1(ctx context.Context, image *runtimeap
 	}
 
 	if resp.Image != nil {
-		if resp.Image.Id == "" || resp.Image.Size_ == 0 {
+		if resp.Image.Id == "" || resp.Image.Size == 0 {
 			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
 			err := errors.New(errorMessage)
 			r.logErr(err, "ImageStatus failed", "image", image.Image)

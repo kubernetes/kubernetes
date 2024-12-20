@@ -86,5 +86,5 @@ func newIocltStringSetReq(linkName string) (*Ifreq, *ethtoolSset) {
 // getSocketUDP returns file descriptor to new UDP socket
 // It is used for communication with ioctl interface.
 func getSocketUDP() (int, error) {
-	return syscall.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
+	return syscall.Socket(unix.AF_INET, unix.SOCK_DGRAM|unix.SOCK_CLOEXEC, 0)
 }

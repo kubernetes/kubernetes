@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/utils/ptr"
 )
@@ -139,4 +141,38 @@ func TestMergeProcessStats(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCadvisorPSIStruct checks the fields in cadvisor PSI structs. If cadvisor
+// PSI structs change, the conversion between cadvisor PSI structs and kubelet stats API structs needs to be re-evaluated and updated.
+func TestCadvisorPSIStructs(t *testing.T) {
+	psiStatsFields := sets.New("Full", "Some")
+	s := cadvisorapiv1.PSIStats{}
+	st := reflect.TypeOf(s)
+	for i := 0; i < st.NumField(); i++ {
+		field := st.Field(i)
+		if !psiStatsFields.Has(field.Name) {
+			t.Errorf("cadvisorapiv1.PSIStats contains unknown field: %s. The conversion between cadvisor PSIStats and kubelet stats API PSIStats needs to be re-evaluated and updated.", field.Name)
+		}
+	}
+
+	psiDataFields := map[string]reflect.Kind{
+		"Total":  reflect.Uint64,
+		"Avg10":  reflect.Float64,
+		"Avg60":  reflect.Float64,
+		"Avg300": reflect.Float64,
+	}
+	d := cadvisorapiv1.PSIData{}
+	dt := reflect.TypeOf(d)
+	for i := 0; i < dt.NumField(); i++ {
+		field := dt.Field(i)
+		wantKind, fieldExist := psiDataFields[field.Name]
+		if !fieldExist {
+			t.Errorf("cadvisorapiv1.PSIData contains unknown field: %s. The conversion between cadvisor PSIData and kubelet stats API PSIData needs to be re-evaluated and updated.", field.Name)
+		}
+		if field.Type.Kind() != wantKind {
+			t.Errorf("unexpected cadvisorapiv1.PSIStats field %s type, want: %s, got: %s. The conversion between cadvisor PSIStats and kubelet stats API PSIStats needs to be re-evaluated and updated.", field.Name, wantKind, field.Type.Kind())
+		}
+	}
+
 }

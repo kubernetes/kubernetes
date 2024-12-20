@@ -192,3 +192,9 @@ func (b *ResourceClaimTemplateSpecApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
 }
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ResourceClaimTemplateSpecApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
+}

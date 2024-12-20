@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -51,19 +53,21 @@ type PodResourcesOptions struct {
 	// from the calculation. If pod-level resources are not set in PodSpec,
 	// pod-level resources will always be skipped.
 	SkipPodLevelResources bool
+	// SkipContainerLevelResources
+	SkipContainerLevelResources bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
 
 func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
-	return supportedPodLevelResources
+	return supportedPodLevelResources.Clone().Insert(v1.ResourceHugePagesPrefix)
 }
 
 // IsSupportedPodLevelResources checks if a given resource is supported by pod-level
 // resource management through the PodLevelResources feature. Returns true if
 // the resource is supported.
 func IsSupportedPodLevelResource(name v1.ResourceName) bool {
-	return supportedPodLevelResources.Has(name)
+	return supportedPodLevelResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
 }
 
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
@@ -112,13 +116,37 @@ func IsPodLevelRequestsSet(pod *v1.Pod) bool {
 	return false
 }
 
+// IsPodLevelLimitsSet checks if pod-level limits are set. It returns true if
+// Limits map is non-empty and contains at least one supported pod-level resource.
+func IsPodLevelLimitsSet(pod *v1.Pod) bool {
+	if pod.Spec.Resources == nil {
+		return false
+	}
+
+	if len(pod.Spec.Resources.Limits) == 0 {
+		return false
+	}
+
+	for resourceName := range pod.Spec.Resources.Limits {
+		if IsSupportedPodLevelResource(resourceName) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // PodRequests computes the total pod requests per the PodResourcesOptions supplied.
 // If PodResourcesOptions is nil, then the requests are returned including pod overhead.
 // If the PodLevelResources feature is enabled AND the pod-level resources are set,
 // those pod-level values are used in calculating Pod Requests.
 // The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	reqs := AggregateContainerRequests(pod, opts)
+	reqs := v1.ResourceList{}
+	if !opts.SkipContainerLevelResources {
+		reqs = AggregateContainerRequests(pod, opts)
+	}
+
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
 			if IsSupportedPodLevelResource(resourceName) {
@@ -223,18 +251,38 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 
 // determineContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
 func determineContainerReqs(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
-	if pod.Status.Resize == v1.PodResizeStatusInfeasible {
-		return cs.Resources.Requests.DeepCopy()
+	if IsPodResizeInfeasible(pod) {
+		return max(cs.Resources.Requests, cs.AllocatedResources)
 	}
-	return max(container.Resources.Requests, cs.Resources.Requests)
+	return max(container.Resources.Requests, cs.Resources.Requests, cs.AllocatedResources)
 }
 
 // determineContainerLimits will return a copy of the container limits based on if resizing is feasible or not.
 func determineContainerLimits(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
-	if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+	if IsPodResizeInfeasible(pod) {
 		return cs.Resources.Limits.DeepCopy()
 	}
 	return max(container.Resources.Limits, cs.Resources.Limits)
+}
+
+// IsPodResizeInfeasible returns true if the pod condition PodResizePending is set to infeasible.
+func IsPodResizeInfeasible(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			return condition.Reason == v1.PodReasonInfeasible
+		}
+	}
+	return false
+}
+
+// IsPodResizeDeferred returns true if the pod condition PodResizePending is set to deferred.
+func IsPodResizeDeferred(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			return condition.Reason == v1.PodReasonDeferred
+		}
+	}
+	return false
 }
 
 // applyNonMissing will return a copy of the given resource list with any missing values replaced by the nonMissing values
@@ -379,23 +427,17 @@ func maxResourceList(list, newList v1.ResourceList) {
 	}
 }
 
-// max returns the result of max(a, b) for each named resource and is only used if we can't
+// max returns the result of max(a, b...) for each named resource and is only used if we can't
 // accumulate into an existing resource list
-func max(a v1.ResourceList, b v1.ResourceList) v1.ResourceList {
-	result := v1.ResourceList{}
-	for key, value := range a {
-		if other, found := b[key]; found {
-			if value.Cmp(other) <= 0 {
-				result[key] = other.DeepCopy()
-				continue
-			}
-		}
-		result[key] = value.DeepCopy()
+func max(a v1.ResourceList, b ...v1.ResourceList) v1.ResourceList {
+	var result v1.ResourceList
+	if a != nil {
+		result = a.DeepCopy()
+	} else {
+		result = v1.ResourceList{}
 	}
-	for key, value := range b {
-		if _, found := result[key]; !found {
-			result[key] = value.DeepCopy()
-		}
+	for _, other := range b {
+		maxResourceList(result, other)
 	}
 	return result
 }

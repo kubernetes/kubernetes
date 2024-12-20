@@ -28,12 +28,12 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -41,13 +41,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 // NodePortRange should match whatever the default/configured range is
@@ -655,23 +654,25 @@ func (j *TestJig) waitForCondition(ctx context.Context, timeout time.Duration, m
 	return service, nil
 }
 
-// newRCTemplate returns the default v1.ReplicationController object for
-// this j, but does not actually create the RC.  The default RC has the same
+// newDeploymentTemplate returns the default appsv1.Deployment object for
+// this j, but does not actually create the Deployment. The default Deployment has the same
 // name as the j and runs the "netexec" container.
-func (j *TestJig) newRCTemplate() *v1.ReplicationController {
+func (j *TestJig) newDeploymentTemplate() *appsv1.Deployment {
 	var replicas int32 = 1
 	var grace int64 = 3 // so we don't race with kube-proxy when scaling up/down
 
-	rc := &v1.ReplicationController{
+	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: j.Namespace,
 			Name:      j.Name,
 			Labels:    j.Labels,
 		},
-		Spec: v1.ReplicationControllerSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: j.Labels,
-			Template: &v1.PodTemplateSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: j.Labels,
+			},
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: j.Labels,
 				},
@@ -697,22 +698,22 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 			},
 		},
 	}
-	return rc
+	return deployment
 }
 
-// AddRCAntiAffinity adds AntiAffinity to the given ReplicationController.
-func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
+// AddDeploymentAntiAffinity adds AntiAffinity to the given Deployment.
+func (j *TestJig) AddDeploymentAntiAffinity(deployment *appsv1.Deployment) {
 	var replicas int32 = 2
 
-	rc.Spec.Replicas = &replicas
-	if rc.Spec.Template.Spec.Affinity == nil {
-		rc.Spec.Template.Spec.Affinity = &v1.Affinity{}
+	deployment.Spec.Replicas = &replicas
+	if deployment.Spec.Template.Spec.Affinity == nil {
+		deployment.Spec.Template.Spec.Affinity = &v1.Affinity{}
 	}
-	if rc.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
-		rc.Spec.Template.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
+	if deployment.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
+		deployment.Spec.Template.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
 	}
-	rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-		rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+	deployment.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+		deployment.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 		v1.PodAffinityTerm{
 			LabelSelector: &metav1.LabelSelector{MatchLabels: j.Labels},
 			Namespaces:    nil,
@@ -720,9 +721,9 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 		})
 }
 
-// CreatePDB returns a PodDisruptionBudget for the given ReplicationController, or returns an error if a PodDisruptionBudget isn't ready
-func (j *TestJig) CreatePDB(ctx context.Context, rc *v1.ReplicationController) (*policyv1.PodDisruptionBudget, error) {
-	pdb := j.newPDBTemplate(rc)
+// CreatePDB returns a PodDisruptionBudget for the given Deployment, or returns an error if a PodDisruptionBudget isn't ready
+func (j *TestJig) CreatePDB(ctx context.Context, deployment *appsv1.Deployment) (*policyv1.PodDisruptionBudget, error) {
+	pdb := j.newPDBTemplate(deployment)
 	newPdb, err := j.Client.PolicyV1().PodDisruptionBudgets(j.Namespace).Create(ctx, pdb, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
@@ -736,8 +737,8 @@ func (j *TestJig) CreatePDB(ctx context.Context, rc *v1.ReplicationController) (
 
 // newPDBTemplate returns the default policyv1.PodDisruptionBudget object for
 // this j, but does not actually create the PDB.  The default PDB specifies a
-// MinAvailable of N-1 and matches the pods created by the RC.
-func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisruptionBudget {
+// MinAvailable of N-1 and matches the pods created by the Deployment.
+func (j *TestJig) newPDBTemplate(rc *appsv1.Deployment) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt32(*rc.Spec.Replicas - 1)
 
 	pdb := &policyv1.PodDisruptionBudget{
@@ -755,49 +756,43 @@ func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisr
 	return pdb
 }
 
-// Run creates a ReplicationController and Pod(s) and waits for the
-// Pod(s) to be running. Callers can provide a function to tweak the RC object
+// Run creates a Deployment and Pod(s) and waits for the
+// Pod(s) to be running. Callers can provide a function to tweak the Deployment object
 // before it is created.
-func (j *TestJig) Run(ctx context.Context, tweak func(rc *v1.ReplicationController)) (*v1.ReplicationController, error) {
-	rc := j.newRCTemplate()
+func (j *TestJig) Run(ctx context.Context, tweak func(rc *appsv1.Deployment)) (*appsv1.Deployment, error) {
+	deployment := j.newDeploymentTemplate()
 	if tweak != nil {
-		tweak(rc)
+		tweak(deployment)
 	}
-	result, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).Create(ctx, rc, metav1.CreateOptions{})
+
+	result, err := j.Client.AppsV1().Deployments(j.Namespace).Create(ctx, deployment, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create RC %q: %w", rc.Name, err)
+		return nil, fmt.Errorf("failed to create Deployment %q: %w", deployment.Name, err)
 	}
-	pods, err := j.waitForPodsCreated(ctx, int(*(rc.Spec.Replicas)))
+
+	err = e2edeployment.WaitForDeploymentComplete(j.Client, result)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pods: %w", err)
+		return nil, fmt.Errorf("failed waiting for Deployment %q: %w", deployment.Name, err)
 	}
-	if err := j.waitForPodsReady(ctx, pods); err != nil {
-		return nil, fmt.Errorf("failed waiting for pods to be running: %w", err)
-	}
+
 	return result, nil
 }
 
 // Scale scales pods to the given replicas
-func (j *TestJig) Scale(ctx context.Context, replicas int) error {
-	rc := j.Name
-	scale, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).GetScale(ctx, rc, metav1.GetOptions{})
+func (j *TestJig) Scale(replicas int) error {
+	deployment, err := e2edeployment.UpdateDeploymentWithRetries(j.Client, j.Namespace, j.Name, func(deployment *appsv1.Deployment) {
+		deployment.Spec.Replicas = ptr.To(int32(replicas))
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get scale for RC %q: %w", rc, err)
+		return fmt.Errorf("failed to scale Deployment %q: %w", j.Name, err)
 	}
 
-	scale.ResourceVersion = "" // indicate the scale update should be unconditional
-	scale.Spec.Replicas = int32(replicas)
-	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(ctx, rc, scale, metav1.UpdateOptions{})
+	err = e2edeployment.WaitForDeploymentComplete(j.Client, deployment)
+
 	if err != nil {
-		return fmt.Errorf("failed to scale RC %q: %w", rc, err)
+		return fmt.Errorf("failed waiting for Deployment %q: %w", j.Name, err)
 	}
-	pods, err := j.waitForPodsCreated(ctx, replicas)
-	if err != nil {
-		return fmt.Errorf("failed waiting for pods: %w", err)
-	}
-	if err := j.waitForPodsReady(ctx, pods); err != nil {
-		return fmt.Errorf("failed waiting for pods to be running: %w", err)
-	}
+
 	return nil
 }
 
@@ -814,43 +809,6 @@ func (j *TestJig) waitForPdbReady(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("timeout waiting for PDB %q to be ready", j.Name)
-}
-
-func (j *TestJig) waitForPodsCreated(ctx context.Context, replicas int) ([]string, error) {
-	// TODO (pohly): replace with gomega.Eventually
-	timeout := 2 * time.Minute
-	// List the pods, making sure we observe all the replicas.
-	label := labels.SelectorFromSet(labels.Set(j.Labels))
-	framework.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
-	for start := time.Now(); time.Since(start) < timeout && ctx.Err() == nil; time.Sleep(2 * time.Second) {
-		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := j.Client.CoreV1().Pods(j.Namespace).List(ctx, options)
-		if err != nil {
-			return nil, err
-		}
-
-		found := []string{}
-		for _, pod := range pods.Items {
-			if pod.DeletionTimestamp != nil {
-				continue
-			}
-			found = append(found, pod.Name)
-		}
-		if len(found) == replicas {
-			framework.Logf("Found all %d pods", replicas)
-			return found, nil
-		}
-		framework.Logf("Found %d/%d pods - will retry", len(found), replicas)
-	}
-	return nil, fmt.Errorf("timeout waiting for %d pods to be created", replicas)
-}
-
-func (j *TestJig) waitForPodsReady(ctx context.Context, pods []string) error {
-	timeout := 2 * time.Minute
-	if !e2epod.CheckPodsRunningReady(ctx, j.Client, j.Namespace, pods, timeout) {
-		return fmt.Errorf("timeout waiting for %d pods to be ready", len(pods))
-	}
-	return nil
 }
 
 func testReachabilityOverServiceName(ctx context.Context, serviceName string, sp v1.ServicePort, execPod *v1.Pod) error {
@@ -1065,18 +1023,20 @@ func (j *TestJig) CheckServiceReachability(ctx context.Context, svc *v1.Service,
 
 // CreateServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
 func (j *TestJig) CreateServicePods(ctx context.Context, replica int) error {
-	config := testutils.RCConfig{
-		Client:       j.Client,
-		Name:         j.Name,
-		Image:        imageutils.GetE2EImage(imageutils.Agnhost),
-		Command:      []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"},
-		Namespace:    j.Namespace,
-		Labels:       j.Labels,
-		PollInterval: 3 * time.Second,
-		Timeout:      framework.PodReadyBeforeTimeout,
-		Replicas:     replica,
+	deploymentConfig := e2edeployment.NewDeployment(j.Name,
+		int32(replica),
+		j.Labels,
+		j.Name,
+		imageutils.GetE2EImage(imageutils.Agnhost),
+		appsv1.RecreateDeploymentStrategyType)
+	deploymentConfig.Spec.Template.Spec.Containers[0].Command = []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"}
+
+	deployment, err := j.Client.AppsV1().Deployments(j.Namespace).Create(ctx, deploymentConfig, metav1.CreateOptions{})
+	if err != nil {
+		return err
 	}
-	return e2erc.RunRC(ctx, config)
+
+	return e2edeployment.WaitForDeploymentComplete(j.Client, deployment)
 }
 
 // CreateSCTPServiceWithPort creates a new SCTP Service with given port based on the

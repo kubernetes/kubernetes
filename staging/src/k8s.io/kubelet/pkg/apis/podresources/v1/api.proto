@@ -4,16 +4,6 @@ syntax = "proto3";
 package v1;
 option go_package = "k8s.io/kubelet/pkg/apis/podresources/v1";
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
-option (gogoproto.goproto_stringer_all) = false;
-option (gogoproto.stringer_all) =  true;
-option (gogoproto.goproto_getters_all) = true;
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_unrecognized_all) = false;
-
 
 // PodResourcesLister is a service provided by the kubelet that provides information about the
 // node resources consumed by pods and containers on the node
@@ -94,7 +84,7 @@ message DynamicResource {
 // of resources, then device_name will be empty and other fields will get added.
 // Each device at the DRA API level may map to zero or more CDI devices.
 message ClaimResource {
-    repeated CDIDevice cdi_devices = 1 [(gogoproto.customname) = "CDIDevices"];
+    repeated CDIDevice cdi_devices = 1;
     string driver_name = 2;
     string pool_name = 3;
     string device_name = 4;

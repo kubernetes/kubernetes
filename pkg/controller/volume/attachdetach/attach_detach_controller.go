@@ -21,12 +21,10 @@ package attachdetach
 import (
 	"context"
 	"fmt"
-	"net"
 	"time"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -806,16 +804,12 @@ func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volu
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
-func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
+func (adc *attachDetachController) GetMounter() mount.Interface {
 	return nil
 }
 
 func (adc *attachDetachController) GetHostName() string {
 	return ""
-}
-
-func (adc *attachDetachController) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
 func (adc *attachDetachController) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -849,10 +843,6 @@ func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UI
 		// nolint:logcheck
 		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in attachDetachController")
 	}
-}
-
-func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface {
-	return utilexec.New()
 }
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {

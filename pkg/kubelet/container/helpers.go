@@ -29,9 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
@@ -69,6 +72,9 @@ type RuntimeHelper interface {
 
 	// SetPodWatchCondition flags a pod to be inspected until the condition is met.
 	SetPodWatchCondition(types.UID, string, func(*PodStatus) bool)
+
+	// PodCPUAndMemoryStats reads the latest CPU & memory usage stats.
+	PodCPUAndMemoryStats(context.Context, *v1.Pod, *PodStatus) (*statsapi.PodStats, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
@@ -94,6 +100,9 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 		return true
 	}
 	// Check RestartPolicy for dead container
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+		return podutil.ContainerShouldRestart(*container, pod.Spec, int32(status.ExitCode))
+	}
 	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
 		klog.V(4).InfoS("Already ran container, do nothing", "pod", klog.KObj(pod), "containerName", container.Name)
 		return false
@@ -151,7 +160,8 @@ func v1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
 }
 
 // ExpandContainerCommandOnlyStatic substitutes only static environment variable values from the
-// container environment definitions. This does *not* include valueFrom substitutions.
+// container environment definitions. This does *not* include valueFrom substitutions. Note any unbound
+// variables will not be expanded or empty substituted, i.e. "echo $(MISSING) => echo $(MISSING)".
 // TODO: callers should use ExpandContainerCommandAndArgs with a fully resolved list of environment.
 func ExpandContainerCommandOnlyStatic(containerCommand []string, envs []v1.EnvVar) (command []string) {
 	mapping := expansion.MappingFuncFor(v1EnvVarsToMap(envs))
@@ -396,6 +406,8 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 // HasAnyRegularContainerStarted returns true if any regular container has
 // started, which indicates all init containers have been initialized.
+// Deprecated: This function is not accurate when its pod sandbox is recreated.
+// Use HasAnyActiveRegularContainerStarted instead.
 func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStatus) bool {
 	if len(statuses) == 0 {
 		return false
@@ -413,6 +425,29 @@ func HasAnyRegularContainerStarted(spec *v1.PodSpec, statuses []v1.ContainerStat
 		if status.State.Running != nil || status.State.Terminated != nil {
 			return true
 		}
+	}
+
+	return false
+}
+
+// HasAnyActiveRegularContainerStarted returns true if any regular container of
+// the current pod sandbox has started, which indicates all init containers
+// have been initialized.
+func HasAnyActiveRegularContainerStarted(spec *v1.PodSpec, podStatus *PodStatus) bool {
+	if podStatus == nil {
+		return false
+	}
+
+	containerNames := sets.New[string]()
+	for _, c := range spec.Containers {
+		containerNames.Insert(c.Name)
+	}
+
+	for _, status := range podStatus.ActiveContainerStatuses {
+		if !containerNames.Has(status.Name) {
+			continue
+		}
+		return true
 	}
 
 	return false

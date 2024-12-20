@@ -30,6 +30,6 @@ func newStreamProtocolV5(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV5) stream(conn streamCreator) error {
-	return p.streamProtocolV4.stream(conn)
+func (p *streamProtocolV5) stream(conn streamCreator, ready chan<- struct{}) error {
+	return p.streamProtocolV4.stream(conn, ready)
 }

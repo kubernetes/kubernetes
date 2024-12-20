@@ -165,6 +165,24 @@ func (s *SnippetWriter) Dup(w io.Writer) *SnippetWriter {
 
 // Append adds the contents of the io.Reader to this SnippetWriter's buffer.
 func (s *SnippetWriter) Append(r io.Reader) error {
+	// The behavior of Do() is to ignore all future calls if there's an error,
+	// assuming the top-level caller will check Error().  This method is
+	// effectively a fancy Do(), so keep the same semantic.
+	if s.err != nil {
+		return nil
+	}
 	_, err := io.Copy(s.w, r)
 	return err
+}
+
+// Merge adds the contents of the io.Reader to this SnippetWriter's buffer and
+// sets this SnippetWriter's error to the other's, if needed.
+func (s *SnippetWriter) Merge(r io.Reader, other *SnippetWriter) error {
+	if s.err != nil {
+		return nil
+	}
+	if other.err != nil {
+		s.err = other.err
+	}
+	return s.Append(r)
 }

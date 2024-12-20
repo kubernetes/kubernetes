@@ -266,6 +266,8 @@ run_tests() {
   export KUBE_CONTAINER_RUNTIME=remote
   export KUBE_CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
   export KUBE_CONTAINER_RUNTIME_NAME=containerd
+  export SNAPSHOTTER_VERSION="${SNAPSHOTTER_VERSION:-v8.3.0}"
+  echo "SNAPSHOTTER_VERSION is $SNAPSHOTTER_VERSION"
   # ginkgo can take forever to exit, so we run it in the background and save the
   # PID, bash will not run traps while waiting on a process, but it will while
   # running a builtin like `wait`, saving the PID also allows us to forward the
@@ -278,10 +280,10 @@ run_tests() {
   kubectl apply -f test/e2e/testing-manifests/storage-csi/external-snapshotter/groupsnapshot.storage.k8s.io_volumegroupsnapshotcontents.yaml || exit 1
   kubectl apply -f test/e2e/testing-manifests/storage-csi/external-snapshotter/groupsnapshot.storage.k8s.io_volumegroupsnapshots.yaml || exit 1
 
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || exit 1
-  curl -s https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | \
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/"${SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || exit 1
+  curl -s https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/"${SNAPSHOTTER_VERSION}"/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | \
 awk '/--leader-election=true/ {print; print "            - \"--feature-gates=CSIVolumeGroupSnapshot=true\""; next}1' |  \
-sed 's|image: registry.k8s.io/sig-storage/snapshot-controller:v8.0.1|image: registry.k8s.io/sig-storage/snapshot-controller:v8.2.0|' | \
+sed "s|image: registry.k8s.io/sig-storage/snapshot-controller:.*|image: registry.k8s.io/sig-storage/snapshot-controller:${SNAPSHOTTER_VERSION}|" | \
  kubectl apply -f - || exit 1
 
 

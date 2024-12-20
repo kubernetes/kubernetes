@@ -24,10 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
@@ -35,6 +34,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
 
@@ -57,7 +57,7 @@ func (f *fakeEtcdClient) Endpoints() []string {
 }
 
 // MemberList lists the current cluster membership.
-func (f *fakeEtcdClient) MemberList(_ context.Context) (*clientv3.MemberListResponse, error) {
+func (f *fakeEtcdClient) MemberList(_ context.Context, _ ...clientv3.OpOption) (*clientv3.MemberListResponse, error) {
 	return &clientv3.MemberListResponse{
 		Members: f.members,
 	}, nil

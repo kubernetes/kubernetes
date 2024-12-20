@@ -20,12 +20,11 @@ import (
 	"maps"
 	"sync"
 
+	"google.golang.org/protobuf/proto"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -211,7 +210,7 @@ func (pdev *podDevices) toCheckpointData() []checkpoint.PodDevicesEntry {
 					continue
 				}
 
-				allocResp, err := devices.allocResp.Marshal()
+				allocResp, err := proto.Marshal(devices.allocResp)
 				if err != nil {
 					klog.ErrorS(err, "Can't marshal allocResp", "podUID", podUID, "containerName", conName, "resourceName", resource)
 					continue
@@ -235,7 +234,7 @@ func (pdev *podDevices) fromCheckpointData(data []checkpoint.PodDevicesEntry) {
 			"podUID", entry.PodUID, "containerName", entry.ContainerName,
 			"resourceName", entry.ResourceName, "deviceIDs", entry.DeviceIDs, "allocated", entry.AllocResp)
 		allocResp := &pluginapi.ContainerAllocateResponse{}
-		err := allocResp.Unmarshal(entry.AllocResp)
+		err := proto.Unmarshal(entry.AllocResp, allocResp)
 		if err != nil {
 			klog.ErrorS(err, "Can't unmarshal allocResp", "podUID", entry.PodUID, "containerName", entry.ContainerName, "resourceName", entry.ResourceName)
 			continue
@@ -344,11 +343,9 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 			opts.Annotations = append(opts.Annotations, kubecontainer.Annotation{Name: k, Value: v})
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DevicePluginCDIDevices) {
-			// Updates for CDI devices.
-			cdiDevices := getCDIDeviceInfo(resp, allCDIDevices)
-			opts.CDIDevices = append(opts.CDIDevices, cdiDevices...)
-		}
+		// Updates for CDI devices.
+		cdiDevices := getCDIDeviceInfo(resp, allCDIDevices)
+		opts.CDIDevices = append(opts.CDIDevices, cdiDevices...)
 	}
 
 	return opts
@@ -357,7 +354,7 @@ func (pdev *podDevices) deviceRunContainerOptions(podUID, contName string) *Devi
 // getCDIDeviceInfo returns CDI devices from an allocate response
 func getCDIDeviceInfo(resp *pluginapi.ContainerAllocateResponse, knownCDIDevices sets.Set[string]) []kubecontainer.CDIDevice {
 	var cdiDevices []kubecontainer.CDIDevice
-	for _, cdiDevice := range resp.CDIDevices {
+	for _, cdiDevice := range resp.CdiDevices {
 		if knownCDIDevices.Has(cdiDevice.Name) {
 			klog.V(4).InfoS("Skip existing CDI Device", "name", cdiDevice.Name)
 			continue
@@ -390,7 +387,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 		if len(allocateInfo.deviceIds) == 0 {
 			continue
 		}
-		devicePluginMap := make(map[string]pluginapi.Device)
+		devicePluginMap := make(map[string]*pluginapi.Device)
 		for numaid, devlist := range allocateInfo.deviceIds {
 			for _, devID := range devlist {
 				var topology *pluginapi.TopologyInfo
@@ -405,7 +402,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 					// ID and Healthy are not relevant here.
 					topology = &pluginapi.TopologyInfo{Nodes: NUMANodes}
 				}
-				devicePluginMap[devID] = pluginapi.Device{
+				devicePluginMap[devID] = &pluginapi.Device{
 					Topology: topology,
 				}
 			}
@@ -416,7 +413,7 @@ func (pdev *podDevices) getContainerDevices(podUID, contName string) ResourceDev
 }
 
 // DeviceInstances is a mapping device name -> plugin device data
-type DeviceInstances map[string]pluginapi.Device
+type DeviceInstances map[string]*pluginapi.Device
 
 // ResourceDeviceInstances is a mapping resource name -> DeviceInstances
 type ResourceDeviceInstances map[string]DeviceInstances

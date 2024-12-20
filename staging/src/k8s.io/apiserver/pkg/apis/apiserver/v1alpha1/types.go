@@ -295,6 +295,18 @@ type Issuer struct {
 	//   example: claimValidationRule[].expression: 'sets.equivalent(claims.aud, ["bar", "foo", "baz"])' to require an exact match.
 	// +optional
 	AudienceMatchPolicy AudienceMatchPolicyType `json:"audienceMatchPolicy,omitempty"`
+
+	// egressSelectorType is an indicator of which egress selection should be used for sending all traffic related
+	// to this issuer (discovery, JWKS, distributed claims, etc).  If unspecified, no custom dialer is used.
+	// When specified, the valid choices are "controlplane" and "cluster".  These correspond to the associated
+	// values in the --egress-selector-config-file.
+	//
+	// - controlplane: for traffic intended to go to the control plane.
+	//
+	// - cluster: for traffic intended to go to the system being managed by Kubernetes.
+	//
+	// +optional
+	EgressSelectorType EgressSelectorType `json:"egressSelectorType,omitempty"`
 }
 
 // AudienceMatchPolicyType is a set of valid values for issuer.audienceMatchPolicy
@@ -304,6 +316,17 @@ type AudienceMatchPolicyType string
 const (
 	// MatchAny means the "aud" claim in the presented JWT must match at least one of the entries in the "audiences" field.
 	AudienceMatchPolicyMatchAny AudienceMatchPolicyType = "MatchAny"
+)
+
+// EgressSelectorType is an indicator of which egress selection should be used for sending traffic.
+type EgressSelectorType string
+
+const (
+	// EgressSelectorControlPlane is the EgressSelectorType for traffic intended to go to the control plane.
+	EgressSelectorControlPlane EgressSelectorType = "controlplane"
+
+	// EgressSelectorCluster is the EgressSelectorType for traffic intended to go to the system being managed by Kubernetes.
+	EgressSelectorCluster EgressSelectorType = "cluster"
 )
 
 // ClaimValidationRule provides the configuration for a single claim validation rule.
@@ -352,7 +375,9 @@ type ClaimMappings struct {
 	// If username.expression uses 'claims.email', then 'claims.email_verified' must be used in
 	// username.expression or extra[*].valueExpression or claimValidationRules[*].expression.
 	// An example claim validation rule expression that matches the validation automatically
-	// applied when username.claim is set to 'email' is 'claims.?email_verified.orValue(true)'.
+	// applied when username.claim is set to 'email' is 'claims.?email_verified.orValue(true) == true'. By explicitly comparing
+	// the value to true, we let type-checking see the result will be a boolean, and to make sure a non-boolean email_verified
+	// claim will be caught at runtime.
 	//
 	// In the flag based approach, the --oidc-username-claim and --oidc-username-prefix are optional. If --oidc-username-claim is not set,
 	// the default value is "sub". For the authentication config, there is no defaulting for claim or prefix. The claim and prefix must be set explicitly.
@@ -548,11 +573,23 @@ type WebhookConfiguration struct {
 	// Same as setting `--authorization-webhook-cache-authorized-ttl` flag
 	// Default: 5m0s
 	AuthorizedTTL metav1.Duration `json:"authorizedTTL"`
+	// CacheAuthorizedRequests specifies whether authorized requests should be cached.
+	// If set to true, the TTL for cached decisions can be configured via the
+	// AuthorizedTTL field.
+	// Default: true
+	// +optional
+	CacheAuthorizedRequests *bool `json:"cacheAuthorizedRequests,omitempty"`
 	// The duration to cache 'unauthorized' responses from the webhook
 	// authorizer.
 	// Same as setting `--authorization-webhook-cache-unauthorized-ttl` flag
 	// Default: 30s
 	UnauthorizedTTL metav1.Duration `json:"unauthorizedTTL"`
+	// CacheUnauthorizedRequests specifies whether unauthorized requests should be cached.
+	// If set to true, the TTL for cached decisions can be configured via the
+	// UnauthorizedTTL field.
+	// Default: true
+	// +optional
+	CacheUnauthorizedRequests *bool `json:"cacheUnauthorizedRequests,omitempty"`
 	// Timeout for the webhook request
 	// Maximum allowed value is 30s.
 	// Required, no default value.

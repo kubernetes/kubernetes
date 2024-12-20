@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 )
 
 var (
@@ -229,6 +230,27 @@ func MarkFSResizeFinished(
 		} else {
 			newPVC.Status.AllocatedResourceStatuses = allocatedResourceStatusMap
 		}
+	}
+
+	newPVC = MergeResizeConditionOnPVC(newPVC, []v1.PersistentVolumeClaimCondition{}, false /* keepOldResizeConditions */)
+	updatedPVC, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
+	return updatedPVC, err
+}
+
+func MarkNodeExpansionFinishedWithRecovery(
+	pvc *v1.PersistentVolumeClaim,
+	newSize resource.Quantity,
+	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	newPVC := pvc.DeepCopy()
+
+	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
+
+	allocatedResourceStatusMap := newPVC.Status.AllocatedResourceStatuses
+	delete(allocatedResourceStatusMap, v1.ResourceStorage)
+	if len(allocatedResourceStatusMap) == 0 {
+		newPVC.Status.AllocatedResourceStatuses = nil
+	} else {
+		newPVC.Status.AllocatedResourceStatuses = allocatedResourceStatusMap
 	}
 
 	newPVC = MergeResizeConditionOnPVC(newPVC, []v1.PersistentVolumeClaimCondition{}, false /* keepOldResizeConditions */)
@@ -435,7 +457,7 @@ func mergeStorageAllocatedResources(pvc *v1.PersistentVolumeClaim, size resource
 }
 
 // GenericResizeFS : call generic filesystem resizer for plugins that don't have any special filesystem resize requirements
-func GenericResizeFS(host volume.VolumeHost, pluginName, devicePath, deviceMountPath string) (bool, error) {
-	resizer := mount.NewResizeFs(host.GetExec(pluginName))
+func GenericResizeFS(host volume.VolumeHost, devicePath, deviceMountPath string) (bool, error) {
+	resizer := mount.NewResizeFs(exec.New())
 	return resizer.Resize(devicePath, deviceMountPath)
 }

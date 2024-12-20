@@ -41,7 +41,7 @@ var _ = SIGDescribe("DefaultProcMount [LinuxOnly]", framework.WithNodeConformanc
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("will mask proc mounts by default", func(ctx context.Context) {
-		testProcMount(ctx, f, v1.DefaultProcMount, gomega.BeNumerically(">", 1), gomega.BeNumerically(">", 0))
+		testProcMount(ctx, f, v1.DefaultProcMount, true, gomega.BeNumerically(">", 1), gomega.BeNumerically(">", 0))
 	})
 })
 
@@ -85,11 +85,11 @@ var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.User
 		if !supportsUserNS(ctx, f) {
 			e2eskipper.Skipf("runtime does not support user namespaces")
 		}
-		testProcMount(ctx, f, v1.UnmaskedProcMount, gomega.Equal(1), gomega.BeZero())
+		testProcMount(ctx, f, v1.UnmaskedProcMount, false, gomega.Equal(1), gomega.BeZero())
 	})
 })
 
-func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMountType, expectedLines gomegatypes.GomegaMatcher, expectedReadOnly gomegatypes.GomegaMatcher) {
+func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMountType, hostUsers bool, expectedLines gomegatypes.GomegaMatcher, expectedReadOnly gomegatypes.GomegaMatcher) {
 	ginkgo.By("creating a target pod")
 	podClient := e2epod.NewPodClient(f)
 	pod := podClient.CreateSync(ctx, &v1.Pod{
@@ -106,7 +106,7 @@ func testProcMount(ctx context.Context, f *framework.Framework, pmt v1.ProcMount
 					},
 				},
 			},
-			HostUsers: &falseVar,
+			HostUsers: &hostUsers,
 		},
 	})
 

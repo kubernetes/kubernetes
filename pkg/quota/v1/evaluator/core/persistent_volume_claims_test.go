@@ -20,10 +20,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -31,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func testVolumeClaim(name string, namespace string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
@@ -40,7 +43,124 @@ func testVolumeClaim(name string, namespace string, spec core.PersistentVolumeCl
 	}
 }
 
+func TestPersistentVolumeClaimEvaluatorMatchingScopes(t *testing.T) {
+	evaluator := NewPersistentVolumeClaimEvaluator(nil)
+	testCases := map[string]struct {
+		claim         *core.PersistentVolumeClaim
+		selectors     []corev1.ScopedResourceSelectorRequirement
+		wantSelectors []corev1.ScopedResourceSelectorRequirement
+	}{
+		"EmptyPVC": {
+			claim: &core.PersistentVolumeClaim{},
+			selectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpDoesNotExist},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpExists},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpDoesNotExist},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+		},
+		"VolumeAttributesClass": {
+			claim: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					VolumeAttributesClassName: ptr.To("class1"),
+				},
+			},
+			selectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpDoesNotExist},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpExists},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class4"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpExists},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+		},
+		"VolumeAttributesClassWithTarget": {
+			claim: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					VolumeAttributesClassName: ptr.To("class1"),
+				},
+				Status: core.PersistentVolumeClaimStatus{
+					CurrentVolumeAttributesClassName: ptr.To("class2"),
+				},
+			},
+			selectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpDoesNotExist},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpExists},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class2"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2", "class4"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class4"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpExists},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class2"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2", "class4"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+		},
+		"VolumeAttributesClassWithModityStatus": {
+			claim: &core.PersistentVolumeClaim{
+				Spec: core.PersistentVolumeClaimSpec{
+					VolumeAttributesClassName: ptr.To("class1"),
+				},
+				Status: core.PersistentVolumeClaimStatus{
+					CurrentVolumeAttributesClassName: ptr.To("class2"),
+					ModifyVolumeStatus: &core.ModifyVolumeStatus{
+						TargetVolumeAttributesClassName: "class3",
+					},
+				},
+			},
+			selectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpDoesNotExist},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpExists},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class2"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class3"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2", "class3"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2", "class3", "class4"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class4"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpExists},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class2"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class3"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2", "class3"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1", "class2", "class3", "class4"}},
+				{ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass, Operator: corev1.ScopeSelectorOpNotIn, Values: []string{"class4"}},
+			},
+		},
+	}
+
+	for testName, testCase := range testCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
+		t.Run(testName, func(t *testing.T) {
+			gotSelectors, err := evaluator.MatchingScopes(testCase.claim, testCase.selectors)
+			if err != nil {
+				t.Error(err)
+			}
+			if diff := cmp.Diff(testCase.wantSelectors, gotSelectors); diff != "" {
+				t.Errorf("%v: unexpected diff (-want, +got):\n%s", testName, diff)
+			}
+		})
+	}
+}
+
 func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	classGold := "gold"
 	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		Selector: &metav1.LabelSelector{

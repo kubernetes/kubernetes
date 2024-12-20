@@ -44,6 +44,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -294,6 +295,96 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		}
 		delSvcAcct()
 		doTokenReview(t, cs, treq, true)
+	})
+
+	t.Run("service account UID validation with feature gate enabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.TokenRequestServiceAccountUIDValidation, true)
+
+		sa, delSvcAcct := createDeleteSvcAcct(t, cs, sa)
+		defer delSvcAcct()
+
+		// Test case 1: Valid UID should succeed
+		treqWithCorrectUID := &authenticationv1.TokenRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: sa.UID, // Use the correct UID
+			},
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences: []string{"api"},
+			},
+		}
+
+		warningHandler.clear()
+		_, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treqWithCorrectUID, metav1.CreateOptions{})
+		if err != nil {
+			t.Errorf("Expected token creation with correct UID to succeed, got error: %v", err)
+		}
+		warningHandler.assertEqual(t, nil)
+
+		// Test case 2: Invalid UID should fail with feature gate enabled
+		treqWithBadUID := &authenticationv1.TokenRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: "wrong-uid-12345", // Wrong UID
+			},
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences: []string{"api"},
+			},
+		}
+
+		warningHandler.clear()
+		_, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treqWithBadUID, metav1.CreateOptions{})
+		expectedError := fmt.Sprintf(`Operation cannot be fulfilled on TokenRequest.authentication.k8s.io "test-svcacct": the UID in the token request (wrong-uid-12345) does not match the UID of the service account (%s)`, sa.UID)
+		if err == nil {
+			t.Error("Expected token creation with wrong UID to fail, but it succeeded")
+		} else if !strings.Contains(err.Error(), expectedError) {
+			t.Errorf("Expected error to contain: %q, but got: %q", expectedError, err.Error())
+		}
+		warningHandler.assertEqual(t, nil)
+
+		// Test case 3: Empty UID should succeed (allows existing clients to continue working)
+		treqWithEmptyUID := &authenticationv1.TokenRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: "", // Empty UID
+			},
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences: []string{"api"},
+			},
+		}
+
+		warningHandler.clear()
+		treqWithEmptyUID, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treqWithEmptyUID, metav1.CreateOptions{})
+		if err != nil {
+			t.Errorf("Expected token creation with empty UID to succeed, got error: %v", err)
+		}
+		warningHandler.assertEqual(t, nil)
+		if treqWithEmptyUID.UID != sa.UID {
+			t.Errorf("Expected UID to be set to service account UID, got: %s", treqWithEmptyUID.UID)
+		}
+	})
+
+	t.Run("service account UID validation with feature gate disabled", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.TokenRequestServiceAccountUIDValidation, false)
+
+		sa, delSvcAcct := createDeleteSvcAcct(t, cs, sa)
+		defer delSvcAcct()
+
+		// Test case: Invalid UID should succeed with feature gate disabled (only warning)
+		treqWithBadUID := &authenticationv1.TokenRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				UID: "wrong-uid-12345", // Wrong UID
+			},
+			Spec: authenticationv1.TokenRequestSpec{
+				Audiences: []string{"api"},
+			},
+		}
+
+		warningHandler.clear()
+		_, err = cs.CoreV1().ServiceAccounts(sa.Namespace).CreateToken(tCtx, sa.Name, treqWithBadUID, metav1.CreateOptions{})
+		if err != nil {
+			t.Errorf("Expected token creation with wrong UID to succeed when feature gate disabled, got error: %v", err)
+		}
+		// Should get a warning about UID mismatch
+		expectedWarning := fmt.Sprintf("the UID in the token request (%s) does not match the UID of the service account (%s) but TokenRequestServiceAccountUIDValidation is not enabled. In the future, this will return a conflict error", treqWithBadUID.UID, sa.UID)
+		warningHandler.assertEqual(t, []string{expectedWarning})
 	})
 
 	t.Run("bound to service account and pod", func(t *testing.T) {

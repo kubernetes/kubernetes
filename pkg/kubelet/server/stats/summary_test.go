@@ -24,12 +24,15 @@ import (
 	"testing"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/randfill"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 )
@@ -48,6 +51,7 @@ var (
 )
 
 func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	ctx := context.Background()
 	assert := assert.New(t)
 
@@ -98,6 +102,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
 	assert.Equal(summary.Node.Swap, cgroupStatsMap["/"].cs.Swap)
+	assert.Equal(summary.Node.IO, cgroupStatsMap["/"].cs.IO)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	assert.Equal(&statsapi.RuntimeStats{ContainerFs: imageFsStats, ImageFs: imageFsStats}, summary.Node.Runtime)
@@ -111,6 +116,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/kubelet"].cs.Swap,
+		IO:                 cgroupStatsMap["/kubelet"].cs.IO,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "misc",
@@ -120,6 +126,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/misc"].cs.Swap,
+		IO:                 cgroupStatsMap["/misc"].cs.IO,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "runtime",
@@ -129,6 +136,7 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/runtime"].cs.Swap,
+		IO:                 cgroupStatsMap["/runtime"].cs.IO,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "pods",
@@ -138,11 +146,13 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/pods"].cs.Swap,
+		IO:                 cgroupStatsMap["/pods"].cs.IO,
 	})
 	assert.Equal(summary.Pods, podStats)
 }
 
 func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	ctx := context.Background()
 	assert := assert.New(t)
 
@@ -194,6 +204,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 	assert.Equal(summary.Node.CPU, cgroupStatsMap["/"].cs.CPU)
 	assert.Equal(summary.Node.Memory, cgroupStatsMap["/"].cs.Memory)
 	assert.Equal(summary.Node.Swap, cgroupStatsMap["/"].cs.Swap)
+	assert.Equal(summary.Node.IO, cgroupStatsMap["/"].cs.IO)
 	assert.Equal(summary.Node.Network, cgroupStatsMap["/"].ns)
 	assert.Equal(summary.Node.Fs, rootFsStats)
 	// Since we are a split filesystem we want root filesystem to be container fs and image to be image filesystem
@@ -208,6 +219,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/kubelet"].cs.Swap,
+		IO:                 cgroupStatsMap["/kubelet"].cs.IO,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "misc",
@@ -217,6 +229,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/misc"].cs.Swap,
+		IO:                 cgroupStatsMap["/misc"].cs.IO,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "runtime",
@@ -226,6 +239,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/runtime"].cs.Swap,
+		IO:                 cgroupStatsMap["/runtime"].cs.IO,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "pods",
@@ -235,11 +249,13 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
 		Swap:               cgroupStatsMap["/pods"].cs.Swap,
+		IO:                 cgroupStatsMap["/pods"].cs.IO,
 	})
 	assert.Equal(summary.Pods, podStats)
 }
 
 func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	ctx := context.Background()
 	assert := assert.New(t)
 
@@ -283,6 +299,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(summary.Node.Network)
 	assert.Nil(summary.Node.Fs)
 	assert.Nil(summary.Node.Runtime)
+	assert.Nil(summary.Node.IO)
 
 	assert.Len(summary.Node.SystemContainers, 4)
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
@@ -313,45 +330,45 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 }
 
 func getFsStats() *statsapi.FsStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.FsStats{}
-	f.Fuzz(v)
+	f.Fill(v)
 	return v
 }
 
 func getContainerStats() *statsapi.ContainerStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.ContainerStats{}
-	f.Fuzz(v)
+	f.Fill(v)
 	return v
 }
 func getVolumeCPUAndMemoryStats() *statsapi.ContainerStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.ContainerStats{}
-	f.Fuzz(&v.Name)
-	f.Fuzz(&v.StartTime)
-	f.Fuzz(v.CPU)
-	f.Fuzz(v.Memory)
+	f.Fill(&v.Name)
+	f.Fill(&v.StartTime)
+	f.Fill(v.CPU)
+	f.Fill(v.Memory)
 	return v
 }
 
 func getVolumeStats() *statsapi.VolumeStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.VolumeStats{}
-	f.Fuzz(v)
+	f.Fill(v)
 	return v
 }
 
 func getNetworkStats() *statsapi.NetworkStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.NetworkStats{}
-	f.Fuzz(v)
+	f.Fill(v)
 	return v
 }
 
 func getRlimitStats() *statsapi.RlimitStats {
-	f := fuzz.New().NilChance(0)
+	f := randfill.New().NilChance(0)
 	v := &statsapi.RlimitStats{}
-	f.Fuzz(v)
+	f.Fill(v)
 	return v
 }

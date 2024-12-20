@@ -22,7 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -143,7 +142,7 @@ type VolumeAttributesClassTestDriver interface {
 	TestDriver
 	// GetVolumeAttributesClass returns a VolumeAttributesClass to create/modify PVCs
 	// It will return nil if the TestDriver does not support VACs
-	GetVolumeAttributesClass(ctx context.Context, config *PerTestConfig) *storagev1beta1.VolumeAttributesClass
+	GetVolumeAttributesClass(ctx context.Context, config *PerTestConfig) *storagev1.VolumeAttributesClass
 }
 
 // CustomTimeoutsTestDriver represents an interface fo a TestDriver that supports custom timeouts.
@@ -264,6 +263,8 @@ type DriverInfo struct {
 	StressTestOptions *StressTestOptions
 	// [Optional] Scale parameters for volume snapshot stress tests.
 	VolumeSnapshotStressTestOptions *VolumeSnapshotStressTestOptions
+	// [Optional] Scale parameters for volume modify stress tests.
+	VolumeModifyStressTestOptions *VolumeModifyStressTestOptions
 	// [Optional] Parameters for performance tests
 	PerformanceTestOptions *PerformanceTestOptions
 }
@@ -284,6 +285,13 @@ type VolumeSnapshotStressTestOptions struct {
 	NumPods int
 	// Number of snapshots to create for each volume.
 	NumSnapshots int
+}
+
+// VolumeModifyStressTestOptions contains parameters used for volume modify stress tests.
+type VolumeModifyStressTestOptions struct {
+	// Number of pods to create in the test. This may also create
+	// up to 1 volume with volumeAttributesClass per pod.
+	NumPods int
 }
 
 // Metrics to evaluate performance of an operation

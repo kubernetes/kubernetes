@@ -25,12 +25,6 @@ import (
 	"github.com/google/cel-go/common/types"
 )
 
-// interpretablePlanner creates an Interpretable evaluation plan from a proto Expr value.
-type interpretablePlanner interface {
-	// Plan generates an Interpretable value (or error) from the input proto Expr.
-	Plan(expr ast.Expr) (Interpretable, error)
-}
-
 // newPlanner creates an interpretablePlanner which references a Dispatcher, TypeProvider,
 // TypeAdapter, Container, and CheckedExpr value. These pieces of data are used to resolve
 // functions, types, and namespaced identifiers at plan time rather than at runtime since
@@ -40,8 +34,7 @@ func newPlanner(disp Dispatcher,
 	adapter types.Adapter,
 	attrFactory AttributeFactory,
 	cont *containers.Container,
-	exprAST *ast.AST,
-	decorators ...InterpretableDecorator) interpretablePlanner {
+	exprAST *ast.AST) *planner {
 	return &planner{
 		disp:        disp,
 		provider:    provider,
@@ -50,7 +43,8 @@ func newPlanner(disp Dispatcher,
 		container:   cont,
 		refMap:      exprAST.ReferenceMap(),
 		typeMap:     exprAST.TypeMap(),
-		decorators:  decorators,
+		decorators:  make([]InterpretableDecorator, 0),
+		observers:   make([]StatefulObserver, 0),
 	}
 }
 
@@ -64,6 +58,7 @@ type planner struct {
 	refMap      map[int64]*ast.ReferenceInfo
 	typeMap     map[int64]*types.Type
 	decorators  []InterpretableDecorator
+	observers   []StatefulObserver
 }
 
 // Plan implements the interpretablePlanner interface. This implementation of the Plan method also
@@ -72,6 +67,17 @@ type planner struct {
 // such as state-tracking, expression re-write, and possibly efficient thread-safe memoization of
 // repeated expressions.
 func (p *planner) Plan(expr ast.Expr) (Interpretable, error) {
+	i, err := p.plan(expr)
+	if err != nil {
+		return nil, err
+	}
+	if len(p.observers) == 0 {
+		return i, nil
+	}
+	return &ObservableInterpretable{Interpretable: i, observers: p.observers}, nil
+}
+
+func (p *planner) plan(expr ast.Expr) (Interpretable, error) {
 	switch expr.Kind() {
 	case ast.CallKind:
 		return p.decorate(p.planCall(expr))
@@ -161,7 +167,7 @@ func (p *planner) planSelect(expr ast.Expr) (Interpretable, error) {
 
 	sel := expr.AsSelect()
 	// Plan the operand evaluation.
-	op, err := p.Plan(sel.Operand())
+	op, err := p.plan(sel.Operand())
 	if err != nil {
 		return nil, err
 	}
@@ -220,14 +226,14 @@ func (p *planner) planCall(expr ast.Expr) (Interpretable, error) {
 
 	args := make([]Interpretable, argCount)
 	if target != nil {
-		arg, err := p.Plan(target)
+		arg, err := p.plan(target)
 		if err != nil {
 			return nil, err
 		}
 		args[0] = arg
 	}
 	for i, argExpr := range call.Args() {
-		arg, err := p.Plan(argExpr)
+		arg, err := p.plan(argExpr)
 		if err != nil {
 			return nil, err
 		}
@@ -496,7 +502,7 @@ func (p *planner) planCreateList(expr ast.Expr) (Interpretable, error) {
 	}
 	elems := make([]Interpretable, len(elements))
 	for i, elem := range elements {
-		elemVal, err := p.Plan(elem)
+		elemVal, err := p.plan(elem)
 		if err != nil {
 			return nil, err
 		}
@@ -521,13 +527,13 @@ func (p *planner) planCreateMap(expr ast.Expr) (Interpretable, error) {
 	hasOptionals := false
 	for i, e := range entries {
 		entry := e.AsMapEntry()
-		keyVal, err := p.Plan(entry.Key())
+		keyVal, err := p.plan(entry.Key())
 		if err != nil {
 			return nil, err
 		}
 		keys[i] = keyVal
 
-		valVal, err := p.Plan(entry.Value())
+		valVal, err := p.plan(entry.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -560,7 +566,7 @@ func (p *planner) planCreateStruct(expr ast.Expr) (Interpretable, error) {
 	for i, f := range objFields {
 		field := f.AsStructField()
 		fields[i] = field.Name()
-		val, err := p.Plan(field.Value())
+		val, err := p.plan(field.Value())
 		if err != nil {
 			return nil, err
 		}
@@ -582,23 +588,23 @@ func (p *planner) planCreateStruct(expr ast.Expr) (Interpretable, error) {
 // planComprehension generates an Interpretable fold operation.
 func (p *planner) planComprehension(expr ast.Expr) (Interpretable, error) {
 	fold := expr.AsComprehension()
-	accu, err := p.Plan(fold.AccuInit())
+	accu, err := p.plan(fold.AccuInit())
 	if err != nil {
 		return nil, err
 	}
-	iterRange, err := p.Plan(fold.IterRange())
+	iterRange, err := p.plan(fold.IterRange())
 	if err != nil {
 		return nil, err
 	}
-	cond, err := p.Plan(fold.LoopCondition())
+	cond, err := p.plan(fold.LoopCondition())
 	if err != nil {
 		return nil, err
 	}
-	step, err := p.Plan(fold.LoopStep())
+	step, err := p.plan(fold.LoopStep())
 	if err != nil {
 		return nil, err
 	}
-	result, err := p.Plan(fold.Result())
+	result, err := p.plan(fold.Result())
 	if err != nil {
 		return nil, err
 	}

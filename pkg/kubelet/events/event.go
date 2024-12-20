@@ -36,6 +36,7 @@ const (
 	NetworkNotReady                = "NetworkNotReady"
 	ResizeDeferred                 = "ResizeDeferred"
 	ResizeInfeasible               = "ResizeInfeasible"
+	ResizeCompleted                = "ResizeCompleted"
 )
 
 // Image event reason list
@@ -61,6 +62,7 @@ const (
 	VolumeResizeFailed                   = "VolumeResizeFailed"
 	VolumeResizeSuccess                  = "VolumeResizeSuccessful"
 	FileSystemResizeFailed               = "FileSystemResizeFailed"
+	VolumePermissionChangeInProgress     = "VolumePermissionChangeInProgress"
 	FileSystemResizeSuccess              = "FileSystemResizeSuccessful"
 	FailedMapVolume                      = "FailedMapVolume"
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"

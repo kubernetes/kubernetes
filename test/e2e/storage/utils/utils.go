@@ -490,9 +490,9 @@ func readFile(content, path string) string {
 // genBinDataFromSeed generate binData with random seed
 func genBinDataFromSeed(len int, seed int64) []byte {
 	binData := make([]byte, len)
-	rand.Seed(seed)
+	r := rand.New(rand.NewSource(seed))
 
-	_, err := rand.Read(binData)
+	_, err := r.Read(binData)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 	}

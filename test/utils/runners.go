@@ -44,7 +44,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )
@@ -119,11 +119,12 @@ type RCConfig struct {
 	Timeout                       time.Duration
 	PodStatusFile                 *os.File
 	Replicas                      int
-	CpuRequest                    int64 // millicores
-	CpuLimit                      int64 // millicores
-	MemRequest                    int64 // bytes
-	MemLimit                      int64 // bytes
-	GpuLimit                      int64 // count
+	CPURequest                    int64                    // millicores
+	CPULimit                      int64                    // millicores
+	MemRequest                    int64                    // bytes
+	MemLimit                      int64                    // bytes
+	GpuLimit                      int64                    // count
+	PodResources                  *v1.ResourceRequirements // Pod-level resources
 	ReadinessProbe                *v1.Probe
 	DNSPolicy                     *v1.DNSPolicy
 	PriorityClassName             string
@@ -302,7 +303,7 @@ func (config *DeploymentConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: pointer.Int32(int32(config.Replicas)),
+			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -329,6 +330,10 @@ func (config *DeploymentConfig) create() error {
 				},
 			},
 		},
+	}
+
+	if config.PodResources != nil {
+		deployment.Spec.Template.Spec.Resources = config.PodResources.DeepCopy()
 	}
 
 	if len(config.AdditionalContainers) > 0 {
@@ -373,7 +378,7 @@ func (config *ReplicaSetConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: pointer.Int32(int32(config.Replicas)),
+			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": config.Name,
@@ -400,6 +405,10 @@ func (config *ReplicaSetConfig) create() error {
 				},
 			},
 		},
+	}
+
+	if config.PodResources != nil {
+		rs.Spec.Template.Spec.Resources = config.PodResources.DeepCopy()
 	}
 
 	if len(config.AdditionalContainers) > 0 {
@@ -445,7 +454,7 @@ func (config *RCConfig) create() error {
 			Name: config.Name,
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: pointer.Int32(int32(config.Replicas)),
+			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: map[string]string{
 				"name": config.Name,
 			},
@@ -476,6 +485,10 @@ func (config *RCConfig) create() error {
 				},
 			},
 		},
+	}
+
+	if config.PodResources != nil {
+		rc.Spec.Template.Spec.Resources = config.PodResources.DeepCopy()
 	}
 
 	if len(config.AdditionalContainers) > 0 {
@@ -521,20 +534,20 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 		c := &template.Spec.Containers[0]
 		c.Ports = append(c.Ports, v1.ContainerPort{Name: k, ContainerPort: int32(v), HostPort: int32(v)})
 	}
-	if config.CpuLimit > 0 || config.MemLimit > 0 || config.GpuLimit > 0 {
+	if config.CPULimit > 0 || config.MemLimit > 0 || config.GpuLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits = v1.ResourceList{}
 	}
-	if config.CpuLimit > 0 {
-		template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CpuLimit, resource.DecimalSI)
+	if config.CPULimit > 0 {
+		template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CPULimit, resource.DecimalSI)
 	}
 	if config.MemLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(config.MemLimit, resource.DecimalSI)
 	}
-	if config.CpuRequest > 0 || config.MemRequest > 0 {
+	if config.CPURequest > 0 || config.MemRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests = v1.ResourceList{}
 	}
-	if config.CpuRequest > 0 {
-		template.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CpuRequest, resource.DecimalSI)
+	if config.CPURequest > 0 {
+		template.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(config.CPURequest, resource.DecimalSI)
 	}
 	if config.MemRequest > 0 {
 		template.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(config.MemRequest, resource.DecimalSI)

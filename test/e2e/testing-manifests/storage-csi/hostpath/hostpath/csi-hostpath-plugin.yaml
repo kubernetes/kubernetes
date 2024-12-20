@@ -219,7 +219,7 @@ spec:
       serviceAccountName: csi-hostpathplugin-sa
       containers:
         - name: hostpath
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.15.0
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
@@ -354,7 +354,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshotter
-          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock

@@ -44,17 +44,14 @@ func TestController(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	const expectedSuccessMetricValue = `
-# HELP apiserver_encryption_config_controller_automatic_reload_success_total [ALPHA] Total number of successful automatic reloads of encryption configuration split by apiserver identity.
-# TYPE apiserver_encryption_config_controller_automatic_reload_success_total counter
-apiserver_encryption_config_controller_automatic_reload_success_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027"} 1
 # HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
 apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="success"} 1
+# HELP apiserver_encryption_config_controller_last_config_info [ALPHA] Information about the last applied encryption configuration with hash as label, split by apiserver identity.
+# TYPE apiserver_encryption_config_controller_last_config_info gauge
+apiserver_encryption_config_controller_last_config_info{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",hash="sha256:6f6af143a5aec5c4056d759f2bdf8b6ffe218a2bf3846c4fd42b6baef037c5ef"} 1
 `
 	const expectedFailureMetricValue = `
-# HELP apiserver_encryption_config_controller_automatic_reload_failures_total [ALPHA] Total number of failed automatic reloads of encryption configuration split by apiserver identity.
-# TYPE apiserver_encryption_config_controller_automatic_reload_failures_total counter
-apiserver_encryption_config_controller_automatic_reload_failures_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027"} 1
 # HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
 apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="failure"} 1
@@ -73,7 +70,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 	}{
 		{
 			name:                    "when invalid config is provided previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -88,7 +85,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 		},
 		{
 			name:                    "when new valid config is provided it should be updated",
-			wantECFileHash:          "some new config hash",
+			wantECFileHash:          "sha256:6f6af143a5aec5c4056d759f2bdf8b6ffe218a2bf3846c4fd42b6baef037c5ef", // some new config hash
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantMetrics:             expectedSuccessMetricValue,
@@ -104,13 +101,13 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 							err:        nil,
 						},
 					},
-					EncryptionFileContentHash: "some new config hash",
+					EncryptionFileContentHash: "sha256:6f6af143a5aec5c4056d759f2bdf8b6ffe218a2bf3846c4fd42b6baef037c5ef", // some new config hash
 				}, nil
 			},
 		},
 		{
 			name:                    "when same valid config is provided previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -128,13 +125,13 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 						},
 					},
 					// hash of initial "testdata/ec_config.yaml" config file before reloading
-					EncryptionFileContentHash: "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+					EncryptionFileContentHash: "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 				}, nil
 			},
 		},
 		{
 			name:                    "when transformer's health check fails previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -158,7 +155,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 		},
 		{
 			name:                    "when multiple health checks are present previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -185,7 +182,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 		},
 		{
 			name:                    "when invalid health check URL is provided previous config shouldn't be changed",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -208,7 +205,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 		},
 		{
 			name:                    "when config is not updated transformers are closed correctly",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           1,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -226,13 +223,13 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 						},
 					},
 					// hash of initial "testdata/ec_config.yaml" config file before reloading
-					EncryptionFileContentHash: "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+					EncryptionFileContentHash: "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 				}, nil
 			},
 		},
 		{
 			name:                    "when config hash is not updated transformers are closed correctly",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           0,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -240,7 +237,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 			wantAddRateLimitedCount: 0,
 			mockGetEncryptionConfigHash: func(ctx context.Context, filepath string) (string, error) {
 				// hash of initial "testdata/ec_config.yaml" config file before reloading
-				return "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3", nil
+				return "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3", nil
 			},
 			mockLoadEncryptionConfig: func(ctx context.Context, filepath string, reload bool, apiServerID string) (*encryptionconfig.EncryptionConfiguration, error) {
 				return nil, fmt.Errorf("should not be called")
@@ -248,7 +245,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 		},
 		{
 			name:                    "when config hash errors transformers are closed correctly",
-			wantECFileHash:          "k8s:enc:unstable:1:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
+			wantECFileHash:          "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3",
 			wantLoadCalls:           0,
 			wantHashCalls:           1,
 			wantTransformerClosed:   true,
@@ -338,9 +335,7 @@ apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash
 			}
 
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.wantMetrics),
-				"apiserver_encryption_config_controller_automatic_reload_success_total",
-				"apiserver_encryption_config_controller_automatic_reload_failures_total",
-				"apiserver_encryption_config_controller_automatic_reloads_total",
+				"apiserver_encryption_config_controller_automatic_reloads_total", "apiserver_encryption_config_controller_automatic_reload_last_config_info",
 			); err != nil {
 				t.Errorf("failed to validate metrics: %v", err)
 			}

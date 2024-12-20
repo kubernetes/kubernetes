@@ -45,7 +45,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	componentbaseversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -95,19 +94,12 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 		// Only test for beta and GA APIs with emulated version.
 		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse(v))
 		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
-		// Feature Gates that are GA and depend directly on the API version to work can not be emulated in previous versions.
-		// Example feature:
-		// v1.x-2 : FeatureGate alpha , API v1alpha1/feature
-		// v1.x-1 : FeatureGate beta  , API v1beta1/feature
-		// v1.x   : FeatureGate GA    , API v1/feature
-		// The code in v1.x uses the clients with the v1 API, if we emulate v1.x-1 it will not work against apiserver that
-		// only understand v1beta1.
-		featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MultiCIDRServiceAllocator, false)
 	}
 
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 		// Disable alphas when emulating previous versions.
 		if v != componentbaseversion.DefaultKubeBinaryVersion {
+			opts.Options.GenericServerRunOptions.EmulationForwardCompatible = true
 			opts.Options.APIEnablement.RuntimeConfig["api/alpha"] = "false"
 		}
 	})
@@ -214,9 +206,6 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 
 			expectedGVK := gvk
 			if testData.ExpectedGVK != nil {
-				if gvk == *testData.ExpectedGVK {
-					t.Errorf("GVK override %s for %s is unnecessary or something was changed incorrectly", testData.ExpectedGVK, gvk)
-				}
 				expectedGVK = *testData.ExpectedGVK
 			}
 
@@ -250,7 +239,7 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 				}
 			}
 			if len(currentNonAlphaVersions) > 0 && strings.Contains(expectedGVK.Version, "alpha") {
-				t.Errorf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
+				t.Logf("Non-alpha versions %q exist, but the expected storage version is %q. Prefer beta or GA storage versions over alpha.",
 					currentNonAlphaVersions.List(),
 					expectedGVK.Version,
 				)

@@ -74,15 +74,11 @@ func newWrappedManagerImpl(socketPath string, manager *ManagerImpl) *wrappedMana
 type wrappedManagerImpl struct {
 	*ManagerImpl
 	socketdir string
-	callback  func(string, []pluginapi.Device)
+	callback  func(string, []*pluginapi.Device)
 }
 
 func (m *wrappedManagerImpl) PluginListAndWatchReceiver(r string, resp *pluginapi.ListAndWatchResponse) {
-	var devices []pluginapi.Device
-	for _, d := range resp.Devices {
-		devices = append(devices, *d)
-	}
-	m.callback(r, devices)
+	m.callback(r, resp.Devices)
 }
 
 func tmpSocketDir() (socketDir, socketName, pluginSocketName string, err error) {
@@ -110,7 +106,7 @@ func TestNewManagerImplStart(t *testing.T) {
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	m, _, p := setup(t, []*pluginapi.Device{}, func(n string, d []pluginapi.Device) {}, socketName, pluginSocketName)
+	m, _, p := setup(t, []*pluginapi.Device{}, func(n string, d []*pluginapi.Device) {}, socketName, pluginSocketName)
 	cleanup(t, m, p)
 	// Stop should tolerate being called more than once.
 	cleanup(t, m, p)
@@ -120,7 +116,7 @@ func TestNewManagerImplStartProbeMode(t *testing.T) {
 	socketDir, socketName, pluginSocketName, err := tmpSocketDir()
 	require.NoError(t, err)
 	defer os.RemoveAll(socketDir)
-	m, _, p, _ := setupInProbeMode(t, []*pluginapi.Device{}, func(n string, d []pluginapi.Device) {}, socketName, pluginSocketName)
+	m, _, p, _ := setupInProbeMode(t, []*pluginapi.Device{}, func(n string, d []*pluginapi.Device) {}, socketName, pluginSocketName)
 	cleanup(t, m, p)
 }
 
@@ -282,7 +278,7 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 	}
 
 	originalCallback := w.callback
-	w.callback = func(resourceName string, devices []pluginapi.Device) {
+	w.callback = func(resourceName string, devices []*pluginapi.Device) {
 		originalCallback(resourceName, devices)
 		updateChan <- new(interface{})
 	}
@@ -350,7 +346,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	as.NotNil(testManager)
 	as.NoError(err)
 
-	devs := []pluginapi.Device{
+	devs := []*pluginapi.Device{
 		{ID: "Device1", Health: pluginapi.Healthy},
 		{ID: "Device2", Health: pluginapi.Healthy},
 		{ID: "Device3", Health: pluginapi.Unhealthy},
@@ -492,7 +488,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	as.NotNil(testManager)
 	as.NoError(err)
 
-	resource1Devs := []pluginapi.Device{
+	resource1Devs := []*pluginapi.Device{
 		{ID: "R1Device1", Health: pluginapi.Healthy},
 		{ID: "R1Device2", Health: pluginapi.Healthy},
 		{ID: "R1Device3", Health: pluginapi.Unhealthy},
@@ -502,7 +498,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	testManager.endpoints[resourceName1] = endpointInfo{e: e1, opts: nil}
 	testManager.genericDeviceUpdateCallback(resourceName1, resource1Devs)
 
-	resource2Devs := []pluginapi.Device{
+	resource2Devs := []*pluginapi.Device{
 		{ID: "R2Device1", Health: pluginapi.Healthy},
 	}
 	resourceName2 := "other.domain2.org/resource2"
@@ -533,7 +529,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	as.NotNil(testManager)
 	as.NoError(err)
 
-	resource1Devs := []pluginapi.Device{
+	resource1Devs := []*pluginapi.Device{
 		{ID: "R1Device1", Health: pluginapi.Healthy},
 		{ID: "R1Device2", Health: pluginapi.Healthy},
 		{ID: "R1Device3", Health: pluginapi.Unhealthy},
@@ -554,7 +550,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	checkAllocatableDevicesConsistsOf(as, devInstances, []string{"R1Device1", "R1Device2"})
 
 	// Unhealthy device becomes healthy
-	resource1Devs = []pluginapi.Device{
+	resource1Devs = []*pluginapi.Device{
 		{ID: "R1Device1", Health: pluginapi.Healthy},
 		{ID: "R1Device2", Health: pluginapi.Healthy},
 		{ID: "R1Device3", Health: pluginapi.Healthy},
@@ -662,7 +658,7 @@ func (b *containerAllocateResponseBuilder) Build() *pluginapi.ContainerAllocateR
 		}
 		cdiDevices = append(cdiDevices, &cdiDevice)
 	}
-	resp.CDIDevices = cdiDevices
+	resp.CdiDevices = cdiDevices
 
 	return resp
 }
@@ -827,7 +823,7 @@ func makePod(limits v1.ResourceList) *v1.Pod {
 }
 
 func getTestManager(tmpDir string, activePods ActivePodsFunc, testRes []TestResource) (*wrappedManagerImpl, error) {
-	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
+	monitorCallback := func(resourceName string, devices []*pluginapi.Device) {}
 	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
 	if err != nil {
 		return nil, err
@@ -898,7 +894,7 @@ type TestResource struct {
 func TestFilterByAffinity(t *testing.T) {
 	as := require.New(t)
 	allDevices := ResourceDeviceInstances{
-		"res1": map[string]pluginapi.Device{
+		"res1": map[string]*pluginapi.Device{
 			"dev1": {
 				ID: "dev1",
 				Topology: &pluginapi.TopologyInfo{
@@ -1201,12 +1197,12 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 	devs := []*pluginapi.Device{
 		{ID: deviceID, Health: pluginapi.Healthy},
 	}
-	p, e := esetup(t, devs, socket, resourceName, func(n string, d []pluginapi.Device) {})
+	p, e := esetup(t, devs, socket, resourceName, func(n string, d []*pluginapi.Device) {})
 
 	waitUpdateAllocatedDevicesChan := make(chan struct{})
 	waitSetGetPreferredAllocChan := make(chan struct{})
 
-	p.SetGetPreferredAllocFunc(func(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+	p.SetGetPreferredAllocFunc(func(r *pluginapi.PreferredAllocationRequest, devs map[string]*pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
 		waitSetGetPreferredAllocChan <- struct{}{}
 		<-waitUpdateAllocatedDevicesChan
 		return &pluginapi.PreferredAllocationResponse{
@@ -1551,7 +1547,7 @@ func TestUpdatePluginResources(t *testing.T) {
 	devID2 := "dev2"
 
 	as := assert.New(t)
-	monitorCallback := func(resourceName string, devices []pluginapi.Device) {}
+	monitorCallback := func(resourceName string, devices []*pluginapi.Device) {}
 	tmpDir, err := os.MkdirTemp("", "checkpoint")
 	as.NoError(err)
 	defer os.RemoveAll(tmpDir)
@@ -1760,8 +1756,8 @@ func allocateStubFunc() func(devs []string) (*pluginapi.AllocateResponse, error)
 	}
 }
 
-func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]pluginapi.Device {
-	res := make(map[string]pluginapi.Device)
+func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]*pluginapi.Device {
+	res := make(map[string]*pluginapi.Device)
 	var topologyInfo *pluginapi.TopologyInfo
 	for node, devs := range devOnNUMA {
 		if topology {
@@ -1770,7 +1766,7 @@ func makeDevice(devOnNUMA checkpoint.DevicesPerNUMA, topology bool) map[string]p
 			topologyInfo = nil
 		}
 		for idx := range devs {
-			res[devs[idx]] = pluginapi.Device{ID: devs[idx], Topology: topologyInfo}
+			res[devs[idx]] = &pluginapi.Device{ID: devs[idx], Topology: topologyInfo}
 		}
 	}
 	return res
@@ -1781,9 +1777,9 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 	defer os.RemoveAll(socketDir)
 	require.NoError(t, err)
 
-	devs := []pluginapi.Device{}
+	devs := []*pluginapi.Device{}
 	for i := 0; i < 1000; i++ {
-		devs = append(devs, pluginapi.Device{
+		devs = append(devs, &pluginapi.Device{
 			ID:     fmt.Sprintf("dev-%d", i),
 			Health: pluginapi.Healthy,
 			Topology: &pluginapi.TopologyInfo{
@@ -1801,7 +1797,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 	testCases := []struct {
 		description string
 		count       int
-		devices     []pluginapi.Device
+		devices     []*pluginapi.Device
 		testfunc    func(manager *wrappedManagerImpl)
 	}{
 		{
@@ -1894,7 +1890,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 		),
 	)
 
-	testManager.genericDeviceUpdateCallback(resourceName, []pluginapi.Device{
+	testManager.genericDeviceUpdateCallback(resourceName, []*pluginapi.Device{
 		{ID: "dev1", Health: pluginapi.Healthy},
 		{ID: "dev2", Health: pluginapi.Unhealthy},
 	})
@@ -1971,10 +1967,10 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 	require.NoError(t, err, "err should be nil")
 	resourceName := "domain1.com/resource1"
 	existDevices := map[string]DeviceInstances{}
-	resourceNameMap := make(map[string]pluginapi.Device)
+	resourceNameMap := make(map[string]*pluginapi.Device)
 	deviceUpdateNumber, deviceUpdateChanBuffer := 200, 100
 	for i := 0; i < deviceUpdateNumber; i++ {
-		resourceNameMap[fmt.Sprintf("dev%d", i)] = pluginapi.Device{
+		resourceNameMap[fmt.Sprintf("dev%d", i)] = &pluginapi.Device{
 			ID:     fmt.Sprintf("dev%d", i),
 			Health: pluginapi.Healthy,
 		}
@@ -2008,7 +2004,7 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceHealthStatus, true)
 
 	for i := 0; i < deviceUpdateNumber; i++ {
-		testManager.genericDeviceUpdateCallback(resourceName, []pluginapi.Device{
+		testManager.genericDeviceUpdateCallback(resourceName, []*pluginapi.Device{
 			{ID: "dev1", Health: pluginapi.Healthy},
 		})
 	}
@@ -2017,7 +2013,7 @@ func TestFeatureGateResourceHealthStatus(t *testing.T) {
 
 	// update device status, assume all device unhealthy.
 	for i := 0; i < deviceUpdateNumber; i++ {
-		testManager.genericDeviceUpdateCallback(resourceName, []pluginapi.Device{
+		testManager.genericDeviceUpdateCallback(resourceName, []*pluginapi.Device{
 			{ID: fmt.Sprintf("dev%d", i), Health: pluginapi.Unhealthy},
 		})
 	}

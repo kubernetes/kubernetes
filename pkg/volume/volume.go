@@ -17,12 +17,15 @@ limitations under the License.
 package volume
 
 import (
+	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -130,6 +133,29 @@ type MounterArgs struct {
 	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
 	DesiredSize         *resource.Quantity
 	SELinuxLabel        string
+	Recorder            record.EventRecorder
+
+	// Optional interface that will be used to change the ownership of the volume, if specified.
+	// mainly used by unit tests
+	VolumeOwnershipApplicator VolumeOwnershipChanger
+}
+
+type VolumeOwnershipChanger interface {
+	AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger
+	ChangePermissions() error
+}
+
+type VolumeOwnership struct {
+	mounter             Mounter
+	dir                 string
+	fsGroup             *int64
+	fsGroupChangePolicy *v1.PodFSGroupChangePolicy
+	completionCallback  func(volumetypes.CompleteFuncParam)
+
+	// for monitoring progress of permission change operation
+	pod         *v1.Pod
+	fileCounter atomic.Int64
+	recorder    record.EventRecorder
 }
 
 // Mounter interface provides methods to set up/mount the volume.

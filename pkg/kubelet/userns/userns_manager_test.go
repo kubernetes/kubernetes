@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -20,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	goruntime "runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,10 +38,11 @@ import (
 )
 
 const (
+	testUserNsLength = uint32(65536)
 	// skip the first block
-	minimumMappingUID = userNsLength
+	minimumMappingUID = testUserNsLength
 	// allocate enough space for 2000 user namespaces
-	mappingLen  = userNsLength * 2000
+	mappingLen  = testUserNsLength * 2000
 	testMaxPods = 110
 )
 
@@ -50,11 +53,12 @@ type testUserNsPodsManager struct {
 	maxPods        int
 	mappingFirstID uint32
 	mappingLen     uint32
+	userNsLength   uint32
 }
 
 func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
 	if m.podDir == "" {
-		return "/tmp/non-existant-dir.This-is-not-used-in-tests"
+		return "/tmp/non-existent-dir.This-is-not-used-in-tests"
 	}
 	return m.podDir
 }
@@ -88,54 +92,91 @@ func (m *testUserNsPodsManager) GetMaxPods() int {
 	return testMaxPods
 }
 
+func (m *testUserNsPodsManager) GetUserNamespacesIDsPerPod() uint32 {
+	if m.userNsLength != 0 {
+		return m.userNsLength
+	}
+	return testUserNsLength
+}
+
 func TestUserNsManagerAllocate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
-	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
-	require.NoError(t, err)
+	customUserNsLength := uint32(1048576)
 
-	allocated, length, err := m.allocateOne("one")
-	assert.NoError(t, err)
-	assert.Equal(t, userNsLength, int(length), "m.isSet(%d).length=%v", allocated, length)
-	assert.True(t, m.isSet(allocated), "m.isSet(%d)", allocated)
-
-	allocated2, length2, err := m.allocateOne("two")
-	assert.NoError(t, err)
-	assert.NotEqual(t, allocated, allocated2, "allocated != allocated2")
-	assert.Equal(t, length, length2, "length == length2")
-
-	// verify that re-adding the same pod with the same settings won't fail
-	err = m.record("two", allocated2, length2)
-	assert.NoError(t, err)
-	// but it fails if anyting is different
-	err = m.record("two", allocated2+1, length2)
-	assert.Error(t, err)
-
-	m.Release("one")
-	m.Release("two")
-	assert.False(t, m.isSet(allocated), "m.isSet(%d)", allocated)
-	assert.False(t, m.isSet(allocated2), "m.nsSet(%d)", allocated2)
-
-	var allocs []uint32
-	for i := 0; i < 1000; i++ {
-		allocated, length, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
-		assert.Equal(t, userNsLength, int(length), "length is not the expected. iter: %v", i)
-		assert.NoError(t, err)
-		assert.GreaterOrEqual(t, allocated, uint32(minimumMappingUID))
-		// The last ID of the userns range (allocated+userNsLength) should be within bounds.
-		assert.LessOrEqual(t, allocated, uint32(minimumMappingUID+mappingLen-userNsLength))
-		allocs = append(allocs, allocated)
+	cases := []struct {
+		name           string
+		userNsLength   uint32
+		mappingFirstID uint32
+		mappingLen     uint32
+	}{
+		{
+			name:           "default",
+			userNsLength:   testUserNsLength,
+			mappingFirstID: minimumMappingUID,
+			mappingLen:     mappingLen,
+		},
+		{
+			name:           "custom",
+			userNsLength:   customUserNsLength,
+			mappingFirstID: customUserNsLength,
+			mappingLen:     customUserNsLength * 2000,
+		},
 	}
-	for i, v := range allocs {
-		assert.True(t, m.isSet(v), "m.isSet(%d) should be true", v)
-		m.Release(types.UID(fmt.Sprintf("%d", i)))
-		assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
 
-		err = m.record(types.UID(fmt.Sprintf("%d", i)), v, userNsLength)
-		assert.NoError(t, err)
-		m.Release(types.UID(fmt.Sprintf("%d", i)))
-		assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testUserNsPodsManager := &testUserNsPodsManager{
+				userNsLength:   tc.userNsLength,
+				mappingFirstID: tc.mappingFirstID,
+				mappingLen:     tc.mappingLen,
+			}
+			m, err := MakeUserNsManager(testUserNsPodsManager)
+			require.NoError(t, err)
+
+			allocated, length, err := m.allocateOne("one")
+			require.NoError(t, err)
+			assert.Equal(t, tc.userNsLength, length, "m.isSet(%d).length=%v", allocated, length)
+			assert.True(t, m.isSet(allocated), "m.isSet(%d)", allocated)
+
+			allocated2, length2, err := m.allocateOne("two")
+			require.NoError(t, err)
+			assert.NotEqual(t, allocated, allocated2, "allocated != allocated2")
+			assert.Equal(t, length, length2, "length == length2")
+
+			// verify that re-adding the same pod with the same settings won't fail
+			err = m.record("two", allocated2, length2)
+			require.NoError(t, err)
+			// but it fails if anyting is different
+			err = m.record("two", allocated2+1, length2)
+			require.Error(t, err)
+
+			m.Release("one")
+			m.Release("two")
+			assert.False(t, m.isSet(allocated), "m.isSet(%d)", allocated)
+			assert.False(t, m.isSet(allocated2), "m.nsSet(%d)", allocated2)
+
+			var allocs []uint32
+			for i := 0; i < 1000; i++ {
+				allocated, length, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
+				assert.Equal(t, tc.userNsLength, length, "length is not the expected. iter: %v", i)
+				require.NoError(t, err)
+				assert.GreaterOrEqual(t, allocated, tc.mappingFirstID)
+				// The last ID of the userns range (allocated+userNsLength) should be within bounds.
+				assert.LessOrEqual(t, allocated, tc.mappingFirstID+tc.mappingLen-tc.userNsLength)
+				allocs = append(allocs, allocated)
+			}
+			for i, v := range allocs {
+				assert.True(t, m.isSet(v), "m.isSet(%d) should be true", v)
+				m.Release(types.UID(fmt.Sprintf("%d", i)))
+				assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
+
+				err = m.record(types.UID(fmt.Sprintf("%d", i)), v, tc.userNsLength)
+				require.NoError(t, err)
+				m.Release(types.UID(fmt.Sprintf("%d", i)))
+				assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
+			}
+		})
 	}
 }
 
@@ -289,7 +330,6 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 		runtimeUserns  bool
 		runtimeHandler string
 		success        bool
-		skipOnWindows  bool
 	}{
 		{
 			name:    "no user namespace",
@@ -323,7 +363,6 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 			expMode:       runtimeapi.NamespaceMode_POD,
 			runtimeUserns: true,
 			success:       true,
-			skipOnWindows: true,
 		},
 		{
 			name: "user namespace, but no runtime support",
@@ -348,10 +387,6 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.skipOnWindows && goruntime.GOOS == "windows" {
-				// TODO: remove skip once the failing test has been fixed.
-				t.Skip("Skip failing test on Windows.")
-			}
 			// These tests will create the userns file, so use an existing podDir.
 			testUserNsPodsManager := &testUserNsPodsManager{
 				podDir: t.TempDir(),

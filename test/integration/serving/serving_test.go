@@ -42,6 +42,7 @@ import (
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 type componentTester interface {
@@ -191,30 +192,30 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 		{"/healthz without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", true, false, intPtr(http.StatusOK)},
+		}, "/healthz", true, false, ptr.To(http.StatusOK)},
 		{"/metrics without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", true, false, intPtr(http.StatusForbidden)},
+		}, "/metrics", true, false, ptr.To(http.StatusForbidden)},
 		{"authorization skipped for /healthz with authn/authz", []string{
 			"--authentication-kubeconfig", kubeconfig,
 			"--authorization-kubeconfig", kubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		}, "/healthz", false, false, ptr.To(http.StatusOK)},
 		{"authorization skipped for /healthz with BROKEN authn/authz", []string{
 			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
 			"--authentication-kubeconfig", brokenKubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		}, "/healthz", false, false, ptr.To(http.StatusOK)},
 		{"not authorized /metrics with BROKEN authn/authz", []string{
 			"--authentication-kubeconfig", kubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusInternalServerError)},
+		}, "/metrics", false, false, ptr.To(http.StatusInternalServerError)},
 		{"always-allowed /metrics with BROKEN authn/authz", []string{
 			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
 			"--authentication-kubeconfig", brokenKubeconfig,
@@ -222,7 +223,7 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 			"--authorization-always-allow-paths", "/healthz,/metrics",
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusOK)},
+		}, "/metrics", false, false, ptr.To(http.StatusOK)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -282,10 +283,6 @@ func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeco
 			}
 		})
 	}
-}
-
-func intPtr(x int) *int {
-	return &x
 }
 
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
@@ -363,7 +360,7 @@ users:
 			"--authorization-always-allow-paths", "/statusz",
 			"--kubeconfig", apiserverConfig.Name(),
 			"--leader-elect=false",
-		}, "/statusz", false, false, intPtr(http.StatusOK)},
+		}, "/statusz", false, false, ptr.To(http.StatusOK)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -23,9 +23,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 )
@@ -183,7 +185,7 @@ probeLoop:
 			// Updating the periodic timer to run the probe again at intervals of probeTickerPeriod
 			// starting from the moment a manual run occurs.
 			probeTicker.Reset(probeTickerPeriod)
-			klog.V(4).InfoS("Triggerd Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
+			klog.V(4).InfoS("Triggered Probe by manual run", "probeType", w.probeType, "pod", klog.KObj(w.pod), "podUID", w.pod.UID, "containerName", w.container.Name)
 			// continue
 		}
 	}
@@ -252,6 +254,9 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
 		}
 		// Abort if the container will not be restarted.
+		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {
+			return c.State.Terminated != nil || podutil.IsContainerRestartable(w.pod.Spec, w.container)
+		}
 		return c.State.Terminated == nil ||
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
 	}

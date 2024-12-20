@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -31,31 +31,31 @@ import (
 )
 
 func TestStructuralRoundtripOrError(t *testing.T) {
-	f := fuzz.New()
+	f := randfill.New()
 	seed := time.Now().UnixNano()
 	t.Logf("seed = %v", seed)
 	//seed = int64(1549012506261785182)
 	f.RandSource(rand.New(rand.NewSource(seed)))
 	f.Funcs(
-		func(s *apiextensions.JSON, c fuzz.Continue) {
+		func(s *apiextensions.JSON, c randfill.Continue) {
 			*s = apiextensions.JSON(map[string]interface{}{"foo": float64(42.2)})
 		},
-		func(s *apiextensions.JSONSchemaPropsOrArray, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
+		func(s *apiextensions.JSONSchemaPropsOrArray, c randfill.Continue) {
+			c.FillNoCustom(s)
 			if s.Schema != nil {
 				s.JSONSchemas = nil
 			} else if s.JSONSchemas == nil {
 				s.Schema = &apiextensions.JSONSchemaProps{}
 			}
 		},
-		func(s *apiextensions.JSONSchemaPropsOrBool, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
+		func(s *apiextensions.JSONSchemaPropsOrBool, c randfill.Continue) {
+			c.FillNoCustom(s)
 			if s.Schema != nil {
 				s.Allows = false
 			}
 		},
-		func(s **string, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
+		func(s **string, c randfill.Continue) {
+			c.FillNoCustom(s)
 			if *s != nil && **s == "" {
 				*s = nil
 			}
@@ -74,7 +74,7 @@ func TestStructuralRoundtripOrError(t *testing.T) {
 			// we drop these intentionally
 			continue
 		}
-		f.Fuzz(x.Field(n).Addr().Interface())
+		f.Fill(x.Field(n).Addr().Interface())
 
 		// it roundtrips or NewStructural errors out. We should never drop anything
 		orig, err := NewStructural(origSchema)

@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"fmt"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -29,15 +29,15 @@ import (
 // Funcs returns the fuzzer functions for the storage api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *storage.StorageClass, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *storage.StorageClass, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			reclamationPolicies := []api.PersistentVolumeReclaimPolicy{api.PersistentVolumeReclaimDelete, api.PersistentVolumeReclaimRetain}
 			obj.ReclaimPolicy = &reclamationPolicies[c.Rand.Intn(len(reclamationPolicies))]
 			bindingModes := []storage.VolumeBindingMode{storage.VolumeBindingImmediate, storage.VolumeBindingWaitForFirstConsumer}
 			obj.VolumeBindingMode = &bindingModes[c.Rand.Intn(len(bindingModes))]
 		},
-		func(obj *storage.CSIDriver, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *storage.CSIDriver, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 
 			// Custom fuzzing for volume modes.
 			switch c.Rand.Intn(7) {

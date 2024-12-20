@@ -129,7 +129,7 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthS
 
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
@@ -189,7 +189,7 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthS
 
 		// randomizing so tests can run in parallel
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
-		devices := []kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
+		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)

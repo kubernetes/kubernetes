@@ -30,6 +30,7 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -43,7 +44,9 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer)
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "resourceclaims",
 	}
-	resourceClaimStorage, statusStorage, err := NewREST(restOptions)
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	resourceClaimStorage, statusStorage, err := NewREST(restOptions, mockNSClient)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}

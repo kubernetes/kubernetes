@@ -304,7 +304,7 @@ func validateCustomResourceDefinitionVersion(ctx context.Context, version *apiex
 
 	if len(version.SelectableFields) > 0 {
 		if version.Schema == nil || version.Schema.OpenAPIV3Schema == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "selectableFields may only be set when version.schema.openAPIV3Schema is not included"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "may only be set when `version.schema.openAPIV3Schema` is not included"))
 		} else {
 			schema, err := structuralschema.NewStructural(version.Schema.OpenAPIV3Schema)
 			if err != nil {
@@ -370,7 +370,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 		if spec.Validation == nil || spec.Validation.OpenAPIV3Schema == nil {
 			for i, v := range spec.Versions {
 				if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
-					allErrs = append(allErrs, field.Required(fldPath.Child("versions").Index(i).Child("schema").Child("openAPIV3Schema"), "schemas are required"))
+					allErrs = append(allErrs, field.Required(fldPath.Child("versions").Index(i).Child("schema").Child("openAPIV3Schema"), ""))
 				}
 			}
 		}
@@ -477,7 +477,7 @@ func validateCustomResourceDefinitionSpec(ctx context.Context, spec *apiextensio
 
 	if len(spec.SelectableFields) > 0 {
 		if spec.Validation == nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "selectableFields may only be set when validations.schema is included"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectableFields"), "", "may only be set when validations.schema is included"))
 		} else {
 			schema, err := structuralschema.NewStructural(spec.Validation.OpenAPIV3Schema)
 			if err != nil {
@@ -1203,9 +1203,9 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			if len(trimmedRule) == 0 {
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("rule"), "rule is not specified"))
 			} else if len(rule.Message) > 0 && len(trimmedMsg) == 0 {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "message must be non-empty if specified"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "must be non-empty if specified"))
 			} else if hasNewlines(trimmedMsg) {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "message must not contain line breaks"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), rule.Message, "must not contain line breaks"))
 			} else if hasNewlines(trimmedRule) && len(trimmedMsg) == 0 {
 				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Required(fldPath.Child("x-kubernetes-validations").Index(i).Child("message"), "message must be specified if rule contains line breaks"))
 			}
@@ -1217,14 +1217,14 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			}
 			trimmedFieldPath := strings.TrimSpace(rule.FieldPath)
 			if len(rule.FieldPath) > 0 && len(trimmedFieldPath) == 0 {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be non-empty if specified"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "must be non-empty if specified"))
 			}
 			if hasNewlines(rule.FieldPath) {
-				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must not contain line breaks"))
+				allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "must not contain line breaks"))
 			}
 			if len(rule.FieldPath) > 0 {
 				if !pathValid(schema, rule.FieldPath) {
-					allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "fieldPath must be a valid path"))
+					allErrs.SchemaErrors = append(allErrs.SchemaErrors, field.Invalid(fldPath.Child("x-kubernetes-validations").Index(i).Child("fieldPath"), rule.FieldPath, "must be a valid path"))
 				}
 
 			}

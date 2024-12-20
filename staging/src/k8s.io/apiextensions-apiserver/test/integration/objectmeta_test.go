@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -71,7 +71,7 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 	if status, ok := err.(errors.APIStatus); !ok {
 		t.Fatalf("expected APIStatus error, but got: %#v", err)
 	} else if !errors.IsBadRequest(err) {
-		t.Fatalf("expected BadRequst error, but got: %v", errors.ReasonForError(err))
+		t.Fatalf("expected BadRequest error, but got: %v", errors.ReasonForError(err))
 	} else if !strings.Contains(status.Status().Message, "cannot be handled") {
 		t.Fatalf("expected 'cannot be handled' error message, got: %v", status.Status().Message)
 	}
@@ -122,7 +122,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 				"embedded": {
 					Type:                   "object",
 					XEmbeddedResource:      true,
-					XPreserveUnknownFields: pointer.BoolPtr(true),
+					XPreserveUnknownFields: ptr.To(true),
 				},
 			},
 		},

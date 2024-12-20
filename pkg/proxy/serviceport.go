@@ -19,6 +19,7 @@ package proxy
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -56,8 +57,6 @@ type ServicePort interface {
 	ExternalPolicyLocal() bool
 	// InternalPolicyLocal returns if a service has only node local endpoints for internal traffic.
 	InternalPolicyLocal() bool
-	// HintsAnnotation returns the value of the v1.DeprecatedAnnotationTopologyAwareHints annotation.
-	HintsAnnotation() string
 	// ExternallyAccessible returns true if the service port is reachable via something
 	// other than ClusterIP (NodePort/ExternalIP/LoadBalancer)
 	ExternallyAccessible() bool
@@ -86,7 +85,6 @@ type BaseServicePortInfo struct {
 	healthCheckNodePort      int
 	externalPolicyLocal      bool
 	internalPolicyLocal      bool
-	hintsAnnotation          string
 }
 
 var _ ServicePort = &BaseServicePortInfo{}
@@ -156,11 +154,6 @@ func (bsvcPortInfo *BaseServicePortInfo) InternalPolicyLocal() bool {
 	return bsvcPortInfo.internalPolicyLocal
 }
 
-// HintsAnnotation is part of ServicePort interface.
-func (bsvcPortInfo *BaseServicePortInfo) HintsAnnotation() string {
-	return bsvcPortInfo.hintsAnnotation
-}
-
 // ExternallyAccessible is part of ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) ExternallyAccessible() bool {
 	return bsvcPortInfo.nodePort != 0 || len(bsvcPortInfo.loadBalancerVIPs) != 0 || len(bsvcPortInfo.externalIPs) != 0
@@ -201,13 +194,6 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 		internalPolicyLocal: internalPolicyLocal,
 	}
 
-	// v1.DeprecatedAnnotationTopologyAwareHints has precedence over v1.AnnotationTopologyMode.
-	var exists bool
-	info.hintsAnnotation, exists = service.Annotations[v1.DeprecatedAnnotationTopologyAwareHints]
-	if !exists {
-		info.hintsAnnotation = service.Annotations[v1.AnnotationTopologyMode]
-	}
-
 	// Filter ExternalIPs to correct IP family
 	ipFamilyMap := proxyutil.MapIPsByIPFamily(service.Spec.ExternalIPs)
 	info.externalIPs = ipFamilyMap[ipFamily]
@@ -220,7 +206,12 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 	}
 
 	cidrFamilyMap := proxyutil.MapCIDRsByIPFamily(loadBalancerSourceRanges)
-	info.loadBalancerSourceRanges = cidrFamilyMap[ipFamily]
+	cidrs := cidrFamilyMap[ipFamily]
+	// zero-masked cidr means "allow any", which same as the empty loadBalancerSourceRanges.
+	if slices.ContainsFunc(cidrs, proxyutil.IsZeroCIDR) {
+		cidrs = []*net.IPNet{}
+	}
+	info.loadBalancerSourceRanges = cidrs
 
 	// Filter Load Balancer Ingress IPs to correct IP family. While proxying load
 	// balancers might choose to proxy connections from an LB IP of one family to a

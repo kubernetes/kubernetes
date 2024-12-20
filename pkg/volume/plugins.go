@@ -17,15 +17,14 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"sync"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	"k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -174,8 +173,6 @@ type VolumePlugin interface {
 	ConstructVolumeSpec(volumeName, volumePath string) (ReconstructedVolume, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
-	// Specifying mount options in a volume plugin that doesn't support
-	// user specified mount options will result in error creating persistent volumes
 	SupportsMountOption() bool
 
 	// SupportsSELinuxContextMount returns true if volume plugins supports
@@ -234,6 +231,7 @@ type AttachableVolumePlugin interface {
 	NewDetacher() (Detacher, error)
 	// CanAttach tests if provided volume spec is attachable
 	CanAttach(spec *Spec) (bool, error)
+	VerifyExhaustedResource(spec *Spec) bool
 }
 
 // DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -315,6 +313,9 @@ type KubeletVolumeHost interface {
 	// Returns trust anchors from the ClusterTrustBundles selected by signer
 	// name and label selector.
 	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
+
+	// Returns the credential bundle for the specified podCertificate projected volume source.
+	GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error)
 }
 
 // CSIDriverVolumeHost is a volume host that has access to CSIDriverLister
@@ -387,13 +388,10 @@ type VolumeHost interface {
 	NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error)
 
 	// Get mounter interface.
-	GetMounter(pluginName string) mount.Interface
+	GetMounter() mount.Interface
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string
-
-	// Returns host IP or nil in the case of error.
-	GetHostIP() (net.IP, error)
 
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
@@ -407,9 +405,6 @@ type VolumeHost interface {
 	GetServiceAccountTokenFunc() func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 
 	DeleteServiceAccountTokenFunc() func(podUID types.UID)
-
-	// Returns an interface that should be used to execute any utilities in volume plugins
-	GetExec(pluginName string) exec.Interface
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)
@@ -637,9 +632,8 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
-	pm.mutex.RLock()
-	defer pm.mutex.RUnlock()
-
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 	if spec == nil {
 		return nil, fmt.Errorf("could not find plugin because volume spec is nil")
 	}
@@ -652,8 +646,8 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 			matchedPluginNames = append(matchedPluginNames, v.GetPluginName())
 		}
 	}
-
 	pm.refreshProbedPlugins()
+
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
 			match = plugin
@@ -673,14 +667,13 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 
 // FindPluginByName fetches a plugin by name. If no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
-	pm.mutex.RLock()
-	defer pm.mutex.RUnlock()
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 
 	var match VolumePlugin
 	if v, found := pm.plugins[name]; found {
 		match = v
 	}
-
 	pm.refreshProbedPlugins()
 	if plugin, found := pm.probedPlugins[name]; found {
 		if match != nil {
@@ -707,6 +700,7 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 	// because the probe function can return a list of valid plugins
 	// even when an error is present we still must add the plugins
 	// or they will be skipped because each event only fires once
+
 	for _, event := range events {
 		if event.Op == ProbeAddOrUpdate {
 			if err := pm.initProbedPlugin(event.Plugin); err != nil {

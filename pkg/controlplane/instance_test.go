@@ -48,6 +48,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -199,7 +200,11 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	_, etcdserver, apiserverCfg, _ := newInstance(t)
 	defer etcdserver.Terminate(t)
 
-	certStorageProvider := certificatesrest.RESTStorageProvider{}
+	certStorageProvider := certificatesrest.RESTStorageProvider{
+		Authorizer: &fakeAuthorizer{
+			decision: authorizer.DecisionAllow,
+		},
+	}
 	apiGroupInfo, err := certStorageProvider.NewRESTStorage(apiserverCfg.ControlPlane.APIResourceConfigSource, apiserverCfg.ControlPlane.Generic.RESTOptionsGetter)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
@@ -210,6 +215,16 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	for _, err := range strategyErrors {
 		t.Error(err)
 	}
+}
+
+type fakeAuthorizer struct {
+	decision authorizer.Decision
+	reason   string
+	err      error
+}
+
+func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return f.decision, f.reason, f.err
 }
 
 func newInstance(t *testing.T) (*Instance, *etcd3testing.EtcdTestServer, CompletedConfig, *assert.Assertions) {
@@ -243,8 +258,14 @@ func TestVersion(t *testing.T) {
 	}
 	expectedInfo := utilversion.Get()
 	kubeVersion := compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion()
+	emulationVersion := compatibility.DefaultKubeEffectiveVersionForTest().EmulationVersion()
+	minCompatibilityVersion := compatibility.DefaultKubeEffectiveVersionForTest().MinCompatibilityVersion()
 	expectedInfo.Major = fmt.Sprintf("%d", kubeVersion.Major())
 	expectedInfo.Minor = fmt.Sprintf("%d", kubeVersion.Minor())
+	expectedInfo.EmulationMajor = fmt.Sprintf("%d", emulationVersion.Major())
+	expectedInfo.EmulationMinor = fmt.Sprintf("%d", emulationVersion.Minor())
+	expectedInfo.MinCompatibilityMajor = fmt.Sprintf("%d", minCompatibilityVersion.Major())
+	expectedInfo.MinCompatibilityMinor = fmt.Sprintf("%d", minCompatibilityVersion.Minor())
 
 	if !reflect.DeepEqual(expectedInfo, info) {
 		t.Errorf("Expected %#v, Got %#v", expectedInfo, info)
@@ -484,7 +505,7 @@ func TestGenericStorageProviders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kube, err := completed.StorageProviders(client.Discovery())
+	kube, err := completed.StorageProviders(client)
 	if err != nil {
 		t.Fatal(err)
 	}

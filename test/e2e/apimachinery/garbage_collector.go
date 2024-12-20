@@ -54,23 +54,31 @@ import (
 // estimateMaximumPods estimates how many pods the cluster can handle
 // with some wiggle room, to prevent pods being unable to schedule due
 // to max pod constraints.
+//
+// Tests that call this should use framework.WithSerial() because they're not
+// safe to run concurrently as they consume a large number of pods.
 func estimateMaximumPods(ctx context.Context, c clientset.Interface, min, max int32) int32 {
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 	framework.ExpectNoError(err)
 
 	availablePods := int32(0)
+	// estimate some reasonable overhead per-node for pods that are non-test
+	const daemonSetReservedPods = 10
 	for _, node := range nodes.Items {
 		if q, ok := node.Status.Allocatable["pods"]; ok {
 			if num, ok := q.AsInt64(); ok {
-				availablePods += int32(num)
+				if num > daemonSetReservedPods {
+					availablePods += int32(num - daemonSetReservedPods)
+				}
 				continue
 			}
 		}
-		// best guess per node, since default maxPerCore is 10 and most nodes have at least
+		// Only when we fail to obtain the number, we fall back to a best guess
+		// per node. Since default maxPerCore is 10 and most nodes have at least
 		// one core.
 		availablePods += 10
 	}
-	//avoid creating exactly max pods
+	// avoid creating exactly max pods
 	availablePods = int32(float32(availablePods) * 0.5)
 	// bound the top and bottom
 	if availablePods > max {
@@ -377,7 +385,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, delete replication controller, propagation policy orphan
 		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller MUST cause pods created by that RC to be orphaned.
 	*/
-	framework.ConformanceIt("should orphan pods created by rc if delete options say so", func(ctx context.Context) {
+	framework.ConformanceIt("should orphan pods created by rc if delete options say so", framework.WithSerial(), func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -636,7 +644,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, delete replication controller, after owned pods
 		Description: Create a replication controller with maximum allocatable Pods between 10 and 100 replicas. Once RC is created and the all Pods are created, delete RC with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication Controller MUST cause pods created by that RC to be deleted before the RC is deleted.
 	*/
-	framework.ConformanceIt("should keep the rc around until all its pods are deleted if the deleteOptions says so", func(ctx context.Context) {
+	framework.ConformanceIt("should keep the rc around until all its pods are deleted if the deleteOptions says so", framework.WithSerial(), func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
@@ -711,7 +719,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		Testname: Garbage Collector, multiple owners
 		Description: Create a replication controller RC1, with maximum allocatable Pods between 10 and 100 replicas. Create second replication controller RC2 and set RC2 as owner for half of those replicas. Once RC1 is created and the all Pods are created, delete RC1 with deleteOptions.PropagationPolicy set to Foreground. Half of the Pods that has RC2 as owner MUST not be deleted or have a deletion timestamp. Deleting the Replication Controller MUST not delete Pods that are owned by multiple replication controllers.
 	*/
-	framework.ConformanceIt("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func(ctx context.Context) {
+	framework.ConformanceIt("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", framework.WithSerial(), func(ctx context.Context) {
 		clientSet := f.ClientSet
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)

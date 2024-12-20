@@ -73,6 +73,7 @@ import (
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+var defaultImage = e2epod.GetDefaultTestImage()
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 var agnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
@@ -237,11 +238,16 @@ func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	// Wait for the Kubelet to be ready.
-	gomega.Eventually(ctx, func(ctx context.Context) bool {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
 		nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
+		if err != nil {
+			return fmt.Errorf("error getting ready nodes: %w", err)
+		}
+		if nodes != 1 {
+			return fmt.Errorf("expected 1 ready node, got %d", nodes)
+		}
+		return nil
+	}, time.Minute, time.Second).Should(gomega.Succeed())
 }
 
 func deleteStateFile(stateFileName string) {

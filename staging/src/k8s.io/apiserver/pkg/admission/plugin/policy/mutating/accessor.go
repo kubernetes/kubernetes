@@ -18,7 +18,7 @@ package mutating
 
 import (
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
 )
@@ -66,7 +66,7 @@ func (v *mutatingAdmissionPolicyAccessor) GetFailurePolicy() *v1.FailurePolicyTy
 	return toV1FailurePolicy(v.Spec.FailurePolicy)
 }
 
-func toV1FailurePolicy(failurePolicy *v1alpha1.FailurePolicyType) *v1.FailurePolicyType {
+func toV1FailurePolicy(failurePolicy *v1beta1.FailurePolicyType) *v1.FailurePolicyType {
 	if failurePolicy == nil {
 		return nil
 	}
@@ -116,7 +116,7 @@ func (v *mutatingAdmissionPolicyBindingAccessor) GetParamRef() *v1.ParamRef {
 	}
 }
 
-func convertV1alpha1ResourceRulesToV1(mc *v1alpha1.MatchResources) *v1.MatchResources {
+func convertV1alpha1ResourceRulesToV1(mc *v1beta1.MatchResources) *v1.MatchResources {
 	if mc == nil {
 		return nil
 	}

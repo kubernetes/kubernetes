@@ -8,7 +8,7 @@
       "name": "clustertrustbundles",
       "namespaced": false,
       "singularName": "clustertrustbundle",
-      "storageVersionHash": "XGGGW2kGm+w=",
+      "storageVersionHash": "v5yhuVertL4=",
       "verbs": [
         "create",
         "delete",
@@ -18,6 +18,34 @@
         "patch",
         "update",
         "watch"
+      ]
+    },
+    {
+      "kind": "PodCertificateRequest",
+      "name": "podcertificaterequests",
+      "namespaced": true,
+      "singularName": "podcertificaterequest",
+      "storageVersionHash": "3F2mRg06NdI=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "PodCertificateRequest",
+      "name": "podcertificaterequests/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
       ]
     }
   ]

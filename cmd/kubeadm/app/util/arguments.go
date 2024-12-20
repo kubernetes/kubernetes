@@ -21,12 +21,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // ArgumentsToCommand takes two Arg slices, one with the base arguments and one

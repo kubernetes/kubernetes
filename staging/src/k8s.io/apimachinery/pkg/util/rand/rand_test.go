@@ -65,10 +65,10 @@ func TestIntn(t *testing.T) {
 
 func TestPerm(t *testing.T) {
 	Seed(5)
-	rand.Seed(5)
+	r := rand.New(rand.NewSource(5))
 	for i := 1; i < 20; i++ {
 		actual := Perm(i)
-		expected := rand.Perm(i)
+		expected := r.Perm(i)
 		for j := 0; j < i; j++ {
 			if actual[j] != expected[j] {
 				t.Errorf("Perm call result is unexpected")

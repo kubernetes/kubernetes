@@ -26,6 +26,7 @@ import (
 
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchemaDeclType(t *testing.T) {
@@ -229,10 +230,6 @@ func arraySchema(arrayType, format string, maxItems *int64) *spec.Schema {
 	}
 }
 
-func maxPtr(max int64) *int64 {
-	return &max
-}
-
 func TestEstimateMaxLengthJSON(t *testing.T) {
 	type maxLengthTest struct {
 		Name                string
@@ -311,7 +308,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 		},
 		{
 			Name:        "arrayWithLength",
-			InputSchema: arraySchema("integer", "int64", maxPtr(10)),
+			InputSchema: arraySchema("integer", "int64", ptr.To[int64](10)),
 			// manually set by MaxItems
 			ExpectedMaxElements: 10,
 		},
@@ -320,7 +317,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 			InputSchema: &spec.Schema{
 				SchemaProps: spec.SchemaProps{
 					Type:      []string{"string"},
-					MaxLength: maxPtr(20),
+					MaxLength: ptr.To[int64](20),
 				}},
 			// manually set by MaxLength, but we expect a 4x multiplier compared to the original input
 			// since OpenAPIv3 maxLength uses code points, but DeclType works with bytes
@@ -335,7 +332,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 						Schema: spec.StringProperty(),
 					},
 					Format:        "string",
-					MaxProperties: maxPtr(15),
+					MaxProperties: ptr.To[int64](15),
 				}},
 			// manually set by MaxProperties
 			ExpectedMaxElements: 15,
@@ -417,7 +414,7 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 				SchemaProps: spec.SchemaProps{
 					Type:      []string{"string"},
 					Format:    "byte",
-					MaxLength: maxPtr(20),
+					MaxLength: ptr.To[int64](20),
 				}},
 			// note that unlike regular strings we don't have to take unicode into account,
 			// so we expect the max length to be exactly equal to the user-supplied one

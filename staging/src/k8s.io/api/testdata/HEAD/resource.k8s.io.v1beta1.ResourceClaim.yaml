@@ -47,20 +47,48 @@ spec:
       requests:
       - requestsValue
     constraints:
-    - matchAttribute: matchAttributeValue
+    - distinctAttribute: distinctAttributeValue
+      matchAttribute: matchAttributeValue
       requests:
       - requestsValue
     requests:
     - adminAccess: true
       allocationMode: allocationModeValue
+      capacity:
+        requests:
+          requestsKey: "0"
       count: 5
       deviceClassName: deviceClassNameValue
+      firstAvailable:
+      - allocationMode: allocationModeValue
+        capacity:
+          requests:
+            requestsKey: "0"
+        count: 5
+        deviceClassName: deviceClassNameValue
+        name: nameValue
+        selectors:
+        - cel:
+            expression: expressionValue
+        tolerations:
+        - effect: effectValue
+          key: keyValue
+          operator: operatorValue
+          tolerationSeconds: 5
+          value: valueValue
       name: nameValue
       selectors:
       - cel:
           expression: expressionValue
+      tolerations:
+      - effect: effectValue
+        key: keyValue
+        operator: operatorValue
+        tolerationSeconds: 5
+        value: valueValue
 status:
   allocation:
+    allocationTimestamp: "2005-01-01T01:01:01Z"
     devices:
       config:
       - opaque:
@@ -77,10 +105,23 @@ status:
         source: sourceValue
       results:
       - adminAccess: true
+        bindingConditions:
+        - bindingConditionsValue
+        bindingFailureConditions:
+        - bindingFailureConditionsValue
+        consumedCapacity:
+          consumedCapacityKey: "0"
         device: deviceValue
         driver: driverValue
         pool: poolValue
         request: requestValue
+        shareID: shareIDValue
+        tolerations:
+        - effect: effectValue
+          key: keyValue
+          operator: operatorValue
+          tolerationSeconds: 5
+          value: valueValue
     nodeSelector:
       nodeSelectorTerms:
       - matchExpressions:
@@ -116,6 +157,7 @@ status:
       ips:
       - ipsValue
     pool: poolValue
+    shareID: shareIDValue
   reservedFor:
   - apiGroup: apiGroupValue
     name: nameValue

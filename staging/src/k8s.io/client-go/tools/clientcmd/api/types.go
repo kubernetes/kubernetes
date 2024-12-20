@@ -40,7 +40,8 @@ type Config struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
-	Preferences Preferences `json:"preferences"`
+	// Deprecated: this field is deprecated in v1.34. It is not used by any of the Kubernetes components.
+	Preferences Preferences `json:"preferences,omitzero"`
 	// Clusters is a map of referencable names to cluster configs
 	Clusters map[string]*Cluster `json:"clusters"`
 	// AuthInfos is a map of referencable names to user configs
@@ -55,6 +56,7 @@ type Config struct {
 }
 
 // IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
+// Deprecated: this structure is deprecated in v1.34. It is not used by any of the Kubernetes components.
 type Preferences struct {
 	// +optional
 	Colors bool `json:"colors,omitempty"`
@@ -123,7 +125,8 @@ type AuthInfo struct {
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	// +optional
 	Token string `json:"token,omitempty" datapolicy:"token"`
-	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
+	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present,
+	// the TokenFile will be periodically read and the last successfully read value takes precedence over Token.
 	// +optional
 	TokenFile string `json:"tokenFile,omitempty"`
 	// Impersonate is the username to act-as.
@@ -339,11 +342,10 @@ const (
 // NewConfig is a convenience function that returns a new Config object with non-nil maps
 func NewConfig() *Config {
 	return &Config{
-		Preferences: *NewPreferences(),
-		Clusters:    make(map[string]*Cluster),
-		AuthInfos:   make(map[string]*AuthInfo),
-		Contexts:    make(map[string]*Context),
-		Extensions:  make(map[string]runtime.Object),
+		Clusters:   make(map[string]*Cluster),
+		AuthInfos:  make(map[string]*AuthInfo),
+		Contexts:   make(map[string]*Context),
+		Extensions: make(map[string]runtime.Object),
 	}
 }
 
@@ -370,6 +372,7 @@ func NewAuthInfo() *AuthInfo {
 
 // NewPreferences is a convenience function that returns a new
 // Preferences object with non-nil maps
+// Deprecated: this method is deprecated in v1.34. It is not used by any of the Kubernetes components.
 func NewPreferences() *Preferences {
 	return &Preferences{Extensions: make(map[string]runtime.Object)}
 }

@@ -492,14 +492,24 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	// as a result, we need to measure the usage of this object for quota
 	// on updates, we need to subtract the previous measured usage
 	// if usage shows no change, just return since it has no impact on quota
-	deltaUsage, err := evaluator.Usage(inputObject)
+	inputUsage, err := evaluator.Usage(inputObject)
 	if err != nil {
 		return quotas, err
 	}
 
 	// ensure that usage for input object is never negative (this would mean a resource made a negative resource requirement)
-	if negativeUsage := quota.IsNegative(deltaUsage); len(negativeUsage) > 0 {
+	if negativeUsage := quota.IsNegative(inputUsage); len(negativeUsage) > 0 {
 		return nil, admission.NewForbidden(a, fmt.Errorf("quota usage is negative for resource(s): %s", prettyPrintResourceNames(negativeUsage)))
+	}
+
+	// initialize a map of delta usage for each interesting quota index.
+	deltaUsageIndexMap := make(map[int]corev1.ResourceList, len(interestingQuotaIndexes))
+	for _, index := range interestingQuotaIndexes {
+		deltaUsageIndexMap[index] = inputUsage
+	}
+	var deltaUsageWhenNoInterestingQuota corev1.ResourceList
+	if admission.Create == a.GetOperation() && len(interestingQuotaIndexes) == 0 {
+		deltaUsageWhenNoInterestingQuota = inputUsage
 	}
 
 	if admission.Update == a.GetOperation() {
@@ -511,20 +521,55 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		// if we can definitively determine that this is not a case of "create on update",
 		// then charge based on the delta.  Otherwise, bill the maximum
 		metadata, err := meta.Accessor(prevItem)
-		if err == nil && len(metadata.GetResourceVersion()) > 0 {
-			prevUsage, innerErr := evaluator.Usage(prevItem)
-			if innerErr != nil {
-				return quotas, innerErr
+		if err == nil {
+			if len(metadata.GetResourceVersion()) > 0 {
+				prevUsage, innerErr := evaluator.Usage(prevItem)
+				if innerErr != nil {
+					return quotas, innerErr
+				}
+
+				deltaUsage := quota.SubtractWithNonNegativeResult(inputUsage, prevUsage)
+				if len(interestingQuotaIndexes) == 0 {
+					deltaUsageWhenNoInterestingQuota = deltaUsage
+				}
+
+				for _, index := range interestingQuotaIndexes {
+					resourceQuota := quotas[index]
+					match, err := evaluator.Matches(&resourceQuota, prevItem)
+					if err != nil {
+						klog.ErrorS(err, "Error occurred while matching resource quota against the existing object",
+							"resourceQuota", resourceQuota)
+						return quotas, err
+					}
+					if match {
+						deltaUsageIndexMap[index] = deltaUsage
+					}
+				}
+			} else if len(interestingQuotaIndexes) == 0 {
+				deltaUsageWhenNoInterestingQuota = inputUsage
 			}
-			deltaUsage = quota.SubtractWithNonNegativeResult(deltaUsage, prevUsage)
 		}
 	}
 
-	// ignore items in deltaUsage with zero usage
-	deltaUsage = quota.RemoveZeros(deltaUsage)
+	// ignore items in deltaUsageIndexMap with zero usage,
+	// as they will not impact the quota.
+	for index := range deltaUsageIndexMap {
+		deltaUsageIndexMap[index] = quota.RemoveZeros(deltaUsageIndexMap[index])
+		if len(deltaUsageIndexMap[index]) == 0 {
+			delete(deltaUsageIndexMap, index)
+		}
+	}
+
 	// if there is no remaining non-zero usage, short-circuit and return
-	if len(deltaUsage) == 0 {
-		return quotas, nil
+	if len(interestingQuotaIndexes) != 0 {
+		if len(deltaUsageIndexMap) == 0 {
+			return quotas, nil
+		}
+	} else {
+		deltaUsage := quota.RemoveZeros(deltaUsageWhenNoInterestingQuota)
+		if len(deltaUsage) == 0 {
+			return quotas, nil
+		}
 	}
 
 	// verify that for every resource that had limited by default consumption
@@ -557,22 +602,29 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 
 	for _, index := range interestingQuotaIndexes {
 		resourceQuota := outQuotas[index]
+		deltaUsage, ok := deltaUsageIndexMap[index]
+		if !ok {
+			continue
+		}
 
 		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
 		requestedUsage := quota.Mask(deltaUsage, hardResources)
 		newUsage := quota.Add(resourceQuota.Status.Used, requestedUsage)
-		maskedNewUsage := quota.Mask(newUsage, quota.ResourceNames(requestedUsage))
 
-		if allowed, exceeded := quota.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {
-			failedRequestedUsage := quota.Mask(requestedUsage, exceeded)
-			failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
-			failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
-			return nil, admission.NewForbidden(a,
-				fmt.Errorf("exceeded quota: %s, requested: %s, used: %s, limited: %s",
-					resourceQuota.Name,
-					prettyPrint(failedRequestedUsage),
-					prettyPrint(failedUsed),
-					prettyPrint(failedHard)))
+		if a.GetSubresource() != "status" {
+			maskedNewUsage := quota.Mask(newUsage, quota.ResourceNames(requestedUsage))
+
+			if allowed, exceeded := quota.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {
+				failedRequestedUsage := quota.Mask(requestedUsage, exceeded)
+				failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
+				failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
+				return nil, admission.NewForbidden(a,
+					fmt.Errorf("exceeded quota: %s, requested: %s, used: %s, limited: %s",
+						resourceQuota.Name,
+						prettyPrint(failedRequestedUsage),
+						prettyPrint(failedUsed),
+						prettyPrint(failedHard)))
+			}
 		}
 
 		// update to the new usage number

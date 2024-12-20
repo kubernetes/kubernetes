@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2843,6 +2842,29 @@ func TestPrintJob(t *testing.T) {
 			// Columns: Name, Status, Completions, Duration, Age
 			expected: []metav1.TableRow{{Cells: []interface{}{"job9", "Terminating", "0/1", "", "0s"}}},
 		},
+		{
+			job: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job10",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					Conditions: []batch.JobCondition{
+						{
+							Type:   batch.JobSuccessCriteriaMet,
+							Status: api.ConditionTrue,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Status, Completions, Duration, Age
+			expected: []metav1.TableRow{{Cells: []interface{}{"job10", "SuccessCriteriaMet", "0/1", "", "0s"}}},
+		},
 	}
 
 	for i, test := range tests {
@@ -4085,7 +4107,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							Controller: boolP(true),
+							Controller: ptr.To(true),
 							APIVersion: "apps/v1",
 							Kind:       "DaemonSet",
 							Name:       "foo",
@@ -4103,7 +4125,7 @@ func TestPrintControllerRevision(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							Controller: boolP(false),
+							Controller: ptr.To(false),
 							Kind:       "ABC",
 							Name:       "foo",
 						},
@@ -4149,10 +4171,6 @@ func TestPrintControllerRevision(t *testing.T) {
 			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
 		}
 	}
-}
-
-func boolP(b bool) *bool {
-	return &b
 }
 
 func TestPrintConfigMap(t *testing.T) {
@@ -4559,18 +4577,21 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 
 func TestPrintReplicationController(t *testing.T) {
 	tests := []struct {
+		name     string
 		rc       api.ReplicationController
 		options  printers.GenerateOptions
 		expected []metav1.TableRow
 	}{
 		// Basic print replication controller without replicas or status.
 		{
+			name: "basic",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rc1",
 					Namespace: "test-namespace",
 				},
 				Spec: api.ReplicationControllerSpec{
+					Replicas: ptr.To[int32](0),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -4597,13 +4618,14 @@ func TestPrintReplicationController(t *testing.T) {
 		},
 		// Basic print replication controller with replicas; does not print containers or labels
 		{
+			name: "basic with replicas",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rc1",
 					Namespace: "test-namespace",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 5,
+					Replicas: ptr.To[int32](5),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -4634,12 +4656,13 @@ func TestPrintReplicationController(t *testing.T) {
 		},
 		// Generate options: Wide; print containers and labels.
 		{
+			name: "wide",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "rc1",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 5,
+					Replicas: ptr.To[int32](5),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -4670,11 +4693,15 @@ func TestPrintReplicationController(t *testing.T) {
 		},
 		{
 			// make sure Bookmark event will not lead a panic
+			name: "no panic",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						metav1.InitialEventsAnnotationKey: "true",
 					},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: ptr.To[int32](0),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
@@ -5644,7 +5671,7 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner:          "kubernetes.io/nfs",
 				ReclaimPolicy:        &policyRetain,
-				AllowVolumeExpansion: boolP(true),
+				AllowVolumeExpansion: ptr.To(true),
 				VolumeBindingMode:    &bindModeWait,
 			},
 			expected: []metav1.TableRow{{Cells: []interface{}{"sc6", "kubernetes.io/nfs", "Retain",
@@ -6305,10 +6332,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.ExactDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6329,10 +6358,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.ExactDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6352,10 +6383,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.ExactDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6386,10 +6419,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.ExactDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6430,10 +6465,12 @@ func TestPrintResourceClaimTemplate(t *testing.T) {
 					Spec: resourceapis.ResourceClaimSpec{
 						Devices: resourceapis.DeviceClaim{
 							Requests: []resourceapis.DeviceRequest{{
-								Name:            "test-deviceRequest",
-								DeviceClassName: "deviceClassName",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "test-deviceRequest",
+								Exactly: &resourceapis.ExactDeviceRequest{
+									DeviceClassName: "deviceClassName",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							}},
 						},
 					},
@@ -6453,10 +6490,12 @@ func TestPrintResourceClaimTemplate(t *testing.T) {
 					Spec: resourceapis.ResourceClaimSpec{
 						Devices: resourceapis.DeviceClaim{
 							Requests: []resourceapis.DeviceRequest{{
-								Name:            "test-deviceRequest",
-								DeviceClassName: "deviceClassName",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "test-deviceRequest",
+								Exactly: &resourceapis.ExactDeviceRequest{
+									DeviceClassName: "deviceClassName",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							}},
 						},
 					},
@@ -6494,7 +6533,7 @@ func TestPrintResourceSlice(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
 				},
 				Spec: resourceapis.ResourceSliceSpec{
-					NodeName: "nodeName",
+					NodeName: ptr.To("nodeName"),
 					Driver:   "driverName",
 					Pool: resourceapis.ResourcePool{
 						Name:               "poolName",
@@ -6512,7 +6551,7 @@ func TestPrintResourceSlice(t *testing.T) {
 					CreationTimestamp: metav1.Time{},
 				},
 				Spec: resourceapis.ResourceSliceSpec{
-					NodeName: "nodeName",
+					NodeName: ptr.To("nodeName"),
 					Driver:   "driverName",
 					Pool: resourceapis.ResourcePool{
 						Name:               "poolName",

@@ -78,7 +78,7 @@ func ValidateStorageVersionMigrationStatusUpdate(newSVMBundle, oldSVMBundle *sto
 
 	// resource version should not change once it has been set
 	if len(oldSVMBundle.Status.ResourceVersion) != 0 && oldSVMBundle.Status.ResourceVersion != newSVMBundle.Status.ResourceVersion {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newSVMBundle.Status.ResourceVersion, "resourceVersion cannot be updated"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("resourceVersion"), newSVMBundle.Status.ResourceVersion, "field is immutable"))
 	}
 
 	// at most one of success or failed may be true
@@ -171,11 +171,11 @@ func validateCondition(condition storagemigration.MigrationCondition, fldPath *f
 	}
 
 	if condition.LastUpdateTime.IsZero() {
-		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), "must be set"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("lastTransitionTime"), ""))
 	}
 
 	if len(condition.Reason) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), "must be set"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("reason"), ""))
 	} else {
 		for _, currErr := range isValidConditionReason(condition.Reason) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("reason"), condition.Reason, currErr))

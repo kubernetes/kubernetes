@@ -168,13 +168,13 @@ func TestServeHTTP(t *testing.T) {
 	}{
 		{
 			name:         "root path, simple get",
-			method:       "GET",
+			method:       http.MethodGet,
 			requestPath:  "/",
 			expectedPath: "/",
 		},
 		{
 			name:            "no upgrade header sent",
-			method:          "GET",
+			method:          http.MethodGet,
 			requestPath:     "/",
 			upgradeRequired: true,
 			expectError: func(err error) bool {
@@ -183,13 +183,13 @@ func TestServeHTTP(t *testing.T) {
 		},
 		{
 			name:         "simple path, get",
-			method:       "GET",
+			method:       http.MethodGet,
 			requestPath:  "/path/to/test",
 			expectedPath: "/path/to/test",
 		},
 		{
 			name:          "request params",
-			method:        "POST",
+			method:        http.MethodPost,
 			requestPath:   "/some/path/",
 			expectedPath:  "/some/path/",
 			requestParams: map[string]string{"param1": "value/1", "param2": "value%2"},
@@ -197,26 +197,26 @@ func TestServeHTTP(t *testing.T) {
 		},
 		{
 			name:          "request headers",
-			method:        "PUT",
+			method:        http.MethodPut,
 			requestPath:   "/some/path",
 			expectedPath:  "/some/path",
 			requestHeader: map[string]string{"Header1": "value1", "Header2": "value2"},
 		},
 		{
 			name:         "empty path - slash should be added",
-			method:       "GET",
+			method:       http.MethodGet,
 			requestPath:  "",
 			expectedPath: "/",
 		},
 		{
 			name:         "remove CORS headers",
-			method:       "GET",
+			method:       http.MethodGet,
 			requestPath:  "/some/path",
 			expectedPath: "/some/path",
 			responseHeader: map[string]string{
 				"Header1":                      "value1",
 				"Access-Control-Allow-Origin":  "some.server",
-				"Access-Control-Allow-Methods": "GET"},
+				"Access-Control-Allow-Methods": http.MethodGet},
 			expectedRespHeader: map[string]string{
 				"Header1": "value1",
 			},
@@ -227,14 +227,14 @@ func TestServeHTTP(t *testing.T) {
 		},
 		{
 			name:            "use location host",
-			method:          "GET",
+			method:          http.MethodGet,
 			requestPath:     "/some/path",
 			expectedPath:    "/some/path",
 			useLocationHost: true,
 		},
 		{
 			name:            "use location host - invalid upgrade",
-			method:          "GET",
+			method:          http.MethodGet,
 			upgradeRequired: true,
 			requestHeader: map[string]string{
 				httpstream.HeaderConnection: httpstream.HeaderUpgrade,
@@ -248,21 +248,21 @@ func TestServeHTTP(t *testing.T) {
 		},
 		{
 			name:               "append server path to request path",
-			method:             "GET",
+			method:             http.MethodGet,
 			requestPath:        "/base",
 			expectedPath:       "/base/base",
 			appendLocationPath: true,
 		},
 		{
 			name:               "append server path to request path with ending slash",
-			method:             "GET",
+			method:             http.MethodGet,
 			requestPath:        "/base/",
 			expectedPath:       "/base/base/",
 			appendLocationPath: true,
 		},
 		{
 			name:               "don't append server path to request path",
-			method:             "GET",
+			method:             http.MethodGet,
 			requestPath:        "/base",
 			expectedPath:       "/base",
 			appendLocationPath: false,
@@ -590,7 +590,7 @@ func TestProxyUpgradeConnectionErrorResponse(t *testing.T) {
 	defer proxy.Close()
 
 	// Send request to proxy server.
-	req, err := http.NewRequest("POST", "http://"+proxy.Listener.Addr().String()+"/some/path", nil)
+	req, err := http.NewRequest(http.MethodPost, "http://"+proxy.Listener.Addr().String()+"/some/path", nil)
 	require.NoError(t, err)
 	req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
 	resp, err := http.DefaultClient.Do(req)
@@ -633,7 +633,7 @@ func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
 			bufferedReader := bufio.NewReader(conn)
 
 			// Send upgrade request resulting in a non-101 response from the backend
-			req, _ := http.NewRequest("GET", "/", nil)
+			req, _ := http.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
 			require.NoError(t, req.Write(conn))
 			// Verify we get the correct response and full message body content
@@ -653,7 +653,7 @@ func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
 			}
 
 			// Send another request to another endpoint to verify it is not received
-			req, _ = http.NewRequest("GET", "/there", nil)
+			req, _ = http.NewRequest(http.MethodGet, "/there", nil)
 			req.Write(conn)
 			// wait to ensure the handler does not receive the request
 			time.Sleep(time.Second)
@@ -688,7 +688,7 @@ func TestProxyUpgradeErrorResponse(t *testing.T) {
 			bufferedReader := bufio.NewReader(conn)
 
 			// Send upgrade request resulting in a non-101 response from the backend
-			req, _ := http.NewRequest("GET", "/", nil)
+			req, _ := http.NewRequest(http.MethodGet, "/", nil)
 			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
 			require.NoError(t, req.Write(conn))
 			// Verify we get the correct response and full message body content
@@ -783,7 +783,7 @@ func TestRejectForwardingRedirectsOption(t *testing.T) {
 			require.NoError(t, err)
 			bufferedReader := bufio.NewReader(conn)
 
-			req, _ := http.NewRequest("GET", proxyURL.String(), nil)
+			req, _ := http.NewRequest(http.MethodGet, proxyURL.String(), nil)
 			require.NoError(t, req.Write(conn))
 			// Verify we get the correct response and message body content
 			resp, err := http.ReadResponse(bufferedReader, nil)
@@ -1073,7 +1073,7 @@ func TestFlushIntervalHeaders(t *testing.T) {
 	frontend := httptest.NewServer(proxyHandler)
 	defer frontend.Close()
 
-	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req, _ := http.NewRequest(http.MethodGet, frontend.URL, nil)
 	req.Close = true
 
 	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
@@ -1118,7 +1118,7 @@ func TestErrorPropagation(t *testing.T) {
 	frontend := httptest.NewServer(proxyHandler)
 	defer frontend.Close()
 
-	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req, _ := http.NewRequest(http.MethodGet, frontend.URL, nil)
 	req.Close = true
 
 	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
@@ -1150,7 +1150,7 @@ func TestProxyRedirectsforRootPath(t *testing.T) {
 	}{
 		{
 			name:               "root path, simple get",
-			method:             "GET",
+			method:             http.MethodGet,
 			requestPath:        "",
 			redirect:           true,
 			expectedStatusCode: 301,
@@ -1160,14 +1160,14 @@ func TestProxyRedirectsforRootPath(t *testing.T) {
 		},
 		{
 			name:               "root path, simple put",
-			method:             "PUT",
+			method:             http.MethodPut,
 			requestPath:        "",
 			redirect:           false,
 			expectedStatusCode: 200,
 		},
 		{
 			name:               "root path, simple head",
-			method:             "HEAD",
+			method:             http.MethodHead,
 			requestPath:        "",
 			redirect:           true,
 			expectedStatusCode: 301,
@@ -1177,7 +1177,7 @@ func TestProxyRedirectsforRootPath(t *testing.T) {
 		},
 		{
 			name:               "root path, simple delete with params",
-			method:             "DELETE",
+			method:             http.MethodDelete,
 			requestPath:        "",
 			redirect:           false,
 			expectedStatusCode: 200,

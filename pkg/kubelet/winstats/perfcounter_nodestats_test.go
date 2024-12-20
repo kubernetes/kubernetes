@@ -30,11 +30,14 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestMonitoring(t *testing.T) {
-	counterClient, err := NewPerfCounterClient()
+	logger, _ := ktesting.NewTestContext(t)
+	counterClient, err := NewPerfCounterClient(logger)
 	assert.NoError(t, err)
 
 	// assert that startMonitoring has been called. nodeInfo should be set.
@@ -54,13 +57,14 @@ func TestMonitoring(t *testing.T) {
 }
 
 func TestGetMachineInfo(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	p := perfCounterNodeStatsClient{
 		nodeInfo: nodeInfo{
 			memoryPhysicalCapacityBytes: 100,
 		},
 	}
 
-	machineInfo, err := p.getMachineInfo()
+	machineInfo, err := p.getMachineInfo(logger)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(100), machineInfo.MemoryCapacity)
 	hostname, _ := os.Hostname()
@@ -92,6 +96,7 @@ func TestGetVersionInfo(t *testing.T) {
 }
 
 func TestCollectMetricsData(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	p := perfCounterNodeStatsClient{}
 
 	cpuCounter := &fakePerfCounterImpl{
@@ -109,28 +114,28 @@ func TestCollectMetricsData(t *testing.T) {
 	networkAdapterCounter := newFakedNetworkCounters(true)
 
 	// Checking the error cases first.
-	p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
+	p.collectMetricsData(logger, cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
 	metrics, _ := p.getNodeMetrics()
 	expectedMetrics := nodeMetrics{}
 	assert.Equal(t, expectedMetrics, metrics)
 
 	cpuCounter.raiseError = false
-	p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
+	p.collectMetricsData(logger, cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
 	metrics, _ = p.getNodeMetrics()
 	assert.Equal(t, expectedMetrics, metrics)
 
 	memWorkingSetCounter.raiseError = false
-	p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
+	p.collectMetricsData(logger, cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
 	metrics, _ = p.getNodeMetrics()
 	assert.Equal(t, expectedMetrics, metrics)
 
 	memCommittedBytesCounter.raiseError = false
-	p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
+	p.collectMetricsData(logger, cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
 	metrics, _ = p.getNodeMetrics()
 	assert.Equal(t, expectedMetrics, metrics)
 
 	networkAdapterCounter = newFakedNetworkCounters(false)
-	p.collectMetricsData(cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
+	p.collectMetricsData(logger, cpuCounter, memWorkingSetCounter, memCommittedBytesCounter, networkAdapterCounter)
 	metrics, _ = p.getNodeMetrics()
 	expectedMetrics = nodeMetrics{
 		cpuUsageCoreNanoSeconds:   uint64(ProcessorCount()) * 1e7,

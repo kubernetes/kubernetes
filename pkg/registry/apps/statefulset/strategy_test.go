@@ -48,9 +48,10 @@ func TestStatefulSetStrategy(t *testing.T) {
 				Labels: validSelector,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -358,10 +359,6 @@ func makeStatefulSetWithMaxUnavailable(maxUnavailable *int) *apps.StatefulSet {
 	}
 }
 
-func getMaxUnavailable(maxUnavailable int) *int {
-	return &maxUnavailable
-}
-
 func createOrdinalsWithStart(start int) *apps.StatefulSetOrdinals {
 	return &apps.StatefulSetOrdinals{
 		Start: int32(start),
@@ -430,30 +427,30 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 		{
 			name:                 "MaxUnavailable not enabled, field used in new, not in old",
 			enableMaxUnavailable: false,
-			ss:                   makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
+			ss:                   makeStatefulSetWithMaxUnavailable(ptr.To(3)),
 			oldSS:                nil,
 			expectedSS:           makeStatefulSetWithMaxUnavailable(nil),
 		},
 		{
 			name:                 "MaxUnavailable not enabled, field used in old and new",
 			enableMaxUnavailable: false,
-			ss:                   makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
-			oldSS:                makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
-			expectedSS:           makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
+			ss:                   makeStatefulSetWithMaxUnavailable(ptr.To(3)),
+			oldSS:                makeStatefulSetWithMaxUnavailable(ptr.To(3)),
+			expectedSS:           makeStatefulSetWithMaxUnavailable(ptr.To(3)),
 		},
 		{
 			name:                 "MaxUnavailable enabled, field used in new only",
 			enableMaxUnavailable: true,
-			ss:                   makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
+			ss:                   makeStatefulSetWithMaxUnavailable(ptr.To(3)),
 			oldSS:                nil,
-			expectedSS:           makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
+			expectedSS:           makeStatefulSetWithMaxUnavailable(ptr.To(3)),
 		},
 		{
 			name:                 "MaxUnavailable enabled, field used in both old and new",
 			enableMaxUnavailable: true,
-			ss:                   makeStatefulSetWithMaxUnavailable(getMaxUnavailable(1)),
-			oldSS:                makeStatefulSetWithMaxUnavailable(getMaxUnavailable(3)),
-			expectedSS:           makeStatefulSetWithMaxUnavailable(getMaxUnavailable(1)),
+			ss:                   makeStatefulSetWithMaxUnavailable(ptr.To(1)),
+			oldSS:                makeStatefulSetWithMaxUnavailable(ptr.To(3)),
+			expectedSS:           makeStatefulSetWithMaxUnavailable(ptr.To(1)),
 		},
 		{
 			name:       "set ordinals, ordinals in use in new only",

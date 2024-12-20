@@ -49,7 +49,6 @@ contexts:
   name: kubernetes-admin@kubernetes
 current-context: kubernetes-admin@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: kubernetes-admin`))
 

@@ -86,6 +86,23 @@ func TestCancelCtx(t *testing.T) {
 	tCtx.Cancel("test is complete")
 }
 
+func TestParallel(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	tCtx := ktesting.Init(t)
+
+	// Each sub-test runs in parallel to the others and waits for the other two.
+	test := func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+		wg.Done()
+		wg.Wait()
+	}
+	tCtx.Run("one", test)
+	tCtx.Run("two", test)
+	tCtx.Run("three", test)
+}
+
 func TestWithTB(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
@@ -106,6 +123,33 @@ func TestWithTB(t *testing.T) {
 		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
 
 		tCtx.Cancel("test is complete")
+		<-tCtx.Done()
+	})
+
+	if err := tCtx.Err(); err != nil {
+		t.Errorf("parent TContext should not have been cancelled: %v", err)
+	}
+}
+
+func TestRun(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	cfg := new(rest.Config)
+	mapper := new(restmapper.DeferredDiscoveryRESTMapper)
+	client := clientset.New(nil)
+	dynamic := dynamic.New(nil)
+	apiextensions := apiextensions.New(nil)
+	tCtx = ktesting.WithClients(tCtx, cfg, mapper, client, dynamic, apiextensions)
+
+	tCtx.Run("sub", func(tCtx ktesting.TContext) {
+		assert.Equal(t, cfg, tCtx.RESTConfig(), "RESTConfig")
+		assert.Equal(t, mapper, tCtx.RESTMapper(), "RESTMapper")
+		assert.Equal(t, client, tCtx.Client(), "Client")
+		assert.Equal(t, dynamic, tCtx.Dynamic(), "Dynamic")
+		assert.Equal(t, apiextensions, tCtx.APIExtensions(), "APIExtensions")
+
+		tCtx.Cancel("test is complete")
+		<-tCtx.Done()
 	})
 
 	if err := tCtx.Err(); err != nil {

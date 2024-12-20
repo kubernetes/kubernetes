@@ -27,6 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/server/resourceconfig"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_newResourceExpirationEvaluator(t *testing.T) {
@@ -42,10 +46,16 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20)},
 		},
 		{
-			name:           "alpha",
+			name:           "alpha .0",
 			currentVersion: "v1.20.0-alpha.0.62+a5d22854a2ac21",
-			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true},
+			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true, isAlphaZero: true},
 		},
+		{
+			name:           "alpha not .0",
+			currentVersion: "v1.20.0-alpha.1.62+a5d22854a2ac21",
+			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true, isAlphaZero: false},
+		},
+
 		{
 			name:           "maintenance",
 			currentVersion: "v1.20.1",
@@ -74,29 +84,6 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 	}
 }
 
-func storageRemovedIn(major, minor int) *removedInStorage {
-	return &removedInStorage{major: major, minor: minor}
-}
-
-func storageNeverRemoved() *removedInStorage {
-	return &removedInStorage{neverRemoved: true}
-}
-
-type removedInStorage struct {
-	major, minor int
-	neverRemoved bool
-}
-
-func (r *removedInStorage) New() runtime.Object {
-	if r.neverRemoved {
-		return &defaultObj{}
-	}
-	return &removedInObj{major: r.major, minor: r.minor}
-}
-
-func (r *removedInStorage) Destroy() {
-}
-
 type defaultObj struct {
 }
 
@@ -121,24 +108,6 @@ func (r *removedInObj) APILifecycleRemoved() (major, minor int) {
 	return r.major, r.minor
 }
 
-func storageIntroducedIn(major, minor int) *introducedInStorage {
-	return &introducedInStorage{major: major, minor: minor}
-}
-
-type introducedInStorage struct {
-	major, minor int
-}
-
-func (r *introducedInStorage) New() runtime.Object {
-	if r.major == 0 && r.minor == 0 {
-		return &defaultObj{}
-	}
-	return &IntroducedInObj{major: r.major, minor: r.minor}
-}
-
-func (r *introducedInStorage) Destroy() {
-}
-
 type IntroducedInObj struct {
 	major, minor int
 }
@@ -153,7 +122,61 @@ func (r *IntroducedInObj) APILifecycleIntroduced() (major, minor int) {
 	return r.major, r.minor
 }
 
-func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
+type introducedAndRemovedInObj struct {
+	majorIntroduced, minorIntroduced int
+	majorRemoved, minorRemoved       int
+}
+
+func (r *introducedAndRemovedInObj) GetObjectKind() schema.ObjectKind {
+	panic("don't do this")
+}
+func (r *introducedAndRemovedInObj) DeepCopyObject() runtime.Object {
+	panic("don't do this either")
+}
+func (r *introducedAndRemovedInObj) APILifecycleIntroduced() (major, minor int) {
+	return r.majorIntroduced, r.minorIntroduced
+}
+func (r *introducedAndRemovedInObj) APILifecycleRemoved() (major, minor int) {
+	return r.majorRemoved, r.minorRemoved
+}
+
+func storageRemovedIn(major, minor int) *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{majorRemoved: major, minorRemoved: minor}
+}
+
+func storageNeverRemoved() *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{}
+}
+
+func storageIntroducedIn(major, minor int) *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{majorIntroduced: major, minorIntroduced: minor}
+}
+
+func storageIntroducedAndRemovedIn(majorIntroduced, minorIntroduced, majorRemoved, minorRemoved int) *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{majorIntroduced: majorIntroduced, minorIntroduced: minorIntroduced, majorRemoved: majorRemoved, minorRemoved: minorRemoved}
+}
+
+type introducedAndRemovedInStorage struct {
+	majorIntroduced, minorIntroduced int
+	majorRemoved, minorRemoved       int
+}
+
+func (r *introducedAndRemovedInStorage) New() runtime.Object {
+	if r.majorIntroduced == 0 && r.minorIntroduced == 0 && r.majorRemoved == 0 && r.minorRemoved == 0 {
+		return &defaultObj{}
+	}
+	if r.majorIntroduced == 0 && r.minorIntroduced == 0 {
+		return &removedInObj{major: r.majorRemoved, minor: r.minorRemoved}
+	}
+	if r.majorRemoved == 0 && r.minorRemoved == 0 {
+		return &IntroducedInObj{major: r.majorIntroduced, minor: r.minorIntroduced}
+	}
+	return &introducedAndRemovedInObj{majorIntroduced: r.majorIntroduced, minorIntroduced: r.minorIntroduced, majorRemoved: r.majorRemoved, minorRemoved: r.minorRemoved}
+}
+
+func (r *introducedAndRemovedInStorage) Destroy() {}
+
+func Test_resourceExpirationEvaluator_isNotRemoved(t *testing.T) {
 	tests := []struct {
 		name                        string
 		resourceExpirationEvaluator resourceExpirationEvaluator
@@ -197,6 +220,17 @@ func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
 			expected:    false,
 		},
 		{
+			name: "removed-in-curr-but-alpha-but-strict-and-alpha-zero",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:               apimachineryversion.MajorMinor(1, 20),
+				isAlpha:                      true,
+				isAlphaZero:                  true,
+				strictRemovedHandlingInAlpha: true,
+			},
+			restStorage: storageRemovedIn(1, 20),
+			expected:    true,
+		},
+		{
 			name: "removed-in-prev-deferral-does-not-help",
 			resourceExpirationEvaluator: resourceExpirationEvaluator{
 				currentVersion:                 apimachineryversion.MajorMinor(1, 21),
@@ -230,45 +264,13 @@ func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
 			restStorage: storageNeverRemoved(),
 			expected:    true,
 		},
-		{
-			name: "introduced-in-curr",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(1, 20),
-			expected:    true,
-		},
-		{
-			name: "introduced-in-prev-major",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(1, 19),
-			expected:    true,
-		},
-		{
-			name: "introduced-in-future",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(1, 21),
-			expected:    false,
-		},
-		{
-			name: "missing-introduced",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(0, 0),
-			expected:    true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gv := schema.GroupVersion{Group: "mygroup", Version: "myversion"}
-			convertor := &dummyConvertor{}
-			if actual := tt.resourceExpirationEvaluator.shouldServe(gv, convertor, tt.restStorage); actual != tt.expected {
-				t.Errorf("shouldServe() = %v, want %v", actual, tt.expected)
+			convertor := &dummyConvertor{prioritizedVersions: []schema.GroupVersion{gv}}
+			if actual := tt.resourceExpirationEvaluator.isNotRemoved(gv, convertor, tt.restStorage); actual != tt.expected {
+				t.Errorf("isRemoved() = %v, want %v", actual, tt.expected)
 			}
 			if !reflect.DeepEqual(convertor.called, gv) {
 				t.Errorf("expected converter to be called with %#v, got %#v", gv, convertor.called)
@@ -278,12 +280,29 @@ func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
 }
 
 type dummyConvertor struct {
-	called runtime.GroupVersioner
+	called              runtime.GroupVersioner
+	prioritizedVersions []schema.GroupVersion
 }
 
 func (d *dummyConvertor) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
 	d.called = gv
 	return in, nil
+}
+
+func (d *dummyConvertor) PrioritizedVersionsForGroup(group string) []schema.GroupVersion {
+	return d.prioritizedVersions
+}
+
+func (d *dummyConvertor) IsGroupRegistered(group string) bool {
+	return true
+}
+
+func (d *dummyConvertor) IsVersionRegistered(v schema.GroupVersion) bool {
+	return true
+}
+
+func (d *dummyConvertor) PrioritizedVersionsAllGroups() []schema.GroupVersion {
+	return d.prioritizedVersions
 }
 
 func checkErr(t *testing.T, actual error, expected string) {
@@ -300,6 +319,7 @@ func checkErr(t *testing.T, actual error, expected string) {
 }
 
 func Test_removeDeletedKinds(t *testing.T) {
+	groupName := "group.name"
 	tests := []struct {
 		name                         string
 		resourceExpirationEvaluator  resourceExpirationEvaluator
@@ -364,8 +384,1164 @@ func Test_removeDeletedKinds(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			convertor := &dummyConvertor{}
-			tt.resourceExpirationEvaluator.RemoveDeletedKinds("group.name", convertor, tt.versionedResourcesStorageMap)
+			convertor := &dummyConvertor{prioritizedVersions: []schema.GroupVersion{
+				{Group: groupName, Version: "v2"}, {Group: groupName, Version: "v1"}}}
+			tt.resourceExpirationEvaluator.removeDeletedKinds(groupName, convertor, tt.versionedResourcesStorageMap)
+			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
+				t.Fatal(dump.Pretty(tt.versionedResourcesStorageMap))
+			}
+		})
+	}
+}
+
+func Test_removeUnIntroducedKinds(t *testing.T) {
+	groupName := "group.name"
+	resource1 := "resource1"
+	resource2 := "resource2"
+	tests := []struct {
+		name                         string
+		resourceExpirationEvaluator  resourceExpirationEvaluator
+		runtimeConfig                map[string]string
+		expectErr                    bool
+		versionedResourcesStorageMap map[string]map[string]rest.Storage
+		expectedStorage              map[string]map[string]rest.Storage
+	}{
+		{
+			name: "remove-future-version",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 21),
+			},
+			runtimeConfig: map[string]string{
+				"api/beta":             "true",
+				groupName + "/v2beta1": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+			},
+		},
+		{
+			name: "missing-introduced-version",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageRemovedIn(1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageRemovedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-ga-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 19),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-alpha-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-beta1-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 21),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-new-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 22),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-enable-future-version-err",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			expectErr: true,
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-enable-future-resource-err",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2/resource2": "true",
+			},
+			expectErr: true,
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-emulation-forward-compatible-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-emulation-forward-compatible-beta2-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2/resource2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta2": {
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-runtime-config-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible:              true,
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-alpha-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 19),
+				runtimeConfigEmulationForwardCompatible: true,
+				emulationForwardCompatible:              true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2alpha1": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 19),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+					resource2: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 19),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+					resource2: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-alpha-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 19),
+				runtimeConfigEmulationForwardCompatible: true,
+				emulationForwardCompatible:              true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2alpha1/resource2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 19),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+					resource2: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 19),
+				},
+				"v2alpha1": {
+					resource2: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-beta1-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 21),
+				emulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta1": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-beta1-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 21),
+				emulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta1/resource2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-beta1-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible:              true,
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta1": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-beta1-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible:              true,
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta1/resource2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource2: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resourceConfig := serverstorage.NewResourceConfig()
+			convertor := &dummyConvertor{prioritizedVersions: []schema.GroupVersion{
+				{Group: groupName, Version: "v2"}, {Group: groupName, Version: "v1"},
+				{Group: groupName, Version: "v2beta1"},
+				{Group: groupName, Version: "v2beta2"},
+				{Group: groupName, Version: "v2alpha1"}}}
+			resourceConfig.EnableVersions(convertor.PrioritizedVersionsForGroup(groupName)...)
+			resourceConfig, err := resourceconfig.MergeAPIResourceConfigs(resourceConfig, tt.runtimeConfig, convertor)
+			require.NoError(t, err)
+			err = tt.resourceExpirationEvaluator.removeUnintroducedKinds(groupName, convertor, tt.versionedResourcesStorageMap, resourceConfig)
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
+				t.Fatal(dump.Pretty(tt.versionedResourcesStorageMap))
+			}
+		})
+	}
+}
+
+func Test_RemoveUnavailableKinds(t *testing.T) {
+	groupName := "group.name"
+	resource1 := "resource1"
+	resource2 := "resource2"
+	tests := []struct {
+		name                         string
+		resourceExpirationEvaluator  resourceExpirationEvaluator
+		runtimeConfig                map[string]string
+		expectErr                    bool
+		versionedResourcesStorageMap map[string]map[string]rest.Storage
+		expectedStorage              map[string]map[string]rest.Storage
+	}{
+		{
+			name: "remove-future-version",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 21),
+			},
+			runtimeConfig: map[string]string{
+				"api/beta":             "true",
+				groupName + "/v2beta1": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+			},
+		},
+		{
+			name: "missing-introduced-version",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageRemovedIn(1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageRemovedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-ga-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 19),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-alpha-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-beta1-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 21),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-new-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 22),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-enable-future-version-err",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			expectErr: true,
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-enable-future-resource-err",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2/resource2": "true",
+			},
+			expectErr: true,
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-emulation-forward-compatible-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+			},
+		},
+		{
+			name: "runtime-config-emulation-forward-compatible-beta2-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2/resource2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta2": {
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-runtime-config-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible:              true,
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-runtime-config-beta2-api-resource1-ok",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 21),
+				emulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resourceConfig := serverstorage.NewResourceConfig()
+			convertor := &dummyConvertor{prioritizedVersions: []schema.GroupVersion{
+				{Group: groupName, Version: "v2"}, {Group: groupName, Version: "v1"},
+				{Group: groupName, Version: "v2beta2"}, {Group: groupName, Version: "v2beta1"},
+				{Group: groupName, Version: "v2alpha1"}}}
+			resourceConfig.EnableVersions(convertor.PrioritizedVersionsForGroup(groupName)...)
+			resourceConfig, err := resourceconfig.MergeAPIResourceConfigs(resourceConfig, tt.runtimeConfig, convertor)
+			require.NoError(t, err)
+			err = tt.resourceExpirationEvaluator.RemoveUnavailableKinds(groupName, convertor, tt.versionedResourcesStorageMap, resourceConfig)
+			if tt.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
 				t.Fatal(dump.Pretty(tt.versionedResourcesStorageMap))
 			}

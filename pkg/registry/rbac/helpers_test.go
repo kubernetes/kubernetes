@@ -26,7 +26,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 func newPod() *kapi.Pod {
@@ -172,10 +172,10 @@ func TestIsOnlyMutatingGCFields(t *testing.T) {
 }
 
 func TestNewMetadataFields(t *testing.T) {
-	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
+	f := randfill.New().NilChance(0.0).NumElements(1, 1)
 	for i := 0; i < 100; i++ {
 		objMeta := metav1.ObjectMeta{}
-		f.Fuzz(&objMeta)
+		f.Fill(&objMeta)
 		objMeta.Name = ""
 		objMeta.GenerateName = ""
 		objMeta.Namespace = ""

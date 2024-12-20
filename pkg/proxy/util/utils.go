@@ -45,11 +45,12 @@ const (
 
 // IsZeroCIDR checks whether the input CIDR string is either
 // the IPv4 or IPv6 zero CIDR
-func IsZeroCIDR(cidr string) bool {
-	if cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR {
-		return true
+func IsZeroCIDR(cidr *net.IPNet) bool {
+	if cidr == nil {
+		return false
 	}
-	return false
+	prefixLen, _ := cidr.Mask.Size()
+	return prefixLen == 0
 }
 
 // ShouldSkipService checks if a given service should skip proxying

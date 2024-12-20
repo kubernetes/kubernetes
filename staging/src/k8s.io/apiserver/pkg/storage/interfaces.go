@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -242,8 +243,8 @@ type Interface interface {
 		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
-	// Count returns number of different entries under the key (generally being path prefix).
-	Count(key string) (int64, error)
+	// Stats returns storage stats.
+	Stats(ctx context.Context) (Stats, error)
 
 	// ReadinessCheck checks if the storage is ready for accepting requests.
 	ReadinessCheck() error
@@ -262,7 +263,23 @@ type Interface interface {
 	// TODO: Remove when storage.Interface will be separate from etc3.store.
 	// Deprecated: Added temporarily to simplify exposing RequestProgress for watch cache.
 	RequestWatchProgress(ctx context.Context) error
+
+	// GetCurrentResourceVersion gets the current resource version from etcd.
+	// This method issues an empty list request and reads only the ResourceVersion from the object metadata
+	GetCurrentResourceVersion(ctx context.Context) (uint64, error)
+
+	// SetKeysFunc allows to override the function used to get keys from storage.
+	// This allows to replace default function that fetches keys from storage with one using cache.
+	SetKeysFunc(KeysFunc)
+
+	// CompactRevision returns latest observed revision that was compacted.
+	// Without ListFromCacheSnapshot enabled only locally executed compaction will be observed.
+	// Returns 0 if no compaction was yet observed.
+	CompactRevision() int64
 }
+
+// KeysFunc is a function prototype to fetch keys from storage.
+type KeysFunc func(context.Context) ([]string, error)
 
 // GetOptions provides the options that may be provided for storage get operations.
 type GetOptions struct {
@@ -324,4 +341,53 @@ type DeleteOptions struct {
 	// enabled by the caller only to facilitate unsafe deletion of corrupt
 	// object which otherwise can not be deleted using the normal flow
 	IgnoreStoreReadError bool
+}
+
+func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {
+	if opts.Recursive && len(opts.Predicate.Continue) > 0 {
+		continueKey, continueRV, err := DecodeContinue(opts.Predicate.Continue, keyPrefix)
+		if err != nil {
+			return 0, "", apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
+		}
+		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return 0, "", apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
+		}
+		// If continueRV > 0, the LIST request needs a specific resource version.
+		// continueRV==0 is invalid.
+		// If continueRV < 0, the request is for the latest resource version.
+		if continueRV > 0 {
+			withRev = continueRV
+		}
+		return withRev, continueKey, nil
+	}
+	if len(opts.ResourceVersion) == 0 {
+		return withRev, "", nil
+	}
+	parsedRV, err := versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return withRev, "", apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+	}
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchNotOlderThan:
+		// The not older than constraint is checked after we get a response from etcd,
+		// and returnedRV is then set to the revision we get from the etcd response.
+	case metav1.ResourceVersionMatchExact:
+		withRev = int64(parsedRV)
+	case "": // legacy case
+		if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
+			withRev = int64(parsedRV)
+		}
+	default:
+		return withRev, "", fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
+	}
+	return withRev, "", nil
+}
+
+// Stats provides statistics information about storage.
+type Stats struct {
+	// ObjectCount informs about number of objects stored in the storage.
+	ObjectCount int64
+	// EstimatedAverageObjectSizeBytes informs about size of objects stored in the storage, based on size of serialized values.
+	// Value is an estimate, meaning it doesn't need to provide accurate nor consistent.
+	EstimatedAverageObjectSizeBytes int64
 }

@@ -25,9 +25,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
-
-	"github.com/pkg/errors"
 
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +43,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
@@ -148,7 +148,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 // NB. this method holds the information about how kubeadm creates kubeconfig files.
 func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConfigSpec, error) {
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
-	if os.IsNotExist(errors.Cause(err)) {
+	if os.IsNotExist(errors.Unwrap(err)) {
 		return nil, errors.Wrap(err, "the CA files do not exist, please run `kubeadm init phase certs ca` to generate it")
 	}
 	if err != nil {
@@ -280,15 +280,7 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	currentCaCert := currentCACerts[0]
 
 	// Find a common trust anchor
-	trustAnchorFound := false
-	for _, expectedCaCert := range expectedCACerts {
-		// Compare the current CA cert to the expected CA cert.
-		// If the certificates match then a common trust anchor was found.
-		if currentCaCert.Equal(expectedCaCert) {
-			trustAnchorFound = true
-			break
-		}
-	}
+	trustAnchorFound := slices.ContainsFunc(expectedCACerts, currentCaCert.Equal)
 	if !trustAnchorFound {
 		return errors.Errorf("a kubeconfig file %q exists but does not contain a trusted CA in its current context's "+
 			"cluster. Total CA certificates found: %d", kubeConfigFilePath, len(currentCACerts))

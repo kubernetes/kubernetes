@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -429,4 +430,12 @@ func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, 
 		"spec.nodeName": pod.Spec.NodeName,
 		"metadata.name": pod.ObjectMeta.Name,
 	}, nil
+}
+
+func mustAtoi(str string) int {
+	result, err := strconv.Atoi(str)
+	if err != nil {
+		panic(err)
+	}
+	return result
 }

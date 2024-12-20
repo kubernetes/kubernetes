@@ -58,7 +58,7 @@ func TestTypeProvider(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, option := NewResolverTypeProviderAndEnvOption(&mockTypeResolver{})
+			option := ResolverEnvOption(&mockTypeResolver{})
 			env := mustCreateEnv(t, option)
 			ast, issues := env.Compile(tc.expression)
 			if len(tc.expectCompileError) > 0 {

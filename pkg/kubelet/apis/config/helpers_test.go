@@ -243,6 +243,7 @@ var (
 		"ImageGCLowThresholdPercent",
 		"ImageMinimumGCAge.Duration",
 		"ImageMaximumGCAge.Duration",
+		"ImagePullCredentialsVerificationPolicy",
 		"KernelMemcgNotification",
 		"KubeAPIBurst",
 		"KubeAPIQPS",
@@ -258,6 +259,7 @@ var (
 		"MaxPods",
 		"MemoryManagerPolicy",
 		"MemorySwap.SwapBehavior",
+		"MergeDefaultEvictionSettings",
 		"NodeLeaseDurationSeconds",
 		"NodeStatusMaxImages",
 		"NodeStatusUpdateFrequency.Duration",
@@ -267,6 +269,7 @@ var (
 		"PodPidsLimit",
 		"PodsPerCore",
 		"Port",
+		"PreloadedImagesVerificationAllowlist[*]",
 		"ProtectKernelDefaults",
 		"ProviderID",
 		"ReadOnlyPort",
@@ -303,5 +306,6 @@ var (
 		"LocalStorageCapacityIsolation",
 		"FailCgroupV1",
 		"CrashLoopBackOff.MaxContainerRestartPeriod",
+		"UserNamespaces.IDsPerPod",
 	)
 )

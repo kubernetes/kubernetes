@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -46,7 +47,7 @@ import (
 	"k8s.io/component-base/metrics"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
+	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	netutils "k8s.io/utils/net"
 )
 
@@ -122,6 +123,9 @@ func TestAddFlags(t *testing.T) {
 		"--storage-backend=etcd3",
 		"--lease-reuse-duration-seconds=100",
 		"--emulated-version=test=1.31",
+		"--coordinated-leadership-lease-duration=10s",
+		"--coordinated-leadership-renew-deadline=5s",
+		"--coordinated-leadership-retry-period=1s",
 	}
 	fs.Parse(args)
 	utilruntime.Must(componentGlobalsRegistry.Set())
@@ -296,6 +300,9 @@ func TestAddFlags(t *testing.T) {
 		},
 		AggregatorRejectForwardingRedirects: true,
 		SystemNamespaces:                    []string{"kube-system", "kube-public", "default"},
+		CoordinatedLeadershipLeaseDuration:  10 * time.Second,
+		CoordinatedLeadershipRenewDeadline:  5 * time.Second,
+		CoordinatedLeadershipRetryPeriod:    1 * time.Second,
 	}
 
 	expected.Authentication.OIDC.UsernameClaim = "sub"
@@ -483,8 +490,8 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			options := NewOptions()
 			if tc.externalSigner {
 				// create and start mock signer.
-				socketPath := fmt.Sprintf("@mock-external-jwt-signer-%d.sock", time.Now().Nanosecond())
-				mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
+				socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
+				mockSigner := v1testing.NewMockSigner(t, socketPath)
 				defer mockSigner.CleanUp()
 
 				mockSigner.MaxTokenExpirationSeconds = tc.externalMaxExpirationSec

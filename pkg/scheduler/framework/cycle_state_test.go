@@ -19,29 +19,39 @@ package framework
 import (
 	"fmt"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 )
 
 type fakeData struct {
 	data string
 }
 
-func (f *fakeData) Clone() StateData {
+func (f *fakeData) Clone() fwk.StateData {
 	copy := &fakeData{
 		data: f.data,
 	}
 	return copy
 }
 
-var key StateKey = "fakedata_key"
+var key fwk.StateKey = "fakedata_key"
 
 // createCycleStateWithFakeData creates *CycleState with fakeData.
 // The given data is used in stored fakeData.
-func createCycleStateWithFakeData(data string, recordPluginMetrics bool) *CycleState {
+func createCycleStateWithFakeData(data string, recordPluginMetrics bool, skipPlugins ...[]string) *CycleState {
 	c := NewCycleState()
 	c.Write(key, &fakeData{
 		data: data,
 	})
 	c.SetRecordPluginMetrics(recordPluginMetrics)
+	if len(skipPlugins) > 0 {
+		c.SetSkipFilterPlugins(sets.New(skipPlugins[0]...))
+	}
+	if len(skipPlugins) > 1 {
+		c.SetSkipScorePlugins(sets.New(skipPlugins[1]...))
+	}
 	return c
 }
 
@@ -57,6 +67,12 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 
 	if a.recordPluginMetrics != b.recordPluginMetrics {
 		return false, fmt.Sprintf("CycleState A and B have a different recordPluginMetrics. A: %v, B: %v", a.recordPluginMetrics, b.recordPluginMetrics)
+	}
+	if diff := cmp.Diff(a.skipFilterPlugins, b.skipFilterPlugins); diff != "" {
+		return false, fmt.Sprintf("CycleState A and B have different SkipFilterPlugin sets. -wanted,+got:\n%s", diff)
+	}
+	if diff := cmp.Diff(a.skipScorePlugins, b.skipScorePlugins); diff != "" {
+		return false, fmt.Sprintf("CycleState A and B have different SkipScorePlugins sets. -wanted,+got:\n%s", diff)
 	}
 
 	var msg string
@@ -75,7 +91,7 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 		typed2, ok2 := v2.(*fakeData)
 		if !ok1 || !ok2 {
 			isEqual = false
-			msg = fmt.Sprintf("CycleState has the data which is not type *fakeData.")
+			msg = "CycleState has the data which is not type *fakeData."
 			return false
 		}
 
@@ -122,6 +138,21 @@ func TestCycleStateClone(t *testing.T) {
 			wantClonedState: createCycleStateWithFakeData("data", false),
 		},
 		{
+			name:            "clone with SkipFilterPlugins",
+			state:           createCycleStateWithFakeData("data", true, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, []string{"p1", "p2", "p3"}),
+		},
+		{
+			name:            "clone with SkipScorePlugins",
+			state:           createCycleStateWithFakeData("data", false, []string{}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", false, []string{}, []string{"p1", "p2", "p3"}),
+		},
+		{
+			name:            "clone with SkipScorePlugins and SkipFilterPlugins",
+			state:           createCycleStateWithFakeData("data", true, []string{"p0"}, []string{"p1", "p2", "p3"}),
+			wantClonedState: createCycleStateWithFakeData("data", true, []string{"p0"}, []string{"p1", "p2", "p3"}),
+		},
+		{
 			name:            "clone with nil CycleState",
 			state:           nil,
 			wantClonedState: nil,
@@ -131,7 +162,11 @@ func TestCycleStateClone(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := tt.state
-			stateCopy := state.Clone()
+			copy := state.Clone()
+			var stateCopy *CycleState
+			if copy != nil {
+				stateCopy = copy.(*CycleState)
+			}
 
 			if isEqual, msg := isCycleStateEqual(stateCopy, tt.wantClonedState); !isEqual {
 				t.Errorf("unexpected cloned state: %v", msg)

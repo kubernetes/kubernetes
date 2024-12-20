@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 )
@@ -135,7 +136,7 @@ func watchCRWithName(ctx context.Context, crdResourceClient dynamic.ResourceInte
 		ctx,
 		metav1.ListOptions{
 			FieldSelector:  "metadata.name=" + name,
-			TimeoutSeconds: int64ptr(600),
+			TimeoutSeconds: ptr.To[int64](600),
 		},
 	)
 }

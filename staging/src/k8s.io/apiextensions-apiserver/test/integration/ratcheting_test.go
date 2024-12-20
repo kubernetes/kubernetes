@@ -46,13 +46,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/cel/environment"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/utils/ptr"
 )
 
 var stringSchema *apiextensionsv1.JSONSchemaProps = &apiextensionsv1.JSONSchemaProps{
@@ -365,7 +368,6 @@ type ratchetingTestCase struct {
 }
 
 func runTests(t *testing.T, cases []ratchetingTestCase) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, true)
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -1114,7 +1116,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					Properties: map[string]apiextensionsv1.JSONSchemaProps{
 						"field": {
 							Type:         "array",
-							XListType:    ptr("map"),
+							XListType:    ptr.To("map"),
 							XListMapKeys: []string{"name", "port"},
 							Items: &apiextensionsv1.JSONSchemaPropsOrArray{
 								Schema: &apiextensionsv1.JSONSchemaProps{
@@ -1394,7 +1396,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 								{
 									Rule:            "!oldSelf.hasValue()",
 									Message:         "oldSelf must be null",
-									OptionalOldSelf: ptr(true),
+									OptionalOldSelf: ptr.To(true),
 								},
 							},
 						},
@@ -1444,7 +1446,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type:                   "object",
-					XPreserveUnknownFields: ptr(true),
+					XPreserveUnknownFields: ptr.To(true),
 				}},
 				applyPatchOperation{
 					"create instance with strings that do not start with k8s",
@@ -1456,7 +1458,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 				},
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type:                   "object",
-					XPreserveUnknownFields: ptr(true),
+					XPreserveUnknownFields: ptr.To(true),
 					Properties: map[string]apiextensionsv1.JSONSchemaProps{
 						"myStringField": {
 							Type: "string",
@@ -1758,10 +1760,6 @@ func TestRatchetingFunctionality(t *testing.T) {
 	runTests(t, cases)
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 type validator func(new, old *unstructured.Unstructured)
 
 func newValidator(customResourceValidation *apiextensionsinternal.JSONSchemaProps, kind schema.GroupVersionKind, namespaceScoped bool) (validator, error) {
@@ -1769,7 +1767,8 @@ func newValidator(customResourceValidation *apiextensionsinternal.JSONSchemaProp
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		// TODO: replace with NewStructural(...).ToGoOpenAPI
-		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
+		formatPostProcessor := apiservervalidation.StripUnsupportedFormatsPostProcessorForVersion(environment.DefaultCompatibilityVersion())
+		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, formatPostProcessor); err != nil {
 			return nil, err
 		}
 	}
@@ -1994,6 +1993,7 @@ func BenchmarkRatcheting(b *testing.B) {
 }
 
 func TestRatchetingDropFields(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	// Field dropping only takes effect when feature is disabled
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CRDValidationRatcheting, false)
 	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
@@ -2028,7 +2028,7 @@ func TestRatchetingDropFields(t *testing.T) {
 											{
 												// Results in error if field wasn't dropped
 												Rule:            "self == oldSelf",
-												OptionalOldSelf: ptr(true),
+												OptionalOldSelf: ptr.To(true),
 											},
 										},
 									},
@@ -2061,7 +2061,7 @@ func TestRatchetingDropFields(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		existing.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf = ptr(true)
+		existing.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"].Properties["field"].XValidations[0].OptionalOldSelf = ptr.To(true)
 		updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), existing, metav1.UpdateOptions{})
 		if err != nil {
 			if apierrors.IsConflict(err) {

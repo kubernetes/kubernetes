@@ -45,7 +45,7 @@ type EndpointSliceCache struct {
 	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
 
 	makeEndpointInfo makeEndpointFunc
-	hostname         string
+	nodeName         string
 }
 
 // endpointSliceTracker keeps track of EndpointSlices as they have been applied
@@ -67,13 +67,13 @@ type endpointSliceData struct {
 }
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(nodeName string, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
 	return &EndpointSliceCache{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
-		hostname:            hostname,
+		nodeName:            nodeName,
 		makeEndpointInfo:    makeEndpointInfo,
 	}
 }
@@ -212,19 +212,25 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		serving := endpoint.Conditions.Serving == nil || *endpoint.Conditions.Serving
 		terminating := endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating
 
-		var zoneHints sets.Set[string]
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
-			if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
+		var zoneHints, nodeHints sets.Set[string]
+		if endpoint.Hints != nil {
+			if len(endpoint.Hints.ForZones) > 0 {
 				zoneHints = sets.New[string]()
 				for _, zone := range endpoint.Hints.ForZones {
 					zoneHints.Insert(zone.Name)
+				}
+			}
+			if len(endpoint.Hints.ForNodes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+				nodeHints = sets.New[string]()
+				for _, node := range endpoint.Hints.ForNodes {
+					nodeHints.Insert(node.Name)
 				}
 			}
 		}
 
 		endpointIP := utilnet.ParseIPSloppy(endpoint.Addresses[0]).String()
 		endpointInfo := newBaseEndpointInfo(endpointIP, portNum, isLocal,
-			ready, serving, terminating, zoneHints)
+			ready, serving, terminating, zoneHints, nodeHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints
 		// isLocal should not vary between matching endpoints, but if it does, we
@@ -237,8 +243,8 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 	return endpointSet
 }
 
-func (cache *EndpointSliceCache) isLocal(hostname string) bool {
-	return len(cache.hostname) > 0 && hostname == cache.hostname
+func (cache *EndpointSliceCache) isLocal(nodeName string) bool {
+	return len(cache.nodeName) > 0 && nodeName == cache.nodeName
 }
 
 // esDataChanged returns true if the esData parameter should be set as a new

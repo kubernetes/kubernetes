@@ -28,8 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
@@ -106,6 +109,9 @@ type defaultFunc func(pod *api.Pod) error
 // A static pod tried to use a ClusterTrustBundle projected volume source.
 var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not use ClusterTrustBundle projected volume sources")
 
+// A static pod tried to use a resource claim.
+var ErrStaticPodTriedToUseResourceClaims = errors.New("static pods may not use ResourceClaims")
+
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
 func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
 	// JSON is valid YAML, so this should work for everything.
@@ -141,15 +147,30 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		return true, nil, err
 	}
 
-	for _, v := range v1Pod.Spec.Volumes {
-		if v.Projected == nil {
-			continue
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreventStaticPodAPIReferences) {
+		// Check if pod has references to API objects
+		_, resource, err := podutil.HasAPIObjectReference(newPod)
+		if err != nil {
+			return true, nil, err
 		}
-
-		for _, s := range v.Projected.Sources {
-			if s.ClusterTrustBundle != nil {
-				return true, nil, ErrStaticPodTriedToUseClusterTrustBundle
+		if resource != "" {
+			return true, nil, fmt.Errorf("static pods may not reference %s", resource)
+		}
+	} else {
+		// TODO: Remove this else block once the PreventStaticPodAPIReferences gate is GA
+		for _, v := range v1Pod.Spec.Volumes {
+			if v.Projected == nil {
+				continue
 			}
+
+			for _, s := range v.Projected.Sources {
+				if s.ClusterTrustBundle != nil {
+					return true, nil, ErrStaticPodTriedToUseClusterTrustBundle
+				}
+			}
+		}
+		if len(v1Pod.Spec.ResourceClaims) > 0 {
+			return true, nil, ErrStaticPodTriedToUseResourceClaims
 		}
 	}
 
@@ -181,6 +202,16 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
 			err = fmt.Errorf("invalid pod: %v", errs)
 			return true, pods, err
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.PreventStaticPodAPIReferences) {
+			// Check if pod has references to API objects
+			_, resource, err := podutil.HasAPIObjectReference(newPod)
+			if err != nil {
+				return true, pods, err
+			}
+			if resource != "" {
+				return true, pods, fmt.Errorf("static pods may not reference %s", resource)
+			}
 		}
 	}
 	v1Pods := &v1.PodList{}

@@ -402,12 +402,12 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// this allows us to easily exercise both modes without restarting the API server
 	// TODO integration test that this dynamically takes effect
 	useSeed := GetKDF(h.name)
-	stateUseSeed := state.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
+	stateUseSeed := state.EncryptedObjectEncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 
 	// state is valid and status keyID is unchanged from when we generated this DEK/seed so there is no need to rotate it
 	// just move the expiration of the current state forward by the reuse interval
 	// useSeed can only change at runtime during tests, so we check it here to allow us to easily exercise both modes
-	if errState == nil && state.EncryptedObject.KeyID == statusKeyID && stateUseSeed == useSeed {
+	if errState == nil && state.EncryptedObjectKeyID == statusKeyID && stateUseSeed == useSeed {
 		state.ExpirationTimestamp = expirationTimestamp
 		h.state.Store(&state)
 		return nil
@@ -423,11 +423,14 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// TODO maybe add success metrics?
 	if errGen == nil && encObject.KeyID == statusKeyID {
 		h.state.Store(&envelopekmsv2.State{
-			Transformer:         transformer,
-			EncryptedObject:     *encObject,
-			UID:                 uid,
-			ExpirationTimestamp: expirationTimestamp,
-			CacheKey:            cacheKey,
+			Transformer:                           transformer,
+			EncryptedObjectKeyID:                  encObject.KeyID,
+			EncryptedObjectEncryptedDEKSource:     encObject.EncryptedDEKSource,
+			EncryptedObjectAnnotations:            encObject.Annotations,
+			EncryptedObjectEncryptedDEKSourceType: encObject.EncryptedDEKSourceType,
+			UID:                                   uid,
+			ExpirationTimestamp:                   expirationTimestamp,
+			CacheKey:                              cacheKey,
 		})
 
 		// it should be logically impossible for the new state to be invalid but check just in case
@@ -439,7 +442,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 					"uid", uid,
 					"useSeed", useSeed,
 					"newKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(encObject.KeyID),
-					"oldKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObject.KeyID),
+					"oldKeyIDHash", envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObjectKeyID),
 					"expirationTimestamp", expirationTimestamp.Format(time.RFC3339),
 				)
 			}
@@ -447,8 +450,9 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 		}
 	}
 
+	//nolint:errorlint // printing the <nil> error is intentional
 	return fmt.Errorf("failed to rotate DEK uid=%q, useSeed=%v, errState=%v, errGen=%v, statusKeyIDHash=%q, encryptKeyIDHash=%q, stateKeyIDHash=%q, expirationTimestamp=%s",
-		uid, useSeed, errState, errGen, envelopekmsv2.GetHashIfNotEmpty(statusKeyID), envelopekmsv2.GetHashIfNotEmpty(encObject.KeyID), envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObject.KeyID), state.ExpirationTimestamp.Format(time.RFC3339))
+		uid, useSeed, errState, errGen, envelopekmsv2.GetHashIfNotEmpty(statusKeyID), envelopekmsv2.GetHashIfNotEmpty(encObject.KeyID), envelopekmsv2.GetHashIfNotEmpty(state.EncryptedObjectKeyID), state.ExpirationTimestamp.Format(time.RFC3339))
 }
 
 // getCurrentState returns the latest state from the last status and encrypt calls.
@@ -461,11 +465,13 @@ func (h *kmsv2PluginProbe) getCurrentState() (envelopekmsv2.State, error) {
 		return envelopekmsv2.State{}, fmt.Errorf("got unexpected nil transformer")
 	}
 
-	encryptedObjectCopy := state.EncryptedObject
-	if len(encryptedObjectCopy.EncryptedData) != 0 {
-		return envelopekmsv2.State{}, fmt.Errorf("got unexpected non-empty EncryptedData")
+	encryptedObjectCopy := kmstypes.EncryptedObject{
+		KeyID:                  state.EncryptedObjectKeyID,
+		EncryptedDEKSource:     state.EncryptedObjectEncryptedDEKSource,
+		Annotations:            state.EncryptedObjectAnnotations,
+		EncryptedDEKSourceType: state.EncryptedObjectEncryptedDEKSourceType,
+		EncryptedData:          []byte{0}, // any non-empty value to pass validation
 	}
-	encryptedObjectCopy.EncryptedData = []byte{0} // any non-empty value to pass validation
 	if err := envelopekmsv2.ValidateEncryptedObject(&encryptedObjectCopy); err != nil {
 		return envelopekmsv2.State{}, fmt.Errorf("got invalid EncryptedObject: %w", err)
 	}
@@ -901,9 +907,8 @@ func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, 
 
 // computeEncryptionConfigHash returns the expected hash for an encryption config file that has been loaded as bytes.
 // We use a hash instead of the raw file contents when tracking changes to avoid holding any encryption keys in memory outside of their associated transformers.
-// This hash must be used in-memory and not externalized to the process because it has no cross-release stability guarantees.
 func computeEncryptionConfigHash(data []byte) string {
-	return fmt.Sprintf("k8s:enc:unstable:1:%x", sha256.Sum256(data))
+	return fmt.Sprintf("sha256:%x", sha256.Sum256(data))
 }
 
 var _ storagevalue.ResourceTransformers = &DynamicTransformers{}

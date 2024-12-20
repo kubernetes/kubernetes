@@ -584,6 +584,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FsGroup:             fsGroup,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
 			FSGroupChangePolicy: fsGroupChangePolicy,
+			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
 		})
 		// Update actual state of world
@@ -1910,10 +1911,8 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		if resizeDone {
 			return volumetypes.NewOperationContext(nil, nil, migrated)
 		}
-		// This is a placeholder error - we should NEVER reach here.
-		err = fmt.Errorf("volume resizing failed for unknown reason")
-		eventErr, detailedErr = volumeToMount.GenerateError("NodeExpandVolume.NodeExpandVolume failed to resize volume", err)
-		return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		klog.InfoS("Waiting for volume to be expandable on the node", "volumeName", volumeToMount.VolumeName)
+		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}
 
 	eventRecorderFunc := func(err *error) {
@@ -2075,6 +2074,11 @@ func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVo
 	featureGateStatus := utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure)
 
 	if !featureGateStatus {
+		// even though RecoverVolumeExpansionFailure feature-gate is disabled, we should consider it enabled
+		// if resizeStatus is not empty or allocatedresources is set
+		if resizeStatus != "" || allocatedResource != nil {
+			return true
+		}
 		return false
 	}
 

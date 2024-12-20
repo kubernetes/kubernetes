@@ -41,6 +41,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	pkgcontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -231,6 +232,36 @@ func startTaintEvictionController(ctx context.Context, controllerContext Control
 	return nil, true, nil
 }
 
+func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.DeviceTaintEvictionController,
+		initFunc: startDeviceTaintEvictionController,
+		requiredFeatureGates: []featuregate.Feature{
+			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
+			features.DynamicResourceAllocation,
+			features.DRADeviceTaints,
+		},
+	}
+}
+
+func startDeviceTaintEvictionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	deviceTaintEvictionController := devicetainteviction.New(
+		controllerContext.ClientBuilder.ClientOrDie(names.DeviceTaintEvictionController),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
+		controllerContext.InformerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		controllerContext.InformerFactory.Resource().V1().DeviceClasses(),
+		controllerName,
+	)
+	go func() {
+		if err := deviceTaintEvictionController.Run(ctx); err != nil {
+			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
+		}
+	}()
+	return nil, true, nil
+}
+
 func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:                      cpnames.CloudNodeLifecycleController,
@@ -392,7 +423,7 @@ func startEphemeralVolumeController(ctx context.Context, controllerContext Contr
 	return nil, true, nil
 }
 
-const defaultResourceClaimControllerWorkers = 10
+const defaultResourceClaimControllerWorkers = 50
 
 func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
@@ -408,11 +439,14 @@ func newResourceClaimControllerDescriptor() *ControllerDescriptor {
 func startResourceClaimController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	ephemeralController, err := resourceclaim.NewController(
 		klog.FromContext(ctx),
-		utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+		resourceclaim.Features{
+			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+		},
 		controllerContext.ClientBuilder.ClientOrDie("resource-claim-controller"),
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaims(),
-		controllerContext.InformerFactory.Resource().V1beta1().ResourceClaimTemplates())
+		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
+		controllerContext.InformerFactory.Resource().V1().ResourceClaimTemplates())
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start resource claim controller: %v", err)
 	}
@@ -701,7 +735,7 @@ func startVolumeAttributesClassProtectionController(ctx context.Context, control
 		controllerContext.ClientBuilder.ClientOrDie("volumeattributesclass-protection-controller"),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
-		controllerContext.InformerFactory.Storage().V1beta1().VolumeAttributesClasses(),
+		controllerContext.InformerFactory.Storage().V1().VolumeAttributesClasses(),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the vac protection controller: %w", err)

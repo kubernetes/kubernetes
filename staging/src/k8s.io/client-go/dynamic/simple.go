@@ -19,9 +19,6 @@ package dynamic
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"time"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -31,9 +28,7 @@ import (
 	"k8s.io/client-go/features"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/apply"
-	"k8s.io/client-go/util/consistencydetector"
-	"k8s.io/client-go/util/watchlist"
-	"k8s.io/klog/v2"
+	"net/http"
 )
 
 type DynamicClient struct {
@@ -251,24 +246,6 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 }
 
 func (c *dynamicResourceClient) List(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
-	if watchListOptions, hasWatchListOptionsPrepared, watchListOptionsErr := watchlist.PrepareWatchListOptionsFromListOptions(opts); watchListOptionsErr != nil {
-		klog.Warningf("Failed preparing watchlist options for %v, falling back to the standard LIST semantics, err = %v", c.resource, watchListOptionsErr)
-	} else if hasWatchListOptionsPrepared {
-		result, err := c.watchList(ctx, watchListOptions)
-		if err == nil {
-			consistencydetector.CheckWatchListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("watchlist request for %v", c.resource), c.list, opts, result)
-			return result, nil
-		}
-		klog.Warningf("The watchlist request for %v ended with an error, falling back to the standard LIST semantics, err = %v", c.resource, err)
-	}
-	result, err := c.list(ctx, opts)
-	if err == nil {
-		consistencydetector.CheckListFromCacheDataConsistencyIfRequested(ctx, fmt.Sprintf("list request for %v", c.resource), c.list, opts, result)
-	}
-	return result, err
-}
-
-func (c *dynamicResourceClient) list(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
 		return nil, err
 	}
@@ -281,27 +258,6 @@ func (c *dynamicResourceClient) list(ctx context.Context, opts metav1.ListOption
 		return nil, err
 	}
 	return &out, nil
-}
-
-// watchList establishes a watch stream with the server and returns an unstructured list.
-func (c *dynamicResourceClient) watchList(ctx context.Context, opts metav1.ListOptions) (*unstructured.UnstructuredList, error) {
-	if err := validateNamespaceWithOptionalName(c.namespace); err != nil {
-		return nil, err
-	}
-
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-
-	result := &unstructured.UnstructuredList{}
-	err := c.client.client.Get().AbsPath(c.makeURLSegments("")...).
-		SpecificallyVersionedParams(&opts, dynamicParameterCodec, versionV1).
-		Timeout(timeout).
-		WatchList(ctx).
-		Into(result)
-
-	return result, err
 }
 
 func (c *dynamicResourceClient) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {

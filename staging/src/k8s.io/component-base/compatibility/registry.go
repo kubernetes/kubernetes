@@ -17,6 +17,7 @@ limitations under the License.
 package compatibility
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
+	"k8s.io/component-base/metrics/prometheus/compatversion"
 	"k8s.io/klog/v2"
 )
 
@@ -89,6 +91,8 @@ type ComponentGlobalsRegistry interface {
 	// and cannot be set from cmd flags anymore.
 	// For a given component, its emulation version can only depend on one other component, no multiple dependency is allowed.
 	SetEmulationVersionMapping(fromComponent, toComponent string, f VersionMapping) error
+	// AddMetrics adds metrics for the emulation version of a component.
+	AddMetrics()
 }
 
 type componentGlobalsRegistry struct {
@@ -102,6 +106,9 @@ type componentGlobalsRegistry struct {
 	// When the `--feature-gates` flag is parsed, it would not take effect until Set() is called,
 	// because the emulation version needs to be set before the feature gate is set.
 	featureGatesConfig map[string][]string
+	// featureGatesConfigFlags stores a pointer to the flag value, allowing other commands
+	// to append to the feature gates configuration rather than overwriting it
+	featureGatesConfigFlags *cliflag.ColonSeparatedMultimapStringString
 	// set stores if the Set() function for the registry is already called.
 	set bool
 }
@@ -114,12 +121,23 @@ func NewComponentGlobalsRegistry() *componentGlobalsRegistry {
 	}
 }
 
+func (r *componentGlobalsRegistry) AddMetrics() {
+	for name, globals := range r.componentGlobals {
+		effectiveVersion := globals.effectiveVersion
+		if effectiveVersion == nil {
+			continue
+		}
+		compatversion.RecordCompatVersionInfo(context.Background(), name, effectiveVersion.BinaryVersion().String(), effectiveVersion.EmulationVersion().String(), effectiveVersion.MinCompatibilityVersion().String())
+	}
+}
+
 func (r *componentGlobalsRegistry) Reset() {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.componentGlobals = make(map[string]*ComponentGlobals)
 	r.emulationVersionConfig = nil
 	r.featureGatesConfig = nil
+	r.featureGatesConfigFlags = nil
 	r.set = false
 }
 
@@ -226,19 +244,17 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 			globals.featureGate.Close()
 		}
 	}
-	if r.emulationVersionConfig != nil || r.featureGatesConfig != nil {
-		klog.Warning("calling componentGlobalsRegistry.AddFlags more than once, the registry will be set by the latest flags")
-	}
-	r.emulationVersionConfig = []string{}
-	r.featureGatesConfig = make(map[string][]string)
 
 	fs.StringSliceVar(&r.emulationVersionConfig, "emulated-version", r.emulationVersionConfig, ""+
 		"The versions different components emulate their capabilities (APIs, features, ...) of.\n"+
 		"If set, the component will emulate the behavior of this version instead of the underlying binary version.\n"+
-		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'. Options are:\n"+strings.Join(r.unsafeVersionFlagOptions(true), "\n")+
-		"If the component is not specified, defaults to \"kube\"")
+		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'.\nOptions are: "+strings.Join(r.unsafeVersionFlagOptions(true), ",")+
+		"\nIf the component is not specified, defaults to \"kube\"")
 
-	fs.Var(cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig), "feature-gates", "Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.\n"+
+	if r.featureGatesConfigFlags == nil {
+		r.featureGatesConfigFlags = cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig)
+	}
+	fs.Var(r.featureGatesConfigFlags, "feature-gates", "Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.\n"+
 		"If the component is not specified, defaults to \"kube\". This flag can be repeatedly invoked. For example: --feature-gates 'wardle:featureA=true,wardle:featureB=false' --feature-gates 'kube:featureC=true'"+
 		"Options are:\n"+strings.Join(r.unsafeKnownFeatures(), "\n"))
 }
@@ -384,11 +400,30 @@ func (r *componentGlobalsRegistry) Validate() []error {
 	defer r.mutex.Unlock()
 	for _, globals := range r.componentGlobals {
 		errs = append(errs, globals.effectiveVersion.Validate()...)
+		var features map[featuregate.Feature]featuregate.FeatureSpec
 		if globals.featureGate != nil {
 			errs = append(errs, globals.featureGate.Validate()...)
+			features = globals.featureGate.GetAll()
+		}
+		binaryVersion := globals.effectiveVersion.BinaryVersion()
+		emulatedVersion := globals.effectiveVersion.EmulationVersion()
+		if binaryVersion.GreaterThan(emulatedVersion) {
+			if enabled := enabledAlphaFeatures(features, globals); len(enabled) != 0 {
+				klog.Warningf("component has alpha features enabled in emulated version, this is unsupported: features=%v", enabled)
+			}
 		}
 	}
 	return errs
+}
+
+func enabledAlphaFeatures(features map[featuregate.Feature]featuregate.FeatureSpec, globals *ComponentGlobals) []string {
+	var enabled []string
+	for feat, featSpec := range features {
+		if featSpec.PreRelease == featuregate.Alpha && globals.featureGate.Enabled(feat) {
+			enabled = append(enabled, string(feat))
+		}
+	}
+	return enabled
 }
 
 func (r *componentGlobalsRegistry) SetEmulationVersionMapping(fromComponent, toComponent string, f VersionMapping) error {
@@ -415,7 +450,7 @@ func (r *componentGlobalsRegistry) SetEmulationVersionMapping(fromComponent, toC
 		return fmt.Errorf("EmulationVersion from %s to %s already exists", fromComponent, toComponent)
 	}
 	versionMapping[toComponent] = f
-	klog.V(klogLevel).Infof("setting the default EmulationVersion of %s based on mapping from the default EmulationVersion of %s", fromComponent, toComponent)
+	klog.V(klogLevel).Infof("setting the default EmulationVersion of %s based on mapping from the default EmulationVersion of %s", toComponent, fromComponent)
 	defaultFromVersion := r.componentGlobals[fromComponent].effectiveVersion.EmulationVersion()
 	emulationVersions, err := r.getFullEmulationVersionConfig(map[string]*version.Version{fromComponent: defaultFromVersion})
 	if err != nil {

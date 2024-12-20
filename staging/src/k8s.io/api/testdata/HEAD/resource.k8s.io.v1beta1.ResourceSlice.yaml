@@ -36,15 +36,53 @@ spec:
   allNodes: true
   devices:
   - basic:
+      allNodes: true
+      allowMultipleAllocations: true
       attributes:
         attributesKey:
           bool: true
           int: 2
           string: stringValue
           version: versionValue
+      bindingConditions:
+      - bindingConditionsValue
+      bindingFailureConditions:
+      - bindingFailureConditionsValue
+      bindsToNode: true
       capacity:
         capacityKey:
+          requestPolicy:
+            default: "0"
+            validRange:
+              max: "0"
+              min: "0"
+              step: "0"
+            validValues:
+            - "0"
           value: "0"
+      consumesCounters:
+      - counterSet: counterSetValue
+        counters:
+          countersKey:
+            value: "0"
+      nodeName: nodeNameValue
+      nodeSelector:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchFields:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+      taints:
+      - effect: effectValue
+        key: keyValue
+        timeAdded: "2004-01-01T01:01:01Z"
+        value: valueValue
     name: nameValue
   driver: driverValue
   nodeName: nodeNameValue
@@ -60,7 +98,13 @@ spec:
         operator: operatorValue
         values:
         - valuesValue
+  perDeviceNodeSelection: true
   pool:
     generation: 2
     name: nameValue
     resourceSliceCount: 3
+  sharedCounters:
+  - counters:
+      countersKey:
+        value: "0"
+    name: nameValue

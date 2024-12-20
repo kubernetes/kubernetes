@@ -102,6 +102,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		fs.AddFlagSet(f)
 	}
 	fs.Parse(customFlags)
+	s.ParsedFlags = &namedFlagSets
 
 	if s.SecureServing.BindPort != 0 {
 		s.SecureServing.Listener, s.SecureServing.BindPort, err = createListenerOnFreePort()
@@ -113,7 +114,7 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 		logger.Info("kube-controller-manager will listen securely", "port", s.SecureServing.BindPort)
 	}
 
-	config, err := s.Config(all, disabled, aliases)
+	config, err := s.Config(ctx, all, disabled, aliases)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}

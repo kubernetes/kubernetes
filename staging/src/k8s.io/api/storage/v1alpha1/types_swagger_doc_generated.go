@@ -125,9 +125,10 @@ func (VolumeAttributesClassList) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeError = map[string]string{
-	"":        "VolumeError captures an error encountered during a volume operation.",
-	"time":    "time represents the time the error was encountered.",
-	"message": "message represents the error encountered during Attach or Detach operation. This string maybe logged, so it should not contain sensitive information.",
+	"":          "VolumeError captures an error encountered during a volume operation.",
+	"time":      "time represents the time the error was encountered.",
+	"message":   "message represents the error encountered during Attach or Detach operation. This string maybe logged, so it should not contain sensitive information.",
+	"errorCode": "errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.\n\nThis is an optional, alpha field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.",
 }
 
 func (VolumeError) SwaggerDoc() map[string]string {

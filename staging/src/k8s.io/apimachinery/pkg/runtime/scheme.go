@@ -17,15 +17,18 @@ limitations under the License.
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/naming"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // Scheme defines methods for serializing and deserializing API objects, a type
@@ -68,6 +71,12 @@ type Scheme struct {
 	// the provided object must be a pointer.
 	defaulterFuncs map[reflect.Type]func(interface{})
 
+	// validationFuncs is a map to funcs to be called with an object to perform validation.
+	// The provided object must be a pointer.
+	// If oldObject is non-nil, update validation is performed and may perform additional
+	// validation such as transition rules and immutability checks.
+	validationFuncs map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList
+
 	// converter stores all registered conversion functions. It also has
 	// default converting behavior.
 	converter *conversion.Converter
@@ -96,6 +105,7 @@ func NewScheme() *Scheme {
 		unversionedKinds:          map[string]reflect.Type{},
 		fieldLabelConversionFuncs: map[schema.GroupVersionKind]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
+		validationFuncs:           map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList{},
 		versionPriority:           map[string][]string{},
 		schemeName:                naming.GetNameFromCallsite(internalPackages...),
 	}
@@ -345,6 +355,35 @@ func (s *Scheme) Default(src Object) {
 	if fn, ok := s.defaulterFuncs[reflect.TypeOf(src)]; ok {
 		fn(src)
 	}
+}
+
+// AddValidationFunc registered a function that can validate the object, and
+// oldObject. These functions will be invoked when Validate() or ValidateUpdate()
+// is called. The function will never be called unless the validated object
+// matches srcType. If this function is invoked twice with the same srcType, the
+// fn passed to the later call will be used instead.
+func (s *Scheme) AddValidationFunc(srcType Object, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList) {
+	s.validationFuncs[reflect.TypeOf(srcType)] = fn
+}
+
+// Validate validates the provided Object according to the generated declarative validation code.
+// WARNING: This does not validate all objects!  The handwritten validation code in validation.go
+// is not run when this is called.  Only the generated zz_generated.validations.go validation code is run.
+func (s *Scheme) Validate(ctx context.Context, options []string, object Object, subresources ...string) field.ErrorList {
+	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
+		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: options}, object, nil)
+	}
+	return nil
+}
+
+// ValidateUpdate validates the provided object and oldObject according to the generated declarative validation code.
+// WARNING: This does not validate all objects!  The handwritten validation code in validation.go
+// is not run when this is called.  Only the generated zz_generated.validations.go validation code is run.
+func (s *Scheme) ValidateUpdate(ctx context.Context, options []string, object, oldObject Object, subresources ...string) field.ErrorList {
+	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
+		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: options}, object, oldObject)
+	}
+	return nil
 }
 
 // Convert will attempt to convert in into out. Both must be pointers. For easy
@@ -704,3 +743,67 @@ func (s *Scheme) Name() string {
 // internalPackages are packages that ignored when creating a default reflector name. These packages are in the common
 // call chains to NewReflector, so they'd be low entropy names for reflectors
 var internalPackages = []string{"k8s.io/apimachinery/pkg/runtime/scheme.go"}
+
+// ToOpenAPIDefinitionName returns the REST-friendly OpenAPI definition name known type identified by groupVersionKind.
+// If the groupVersionKind does not identify a known type, an error is returned.
+// The Version field of groupVersionKind is required, and the Group and Kind fields are required for unstructured.Unstructured
+// types. If a required field is empty, an error is returned.
+//
+// The OpenAPI definition name is the canonical name of the type, with the group and version removed.
+// For example, the OpenAPI definition name of Pod is `io.k8s.api.core.v1.Pod`.
+//
+// A known type that is registered as an unstructured.Unstructured type is treated as a custom resource and
+// which has an OpenAPI definition name of the form `<reversed-group>.<version.<kind>`.
+// For example, the OpenAPI definition name of `group: stable.example.com, version: v1, kind: Pod` is
+// `com.example.stable.v1.Pod`.
+func (s *Scheme) ToOpenAPIDefinitionName(groupVersionKind schema.GroupVersionKind) (string, error) {
+	if groupVersionKind.Version == "" { // Empty version is not allowed by New() so check it first to avoid a panic.
+		return "", fmt.Errorf("version is required on all types: %v", groupVersionKind)
+	}
+	example, err := s.New(groupVersionKind)
+	if err != nil {
+		return "", err
+	}
+	if _, ok := example.(Unstructured); ok {
+		if groupVersionKind.Group == "" || groupVersionKind.Kind == "" {
+			return "", fmt.Errorf("unable to convert GroupVersionKind with empty fields to unstructured type to an OpenAPI definition name: %v", groupVersionKind)
+		}
+		return reverseParts(groupVersionKind.Group) + "." + groupVersionKind.Version + "." + groupVersionKind.Kind, nil
+	}
+	rtype := reflect.TypeOf(example).Elem()
+	name := toOpenAPIDefinitionName(rtype.PkgPath() + "." + rtype.Name())
+	return name, nil
+}
+
+// toOpenAPIDefinitionName converts Golang package/type canonical name into REST friendly OpenAPI name.
+// Input is expected to be `PkgPath + "." TypeName.
+//
+// Examples of REST friendly OpenAPI name:
+//
+//	Input:  k8s.io/api/core/v1.Pod
+//	Output: io.k8s.api.core.v1.Pod
+//
+//	Input:  k8s.io/api/core/v1
+//	Output: io.k8s.api.core.v1
+//
+//	Input:  csi.storage.k8s.io/v1alpha1.CSINodeInfo
+//	Output: io.k8s.storage.csi.v1alpha1.CSINodeInfo
+//
+// Note that this is a copy of ToRESTFriendlyName from k8s.io/kube-openapi/pkg/util. It is duplicated here to avoid
+// a dependency on kube-openapi.
+func toOpenAPIDefinitionName(name string) string {
+	nameParts := strings.Split(name, "/")
+	// Reverse first part. e.g., io.k8s... instead of k8s.io...
+	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
+		nameParts[0] = reverseParts(nameParts[0])
+	}
+	return strings.Join(nameParts, ".")
+}
+
+func reverseParts(dotSeparatedName string) string {
+	parts := strings.Split(dotSeparatedName, ".")
+	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
+		parts[i], parts[j] = parts[j], parts[i]
+	}
+	return strings.Join(parts, ".")
+}

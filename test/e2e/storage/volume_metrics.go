@@ -625,39 +625,37 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 				validator(ctx, []map[string]int64{{storageClassName: 1}, nil, {ns: 1}, nil})
 			})
 
-		// TODO: Merge with bound/unbound tests when "VolumeAttributesClass" feature is enabled by default
-		f.It("should create unbound pvc count metrics for pvc controller with volume attributes class dimension after creating pvc only",
-			feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func(ctx context.Context) {
-				var err error
-				dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
-				pvcConfigWithVAC := pvcConfig
-				pvcConfigWithVAC.VolumeAttributesClassName = &volumeAttributesClassName
-				pvcWithVAC := e2epv.MakePersistentVolumeClaim(pvcConfigWithVAC, ns)
-				pvc, err = e2epv.CreatePVC(ctx, c, ns, pvcWithVAC)
-				framework.ExpectNoError(err, "Error creating pvc: %v", err)
-				waitForPVControllerSync(ctx, metricsGrabber, unboundPVCKey, volumeAttributeClassKey)
-				controllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
-				framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
-				err = testutil.ValidateMetrics(testutil.Metrics(controllerMetrics), unboundPVCKey, dimensions...)
-				framework.ExpectNoError(err, "Invalid metric in Controller Manager metrics: %q", unboundPVCKey)
-			})
+		// TODO: Merge with bound/unbound tests when "VolumeAttributesClass" feature is enabled by default.
+		f.It("should create unbound pvc count metrics for pvc controller with volume attributes class dimension after creating pvc only", framework.WithFeatureGate(features.VolumeAttributesClass), feature.VolumeAttributesClass, func(ctx context.Context) {
+			var err error
+			dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
+			pvcConfigWithVAC := pvcConfig
+			pvcConfigWithVAC.VolumeAttributesClassName = &volumeAttributesClassName
+			pvcWithVAC := e2epv.MakePersistentVolumeClaim(pvcConfigWithVAC, ns)
+			pvc, err = e2epv.CreatePVC(ctx, c, ns, pvcWithVAC)
+			framework.ExpectNoError(err, "Error creating pvc: %v", err)
+			waitForPVControllerSync(ctx, metricsGrabber, unboundPVCKey, volumeAttributeClassKey)
+			controllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
+			framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
+			err = testutil.ValidateMetrics(testutil.Metrics(controllerMetrics), unboundPVCKey, dimensions...)
+			framework.ExpectNoError(err, "Invalid metric in Controller Manager metrics: %q", unboundPVCKey)
+		})
 
 		// TODO: Merge with bound/unbound tests when "VolumeAttributesClass" feature is enabled by default
-		f.It("should create bound pv/pvc count metrics for pvc controller with volume attributes class dimension after creating both pv and pvc",
-			feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func(ctx context.Context) {
-				var err error
-				dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
-				pvcConfigWithVAC := pvcConfig
-				pvcConfigWithVAC.VolumeAttributesClassName = &volumeAttributesClassName
-				pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfigWithVAC, ns, true)
-				framework.ExpectNoError(err, "Error creating pv pvc: %v", err)
-				waitForPVControllerSync(ctx, metricsGrabber, boundPVKey, storageClassKey)
-				waitForPVControllerSync(ctx, metricsGrabber, boundPVCKey, volumeAttributeClassKey)
-				controllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
-				framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
-				err = testutil.ValidateMetrics(testutil.Metrics(controllerMetrics), boundPVCKey, dimensions...)
-				framework.ExpectNoError(err, "Invalid metric in Controller Manager metrics: %q", boundPVCKey)
-			})
+		f.It("should create bound pv/pvc count metrics for pvc controller with volume attributes class dimension after creating both pv and pvc", framework.WithFeatureGate(features.VolumeAttributesClass), feature.VolumeAttributesClass, func(ctx context.Context) {
+			var err error
+			dimensions := []string{namespaceKey, storageClassKey, volumeAttributeClassKey}
+			pvcConfigWithVAC := pvcConfig
+			pvcConfigWithVAC.VolumeAttributesClassName = &volumeAttributesClassName
+			pv, pvc, err = e2epv.CreatePVPVC(ctx, c, f.Timeouts, pvConfig, pvcConfigWithVAC, ns, true)
+			framework.ExpectNoError(err, "Error creating pv pvc: %v", err)
+			waitForPVControllerSync(ctx, metricsGrabber, boundPVKey, storageClassKey)
+			waitForPVControllerSync(ctx, metricsGrabber, boundPVCKey, volumeAttributeClassKey)
+			controllerMetrics, err := metricsGrabber.GrabFromControllerManager(ctx)
+			framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
+			err = testutil.ValidateMetrics(testutil.Metrics(controllerMetrics), boundPVCKey, dimensions...)
+			framework.ExpectNoError(err, "Invalid metric in Controller Manager metrics: %q", boundPVCKey)
+		})
 
 		ginkgo.It("should create total pv count metrics for with plugin and volume mode labels after creating pv",
 			func(ctx context.Context) {

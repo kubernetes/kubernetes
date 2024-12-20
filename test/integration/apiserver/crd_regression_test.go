@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // Regression test for https://issues.k8s.io/109099
@@ -72,7 +72,7 @@ func TestCRDExponentialRecursionBug(t *testing.T) {
 					Storage: true,
 					Schema: &apiextensionsv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							XPreserveUnknownFields: pointer.BoolPtr(true),
+							XPreserveUnknownFields: ptr.To(true),
 							Type:                   "object",
 							Properties:             map[string]apiextensionsv1.JSONSchemaProps{},
 						},

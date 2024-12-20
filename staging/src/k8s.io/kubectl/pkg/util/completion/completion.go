@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -321,7 +322,7 @@ func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cm
 	o.Complete(restClientGetter, cmd, nil)
 
 	// Get the list of resources
-	o.Output = "name"
+	o.PrintFlags.OutputFormat = ptr.To("name")
 	o.Cached = true
 	o.Verbs = []string{"get"}
 	// TODO:Should set --request-timeout=5s

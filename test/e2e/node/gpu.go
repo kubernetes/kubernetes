@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"regexp"
 	"time"
@@ -292,25 +293,40 @@ func SetupEnvironmentAndSkipIfNeeded(ctx context.Context, f *framework.Framework
 	}
 }
 
-func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet clientset.Interface) bool {
+func isControlPlaneNode(node v1.Node) bool {
+	_, isControlPlane := node.Labels["node-role.kubernetes.io/control-plane"]
+	if isControlPlane {
+		framework.Logf("Node: %q is a control-plane node (label)", node.Name)
+		return true
+	}
+
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == "node-role.kubernetes.io/control-plane" {
+			framework.Logf("Node: %q is a control-plane node (taint)", node.Name)
+			return true
+		}
+	}
+	framework.Logf("Node: %q is NOT a control-plane node", node.Name)
+	return false
+}
+
+func areGPUsAvailableOnAllSchedulableNodes(ctx context.Context, clientSet clientset.Interface) error {
 	framework.Logf("Getting list of Nodes from API server")
 	nodeList, err := clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err, "getting node list")
+	if err != nil {
+		return fmt.Errorf("unexpected error getting node list: %w", err)
+	}
 	for _, node := range nodeList.Items {
-		if node.Spec.Unschedulable {
-			continue
-		}
-		if _, ok := node.Labels[framework.ControlPlaneLabel]; ok {
+		if node.Spec.Unschedulable || isControlPlaneNode(node) {
 			continue
 		}
 		framework.Logf("gpuResourceName %s", e2egpu.NVIDIAGPUResourceName)
 		if val, ok := node.Status.Capacity[e2egpu.NVIDIAGPUResourceName]; !ok || val.Value() == 0 {
-			framework.Logf("Nvidia GPUs not available on Node: %q", node.Name)
-			return false
+			return fmt.Errorf("nvidia GPUs not available on Node: %q", node.Name)
 		}
 	}
 	framework.Logf("Nvidia GPUs exist on all schedulable nodes")
-	return true
+	return nil
 }
 
 func logOSImages(ctx context.Context, f *framework.Framework) {
@@ -386,9 +402,9 @@ func waitForGPUs(ctx context.Context, f *framework.Framework, namespace, name st
 
 	// Wait for Nvidia GPUs to be available on nodes
 	framework.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
-	gomega.Eventually(ctx, func(ctx context.Context) bool {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
 		return areGPUsAvailableOnAllSchedulableNodes(ctx, f.ClientSet)
-	}, driverInstallTimeout, time.Second).Should(gomega.BeTrueBecause("expected GPU resources to be available within the timout"))
+	}, driverInstallTimeout, time.Second).Should(gomega.Succeed())
 }
 
 // StartJob starts a simple CUDA job that requests gpu and the specified number of completions

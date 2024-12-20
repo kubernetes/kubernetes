@@ -21,7 +21,7 @@ import (
 	celgo "github.com/google/cel-go/cel"
 	"io"
 
-	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,9 +53,9 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-type Policy = v1alpha1.MutatingAdmissionPolicy
-type PolicyBinding = v1alpha1.MutatingAdmissionPolicyBinding
-type PolicyMutation = v1alpha1.Mutation
+type Policy = v1beta1.MutatingAdmissionPolicy
+type PolicyBinding = v1beta1.MutatingAdmissionPolicyBinding
+type PolicyMutation = v1beta1.Mutation
 type PolicyHook = generic.PolicyHook[*Policy, *PolicyBinding, PolicyEvaluator]
 
 type Mutator struct {
@@ -96,8 +96,8 @@ func NewPlugin(_ io.Reader) *Plugin {
 		handler,
 		func(f informers.SharedInformerFactory, client kubernetes.Interface, dynamicClient dynamic.Interface, restMapper meta.RESTMapper) generic.Source[PolicyHook] {
 			return generic.NewPolicySource(
-				f.Admissionregistration().V1alpha1().MutatingAdmissionPolicies().Informer(),
-				f.Admissionregistration().V1alpha1().MutatingAdmissionPolicyBindings().Informer(),
+				f.Admissionregistration().V1beta1().MutatingAdmissionPolicies().Informer(),
+				f.Admissionregistration().V1beta1().MutatingAdmissionPolicyBindings().Informer(),
 				NewMutatingAdmissionPolicyAccessor,
 				NewMutatingAdmissionPolicyBindingAccessor,
 				compilePolicy,
@@ -142,7 +142,7 @@ func (v *Variable) GetName() string {
 	return v.Name
 }
 
-func convertv1alpha1Variables(variables []v1alpha1.Variable) []cel.NamedExpressionAccessor {
+func convertv1alpha1Variables(variables []v1beta1.Variable) []cel.NamedExpressionAccessor {
 	namedExpressions := make([]cel.NamedExpressionAccessor, len(variables))
 	for i, variable := range variables {
 		namedExpressions[i] = &Variable{Name: variable.Name, Expression: variable.Expression}

@@ -100,7 +100,7 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.M
 			spec.Name(),
 			pod.UID,
 			plugin,
-			plugin.host.GetMounter(plugin.GetPluginName()),
+			plugin.host.GetMounter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source:    *spec.Volume.Secret,
@@ -115,7 +115,7 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 			volName,
 			podUID,
 			plugin,
-			plugin.host.GetMounter(plugin.GetPluginName()),
+			plugin.host.GetMounter(),
 			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
@@ -242,7 +242,8 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	setPerms := func(_ string) error {
 		// This may be the first time writing and new files get created outside the timestamp subdirectory:
 		// change the permissions on the whole volume and not only in the timestamp directory.
-		return volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
+		ownershipChanger := volume.NewVolumeOwnership(b, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
+		return ownershipChanger.ChangePermissions()
 	}
 	err = writer.Write(payload, setPerms)
 	if err != nil {

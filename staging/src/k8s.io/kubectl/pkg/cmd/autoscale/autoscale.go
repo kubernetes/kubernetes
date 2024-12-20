@@ -19,14 +19,16 @@ package autoscale
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,6 +38,7 @@ import (
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	autoscalingv2client "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	"k8s.io/client-go/scale"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -54,10 +57,16 @@ var (
 
 	autoscaleExample = templates.Examples(i18n.T(`
 		# Auto scale a deployment "foo", with the number of pods between 2 and 10, no target CPU utilization specified so a default autoscaling policy will be used
-		kubectl autoscale deployment foo --min=2 --max=10
+        kubectl autoscale deployment foo --min=2 --max=10
 
 		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%
-		kubectl autoscale rc foo --max=5 --cpu-percent=80`))
+        kubectl autoscale rc foo --max=5 --cpu=80%
+
+		# Auto scale a deployment "bar", with the number of pods between 3 and 6, target average CPU of 500m and memory of 200Mi
+		kubectl autoscale deployment bar --min=3 --max=6 --cpu=500m --memory=200Mi
+		
+		# Auto scale a deployment "bar", with the number of pods between 2 and 8, target CPU utilization 60% and memory utilization 70%
+        kubectl autoscale deployment bar --min=3 --max=6 --cpu=60% --memory=70%`))
 )
 
 // AutoscaleOptions declares the arguments accepted by the Autoscale command
@@ -74,6 +83,8 @@ type AutoscaleOptions struct {
 	Min        int32
 	Max        int32
 	CPUPercent int32
+	CPU        string
+	Memory     string
 
 	createAnnotation bool
 	args             []string
@@ -109,7 +120,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *c
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use:                   "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU]",
+		Use:                   "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu=CPU] [--memory=MEMORY]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Auto-scale a deployment, replica set, stateful set, or replication controller"),
 		Long:                  autoscaleLong,
@@ -129,7 +140,11 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *c
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
 	cmd.Flags().Int32Var(&o.CPUPercent, "cpu-percent", -1, "The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used.")
+	cmd.Flags().StringVar(&o.CPU, "cpu", "", `Target CPU utilization over all the pods. When specified as a percentage (e.g."70%" for 70% of requested CPU) it will target average utilization. When specified as quantity (e.g."500m" for 500 milliCPU) it will target average value. Value without units is treated as a quantity with miliCPU being the unit (e.g."500" is "500m").`)
+	cmd.Flags().StringVar(&o.Memory, "memory", "", `Target memory utilization over all the pods. When specified  as a percentage (e.g."60%" for 60% of requested memory) it will target average utilization. When specified as quantity (e.g."200Mi" for 200 MiB, "1Gi" for 1 GiB) it will target average value. Value without units is treated as a quantity with mebibytes being the unit (e.g."200" is "200Mi").`)
 	cmd.Flags().StringVar(&o.Name, "name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
+	_ = cmd.Flags().MarkDeprecated("cpu-percent",
+		"Use --cpu with percentage or resource quantity format (e.g., '70%' for utilization or '500m' for milliCPU).")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")
 	cmdutil.AddApplyAnnotationFlags(cmd)
@@ -189,7 +204,22 @@ func (o *AutoscaleOptions) Validate() error {
 	if o.Max < o.Min {
 		return fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS, max: %d, min: %d", o.Max, o.Min)
 	}
-
+	// only one of the CPUPercent or CPU param is allowed
+	if o.CPUPercent > 0 && o.CPU != "" {
+		return fmt.Errorf("--cpu-percent and --cpu are mutually exclusive")
+	}
+	// validate CPU target if specified
+	if o.CPU != "" {
+		if _, _, _, err := parseResourceInput(o.CPU, corev1.ResourceCPU); err != nil {
+			return err
+		}
+	}
+	// validate Memory target if specified
+	if o.Memory != "" {
+		if _, _, _, err := parseResourceInput(o.Memory, corev1.ResourceMemory); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -214,16 +244,24 @@ func (o *AutoscaleOptions) Run() error {
 
 		mapping := info.ResourceMapping()
 		gvr := mapping.GroupVersionKind.GroupVersion().WithResource(mapping.Resource.Resource)
-		if _, err := o.scaleKindResolver.ScaleForResource(gvr); err != nil {
-			return fmt.Errorf("cannot autoscale a %v: %v", mapping.GroupVersionKind.Kind, err)
+		if _, err = o.scaleKindResolver.ScaleForResource(gvr); err != nil {
+			return fmt.Errorf("cannot autoscale a %s: %w", mapping.GroupVersionKind.Kind, err)
 		}
 
-		// handles the creation of HorizontalPodAutoscaler objects for both v2 and v1 APIs.
-		// If v2 API fails, try to create and handle HorizontalPodAutoscaler using v1 API
-		hpaV2 := o.createHorizontalPodAutoscalerV2(info.Name, mapping)
-		if err := o.handleHPA(hpaV2); err != nil {
-			klog.V(1).Infof("Encountered an error with the v2 HorizontalPodAutoscaler: %v. "+
-				"Falling back to try the v1 HorizontalPodAutoscaler", err)
+		// handles the creation of HorizontalPodAutoscaler objects for both autoscaling/v2 and autoscaling/v1 APIs.
+		// If autoscaling/v2 API fails, try to create and handle HorizontalPodAutoscaler using autoscaling/v1 API
+		var hpaV2 runtime.Object
+		hpaV2, err = o.createHorizontalPodAutoscalerV2(info.Name, mapping)
+		if err != nil {
+			return fmt.Errorf("failed to create HorizontalPodAutoscaler using autoscaling/v2 API: %w", err)
+		}
+		if err = o.handleHPA(hpaV2); err != nil {
+			klog.V(1).Infof("Encountered an error with the autoscaling/v2 HorizontalPodAutoscaler: %v. "+
+				"Falling back to try the autoscaling/v1 HorizontalPodAutoscaler", err)
+			// check if the HPA can be created using v1 API.
+			if ok, err := o.canCreateHPAV1(); !ok {
+				return fmt.Errorf("failed to create autoscaling/v2 HPA and the configuration is incompatible with autoscaling/v1: %w", err)
+			}
 			hpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)
 			if err := o.handleHPA(hpaV1); err != nil {
 				return err
@@ -239,6 +277,18 @@ func (o *AutoscaleOptions) Run() error {
 		return fmt.Errorf("no objects passed to autoscale")
 	}
 	return nil
+}
+
+func (o *AutoscaleOptions) canCreateHPAV1() (bool, error) {
+	// Allow fallback to v1 HPA only if:
+	// 1. CPUPercent is set and Memory is not set.
+	// 2. Or, Memory is not set and the metric type is UtilizationMetricType.
+	_, _, metricsType, err := parseResourceInput(o.CPU, corev1.ResourceCPU)
+	if err != nil {
+		return false, err
+	}
+	return (o.CPUPercent >= 0 && o.Memory == "") ||
+		(o.Memory == "" && metricsType == autoscalingv2.UtilizationMetricType), nil
 }
 
 // handleHPA handles the creation and management of a single HPA object.
@@ -288,7 +338,7 @@ func (o *AutoscaleOptions) handleHPA(hpa runtime.Object) error {
 	return printer.PrintObj(actualHPA, o.Out)
 }
 
-func (o *AutoscaleOptions) createHorizontalPodAutoscalerV2(refName string, mapping *meta.RESTMapping) *autoscalingv2.HorizontalPodAutoscaler {
+func (o *AutoscaleOptions) createHorizontalPodAutoscalerV2(refName string, mapping *meta.RESTMapping) (*autoscalingv2.HorizontalPodAutoscaler, error) {
 	name := o.Name
 	if len(name) == 0 {
 		name = refName
@@ -312,22 +362,83 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscalerV2(refName string, mappi
 		scaler.Spec.MinReplicas = &o.Min
 	}
 
-	if o.CPUPercent >= 0 {
-		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
-			{
-				Type: autoscalingv2.ResourceMetricSourceType,
-				Resource: &autoscalingv2.ResourceMetricSource{
-					Name: corev1.ResourceCPU,
-					Target: autoscalingv2.MetricTarget{
-						Type:               autoscalingv2.UtilizationMetricType,
-						AverageUtilization: &o.CPUPercent,
-					},
-				},
+	metrics := []autoscalingv2.MetricSpec{}
+
+	// add CPU metric if any of the CPU targets are specified
+	if o.CPUPercent > 0 {
+		cpuMetric := autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   corev1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{},
 			},
 		}
+		cpuMetric.Resource.Target.Type = autoscalingv2.UtilizationMetricType
+		cpuMetric.Resource.Target.AverageUtilization = &o.CPUPercent
+		metrics = append(metrics, cpuMetric)
 	}
 
-	return &scaler
+	// add Cpu metric if any of the cpu targets are specified
+	if o.CPU != "" {
+		cpuMetric := autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   corev1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{},
+			},
+		}
+
+		quantity, value, metricsType, err := parseResourceInput(o.CPU, corev1.ResourceCPU)
+		if err != nil {
+			return nil, err
+		}
+		switch metricsType {
+		case autoscalingv2.UtilizationMetricType:
+			cpuMetric.Resource.Target.Type = autoscalingv2.UtilizationMetricType
+			cpuMetric.Resource.Target.AverageUtilization = &value
+		case autoscalingv2.AverageValueMetricType:
+			cpuMetric.Resource.Target.Type = autoscalingv2.AverageValueMetricType
+			cpuMetric.Resource.Target.AverageValue = &quantity
+		default:
+			return nil, fmt.Errorf("unsupported metric type: %v", metricsType)
+		}
+		metrics = append(metrics, cpuMetric)
+	}
+
+	// add Memory metric if any of the memory targets are specified
+	if o.Memory != "" {
+		memoryMetric := autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   corev1.ResourceMemory,
+				Target: autoscalingv2.MetricTarget{},
+			},
+		}
+		quantity, value, metricsType, err := parseResourceInput(o.Memory, corev1.ResourceMemory)
+		if err != nil {
+			return nil, err
+		}
+		switch metricsType {
+		case autoscalingv2.UtilizationMetricType:
+			memoryMetric.Resource.Target.Type = autoscalingv2.UtilizationMetricType
+			memoryMetric.Resource.Target.AverageUtilization = &value
+		case autoscalingv2.AverageValueMetricType:
+			memoryMetric.Resource.Target.Type = autoscalingv2.AverageValueMetricType
+			memoryMetric.Resource.Target.AverageValue = &quantity
+		default:
+			return nil, fmt.Errorf("unsupported metric type: %v", metricsType)
+		}
+		metrics = append(metrics, memoryMetric)
+	}
+
+	// Only set Metrics if there are any defined
+	if len(metrics) > 0 {
+		scaler.Spec.Metrics = metrics
+	} else {
+		scaler.Spec.Metrics = nil
+	}
+
+	return &scaler, nil
 }
 
 func (o *AutoscaleOptions) createHorizontalPodAutoscalerV1(refName string, mapping *meta.RESTMapping) *autoscalingv1.HorizontalPodAutoscaler {
@@ -360,4 +471,73 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscalerV1(refName string, mappi
 	}
 
 	return &scaler
+}
+
+// parseResourceInput parses a resource input string into either a utilization percentage or a quantity value.
+// It supports:
+// - Percentage values (e.g., "70%") for UtilizationMetricType
+// - Quantity values with units (e.g., "500m", "2Gi")
+// - Bare numbers without units, which are interpreted as:
+//   - CPU: milliCPU ("500" → "500m")
+//   - Memory: Mebibytes ("512" → "512Mi")
+func parseResourceInput(input string, resourceType corev1.ResourceName) (apiresource.Quantity, int32, autoscalingv2.MetricTargetType, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return apiresource.Quantity{}, 0, "", fmt.Errorf("empty input")
+	}
+
+	// Case 1: Handle percentage-based metrics like "70%"
+	percentValue, isPercent, err := parsePercentage(input)
+	if isPercent {
+		if err != nil {
+			return apiresource.Quantity{}, 0, "", err
+		}
+		return apiresource.Quantity{}, percentValue, autoscalingv2.UtilizationMetricType, nil
+	}
+
+	// Case 2: Try to interpret input as a bare number (e.g., "500"), and apply default float
+	valueFloat, err := strconv.ParseFloat(input, 64)
+	if err == nil {
+		unit, err := getDefaultUnitForResource(resourceType)
+		if err != nil {
+			return apiresource.Quantity{}, 0, "", err
+		}
+
+		inputWithUnit := fmt.Sprintf("%g%s", valueFloat, unit)
+		quantity, err := apiresource.ParseQuantity(inputWithUnit)
+		if err != nil {
+			return apiresource.Quantity{}, 0, "", err
+		}
+		return quantity, 0, autoscalingv2.AverageValueMetricType, nil
+	}
+
+	// Case 3: Parse normally if input has a valid unit (e.g., "500m", "2Gi")
+	quantity, err := apiresource.ParseQuantity(input)
+	if err != nil {
+		return apiresource.Quantity{}, 0, "", fmt.Errorf("invalid resource %s value: %s", resourceType, input)
+	}
+	return quantity, 0, autoscalingv2.AverageValueMetricType, nil
+}
+
+func getDefaultUnitForResource(resourceType corev1.ResourceName) (string, error) {
+	switch resourceType {
+	case corev1.ResourceCPU:
+		return "m", nil
+	case corev1.ResourceMemory:
+		return "Mi", nil
+	default:
+		return "", fmt.Errorf("unsupported resource type: %v", resourceType)
+	}
+}
+
+func parsePercentage(input string) (int32, bool, error) {
+	if !strings.HasSuffix(input, "%") {
+		return 0, false, nil
+	}
+	trimmed := strings.TrimSuffix(input, "%")
+	valueInt64, err := strconv.ParseInt(trimmed, 10, 32)
+	if err != nil || valueInt64 < 0 {
+		return 0, true, fmt.Errorf("invalid percentage value: %s", trimmed)
+	}
+	return int32(valueInt64), true, nil
 }

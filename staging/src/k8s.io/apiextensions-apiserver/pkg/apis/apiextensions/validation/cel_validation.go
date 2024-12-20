@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
+	"k8s.io/utils/ptr"
 )
 
 // unbounded uses nil to represent an unbounded cardinality value.
@@ -205,7 +206,7 @@ func (c *CELSchemaContext) childContext(child *apiextensions.JSONSchemaProps, ac
 	if maxElements == unbounded {
 		return result
 	}
-	result.MaxCardinality = uint64ptr(multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements))
+	result.MaxCardinality = ptr.To[uint64](multiplyWithOverflowGuard(*c.MaxCardinality, *maxElements))
 	return result
 }
 
@@ -312,7 +313,7 @@ func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 		}
 		// return 1 to indicate that all fields of an object exist at most one for
 		// each occurrence of the object they are fields of
-		return uint64ptr(1)
+		return ptr.To[uint64](1)
 	case "array":
 		if schema.MaxItems != nil {
 			maxItems := uint64(zeroIfNegative(*schema.MaxItems))
@@ -320,7 +321,7 @@ func extractMaxElements(schema *apiextensions.JSONSchemaProps) *uint64 {
 		}
 		return unbounded
 	default:
-		return uint64ptr(1)
+		return ptr.To[uint64](1)
 	}
 }
 
@@ -329,8 +330,4 @@ func zeroIfNegative(v int64) int64 {
 		return 0
 	}
 	return v
-}
-
-func uint64ptr(i uint64) *uint64 {
-	return &i
 }

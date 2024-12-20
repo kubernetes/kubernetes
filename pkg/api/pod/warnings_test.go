@@ -19,15 +19,19 @@ package pod
 import (
 	"context"
 	"reflect"
-	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func BenchmarkNoWarnings(b *testing.B) {
@@ -148,10 +152,11 @@ func TestWarnings(t *testing.T) {
 	}
 	testName := "Test"
 	testcases := []struct {
-		name        string
-		template    *api.PodTemplateSpec
-		oldTemplate *api.PodTemplateSpec
-		expected    []string
+		name                  string
+		template              *api.PodTemplateSpec
+		oldTemplate           *api.PodTemplateSpec
+		gitRepoPluginDisabled bool
+		expected              []string
 	}{
 		{
 			name:     "null",
@@ -175,6 +180,16 @@ func TestWarnings(t *testing.T) {
 				}},
 			},
 			expected: []string{`spec.volumes[0].gitRepo: deprecated in v1.11`},
+		},
+		{
+			name: "gitRepo plugin disabled",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
+				}},
+			},
+			gitRepoPluginDisabled: true,
+			expected:              []string{`spec.volumes[0].gitRepo: deprecated in v1.11, and disabled by default in v1.33+`},
 		},
 		{
 			name: "scaleIO",
@@ -579,6 +594,40 @@ func TestWarnings(t *testing.T) {
 			}},
 			expected: []string{
 				`volume "foo" (Projected): overlapping paths: "test/test2" (DownwardAPI) with "test" (Secret "TestSecret")`,
+			},
+		},
+		{
+			name: "overlapping paths in projected volume - secret and pod certificate",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{{
+					Name: "foo",
+					VolumeSource: api.VolumeSource{
+						Projected: &api.ProjectedVolumeSource{
+							Sources: []api.VolumeProjection{{
+								Secret: &api.SecretProjection{
+									LocalObjectReference: api.LocalObjectReference{Name: "TestSecret"},
+									Items: []api.KeyToPath{
+										{Key: "mykey", Path: "test"},
+									},
+								},
+							}, {
+								PodCertificate: &api.PodCertificateProjection{
+									CredentialBundlePath: "test",
+									KeyPath:              "test",
+									CertificateChainPath: "test",
+								},
+							}},
+						},
+					},
+				}},
+			}},
+			expected: []string{
+				`volume "foo" (Projected): overlapping paths: "test" (PodCertificate credential bundle) with "test" (PodCertificate key)`,
+				`volume "foo" (Projected): overlapping paths: "test" (PodCertificate credential bundle) with "test" (PodCertificate chain)`,
+				`volume "foo" (Projected): overlapping paths: "test" (PodCertificate credential bundle) with "test" (Secret "TestSecret")`,
+				`volume "foo" (Projected): overlapping paths: "test" (PodCertificate key) with "test" (PodCertificate chain)`,
+				`volume "foo" (Projected): overlapping paths: "test" (PodCertificate key) with "test" (Secret "TestSecret")`,
+				`volume "foo" (Projected): overlapping paths: "test" (PodCertificate chain) with "test" (Secret "TestSecret")`,
 			},
 		},
 		{
@@ -995,7 +1044,7 @@ func TestWarnings(t *testing.T) {
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: api.PodSpec{
-					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+					TerminationGracePeriodSeconds: ptr.To[int64](-1),
 				},
 			},
 			expected: []string{
@@ -1767,29 +1816,38 @@ func TestWarnings(t *testing.T) {
 				`spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].preference.matchExpressions[0].values[0]: -1 is invalid, a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')`,
 			},
 		},
+		{
+			name: "dubious IP address formats",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Nameservers: []string{"1.2.3.4", "05.06.07.08"},
+				},
+				HostAliases: []api.HostAlias{
+					{IP: "::ffff:1.2.3.4"},
+				},
+			}},
+			expected: []string{
+				`spec.dnsConfig.nameservers[1]: non-standard IP address "05.06.07.08" will be considered invalid in a future Kubernetes release: use "5.6.7.8"`,
+				`spec.hostAliases[0].ip: non-standard IP address "::ffff:1.2.3.4" will be considered invalid in a future Kubernetes release: use "1.2.3.4"`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GitRepoVolumeDriver, !tc.gitRepoPluginDisabled)
 			var oldTemplate *api.PodTemplateSpec
 			if tc.oldTemplate != nil {
 				oldTemplate = tc.oldTemplate
 			}
 			actual := GetWarningsForPodTemplate(context.TODO(), nil, tc.template, oldTemplate)
-			if len(actual) != len(tc.expected) {
-				t.Errorf("expected %d errors, got %d:\n%v", len(tc.expected), len(actual), strings.Join(actual, "\n"))
-			}
-			actualSet := sets.New(actual...)
-			expectedSet := sets.New(tc.expected...)
-			for _, missing := range sets.List(expectedSet.Difference(actualSet)) {
-				t.Errorf("missing: %s", missing)
-			}
-			for _, extra := range sets.List(actualSet.Difference(expectedSet)) {
-				t.Errorf("extra:   %s", extra)
+			if diff := cmp.Diff(actual, tc.expected, cmpopts.SortSlices(stringLess), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("bad warning output; diff (-got +want)\n%s", diff)
 			}
 		})
 
 		t.Run("pod_"+tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GitRepoVolumeDriver, !tc.gitRepoPluginDisabled)
 			var pod *api.Pod
 			if tc.template != nil {
 				pod = &api.Pod{
@@ -1798,19 +1856,15 @@ func TestWarnings(t *testing.T) {
 				}
 			}
 			actual := GetWarningsForPod(context.TODO(), pod, &api.Pod{})
-			if len(actual) != len(tc.expected) {
-				t.Errorf("expected %d errors, got %d:\n%v", len(tc.expected), len(actual), strings.Join(actual, "\n"))
-			}
-			actualSet := sets.New(actual...)
-			expectedSet := sets.New(tc.expected...)
-			for _, missing := range sets.List(expectedSet.Difference(actualSet)) {
-				t.Errorf("missing: %s", missing)
-			}
-			for _, extra := range sets.List(actualSet.Difference(expectedSet)) {
-				t.Errorf("extra:   %s", extra)
+			if diff := cmp.Diff(actual, tc.expected, cmpopts.SortSlices(stringLess), cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("bad warning output; diff (-got +want)\n%s", diff)
 			}
 		})
 	}
+}
+
+func stringLess(a, b string) bool {
+	return a < b
 }
 
 func TestTemplateOnlyWarnings(t *testing.T) {
@@ -1821,7 +1875,7 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 		expected    []string
 	}{
 		{
-			name: "annotations",
+			name: "AppArmor annotations",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
@@ -1833,7 +1887,7 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 			},
 		},
 		{
-			name: "AppArmor pod field",
+			name: "AppArmor matching pod field",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
@@ -1848,6 +1902,25 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 				},
 			},
 			expected: []string{},
+		},
+		{
+			name: "AppArmor different pod field",
+			template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+					`container.apparmor.security.beta.kubernetes.io/foo`: `localhost/foo`,
+				}},
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						AppArmorProfile: &api.AppArmorProfile{Type: api.AppArmorProfileTypeLocalhost, LocalhostProfile: ptr.To("bar")},
+					},
+					Containers: []api.Container{{
+						Name: "foo",
+					}},
+				},
+			},
+			expected: []string{
+				`template.metadata.annotations[container.apparmor.security.beta.kubernetes.io/foo]: deprecated since v1.30; use the "appArmorProfile" field instead`,
+			},
 		},
 		{
 			name: "AppArmor container field",

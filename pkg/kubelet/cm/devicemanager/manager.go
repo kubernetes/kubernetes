@@ -202,15 +202,12 @@ func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 		if filePath == m.checkpointFile() {
 			continue
 		}
-		// TODO: Until the bug - https://github.com/golang/go/issues/33357 is fixed, os.stat wouldn't return the
-		// right mode(socket) on windows. Hence deleting the file, without checking whether
-		// its a socket, on windows.
-		stat, err := os.Lstat(filePath)
+		stat, err := os.Stat(filePath)
 		if err != nil {
 			klog.ErrorS(err, "Failed to stat file", "path", filePath)
 			continue
 		}
-		if stat.IsDir() {
+		if stat.IsDir() || stat.Mode()&os.ModeSocket == 0 {
 			continue
 		}
 		err = os.RemoveAll(filePath)
@@ -260,21 +257,17 @@ func (m *ManagerImpl) PluginDisconnected(resourceName string) {
 // is captured. Also, registered device and device to container allocation
 // information is checkpointed to the disk.
 func (m *ManagerImpl) PluginListAndWatchReceiver(resourceName string, resp *pluginapi.ListAndWatchResponse) {
-	var devices []pluginapi.Device
-	for _, d := range resp.Devices {
-		devices = append(devices, *d)
-	}
-	m.genericDeviceUpdateCallback(resourceName, devices)
+	m.genericDeviceUpdateCallback(resourceName, resp.Devices)
 }
 
-func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []pluginapi.Device) {
+func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices []*pluginapi.Device) {
 	healthyCount := 0
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.New[string]()
 	m.unhealthyDevices[resourceName] = sets.New[string]()
 	oldDevices := m.allDevices[resourceName]
 	podsToUpdate := sets.New[string]()
-	m.allDevices[resourceName] = make(map[string]pluginapi.Device)
+	m.allDevices[resourceName] = make(map[string]*pluginapi.Device)
 	for _, dev := range devices {
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {

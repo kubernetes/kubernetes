@@ -33,14 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -51,7 +49,8 @@ import (
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchedulingGates(t *testing.T) {
@@ -113,6 +112,12 @@ func TestSchedulingGates(t *testing.T) {
 				scheduler.WithPodMaxBackoffSeconds(0),
 			)
 			testutils.SyncSchedulerInformerFactory(testCtx)
+
+			if testCtx.Scheduler.APIDispatcher != nil {
+				logger, _ := ktesting.NewTestContext(t)
+				testCtx.Scheduler.APIDispatcher.Run(logger)
+				defer testCtx.Scheduler.APIDispatcher.Close()
+			}
 
 			cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
 
@@ -190,15 +195,15 @@ func (f *fakeCRPlugin) Name() string {
 	return "fakeCRPlugin"
 }
 
-func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Unschedulable, "always fail")
+func (f *fakeCRPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Unschedulable, "always fail")
 }
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: "foos.v1.example.com", ActionType: framework.All}},
+func (f *fakeCRPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: "foos.v1.example.com", ActionType: fwk.All}},
 	}, nil
 }
 
@@ -264,7 +269,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -323,17 +328,17 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Pop fake-pod out. It should be unschedulable.
 	podInfo := testutils.NextPodOrDie(t, testCtx)
-	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
+	schedFramework, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+	_, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo.Pod)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
+	testCtx.Scheduler.FailureHandler(ctx, schedFramework, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fitError), nil, time.Now())
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
@@ -378,7 +383,7 @@ func TestRequeueByBindFailure(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -441,11 +446,11 @@ func (*firstFailBindPlugin) Name() string {
 	return "firstFailBindPlugin"
 }
 
-func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodename string) *framework.Status {
+func (p *firstFailBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodename string) *fwk.Status {
 	if p.counter == 0 {
 		// fail in the first Bind call.
 		p.counter++
-		return framework.NewStatus(framework.Error, "firstFailBindPlugin rejects the Pod")
+		return fwk.NewStatus(fwk.Error, "firstFailBindPlugin rejects the Pod")
 	}
 
 	return p.defaultBinderPlugin.Bind(ctx, state, pod, nodename)
@@ -454,16 +459,15 @@ func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleSt
 // TestRequeueByPermitRejection verify Pods failed by permit plugins in the binding cycle are
 // put back to the queue, according to the correct scheduling cycle number.
 func TestRequeueByPermitRejection(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
 	queueingHintCalledCounter := 0
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{
 		fakePermitPluginName: func(ctx context.Context, o runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 			fakePermit = &fakePermitPlugin{
 				frameworkHandler: fh,
-				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+				schedulingHint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 					queueingHintCalledCounter++
-					return framework.Queue, nil
+					return fwk.Queue, nil
 				},
 			}
 			return fakePermit, nil
@@ -471,7 +475,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -563,7 +567,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 
 type fakePermitPlugin struct {
 	frameworkHandler framework.Handle
-	schedulingHint   framework.QueueingHintFn
+	schedulingHint   fwk.QueueingHintFn
 }
 
 const fakePermitPluginName = "fakePermitPlugin"
@@ -572,12 +576,47 @@ func (p *fakePermitPlugin) Name() string {
 	return fakePermitPluginName
 }
 
-func (p *fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
-	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
+func (p *fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, _ *v1.Pod, _ string) (*fwk.Status, time.Duration) {
+	return fwk.NewStatus(fwk.Wait), wait.ForeverTestTimeout
 }
 
-func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: framework.UpdateNodeLabel}, QueueingHintFn: p.schedulingHint},
+func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}, QueueingHintFn: p.schedulingHint},
 	}, nil
+}
+
+func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
+	// Set initial backoff to 1000s to make sure pod won't go to the activeQ after being requeued.
+	testCtx := testutils.InitTestSchedulerWithNS(t, "pop-from-backoffq", scheduler.WithPodInitialBackoffSeconds(1000), scheduler.WithPodMaxBackoffSeconds(1000))
+	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx
+
+	// Create node, so we can schedule pods.
+	node := st.MakeNode().Name("node").Obj()
+	if _, err := cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatal("Failed to create node")
+	}
+
+	// Create a pod that will be unschedulable.
+	pod := st.MakePod().Namespace(ns).Name("pod").NodeAffinityIn("foo", []string{"bar"}, st.NodeSelectorTypeMatchExpressions).Container(imageutils.GetPauseImageName()).Obj()
+	if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	err := wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodUnschedulable(cs, ns, pod.Name))
+	if err != nil {
+		t.Fatalf("Expected pod to be unschedulable: %v", err)
+	}
+
+	// Create node with label to make the pod schedulable.
+	node2 := st.MakeNode().Name("node-schedulable").Label("foo", "bar").Obj()
+	if _, err := cs.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{}); err != nil {
+		t.Fatal("Failed to create node-schedulable")
+	}
+
+	// Pod should be scheduled, even if it was in the backoffQ, because PopFromBackoffQ feature is enabled.
+	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
+	if err != nil {
+		t.Fatalf("Expected pod to be scheduled: %v", err)
+	}
 }

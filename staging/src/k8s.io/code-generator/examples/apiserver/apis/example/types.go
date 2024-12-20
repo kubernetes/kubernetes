@@ -45,3 +45,20 @@ type TestTypeList struct {
 type TestTypeStatus struct {
 	Blah string
 }
+
+type Conversion struct {
+	Identical MemoryIdentical
+	Different MemoryDifferent
+}
+type MemoryIdentical struct {
+	Items      *MemoryIdentical
+	Properties map[string]MemoryIdentical
+	AllOf      []MemoryIdentical
+	Bool       bool
+}
+type MemoryDifferent struct {
+	Items      *MemoryDifferent
+	Properties map[string]MemoryDifferent
+	AllOf      []MemoryDifferent
+	Bool       bool // differs from external representation
+}

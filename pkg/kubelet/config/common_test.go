@@ -17,8 +17,9 @@ limitations under the License.
 package config
 
 import (
-	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -175,8 +176,64 @@ func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	_, _, err = tryDecodeSinglePod(json, noDefault)
-	if !errors.Is(err, ErrStaticPodTriedToUseClusterTrustBundle) {
-		t.Errorf("Got error %q, want %q", err, ErrStaticPodTriedToUseClusterTrustBundle)
+	if !strings.Contains(err.Error(), "may not reference clustertrustbundles") {
+		t.Errorf("Got error %q, want %q", err, fmt.Errorf("static pods may not reference clustertrustbundles API objects"))
+	}
+}
+
+func TestDecodeSinglePodRejectsResourceClaims(t *testing.T) {
+	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
+	pod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test",
+			UID:       "12345",
+			Namespace: "mynamespace",
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSClusterFirst,
+			TerminationGracePeriodSeconds: &grace,
+			Containers: []v1.Container{{
+				Name:                     "image",
+				Image:                    "test/image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePath:   "/dev/termination-log",
+				TerminationMessagePolicy: v1.TerminationMessageReadFile,
+				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
+				Resources: v1.ResourceRequirements{
+					Claims: []v1.ResourceClaim{{
+						Name: "my-claim",
+					}},
+				},
+			}},
+			ResourceClaims: []v1.PodResourceClaim{{
+				Name:              "my-claim",
+				ResourceClaimName: ptr.To("some-external-claim"),
+			}},
+			SecurityContext:    &v1.PodSecurityContext{},
+			SchedulerName:      v1.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
+	}
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	_, _, err = tryDecodeSinglePod(json, noDefault)
+	if !strings.Contains(err.Error(), "may not reference resourceclaims") {
+		t.Errorf("Got error %q, want %q", err, fmt.Errorf("static pods may not reference resourceclaims API objects"))
 	}
 }
 

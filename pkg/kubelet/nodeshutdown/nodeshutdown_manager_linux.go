@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
 )
 
 const (
@@ -52,16 +51,15 @@ type dbusInhibiter interface {
 	InhibitShutdown() (systemd.InhibitLock, error)
 	ReleaseInhibitLock(lock systemd.InhibitLock) error
 	ReloadLogindConf() error
-	MonitorShutdown() (<-chan bool, error)
+	MonitorShutdown(klog.Logger) (<-chan bool, error)
 	OverrideInhibitDelay(inhibitDelayMax time.Duration) error
 }
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
 type managerImpl struct {
-	logger       klog.Logger
-	recorder     record.EventRecorder
-	nodeRef      *v1.ObjectReference
-	probeManager prober.Manager
+	logger   klog.Logger
+	recorder record.EventRecorder
+	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
 	syncNodeStatus func()
@@ -94,7 +92,6 @@ func NewManager(conf *Config) Manager {
 
 	manager := &managerImpl{
 		logger:         conf.Logger,
-		probeManager:   conf.ProbeManager,
 		recorder:       conf.Recorder,
 		nodeRef:        conf.NodeRef,
 		getPods:        conf.GetPodsFunc,
@@ -210,7 +207,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 		return nil, err
 	}
 
-	events, err := m.dbusCon.MonitorShutdown()
+	events, err := m.dbusCon.MonitorShutdown(m.logger)
 	if err != nil {
 		releaseErr := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		if releaseErr != nil {

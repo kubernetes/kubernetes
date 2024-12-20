@@ -259,6 +259,7 @@ type ObjectDefaulter interface {
 
 type ObjectVersioner interface {
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
+	PrioritizedVersionsForGroup(group string) []schema.GroupVersion
 }
 
 // ObjectConvertor converts an object to a different version.
@@ -383,4 +384,10 @@ type Unstructured interface {
 	//
 	// If the items passed to fn are not retained, or are retained for the same duration, use EachListItem instead for memory efficiency.
 	EachListItemWithAlloc(func(Object) error) error
+}
+
+// ApplyConfiguration is an interface that root apply configuration types implement.
+type ApplyConfiguration interface {
+	// IsApplyConfiguration is implemented if the object is the root of an apply configuration.
+	IsApplyConfiguration()
 }

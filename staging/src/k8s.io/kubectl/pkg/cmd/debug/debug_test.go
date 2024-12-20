@@ -1468,6 +1468,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1522,6 +1525,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1578,6 +1584,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1631,6 +1640,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1683,6 +1695,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1723,6 +1738,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1771,6 +1789,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1863,6 +1884,9 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1916,6 +1940,9 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-debugger-node-XXX-1",
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1972,6 +1999,11 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 				},
 			},
 			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -2035,6 +2067,11 @@ func TestGenerateNodeDebugPodCustomProfile(t *testing.T) {
 				},
 			},
 			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app.kubernetes.io/managed-by": "kubectl-debug",
+					},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{

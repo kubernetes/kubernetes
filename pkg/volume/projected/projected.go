@@ -17,6 +17,8 @@ limitations under the License.
 package projected
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -229,7 +231,8 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	setPerms := func(_ string) error {
 		// This may be the first time writing and new files get created outside the timestamp subdirectory:
 		// change the permissions on the whole volume and not only in the timestamp directory.
-		return volume.SetVolumeOwnership(s, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
+		ownershipChanger := volume.NewVolumeOwnership(s, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
+		return ownershipChanger.ChangePermissions()
 	}
 	err = writer.Write(data, setPerms)
 	if err != nil {
@@ -253,7 +256,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 
 	errlist := []error{}
 	payload := make(map[string]volumeutil.FileProjection)
-	for _, source := range s.source.Sources {
+	for sourceIndex, source := range s.source.Sources {
 		switch {
 		case source.Secret != nil:
 			optional := source.Secret.Optional != nil && *source.Secret.Optional
@@ -385,6 +388,43 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				Mode:   mode,
 				FsUser: mounterArgs.FsUser,
 			}
+		case source.PodCertificate != nil:
+			key, certificates, err := s.plugin.kvHost.GetPodCertificateCredentialBundle(context.TODO(), s.pod.ObjectMeta.Namespace, s.pod.ObjectMeta.Name, string(s.pod.ObjectMeta.UID), s.volName, sourceIndex)
+			if err != nil {
+				errlist = append(errlist, err)
+				continue
+			}
+
+			mode := *s.source.DefaultMode
+			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+				mode = 0600
+			}
+
+			if source.PodCertificate.CredentialBundlePath != "" {
+				credentialBundle := bytes.Buffer{}
+				credentialBundle.Write(key)
+				credentialBundle.Write(certificates)
+				payload[source.PodCertificate.CredentialBundlePath] = volumeutil.FileProjection{
+					Data:   credentialBundle.Bytes(),
+					Mode:   mode,
+					FsUser: mounterArgs.FsUser,
+				}
+			}
+			if source.PodCertificate.KeyPath != "" {
+				payload[source.PodCertificate.KeyPath] = volumeutil.FileProjection{
+					Data:   key,
+					Mode:   mode,
+					FsUser: mounterArgs.FsUser,
+				}
+			}
+			if source.PodCertificate.CertificateChainPath != "" {
+				payload[source.PodCertificate.CertificateChainPath] = volumeutil.FileProjection{
+					Data:   certificates,
+					Mode:   mode,
+					FsUser: mounterArgs.FsUser,
+				}
+			}
+
 		}
 	}
 	return payload, utilerrors.NewAggregate(errlist)
@@ -412,6 +452,7 @@ func (c *projectedVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	c.plugin.deleteServiceAccountToken(c.podUID)
+
 	return nil
 }
 
@@ -420,5 +461,5 @@ func getVolumeSource(spec *volume.Spec) (*v1.ProjectedVolumeSource, bool, error)
 		return spec.Volume.Projected, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a projected volume type")
+	return nil, false, fmt.Errorf("spec does not reference a projected volume type")
 }

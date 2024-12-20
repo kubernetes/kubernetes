@@ -557,7 +557,7 @@ func testReleaseLease(t *testing.T, objectType string) {
 					verb:       "get",
 					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
+						return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
 					},
 				},
 				{
@@ -572,6 +572,13 @@ func testReleaseLease(t *testing.T, objectType string) {
 					objectType: objectType,
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
 						return true, action.(fakeclient.UpdateAction).GetObject(), nil
+					},
+				},
+				{
+					verb:       "get",
+					objectType: objectType,
+					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.NewNotFound(action.(fakeclient.GetAction).GetResource().GroupResource(), action.(fakeclient.GetAction).GetName())
 					},
 				},
 			},
@@ -675,6 +682,59 @@ func testReleaseLease(t *testing.T, objectType string) {
 // Will test leader election using endpoints as the resource
 func TestReleaseLeaseLeases(t *testing.T) {
 	testReleaseLease(t, "leases")
+}
+
+// TestReleaseMethodCallsGet test release method calls Get
+func TestReleaseMethodCallsGet(t *testing.T) {
+	objectType := "leases"
+	getCalled := false
+
+	lockMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	recorder := record.NewFakeRecorder(100)
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+		EventRecorder: recorder,
+	}
+	c := &fake.Clientset{}
+	c.AddReactor("get", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		// flag to check if Get is called
+		getCalled = true
+		return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), &rl.LeaderElectionRecord{
+			HolderIdentity:       "baz",
+			LeaseDurationSeconds: 10,
+		}), nil
+	})
+	c.AddReactor("update", objectType, func(action fakeclient.Action) (bool, runtime.Object, error) {
+		return true, action.(fakeclient.UpdateAction).GetObject(), nil
+	})
+
+	lock := &rl.LeaseLock{
+		LeaseMeta:  lockMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	}
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		LeaseDuration: 10 * time.Second,
+		Callbacks: LeaderCallbacks{
+			OnNewLeader: func(l string) {},
+		},
+	}
+	observedRawRecord := GetRawRecordOrDie(t, objectType, rl.LeaderElectionRecord{HolderIdentity: "baz"})
+	le := &LeaderElector{
+		config:            lec,
+		observedRecord:    rl.LeaderElectionRecord{HolderIdentity: "baz"},
+		observedRawRecord: observedRawRecord,
+		observedTime:      time.Now(),
+		clock:             clock.RealClock{},
+		metrics:           globalMetricsFactory.newLeaderMetrics(),
+	}
+
+	le.release()
+
+	if !getCalled {
+		t.Errorf("release method does not call Get")
+	}
 }
 
 func TestReleaseOnCancellation_Leases(t *testing.T) {
@@ -791,9 +851,11 @@ func testReleaseOnCancellation(t *testing.T, objectType string) {
 						if lockObj != nil {
 							// Third and more get (first create, second renew) should return our canceled error
 							// FakeClient doesn't do anything with the context so we're doing this ourselves
-							if gets >= 3 {
-								close(onRenewCalled)
-								<-onRenewResume
+							if gets >= 4 {
+								if gets == 4 {
+									close(onRenewCalled)
+									<-onRenewResume
+								}
 								return true, nil, context.Canceled
 							}
 							return true, lockObj, nil

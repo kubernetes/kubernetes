@@ -32,6 +32,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	v1 "k8s.io/api/core/v1"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
@@ -71,8 +72,7 @@ func TestGetEtcdPodSpec(t *testing.T) {
 
 func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	var tests = []struct {
 		cfg              *kubeadmapi.ClusterConfiguration
@@ -81,7 +81,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.99.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						DataDir: tmpdir + "/etcd",
@@ -94,7 +94,6 @@ kind: Pod
 metadata:
   annotations:
     kubeadm.kubernetes.io/etcd.advertise-client-urls: https://:2379
-  creationTimestamp: null
   labels:
     component: etcd
     tier: control-plane
@@ -108,8 +107,7 @@ spec:
     - --cert-file=etcd/server.crt
     - --client-cert-auth=true
     - --data-dir=%s/etcd
-    - --experimental-initial-corrupt-check=true
-    - --experimental-watch-progress-notify-interval=5s
+    - --feature-gates=InitialCorruptCheck=true
     - --initial-advertise-peer-urls=https://:2380
     - --initial-cluster==https://:2380
     - --key-file=etcd/server.key
@@ -123,6 +121,7 @@ spec:
     - --peer-trusted-ca-file=etcd/ca.crt
     - --snapshot-count=10000
     - --trusted-ca-file=etcd/ca.crt
+    - --watch-progress-notify-interval=5s
     image: /etcd:%s
     imagePullPolicy: IfNotPresent
     livenessProbe:
@@ -130,18 +129,22 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /livez
-        port: 2381
+        port: probe-port
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
       timeoutSeconds: 15
     name: etcd
+    ports:
+    - containerPort: 2381
+      name: probe-port
+      protocol: TCP
     readinessProbe:
       failureThreshold: 3
       httpGet:
         host: 127.0.0.1
         path: /readyz
-        port: 2381
+        port: probe-port
         scheme: HTTP
       periodSeconds: 1
       timeoutSeconds: 15
@@ -154,7 +157,7 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /readyz
-        port: 2381
+        port: probe-port
         scheme: HTTP
       initialDelaySeconds: 10
       periodSeconds: 10
@@ -230,8 +233,7 @@ status: {}
 
 func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
@@ -285,6 +287,8 @@ func TestGetEtcdCommand(t *testing.T) {
 	var tests = []struct {
 		name             string
 		advertiseAddress string
+		k8sVersion       string
+		etcdImageTag     string
 		nodeName         string
 		extraArgs        []kubeadmapi.Arg
 		initialCluster   []etcdutil.Member
@@ -297,8 +301,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
@@ -328,8 +332,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
@@ -360,8 +364,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=bar",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				"--listen-client-urls=https://10.0.1.10:2379",
 				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 				"--advertise-client-urls=https://10.0.1.10:2379",
@@ -387,8 +391,8 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				"--experimental-initial-corrupt-check=true",
-				"--experimental-watch-progress-notify-interval=5s",
+				"--feature-gates=InitialCorruptCheck=true",
+				"--watch-progress-notify-interval=5s",
 				fmt.Sprintf("--listen-client-urls=https://[::1]:%d,https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
 				fmt.Sprintf("--listen-metrics-urls=http://[::1]:%d", kubeadmconstants.EtcdMetricsPort),
 				fmt.Sprintf("--advertise-client-urls=https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenClientPort),
@@ -407,6 +411,90 @@ func TestGetEtcdCommand(t *testing.T) {
 				fmt.Sprintf("--initial-cluster=foo=https://[2001:db8::3]:%d", kubeadmconstants.EtcdListenPeerPort),
 			},
 		},
+		{
+			name:             "Default args - with k8s 1.33.0",
+			advertiseAddress: "1.2.3.4",
+			k8sVersion:       "1.33.0",
+			nodeName:         "bar",
+			expected: []string{
+				"etcd",
+				"--name=bar",
+				"--experimental-initial-corrupt-check=true",
+				"--experimental-watch-progress-notify-interval=5s",
+				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
+				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				"--data-dir=/var/lib/etcd",
+				"--cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerCertName),
+				"--key-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerKeyName),
+				"--trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
+				"--client-cert-auth=true",
+				"--peer-cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerCertName),
+				"--peer-key-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerKeyName),
+				"--peer-trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
+				"--snapshot-count=10000",
+				"--peer-client-cert-auth=true",
+				fmt.Sprintf("--initial-cluster=bar=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+			},
+		},
+		{
+			name:             "Default args - with semver etcd image (3.5.21-0)",
+			advertiseAddress: "1.2.3.4",
+			etcdImageTag:     "3.5.21-0",
+			nodeName:         "bar",
+			expected: []string{
+				"etcd",
+				"--name=bar",
+				"--experimental-initial-corrupt-check=true",
+				"--experimental-watch-progress-notify-interval=5s",
+				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
+				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				"--data-dir=/var/lib/etcd",
+				"--cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerCertName),
+				"--key-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerKeyName),
+				"--trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
+				"--client-cert-auth=true",
+				"--peer-cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerCertName),
+				"--peer-key-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerKeyName),
+				"--peer-trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
+				"--snapshot-count=10000",
+				"--peer-client-cert-auth=true",
+				fmt.Sprintf("--initial-cluster=bar=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+			},
+		},
+		{
+			name:             "Default args - with non-semver etcd image",
+			advertiseAddress: "1.2.3.4",
+			etcdImageTag:     "non-semver",
+			nodeName:         "bar",
+			expected: []string{
+				"etcd",
+				"--name=bar",
+				"--experimental-initial-corrupt-check=true",
+				"--experimental-watch-progress-notify-interval=5s",
+				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d,https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort, kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-metrics-urls=http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
+				fmt.Sprintf("--advertise-client-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+				"--data-dir=/var/lib/etcd",
+				"--cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerCertName),
+				"--key-file=" + filepath.FromSlash(kubeadmconstants.EtcdServerKeyName),
+				"--trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
+				"--client-cert-auth=true",
+				"--peer-cert-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerCertName),
+				"--peer-key-file=" + filepath.FromSlash(kubeadmconstants.EtcdPeerKeyName),
+				"--peer-trusted-ca-file=" + filepath.FromSlash(kubeadmconstants.EtcdCACertName),
+				"--snapshot-count=10000",
+				"--peer-client-cert-auth=true",
+				fmt.Sprintf("--initial-cluster=bar=https://1.2.3.4:%d", kubeadmconstants.EtcdListenPeerPort),
+			},
+		},
 	}
 
 	for _, rt := range tests {
@@ -415,8 +503,12 @@ func TestGetEtcdCommand(t *testing.T) {
 				AdvertiseAddress: rt.advertiseAddress,
 			}
 			cfg := &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: rt.k8sVersion,
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
+						ImageMeta: kubeadmapi.ImageMeta{
+							ImageTag: rt.etcdImageTag,
+						},
 						DataDir:   "/var/lib/etcd",
 						ExtraArgs: rt.extraArgs,
 					},

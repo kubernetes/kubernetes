@@ -686,7 +686,6 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 		objv1beta2 := newConversionMultiVersionFixture(ns, id, "v1beta2")
 		meta, _, _ := unstructured.NestedFieldCopy(obj.Object, "metadata")
 		unstructured.SetNestedField(objv1beta2.Object, meta, "metadata")
-		lastRV := objv1beta2.GetResourceVersion()
 
 		for _, verb := range []string{"get", "list", "create", "update", "patch", "delete", "deletecollection"} {
 			t.Run(verb, func(t *testing.T) {
@@ -694,10 +693,7 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 				case "get":
 					_, err = clients["v1beta2"].Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 				case "list":
-					// With ResilientWatchcCacheInitialization feature, List requests are rejected with 429 if watchcache is not initialized.
-					// However, in some of these tests that install faulty converter webhook, watchcache will never initialize by definition (as list will never succeed due to faulty converter webook).
-					// In such case, the returned error will differ from the one returned from the etcd, so we need to force the request to go to etcd.
-					_, err = clients["v1beta2"].List(context.TODO(), metav1.ListOptions{ResourceVersion: lastRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact})
+					_, err = clients["v1beta2"].List(context.TODO(), metav1.ListOptions{})
 				case "create":
 					_, err = clients["v1beta2"].Create(context.TODO(), newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{})
 				case "update":
@@ -985,7 +981,6 @@ func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClient
 		t.Fatal(err)
 	}
 	c.crd = crd
-
 }
 
 func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
@@ -1340,4 +1335,103 @@ func jsonPtr(x interface{}) *apiextensionsv1.JSON {
 	}
 	ret := apiextensionsv1.JSON{Raw: bs}
 	return &ret
+}
+
+func TestWebhookConversion_WhitespaceCABundleEtcdBypass(t *testing.T) {
+	// Setup server and clients
+	tearDown, config, options, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	apiExtensionsClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crd := multiVersionFixture.DeepCopy()
+
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd, nil, nil)
+	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	etcdClient, _, err := storage.GetEtcdClients(restOptions.StorageConfig.Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err = etcdClient.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	etcdObjectReader := storage.NewEtcdObjectReader(etcdClient, &restOptions, crd)
+
+	ctcTearDown, ctc := newConversionTestContext(t, apiExtensionsClient, dynamicClient, etcdObjectReader, crd)
+	defer ctcTearDown()
+
+	ns := "whitespace-cabundle"
+	version := "v1beta1"
+	client := ctc.versionedClient(ns, version)
+
+	// Create a CR instance
+	name := "test"
+	obj, err := client.Create(context.TODO(), newConversionMultiVersionFixture(ns, name, version), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create CR instance: %v", err)
+	}
+	verifyMultiVersionObject(t, "v1beta1", obj)
+
+	// Set up webhook conversion
+	tearDown, webhookClientConfig, err := StartConversionWebhookServer(NewObjectConverterWebhookHandler(t, noopConverter))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+		Strategy: apiextensionsv1.WebhookConverter,
+		Webhook: &apiextensionsv1.WebhookConversion{
+			ClientConfig:             webhookClientConfig,
+			ConversionReviewVersions: []string{"v1beta1"},
+		},
+	}
+	crd.TypeMeta = metav1.TypeMeta{
+		APIVersion: "apiextensions.k8s.io/v1",
+		Kind:       "CustomResourceDefinition",
+	}
+
+	// Fetch the latest CRD from the API server to get the current resourceVersion
+	crdFromAPI, err := ctc.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(
+		context.TODO(), crd.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	crd.ResourceVersion = crdFromAPI.ResourceVersion
+	_, err = ctc.apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Update(
+		context.TODO(), crd, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Replace the CABundle with empty spaces
+	crd.Spec.Conversion.Webhook.ClientConfig.CABundle = []byte("    \n\t   ")
+	err = etcdObjectReader.SetStoredCustomResourceDefinition(crd.Name, crd)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try to read the CR instance (should succeed, as no conversion is needed)
+	obj, err = ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifyMultiVersionObject(t, "v1beta1", obj)
+
 }

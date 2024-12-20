@@ -18,18 +18,30 @@ package validation
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strconv"
+	"time"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/utils/clock"
 )
 
 var (
@@ -242,12 +254,12 @@ func validateConditions(fldPath *field.Path, csr *certificates.CertificateSignin
 			case certificates.CertificateApproved:
 				hasApproved = true
 				if hasDenied {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("type"), c.Type, "Approved and Denied conditions are mutually exclusive"))
+					allErrs = append(allErrs, field.Invalid(fldPath, c.Type, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative())
 				}
 			case certificates.CertificateDenied:
 				hasDenied = true
 				if hasApproved {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("type"), c.Type, "Approved and Denied conditions are mutually exclusive"))
+					allErrs = append(allErrs, field.Invalid(fldPath, c.Type, "Approved and Denied conditions are mutually exclusive").WithOrigin("zeroOrOneOf").MarkCoveredByDeclarative())
 				}
 			}
 		}
@@ -304,7 +316,7 @@ func validateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.Certif
 			case len(newConditions) > len(oldConditions):
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not add a condition of type %q", t)))
 			case !apiequality.Semantic.DeepEqual(oldConditions, newConditions):
-				conditionDiff := cmp.Diff(oldConditions, newConditions)
+				conditionDiff := diff.Diff(oldConditions, newConditions)
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not modify a condition of type %q\n%v", t, conditionDiff)))
 			}
 		}
@@ -571,4 +583,374 @@ func validateTrustBundle(path *field.Path, in string) field.ErrorList {
 	}
 
 	return allErrors
+}
+
+// ValidatePodCertificateRequestCreate runs all validation checks on a pod certificate request create.
+func ValidatePodCertificateRequestCreate(req *certificates.PodCertificateRequest) field.ErrorList {
+	var allErrors field.ErrorList
+
+	metaErrors := apivalidation.ValidateObjectMeta(&req.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrors = append(allErrors, metaErrors...)
+
+	signerNameErrors := apivalidation.ValidateSignerName(field.NewPath("spec", "signerName"), req.Spec.SignerName)
+	allErrors = append(allErrors, signerNameErrors...)
+
+	for _, msg := range apivalidation.ValidatePodName(req.Spec.PodName, false) {
+		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "podName"), req.Spec.PodName, msg))
+	}
+	if len(req.Spec.PodUID) == 0 {
+		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "podUID"), req.Spec.PodUID, "must not be empty"))
+	}
+	if len(req.Spec.PodUID) > 128 {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "podUID"), req.Spec.PodUID, 128))
+	}
+	for _, msg := range apivalidation.ValidateServiceAccountName(req.Spec.ServiceAccountName, false) {
+		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "serviceAccountName"), req.Spec.ServiceAccountName, msg))
+	}
+	if len(req.Spec.ServiceAccountUID) == 0 {
+		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "serviceAccountUID"), req.Spec.ServiceAccountUID, "must not be empty"))
+	}
+	if len(req.Spec.ServiceAccountUID) > 128 {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "serviceAccountUID"), req.Spec.ServiceAccountUID, 128))
+	}
+	for _, msg := range apivalidation.ValidateNodeName(string(req.Spec.NodeName), false) {
+		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "nodeName"), req.Spec.NodeName, msg))
+	}
+	if len(req.Spec.NodeUID) == 0 {
+		allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "nodeUID"), req.Spec.NodeUID, "must not be empty"))
+	}
+	if len(req.Spec.NodeUID) > 128 {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "nodeUID"), req.Spec.NodeUID, 128))
+	}
+
+	if req.Spec.MaxExpirationSeconds == nil {
+		allErrors = append(allErrors, field.Required(field.NewPath("spec", "maxExpirationSeconds"), "must be set"))
+		return allErrors
+	}
+	if apivalidation.IsKubernetesSignerName(req.Spec.SignerName) {
+		// Kubernetes signers are restricted to max 24 hour certs
+		if !(certificates.MinMaxExpirationSeconds <= *req.Spec.MaxExpirationSeconds && *req.Spec.MaxExpirationSeconds <= certificates.KubernetesMaxMaxExpirationSeconds) {
+			allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "maxExpirationSeconds"), req.Spec.MaxExpirationSeconds, fmt.Sprintf("must be in the range [%d, %d]", certificates.MinMaxExpirationSeconds, certificates.KubernetesMaxMaxExpirationSeconds)))
+		}
+	} else {
+		// All other signers are restricted to max 91 day certs.
+		if !(certificates.MinMaxExpirationSeconds <= *req.Spec.MaxExpirationSeconds && *req.Spec.MaxExpirationSeconds <= certificates.MaxMaxExpirationSeconds) {
+			allErrors = append(allErrors, field.Invalid(field.NewPath("spec", "maxExpirationSeconds"), req.Spec.MaxExpirationSeconds, fmt.Sprintf("must be in the range [%d, %d]", certificates.MinMaxExpirationSeconds, certificates.MaxMaxExpirationSeconds)))
+		}
+	}
+
+	if len(req.Spec.PKIXPublicKey) > certificates.MaxPKIXPublicKeySize {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "pkixPublicKey"), req.Spec.PKIXPublicKey, certificates.MaxPKIXPublicKeySize))
+		return allErrors
+	}
+
+	if len(req.Spec.ProofOfPossession) > certificates.MaxProofOfPossessionSize {
+		allErrors = append(allErrors, field.TooLong(field.NewPath("spec", "proofOfPossession"), req.Spec.ProofOfPossession, certificates.MaxProofOfPossessionSize))
+		return allErrors
+	}
+
+	pubAny, err := x509.ParsePKIXPublicKey(req.Spec.PKIXPublicKey)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(pkixPath, req.Spec.PKIXPublicKey, "must be a valid PKIX-serialized public key"))
+		return allErrors
+	}
+
+	// Verify public key properties and the proof-of-possession signature.
+	switch pub := pubAny.(type) {
+	case ed25519.PublicKey:
+		// ed25519 has no key configuration to check
+		if !ed25519.Verify(pub, []byte(req.Spec.PodUID), req.Spec.ProofOfPossession) {
+			allErrors = append(allErrors, field.Invalid(popPath, field.OmitValueType{}, "could not verify proof-of-possession signature"))
+			return allErrors
+		}
+
+	case *ecdsa.PublicKey:
+		if pub.Curve != elliptic.P256() && pub.Curve != elliptic.P384() && pub.Curve != elliptic.P521() {
+			allErrors = append(allErrors, field.Invalid(pkixPath, "curve "+pub.Curve.Params().Name, "elliptic public keys must use curve P256 or P384"))
+			return allErrors
+		}
+		if !ecdsa.VerifyASN1(pub, hashBytes([]byte(req.Spec.PodUID)), req.Spec.ProofOfPossession) {
+			allErrors = append(allErrors, field.Invalid(popPath, field.OmitValueType{}, "could not verify proof-of-possession signature"))
+			return allErrors
+		}
+
+	case *rsa.PublicKey:
+		if pub.Size()*8 != 3072 && pub.Size()*8 != 4096 {
+			allErrors = append(allErrors, field.Invalid(pkixPath, fmt.Sprintf("%d-bit modulus", pub.Size()*8), "RSA keys must have modulus size 3072 or 4096"))
+			return allErrors
+		}
+		if err := rsa.VerifyPSS(pub, crypto.SHA256, hashBytes([]byte(req.Spec.PodUID)), req.Spec.ProofOfPossession, nil); err != nil {
+			allErrors = append(allErrors, field.Invalid(popPath, field.OmitValueType{}, "could not verify proof-of-possession signature"))
+			return allErrors
+		}
+
+	default:
+		allErrors = append(allErrors, field.Invalid(pkixPath, req.Spec.PKIXPublicKey, "unknown public key type; supported types are Ed25519, ECDSA, and RSA"))
+		return allErrors
+	}
+
+	return allErrors
+}
+
+func hashBytes(in []byte) []byte {
+	out := sha256.Sum256(in)
+	return out[:]
+}
+
+var (
+	pkixPath         = field.NewPath("spec", "pkixPublicKey")
+	popPath          = field.NewPath("spec", "proofOfPossession")
+	certChainPath    = field.NewPath("status", "certificateChain")
+	notBeforePath    = field.NewPath("status", "notBefore")
+	notAfterPath     = field.NewPath("status", "notAfter")
+	beginRefreshPath = field.NewPath("status", "beginRefreshAt")
+)
+
+// ValidatePodCertificateRequestUpdate runs all update validation checks on a
+// non-status update.
+//
+// All spec fields are immutable after creation, and status updates must go
+// through the dedicated status update verb, so only metadata updates are
+// allowed.
+func ValidatePodCertificateRequestUpdate(newReq, oldReq *certificates.PodCertificateRequest) field.ErrorList {
+	var allErrors field.ErrorList
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newReq.ObjectMeta, &oldReq.ObjectMeta, field.NewPath("metadata"))...)
+
+	// All spec fields are immutable.
+	allErrors = append(allErrors, apivalidation.ValidateImmutableField(newReq.Spec, oldReq.Spec, field.NewPath("spec"))...)
+
+	return allErrors
+}
+
+// ValidatePodCertificateRequestStatusUpdate validates a status update for a
+// PodCertificateRequest.
+func ValidatePodCertificateRequestStatusUpdate(newReq, oldReq *certificates.PodCertificateRequest, clock clock.PassiveClock) field.ErrorList {
+	var allErrors field.ErrorList
+
+	// Metadata is *mostly* immutable... ManagedFields is allowed to change.  We
+	// are reliant on the strategy that's calling us to have patched
+	// newReq.ObjectMeta using metav1.ResetObjectMetaForStatus.
+	allErrors = append(allErrors, apivalidation.ValidateObjectMetaUpdate(&newReq.ObjectMeta, &oldReq.ObjectMeta, field.NewPath("metadata"))...)
+	if len(allErrors) > 0 {
+		return allErrors
+	}
+
+	// Don't validate spec.  Strategy has stomped it.
+
+	// There can be at most one of the known conditions, and it must have status "True"
+	numKnownConditions := 0
+	for i, cond := range newReq.Status.Conditions {
+		switch cond.Type {
+		case certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed:
+			numKnownConditions++
+			if numKnownConditions > 1 {
+				allErrors = append(allErrors, field.Invalid(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, `There may be at most one condition with type "Issued", "Denied", or "Failed"`))
+			}
+			if cond.Status != metav1.ConditionTrue {
+				allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "status"), cond.Status, []metav1.ConditionStatus{metav1.ConditionTrue}))
+			}
+		default:
+			allErrors = append(allErrors, field.NotSupported(field.NewPath("status", "conditions", formatIndex(i), "type"), cond.Type, []string{certificates.PodCertificateRequestConditionTypeIssued, certificates.PodCertificateRequestConditionTypeDenied, certificates.PodCertificateRequestConditionTypeFailed}))
+		}
+	}
+
+	allErrors = append(allErrors, metav1validation.ValidateConditions(newReq.Status.Conditions, field.NewPath("status", "conditions"))...)
+
+	// Bail if something seems wrong with the conditions --- we use the
+	// conditions to drive validation of the remainder of the status fields.
+	if len(allErrors) > 0 {
+		return allErrors
+	}
+
+	// Is the original PCR in a terminal condition?  If so, the entire status
+	// field (including conditions) is immutable.  No more changes are
+	// permitted.
+	if pcrIsIssued(oldReq) || pcrIsDenied(oldReq) || pcrIsFailed(oldReq) {
+		allErrors = append(allErrors, validateSemanticEquality(newReq.Status, oldReq.Status, field.NewPath("status"), "immutable after PodCertificateRequest is issued, denied, or failed")...)
+		return allErrors
+	}
+
+	// Are we transitioning to the "denied" or "failed" terminal conditions?
+	if pcrIsDenied(newReq) || pcrIsFailed(newReq) {
+		// No other status fields may change besides conditions.
+		wantStatus := certificates.PodCertificateRequestStatus{
+			Conditions: newReq.Status.Conditions,
+		}
+		allErrors = append(allErrors, validateSemanticEquality(newReq.Status, wantStatus, field.NewPath("status"), "non-condition status fields must be empty when denying or failing the PodCertificateRequest")...)
+		return allErrors
+	}
+
+	// Are we transitioning to the "issued" terminal condition?
+	if pcrIsIssued(newReq) {
+		if len(newReq.Status.CertificateChain) > certificates.MaxCertificateChainSize {
+			allErrors = append(allErrors, field.TooLong(field.NewPath("status", "certificateChain"), newReq.Status.CertificateChain, certificates.MaxCertificateChainSize))
+			return allErrors
+		}
+
+		leafBlock, rest := pem.Decode([]byte(newReq.Status.CertificateChain))
+		if leafBlock == nil {
+			allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "issued certificate chain must contain at least one certificate"))
+			return allErrors
+		}
+		if leafBlock.Type != "CERTIFICATE" {
+			allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "issued certificate chain must consist entirely of CERTIFICATE PEM blocks"))
+			return allErrors
+		}
+
+		leafCert, err := x509.ParseCertificate(leafBlock.Bytes)
+		if err != nil {
+			allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate does not parse as valid X.509"))
+			return allErrors
+		}
+
+		// Was the certificate issued to the public key in the spec?
+		wantPKAny, err := x509.ParsePKIXPublicKey(oldReq.Spec.PKIXPublicKey)
+		if err != nil {
+			allErrors = append(allErrors, field.Invalid(pkixPath, oldReq.Spec.PKIXPublicKey, "must be a valid PKIX-serialized public key"))
+			return allErrors
+		}
+		switch wantPK := wantPKAny.(type) {
+		case ed25519.PublicKey:
+			if !wantPK.Equal(leafCert.PublicKey) {
+				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate was not issued to the requested public key"))
+				return allErrors
+			}
+		case *rsa.PublicKey:
+			if !wantPK.Equal(leafCert.PublicKey) {
+				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate was not issued to the requested public key"))
+				return allErrors
+			}
+		case *ecdsa.PublicKey:
+			if !wantPK.Equal(leafCert.PublicKey) {
+				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "leaf certificate was not issued to the requested public key"))
+				return allErrors
+			}
+		}
+
+		// All timestamps must be set.
+		if newReq.Status.NotBefore == nil {
+			allErrors = append(allErrors, field.Required(notBeforePath, "must be present and consistent with the issued certificate"))
+		}
+		if newReq.Status.NotAfter == nil {
+			allErrors = append(allErrors, field.Required(notAfterPath, "must be present and consistent with the issued certificate"))
+		}
+		if newReq.Status.BeginRefreshAt == nil {
+			allErrors = append(allErrors, field.Required(beginRefreshPath, "must be present and in the range [notbefore+10min, notafter-10min]"))
+		}
+		if len(allErrors) > 0 {
+			return allErrors
+		}
+
+		// Validate that NotBefore is consistent with the status field, and within 5
+		// minutes of the current time.
+		if !newReq.Status.NotBefore.Time.Equal(leafCert.NotBefore) {
+			allErrors = append(allErrors, field.Invalid(notBeforePath, newReq.Status.NotBefore.Time, "must be set to the NotBefore time encoded in the leaf certificate"))
+			return allErrors
+		}
+		if !timeNear(newReq.Status.NotBefore.Time, clock.Now(), 5*time.Minute) {
+			allErrors = append(allErrors, field.Invalid(notBeforePath, newReq.Status.NotBefore.Time, "must be set to within 5 minutes of kube-apiserver's current time"))
+			return allErrors
+		}
+
+		// Validate that NotAfter is consistent with the status field
+		if !newReq.Status.NotAfter.Time.Equal(leafCert.NotAfter) {
+			allErrors = append(allErrors, field.Invalid(notAfterPath, newReq.Status.NotAfter.Time, "must be set to the NotAfter time encoded in the leaf certificate"))
+			return allErrors
+		}
+
+		// Validate that leaf cert lifetime against minimum and maximum constraints.
+		lifetime := leafCert.NotAfter.Sub(leafCert.NotBefore)
+		if lifetime < 1*time.Hour {
+			allErrors = append(allErrors, field.Invalid(certChainPath, lifetime, "leaf certificate lifetime must be >= 1 hour"))
+			return allErrors
+		}
+		if lifetime > time.Duration(*newReq.Spec.MaxExpirationSeconds)*time.Second {
+			allErrors = append(allErrors, field.Invalid(certChainPath, lifetime, fmt.Sprintf("leaf certificate lifetime must be <= spec.maxExpirationSeconds (%v)", *newReq.Spec.MaxExpirationSeconds)))
+			return allErrors
+		}
+
+		// Validate that BeginRefreshAt is within limits.
+		if newReq.Status.BeginRefreshAt.Time.Before(newReq.Status.NotBefore.Time.Add(10 * time.Minute)) {
+			allErrors = append(allErrors, field.Invalid(beginRefreshPath, newReq.Status.BeginRefreshAt.Time, "must be at least 10 minutes after status.notBefore"))
+			return allErrors
+		}
+		if newReq.Status.BeginRefreshAt.Time.After(newReq.Status.NotAfter.Time.Add(-10 * time.Minute)) {
+			allErrors = append(allErrors, field.Invalid(beginRefreshPath, newReq.Status.BeginRefreshAt.Time, "must be at least 10 minutes before status.notAfter"))
+			return allErrors
+		}
+
+		// Check the remainder of the certificates in the chain, if any.  We cannot
+		// easily verify the chain, because the Golang X.509 libraries are wisely
+		// written to prevent us from doing stupid things like verifying a partial
+		// chain, but we can at least check that they are valid certificates.
+		for {
+			var nextBlock *pem.Block
+			nextBlock, rest = pem.Decode(rest)
+			if nextBlock == nil {
+				break
+			}
+
+			if nextBlock.Type != "CERTIFICATE" {
+				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "issued certificate chain must consist entirely of CERTFICATE PEM blocks"))
+				return allErrors
+			}
+
+			_, err := x509.ParseCertificate(nextBlock.Bytes)
+			if err != nil {
+				allErrors = append(allErrors, field.Invalid(certChainPath, newReq.Status.CertificateChain, "intermediate certificate does not parse as valid X.509"))
+				return allErrors
+			}
+		}
+
+		return allErrors
+	}
+
+	// We are not transitioning to any terminal state.  The whole status object
+	// is immutable.
+	allErrors = append(allErrors, validateSemanticEquality(newReq.Status, oldReq.Status, field.NewPath("status"), `status is immutable unless transitioning to "Issued", "Denied", or "Failed"`)...)
+	return allErrors
+}
+
+func pcrIsIssued(pcr *certificates.PodCertificateRequest) bool {
+	for _, cond := range pcr.Status.Conditions {
+		if cond.Type == certificates.PodCertificateRequestConditionTypeIssued && cond.Status == metav1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func pcrIsDenied(pcr *certificates.PodCertificateRequest) bool {
+	for _, cond := range pcr.Status.Conditions {
+		if cond.Type == certificates.PodCertificateRequestConditionTypeDenied && cond.Status == metav1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func pcrIsFailed(pcr *certificates.PodCertificateRequest) bool {
+	for _, cond := range pcr.Status.Conditions {
+		if cond.Type == certificates.PodCertificateRequestConditionTypeFailed && cond.Status == metav1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func formatIndex(i int) string {
+	return "[" + strconv.Itoa(i) + "]"
+}
+
+// Similar to apivalidation.ValidateImmutableField but we can supply our own detail string.
+func validateSemanticEquality(oldVal, newVal any, fldPath *field.Path, detail string) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !apiequality.Semantic.DeepEqual(oldVal, newVal) {
+		allErrs = append(allErrs, field.Invalid(fldPath, field.OmitValueType{}, detail))
+	}
+	return allErrs
+}
+
+func timeNear(a, b time.Time, skew time.Duration) bool {
+	return a.After(b.Add(-skew)) && a.Before(b.Add(skew))
 }

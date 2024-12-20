@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/protobuf/internal/editiondefaults"
 	"google.golang.org/protobuf/internal/filedesc"
+	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -43,6 +44,8 @@ func toEditionProto(ed filedesc.Edition) descriptorpb.Edition {
 		return descriptorpb.Edition_EDITION_PROTO3
 	case filedesc.Edition2023:
 		return descriptorpb.Edition_EDITION_2023
+	case filedesc.Edition2024:
+		return descriptorpb.Edition_EDITION_2024
 	default:
 		panic(fmt.Sprintf("unknown value for edition: %v", ed))
 	}
@@ -123,10 +126,43 @@ func mergeEditionFeatures(parentDesc protoreflect.Descriptor, child *descriptorp
 		parentFS.IsJSONCompliant = *jf == descriptorpb.FeatureSet_ALLOW
 	}
 
-	if goFeatures, ok := proto.GetExtension(child, gofeaturespb.E_Go).(*gofeaturespb.GoFeatures); ok && goFeatures != nil {
-		if luje := goFeatures.LegacyUnmarshalJsonEnum; luje != nil {
-			parentFS.GenerateLegacyUnmarshalJSON = *luje
-		}
+	// We must not use proto.GetExtension(child, gofeaturespb.E_Go)
+	// because that only works for messages we generated, but not for
+	// dynamicpb messages. See golang/protobuf#1669.
+	//
+	// Further, we harden this code against adversarial inputs: a
+	// service which accepts descriptors from a possibly malicious
+	// source shouldn't crash.
+	goFeatures := child.ProtoReflect().Get(gofeaturespb.E_Go.TypeDescriptor())
+	if !goFeatures.IsValid() {
+		return parentFS
+	}
+	gf, ok := goFeatures.Interface().(protoreflect.Message)
+	if !ok {
+		return parentFS
+	}
+	// gf.Interface() could be *dynamicpb.Message or *gofeaturespb.GoFeatures.
+	fields := gf.Descriptor().Fields()
+
+	if fd := fields.ByNumber(genid.GoFeatures_LegacyUnmarshalJsonEnum_field_number); fd != nil &&
+		!fd.IsList() &&
+		fd.Kind() == protoreflect.BoolKind &&
+		gf.Has(fd) {
+		parentFS.GenerateLegacyUnmarshalJSON = gf.Get(fd).Bool()
+	}
+
+	if fd := fields.ByNumber(genid.GoFeatures_StripEnumPrefix_field_number); fd != nil &&
+		!fd.IsList() &&
+		fd.Kind() == protoreflect.EnumKind &&
+		gf.Has(fd) {
+		parentFS.StripEnumPrefix = int(gf.Get(fd).Enum())
+	}
+
+	if fd := fields.ByNumber(genid.GoFeatures_ApiLevel_field_number); fd != nil &&
+		!fd.IsList() &&
+		fd.Kind() == protoreflect.EnumKind &&
+		gf.Has(fd) {
+		parentFS.APILevel = int(gf.Get(fd).Enum())
 	}
 
 	return parentFS

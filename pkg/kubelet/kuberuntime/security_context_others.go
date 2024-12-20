@@ -20,15 +20,19 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
+	"math"
+	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // verifyRunAsNonRoot verifies RunAsNonRoot.
-func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, username string) error {
+func verifyRunAsNonRoot(ctx context.Context, pod *v1.Pod, container *v1.Container, uid *int64, username string) error {
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	// If the option is not set, or if running as root is allowed, return nil.
 	if effectiveSc == nil || effectiveSc.RunAsNonRoot == nil || !*effectiveSc.RunAsNonRoot {
@@ -43,10 +47,23 @@ func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, userna
 	}
 
 	switch {
-	case uid != nil && *uid == 0:
-		return fmt.Errorf("container has runAsNonRoot and image will run as root (pod: %q, container: %s)", format.Pod(pod), container.Name)
 	case uid == nil && len(username) > 0:
 		return fmt.Errorf("container has runAsNonRoot and image has non-numeric user (%s), cannot verify user is non-root (pod: %q, container: %s)", username, format.Pod(pod), container.Name)
+	case uid != nil:
+		if *uid == 0 {
+			return fmt.Errorf("container has runAsNonRoot and image will run as root (pod: %q, container: %s)", format.Pod(pod), container.Name)
+		}
+		if errs := validation.IsValidUserID(*uid); len(errs) > 0 {
+			return fmt.Errorf(
+				"container has runAsNonRoot and image has an invalid user id (%d). (Must be 1-(%d)): %s (pod: %q, container: %s)",
+				*uid,
+				math.MaxInt32,
+				strings.Join(errs, "; "),
+				format.Pod(pod),
+				container.Name,
+			)
+		}
+		return nil
 	default:
 		return nil
 	}

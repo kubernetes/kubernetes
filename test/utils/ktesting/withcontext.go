@@ -29,9 +29,6 @@ import (
 // context.
 func WithCancel(tCtx TContext) TContext {
 	ctx, cancel := context.WithCancelCause(tCtx)
-	tCtx.Cleanup(func() {
-		cancel(cleanupErr(tCtx.Name()))
-	})
 
 	return withContext{
 		TContext: tCtx,
@@ -44,6 +41,13 @@ func WithCancel(tCtx TContext) TContext {
 			cancel(cancelCause)
 		},
 	}
+}
+
+// WithoutCancel causes the returned context to ignore cancellation of its parent.
+func WithoutCancel(tCtx TContext) TContext {
+	tCtx.Helper()
+	ctx := context.WithoutCancel(tCtx)
+	return WithContext(tCtx, ctx)
 }
 
 // WithTimeout sets up new context with a timeout. Canceling the timeout gets
@@ -100,6 +104,10 @@ func (wCtx withContext) Expect(actual interface{}, extra ...interface{}) gomega.
 func (wCtx withContext) ExpectNoError(err error, explain ...interface{}) {
 	wCtx.Helper()
 	expectNoError(wCtx, err, explain...)
+}
+
+func (cCtx withContext) Run(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, cb)
 }
 
 func (wCtx withContext) Logger() klog.Logger {

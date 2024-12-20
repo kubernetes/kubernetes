@@ -70,6 +70,12 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageRepository != "" {
 		etcdImageRepository = cfg.Etcd.Local.ImageRepository
 	}
+	etcdImageTag := GetEtcdImageTag(cfg)
+	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
+}
+
+// GetEtcdImageTag generates and returns the image tag for etcd
+func GetEtcdImageTag(cfg *kubeadmapi.ClusterConfiguration) string {
 	// Etcd uses an imageTag that corresponds to the etcd version matching the Kubernetes version
 	etcdImageTag := constants.DefaultEtcdVersion
 	etcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
@@ -83,7 +89,7 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {
 		etcdImageTag = cfg.Etcd.Local.ImageTag
 	}
-	return GetGenericImage(etcdImageRepository, constants.Etcd, etcdImageTag)
+	return etcdImageTag
 }
 
 // GetControlPlaneImages returns a list of container images kubeadm expects to use on a control plane node

@@ -17,10 +17,10 @@ limitations under the License.
 package runtime
 
 import (
-	"errors"
 	"net"
 	"os"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,6 +28,7 @@ import (
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var errTest = errors.New("test")
@@ -447,12 +448,7 @@ func TestDetectCRISocketImpl(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			socket, err := detectCRISocketImpl(func(path string) bool {
-				for _, existing := range test.existingSockets {
-					if path == existing {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(test.existingSockets, path)
 			}, test.existingSockets)
 
 			if (err != nil) != test.expectedError {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
@@ -81,9 +80,6 @@ func (h *Handle) addrHandle(link Link, addr *Addr, req *nl.NetlinkRequest) error
 		msg.Index = uint32(addr.LinkIndex)
 	} else {
 		base := link.Attrs()
-		if addr.Label != "" && !strings.HasPrefix(addr.Label, base.Name) {
-			return fmt.Errorf("label must begin with interface name")
-		}
 		h.ensureIndex(base)
 		msg.Index = uint32(base.Index)
 	}

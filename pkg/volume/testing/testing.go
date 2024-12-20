@@ -191,6 +191,7 @@ type FakeVolumePlugin struct {
 	SupportsSELinux        bool
 	DisableNodeExpansion   bool
 	CanSupportFn           func(*volume.Spec) bool
+	VerifyExhaustedEnabled bool
 
 	// default to false which means it is attachable by default
 	NonAttachable bool
@@ -437,6 +438,10 @@ func (plugin *FakeVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	return !plugin.NonAttachable, nil
 }
 
+func (plugin *FakeVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return plugin.VerifyExhaustedEnabled
+}
+
 func (plugin *FakeVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
 	return true, nil
 }
@@ -615,6 +620,10 @@ func (f *FakeAttachableVolumePlugin) NewDetacher() (volume.Detacher, error) {
 
 func (f *FakeAttachableVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
 	return true, nil
+}
+
+func (f *FakeAttachableVolumePlugin) VerifyExhaustedResource(spec *volume.Spec) bool {
+	return false
 }
 
 var _ volume.VolumePlugin = &FakeAttachableVolumePlugin{}

@@ -25,20 +25,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// providerRequiresNetworkingConfiguration returns whether the cloud provider
-// requires special networking configuration.
-func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
-	// TODO: We should have a mechanism to say whether native cloud provider
-	// is used or whether we are using overlay networking. We should return
-	// true for cloud providers if they implement Routes() interface and
-	// we are not using overlay networking.
-	if kl.cloud == nil || kl.cloud.ProviderName() != "gce" {
-		return false
-	}
-	_, supported := kl.cloud.Routes()
-	return supported
-}
-
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
 // from the current CIDR. Return true if pod CIDR is actually changed.
 func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error) {
@@ -67,5 +53,7 @@ func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error)
 // This function is defined in kubecontainer.RuntimeHelper interface so we
 // have to implement it.
 func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
-	return kl.dnsConfigurer.GetPodDNS(pod)
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	return kl.dnsConfigurer.GetPodDNS(context.TODO(), pod)
 }

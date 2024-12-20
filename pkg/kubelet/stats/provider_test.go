@@ -26,18 +26,22 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
-	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -63,6 +67,7 @@ const (
 	offsetFsInodeUsage
 	offsetAcceleratorDutyCycle
 	offsetMemSwapUsageBytes
+	offsetPSIDataTotal
 )
 
 var (
@@ -78,9 +83,8 @@ func TestGetCgroupStats(t *testing.T) {
 	)
 
 	var (
-		mockCadvisor     = cadvisortest.NewMockInterface(t)
-		mockPodManager   = new(kubepodtest.MockManager)
-		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+		mockCadvisor   = cadvisortest.NewMockInterface(t)
+		mockPodManager = new(kubepodtest.MockManager)
 
 		assert  = assert.New(t)
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
@@ -91,7 +95,7 @@ func TestGetCgroupStats(t *testing.T) {
 
 	mockCadvisor.EXPECT().ContainerInfoV2(cgroupName, options).Return(containerInfoMap, nil)
 
-	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
+	provider := newStatsProvider(mockCadvisor, mockPodManager, fakeContainerStatsProvider{})
 	cs, ns, err := provider.GetCgroupStats(cgroupName, updateStats)
 	assert.NoError(err)
 
@@ -112,9 +116,8 @@ func TestGetCgroupCPUAndMemoryStats(t *testing.T) {
 	)
 
 	var (
-		mockCadvisor     = cadvisortest.NewMockInterface(t)
-		mockPodManager   = new(kubepodtest.MockManager)
-		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+		mockCadvisor   = cadvisortest.NewMockInterface(t)
+		mockPodManager = new(kubepodtest.MockManager)
 
 		assert  = assert.New(t)
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
@@ -125,7 +128,7 @@ func TestGetCgroupCPUAndMemoryStats(t *testing.T) {
 
 	mockCadvisor.EXPECT().ContainerInfoV2(cgroupName, options).Return(containerInfoMap, nil)
 
-	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
+	provider := newStatsProvider(mockCadvisor, mockPodManager, fakeContainerStatsProvider{})
 	cs, err := provider.GetCgroupCPUAndMemoryStats(cgroupName, updateStats)
 	assert.NoError(err)
 
@@ -143,9 +146,8 @@ func TestRootFsStats(t *testing.T) {
 	)
 
 	var (
-		mockCadvisor     = cadvisortest.NewMockInterface(t)
-		mockPodManager   = new(kubepodtest.MockManager)
-		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+		mockCadvisor   = cadvisortest.NewMockInterface(t)
+		mockPodManager = new(kubepodtest.MockManager)
 
 		assert  = assert.New(t)
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
@@ -158,7 +160,7 @@ func TestRootFsStats(t *testing.T) {
 	mockCadvisor.EXPECT().RootFsInfo().Return(rootFsInfo, nil)
 	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(containerInfoMap, nil)
 
-	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
+	provider := newStatsProvider(mockCadvisor, mockPodManager, fakeContainerStatsProvider{})
 	stats, err := provider.RootFsStats()
 	assert.NoError(err)
 
@@ -171,7 +173,7 @@ func TestRootFsStats(t *testing.T) {
 
 func TestHasDedicatedImageFs(t *testing.T) {
 	ctx := context.Background()
-	imageStatsExpected := &statsapi.FsStats{AvailableBytes: uint64Ptr(1)}
+	imageStatsExpected := &statsapi.FsStats{AvailableBytes: ptr.To[uint64](1)}
 
 	for desc, test := range map[string]struct {
 		rootfsDevice     string
@@ -197,18 +199,17 @@ func TestHasDedicatedImageFs(t *testing.T) {
 			rootfsDevice:     "root/device",
 			imagefsDevice:    "root/device",
 			dedicated:        true,
-			imageFsStats:     &statsapi.FsStats{AvailableBytes: uint64Ptr(1)},
-			containerFsStats: &statsapi.FsStats{AvailableBytes: uint64Ptr(2)},
+			imageFsStats:     &statsapi.FsStats{AvailableBytes: ptr.To[uint64](1)},
+			containerFsStats: &statsapi.FsStats{AvailableBytes: ptr.To[uint64](2)},
 		},
 	} {
 		t.Logf("TestCase %q", desc)
 		var (
-			mockCadvisor     = cadvisortest.NewMockInterface(t)
-			mockPodManager   = new(kubepodtest.MockManager)
-			mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+			mockCadvisor   = cadvisortest.NewMockInterface(t)
+			mockPodManager = new(kubepodtest.MockManager)
 		)
 		mockCadvisor.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{Device: test.rootfsDevice}, nil)
-		provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{
+		provider := newStatsProvider(mockCadvisor, mockPodManager, fakeContainerStatsProvider{
 			device:      test.imagefsDevice,
 			imageFs:     test.imageFsStats,
 			containerFs: test.containerFsStats,
@@ -265,6 +266,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 		CreationTime: testTime(creationTime, seed),
 		HasCpu:       true,
 		HasMemory:    true,
+		HasDiskIo:    true,
 		HasNetwork:   true,
 		Labels:       labels,
 		Memory: cadvisorapiv2.MemorySpec{
@@ -280,8 +282,10 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 
 	stats := cadvisorapiv2.ContainerStats{
 		Timestamp: testTime(timestamp, seed),
-		Cpu:       &cadvisorapiv1.CpuStats{},
-		CpuInst:   &cadvisorapiv2.CpuInstStats{},
+		Cpu: &cadvisorapiv1.CpuStats{
+			PSI: getTestPSIStats(seed),
+		},
+		CpuInst: &cadvisorapiv2.CpuInstStats{},
 		Memory: &cadvisorapiv1.MemoryStats{
 			Usage:      uint64(seed + offsetMemUsageBytes),
 			WorkingSet: uint64(seed + offsetMemWorkingSetBytes),
@@ -291,6 +295,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
 			},
 			Swap: uint64(seed + offsetMemSwapUsageBytes),
+			PSI:  getTestPSIStats(seed),
 		},
 		Network: &cadvisorapiv2.NetworkStats{
 			Interfaces: []cadvisorapiv1.InterfaceStats{{
@@ -323,12 +328,31 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				DutyCycle:   uint64(seed + offsetAcceleratorDutyCycle),
 			},
 		},
+		DiskIo: &cadvisorapiv1.DiskIoStats{
+			PSI: getTestPSIStats(seed),
+		},
 	}
 	stats.Cpu.Usage.Total = uint64(seed + offsetCPUUsageCoreSeconds)
 	stats.CpuInst.Usage.Total = uint64(seed + offsetCPUUsageCores)
 	return cadvisorapiv2.ContainerInfo{
 		Spec:  spec,
 		Stats: []*cadvisorapiv2.ContainerStats{&stats},
+	}
+}
+
+func getTestPSIStats(seed int) cadvisorapiv1.PSIStats {
+	return cadvisorapiv1.PSIStats{
+		Full: getTestPSIData(seed),
+		Some: getTestPSIData(seed),
+	}
+}
+
+func getTestPSIData(seed int) cadvisorapiv1.PSIData {
+	return cadvisorapiv1.PSIData{
+		Total:  uint64(seed + offsetPSIDataTotal),
+		Avg10:  float64(10),
+		Avg60:  float64(10),
+		Avg300: float64(10),
 	}
 }
 
@@ -389,9 +413,9 @@ func getPodVolumeStats(seed int, volumeName string) statsapi.VolumeStats {
 }
 
 func generateCustomMetricSpec() []cadvisorapiv1.MetricSpec {
-	f := fuzz.New().NilChance(0).Funcs(
-		func(e *cadvisorapiv1.MetricSpec, c fuzz.Continue) {
-			c.Fuzz(&e.Name)
+	f := randfill.New().NilChance(0).Funcs(
+		func(e *cadvisorapiv1.MetricSpec, c randfill.Continue) {
+			c.Fill(&e.Name)
 			switch c.Intn(3) {
 			case 0:
 				e.Type = cadvisorapiv1.MetricGauge
@@ -406,28 +430,28 @@ func generateCustomMetricSpec() []cadvisorapiv1.MetricSpec {
 			case 1:
 				e.Format = cadvisorapiv1.FloatType
 			}
-			c.Fuzz(&e.Units)
+			c.Fill(&e.Units)
 		})
 	var ret []cadvisorapiv1.MetricSpec
-	f.Fuzz(&ret)
+	f.Fill(&ret)
 	return ret
 }
 
 func generateCustomMetrics(spec []cadvisorapiv1.MetricSpec) map[string][]cadvisorapiv1.MetricVal {
 	ret := map[string][]cadvisorapiv1.MetricVal{}
 	for _, metricSpec := range spec {
-		f := fuzz.New().NilChance(0).Funcs(
-			func(e *cadvisorapiv1.MetricVal, c fuzz.Continue) {
+		f := randfill.New().NilChance(0).Funcs(
+			func(e *cadvisorapiv1.MetricVal, c randfill.Continue) {
 				switch metricSpec.Format {
 				case cadvisorapiv1.IntType:
-					c.Fuzz(&e.IntValue)
+					c.Fill(&e.IntValue)
 				case cadvisorapiv1.FloatType:
-					c.Fuzz(&e.FloatValue)
+					c.Fill(&e.FloatValue)
 				}
 			})
 
 		var metrics []cadvisorapiv1.MetricVal
-		f.Fuzz(&metrics)
+		f.Fill(&metrics)
 		ret[metricSpec.Name] = metrics
 	}
 	return ret
@@ -469,6 +493,7 @@ func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStat
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
 	assert.EqualValues(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
 	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
+	checkPSIStats(t, label+".CPU", seed, stats.PSI)
 }
 
 func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.MemoryStats) {
@@ -483,6 +508,28 @@ func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.C
 	} else {
 		expected := info.Spec.Memory.Limit - *stats.WorkingSetBytes
 		assert.EqualValues(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
+	}
+	checkPSIStats(t, label+".Mem", seed, stats.PSI)
+}
+
+func checkIOStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.IOStats) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
+		checkPSIStats(t, label+".IO", seed, stats.PSI)
+	}
+}
+
+func checkPSIStats(t *testing.T, label string, seed int, stats *statsapi.PSIStats) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		require.NotNil(t, stats, label+".PSI")
+		assert.EqualValues(t, seed+offsetPSIDataTotal, stats.Full.Total, label+".PSI.Full.Total")
+		assert.InDelta(t, 10, stats.Full.Avg10, 0.01, label+".PSI.Full.Avg10")
+		assert.InDelta(t, 10, stats.Full.Avg60, 0.01, label+".PSI.Full.Avg60")
+		assert.InDelta(t, 10, stats.Full.Avg300, 0.01, label+".PSI.Full.Avg300")
+		assert.EqualValues(t, seed+offsetPSIDataTotal, stats.Some.Total, label+".PSI.Some.Total")
+		assert.InDelta(t, 10, stats.Some.Avg10, 0.01, label+".PSI.Some.Avg10")
+		assert.InDelta(t, 10, stats.Some.Avg60, 0.01, label+".PSI.Some.Avg60")
+		assert.InDelta(t, 10, stats.Some.Avg300, 0.01, label+".PSI.Some.Avg300")
 	}
 }
 
@@ -582,6 +629,7 @@ type fakeContainerStatsProvider struct {
 	device      string
 	imageFs     *statsapi.FsStats
 	containerFs *statsapi.FsStats
+	podStats    *statsapi.PodStats
 }
 
 func (p fakeContainerStatsProvider) ListPodStats(context.Context) ([]statsapi.PodStats, error) {
@@ -590,6 +638,13 @@ func (p fakeContainerStatsProvider) ListPodStats(context.Context) ([]statsapi.Po
 
 func (p fakeContainerStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage(context.Context) ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (p fakeContainerStatsProvider) PodCPUAndMemoryStats(context.Context, *v1.Pod, *kubecontainer.PodStatus) (*statsapi.PodStats, error) {
+	if p.podStats != nil {
+		return p.podStats, nil
+	}
+	return nil, fmt.Errorf("no podStats set")
 }
 
 func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats(context.Context) ([]statsapi.PodStats, error) {

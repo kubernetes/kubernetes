@@ -38,6 +38,7 @@ import (
 	stats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 var zero time.Time
@@ -626,8 +627,8 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 
 	// Expect 40% usage.
 	imageStats := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(600),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(600)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageStats, imageStats, nil)
 
@@ -659,8 +660,8 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 
 	// Expect 95% usage and most of it gets freed.
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(50),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(50)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
 	fakeRuntime.ImageList = []container.Image{
@@ -681,8 +682,8 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 
 	// Expect 95% usage and little of it gets freed.
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(50),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(50)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
 	fakeRuntime.ImageList = []container.Image{
@@ -739,7 +740,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 func getImagesAndFreeSpace(ctx context.Context, t *testing.T, assert *assert.Assertions, im *realImageGCManager, fakeRuntime *containertest.FakeRuntime, spaceToFree, expectedSpaceFreed int64, imagesLen int, freeTime time.Time) {
 	images, err := im.imagesInEvictionOrder(ctx, freeTime)
 	require.NoError(t, err)
-	spaceFreed, err := im.freeSpace(ctx, spaceToFree, freeTime, images)
+	_, spaceFreed, err := im.freeSpace(ctx, spaceToFree, freeTime, images)
 	require.NoError(t, err)
 	assert.EqualValues(expectedSpaceFreed, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, imagesLen)
@@ -909,14 +910,10 @@ func TestValidateImageGCPolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if _, err := NewImageGCManager(nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider()); err != nil {
+		if _, err := NewImageGCManager(nil, nil, nil, nil, nil, tc.imageGCPolicy, noopoteltrace.NewTracerProvider()); err != nil {
 			if err.Error() != tc.expectErr {
 				t.Errorf("[%s:]Expected err:%v, but got:%v", tc.name, tc.expectErr, err.Error())
 			}
 		}
 	}
-}
-
-func uint64Ptr(i uint64) *uint64 {
-	return &i
 }

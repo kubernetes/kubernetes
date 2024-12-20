@@ -59,7 +59,7 @@ type makeEndpointFunc func(info *BaseEndpointInfo, svcPortName *ServicePortName)
 type processEndpointsMapChangeFunc func(oldEndpointsMap, newEndpointsMap EndpointsMap)
 
 // NewEndpointsChangeTracker initializes an EndpointsChangeTracker
-func NewEndpointsChangeTracker(ipFamily v1.IPFamily, hostname string, makeEndpointInfo makeEndpointFunc, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
+func NewEndpointsChangeTracker(ipFamily v1.IPFamily, nodeName string, makeEndpointInfo makeEndpointFunc, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointsChangeTracker {
 	addressType := discovery.AddressTypeIPv4
 	if ipFamily == v1.IPv6Protocol {
 		addressType = discovery.AddressTypeIPv6
@@ -70,7 +70,7 @@ func NewEndpointsChangeTracker(ipFamily v1.IPFamily, hostname string, makeEndpoi
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 		trackerStartTime:          time.Now(),
 		processEndpointsMapChange: processEndpointsMapChange,
-		endpointSliceCache:        NewEndpointSliceCache(hostname, makeEndpointInfo),
+		endpointSliceCache:        NewEndpointSliceCache(nodeName, makeEndpointInfo),
 	}
 }
 

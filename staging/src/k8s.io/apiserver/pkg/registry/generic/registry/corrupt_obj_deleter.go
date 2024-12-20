@@ -107,8 +107,14 @@ func (d *corruptObjectDeleter) Delete(ctx context.Context, name string, deleteVa
 	klog.FromContext(ctx).V(1).Info("Going to perform unsafe object deletion", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
 	out := d.store.NewFunc()
 	storageOpts := storage.DeleteOptions{IgnoreStoreReadError: true}
-	// dropping preconditions, and keeping the admission
-	if err := storageBackend.Delete(ctx, key, out, nil, storage.ValidateObjectFunc(deleteValidation), nil, storageOpts); err != nil {
+	// we don't have the old object in the cache, neither can it be
+	// retrieved from the storage and decoded into an object
+	// successfully, so we do the following:
+	//  a) skip preconditions check
+	//  b) skip admission validation, rest.ValidateAllObjectFunc will "admit everything"
+	var nilPreconditions *storage.Preconditions = nil
+	var nilCachedExistingObject runtime.Object = nil
+	if err := storageBackend.Delete(ctx, key, out, nilPreconditions, rest.ValidateAllObjectFunc, nilCachedExistingObject, storageOpts); err != nil {
 		if storage.IsNotFound(err) {
 			// the DELETE succeeded, but we don't have the object since it's
 			// not retrievable from the storage, so we send a nil object

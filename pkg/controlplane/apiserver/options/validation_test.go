@@ -26,7 +26,6 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
-	"k8s.io/component-base/featuregate"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -165,34 +164,6 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 	}
 }
 
-func TestValidateUnknownVersionInteroperabilityProxyFeature(t *testing.T) {
-	const conflict = "UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled"
-	tests := []struct {
-		name            string
-		featuresEnabled []featuregate.Feature
-	}{
-		{
-			name:            "enabled: UnknownVersionInteroperabilityProxy, disabled: StorageVersionAPI",
-			featuresEnabled: []featuregate.Feature{features.UnknownVersionInteroperabilityProxy},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			for _, feature := range test.featuresEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)
-			}
-			var errMessageGot string
-			if errs := validateUnknownVersionInteroperabilityProxyFeature(); len(errs) > 0 {
-				errMessageGot = errs[0].Error()
-			}
-			if !strings.Contains(errMessageGot, conflict) {
-				t.Errorf("Expected error message to contain: %q, but got: %q", conflict, errMessageGot)
-			}
-		})
-	}
-}
-
 func TestValidateOptions(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -266,7 +237,7 @@ func TestValidateOptions(t *testing.T) {
 	}
 }
 
-func TestValidateServcieAccountTokenSigningConfig(t *testing.T) {
+func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 	tests := []struct {
 		name           string
 		featureEnabled bool
@@ -332,11 +303,9 @@ func TestValidateServcieAccountTokenSigningConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "invalid external signer endpoint provided - 1",
+			name:           "relative external signer endpoint provided",
 			featureEnabled: true,
-			expectedErrors: []error{
-				fmt.Errorf("invalid value \"abc\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
-			},
+			expectedErrors: []error{},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "abc",
 			},
@@ -345,7 +314,7 @@ func TestValidateServcieAccountTokenSigningConfig(t *testing.T) {
 			name:           "invalid external signer endpoint provided - 2",
 			featureEnabled: true,
 			expectedErrors: []error{
-				fmt.Errorf("invalid value \"@abc@\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
+				fmt.Errorf("invalid value \"@abc@\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "@abc@",
@@ -355,30 +324,10 @@ func TestValidateServcieAccountTokenSigningConfig(t *testing.T) {
 			name:           "invalid external signer endpoint provided - 3",
 			featureEnabled: true,
 			expectedErrors: []error{
-				fmt.Errorf("invalid value \"@abc.abc  .ae\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
+				fmt.Errorf("invalid value \"@abc.abc  .ae\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "@abc.abc  .ae",
-			},
-		},
-		{
-			name:           "invalid external signer endpoint provided - 4",
-			featureEnabled: true,
-			expectedErrors: []error{
-				fmt.Errorf("invalid value \"/@e_adnb/xyz /efg\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
-			},
-			options: &Options{
-				ServiceAccountSigningEndpoint: "/@e_adnb/xyz /efg",
-			},
-		},
-		{
-			name:           "invalid external signer endpoint provided - 5",
-			featureEnabled: true,
-			expectedErrors: []error{
-				fmt.Errorf("invalid value \"/e /xyz /efg\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
-			},
-			options: &Options{
-				ServiceAccountSigningEndpoint: "/e /xyz /efg",
 			},
 		},
 		{
@@ -411,10 +360,10 @@ func TestValidateServcieAccountTokenSigningConfig(t *testing.T) {
 			expectedErrors: []error{
 				fmt.Errorf("can't set `--service-account-signing-key-file` and/or `--service-account-key-file` with `--service-account-signing-endpoint` (They are mutually exclusive)"),
 				fmt.Errorf("setting `--service-account-signing-endpoint` requires enabling ExternalServiceAccountTokenSigner feature gate"),
-				fmt.Errorf("invalid value \"/e /xyz /efg\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
+				fmt.Errorf("invalid value \"@a@\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
 			options: &Options{
-				ServiceAccountSigningEndpoint: "/e /xyz /efg",
+				ServiceAccountSigningEndpoint: "@a@",
 				ServiceAccountSigningKeyFile:  "/abc/efg",
 				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
 					ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
@@ -438,12 +387,75 @@ func TestValidateServcieAccountTokenSigningConfig(t *testing.T) {
 				}
 			}
 
-			if test.featureEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, test.featureEnabled)
 			errs := validateServiceAccountTokenSigningConfig(test.options)
 			if !reflect.DeepEqual(errs, test.expectedErrors) {
 				t.Errorf("Expected errors message: %v \n but got: %v", test.expectedErrors, errs)
+			}
+		})
+	}
+}
+
+func TestValidateCoordinatedLeadershipFlags(t *testing.T) {
+	tests := []struct {
+		name           string
+		options        *Options
+		expectedErrors map[string]bool
+	}{
+		{
+			name: "no errors",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 10,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   2,
+			},
+		},
+		{
+			name: "invalid lease duration",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 5,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   2,
+			},
+			expectedErrors: map[string]bool{
+				"--coordinated-leadership-lease-duration must be greater than --coordinated-leadership-renew-deadline": true,
+			},
+		},
+		{
+			name: "invalid retry period",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 10,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   5,
+			},
+			expectedErrors: map[string]bool{
+				"--coordinated-leadership-renew-deadline must be greater than --coordinated-leadership-retry-period": true,
+			},
+		},
+		{
+			name: "all errors",
+			options: &Options{
+				CoordinatedLeadershipLeaseDuration: 5,
+				CoordinatedLeadershipRenewDeadline: 5,
+				CoordinatedLeadershipRetryPeriod:   5,
+			},
+			expectedErrors: map[string]bool{
+				"--coordinated-leadership-lease-duration must be greater than --coordinated-leadership-renew-deadline": true,
+				"--coordinated-leadership-renew-deadline must be greater than --coordinated-leadership-retry-period":   true,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			errs := validateCoordinatedLeadershipFlags(test.options)
+			if len(errs) != len(test.expectedErrors) {
+				t.Errorf("Expected %d errors, but got %d", len(test.expectedErrors), len(errs))
+			}
+			for _, err := range errs {
+				if _, ok := test.expectedErrors[err.Error()]; !ok {
+					t.Errorf("Unexpected error: %v", err)
+				}
 			}
 		})
 	}

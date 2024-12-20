@@ -24,6 +24,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -169,6 +171,10 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 
 // SetUp creates new directory and clones a git repo.
 func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GitRepoVolumeDriver) {
+		return fmt.Errorf("git-repo volume plugin has been disabled; if necessary, it may be re-enabled by enabling the feature-gate `GitRepoVolumeDriver`")
+	}
+
 	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
@@ -229,8 +235,9 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
-	volume.SetVolumeOwnership(b, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
-
+	ownershipChanger := volume.NewVolumeOwnership(b, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
+	// We do not care about return value, this plugin is deprecated
+	_ = ownershipChanger.ChangePermissions()
 	volumeutil.SetReady(b.getMetaDir())
 	return nil
 }

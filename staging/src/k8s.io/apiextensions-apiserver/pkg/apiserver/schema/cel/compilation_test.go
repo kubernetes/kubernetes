@@ -1872,6 +1872,18 @@ func TestCostEstimation(t *testing.T) {
 			setMaxElements:   1000,
 			expectedSetCost:  401,
 		},
+		{
+			name: "IntOrString type with quantity rule",
+			schemaGenerator: func(max *int64) *schema.Structural {
+				intOrString := intOrStringType()
+				intOrString = withRule(intOrString, "isQuantity(self)")
+				intOrString = withMaxLength(intOrString, max)
+				return &intOrString
+			},
+			expectedCalcCost: 314574,
+			setMaxElements:   20,
+			expectedSetCost:  9,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

@@ -21,8 +21,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
@@ -30,9 +28,9 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -41,10 +39,7 @@ func NewWaitControlPlanePhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "wait-control-plane",
 		Short: "Wait for the control plane to start",
-		// TODO: unhide this phase once WaitForAllControlPlaneComponents goes GA:
-		// https://github.com/kubernetes/kubeadm/issues/2907
-		Hidden: true,
-		Run:    runWaitControlPlanePhase,
+		Run:   runWaitControlPlanePhase,
 	}
 	return phase
 }
@@ -91,15 +86,11 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 
 	var podMap map[string]*v1.Pod
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
-	if features.Enabled(data.Cfg().ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
-		podMap, err = staticpodutil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
-			constants.ControlPlaneComponents...)
-		if err == nil {
-			err = waiter.WaitForControlPlaneComponents(podMap,
-				data.Cfg().LocalAPIEndpoint.AdvertiseAddress)
-		}
-	} else {
-		err = waiter.WaitForAPI()
+	podMap, err = staticpodutil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
+		constants.ControlPlaneComponents...)
+	if err == nil {
+		err = waiter.WaitForControlPlaneComponents(podMap,
+			data.Cfg().LocalAPIEndpoint.AdvertiseAddress)
 	}
 	if err != nil {
 		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)

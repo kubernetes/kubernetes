@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 type MicroTimeHolder struct {
@@ -378,10 +378,10 @@ func TestMicroTimeProtoUnmarshalRaw(t *testing.T) {
 }
 
 func TestMicroTimeRoundtripCBOR(t *testing.T) {
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	for i := 0; i < 500; i++ {
 		var initial, final MicroTime
-		fuzzer.Fuzz(&initial)
+		fuzzer.Fill(&initial)
 		b, err := cbor.Marshal(initial)
 		if err != nil {
 			t.Errorf("error encoding %v: %v", initial, err)

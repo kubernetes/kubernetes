@@ -17,13 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"runtime"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	"k8s.io/kubernetes/pkg/volume"
@@ -83,10 +83,10 @@ func NewInitializedVolumePluginMgr(
 		configMapManager:          configMapManager,
 		tokenManager:              tokenManager,
 		clusterTrustBundleManager: clusterTrustBundleManager,
+		podCertificateManager:     kubelet.podCertificateManager,
 		informerFactory:           informerFactory,
 		csiDriverLister:           csiDriverLister,
 		csiDriversSynced:          csiDriversSynced,
-		exec:                      utilexec.New(),
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -113,10 +113,10 @@ type kubeletVolumeHost struct {
 	tokenManager              *token.Manager
 	configMapManager          configmap.Manager
 	clusterTrustBundleManager clustertrustbundle.Manager
+	podCertificateManager     podcertificate.Manager
 	informerFactory           informers.SharedInformerFactory
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriversSynced          cache.InformerSynced
-	exec                      utilexec.Interface
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -215,20 +215,12 @@ func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Sp
 	return plugin.NewUnmounter(spec.Name(), podUID)
 }
 
-func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
+func (kvh *kubeletVolumeHost) GetMounter() mount.Interface {
 	return kvh.kubelet.mounter
 }
 
 func (kvh *kubeletVolumeHost) GetHostName() string {
 	return kvh.kubelet.hostname
-}
-
-func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
-	hostIPs, err := kvh.kubelet.GetHostIPs()
-	if err != nil {
-		return nil, err
-	}
-	return hostIPs[0], err
 }
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
@@ -273,6 +265,10 @@ func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSe
 	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
 }
 
+func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return kvh.podCertificateManager.GetPodCertificateCredentialBundle(ctx, namespace, podName, podUID, volumeName, sourceIndex)
+}
+
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	node, err := kvh.kubelet.GetNode()
 	if err != nil {
@@ -301,8 +297,4 @@ func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 
 func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
 	return kvh.kubelet.recorder
-}
-
-func (kvh *kubeletVolumeHost) GetExec(pluginName string) utilexec.Interface {
-	return kvh.exec
 }

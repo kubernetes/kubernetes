@@ -69,6 +69,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-base/zpages/statusz"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-client/pkg/util"
@@ -117,6 +118,7 @@ const (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
+	flagz                flagz.Reader
 	auth                 AuthInterface
 	host                 HostInterface
 	restfulCont          containerInterface
@@ -167,6 +169,7 @@ func ListenAndServeKubeletServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
+	flagz flagz.Reader,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tlsOptions *TLSOptions,
 	auth AuthInterface,
@@ -175,11 +178,8 @@ func ListenAndServeKubeletServer(
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, checkers, auth, kubeCfg)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		handler.InstallTracingFilter(tp)
-	}
+	handler := NewServer(host, resourceAnalyzer, checkers, flagz, auth, kubeCfg)
+	handler.InstallTracingFilter(tp)
 
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -210,15 +210,13 @@ func ListenAndServeKubeletReadOnlyServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
+	flagz flagz.Reader,
 	address net.IP,
 	port uint,
 	tp oteltrace.TracerProvider) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, checkers, nil, nil)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
-	}
+	s := NewServer(host, resourceAnalyzer, checkers, nil, nil, nil)
+	s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
@@ -236,11 +234,11 @@ func ListenAndServeKubeletReadOnlyServer(
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(endpoint string, providers podresources.PodResourcesProviders) {
-	server := grpc.NewServer(apisgrpc.WithRateLimiter("podresources", podresources.DefaultQPS, podresources.DefaultBurstTokens))
+func ListenAndServePodResources(ctx context.Context, endpoint string, providers podresources.PodResourcesProviders) {
+	server := grpc.NewServer(apisgrpc.WithRateLimiter(ctx, "podresources", podresources.DefaultQPS, podresources.DefaultBurstTokens))
 
 	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(providers))
-	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(providers))
+	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(ctx, providers))
 
 	l, err := util.CreateListener(endpoint)
 	if err != nil {
@@ -277,7 +275,6 @@ type HostInterface interface {
 	CheckpointContainer(ctx context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
-	GetHostname() string
 	SyncLoopHealthCheck(req *http.Request) error
 	GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
@@ -291,10 +288,12 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
+	flagz flagz.Reader,
 	auth AuthInterface,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 
 	server := Server{
+		flagz:                flagz,
 		host:                 host,
 		resourceAnalyzer:     resourceAnalyzer,
 		auth:                 auth,
@@ -306,9 +305,10 @@ func NewServer(
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	server.InstallDefaultHandlers()
+	server.InstallAuthNotRequiredHandlers()
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
-		server.InstallDebuggingHandlers()
+		klog.InfoS("Adding debug handlers to kubelet server")
+		server.InstallAuthRequiredHandlers()
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
 		server.InstallSystemLogHandler(kubeCfg.EnableSystemLogHandler, kubeCfg.EnableSystemLogQuery)
@@ -402,9 +402,11 @@ func (s *Server) getMetricMethodBucket(method string) string {
 	return "other"
 }
 
-// InstallDefaultHandlers registers the default set of supported HTTP request
-// patterns with the restful Container.
-func (s *Server) InstallDefaultHandlers() {
+// InstallAuthNotRequiredHandlers registers request handlers that do not require authorization, which are
+// installed on both the unsecured and secured (TLS) servers.
+// NOTE: This method is maintained for backwards compatibility, but no new endpoints should be added
+// to this set. New handlers should be added under InstallAuthorizedHandlers.
+func (s *Server) InstallAuthNotRequiredHandlers() {
 	s.addMetricsBucketMatcher("healthz")
 	checkers := []healthz.HealthChecker{
 		healthz.PingHealthz,
@@ -446,6 +448,11 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.ProcessMetrics:      struct{}{},
 		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+	}
+
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
@@ -480,12 +487,15 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Handle(proberMetricsPath,
 		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
+
+	// DO NOT ADD NEW HANDLERS HERE!
+	// See note in method comment.
 }
 
-// InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
-func (s *Server) InstallDebuggingHandlers() {
-	klog.InfoS("Adding debug handlers to kubelet server")
-
+// InstallAuthRequiredHandlers registers the HTTP handlers that should only be installed on servers
+// with authorization enabled.
+// NOTE: New endpoints must require authorization.
+func (s *Server) InstallAuthRequiredHandlers() {
 	s.addMetricsBucketMatcher("run")
 	ws := new(restful.WebService)
 	ws.
@@ -567,6 +577,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
 		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.flagz != nil {
+			s.addMetricsBucketMatcher("flagz")
+			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
+		}
 	}
 
 	// The /runningpods endpoint is used for testing only.

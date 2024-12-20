@@ -283,6 +283,29 @@ var (
 		"Number of packets accepted on nodeports of loopback interface",
 		nil, nil, metrics.ALPHA, "")
 	LocalhostNodePortAcceptedNFAcctCounter = "localhost_nps_accepted_pkts"
+
+	// ReconcileConntrackFlowsLatency is the latency of one round of kube-proxy conntrack flows reconciliation.
+	ReconcileConntrackFlowsLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "conntrack_reconciler_sync_duration_seconds",
+			Help:           "ReconcileConntrackFlowsLatency latency in seconds",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
+
+	// ReconcileConntrackFlowsDeletedEntriesTotal is the number of entries deleted by conntrack reconciler.
+	ReconcileConntrackFlowsDeletedEntriesTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "conntrack_reconciler_deleted_entries_total",
+			Help:           "Cumulative conntrack flows deleted by conntrack reconciler",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"ip_family"},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -321,15 +344,21 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(IPTablesPartialRestoreFailuresTotal)
 			legacyregistry.MustRegister(IPTablesRulesTotal)
 			legacyregistry.MustRegister(IPTablesRulesLastSync)
+			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
+			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeIPVS:
 			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
+			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
+			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeNFTables:
 			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
 			legacyregistry.MustRegister(SyncPartialProxyRulesLatency)
 			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
 			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
+			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
+			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeKernelspace:
 			// currently no winkernel-specific metrics

@@ -83,6 +83,25 @@ const (
 	StaticMemoryManagerPolicy = "Static"
 )
 
+// ImagePullCredentialsVerificationPolicy is an enum for the policy that is enforced
+// when pod is requesting an image that appears on the system
+type ImagePullCredentialsVerificationPolicy string
+
+const (
+	// NeverVerify will never require credential verification for images that
+	// already exist on the node
+	NeverVerify ImagePullCredentialsVerificationPolicy = "NeverVerify"
+	// NeverVerifyPreloadedImages does not require credential verification for images
+	// pulled outside the kubelet process
+	NeverVerifyPreloadedImages ImagePullCredentialsVerificationPolicy = "NeverVerifyPreloadedImages"
+	// NeverVerifyAllowlistedImages does not require credential verification for
+	// a list of images that were pulled outside the kubelet process
+	NeverVerifyAllowlistedImages ImagePullCredentialsVerificationPolicy = "NeverVerifyAllowlistedImages"
+	// AlwaysVerify requires credential verification for accessing any image on the
+	// node irregardless how it was pulled
+	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
@@ -210,6 +229,28 @@ type KubeletConfiguration struct {
 	// Default: 10
 	// +optional
 	RegistryBurst int32 `json:"registryBurst,omitempty"`
+	// imagePullCredentialsVerificationPolicy determines how credentials should be
+	// verified when pod requests an image that is already present on the node:
+	//   - NeverVerify
+	//       - anyone on a node can use any image present on the node
+	//   - NeverVerifyPreloadedImages
+	//       - images that were pulled to the node by something else than the kubelet
+	//         can be used without reverifying pull credentials
+	//   - NeverVerifyAllowlistedImages
+	//       - like "NeverVerifyPreloadedImages" but only node images from
+	//         `preloadedImagesVerificationAllowlist` don't require reverification
+	//   - AlwaysVerify
+	//       - all images require credential reverification
+	// +optional
+	ImagePullCredentialsVerificationPolicy ImagePullCredentialsVerificationPolicy `json:"imagePullCredentialsVerificationPolicy,omitempty"`
+	// preloadedImagesVerificationAllowlist specifies a list of images that are
+	// exempted from credential reverification for the "NeverVerifyAllowlistedImages"
+	// `imagePullCredentialsVerificationPolicy`.
+	// The list accepts a full path segment wildcard suffix "/*".
+	// Only use image specs without an image tag or digest.
+	// +optional
+	// +listType=set
+	PreloadedImagesVerificationAllowlist []string `json:"preloadedImagesVerificationAllowlist,omitempty"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced. The value cannot be a negative number.
 	// Default: 50
@@ -260,6 +301,7 @@ type KubeletConfiguration struct {
 	ClusterDNS []string `json:"clusterDNS,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
+	// Deprecated: no longer has any effect.
 	// Default: "4h"
 	// +optional
 	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout,omitempty"`
@@ -350,7 +392,6 @@ type KubeletConfiguration struct {
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// cpuManagerPolicy is the name of the policy to use.
-	// Requires the CPUManager feature gate to be enabled.
 	// Default: "None"
 	// +optional
 	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
@@ -365,12 +406,10 @@ type KubeletConfiguration struct {
 	SingleProcessOOMKill *bool `json:"singleProcessOOMKill,omitempty"`
 	// cpuManagerPolicyOptions is a set of key=value which 	allows to set extra options
 	// to fine tune the behaviour of the cpu manager policies.
-	// Requires  both the "CPUManager" and "CPUManagerPolicyOptions" feature gates to be enabled.
 	// Default: nil
 	// +optional
 	CPUManagerPolicyOptions map[string]string `json:"cpuManagerPolicyOptions,omitempty"`
 	// cpuManagerReconcilePeriod is the reconciliation period for the CPU Manager.
-	// Requires the CPUManager feature gate to be enabled.
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
@@ -547,6 +586,16 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	EvictionMinimumReclaim map[string]string `json:"evictionMinimumReclaim,omitempty"`
+	// mergeDefaultEvictionSettings indicates that defaults for the evictionHard, evictionSoft, evictionSoftGracePeriod, and evictionMinimumReclaim
+	// fields should be merged into values specified for those fields in this configuration.
+	// Signals specified in this configuration take precedence.
+	// Signals not specified in this configuration inherit their defaults.
+	// If false, and if any signal is specified in this configuration then other signals that
+	// are not specified in this configuration will be set to 0.
+	// It applies to merging the fields for which the default exists, and currently only evictionHard has default values.
+	// Default: false
+	// +optional
+	MergeDefaultEvictionSettings *bool `json:"mergeDefaultEvictionSettings,omitempty"`
 	// podsPerCore is the maximum number of pods per core. Cannot exceed maxPods.
 	// The value must be a non-negative integer.
 	// If 0, there is no limit on the number of Pods.
@@ -839,7 +888,6 @@ type KubeletConfiguration struct {
 	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
 	// See https://kep.k8s.io/2832 for more details.
 	// Default: nil
-	// +featureGate=KubeletTracing
 	// +optional
 	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`
 
@@ -873,6 +921,11 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
+
+	// UserNamespaces contains User Namespace configurations.
+	// +featureGate=UserNamespacesSupport
+	// +optional
+	UserNamespaces *UserNamespaces `json:"userNamespaces,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -1067,4 +1120,18 @@ type CredentialProvider struct {
 type ExecEnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+// UserNamespaces contains User Namespace configurations.
+type UserNamespaces struct {
+	// IDsPerPod is the mapping length of UIDs and GIDs.
+	// The length must be a multiple of 65536, and must be less than 1<<32.
+	// On non-linux such as windows, only null / absent is allowed.
+	//
+	// Changing the value may require recreating all containers on the node.
+	//
+	// Default: 65536
+	// +featureGate=UserNamespacesSupport
+	// +optional
+	IDsPerPod *int64 `json:"idsPerPod,omitempty"`
 }

@@ -76,7 +76,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 			if !isPodCgroupV2(f, pod) {
 				e2eskipper.Skipf("swap tests require cgroup v2")
 			}
-			gomega.Expect(getSwapBehavior()).To(gomega.Or(gomega.Equal(types.NoSwap), gomega.BeEmpty()), "NodeConformance is expected to run with NoSwap")
+			gomega.Expect(getSwapBehavior()).To(gomega.Or(gomega.Equal(string(types.NoSwap)), gomega.BeEmpty()), "NodeConformance is expected to run with NoSwap")
 
 			expectNoSwap(f, pod)
 		},
@@ -105,8 +105,8 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 		enableLimitedSwap := func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
 			msg := "swap behavior is already set to LimitedSwap"
 
-			if swapBehavior := initialConfig.MemorySwap.SwapBehavior; swapBehavior != types.LimitedSwap {
-				initialConfig.MemorySwap.SwapBehavior = types.LimitedSwap
+			if swapBehavior := initialConfig.MemorySwap.SwapBehavior; swapBehavior != string(types.LimitedSwap) {
+				initialConfig.MemorySwap.SwapBehavior = string(types.LimitedSwap)
 				msg = "setting swap behavior to LimitedSwap"
 			}
 
@@ -124,7 +124,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, feature.Swap, framewo
 				if !isPodCgroupV2(f, pod) {
 					e2eskipper.Skipf("swap tests require cgroup v2")
 				}
-				gomega.Expect(getSwapBehavior()).To(gomega.Equal(types.LimitedSwap))
+				gomega.Expect(getSwapBehavior()).To(gomega.Equal(string(types.LimitedSwap)))
 
 				expectedSwapLimit := calcSwapForBurstablePod(f, pod)
 				expectLimitedSwap(f, pod, expectedSwapLimit)

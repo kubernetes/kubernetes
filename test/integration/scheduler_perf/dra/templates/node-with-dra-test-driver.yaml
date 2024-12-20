@@ -3,6 +3,10 @@ kind: Node
 metadata:
   # The name is relevant for selecting whether the driver has resources for this node.
   generateName: scheduler-perf-dra-
+  # The label is used by the node selector in ResourceSlices to scope devices to nodes
+  # that have DRA enabled.
+  labels:
+    node-with-dra: "true"
 spec: {}
 status:
   capacity:

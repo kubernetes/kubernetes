@@ -34,7 +34,8 @@ import (
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versionedinformers "k8s.io/client-go/informers"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
+	certinformersv1alpha1 "k8s.io/client-go/informers/certificates/v1alpha1"
+	resourceinformers "k8s.io/client-go/informers/resource/v1"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/features"
@@ -68,6 +69,9 @@ type Config struct {
 	// AuthorizationConfiguration stores the configuration for the Authorizer chain
 	// It will deprecate most of the above flags when GA
 	AuthorizationConfiguration *authzconfig.AuthorizationConfiguration
+	// InitialAuthorizationConfigurationData holds the initial authorization configuration data
+	// that was read from the authorization configuration file.
+	InitialAuthorizationConfigurationData string
 }
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
@@ -84,6 +88,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		initialConfig:    config,
 		apiServerID:      serverID,
 		lastLoadedConfig: config.AuthorizationConfiguration,
+		lastReadData:     []byte(config.InitialAuthorizationConfigurationData),
 		reloadInterval:   time.Minute,
 		compiler:         authorizationcel.NewDefaultCompiler(),
 	}
@@ -99,7 +104,11 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 		case authzconfig.AuthorizerType(modes.ModeNode):
 			var slices resourceinformers.ResourceSliceInformer
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				slices = config.VersionedInformerFactory.Resource().V1beta1().ResourceSlices()
+				slices = config.VersionedInformerFactory.Resource().V1().ResourceSlices()
+			}
+			var podCertificateRequestInformer certinformersv1alpha1.PodCertificateRequestInformer
+			if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
+				podCertificateRequestInformer = config.VersionedInformerFactory.Certificates().V1alpha1().PodCertificateRequests()
 			}
 			node.RegisterMetrics()
 			graph := node.NewGraph()
@@ -110,6 +119,7 @@ func (config Config) New(ctx context.Context, serverID string) (authorizer.Autho
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 				slices, // Nil check in AddGraphEventHandlers can be removed when always creating this.
+				podCertificateRequestInformer,
 			)
 			r.nodeAuthorizer = node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 
@@ -160,12 +170,16 @@ func GetNameForAuthorizerMode(mode string) string {
 	return strings.ToLower(mode)
 }
 
-func LoadAndValidateFile(configFile string, compiler authorizationcel.Compiler, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
+func LoadAndValidateFile(configFile string, compiler authorizationcel.Compiler, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, string, error) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return LoadAndValidateData(data, compiler, requireNonWebhookTypes)
+	config, err := LoadAndValidateData(data, compiler, requireNonWebhookTypes)
+	if err != nil {
+		return nil, "", err
+	}
+	return config, string(data), nil
 }
 
 func LoadAndValidateData(data []byte, compiler authorizationcel.Compiler, requireNonWebhookTypes sets.Set[authzconfig.AuthorizerType]) (*authzconfig.AuthorizationConfiguration, error) {
@@ -198,7 +212,6 @@ func LoadAndValidateData(data []byte, compiler authorizationcel.Compiler, requir
 		if expectedName != authorizer.Name {
 			allErrors = append(allErrors, fmt.Errorf("expected name %s for authorizer %s instead of %s", expectedName, authorizer.Type, authorizer.Name))
 		}
-
 	}
 
 	if missingTypes := requireNonWebhookTypes.Difference(seenModes); missingTypes.Len() > 0 {

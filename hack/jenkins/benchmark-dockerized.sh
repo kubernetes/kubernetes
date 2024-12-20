@@ -43,11 +43,15 @@ export KUBE_ROOT
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 # Install tools we need
-go -C "${KUBE_ROOT}/hack/tools" install github.com/cespare/prettybench
-go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
+hack_tools_gotoolchain="${GOTOOLCHAIN:-}"
+if [ -n "${KUBE_HACK_TOOLS_GOTOOLCHAIN:-}" ]; then
+  hack_tools_gotoolchain="${KUBE_HACK_TOOLS_GOTOOLCHAIN}";
+fi
+GOTOOLCHAIN="${hack_tools_gotoolchain}" go -C "${KUBE_ROOT}/hack/tools" install github.com/cespare/prettybench
 
-# Disable the Go race detector.
-export KUBE_RACE=" "
+# Disable the Go race detector by explicitly setting it to the empty string (= no argument).
+# This is also the default, but let's be explicit in case that this changes later.
+export KUBE_RACE=""
 # Disable coverage report
 export KUBE_COVER="n"
 export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}

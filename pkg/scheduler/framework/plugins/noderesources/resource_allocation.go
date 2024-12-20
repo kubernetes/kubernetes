@@ -21,13 +21,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 
 	resourcehelper "k8s.io/component-helpers/resource"
-	"k8s.io/kubernetes/pkg/features"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -36,7 +34,9 @@ type scorer func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer
 
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
-	Name string
+	Name                            string
+	enableInPlacePodVerticalScaling bool
+	enablePodLevelResources         bool
 	// used to decide whether to use Requested or NonZeroRequested for
 	// cpu and memory.
 	useRequested bool
@@ -48,14 +48,14 @@ type resourceAllocationScorer struct {
 func (r *resourceAllocationScorer) score(
 	ctx context.Context,
 	pod *v1.Pod,
-	nodeInfo *framework.NodeInfo,
-	podRequests []int64) (int64, *framework.Status) {
+	nodeInfo fwk.NodeInfo,
+	podRequests []int64) (int64, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
 	// resources not set, nothing scheduled,
 	if len(r.resources) == 0 {
-		return 0, framework.NewStatus(framework.Error, "resources not found")
+		return 0, fwk.NewStatus(fwk.Error, "resources not found")
 	}
 
 	requested := make([]int64, len(r.resources))
@@ -86,10 +86,10 @@ func (r *resourceAllocationScorer) score(
 // - 1st param: quantity of allocatable resource on the node.
 // - 2nd param: aggregated quantity of requested resource on the node.
 // Note: if it's an extended resource, and the pod doesn't request it, (0, 0) is returned.
-func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger klog.Logger, nodeInfo *framework.NodeInfo, resource v1.ResourceName, podRequest int64) (int64, int64) {
-	requested := nodeInfo.NonZeroRequested
+func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger klog.Logger, nodeInfo fwk.NodeInfo, resource v1.ResourceName, podRequest int64) (int64, int64) {
+	requested := nodeInfo.GetNonZeroRequested()
 	if r.useRequested {
-		requested = nodeInfo.Requested
+		requested = nodeInfo.GetRequested()
 	}
 
 	// If it's an extended resource, and the pod doesn't request it. We return (0, 0)
@@ -99,14 +99,14 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger kl
 	}
 	switch resource {
 	case v1.ResourceCPU:
-		return nodeInfo.Allocatable.MilliCPU, (requested.MilliCPU + podRequest)
+		return nodeInfo.GetAllocatable().GetMilliCPU(), (requested.GetMilliCPU() + podRequest)
 	case v1.ResourceMemory:
-		return nodeInfo.Allocatable.Memory, (requested.Memory + podRequest)
+		return nodeInfo.GetAllocatable().GetMemory(), (requested.GetMemory() + podRequest)
 	case v1.ResourceEphemeralStorage:
-		return nodeInfo.Allocatable.EphemeralStorage, (nodeInfo.Requested.EphemeralStorage + podRequest)
+		return nodeInfo.GetAllocatable().GetEphemeralStorage(), (nodeInfo.GetRequested().GetEphemeralStorage() + podRequest)
 	default:
-		if _, exists := nodeInfo.Allocatable.ScalarResources[resource]; exists {
-			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
+		if _, exists := nodeInfo.GetAllocatable().GetScalarResources()[resource]; exists {
+			return nodeInfo.GetAllocatable().GetScalarResources()[resource], (nodeInfo.GetRequested().GetScalarResources()[resource] + podRequest)
 		}
 	}
 	logger.V(10).Info("Requested resource is omitted for node score calculation", "resourceName", resource)
@@ -118,9 +118,9 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger kl
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
 
 	opts := resourcehelper.PodResourcesOptions{
-		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		UseStatusResources: r.enableInPlacePodVerticalScaling,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources: !r.enablePodLevelResources,
 	}
 
 	if !r.useRequested {
@@ -145,4 +145,13 @@ func (r *resourceAllocationScorer) calculatePodResourceRequestList(pod *v1.Pod, 
 		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name))
 	}
 	return podRequests
+}
+
+func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {
+	for _, request := range podRequests {
+		if request != 0 {
+			return false
+		}
+	}
+	return true
 }

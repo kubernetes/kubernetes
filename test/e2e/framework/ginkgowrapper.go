@@ -208,9 +208,18 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
 			addLabel(fullLabel)
-			if arg.extraFeature != "" {
-				texts = append(texts, fmt.Sprintf("[%s]", arg.extraFeature))
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:"+arg.extraFeature))
+			if arg.alphaBetaLevel != "" {
+				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
+			}
+			if arg.offByDefault {
+				texts = append(texts, "[Feature:OffByDefault]")
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
+				// Alphas are always off by default but we may want to select
+				// betas based on defaulted-ness.
+				if arg.alphaBetaLevel == "Beta" {
+					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
+				}
 			}
 			if fullLabel == "Serial" {
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Serial)
@@ -305,6 +314,12 @@ func validateText(location types.CodeLocation, text string, labels []string) {
 			// Okay, was also set as label.
 			continue
 		}
+		// TODO: we currently only set this as a text value
+		// We should probably reflect it into labels, but that could break some
+		// existing jobs and we're still setting on an exact plan
+		if tag == "Feature:OffByDefault" {
+			continue
+		}
 		if deprecatedTags.Has(tag) {
 			recordTextBug(location, fmt.Sprintf("[%s] in plain text is deprecated and must be added through With%s instead", tag, tag))
 		}
@@ -328,7 +343,7 @@ func recordTextBug(location types.CodeLocation, message string) {
 	RecordBug(Bug{FileName: location.FileName, LineNumber: location.LineNumber, Message: message})
 }
 
-// WithEnvironment specifies that a certain test or group of tests only works
+// WithFeature specifies that a certain test or group of tests only works
 // with a feature available. The return value must be passed as additional
 // argument to [framework.It], [framework.Describe], [framework.Context].
 //
@@ -350,7 +365,8 @@ func withFeature(name Feature) interface{} {
 }
 
 // WithFeatureGate specifies that a certain test or group of tests depends on a
-// feature gate being enabled. The return value must be passed as additional
+// feature gate and the corresponding API group (if there is one)
+// being enabled. The return value must be passed as additional
 // argument to [framework.It], [framework.Describe], [framework.Context].
 //
 // The feature gate must be listed in
@@ -359,9 +375,21 @@ func withFeature(name Feature) interface{} {
 // also need to be removed.
 //
 // [Alpha] resp. [Beta] get added to the test name automatically depending
-// on the current stability level of the feature. Feature:Alpha resp.
-// Feature:Beta get added to the Ginkgo labels because this is a special
-// requirement for how the cluster needs to be configured.
+// on the current stability level of the feature, to emulate historic
+// usage of those tags.
+//
+// For label filtering, Alpha resp. Beta get added to the Ginkgo labels.
+//
+// [Feature:OffByDefault] gets added to support skipping a test with
+// a dependency on an alpha or beta feature gate in jobs which use the
+// traditional \[Feature:.*\] skip regular expression.
+//
+// Feature:OffByDefault is also available for label filtering.
+//
+// BetaOffByDefault is also added *only as a label* when the feature gate is
+// an off by default beta feature. This can be used to include/exclude based
+// on beta + defaulted-ness. Alpha has no equivalent because all alphas are
+// off by default.
 //
 // If the test can run in any cluster that has alpha resp. beta features and
 // API groups enabled, then annotating it with just WithFeatureGate is
@@ -390,7 +418,8 @@ func withFeatureGate(featureGate featuregate.Feature) interface{} {
 	}
 
 	l := newLabel("FeatureGate", string(featureGate))
-	l.extraFeature = level
+	l.offByDefault = !spec.Default
+	l.alphaBetaLevel = level
 	return l
 }
 
@@ -415,7 +444,7 @@ func withEnvironment(name Environment) interface{} {
 	return newLabel("Environment", string(name))
 }
 
-// WithConformace specifies that a certain test or group of tests must pass in
+// WithConformance specifies that a certain test or group of tests must pass in
 // all conformant Kubernetes clusters. The return value must be passed as
 // additional argument to [framework.It], [framework.Describe],
 // [framework.Context].
@@ -486,9 +515,10 @@ func withSerial() interface{} {
 	return newLabel("Serial")
 }
 
-// WithSlow specifies that a certain test or group of tests must not run in
-// parallel with other tests. The return value must be passed as additional
-// argument to [framework.It], [framework.Describe], [framework.Context].
+// WithSlow specifies that a certain test, or each test within a group of
+// tests, is slow (is expected to take longer than 5 minutes to run in CI).
+// The return value must be passed as additional argument to [framework.It],
+// [framework.Describe], [framework.Context].
 func WithSlow() interface{} {
 	return withSlow()
 }
@@ -536,13 +566,19 @@ func withFlaky() interface{} {
 type label struct {
 	// parts get concatenated with ":" to build the full label.
 	parts []string
-	// extra is an optional feature name. It gets added as [<extraFeature>]
-	// to the test name and as Feature:<extraFeature> to the labels.
-	extraFeature string
 	// explanation gets set for each label to help developers
 	// who pass a label to a ginkgo function. They need to use
 	// the corresponding framework function instead.
 	explanation string
+
+	// TODO: the fields below are only used for FeatureGates, we may want to refactor
+
+	// alphaBetaLevel is "Alpha", "Beta" or empty for GA features
+	// It gets added as [<level>] [Feature:<level>]
+	// to the test name and as Feature:<level> to the labels.
+	alphaBetaLevel string
+	// set based on featuregate default state
+	offByDefault bool
 }
 
 func newLabel(parts ...string) label {
@@ -565,7 +601,10 @@ func TagsEqual(a, b interface{}) bool {
 	if !ok {
 		return false
 	}
-	if al.extraFeature != bl.extraFeature {
+	if al.alphaBetaLevel != bl.alphaBetaLevel {
+		return false
+	}
+	if al.offByDefault != bl.offByDefault {
 		return false
 	}
 	return slices.Equal(al.parts, bl.parts)

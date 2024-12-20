@@ -25,7 +25,8 @@ import (
 
 // FakeInterface implements Interface by just recording entries that have been cleared.
 type FakeInterface struct {
-	entries []*netlink.ConntrackFlow
+	entries         []*netlink.ConntrackFlow
+	netlinkRequests int // try to get the estimated number of netlink request
 }
 
 var _ Interface = &FakeInterface{}
@@ -37,18 +38,30 @@ func NewFake() *FakeInterface {
 
 // ListEntries is part of Interface
 func (fake *FakeInterface) ListEntries(_ uint8) ([]*netlink.ConntrackFlow, error) {
-	return fake.entries, nil
+	entries := make([]*netlink.ConntrackFlow, len(fake.entries))
+	copy(entries, fake.entries)
+	// 1 netlink request to dump the table
+	// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L93-L94
+	fake.netlinkRequests++
+	return entries, nil
 }
 
 // ClearEntries is part of Interface
 func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
 	var flows []*netlink.ConntrackFlow
 	before := len(fake.entries)
+	// 1 netlink request to dump the table
+	// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L163
+	fake.netlinkRequests++
+
 	for _, flow := range fake.entries {
 		var matched bool
 		for _, filter := range filters {
 			matched = filter.MatchConntrackFlow(flow)
 			if matched {
+				// 1 netlink request to delete the flow
+				// https://github.com/vishvananda/netlink/blob/0af32151e72b990c271ef6268e8aadb7e015f2bd/conntrack_linux.go#L182
+				fake.netlinkRequests++
 				break
 			}
 		}

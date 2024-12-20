@@ -21,7 +21,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -70,7 +70,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutoscaler) {
 	if obj.Spec.MinReplicas == nil {
-		obj.Spec.MinReplicas = pointer.Int32(1)
+		obj.Spec.MinReplicas = ptr.To[int32](1)
 	}
 
 	if len(obj.Spec.Metrics) == 0 {
@@ -91,9 +91,12 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutosca
 	SetDefaults_HorizontalPodAutoscalerBehavior(obj)
 }
 
-// SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it is not null
+// SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it contains
+// at least one scaling rule policy (for scale-up or scale-down)
 func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPodAutoscaler) {
-	// if behavior is specified, we should fill all the 'nil' values with the default ones
+	// If behavior contains a scaling rule policy (either for scale-up, scale-down, or both), we
+	// should fill all the unset scaling policy fields (i.e. StabilizationWindowSeconds,
+	// SelectPolicy, Policies) with default values
 	if obj.Spec.Behavior != nil {
 		obj.Spec.Behavior.ScaleUp = GenerateHPAScaleUpRules(obj.Spec.Behavior.ScaleUp)
 		obj.Spec.Behavior.ScaleDown = GenerateHPAScaleDownRules(obj.Spec.Behavior.ScaleDown)
@@ -128,6 +131,9 @@ func copyHPAScalingRules(from, to *autoscalingv2.HPAScalingRules) *autoscalingv2
 	}
 	if from.Policies != nil {
 		to.Policies = from.Policies
+	}
+	if from.Tolerance != nil {
+		to.Tolerance = from.Tolerance
 	}
 	return to
 }

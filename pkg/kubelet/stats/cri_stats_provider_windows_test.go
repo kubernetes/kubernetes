@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/volume"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 type fakeNetworkStatsProvider struct {
@@ -150,15 +151,15 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 					},
 				},
@@ -166,14 +167,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -227,15 +228,15 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 					},
 				},
@@ -243,14 +244,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -258,14 +259,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -313,15 +314,15 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 					},
 				},
@@ -329,14 +330,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -384,21 +385,21 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.NewTime(fakeClock.Now()),
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test",
-						RxBytes: toP(1),
-						TxBytes: toP(10),
+						RxBytes: ptr.To[uint64](1),
+						TxBytes: ptr.To[uint64](10),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test",
-							RxBytes: toP(1),
+							RxBytes: ptr.To[uint64](1),
 
-							TxBytes: toP(10),
+							TxBytes: ptr.To[uint64](10),
 						},
 						{
 							Name:    "test3",
-							RxBytes: toP(3),
+							RxBytes: ptr.To[uint64](3),
 
-							TxBytes: toP(30),
+							TxBytes: ptr.To[uint64](30),
 						},
 					},
 				},
@@ -406,14 +407,14 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 					Time: v1.Time{},
 					InterfaceStats: statsapi.InterfaceStats{
 						Name:    "test2",
-						RxBytes: toP(2),
-						TxBytes: toP(20),
+						RxBytes: ptr.To[uint64](2),
+						TxBytes: ptr.To[uint64](20),
 					},
 					Interfaces: []statsapi.InterfaceStats{
 						{
 							Name:    "test2",
-							RxBytes: toP(2),
-							TxBytes: toP(20),
+							RxBytes: ptr.To[uint64](2),
+							TxBytes: ptr.To[uint64](20),
 						},
 					},
 				},
@@ -444,10 +445,6 @@ func Test_criStatsProvider_listContainerNetworkStats(t *testing.T) {
 			}
 		})
 	}
-}
-
-func toP(i uint64) *uint64 {
-	return &i
 }
 
 func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
@@ -525,27 +522,27 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		Uid:       "sb0-uid",
 	}
 
-	got, err := p.makeWinContainerStats(inputStats, inputContainer, inputRootFsInfo, make(map[runtimeapi.FilesystemIdentifier]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
+	got, err := p.makeWinContainerStats(inputStats, inputContainer, inputRootFsInfo, make(map[string]*cadvisorapiv2.FsInfo), inputPodSandboxMetadata)
 
 	expected := &statsapi.ContainerStats{
 		Name:      "c0",
 		StartTime: v1.NewTime(time.Unix(0, containerStartTime.Unix())),
 		CPU: &statsapi.CPUStats{
 			Time:                 v1.NewTime(time.Unix(0, cpuUsageTimestamp)),
-			UsageNanoCores:       toP(cpuUsageNanoCores),
-			UsageCoreNanoSeconds: toP(cpuUsageNanoSeconds),
+			UsageNanoCores:       ptr.To[uint64](cpuUsageNanoCores),
+			UsageCoreNanoSeconds: ptr.To[uint64](cpuUsageNanoSeconds),
 		},
 		Memory: &statsapi.MemoryStats{
 			Time:            v1.NewTime(time.Unix(0, memoryUsageTimestamp)),
-			AvailableBytes:  toP(memoryUsageAvailableBytes),
-			WorkingSetBytes: toP(memoryUsageWorkingSetBytes),
-			PageFaults:      toP(memoryUsagePageFaults),
+			AvailableBytes:  ptr.To[uint64](memoryUsageAvailableBytes),
+			WorkingSetBytes: ptr.To[uint64](memoryUsageWorkingSetBytes),
+			PageFaults:      ptr.To[uint64](memoryUsagePageFaults),
 		},
 		Rootfs: &statsapi.FsStats{},
 		Logs: &statsapi.FsStats{
 			Time:       c0LogStats.Time,
-			UsedBytes:  toP(logStatsUsed),
-			InodesUsed: toP(logStatsInodesUsed),
+			UsedBytes:  ptr.To[uint64](logStatsUsed),
+			InodesUsed: ptr.To[uint64](logStatsInodesUsed),
 		},
 	}
 

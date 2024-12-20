@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -39,7 +38,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
-	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
+	externaljwtv1 "k8s.io/externaljwt/apis/v1"
 )
 
 var (
@@ -71,6 +71,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 		iss                         string
 		backendSetKeyID             string
 		backendSetAlgorithm         string
+		backendHeaderType           string
 		supportedKeys               map[string]supportedKeyT
 		allowSigningWithNonOIDCKeys bool
 
@@ -98,6 +99,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			},
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -143,6 +145,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			},
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -174,6 +177,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			},
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -204,6 +208,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "empty key ID returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     "",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -217,6 +222,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "key id longer than 1024 bytes returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     string(make([]byte, 1025)),
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -230,6 +236,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "unsupported alg returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "something-unsupported",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -243,6 +250,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "empty alg returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -252,14 +260,27 @@ func TestExternalTokenGenerator(t *testing.T) {
 			},
 			wantErr: fmt.Errorf("while validating header: bad signing algorithm \"\""),
 		},
+		{
+			desc:                "Invalid backend header type",
+			iss:                 "some-issuer",
+			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "WHAT",
+			backendSetAlgorithm: "RS256",
+			supportedKeys: map[string]supportedKeyT{
+				"key-id-1": {
+					key:             &rsaKey1.PublicKey,
+					excludeFromOidc: true,
+				},
+			},
+			wantErr: fmt.Errorf("while validating header: bad type"),
+		},
 	}
 
 	for i, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := context.Background()
 
-			sockname := fmt.Sprintf("@test-external-token-generator-%d-%d.sock", time.Now().Nanosecond(), i)
-			t.Cleanup(func() { _ = os.Remove(sockname) })
+			sockname := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("test-external-token-generator-%d-%d.sock", time.Now().Nanosecond(), i))
 
 			addr := &net.UnixAddr{Name: sockname, Net: "unix"}
 			listener, err := net.ListenUnix(addr.Network(), addr)
@@ -276,8 +297,9 @@ func TestExternalTokenGenerator(t *testing.T) {
 				supportedKeys:      tc.supportedKeys,
 				refreshHintSeconds: 10,
 				DataTimeStamp:      timestamppb.New(time.Time{}),
+				headerType:         tc.backendHeaderType,
 			}
-			externaljwtv1alpha1.RegisterExternalJWTSignerServer(grpcServer, backend)
+			externaljwtv1.RegisterExternalJWTSignerServer(grpcServer, backend)
 
 			go func() {
 				if err := grpcServer.Serve(listener); err != nil {
@@ -386,24 +408,25 @@ type supportedKeyT struct {
 }
 
 type dummyExtrnalSigner struct {
-	externaljwtv1alpha1.UnimplementedExternalJWTSignerServer
+	externaljwtv1.UnimplementedExternalJWTSignerServer
 
 	// required for Sign()
 	keyID            string
 	signingAlgorithm string
 	signature        string
+	headerType       string
 
 	// required for FetchKeys()
 	keyLock               sync.Mutex
 	supportedKeys         map[string]supportedKeyT
 	refreshHintSeconds    int
 	DataTimeStamp         *timestamppb.Timestamp
-	SupportedKeysOverride []*externaljwtv1alpha1.Key
+	SupportedKeysOverride []*externaljwtv1.Key
 }
 
-func (des *dummyExtrnalSigner) Sign(ctx context.Context, r *externaljwtv1alpha1.SignJWTRequest) (*externaljwtv1alpha1.SignJWTResponse, error) {
+func (des *dummyExtrnalSigner) Sign(ctx context.Context, r *externaljwtv1.SignJWTRequest) (*externaljwtv1.SignJWTResponse, error) {
 	header := &headerT{
-		Type:      "JWT",
+		Type:      des.headerType,
 		Algorithm: des.signingAlgorithm,
 		KeyID:     des.keyID,
 	}
@@ -413,18 +436,18 @@ func (des *dummyExtrnalSigner) Sign(ctx context.Context, r *externaljwtv1alpha1.
 		return nil, fmt.Errorf("failed to create header for JWT response")
 	}
 
-	resp := &externaljwtv1alpha1.SignJWTResponse{
+	resp := &externaljwtv1.SignJWTResponse{
 		Header:    base64.RawURLEncoding.EncodeToString(headerJSON),
 		Signature: des.signature,
 	}
 	return resp, nil
 }
 
-func (des *dummyExtrnalSigner) FetchKeys(ctx context.Context, r *externaljwtv1alpha1.FetchKeysRequest) (*externaljwtv1alpha1.FetchKeysResponse, error) {
+func (des *dummyExtrnalSigner) FetchKeys(ctx context.Context, r *externaljwtv1.FetchKeysRequest) (*externaljwtv1.FetchKeysResponse, error) {
 	des.keyLock.Lock()
 	defer des.keyLock.Unlock()
 
-	pbKeys := []*externaljwtv1alpha1.Key{}
+	pbKeys := []*externaljwtv1.Key{}
 	if des.SupportedKeysOverride != nil {
 		pbKeys = des.SupportedKeysOverride
 	} else {
@@ -433,7 +456,7 @@ func (des *dummyExtrnalSigner) FetchKeys(ctx context.Context, r *externaljwtv1al
 			if err != nil {
 				return nil, fmt.Errorf("while marshaling key: %w", err)
 			}
-			pbKey := &externaljwtv1alpha1.Key{
+			pbKey := &externaljwtv1.Key{
 				KeyId:                    kid,
 				Key:                      keyBytes,
 				ExcludeFromOidcDiscovery: k.excludeFromOidc,
@@ -442,7 +465,7 @@ func (des *dummyExtrnalSigner) FetchKeys(ctx context.Context, r *externaljwtv1al
 		}
 	}
 
-	return &externaljwtv1alpha1.FetchKeysResponse{
+	return &externaljwtv1.FetchKeysResponse{
 		Keys:               pbKeys,
 		DataTimestamp:      des.DataTimeStamp,
 		RefreshHintSeconds: int64(des.refreshHintSeconds),

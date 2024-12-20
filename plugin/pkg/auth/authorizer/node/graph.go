@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	certsv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -125,6 +126,7 @@ const (
 	secretVertexType
 	vaVertexType
 	serviceAccountVertexType
+	pcrVertexType
 )
 
 var vertexTypes = map[vertexType]string{
@@ -138,6 +140,7 @@ var vertexTypes = map[vertexType]string{
 	secretVertexType:         "secret",
 	vaVertexType:             "volumeattachment",
 	serviceAccountVertexType: "serviceAccount",
+	pcrVertexType:            "podcertificaterequest",
 }
 
 // vertexTypeWithAuthoritativeIndex indicates which types of vertices can hold
@@ -152,6 +155,7 @@ var vertexTypeWithAuthoritativeIndex = map[vertexType]bool{
 	resourceClaimVertexType:  true,
 	vaVertexType:             true,
 	serviceAccountVertexType: true,
+	pcrVertexType:            true,
 }
 
 // must be called under a write lock
@@ -374,10 +378,9 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 		return
 	}
 
-	// TODO(mikedanese): If the pod doesn't mount the service account secrets,
-	// should the node still get access to the service account?
-	//
-	// ref https://github.com/kubernetes/kubernetes/issues/58790
+	// The pod unconditionally gets access to the pod's service account.  In the
+	// future, this access could be restricted based on whether or not the pod
+	// actually mounts a service account token, or has a podcertificate volume.
 	if len(pod.Spec.ServiceAccountName) > 0 {
 		serviceAccountVertex := g.getOrCreateVertexLocked(serviceAccountVertexType, pod.Namespace, pod.Spec.ServiceAccountName)
 		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
@@ -424,6 +427,12 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 			g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
 		}
 	}
+
+	if pod.Status.ExtendedResourceClaimStatus != nil && len(pod.Status.ExtendedResourceClaimStatus.ResourceClaimName) > 0 {
+		claimVertex := g.getOrCreateVertexLocked(resourceClaimVertexType, pod.Namespace, pod.Status.ExtendedResourceClaimStatus.ResourceClaimName)
+		// Edge adds must be handled by addEdgeLocked instead of direct g.graph.SetEdge calls.
+		g.addEdgeLocked(claimVertex, podVertex, nodeVertex)
+	}
 }
 
 // Must be called under a write lock.
@@ -456,6 +465,43 @@ func (g *Graph) DeletePod(name, namespace string) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	g.deleteVertexLocked(podVertexType, namespace, name)
+}
+
+// AddPodCertificateRequest adds a PodCertificateRequest to the graph.
+//
+// PCRs technically have two valid edges:
+//
+// * PCR -> Pod (-> Node)
+//
+// * PCR -> Node
+//
+// We only add the direct PCR -> Node edge, since that is enough to perform the
+// authorization, and it's a shorter graph traversal.  The noderestriction
+// admission plugin ensures that all PCRs created have a valid node,
+// serviceaccount, and pod combination that actually exists in the cluster.
+func (g *Graph) AddPodCertificateRequest(pcr *certsv1alpha1.PodCertificateRequest) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("AddPodCertificateRequest").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
+	g.deleteVertexLocked(pcrVertexType, pcr.ObjectMeta.Namespace, pcr.ObjectMeta.Name)
+	pcrVertex := g.getOrCreateVertexLocked(pcrVertexType, pcr.ObjectMeta.Namespace, pcr.ObjectMeta.Name)
+	nodeVertex := g.getOrCreateVertexLocked(nodeVertexType, "", string(pcr.Spec.NodeName))
+	g.addEdgeLocked(pcrVertex, nodeVertex, nodeVertex)
+}
+
+// DeletePodCertificateRequest removes it from the graph.
+func (g *Graph) DeletePodCertificateRequest(pcr *certsv1alpha1.PodCertificateRequest) {
+	start := time.Now()
+	defer func() {
+		graphActionsDuration.WithLabelValues("DeletePodCertificateRequest").Observe(time.Since(start).Seconds())
+	}()
+	g.lock.Lock()
+	defer g.lock.Unlock()
+	g.deleteVertexLocked(pcrVertexType, pcr.ObjectMeta.Namespace, pcr.ObjectMeta.Name)
 }
 
 // AddPV sets up edges for the following relationships:

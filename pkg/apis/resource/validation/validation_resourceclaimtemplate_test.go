@@ -22,7 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func testClaimTemplate(name, namespace string, spec resource.ResourceClaimSpec) *resource.ResourceClaimTemplate {
@@ -98,7 +98,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 		"deletion-grace-period-seconds": {
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
-				template.DeletionGracePeriodSeconds = pointer.Int64(10)
+				template.DeletionGracePeriodSeconds = ptr.To[int64](10)
 				return template
 			}(),
 		},
@@ -178,10 +178,35 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"bad-classname": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
-				template.Spec.Spec.Devices.Requests[0].DeviceClassName = badName
+				template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName = badName
+				return template
+			}(),
+		},
+		"prioritized-list": {
+			wantFailures: nil,
+			template:     testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable),
+		},
+		"prioritized-list-both-first-available-and-exactly-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0), nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"),
+			},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].Exactly = &resource.ExactDeviceRequest{
+					DeviceClassName: goodName,
+					AllocationMode:  resource.DeviceAllocationModeAll,
+				}
+				return template
+			}(),
+		},
+		"prioritized-list-bad-class-name-on-subrequest": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			template: func() *resource.ResourceClaimTemplate {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName = badName
 				return template
 			}(),
 		},
@@ -210,12 +235,24 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 		"invalid-update-class": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
 				spec := validClaimTemplate.Spec.DeepCopy()
-				spec.Spec.Devices.Requests[0].DeviceClassName += "2"
+				spec.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return *spec
 			}(), "field is immutable")},
 			oldClaimTemplate: validClaimTemplate,
 			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
-				template.Spec.Spec.Devices.Requests[0].DeviceClassName += "2"
+				template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
+				return template
+			},
+		},
+		"prioritized-listinvalid-update-class": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
+				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName += "2"
+				return template.Spec
+			}(), "field is immutable")},
+			oldClaimTemplate: testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable),
+			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
+				template.Spec.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName += "2"
 				return template
 			},
 		},

@@ -17,8 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
-
 	"github.com/spf13/pflag"
 )
 
@@ -28,17 +26,15 @@ type ContainerRuntimeOptions struct {
 
 	// RuntimeCgroups that container runtime is expected to be isolated in.
 	RuntimeCgroups string
-	// PodSandboxImage is the image whose network/ipc namespaces
-	// containers in each pod will use.
-	PodSandboxImage string
 	// Image credential provider plugin options
 
-	// ImageCredentialProviderConfigFile is the path to the credential provider plugin config file.
-	// This config file is a specification for what credential providers are enabled and invoked
-	// by the kubelet. The plugin config should contain information about what plugin binary
+	// ImageCredentialProviderConfigPath is the path to the credential provider plugin config file or directory.
+	// If a directory is specified, all .json, .yaml, or .yml files in the directory are loaded and merged
+	// in lexicographical order. This config file(s) specify what credential providers are enabled
+	// and invoked by the kubelet. The plugin config should contain information about what plugin binary
 	// to execute and what container images the plugin should be called for.
 	// +optional
-	ImageCredentialProviderConfigFile string
+	ImageCredentialProviderConfigPath string
 	// ImageCredentialProviderBinDir is the path to the directory where credential provider plugin
 	// binaries exist. The name of each plugin binary is expected to match the name of the plugin
 	// specified in imageCredentialProviderConfigFile.
@@ -48,12 +44,13 @@ type ContainerRuntimeOptions struct {
 
 // AddFlags adds flags to the container runtime, according to ContainerRuntimeOptions.
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
+	var tmp string
 	// General settings.
 	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
-	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image."))
+	fs.StringVar(&tmp, "pod-infra-container-image", "", "Specified image will not be pruned by the image garbage collector. CRI implementations have their own configuration to set this image.")
 	_ = fs.MarkDeprecated("pod-infra-container-image", "will be removed in 1.35. Image garbage collector will get sandbox image information from CRI.")
 
 	// Image credential provider settings.
-	fs.StringVar(&s.ImageCredentialProviderConfigFile, "image-credential-provider-config", s.ImageCredentialProviderConfigFile, "The path to the credential provider plugin config file.")
+	fs.StringVar(&s.ImageCredentialProviderConfigPath, "image-credential-provider-config", s.ImageCredentialProviderConfigPath, "Path to a credential provider plugin config file (JSON/YAML/YML) or a directory of such files (merged in lexicographical order; non-recursive search).")
 	fs.StringVar(&s.ImageCredentialProviderBinDir, "image-credential-provider-bin-dir", s.ImageCredentialProviderBinDir, "The path to the directory where credential provider plugin binaries are located.")
 }

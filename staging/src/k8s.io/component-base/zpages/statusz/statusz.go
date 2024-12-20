@@ -17,11 +17,12 @@ limitations under the License.
 package statusz
 
 import (
-	"bytes"
 	"fmt"
-	"html/template"
+	"html"
 	"math/rand"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"k8s.io/component-base/compatibility"
@@ -30,63 +31,43 @@ import (
 )
 
 var (
-	delimiters = []string{":", ": ", "=", " "}
+	delimiters            = []string{":", ": ", "=", " "}
+	nonDebuggingEndpoints = map[string]bool{
+		"/apis":        true,
+		"/api":         true,
+		"/openid":      true,
+		"/openapi":     true,
+		"/.well-known": true,
+	}
 )
 
 const DefaultStatuszPath = "/statusz"
 
-const (
-	headerFmt = `
+const headerFmt = `
 %s statusz
 Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
 `
-
-	dataTemplate = `
-Started{{.Delim}} {{.StartTime}}
-Up{{.Delim}} {{.Uptime}}
-Go version{{.Delim}} {{.GoVersion}}
-Binary version{{.Delim}} {{.BinaryVersion}}
-{{if .EmulationVersion}}Emulation version{{.Delim}} {{.EmulationVersion}}{{end}}
-`
-)
-
-type contentFields struct {
-	Delim            string
-	StartTime        string
-	Uptime           string
-	GoVersion        string
-	BinaryVersion    string
-	EmulationVersion string
-}
 
 type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry(effectiveVersion compatibility.EffectiveVersion) statuszRegistry {
-	return &registry{effectiveVersion: effectiveVersion}
+type ListedPathsOption []string
+
+func NewRegistry(effectiveVersion compatibility.EffectiveVersion, opts ...func(*registry)) statuszRegistry {
+	r := &registry{effectiveVersion: effectiveVersion}
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
-	dataTmpl, err := initializeTemplates()
-	if err != nil {
-		klog.Errorf("error while parsing gotemplates: %v", err)
-		return
-	}
-	m.Handle(DefaultStatuszPath, handleStatusz(componentName, dataTmpl, reg))
+	m.Handle(DefaultStatuszPath, handleStatusz(componentName, reg))
 }
 
-func initializeTemplates() (*template.Template, error) {
-	d := template.New("data")
-	dataTmpl, err := d.Parse(dataTemplate)
-	if err != nil {
-		return nil, err
-	}
-
-	return dataTmpl, nil
-}
-
-func handleStatusz(componentName string, dataTmpl *template.Template, reg statuszRegistry) http.HandlerFunc {
+func handleStatusz(componentName string, reg statuszRegistry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !httputil.AcceptableMediaType(r) {
 			http.Error(w, httputil.ErrUnsupportedMediaType.Error(), http.StatusNotAcceptable)
@@ -94,7 +75,7 @@ func handleStatusz(componentName string, dataTmpl *template.Template, reg status
 		}
 
 		fmt.Fprintf(w, headerFmt, componentName)
-		data, err := populateStatuszData(dataTmpl, reg)
+		data, err := populateStatuszData(reg, componentName)
 		if err != nil {
 			klog.Errorf("error while populating statusz data: %v", err)
 			http.Error(w, "error while populating statusz data", http.StatusInternalServerError)
@@ -106,35 +87,60 @@ func handleStatusz(componentName string, dataTmpl *template.Template, reg status
 	}
 }
 
-func populateStatuszData(tmpl *template.Template, reg statuszRegistry) (string, error) {
-	if tmpl == nil {
-		return "", fmt.Errorf("received nil template")
-	}
-
+func populateStatuszData(reg statuszRegistry, componentName string) (string, error) {
 	randomIndex := rand.Intn(len(delimiters))
-	data := contentFields{
-		Delim:         delimiters[randomIndex],
-		StartTime:     reg.processStartTime().Format(time.UnixDate),
-		Uptime:        uptime(reg.processStartTime()),
-		GoVersion:     reg.goVersion(),
-		BinaryVersion: reg.binaryVersion().String(),
-	}
+	delim := html.EscapeString(delimiters[randomIndex])
+	startTime := html.EscapeString(reg.processStartTime().Format(time.UnixDate))
+	uptime := html.EscapeString(uptime(reg.processStartTime()))
+	goVersion := html.EscapeString(reg.goVersion())
+	binaryVersion := html.EscapeString(reg.binaryVersion().String())
 
+	var emulationVersion string
 	if reg.emulationVersion() != nil {
-		data.EmulationVersion = reg.emulationVersion().String()
+		emulationVersion = fmt.Sprintf(`Emulation version%s %s`, delim, html.EscapeString(reg.emulationVersion().String()))
+	}
+	paths := aggregatePaths(reg.paths())
+	if paths != "" {
+		paths = fmt.Sprintf(`Paths%s %s`, delim, html.EscapeString(paths))
 	}
 
-	var tpl bytes.Buffer
-	err := tmpl.Execute(&tpl, data)
-	if err != nil {
-		return "", fmt.Errorf("error executing statusz template: %w", err)
-	}
+	status := fmt.Sprintf(`
+Started%[1]s %[2]s
+Up%[1]s %[3]s
+Go version%[1]s %[4]s
+Binary version%[1]s %[5]s
+%[6]s
+%[7]s
+`, delim, startTime, uptime, goVersion, binaryVersion, emulationVersion, paths)
 
-	return tpl.String(), nil
+	return status, nil
 }
 
 func uptime(t time.Time) string {
 	upSince := int64(time.Since(t).Seconds())
 	return fmt.Sprintf("%d hr %02d min %02d sec",
 		upSince/3600, (upSince/60)%60, upSince%60)
+}
+
+func aggregatePaths(listedPaths []string) string {
+	paths := make(map[string]bool)
+	for _, listedPath := range listedPaths {
+		folder := "/" + strings.Split(listedPath, "/")[1]
+		if !paths[folder] && !nonDebuggingEndpoints[folder] {
+			paths[folder] = true
+		}
+	}
+
+	var sortedPaths []string
+	for p := range paths {
+		sortedPaths = append(sortedPaths, p)
+	}
+	sort.Strings(sortedPaths)
+
+	var path string
+	for _, p := range sortedPaths {
+		path += " " + p
+	}
+
+	return path
 }

@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -53,26 +54,26 @@ func TestGCEDiskConflicts(t *testing.T) {
 		Name:         "volume with no restriction",
 		VolumeSource: v1.VolumeSource{},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
+	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
-		preFilterWantStatus *framework.Status
-		wantStatus          *framework.Status
+		preFilterWantStatus *fwk.Status
+		wantStatus          *fwk.Status
 	}{
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(),
 			name:                "nothing",
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 			wantStatus:          nil,
 		},
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
 			name:                "one state",
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 			wantStatus:          nil,
 		},
 		{
@@ -93,7 +94,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 			pod:                 st.MakePod().Volume(volWithNoRestriction).Obj(),
 			nodeInfo:            framework.NewNodeInfo(),
 			name:                "pod with a volume that doesn't have restrictions",
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 			wantStatus:          nil,
 		},
 	}
@@ -105,7 +106,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -135,27 +136,27 @@ func TestAWSDiskConflicts(t *testing.T) {
 			},
 		},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
+	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
-		wantStatus          *framework.Status
-		preFilterWantStatus *framework.Status
+		wantStatus          *fwk.Status
+		preFilterWantStatus *fwk.Status
 	}{
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(),
 			name:                "nothing",
 			wantStatus:          nil,
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
 			name:                "one state",
 			wantStatus:          nil,
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod:                 st.MakePod().Volume(volState).Obj(),
@@ -180,7 +181,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -216,27 +217,27 @@ func TestRBDDiskConflicts(t *testing.T) {
 			},
 		},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
+	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
-		wantStatus          *framework.Status
-		preFilterWantStatus *framework.Status
+		wantStatus          *fwk.Status
+		preFilterWantStatus *fwk.Status
 	}{
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(),
 			name:                "nothing",
 			wantStatus:          nil,
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
 			name:                "one state",
 			wantStatus:          nil,
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod:                 st.MakePod().Volume(volState).Obj(),
@@ -261,7 +262,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -297,27 +298,27 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			},
 		},
 	}
-	errStatus := framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
+	errStatus := fwk.NewStatus(fwk.Unschedulable, ErrReasonDiskConflict)
 	tests := []struct {
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		name                string
-		wantStatus          *framework.Status
-		preFilterWantStatus *framework.Status
+		wantStatus          *fwk.Status
+		preFilterWantStatus *fwk.Status
 	}{
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(),
 			name:                "nothing",
 			wantStatus:          nil,
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod:                 &v1.Pod{},
 			nodeInfo:            framework.NewNodeInfo(st.MakePod().Volume(volState).Obj()),
 			name:                "one state",
 			wantStatus:          nil,
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod:                 st.MakePod().Volume(volState).Obj(),
@@ -342,7 +343,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -404,12 +405,12 @@ func TestAccessModeConflicts(t *testing.T) {
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
-		nodeInfo            *framework.NodeInfo
+		nodeInfo            fwk.NodeInfo
 		existingPods        []*v1.Pod
 		existingNodes       []*v1.Node
 		existingPVCs        []*v1.PersistentVolumeClaim
-		preFilterWantStatus *framework.Status
-		wantStatus          *framework.Status
+		preFilterWantStatus *fwk.Status
+		wantStatus          *fwk.Status
 	}{
 		{
 			name:                "nothing",
@@ -418,7 +419,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingPods:        []*v1.Pod{},
 			existingNodes:       []*v1.Node{},
 			existingPVCs:        []*v1.PersistentVolumeClaim{},
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 			wantStatus:          nil,
 		},
 		{
@@ -428,7 +429,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingPods:        []*v1.Pod{},
 			existingNodes:       []*v1.Node{},
 			existingPVCs:        []*v1.PersistentVolumeClaim{},
-			preFilterWantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, "persistentvolumeclaim \"claim-with-rwop-1\" not found"),
+			preFilterWantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "persistentvolumeclaim \"claim-with-rwop-1\" not found"),
 			wantStatus:          nil,
 		},
 		{
@@ -438,7 +439,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingPods:        []*v1.Pod{podWithReadWriteManyPVC},
 			existingNodes:       []*v1.Node{node},
 			existingPVCs:        []*v1.PersistentVolumeClaim{readWriteOncePodPVC1, readWriteManyPVC},
-			preFilterWantStatus: framework.NewStatus(framework.Skip),
+			preFilterWantStatus: fwk.NewStatus(fwk.Skip),
 			wantStatus:          nil,
 		},
 		{
@@ -449,7 +450,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingNodes:       []*v1.Node{node},
 			existingPVCs:        []*v1.PersistentVolumeClaim{readWriteOncePodPVC1, readWriteManyPVC},
 			preFilterWantStatus: nil,
-			wantStatus:          framework.NewStatus(framework.Unschedulable, ErrReasonReadWriteOncePodConflict),
+			wantStatus:          fwk.NewStatus(fwk.Unschedulable, ErrReasonReadWriteOncePodConflict),
 		},
 		{
 			name:                "two conflicts, unschedulable",
@@ -459,7 +460,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			existingNodes:       []*v1.Node{node},
 			existingPVCs:        []*v1.PersistentVolumeClaim{readWriteOncePodPVC1, readWriteOncePodPVC2, readWriteManyPVC},
 			preFilterWantStatus: nil,
-			wantStatus:          framework.NewStatus(framework.Unschedulable, ErrReasonReadWriteOncePodConflict),
+			wantStatus:          fwk.NewStatus(fwk.Unschedulable, ErrReasonReadWriteOncePodConflict),
 		},
 	}
 
@@ -470,7 +471,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			defer cancel()
 			p := newPluginWithListers(ctx, t, test.existingPods, test.existingNodes, test.existingPVCs)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -579,7 +580,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 		oldObj, newObj interface{}
 		existingPods   []*v1.Pod
 		existingPVC    *v1.PersistentVolumeClaim
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"queue-new-object-gcedisk-conflict": {
@@ -587,7 +588,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podGCEDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-gcedisk-no-conflict": {
@@ -595,7 +596,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podGCEDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-new-object-awsdisk-conflict": {
@@ -603,7 +604,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podAWSDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-awsdisk-no-conflict": {
@@ -611,7 +612,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podAWSDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-new-object-rbddisk-conflict": {
@@ -619,7 +620,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podRBDDiskDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-rbddisk-no-conflict": {
@@ -627,7 +628,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podRBDDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-new-object-iscsidisk-conflict": {
@@ -635,7 +636,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podISCSIDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-iscsidisk-no-conflict": {
@@ -643,7 +644,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podISCSIDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-has-same-claim": {
@@ -651,7 +652,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       st.MakePod().Name("pod2").PVC("claim-rwop").Obj(),
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-no-same-claim": {
@@ -659,7 +660,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       st.MakePod().Name("pod2").PVC("claim-2-rwop").Obj(),
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 	}
@@ -718,42 +719,42 @@ func Test_isSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 		existingPods   []*v1.Pod
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"queue-new-object-pvc-belong-pod": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithTwoPVCs,
 			newObj:       PVC1,
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-unused": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithOnePVC,
 			newObj:       PVC2,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"skip-nil-old-object": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithOnePVC,
 			newObj:       PVC2,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"skip-new-object-not-belong-pod": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithOnePVC,
 			newObj:       PVC2,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"skip-new-object-namespace-not-equal-pod": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithNotEqualNamespace,
 			newObj:       PVC1,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 	}

@@ -18,10 +18,4 @@ limitations under the License.
 
 package v1alpha3
 
-type DeviceClassExpansion interface{}
-
-type ResourceClaimExpansion interface{}
-
-type ResourceClaimTemplateExpansion interface{}
-
-type ResourceSliceExpansion interface{}
+type DeviceTaintRuleExpansion interface{}

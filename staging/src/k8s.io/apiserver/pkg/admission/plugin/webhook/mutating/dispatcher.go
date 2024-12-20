@@ -261,7 +261,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	// Make the webhook request
 	client, err := invocation.Webhook.GetRESTClient(a.cm)
 	if err != nil {
-		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewBadRequest("error getting REST client")}
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("could not get REST client: %w", err), Status: apierrors.NewInternalError(err)}
 	}
 	ctx, span := tracing.Start(ctx, "Call mutating webhook",
 		attribute.String("configuration", configurationName),
@@ -305,7 +305,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 		if se, ok := err.(*apierrors.StatusError); ok {
 			status = se
 		} else {
-			status = apierrors.NewBadRequest("error calling webhook")
+			status = apierrors.NewServiceUnavailable("error calling webhook")
 		}
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("failed to call webhook: %w", err), Status: status}
 	}
@@ -335,7 +335,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	}
 	patchObj, err := jsonpatch.DecodePatch(result.Patch)
 	if err != nil {
-		return false, apierrors.NewInternalError(err)
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("received undecodable patch in webhook response: %w", err), Status: apierrors.NewServiceUnavailable("error decoding patch in webhook response")}
 	}
 
 	if len(patchObj) == 0 {

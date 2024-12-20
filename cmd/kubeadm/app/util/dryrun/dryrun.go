@@ -74,6 +74,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		if len(outputFilePath) == 0 {
 			outputFilePath = file.RealPath
 		}
+		outputFilePath = filepath.ToSlash(outputFilePath)
 
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
 		fmt.Fprintf(w, "%s", fileBytes)
@@ -91,12 +92,6 @@ func NewWaiter() apiclient.Waiter {
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, apiServerAddress string) error {
-	return nil
-}
-
-// WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForAPI() error {
-	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
 	return nil
 }
 

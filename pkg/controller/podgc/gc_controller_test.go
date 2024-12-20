@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func alwaysReady() bool { return true }
@@ -687,7 +687,7 @@ func TestGCInspectingPatchedPodBeforeDeletion(t *testing.T) {
 			},
 			expectedDeleteAction: &clienttesting.DeleteActionImpl{
 				Name:          "testPod",
-				DeleteOptions: metav1.DeleteOptions{GracePeriodSeconds: pointer.Int64(0)},
+				DeleteOptions: metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)},
 			},
 		},
 	}

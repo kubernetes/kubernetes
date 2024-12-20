@@ -152,7 +152,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 	case p.Exec != nil:
 		klog.V(4).InfoS("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
-		return pb.exec.Probe(pb.newExecInContainer(ctx, container, containerID, command, timeout))
+		return pb.exec.Probe(pb.newExecInContainer(ctx, pod, container, containerID, command, timeout))
 
 	case p.HTTPGet != nil:
 		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
@@ -202,14 +202,18 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 type execInContainer struct {
 	// run executes a command in a container. Combined stdout and stderr output is always returned. An
 	// error is returned if one occurred.
-	run    func() ([]byte, error)
-	writer io.Writer
+	run       func() ([]byte, error)
+	writer    io.Writer
+	pod       *v1.Pod
+	container v1.Container
 }
 
-func (pb *prober) newExecInContainer(ctx context.Context, container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
-	return &execInContainer{run: func() ([]byte, error) {
-		return pb.runner.RunInContainer(ctx, containerID, cmd, timeout)
-	}}
+func (pb *prober) newExecInContainer(ctx context.Context, pod *v1.Pod, container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
+	return &execInContainer{
+		run:       func() ([]byte, error) { return pb.runner.RunInContainer(ctx, containerID, cmd, timeout) },
+		pod:       pod,
+		container: container,
+	}
 }
 
 func (eic *execInContainer) Run() error {
@@ -253,7 +257,7 @@ func (eic *execInContainer) Start() error {
 	if eic.writer != nil {
 		// only record the write error, do not cover the command run error
 		if p, err := eic.writer.Write(data); err != nil {
-			klog.ErrorS(err, "Unable to write all bytes from execInContainer", "expectedBytes", len(data), "actualBytes", p)
+			klog.ErrorS(err, "Unable to write all bytes from execInContainer", "expectedBytes", len(data), "actualBytes", p, "pod", klog.KObj(eic.pod), "containerName", eic.container.Name)
 		}
 	}
 	return err

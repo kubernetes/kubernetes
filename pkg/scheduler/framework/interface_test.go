@@ -24,17 +24,18 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-var errorStatus = NewStatus(Error, "internal error")
-var statusWithErr = AsStatus(errors.New("internal error"))
+var errorStatus = fwk.NewStatus(fwk.Error, "internal error")
+var statusWithErr = fwk.AsStatus(errors.New("internal error"))
 
 func TestStatus(t *testing.T) {
 	tests := []struct {
 		name              string
-		status            *Status
-		expectedCode      Code
+		status            *fwk.Status
+		expectedCode      fwk.Code
 		expectedMessage   string
 		expectedIsSuccess bool
 		expectedIsWait    bool
@@ -43,8 +44,8 @@ func TestStatus(t *testing.T) {
 	}{
 		{
 			name:              "success status",
-			status:            NewStatus(Success, ""),
-			expectedCode:      Success,
+			status:            fwk.NewStatus(fwk.Success, ""),
+			expectedCode:      fwk.Success,
 			expectedMessage:   "",
 			expectedIsSuccess: true,
 			expectedIsWait:    false,
@@ -53,8 +54,8 @@ func TestStatus(t *testing.T) {
 		},
 		{
 			name:              "wait status",
-			status:            NewStatus(Wait, ""),
-			expectedCode:      Wait,
+			status:            fwk.NewStatus(fwk.Wait, ""),
+			expectedCode:      fwk.Wait,
 			expectedMessage:   "",
 			expectedIsSuccess: false,
 			expectedIsWait:    true,
@@ -63,8 +64,8 @@ func TestStatus(t *testing.T) {
 		},
 		{
 			name:              "error status",
-			status:            NewStatus(Error, "unknown error"),
-			expectedCode:      Error,
+			status:            fwk.NewStatus(fwk.Error, "unknown error"),
+			expectedCode:      fwk.Error,
 			expectedMessage:   "unknown error",
 			expectedIsSuccess: false,
 			expectedIsWait:    false,
@@ -73,8 +74,8 @@ func TestStatus(t *testing.T) {
 		},
 		{
 			name:              "skip status",
-			status:            NewStatus(Skip, ""),
-			expectedCode:      Skip,
+			status:            fwk.NewStatus(fwk.Skip, ""),
+			expectedCode:      fwk.Skip,
 			expectedMessage:   "",
 			expectedIsSuccess: false,
 			expectedIsWait:    false,
@@ -84,7 +85,7 @@ func TestStatus(t *testing.T) {
 		{
 			name:              "nil status",
 			status:            nil,
-			expectedCode:      Success,
+			expectedCode:      fwk.Success,
 			expectedMessage:   "",
 			expectedIsSuccess: true,
 			expectedIsSkip:    false,
@@ -183,7 +184,7 @@ func TestPreFilterResultMerge(t *testing.T) {
 func TestIsStatusEqual(t *testing.T) {
 	tests := []struct {
 		name string
-		x, y *Status
+		x, y *fwk.Status
 		want bool
 	}{
 		{
@@ -195,13 +196,13 @@ func TestIsStatusEqual(t *testing.T) {
 		{
 			name: "nil should be equal to success status",
 			x:    nil,
-			y:    NewStatus(Success),
+			y:    fwk.NewStatus(fwk.Success),
 			want: true,
 		},
 		{
 			name: "nil should not be equal with status except success",
 			x:    nil,
-			y:    NewStatus(Error, "internal error"),
+			y:    fwk.NewStatus(fwk.Error, "internal error"),
 			want: false,
 		},
 		{
@@ -212,44 +213,44 @@ func TestIsStatusEqual(t *testing.T) {
 		},
 		{
 			name: "same type statuses without reasons should be equal",
-			x:    NewStatus(Success),
-			y:    NewStatus(Success),
+			x:    fwk.NewStatus(fwk.Success),
+			y:    fwk.NewStatus(fwk.Success),
 			want: true,
 		},
 		{
 			name: "statuses with same message should be equal",
-			x:    NewStatus(Unschedulable, "unschedulable"),
-			y:    NewStatus(Unschedulable, "unschedulable"),
+			x:    fwk.NewStatus(fwk.Unschedulable, "unschedulable"),
+			y:    fwk.NewStatus(fwk.Unschedulable, "unschedulable"),
 			want: true,
 		},
 		{
 			name: "error statuses with same message should be equal",
-			x:    NewStatus(Error, "error"),
-			y:    NewStatus(Error, "error"),
+			x:    fwk.NewStatus(fwk.Error, "error"),
+			y:    fwk.NewStatus(fwk.Error, "error"),
 			want: true,
 		},
 		{
 			name: "statuses with different reasons should not be equal",
-			x:    NewStatus(Unschedulable, "unschedulable"),
-			y:    NewStatus(Unschedulable, "unschedulable", "injected filter status"),
+			x:    fwk.NewStatus(fwk.Unschedulable, "unschedulable"),
+			y:    fwk.NewStatus(fwk.Unschedulable, "unschedulable", "injected filter status"),
 			want: false,
 		},
 		{
 			name: "statuses with different codes should not be equal",
-			x:    NewStatus(Error, "internal error"),
-			y:    NewStatus(Unschedulable, "internal error"),
+			x:    fwk.NewStatus(fwk.Error, "internal error"),
+			y:    fwk.NewStatus(fwk.Unschedulable, "internal error"),
 			want: false,
 		},
 		{
 			name: "wrap error status should be equal with original one",
 			x:    statusWithErr,
-			y:    AsStatus(fmt.Errorf("error: %w", statusWithErr.AsError())),
+			y:    fwk.AsStatus(fmt.Errorf("error: %w", statusWithErr.AsError())),
 			want: true,
 		},
 		{
 			name: "statues with different errors that have the same message shouldn't be equal",
-			x:    AsStatus(errors.New("error")),
-			y:    AsStatus(errors.New("error")),
+			x:    fwk.AsStatus(errors.New("error")),
+			y:    fwk.AsStatus(errors.New("error")),
 			want: false,
 		},
 	}
@@ -262,9 +263,9 @@ func TestIsStatusEqual(t *testing.T) {
 	}
 }
 
-type nodeInfoLister []*NodeInfo
+type nodeInfoLister []fwk.NodeInfo
 
-func (nodes nodeInfoLister) Get(nodeName string) (*NodeInfo, error) {
+func (nodes nodeInfoLister) Get(nodeName string) (fwk.NodeInfo, error) {
 	for _, node := range nodes {
 		if node != nil && node.Node().Name == nodeName {
 			return node, nil
@@ -273,15 +274,15 @@ func (nodes nodeInfoLister) Get(nodeName string) (*NodeInfo, error) {
 	return nil, fmt.Errorf("unable to find node: %s", nodeName)
 }
 
-func (nodes nodeInfoLister) List() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) List() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nodes, nil
 }
 
@@ -291,63 +292,63 @@ func TestNodesForStatusCode(t *testing.T) {
 	tests := []struct {
 		name          string
 		nodesStatuses *NodeToStatus
-		code          Code
+		code          fwk.Code
 		expected      sets.Set[string] // set of expected node names.
 	}{
 		{
 			name: "No node should be attempted",
-			nodesStatuses: NewNodeToStatus(map[string]*Status{
-				"node1": NewStatus(UnschedulableAndUnresolvable),
-				"node2": NewStatus(UnschedulableAndUnresolvable),
-				"node3": NewStatus(UnschedulableAndUnresolvable),
-				"node4": NewStatus(UnschedulableAndUnresolvable),
-			}, NewStatus(UnschedulableAndUnresolvable)),
-			code:     Unschedulable,
+			nodesStatuses: NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node2": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node3": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node4": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			code:     fwk.Unschedulable,
 			expected: sets.New[string](),
 		},
 		{
 			name: "All nodes should be attempted",
-			nodesStatuses: NewNodeToStatus(map[string]*Status{
-				"node1": NewStatus(UnschedulableAndUnresolvable),
-				"node2": NewStatus(UnschedulableAndUnresolvable),
-				"node3": NewStatus(UnschedulableAndUnresolvable),
-				"node4": NewStatus(UnschedulableAndUnresolvable),
-			}, NewStatus(UnschedulableAndUnresolvable)),
-			code:     UnschedulableAndUnresolvable,
+			nodesStatuses: NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node2": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node3": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node4": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			code:     fwk.UnschedulableAndUnresolvable,
 			expected: sets.New[string]("node1", "node2", "node3", "node4"),
 		},
 		{
 			name:          "No node should be attempted, as all are implicitly not matching the code",
 			nodesStatuses: NewDefaultNodeToStatus(),
-			code:          Unschedulable,
+			code:          fwk.Unschedulable,
 			expected:      sets.New[string](),
 		},
 		{
 			name:          "All nodes should be attempted, as all are implicitly matching the code",
 			nodesStatuses: NewDefaultNodeToStatus(),
-			code:          UnschedulableAndUnresolvable,
+			code:          fwk.UnschedulableAndUnresolvable,
 			expected:      sets.New[string]("node1", "node2", "node3", "node4"),
 		},
 		{
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
-			nodesStatuses: NewNodeToStatus(map[string]*Status{
-				"node1": NewStatus(Unschedulable),
-				"node2": NewStatus(UnschedulableAndUnresolvable),
-				"node3": NewStatus(Unschedulable),
+			nodesStatuses: NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+				"node2": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node3": fwk.NewStatus(fwk.Unschedulable),
 				// node4 is UnschedulableAndUnresolvable by absence
-			}, NewStatus(UnschedulableAndUnresolvable)),
-			code:     Unschedulable,
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			code:     fwk.Unschedulable,
 			expected: sets.New("node1", "node3"),
 		},
 		{
 			name: "Unschedulable status should be skipped but UnschedulableAndUnresolvable should be tried",
-			nodesStatuses: NewNodeToStatus(map[string]*Status{
-				"node1": NewStatus(Unschedulable),
-				"node2": NewStatus(UnschedulableAndUnresolvable),
-				"node3": NewStatus(Unschedulable),
+			nodesStatuses: NewNodeToStatus(map[string]*fwk.Status{
+				"node1": fwk.NewStatus(fwk.Unschedulable),
+				"node2": fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+				"node3": fwk.NewStatus(fwk.Unschedulable),
 				// node4 is UnschedulableAndUnresolvable by absence
-			}, NewStatus(UnschedulableAndUnresolvable)),
-			code:     UnschedulableAndUnresolvable,
+			}, fwk.NewStatus(fwk.UnschedulableAndUnresolvable)),
+			code:     fwk.UnschedulableAndUnresolvable,
 			expected: sets.New("node2", "node4"),
 		},
 	}

@@ -77,6 +77,23 @@ message CarpCondition {
   optional string message = 6;
 }
 
+message CarpInfo {
+  // A is the first map key.
+  // +required
+  optional int64 a = 1;
+
+  // B is the second map key.
+  // +required
+  optional string b = 2;
+
+  // C is the third, optional map key
+  // +optional
+  optional string c = 4;
+
+  // Some data for each pair of A and B.
+  optional string data = 3;
+}
+
 // CarpList is a list of Carps.
 message CarpList {
   // Standard list metadata.
@@ -129,7 +146,7 @@ message CarpSpec {
   // Deprecated: Use serviceAccountName instead.
   // +k8s:conversion-gen=false
   // +optional
-  optional string serviceAccount = 9;
+  optional string deprecatedServiceAccount = 9;
 
   // NodeName is a request to schedule this carp onto a specific node. If it is non-empty,
   // the scheduler simply schedules this carp onto that node, assuming that it fits resource
@@ -138,7 +155,6 @@ message CarpSpec {
   optional string nodeName = 10;
 
   // Host networking requested for this carp. Use the host's network namespace.
-  // If this option is set, the ports that will be used must be specified.
   // Default to false.
   // +k8s:conversion-gen=false
   // +optional
@@ -169,7 +185,7 @@ message CarpSpec {
   // If specified, the carp will be dispatched by specified scheduler.
   // If not specified, the carp will be dispatched by default scheduler.
   // +optional
-  optional string schedulername = 19;
+  optional string schedulerName = 19;
 }
 
 // CarpStatus represents information about the status of a carp. Status may trail the actual
@@ -182,6 +198,10 @@ message CarpStatus {
 
   // Current service state of carp.
   // More info: http://kubernetes.io/docs/user-guide/carp-states#carp-conditions
+  // +patchStrategy=merge
+  // +patchMergeKey=type
+  // +listType=map
+  // +listMapKey=type
   // +optional
   repeated CarpCondition conditions = 2;
 
@@ -207,5 +227,13 @@ message CarpStatus {
   // This is before the Kubelet pulled the container image(s) for the carp.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time startTime = 7;
+
+  // Carp infos are provided by different clients, hence the map type.
+  //
+  // +listType=map
+  // +listMapKey=a
+  // +listMapKey=b
+  // +listMapKey=c
+  repeated CarpInfo infos = 8;
 }
 

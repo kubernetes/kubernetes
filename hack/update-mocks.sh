@@ -27,7 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 echo 'installing mockery'
-go -C "${KUBE_ROOT}/hack/tools" install github.com/vektra/mockery/v2
+GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/vektra/mockery/v2
 
 function git_grep() {
   git grep --untracked --exclude-standard \

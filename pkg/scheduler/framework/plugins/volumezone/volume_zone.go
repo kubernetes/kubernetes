@@ -32,6 +32,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -54,7 +55,7 @@ const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.VolumeZone
 
-	preFilterStateKey framework.StateKey = "PreFilter" + Name
+	preFilterStateKey fwk.StateKey = "PreFilter" + Name
 
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"
@@ -68,7 +69,7 @@ type pvTopology struct {
 }
 
 // the state is initialized in PreFilter phase. because we save the pointer in
-// framework.CycleState, in the later phases we don't need to call Write method
+// fwk.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
 	// podPVTopologies holds the pv information we need
@@ -76,7 +77,7 @@ type stateData struct {
 	podPVTopologies []pvTopology
 }
 
-func (d *stateData) Clone() framework.StateData {
+func (d *stateData) Clone() fwk.StateData {
 	return d
 }
 
@@ -108,27 +109,27 @@ func (pl *VolumeZone) Name() string {
 //
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
-func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeZone) PreFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {
 		return nil, status
 	}
 	if len(podPVTopologies) == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cs.Write(preFilterStateKey, &stateData{podPVTopologies: podPVTopologies})
 	return nil, nil
 }
 
 // getPVbyPod gets PVTopology from pod
-func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *framework.Status) {
+func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology, *fwk.Status) {
 	podPVTopologies := make([]pvTopology, 0)
 
 	pvcNames := pl.getPersistentVolumeClaimNameFromPod(pod)
 	for _, pvcName := range pvcNames {
 		if pvcName == "" {
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
+			return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if s := getErrorAsStatus(err); !s.IsSuccess() {
@@ -139,7 +140,7 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 		if pvName == "" {
 			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 			if len(scName) == 0 {
-				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
+				return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
 
 			class, err := pl.scLister.Get(scName)
@@ -147,14 +148,14 @@ func (pl *VolumeZone) getPVbyPod(logger klog.Logger, pod *v1.Pod) ([]pvTopology,
 				return nil, s
 			}
 			if class.VolumeBindingMode == nil {
-				return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+				return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
 			}
 			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
 				// Skip unbound volumes
 				continue
 			}
 
-			return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
+			return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
@@ -187,7 +188,7 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
@@ -198,7 +199,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	state, err := getStateData(cs)
 	if err != nil {
 		// Fallback to calculate pv list here
-		var status *framework.Status
+		var status *fwk.Status
 		podPVTopologies, status = pl.getPVbyPod(logger, pod)
 		if !status.IsSuccess() {
 			return status
@@ -230,14 +231,14 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 		}
 		if !ok || !pvTopology.values.Has(v) {
 			logger.V(10).Info("Won't schedule pod onto node due to volume (mismatch on label key)", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonConflict)
 		}
 	}
 
 	return nil
 }
 
-func getStateData(cs *framework.CycleState) (*stateData, error) {
+func getStateData(cs fwk.CycleState) (*stateData, error) {
 	state, err := cs.Read(preFilterStateKey)
 	if err != nil {
 		return nil, err
@@ -249,40 +250,40 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 	return s, nil
 }
 
-func getErrorAsStatus(err error) *framework.Status {
+func getErrorAsStatus(err error) *fwk.Status {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
 		}
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	return nil
 }
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeZone) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *VolumeZone) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	// A new node or updating a node's volume zone labels may make a pod schedulable.
 	// A note about UpdateNodeTaint event:
 	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
 	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
 	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
 	if pl.enableSchedulingQueueHint {
 		// preCheck is not used when QHint is enabled.
-		nodeActionType = framework.Add | framework.UpdateNodeLabel
+		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
 	}
 
-	return []framework.ClusterEventWithHint{
+	return []fwk.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
+		{Event: fwk.ClusterEvent{Resource: fwk.StorageClass, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 		// A new pvc may make a pod schedulable.
 		// Also, if pvc's VolumeName is filled, that also could make a pod schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
 	}, nil
 }
 
@@ -302,18 +303,18 @@ func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string 
 
 // isSchedulableAfterPersistentVolumeClaimChange is invoked whenever a PersistentVolumeClaim added or updated.
 // It checks whether the change of PVC has made a previously unschedulable pod schedulable.
-func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, modifiedPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
 	}
 	if pl.isPVCRequestedFromPod(logger, modifiedPVC, pod) {
 		logger.V(5).Info("PVC that is referred from the pod was created or updated, which might make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("PVC irrelevant to the Pod was created or updated, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // isPVCRequestedFromPod verifies if the PVC is requested from a given Pod.
@@ -335,41 +336,41 @@ func (pl *VolumeZone) isPVCRequestedFromPod(logger klog.Logger, pvc *v1.Persiste
 // isSchedulableAfterStorageClassAdded is invoked whenever a StorageClass is added.
 // It checks whether the addition of StorageClass has made a previously unschedulable pod schedulable.
 // Only a new StorageClass with WaitForFirstConsumer will cause a pod to become schedulable.
-func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, addedStorageClass, err := util.As[*storage.StorageClass](nil, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
 	}
 	if (addedStorageClass.VolumeBindingMode == nil) || (*addedStorageClass.VolumeBindingMode != storage.VolumeBindingWaitForFirstConsumer) {
 		logger.V(5).Info("StorageClass is created, but its VolumeBindingMode is not waitForFirstConsumer, which doesn't make the pod schedulable", "storageClass", klog.KObj(addedStorageClass), "pod", klog.KObj(pod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	logger.V(5).Info("StorageClass with waitForFirstConsumer mode was created and it might make this pod schedulable", "pod", klog.KObj(pod), "StorageClass", klog.KObj(addedStorageClass))
-	return framework.Queue, nil
+	return fwk.Queue, nil
 }
 
 // isSchedulableAfterPersistentVolumeChange is invoked whenever a PersistentVolume added or updated.
 // It checks whether the change of PV has made a previously unschedulable pod schedulable.
 // Changing the PV topology labels could cause the pod to become schedulable.
-func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalPV, modifiedPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
 	}
 	if originalPV == nil {
 		logger.V(5).Info("PV is newly created, which might make the pod schedulable")
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 	originalPVTopologies := pl.getPVTopologies(logger, originalPV)
 	modifiedPVTopologies := pl.getPVTopologies(logger, modifiedPV)
 	if !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
 		logger.V(5).Info("PV's topology was updated, which might make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("PV was updated, but the topology is unchanged, which it doesn't make the pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // getPVTopologies retrieves pvTopology from a given PV and returns the array

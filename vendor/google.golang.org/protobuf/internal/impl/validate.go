@@ -37,6 +37,10 @@ const (
 
 	// ValidationValid indicates that unmarshaling the message will succeed.
 	ValidationValid
+
+	// ValidationWrongWireType indicates that a validated field does not have
+	// the expected wire type.
+	ValidationWrongWireType
 )
 
 func (v ValidationStatus) String() string {
@@ -149,11 +153,23 @@ func newValidationInfo(fd protoreflect.FieldDescriptor, ft reflect.Type) validat
 		switch fd.Kind() {
 		case protoreflect.MessageKind:
 			vi.typ = validationTypeMessage
+
+			if ft.Kind() == reflect.Ptr {
+				// Repeated opaque message fields are *[]*T.
+				ft = ft.Elem()
+			}
+
 			if ft.Kind() == reflect.Slice {
 				vi.mi = getMessageInfo(ft.Elem())
 			}
 		case protoreflect.GroupKind:
 			vi.typ = validationTypeGroup
+
+			if ft.Kind() == reflect.Ptr {
+				// Repeated opaque message fields are *[]*T.
+				ft = ft.Elem()
+			}
+
 			if ft.Kind() == reflect.Slice {
 				vi.mi = getMessageInfo(ft.Elem())
 			}
@@ -195,9 +211,7 @@ func newValidationInfo(fd protoreflect.FieldDescriptor, ft reflect.Type) validat
 		switch fd.Kind() {
 		case protoreflect.MessageKind:
 			vi.typ = validationTypeMessage
-			if !fd.IsWeak() {
-				vi.mi = getMessageInfo(ft)
-			}
+			vi.mi = getMessageInfo(ft)
 		case protoreflect.GroupKind:
 			vi.typ = validationTypeGroup
 			vi.mi = getMessageInfo(ft)
@@ -304,26 +318,6 @@ State:
 				}
 				if f != nil {
 					vi = f.validation
-					if vi.typ == validationTypeMessage && vi.mi == nil {
-						// Probable weak field.
-						//
-						// TODO: Consider storing the results of this lookup somewhere
-						// rather than recomputing it on every validation.
-						fd := st.mi.Desc.Fields().ByNumber(num)
-						if fd == nil || !fd.IsWeak() {
-							break
-						}
-						messageName := fd.Message().FullName()
-						messageType, err := protoregistry.GlobalTypes.FindMessageByName(messageName)
-						switch err {
-						case nil:
-							vi.mi, _ = messageType.(*MessageInfo)
-						case protoregistry.NotFound:
-							vi.typ = validationTypeBytes
-						default:
-							return out, ValidationUnknown
-						}
-					}
 					break
 				}
 				// Possible extension field.

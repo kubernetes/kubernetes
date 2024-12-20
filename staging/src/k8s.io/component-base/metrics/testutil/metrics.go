@@ -38,8 +38,20 @@ var (
 	QuantileLabel model.LabelName = model.QuantileLabel
 )
 
-// Metrics is generic metrics for other specific metrics
-type Metrics map[string]model.Samples
+// Metrics is generic metrics for other specific metrics.
+// This directly exposes Prometheus types. Test code may
+// use those via type aliases provided by this package
+// instead of imorting the Prometheus packages (https://github.com/kubernetes/kubernetes/issues/89267).
+type Metrics map[string]Samples
+type Samples = model.Samples
+type Sample = model.Sample
+type Metric = model.Metric
+type LabelValue = model.LabelValue
+type LabelName = model.LabelName
+type SampleHistogram = model.SampleHistogram
+type FloatString = model.FloatString
+type HistogramBuckets = model.HistogramBuckets
+type HistogramBucket = model.HistogramBucket
 
 // Equal returns true if all metrics are the same as the arguments.
 func (m *Metrics) Equal(o Metrics) bool {
@@ -278,10 +290,6 @@ func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, l
 		}
 	}
 	return vec, nil
-}
-
-func uint64Ptr(u uint64) *uint64 {
-	return &u
 }
 
 // Bucket of a histogram

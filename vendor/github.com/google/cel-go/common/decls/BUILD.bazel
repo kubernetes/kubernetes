@@ -13,7 +13,9 @@ go_library(
     importpath = "github.com/google/cel-go/common/decls",
     deps = [
         "//checker/decls:go_default_library",
+        "//common:go_default_library",
         "//common/functions:go_default_library",
+        "//common/operators:go_default_library",
         "//common/types:go_default_library",
         "//common/types/ref:go_default_library",
         "//common/types/traits:go_default_library",

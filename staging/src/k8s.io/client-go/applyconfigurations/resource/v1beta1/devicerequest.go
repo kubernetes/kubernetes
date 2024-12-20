@@ -25,12 +25,15 @@ import (
 // DeviceRequestApplyConfiguration represents a declarative configuration of the DeviceRequest type for use
 // with apply.
 type DeviceRequestApplyConfiguration struct {
-	Name            *string                               `json:"name,omitempty"`
-	DeviceClassName *string                               `json:"deviceClassName,omitempty"`
-	Selectors       []DeviceSelectorApplyConfiguration    `json:"selectors,omitempty"`
-	AllocationMode  *resourcev1beta1.DeviceAllocationMode `json:"allocationMode,omitempty"`
-	Count           *int64                                `json:"count,omitempty"`
-	AdminAccess     *bool                                 `json:"adminAccess,omitempty"`
+	Name            *string                                 `json:"name,omitempty"`
+	DeviceClassName *string                                 `json:"deviceClassName,omitempty"`
+	Selectors       []DeviceSelectorApplyConfiguration      `json:"selectors,omitempty"`
+	AllocationMode  *resourcev1beta1.DeviceAllocationMode   `json:"allocationMode,omitempty"`
+	Count           *int64                                  `json:"count,omitempty"`
+	AdminAccess     *bool                                   `json:"adminAccess,omitempty"`
+	FirstAvailable  []DeviceSubRequestApplyConfiguration    `json:"firstAvailable,omitempty"`
+	Tolerations     []DeviceTolerationApplyConfiguration    `json:"tolerations,omitempty"`
+	Capacity        *CapacityRequirementsApplyConfiguration `json:"capacity,omitempty"`
 }
 
 // DeviceRequestApplyConfiguration constructs a declarative configuration of the DeviceRequest type for use with
@@ -89,5 +92,39 @@ func (b *DeviceRequestApplyConfiguration) WithCount(value int64) *DeviceRequestA
 // If called multiple times, the AdminAccess field is set to the value of the last call.
 func (b *DeviceRequestApplyConfiguration) WithAdminAccess(value bool) *DeviceRequestApplyConfiguration {
 	b.AdminAccess = &value
+	return b
+}
+
+// WithFirstAvailable adds the given value to the FirstAvailable field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the FirstAvailable field.
+func (b *DeviceRequestApplyConfiguration) WithFirstAvailable(values ...*DeviceSubRequestApplyConfiguration) *DeviceRequestApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithFirstAvailable")
+		}
+		b.FirstAvailable = append(b.FirstAvailable, *values[i])
+	}
+	return b
+}
+
+// WithTolerations adds the given value to the Tolerations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Tolerations field.
+func (b *DeviceRequestApplyConfiguration) WithTolerations(values ...*DeviceTolerationApplyConfiguration) *DeviceRequestApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTolerations")
+		}
+		b.Tolerations = append(b.Tolerations, *values[i])
+	}
+	return b
+}
+
+// WithCapacity sets the Capacity field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Capacity field is set to the value of the last call.
+func (b *DeviceRequestApplyConfiguration) WithCapacity(value *CapacityRequirementsApplyConfiguration) *DeviceRequestApplyConfiguration {
+	b.Capacity = value
 	return b
 }

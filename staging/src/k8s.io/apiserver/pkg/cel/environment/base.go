@@ -176,6 +176,20 @@ var baseOptsWithoutStrictCost = []VersionedOptions{
 			ext.TwoVarComprehensions(),
 		},
 	},
+	// Semver
+	{
+		IntroducedVersion: version.MajorMinor(1, 33),
+		EnvOptions: []cel.EnvOption{
+			library.SemverLib(library.SemverVersion(1)),
+		},
+	},
+	// List library
+	{
+		IntroducedVersion: version.MajorMinor(1, 34),
+		EnvOptions: []cel.EnvOption{
+			ext.Lists(ext.ListsVersion(3)),
+		},
+	},
 }
 
 var (

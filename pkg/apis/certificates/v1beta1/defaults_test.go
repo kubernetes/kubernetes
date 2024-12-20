@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	capi "k8s.io/api/certificates/v1beta1"
+	"k8s.io/utils/ptr"
 )
 
 func TestIsKubeletServingCSR(t *testing.T) {
@@ -213,7 +214,6 @@ var (
 )
 
 func TestSetDefaults_CertificateSigningRequestSpec(t *testing.T) {
-	strPtr := func(s string) *string { return &s }
 	tests := map[string]struct {
 		csr                capi.CertificateSigningRequestSpec
 		expectedSignerName string
@@ -230,14 +230,14 @@ func TestSetDefaults_CertificateSigningRequestSpec(t *testing.T) {
 			csr: capi.CertificateSigningRequestSpec{
 				Request:    csrWithOpts(kubeletServerPEMOptions),
 				Usages:     kubeletServerUsages,
-				SignerName: strPtr("example.com/not-kubelet-serving"),
+				SignerName: ptr.To("example.com/not-kubelet-serving"),
 			},
 			expectedSignerName: "example.com/not-kubelet-serving",
 		},
 		"defaults usages if not set": {
 			csr: capi.CertificateSigningRequestSpec{
 				Request:    csrWithOpts(kubeletServerPEMOptions),
-				SignerName: strPtr("example.com/test"),
+				SignerName: ptr.To("example.com/test"),
 			},
 			expectedSignerName: "example.com/test",
 			expectedUsages:     []capi.KeyUsage{capi.UsageDigitalSignature, capi.UsageKeyEncipherment},

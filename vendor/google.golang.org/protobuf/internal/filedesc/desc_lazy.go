@@ -32,11 +32,6 @@ func (file *File) resolveMessages() {
 		for j := range md.L2.Fields.List {
 			fd := &md.L2.Fields.List[j]
 
-			// Weak fields are resolved upon actual use.
-			if fd.L1.IsWeak {
-				continue
-			}
-
 			// Resolve message field dependency.
 			switch fd.L1.Kind {
 			case protoreflect.EnumKind:
@@ -150,8 +145,6 @@ func (fd *File) unmarshalFull(b []byte) {
 			switch num {
 			case genid.FileDescriptorProto_PublicDependency_field_number:
 				fd.L2.Imports[v].IsPublic = true
-			case genid.FileDescriptorProto_WeakDependency_field_number:
-				fd.L2.Imports[v].IsWeak = true
 			}
 		case protowire.BytesType:
 			v, m := protowire.ConsumeBytes(b)
@@ -502,8 +495,6 @@ func (fd *Field) unmarshalOptions(b []byte) {
 			switch num {
 			case genid.FieldOptions_Packed_field_number:
 				fd.L1.EditionFeatures.IsPacked = protowire.DecodeBool(v)
-			case genid.FieldOptions_Weak_field_number:
-				fd.L1.IsWeak = protowire.DecodeBool(v)
 			case genid.FieldOptions_Lazy_field_number:
 				fd.L1.IsLazy = protowire.DecodeBool(v)
 			case FieldOptions_EnforceUTF8:

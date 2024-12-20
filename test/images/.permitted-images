@@ -4,7 +4,6 @@
 # The sources for which are in test/images/agnhost.
 # If agnhost is missing functionality for your tests, please reach out to SIG Testing.
 gcr.io/authenticated-image-pulling/alpine
-gcr.io/authenticated-image-pulling/windows-nanoserver
 gcr.io/k8s-authenticated-test/agnhost
 invalid.registry.k8s.io/invalid/alpine
 registry.k8s.io/build-image/distroless-iptables
@@ -24,7 +23,6 @@ registry.k8s.io/e2e-test-images/node-perf/tf-wide-deep
 registry.k8s.io/e2e-test-images/nonewprivs
 registry.k8s.io/e2e-test-images/nonroot
 registry.k8s.io/e2e-test-images/perl
-registry.k8s.io/e2e-test-images/redis
 registry.k8s.io/e2e-test-images/regression-issue-74839
 registry.k8s.io/e2e-test-images/resource-consumer
 registry.k8s.io/e2e-test-images/sample-apiserver

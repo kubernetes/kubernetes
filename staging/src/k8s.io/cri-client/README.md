@@ -1,3 +1,8 @@
+> ⚠️ **This is an automatically published [staged repository](https://git.k8s.io/kubernetes/staging#external-repository-staging-area) for Kubernetes**.   
+> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> This repository is read-only for importing, and not used for direct contributions.  
+> See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
+
 # cri-client
 
 Container Runtime Interface client implementation
@@ -34,7 +39,7 @@ You can reach the maintainers of this repository at:
 - Slack: #sig-node (on https://kubernetes.slack.com -- get an
   invite at [slack.kubernetes.io](https://slack.kubernetes.io))
 - Mailing List:
-  https://groups.google.com/forum/#!forum/kubernetes-sig-node
+  https://groups.google.com/a/kubernetes.io/g/sig-node
 
 ### Code of Conduct
 

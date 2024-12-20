@@ -72,7 +72,7 @@ func newValidationAdmissionMetrics() *ValidatingAdmissionPolicyMetrics {
 		Subsystem: metricsSubsystem,
 		Name:      "check_duration_seconds",
 		Help:      "Validation admission latency for individual validation expressions in seconds, labeled by policy and further including binding and enforcement action taken.",
-		// the bucket distribution here is based oo the benchmark suite at
+		// the bucket distribution here is based on the benchmark suite at
 		// github.com/DangerOnTheRanger/cel-benchmark performed on 16-core Intel Xeon
 		// the lowest bucket was based around the 180ns/op figure for BenchmarkAccess,
 		// plus some additional leeway to account for the apiserver doing other things

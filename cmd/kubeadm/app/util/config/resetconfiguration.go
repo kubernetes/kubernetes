@@ -20,8 +20,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 
@@ -32,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
@@ -91,7 +90,15 @@ func LoadResetConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurat
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
+	return BytesToResetConfiguration(b, opts)
+}
+
+// BytesToResetConfiguration converts a byte slice to an internal, defaulted and validated ResetConfiguration object.
+// The map may contain many different YAML/JSON documents. These documents are parsed one-by-one.
+// The resulting ResetConfiguration is then dynamically defaulted and validated prior to return.
+func BytesToResetConfiguration(b []byte, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.ResetConfiguration, error) {
+	// Split the YAML/JSON documents in the file into a DocumentMap
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
 	if err != nil {
 		return nil, err
 	}
@@ -99,13 +106,14 @@ func LoadResetConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurat
 	return documentMapToResetConfiguration(gvkmap, false, opts.AllowExperimental, false, opts.SkipCRIDetect)
 }
 
-// documentMapToResetConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
+// documentMapToResetConfiguration takes a map between GVKs and YAML/JSON documents (as returned by SplitYAMLDocuments),
 // finds a ResetConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
 func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental bool, strictErrors bool, skipCRIDetect bool) (*kubeadmapi.ResetConfiguration, error) {
 	resetBytes := []byte{}
 	for gvk, bytes := range gvkmap {
 		// not interested in anything other than ResetConfiguration
 		if gvk.Kind != constants.ResetConfigurationKind {
+			klog.Warningf("[config] WARNING: Ignored configuration document with GroupVersionKind %v\n", gvk)
 			continue
 		}
 
@@ -114,7 +122,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 			return nil, err
 		}
 
-		// verify the validity of the YAML
+		// verify the validity of the YAML/JSON
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
 			if !strictErrors {
 				klog.Warning(err.Error())
@@ -127,7 +135,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 	}
 
 	if len(resetBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
+		return nil, errors.Errorf("no %s found in the supplied config", constants.ResetConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.ResetConfiguration{}

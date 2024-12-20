@@ -61,7 +61,7 @@ type DesiredStateOfWorld interface {
 	// added.
 	// If a pod with the same unique name already exists under the specified
 	// volume, this is a no-op.
-	AddPodToVolume(podName types.UniquePodName, pod *v1.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGIDValue string, seLinuxContainerContexts []*v1.SELinuxOptions) (v1.UniqueVolumeName, error)
+	AddPodToVolume(logger klog.Logger, podName types.UniquePodName, pod *v1.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGIDValue string, seLinuxContainerContexts []*v1.SELinuxOptions) (v1.UniqueVolumeName, error)
 
 	// MarkVolumesReportedInUse sets the ReportedInUse value to true for the
 	// reportedVolumes. For volumes not in the reportedVolumes list, the
@@ -258,6 +258,7 @@ const (
 )
 
 func (dsw *desiredStateOfWorld) AddPodToVolume(
+	logger klog.Logger,
 	podName types.UniquePodName,
 	pod *v1.Pod,
 	volumeSpec *volume.Spec,
@@ -274,7 +275,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			volumeSpec.Name(),
 			err)
 	}
-	volumePluginName := getVolumePluginNameWithDriver(volumePlugin, volumeSpec)
+	volumePluginName := getVolumePluginNameWithDriver(logger, volumePlugin, volumeSpec)
 	accessMode := getVolumeAccessMode(volumeSpec)
 
 	var volumeName v1.UniqueVolumeName
@@ -296,16 +297,16 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				err)
 		}
 	} else {
-		// For non-attachable and non-device-mountable volumes, generate a unique name based on the pod
-		// namespace and name and the name of the volume within the pod.
+		// For non-attachable and non-device-mountable volumes, generate a unique name based on the unique pod
+		// name (refer to podUID) and the name of the volume within the pod.
 		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
 
-	seLinuxFileLabel, pluginSupportsSELinuxContextMount, err := dsw.getSELinuxLabel(volumeSpec, seLinuxContainerContexts, pod.Spec.SecurityContext)
+	seLinuxFileLabel, pluginSupportsSELinuxContextMount, err := dsw.getSELinuxLabel(logger, volumeSpec, seLinuxContainerContexts, pod.Spec.SecurityContext)
 	if err != nil {
 		return "", err
 	}
-	klog.V(4).InfoS("expected volume SELinux label context", "volume", volumeSpec.Name(), "label", seLinuxFileLabel)
+	logger.V(4).Info("expected volume SELinux label context", "volume", volumeSpec.Name(), "label", seLinuxFileLabel)
 
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
 		var sizeLimit *resource.Quantity
@@ -325,7 +326,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		effectiveSELinuxMountLabel := seLinuxFileLabel
 		if !util.VolumeSupportsSELinuxMount(volumeSpec) {
 			// Clear SELinux label for the volume with unsupported access modes.
-			klog.V(4).InfoS("volume does not support SELinux context mount, clearing the expected label", "volume", volumeSpec.Name())
+			logger.V(4).Info("volume does not support SELinux context mount, clearing the expected label", "volume", volumeSpec.Name())
 			effectiveSELinuxMountLabel = ""
 		}
 		if seLinuxFileLabel != "" {
@@ -368,6 +369,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				fullErr := fmt.Errorf("conflicting SELinux labels of volume %s: %q and %q", volumeSpec.Name(), existingVolume.originalSELinuxLabel, seLinuxFileLabel)
 				supported := util.VolumeSupportsSELinuxMount(volumeSpec)
 				err := handleSELinuxMetricError(
+					logger,
 					fullErr,
 					supported,
 					seLinuxVolumeContextMismatchWarnings.WithLabelValues(volumePluginName, accessMode),
@@ -396,7 +398,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 // if the plugin supports mounting the volume with SELinux context.
 // It returns error if the SELinux label cannot be constructed or when the volume is used with multiple SELinux
 // labels.
-func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext) (seLinuxFileLabel string, pluginSupportsSELinuxContextMount bool, err error) {
+func (dsw *desiredStateOfWorld) getSELinuxLabel(logger klog.Logger, volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions, podSecurityContext *v1.PodSecurityContext) (seLinuxFileLabel string, pluginSupportsSELinuxContextMount bool, err error) {
 	labelInfo, err := util.GetMountSELinuxLabel(volumeSpec, seLinuxContainerContexts, podSecurityContext, dsw.volumePluginMgr, dsw.seLinuxTranslator)
 	if err != nil {
 		accessMode := getVolumeAccessMode(volumeSpec)
@@ -404,6 +406,7 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 
 		if util.IsSELinuxLabelTranslationError(err) {
 			err := handleSELinuxMetricError(
+				logger,
 				err,
 				seLinuxSupported,
 				seLinuxContainerContextWarnings.WithLabelValues(accessMode),
@@ -412,6 +415,7 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 		}
 		if util.IsMultipleSELinuxLabelsError(err) {
 			err := handleSELinuxMetricError(
+				logger,
 				err,
 				seLinuxSupported,
 				seLinuxPodContextMismatchWarnings.WithLabelValues(accessMode),
@@ -637,7 +641,7 @@ func (dsw *desiredStateOfWorld) MarkVolumeAttachability(volumeName v1.UniqueVolu
 }
 
 // Based on isRWOP, bump the right warning / error metric and either consume the error or return it.
-func handleSELinuxMetricError(err error, seLinuxSupported bool, warningMetric, errorMetric metrics.GaugeMetric) error {
+func handleSELinuxMetricError(logger klog.Logger, err error, seLinuxSupported bool, warningMetric, errorMetric metrics.GaugeMetric) error {
 	if seLinuxSupported {
 		errorMetric.Add(1.0)
 		return err
@@ -645,12 +649,12 @@ func handleSELinuxMetricError(err error, seLinuxSupported bool, warningMetric, e
 
 	// This is not an error yet, but it will be when support for other access modes is added.
 	warningMetric.Add(1.0)
-	klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
+	logger.V(4).Error(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
 	return nil
 }
 
 // Return the volume plugin name, together with the CSI driver name if it's a CSI volume.
-func getVolumePluginNameWithDriver(plugin volume.VolumePlugin, spec *volume.Spec) string {
+func getVolumePluginNameWithDriver(logger klog.Logger, plugin volume.VolumePlugin, spec *volume.Spec) string {
 	pluginName := plugin.GetPluginName()
 	if pluginName != csi.CSIPluginName {
 		return pluginName
@@ -660,7 +664,7 @@ func getVolumePluginNameWithDriver(plugin volume.VolumePlugin, spec *volume.Spec
 	driverName, err := csi.GetCSIDriverName(spec)
 	if err != nil {
 		// In theory this is unreachable - such volume would not pass validation.
-		klog.V(4).ErrorS(err, "failed to get CSI driver name from volume spec")
+		logger.V(4).Error(err, "failed to get CSI driver name from volume spec")
 		driverName = "unknown"
 	}
 	// `/` is used to separate plugin + CSI driver in util.GetUniqueVolumeName() too

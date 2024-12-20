@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration"
@@ -147,8 +147,8 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
-							Path:      pointer.String("/crdconvert"),
-							Port:      pointer.Int32(servicePort),
+							Path:      ptr.To("/crdconvert"),
+							Port:      ptr.To[int32](servicePort),
 						},
 					},
 					ConversionReviewVersions: []string{"v1", "v1beta1"},
@@ -182,8 +182,8 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: f.Namespace.Name,
 							Name:      serviceCRDName,
-							Path:      pointer.String("/crdconvert"),
-							Port:      pointer.Int32(servicePort),
+							Path:      ptr.To("/crdconvert"),
+							Port:      ptr.To[int32](servicePort),
 						},
 					},
 					ConversionReviewVersions: []string{"v1", "v1beta1"},

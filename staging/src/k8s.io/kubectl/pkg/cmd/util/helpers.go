@@ -425,14 +425,42 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 type FeatureGate string
 
 const (
-	ApplySet                FeatureGate = "KUBECTL_APPLYSET"
-	CmdPluginAsSubcommand   FeatureGate = "KUBECTL_ENABLE_CMD_SHADOW"
-	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
+	// owner: @soltysh
+	// kep: https://kep.k8s.io/859
+	//
+	// HTTP headers with command name and flags used.
+	CmdHeaders FeatureGate = "KUBECTL_COMMAND_HEADERS"
+
+	// owner: @ardaguclu
+	// kep: https://kep.k8s.io/3104
+	//
+	// Separate kubectl user preferences.
+	KubeRC FeatureGate = "KUBECTL_KUBERC"
+
+	// owner: @soltysh
+	// kep: https://kep.k8s.io/3515
+	//
+	// Improved kubectl apply --prune behavior.
+	OpenAPIV3Patch FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
+
+	// owner: @justinb
+	// kep: https://kep.k8s.io/3659
+	//
+	// Improved kubectl apply --prune behavior.
+	ApplySet FeatureGate = "KUBECTL_APPLYSET"
+
+	// owner: @seans
+	// kep: https://kep.k8s.io/4006
+	//
+	// Transition to WebSockets.
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
-	// DebugCustomProfile should be dropped in 1.34
-	DebugCustomProfile FeatureGate = "KUBECTL_DEBUG_CUSTOM_PROFILE"
-	KubeRC             FeatureGate = "KUBECTL_KUBERC"
+
+	// owner: @thockin
+	// kep: https://kep.k8s.io/5296
+	//
+	// Support KYAML output.
+	KYAMLOutput FeatureGate = "KUBECTL_KYAML"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
@@ -539,7 +567,7 @@ func AddPruningFlags(cmd *cobra.Command, prune *bool, pruneAllowlist *[]string, 
 }
 
 func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string) {
-	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s This flag is beta and may change in the future.", usage))
+	cmd.Flags().StringVar(subresource, "subresource", "", usage)
 	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		var commonSubresources = []string{"status", "scale", "resize"}
 		return commonSubresources, cobra.ShellCompDirectiveNoFileComp

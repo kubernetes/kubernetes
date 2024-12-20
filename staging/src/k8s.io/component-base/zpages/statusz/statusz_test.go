@@ -36,6 +36,7 @@ Up: %s
 Go version: %s
 Binary version: %v
 Emulation version: %v
+Paths:  /livez /readyz
 `
 
 const wantTmplWithoutEmulation = `
@@ -47,6 +48,19 @@ Up: %s
 Go version: %s
 Binary version: %v
 
+Paths:  /livez /readyz
+`
+
+const wantTmplWithKubeApiserverComp = `
+%s statusz
+Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.
+
+Started: %v
+Up: %s
+Go version: %s
+Binary version: %v
+
+Paths:  /livez /readyz
 `
 
 func TestStatusz(t *testing.T) {
@@ -58,6 +72,7 @@ func TestStatusz(t *testing.T) {
 	fakeEvStr := "1.30"
 	fakeBinaryVersion := parseVersion(t, fakeBvStr)
 	fakeEmulationVersion := parseVersion(t, fakeEvStr)
+	fakeListedPaths := []string{"/livez/poststarthook/peer-discovery-cache-sync", "/livez/post", "/readyz/informer-sync", "/readyz/log", "/readyz/ping"}
 	tests := []struct {
 		name           string
 		componentName  string
@@ -80,6 +95,7 @@ func TestStatusz(t *testing.T) {
 				goVer:        fakeGoVersion,
 				binaryVer:    fakeBinaryVersion,
 				emulationVer: fakeEmulationVersion,
+				listedPaths:  fakeListedPaths,
 			},
 			wantStatusCode: http.StatusOK,
 			wantBody: fmt.Sprintf(
@@ -101,11 +117,33 @@ func TestStatusz(t *testing.T) {
 				goVer:        fakeGoVersion,
 				binaryVer:    fakeBinaryVersion,
 				emulationVer: nil,
+				listedPaths:  fakeListedPaths,
 			},
 			wantStatusCode: http.StatusOK,
 			wantBody: fmt.Sprintf(
 				wantTmplWithoutEmulation,
 				"test-server",
+				fakeStartTime.Format(time.UnixDate),
+				fakeUptime,
+				fakeGoVersion,
+				fakeBinaryVersion,
+			),
+		},
+		{
+			name:          "valid request for kube-apiserver",
+			componentName: "kube-apiserver",
+			reqHeader:     "text/plain; charset=utf-8",
+			registry: fakeRegistry{
+				startTime:    fakeStartTime,
+				goVer:        fakeGoVersion,
+				binaryVer:    fakeBinaryVersion,
+				emulationVer: nil,
+				listedPaths:  fakeListedPaths,
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody: fmt.Sprintf(
+				wantTmplWithKubeApiserverComp,
+				"kube-apiserver",
 				fakeStartTime.Format(time.UnixDate),
 				fakeUptime,
 				fakeGoVersion,
@@ -166,6 +204,7 @@ type fakeRegistry struct {
 	goVer        string
 	binaryVer    *version.Version
 	emulationVer *version.Version
+	listedPaths  []string
 }
 
 func (f fakeRegistry) processStartTime() time.Time {
@@ -182,4 +221,8 @@ func (f fakeRegistry) binaryVersion() *version.Version {
 
 func (f fakeRegistry) emulationVersion() *version.Version {
 	return f.emulationVer
+}
+
+func (f fakeRegistry) paths() []string {
+	return f.listedPaths
 }

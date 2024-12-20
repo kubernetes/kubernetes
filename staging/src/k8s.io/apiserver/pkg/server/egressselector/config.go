@@ -32,7 +32,7 @@ import (
 
 var cfgScheme = runtime.NewScheme()
 
-// validEgressSelectorNames contains the set of valid egress selctor names.
+// validEgressSelectorNames contains the set of valid egress selector names.
 var validEgressSelectorNames = sets.NewString("controlplane", "cluster", "etcd")
 
 func init() {
@@ -165,7 +165,7 @@ func validateDirectConnection(connection apiserver.Connection, fldPath *field.Pa
 		return field.ErrorList{field.Invalid(
 			fldPath.Child("transport"),
 			"direct",
-			"Transport config should be absent for direct connect"),
+			"config must be absent for direct connect"),
 		}
 	}
 
@@ -178,7 +178,7 @@ func validateUDSConnection(udsConfig *apiserver.UDSTransport, fldPath *field.Pat
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("udsName"),
 			"nil",
-			"UDSName should be present for UDS connections"))
+			"must be present for UDS connections"))
 	}
 	return allErrs
 }
@@ -191,7 +191,7 @@ func validateTCPConnection(tcpConfig *apiserver.TCPTransport, fldPath *field.Pat
 			allErrs = append(allErrs, field.Invalid(
 				fldPath.Child("tlsConfig"),
 				"nil",
-				"TLSConfig config should not be present when using HTTP"))
+				"config must not be present when using HTTP"))
 		}
 	} else if strings.HasPrefix(tcpConfig.URL, "https://") {
 		return validateTLSConfig(tcpConfig.TLSConfig, fldPath)

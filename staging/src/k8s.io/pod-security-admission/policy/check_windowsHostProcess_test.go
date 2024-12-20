@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestWindowsHostProcess(t *testing.T) {
@@ -34,15 +34,15 @@ func TestWindowsHostProcess(t *testing.T) {
 			name: "host process",
 			pod: &corev1.Pod{Spec: corev1.PodSpec{
 				SecurityContext: &corev1.PodSecurityContext{
-					WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: utilpointer.Bool(true)},
+					WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: ptr.To(true)},
 				},
 				Containers: []corev1.Container{
 					{Name: "a", SecurityContext: nil},
 					{Name: "b", SecurityContext: &corev1.SecurityContext{}},
 					{Name: "c", SecurityContext: &corev1.SecurityContext{WindowsOptions: &corev1.WindowsSecurityContextOptions{}}},
-					{Name: "d", SecurityContext: &corev1.SecurityContext{WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: utilpointer.Bool(false)}}},
-					{Name: "e", SecurityContext: &corev1.SecurityContext{WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: utilpointer.Bool(true)}}},
-					{Name: "f", SecurityContext: &corev1.SecurityContext{WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: utilpointer.Bool(true)}}},
+					{Name: "d", SecurityContext: &corev1.SecurityContext{WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: ptr.To(false)}}},
+					{Name: "e", SecurityContext: &corev1.SecurityContext{WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: ptr.To(true)}}},
+					{Name: "f", SecurityContext: &corev1.SecurityContext{WindowsOptions: &corev1.WindowsSecurityContextOptions{HostProcess: ptr.To(true)}}},
 				},
 			}},
 			expectReason: `hostProcess`,
