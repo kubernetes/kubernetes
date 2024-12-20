@@ -644,7 +644,7 @@ resources:
 		resources := etcd.GetResources(t, serverResources)
 		client := dynamic.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
 
-		etcdStorageData := etcd.GetEtcdStorageDataForNamespace(testNamespace)
+		etcdStorageData := etcd.GetServedEtcdStorageDataForNamespace(testNamespace)
 		restResourceSet := sets.New[schema.GroupVersionResource]()
 		stubResourceSet := sets.New[schema.GroupVersionResource]()
 		for _, resource := range resources {

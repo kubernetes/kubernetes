@@ -32,6 +32,46 @@ func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
 	return GetEtcdStorageDataForNamespace("etcdstoragepathtestnamespace")
 }
 
+// GetServedEtcdStorageData returns etcd for all persisted objects that
+// are served at the latest release.
+func GetServedEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionResource]StorageData {
+	data := GetEtcdStorageDataForNamespace(namespace)
+	removed := GetRemovedEtcdStorageDataForNamespace(namespace)
+	for k := range removed {
+		delete(data, k)
+	}
+	return data
+}
+
+// GetRemovedEtcdStorageData returns etcd storage information for
+// APIs that have been removed at the latest release but may still emulated
+// with older emulated versions
+func GetRemovedEtcdStorageData() map[schema.GroupVersionResource]StorageData {
+	return GetRemovedEtcdStorageDataForNamespace("etcdstoragepathtestnamespace")
+}
+
+// TODO: This should be removed and etcd fixture data
+// should be versioned in 1.33
+func GetRemovedEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionResource]StorageData {
+	return map[schema.GroupVersionResource]StorageData{
+		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
+		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"): {
+			Stub:             `{"metadata": {"name": "fs-2"}, "spec": {"priorityLevelConfiguration": {"name": "name1"}}}`,
+			ExpectedEtcdPath: "/registry/flowschemas/fs-2",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "FlowSchema"),
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3
+		gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"): {
+			Stub:             `{"metadata": {"name": "conf4"}, "spec": {"type": "Limited", "limited": {"nominalConcurrencyShares":3, "limitResponse": {"type": "Reject"}}}}`,
+			ExpectedEtcdPath: "/registry/prioritylevelconfigurations/conf4",
+			ExpectedGVK:      gvkP("flowcontrol.apiserver.k8s.io", "v1", "PriorityLevelConfiguration"),
+		},
+		// --
+	}
+}
+
 // GetEtcdStorageDataForNamespace returns etcd data for all persisted objects.
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
