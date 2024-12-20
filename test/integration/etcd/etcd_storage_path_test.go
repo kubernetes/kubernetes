@@ -39,9 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -78,10 +76,7 @@ func TestEtcdStoragePath(t *testing.T) {
 	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
 	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
 
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
-
-	apiServer := StartRealAPIServerOrDie(t)
+	apiServer := StartRealAPIServerOrDie(t, []string{"--feature-gates=AllAlpha=true,AllBeta=true"})
 	defer apiServer.Cleanup()
 	defer dumpEtcdKVOnFailure(t, apiServer.KV)
 

@@ -69,7 +69,7 @@ func TestOverlappingBuiltInResources(t *testing.T) {
 
 // TestOverlappingCustomResourceAPIService ensures creating and deleting a custom resource overlapping with APIServices does not destroy APIService data
 func TestOverlappingCustomResourceAPIService(t *testing.T) {
-	apiServer := StartRealAPIServerOrDie(t)
+	apiServer := StartRealAPIServerOrDie(t, nil)
 	defer apiServer.Cleanup()
 
 	apiServiceClient, err := apiregistrationclient.NewForConfig(apiServer.Config)
@@ -231,7 +231,7 @@ func TestOverlappingCustomResourceAPIService(t *testing.T) {
 
 // TestOverlappingCustomResourceCustomResourceDefinition ensures creating and deleting a custom resource overlapping with CustomResourceDefinition does not destroy CustomResourceDefinition data
 func TestOverlappingCustomResourceCustomResourceDefinition(t *testing.T) {
-	apiServer := StartRealAPIServerOrDie(t)
+	apiServer := StartRealAPIServerOrDie(t, nil)
 	defer apiServer.Cleanup()
 
 	crdClient, err := crdclient.NewForConfig(apiServer.Config)
