@@ -2055,6 +2055,9 @@ func DescribeProbe(probe *corev1.Probe) string {
 		} else {
 			url.Host = probe.HTTPGet.Host
 		}
+		if url.Host == "" {
+			url.Host = "localhost"
+		}
 		url.Path = probe.HTTPGet.Path
 		return fmt.Sprintf("http-get %s %s", url.String(), attrs)
 	case probe.TCPSocket != nil:
