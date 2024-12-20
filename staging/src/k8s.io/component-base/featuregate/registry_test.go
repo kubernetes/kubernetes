@@ -118,7 +118,7 @@ func TestVersionFlagOptions(t *testing.T) {
 func TestVersionFlagOptionsWithMapping(t *testing.T) {
 	r := testRegistry(t)
 	utilruntime.Must(r.SetEmulationVersionMapping(testComponent, DefaultKubeComponent,
-		func(from *version.Version) *version.Version { return from.OffsetMinor(3) }))
+		func(from *version.Version) *version.Version { return version.MajorMinor(1, from.Minor()+23) }))
 	emuVers := strings.Join(r.unsafeVersionFlagOptions(true), "\n")
 	expectedEmuVers := "test=2.8..2.8 (default=2.8)"
 	if emuVers != expectedEmuVers {
