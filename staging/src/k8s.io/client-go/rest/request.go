@@ -1013,7 +1013,7 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
-	), objectDecoder, nil
+	).WithLogger(klog.FromContext(ctx)), objectDecoder, nil
 }
 
 // updateRequestResultMetric increments the RequestResult metric counter,
