@@ -51,6 +51,7 @@ type Reporter interface {
 // StreamWatcher turns any stream for which you can write a Decoder interface
 // into a watch.Interface.
 type StreamWatcher struct {
+	logger klog.Logger
 	sync.Mutex
 	source   Decoder
 	reporter Reporter
@@ -61,6 +62,7 @@ type StreamWatcher struct {
 // NewStreamWatcher creates a StreamWatcher from the given decoder.
 func NewStreamWatcher(d Decoder, r Reporter) *StreamWatcher {
 	sw := &StreamWatcher{
+		logger:   klog.Background(),
 		source:   d,
 		reporter: r,
 		// It's easy for a consumer to add buffering via an extra
@@ -74,6 +76,12 @@ func NewStreamWatcher(d Decoder, r Reporter) *StreamWatcher {
 		done: make(chan struct{}),
 	}
 	go sw.receive()
+	return sw
+}
+
+// WithLogger overwrites the logger in the StreamWatcher instance and returns that same instance.
+func (sw *StreamWatcher) WithLogger(logger klog.Logger) *StreamWatcher {
+	sw.logger = logger
 	return sw
 }
 
@@ -98,7 +106,7 @@ func (sw *StreamWatcher) Stop() {
 
 // receive reads result from the decoder in a loop and sends down the result channel.
 func (sw *StreamWatcher) receive() {
-	defer utilruntime.HandleCrash()
+	defer utilruntime.HandleCrashWithLogger(sw.logger)
 	defer close(sw.result)
 	defer sw.Stop()
 	for {
@@ -108,10 +116,10 @@ func (sw *StreamWatcher) receive() {
 			case io.EOF:
 				// watch closed normally
 			case io.ErrUnexpectedEOF:
-				klog.V(1).Infof("Unexpected EOF during watch stream event decoding: %v", err)
+				sw.logger.V(1).Info("Unexpected EOF during watch stream event decoding", "err", err)
 			default:
 				if net.IsProbableEOF(err) || net.IsTimeout(err) {
-					klog.V(5).Infof("Unable to decode an event from the watch stream: %v", err)
+					sw.logger.V(5).Info("Unable to decode an event from the watch stream", "err", err)
 				} else {
 					select {
 					case <-sw.done:
