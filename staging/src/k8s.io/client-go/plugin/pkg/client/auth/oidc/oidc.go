@@ -49,6 +49,7 @@ const (
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("oidc", newOIDCAuthProvider); err != nil {
+		//nolint:logcheck // Should not happen.
 		klog.Fatalf("Failed to register oidc auth plugin: %v", err)
 	}
 }
@@ -125,6 +126,7 @@ func newOIDCAuthProvider(clusterAddress string, cfg map[string]string, persister
 	}
 
 	if len(cfg[cfgExtraScopes]) > 0 {
+		//nolint:logcheck // Should not happen.
 		klog.V(2).Infof("%s auth provider field depricated, refresh request don't send scopes",
 			cfgExtraScopes)
 	}
