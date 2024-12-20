@@ -1,0 +1,4 @@
+paths-ignore:
+  - '**/test/**'
+  - '**/staging/**'
+  - '**/third_party**'
