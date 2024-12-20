@@ -133,15 +133,25 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
 		// If instance-config.yaml exist on disk, we don't need to create it.
 		_, err := os.Stat(filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName))
+		// After the NodeLocalCRISocket feature gate is removed, os.IsNotExist(err) should also be removed.
+		// If there is no instance configuration, it indicates that the configuration on the node has been corrupted,
+		// and an error needs to be reported.
 		if os.IsNotExist(err) {
 			var containerRuntimeEndpoint string
+			var kubeletFlags []kubeadmapi.Arg
 			dynamicFlags, err := kubeletphase.ReadKubeletDynamicEnvFile(filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName))
 			if err == nil {
 				args := kubeadmutil.ArgumentsFromCommand(dynamicFlags)
 				for _, arg := range args {
 					if arg.Name == "container-runtime-endpoint" {
 						containerRuntimeEndpoint = arg.Value
-						break
+						continue
+					}
+					kubeletFlags = append(kubeletFlags, arg)
+				}
+				if len(containerRuntimeEndpoint) != 0 {
+					if err := kubeletphase.WriteKubeletArgsToFile(kubeletFlags, nil, kubeletDir); err != nil {
+						return err
 					}
 				}
 			} else if dryRun {
