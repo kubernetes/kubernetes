@@ -19,7 +19,8 @@ package cm
 import (
 	"context"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -38,6 +39,8 @@ var _ func(string) ([]int, error) = getCgroupProcs
 var _ func(types.UID) string = GetPodCgroupNameSuffix
 var _ func(string, bool, string) string = NodeAllocatableRoot
 var _ func(string) (string, error) = GetKubeletContainer
+var _ func(int64, int64) int = CompareCPULimits
+var _ func(int64, int64) int = CompareCPURequests
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
@@ -86,4 +89,17 @@ func buildContainerMapAndRunningSetFromRuntime(ctx context.Context, runtimeServi
 		}
 	}
 	return containerMap, runningSet
+}
+
+// CompareCPUQuantities compares the millivalues of two nillable quantities. A nil value is
+// considered equivalent to 0.
+func CompareCPUQuantities(x, y *resource.Quantity, compareFunc func(int64, int64) int) int {
+	var xMilliVal, yMilliVal int64
+	if x != nil {
+		xMilliVal = x.MilliValue()
+	}
+	if y != nil {
+		yMilliVal = y.MilliValue()
+	}
+	return compareFunc(xMilliVal, yMilliVal)
 }

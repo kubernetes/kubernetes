@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -985,5 +986,119 @@ func TestResourceConfigForPodWithEnforceMemoryQoS(t *testing.T) {
 		if !reflect.DeepEqual(actual.Unified, testCase.expected.Unified) {
 			t.Errorf("unexpected result, test: %v, unified not as expected", testName)
 		}
+	}
+}
+
+func TestCompareCPULimits(t *testing.T) {
+	tests := []struct {
+		name   string
+		x, y   int64
+		expect int
+	}{{
+		name:   "regular equal",
+		x:      300,
+		y:      300,
+		expect: 0,
+	}, {
+		name:   "regular less than",
+		x:      0,
+		y:      300,
+		expect: -1,
+	}, {
+		name:   "regular greater than",
+		x:      300,
+		y:      0,
+		expect: 1,
+	}, {
+		name:   "equal zero values",
+		x:      0,
+		y:      0,
+		expect: 0,
+	}, {
+		name:   "equal minimums",
+		x:      MinMilliCPULimit,
+		y:      MinMilliCPULimit,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 0",
+		x:      0,
+		y:      MinMilliCPULimit,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 1",
+		x:      MinMilliCPULimit,
+		y:      1,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 2",
+		x:      0,
+		y:      1,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 3",
+		x:      MinMilliCPULimit,
+		y:      MinShares, // Ensure these don't get mixed up.
+		expect: 0,
+	}}
+
+	for _, test := range tests {
+		assert.Equal(t, test.expect, CompareCPULimits(test.x, test.y), test.name)
+	}
+}
+
+func TestCompareCPURequests(t *testing.T) {
+	tests := []struct {
+		name   string
+		x, y   int64
+		expect int
+	}{{
+		name:   "regular equal",
+		x:      300,
+		y:      300,
+		expect: 0,
+	}, {
+		name:   "regular less than",
+		x:      0,
+		y:      300,
+		expect: -1,
+	}, {
+		name:   "regular greater than",
+		x:      300,
+		y:      0,
+		expect: 1,
+	}, {
+		name:   "equal zero values",
+		x:      0,
+		y:      0,
+		expect: 0,
+	}, {
+		name:   "equal minimums",
+		x:      MinShares,
+		y:      MinShares,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 0",
+		x:      0,
+		y:      MinShares,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 1",
+		x:      MinShares,
+		y:      1,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 2",
+		x:      0,
+		y:      1,
+		expect: 0,
+	}, {
+		name:   "equivalent minimums 3",
+		x:      MinMilliCPULimit,
+		y:      MinShares, // Ensure these don't get mixed up.
+		expect: 1,
+	}}
+
+	for _, test := range tests {
+		assert.Equal(t, test.expect, CompareCPURequests(test.x, test.y), test.name)
 	}
 }

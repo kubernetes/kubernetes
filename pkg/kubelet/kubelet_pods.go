@@ -1791,24 +1791,12 @@ func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontaine
 
 			// Only compare resizeable resources, and only compare resources that are explicitly configured.
 			if hasCPUReq {
-				if cs.Resources.CPURequest == nil {
-					if !cpuReq.IsZero() {
-						return false
-					}
-				} else if !cpuReq.Equal(*cs.Resources.CPURequest) &&
-					(cpuReq.MilliValue() > cm.MinShares || cs.Resources.CPURequest.MilliValue() > cm.MinShares) {
-					// If both allocated & status CPU requests are at or below MinShares then they are considered equal.
+				if cm.CompareCPUQuantities(&cpuReq, cs.Resources.CPURequest, cm.CompareCPURequests) != 0 {
 					return false
 				}
 			}
 			if hasCPULim {
-				if cs.Resources.CPULimit == nil {
-					if !cpuLim.IsZero() {
-						return false
-					}
-				} else if !cpuLim.Equal(*cs.Resources.CPULimit) &&
-					(cpuLim.MilliValue() > cm.MinMilliCPULimit || cs.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit) {
-					// If both allocated & status CPU limits are at or below the minimum limit, then they are considered equal.
+				if cm.CompareCPUQuantities(&cpuLim, cs.Resources.CPULimit, cm.CompareCPULimits) != 0 {
 					return false
 				}
 			}
@@ -2154,10 +2142,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		resources := alloc
 		if resources.Limits != nil {
 			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
-				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
+				// If both the allocated & actual CPU limits are semantically equivalent, preserve the
 				// allocated value in the API to avoid confusion and simplify comparisons.
-				if cStatus.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit ||
-					resources.Limits.Cpu().MilliValue() > cm.MinMilliCPULimit {
+				if cm.CompareCPUQuantities(cStatus.Resources.CPULimit, resources.Limits.Cpu(), cm.CompareCPULimits) != 0 {
 					resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
 				}
 			} else {
@@ -2171,10 +2158,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		if resources.Requests != nil {
 			if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
-				// If both the allocated & actual resources are at or below MinShares, preserve the
+				// If both the allocated & actual CPU requests are semantically equivalent, preserve the
 				// allocated value in the API to avoid confusion and simplify comparisons.
-				if cStatus.Resources.CPURequest.MilliValue() > cm.MinShares ||
-					resources.Requests.Cpu().MilliValue() > cm.MinShares {
+				if cm.CompareCPUQuantities(cStatus.Resources.CPURequest, resources.Requests.Cpu(), cm.CompareCPURequests) != 0 {
 					resources.Requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
 				}
 			} else {

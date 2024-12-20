@@ -600,18 +600,17 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 	// Note: cgroup doesn't support memory request today, so we don't compare that. If canAdmitPod called  during
 	// handlePodResourcesResize finds 'fit', then desiredMemoryRequest == currentMemoryRequest.
 
-	// Special case for minimum CPU request
-	if desiredResources.cpuRequest <= cm.MinShares && currentResources.cpuRequest <= cm.MinShares {
-		// If both desired & current CPU requests are at or below MinShares,
-		// then consider these equal.
+	// Special cases for platform-specific CPU adjustments.
+	if cm.CompareCPURequests(desiredResources.cpuRequest, currentResources.cpuRequest) == 0 {
+		// If desired & current CPU requests are equivalent, then set the requests to be explicitly equal.
 		desiredResources.cpuRequest = currentResources.cpuRequest
+
 	}
-	// Special case for minimum CPU limit
-	if desiredResources.cpuLimit <= cm.MinMilliCPULimit && currentResources.cpuLimit <= cm.MinMilliCPULimit {
-		// If both desired & current CPU limit are at or below the minimum effective limit,
-		// then consider these equal.
+	if cm.CompareCPULimits(desiredResources.cpuLimit, currentResources.cpuLimit) == 0 {
+		// If desired & current CPU limits are equivalent, then set the limits to be explicitly equal.
 		desiredResources.cpuLimit = currentResources.cpuLimit
 	}
+
 	if currentResources == desiredResources {
 		// No resize required.
 		return true
@@ -848,16 +847,12 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 				actualLimit := nonNilQuantity(status.Resources.MemoryLimit)
 				return actualLimit.Equal(*container.Resources.Limits.Memory())
 			case v1.ResourceCPU:
-				actualLimit := nonNilQuantity(status.Resources.CPULimit)
-				actualRequest := nonNilQuantity(status.Resources.CPURequest)
+				actualLimit := status.Resources.CPULimit
+				actualRequest := status.Resources.CPURequest
 				desiredLimit := container.Resources.Limits.Cpu()
 				desiredRequest := container.Resources.Requests.Cpu()
-				// Consider limits equal if both are at or below the effective minimum limit.
-				equalLimits := actualLimit.Equal(*desiredLimit) || (actualLimit.MilliValue() <= cm.MinMilliCPULimit &&
-					desiredLimit.MilliValue() <= cm.MinMilliCPULimit)
-				// Consider requests equal if both are at or below MinShares.
-				equalRequests := actualRequest.Equal(*desiredRequest) || (actualRequest.MilliValue() <= cm.MinShares &&
-					desiredRequest.MilliValue() <= cm.MinShares)
+				equalLimits := cm.CompareCPUQuantities(desiredLimit, actualLimit, cm.CompareCPULimits) == 0
+				equalRequests := cm.CompareCPUQuantities(desiredRequest, actualRequest, cm.CompareCPURequests) == 0
 				return equalLimits && equalRequests
 			default:
 				return true // Shouldn't happen.
