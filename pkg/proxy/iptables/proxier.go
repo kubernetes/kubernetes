@@ -164,6 +164,7 @@ type Proxier struct {
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
 	lastIPTablesCleanup  time.Time
+	lastFullSync         time.Time
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -540,7 +541,34 @@ func (proxier *Proxier) SyncLoop() {
 
 	// synthesize "last change queued" time as the informers are syncing.
 	metrics.SyncProxyRulesLastQueuedTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
+	go proxier.FullSyncLoop()
 	proxier.syncRunner.Loop(wait.NeverStop)
+
+}
+
+func (proxier *Proxier) FullSyncLoop() {
+	timer := time.NewTimer(proxyutil.FullSyncPeriod)
+	for {
+		select {
+		case <-wait.NeverStop:
+			klog.V(3).Infof("Iptables Proxier Full Sync Loop stopped")
+			return
+		case <-timer.C:
+			proxier.tryFullSync(timer)
+		}
+	}
+}
+
+func (proxier *Proxier) tryFullSync(timer *time.Timer) {
+	now := time.Now()
+	nextFullSync := proxier.lastFullSync.Add(proxyutil.FullSyncPeriod)
+	if now.Before(nextFullSync) {
+		timer.Reset(nextFullSync.Sub(now))
+		return
+	}
+	klog.V(3).Infof("Iptables Proxier Full Sync")
+	proxier.forceSyncProxyRules()
+	timer.Reset(proxyutil.FullSyncPeriod)
 }
 
 func (proxier *Proxier) setInitialized(value bool) {
@@ -818,6 +846,7 @@ func (proxier *Proxier) syncProxyRules() {
 			metrics.SyncPartialProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
 		} else {
 			metrics.SyncFullProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
+			proxier.lastFullSync = time.Now()
 		}
 		proxier.logger.V(2).Info("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()

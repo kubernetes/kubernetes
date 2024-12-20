@@ -57,6 +57,11 @@ func (proxier *metaProxier) SyncLoop() {
 	proxier.ipv4Proxier.SyncLoop()    // never returns
 }
 
+func (proxier *metaProxier) FullSyncLoop() {
+	go proxier.ipv6Proxier.FullSyncLoop() // Use go-routine here!
+	proxier.ipv4Proxier.FullSyncLoop()    // never returns
+}
+
 // OnServiceAdd is called whenever creation of new service object is observed.
 func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
 	proxier.ipv4Proxier.OnServiceAdd(service)

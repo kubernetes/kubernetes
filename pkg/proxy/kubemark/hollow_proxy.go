@@ -46,6 +46,11 @@ func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
 	select {}
 }
+
+func (*FakeProxier) FullSyncLoop() {
+	select {}
+}
+
 func (*FakeProxier) OnServiceAdd(service *v1.Service)                                 {}
 func (*FakeProxier) OnServiceUpdate(oldService, service *v1.Service)                  {}
 func (*FakeProxier) OnServiceDelete(service *v1.Service)                              {}
