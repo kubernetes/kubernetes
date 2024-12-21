@@ -287,7 +287,7 @@ var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), fun
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark][NodeSpeicalFeature:Benchmark]", itArg.podsNr, itArg.bgPodsNr)
+			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark]", itArg.podsNr, itArg.bgPodsNr)
 			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "sequence"
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
