@@ -72,6 +72,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"fs"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a flow schema.
 type StatusREST struct {
 	store *genericregistry.Store

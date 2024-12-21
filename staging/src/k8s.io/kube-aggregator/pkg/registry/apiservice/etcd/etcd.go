@@ -70,6 +70,14 @@ func (c *REST) Categories() []string {
 	return []string{"api-extensions"}
 }
 
+// Implement ShortNamesProvider
+var _ rest.ShortNamesProvider = &REST{}
+
+// ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
+func (r *REST) ShortNames() []string {
+	return []string{"apis", "apisvc"}
+}
+
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
 // ConvertToTable implements the TableConvertor interface for REST.
