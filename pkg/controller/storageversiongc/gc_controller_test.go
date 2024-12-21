@@ -41,6 +41,7 @@ func setupController(ctx context.Context, clientset kubernetes.Interface) {
 	controller := NewStorageVersionGC(ctx, clientset, leaseInformer, storageVersionInformer)
 	go controller.Run(context.Background())
 	informerFactory.Start(nil)
+	informerFactory.WaitForCacheSync(nil)
 }
 
 func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
