@@ -94,14 +94,21 @@ func IsUnixDomainSocket(filePath string) (bool, error) {
 // permissions once the directory is created.
 func MkdirAll(path string, perm os.FileMode) error {
 	klog.V(6).InfoS("Function MkdirAll starts", "path", path, "perm", perm)
+	if _, err := os.Stat(path); err == nil {
+		// Path already exists: nothing to do.
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("error checking path %s: %w", path, err)
+	}
+
 	err := os.MkdirAll(path, perm)
 	if err != nil {
-		return fmt.Errorf("Error creating directory %s: %v", path, err)
+		return fmt.Errorf("error creating directory %s: %w", path, err)
 	}
 
 	err = Chmod(path, perm)
 	if err != nil {
-		return fmt.Errorf("Error setting permissions for directory %s: %v", path, err)
+		return fmt.Errorf("error setting permissions for directory %s: %w", path, err)
 	}
 
 	return nil
