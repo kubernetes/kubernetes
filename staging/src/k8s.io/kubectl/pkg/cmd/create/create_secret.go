@@ -250,7 +250,7 @@ func (o *CreateSecretOptions) Run() error {
 		}
 		secret, err = o.Client.Secrets(o.Namespace).Create(context.TODO(), secret, createOptions)
 		if err != nil {
-			return fmt.Errorf("failed to create secret %v", err)
+			return fmt.Errorf("failed to create secret: %v", err)
 		}
 	}
 
