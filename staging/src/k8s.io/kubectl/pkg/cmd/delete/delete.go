@@ -506,6 +506,10 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 		operation = "force deleted"
 	}
 
+	if info.Namespaced() {
+		operation = fmt.Sprintf("%s from %s namespace", operation, info.Namespace)
+	}
+
 	switch o.DryRunStrategy {
 	case cmdutil.DryRunClient:
 		operation = fmt.Sprintf("%s (dry run)", operation)
