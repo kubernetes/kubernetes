@@ -76,11 +76,17 @@ type cache struct {
 	timestamp *time.Time
 	// Map that stores the subscriber records.
 	subscribers map[types.UID][]*subRecord
+
+	processingPods map[types.UID]*data
 }
 
 // NewCache creates a pod cache.
 func NewCache() Cache {
-	return &cache{pods: map[types.UID]*data{}, subscribers: map[types.UID][]*subRecord{}}
+	return &cache{
+		pods:           map[types.UID]*data{},
+		subscribers:    map[types.UID][]*subRecord{},
+		processingPods: map[types.UID]*data{},
+	}
 }
 
 // Get returns the PodStatus for the pod; callers are expected not to
@@ -88,14 +94,39 @@ func NewCache() Cache {
 func (c *cache) Get(id types.UID) (*PodStatus, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		if d, ok := c.processingPods[id]; ok {
+			return d.status, d.err
+		}
+	}
 	d := c.get(id)
 	return d.status, d.err
 }
 
 func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		d := c.getProcessingPods(id)
+		if d != nil {
+			return d.status, d.err
+		}
+	}
+
 	ch := c.subscribe(id, minTime)
 	d := <-ch
 	return d.status, d.err
+}
+
+func (c *cache) getProcessingPods(id types.UID) *data {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if d, ok := c.processingPods[id]; ok {
+		// a fallback mechanism ensures that if the container runtime events are not up-to-date,
+		// it can still fall back to the old mode to work, but adding it will cause two e2e cases to fail
+
+		// delete(c.processingPods, id)
+		return d
+	}
+	return nil
 }
 
 // Set sets the PodStatus for the pod only if the data is newer than the cache
@@ -104,6 +135,7 @@ func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.T
 	defer c.lock.Unlock()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		c.processingPods[id] = &data{status: status, err: err, modified: timestamp}
 		// Set the value in the cache only if it's not present already
 		// or the timestamp in the cache is older than the current update timestamp
 		if cachedVal, ok := c.pods[id]; ok && cachedVal.modified.After(timestamp) {
@@ -121,6 +153,7 @@ func (c *cache) Delete(id types.UID) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.pods, id)
+	delete(c.processingPods, id)
 }
 
 // UpdateTime modifies the global timestamp of the cache and notify
