@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -281,6 +282,40 @@ func TestDecodeBrokenJSON(t *testing.T) {
 	}
 }
 
+func TestDecodeDuplicateKeyYAML(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
+foo: bar1
+foo: bar2
+---
+  `)), 100)
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err != nil {
+		t.Fatalf("unexpected error with unstrict: %v", err)
+	}
+	if val := obj["foo"].(string); val != "bar2" {
+		t.Fatalf("unexpected value: %s", val)
+	}
+}
+
+func TestDecodeDuplicateKeyYAMLStrict(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
+foo: bar1
+foo: bar2
+---
+  `)), 100, WithStrict())
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with yaml: strict, got no error")
+	}
+	const msg = `error converting YAML to JSON: yaml: unmarshal errors:
+  line 3: key "foo" already set in map`
+	if msg != err.Error() {
+		t.Fatalf("expected %q, got %q", msg, err.Error())
+	}
+}
+
 type generic map[string]interface{}
 
 func TestYAMLOrJSONDecoder(t *testing.T) {
@@ -336,42 +371,49 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		}},
 	}
 	for i, testCase := range testCases {
-		decoder := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(testCase.input)), testCase.buffer)
-		objs := []generic{}
+		for _, strict := range []bool{false, true} {
+			var decoder *YAMLOrJSONDecoder
+			if strict {
+				decoder = NewYAMLOrJSONDecoder(bytes.NewReader([]byte(testCase.input)), testCase.buffer, WithStrict())
+			} else {
+				decoder = NewYAMLOrJSONDecoder(bytes.NewReader([]byte(testCase.input)), testCase.buffer)
+			}
+			objs := []generic{}
 
-		var err error
-		for {
-			out := make(generic)
-			err = decoder.Decode(&out)
-			if err != nil {
-				break
+			var err error
+			for {
+				out := make(generic)
+				err = decoder.Decode(&out)
+				if err != nil {
+					break
+				}
+				objs = append(objs, out)
 			}
-			objs = append(objs, out)
-		}
-		if err != io.EOF {
-			switch {
-			case testCase.err && err == nil:
-				t.Errorf("%d: unexpected non-error", i)
-				continue
-			case !testCase.err && err != nil:
-				t.Errorf("%d: unexpected error: %v", i, err)
-				continue
-			case err != nil:
-				continue
+			if !errors.Is(err, io.EOF) {
+				switch {
+				case testCase.err && err == nil:
+					t.Errorf("%d: unexpected non-error", i)
+					continue
+				case !testCase.err && err != nil:
+					t.Errorf("%d: unexpected error: %v", i, err)
+					continue
+				case err != nil:
+					continue
+				}
 			}
-		}
-		switch decoder.decoder.(type) {
-		case *YAMLToJSONDecoder:
-			if testCase.isJSON {
-				t.Errorf("%d: expected JSON decoder, got YAML", i)
+			switch decoder.decoder.(type) {
+			case *YAMLToJSONDecoder:
+				if testCase.isJSON {
+					t.Errorf("%d: expected JSON decoder, got YAML", i)
+				}
+			case *json.Decoder:
+				if !testCase.isJSON {
+					t.Errorf("%d: expected YAML decoder, got JSON", i)
+				}
 			}
-		case *json.Decoder:
-			if !testCase.isJSON {
-				t.Errorf("%d: expected YAML decoder, got JSON", i)
+			if fmt.Sprintf("%#v", testCase.out) != fmt.Sprintf("%#v", objs) {
+				t.Errorf("%d: objects were not equal: \n%#v\n%#v", i, testCase.out, objs)
 			}
-		}
-		if fmt.Sprintf("%#v", testCase.out) != fmt.Sprintf("%#v", objs) {
-			t.Errorf("%d: objects were not equal: \n%#v\n%#v", i, testCase.out, objs)
 		}
 	}
 }
