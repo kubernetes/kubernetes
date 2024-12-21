@@ -25,6 +25,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 )
 
@@ -67,6 +69,12 @@ func runKubeletConfigPhase(c workflow.RunData) error {
 	err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), kubeletConfigDir, data.PatchesDir(), data.DryRun(), data.OutputWriter())
 	if err != nil {
 		return err
+	}
+
+	if features.Enabled(data.InitCfg().ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
+		if err := patchnodephase.RemoveCRISocketAnnotation(data.Client(), data.InitCfg().NodeRegistration.Name); err != nil {
+			return err
+		}
 	}
 
 	fmt.Println("[upgrade/kubelet-config] The kubelet configuration for this node was successfully upgraded!")
