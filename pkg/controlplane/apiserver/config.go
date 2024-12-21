@@ -316,7 +316,7 @@ func CreateConfig(
 		}
 		// build peer proxy config only if peer ca file exists
 		if opts.PeerCAFile != "" {
-			config.PeerProxy, err = BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
+			config.PeerProxy, err = BuildPeerProxy(versionedInformers, genericConfig.LoopbackClientConfig, opts.ProxyClientCertFile,
 				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.Extra.PeerEndpointLeaseReconciler, config.Generic.Serializer)
 			if err != nil {
 				return nil, nil, err
