@@ -52,13 +52,12 @@ type ServiceHealthServer interface {
 	SyncEndpoints(newEndpoints map[types.NamespacedName]int) error
 }
 
-type proxierHealthChecker interface {
-	// IsHealthy returns the proxier's health state, following the same
-	// definition the HTTP server defines.
-	IsHealthy() bool
+type proxyHealthChecker interface {
+	// Health returns the proxy's health state and last updated time.
+	Health() ProxyHealthCheckStatus
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
 	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
 	// treats them all the same.
 	nodeIPs := []net.IP{net.IPv4zero}
@@ -84,7 +83,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxierHealthChecker) ServiceHealthServer {
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
 	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
 }
 
@@ -96,7 +95,7 @@ type server struct {
 	listener    listener
 	httpFactory httpServerFactory
 
-	healthzServer proxierHealthChecker
+	healthzServer proxyHealthChecker
 
 	lock     sync.RWMutex
 	services map[types.NamespacedName]*hcInstance
@@ -231,13 +230,13 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 	count := svc.endpoints
 	h.hcs.lock.RUnlock()
-	kubeProxyHealthy := h.hcs.healthzServer.IsHealthy()
+	status := h.hcs.healthzServer.Health()
 
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
 	resp.Header().Set("X-Load-Balancing-Endpoint-Weight", strconv.Itoa(count))
 
-	if count != 0 && kubeProxyHealthy {
+	if count != 0 && status.Healthy {
 		resp.WriteHeader(http.StatusOK)
 	} else {
 		resp.WriteHeader(http.StatusServiceUnavailable)
@@ -251,7 +250,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 			"localEndpoints": %d,
 			"serviceProxyHealthy": %v
 		}
-		`, h.name.Namespace, h.name.Name, count, kubeProxyHealthy)), "\n"))
+		`, h.name.Namespace, h.name.Name, count, status.Healthy)), "\n"))
 }
 
 func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
