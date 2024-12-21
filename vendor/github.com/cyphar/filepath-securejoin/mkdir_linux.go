@@ -119,7 +119,12 @@ func MkdirAllHandle(root *os.File, unsafePath string, mode int) (_ *os.File, Err
 		// NOTE: mkdir(2) will not follow trailing symlinks, so we can safely
 		// create the final component without worrying about symlink-exchange
 		// attacks.
-		if err := unix.Mkdirat(int(currentDir.Fd()), part, uint32(mode)); err != nil {
+		//
+		// If we get -EEXIST, it's possible that another program created the
+		// directory at the same time as us. In that case, just continue on as
+		// if we created it (if the created inode is not a directory, the
+		// following open call will fail).
+		if err := unix.Mkdirat(int(currentDir.Fd()), part, uint32(mode)); err != nil && !errors.Is(err, unix.EEXIST) {
 			err = &os.PathError{Op: "mkdirat", Path: currentDir.Name() + "/" + part, Err: err}
 			// Make the error a bit nicer if the directory is dead.
 			if err2 := isDeadInode(currentDir); err2 != nil {
