@@ -369,9 +369,21 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
 	if math.Abs(1.0-usageRatio) > c.tolerance {
 		// update number of replicas if the change is large enough
-		replicaCount = int32(math.Ceil(float64(usage) / float64(targetUsagePerPod)))
+		replicaCountResult := math.Ceil(float64(usage) / float64(targetUsagePerPod))
+		// Ensure that the result exceeds the bounds of an int32
+		if replicaCountResult > float64(math.MaxInt32) {
+			replicaCount = math.MaxInt32
+		} else {
+			replicaCount = int32(replicaCountResult)
+		}
 	}
-	usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
+	usageResult := math.Ceil(float64(usage) / float64(statusReplicas))
+	// Ensure that the result exceeds the bounds of an int64
+	if usageResult > float64(math.MaxInt64) {
+		usage = math.MaxInt64
+	} else {
+		usage = int64(usageResult)
+	}
 	return replicaCount, usage, timestamp, nil
 }
 
