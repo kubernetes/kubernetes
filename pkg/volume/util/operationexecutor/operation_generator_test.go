@@ -61,7 +61,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 				PersistentVolumeSource: v1.PersistentVolumeSource{
 					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				}},
-			probVolumePlugins: volumetesting.ProbeVolumePlugins(volume.VolumeConfig{}),
+			probVolumePlugins: volumetesting.ProbeVolumePlugins(t, volume.VolumeConfig{}),
 		},
 	}
 

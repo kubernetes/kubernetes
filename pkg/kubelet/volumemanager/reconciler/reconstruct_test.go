@@ -295,7 +295,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			outerName := filepath.Base(tc.volumePath)
 			pod, pv, pvc := getPodPVCAndPV(tc.volumeMode, "pod1", outerName, "pvc1")
 			volumeSpec := &volume.Spec{PersistentVolume: pv}
-			kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
+			kubeClient := createtestClientWithPVPVC(t, pv, pvc, v1.AttachedVolume{
 				Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", outerName)),
 				DevicePath: "fake/path",
 			})
