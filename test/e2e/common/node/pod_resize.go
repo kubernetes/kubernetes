@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +34,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -965,6 +965,322 @@ func doPodResizeTests() {
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{},
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod, one restartable init container - increase CPU & memory",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy:     &noRestart,
+					MemPolicy:     &noRestart,
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"200m","memory":"400Mi"},"limits":{"cpu":"200m","memory":"400Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:     &noRestart,
+					MemPolicy:     &noRestart,
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod, one restartable init container - decrease CPU & memory",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "500Mi", MemLim: "500Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "500Mi", MemLim: "500Mi"},
+					CPUPolicy:     &noRestart,
+					MemPolicy:     &noRestart,
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"100m","memory":"250Mi"},"limits":{"cpu":"100m","memory":"250Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "500Mi", MemLim: "500Mi"},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "250Mi", MemLim: "250Mi"},
+					CPUPolicy:     &noRestart,
+					MemPolicy:     &noRestart,
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod, one restartable init container - increase CPU & decrease memory",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"200m","memory":"100Mi"},"limits":{"cpu":"200m","memory":"100Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "200m", CPULim: "200m", MemReq: "100Mi", MemLim: "100Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod, one restartable init container - decrease CPU & increase memory",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"50m","memory":"300Mi"},"limits":{"cpu":"50m","memory":"300Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "100m", MemReq: "200Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "50m", CPULim: "50m", MemReq: "300Mi", MemLim: "300Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - decrease init container CPU & memory",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "300m", CPULim: "400m", MemReq: "300Mi", MemLim: "400Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"100m","memory":"100Mi"},"limits":{"cpu":"200m","memory":"200Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU & memory",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"300m","memory":"300Mi"},"limits":{"cpu":"400m","memory":"400Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "300m", CPULim: "400m", MemReq: "300Mi", MemLim: "400Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - decrease init container CPU only",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "300m", CPULim: "400m", MemReq: "300Mi", MemLim: "400Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"100m"},"limits":{"cpu":"200m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "300Mi", MemLim: "400Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU only",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"300m"},"limits":{"cpu":"400m"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "300m", CPULim: "400m", MemReq: "100Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - decrease init container memory only",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "300m", CPULim: "400m", MemReq: "300Mi", MemLim: "400Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"memory":"100Mi"},"limits":{"memory":"200Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "300m", CPULim: "400m", MemReq: "100Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - increase init container memory only",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: `{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"memory":"300Mi"},"limits":{"memory":"400Mi"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "100Mi", MemLim: "200Mi"},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: "100m", CPULim: "200m", MemReq: "300Mi", MemLim: "400Mi"},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
 			},
 		},
