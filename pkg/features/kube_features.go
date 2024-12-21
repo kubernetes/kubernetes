@@ -868,6 +868,12 @@ const (
 	//
 	// Enables specifying resources at pod-level.
 	PodLevelResources featuregate.Feature = "PodLevelResources"
+
+	// owner: @ffromani
+	// beta: v1.33
+	//
+	// Disable CPU Quota for pods which have exclusive CPUs allocated
+	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
 )
 
 func init() {
