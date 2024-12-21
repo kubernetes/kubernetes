@@ -267,6 +267,7 @@ type HostInterface interface {
 	GetRunningPods(ctx context.Context) ([]*v1.Pod, error)
 	RunInContainer(ctx context.Context, name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	CheckpointContainer(ctx context.Context, podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error
+	GetCheckpoint(podFullName, containerName string) ([]byte, error)
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	GetHostname() string
@@ -481,6 +482,9 @@ func (s *Server) InstallDefaultHandlers() {
 		ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
 			To(s.checkpoint).
 			Operation("checkpoint"))
+		ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
+			To(s.getCheckpoint).
+			Operation("getCheckpoint"))
 		s.restfulCont.Add(ws)
 	}
 }
@@ -1075,6 +1079,18 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		response,
 		[]byte(fmt.Sprintf("{\"items\":[\"%s\"]}", options.Location)),
 	)
+}
+
+// getCheckpoint returns the latest version of the given checkpoint to the client
+func (s *Server) getCheckpoint(request *restful.Request, response *restful.Response) {
+	podFullName := request.PathParameter("podID") + "_" + request.PathParameter("podNamespace")
+	containerName := request.PathParameter("containerName")
+	checkpoint, err := s.host.GetCheckpoint(podFullName, containerName)
+	if err != nil {
+		response.WriteError(http.StatusNotFound, err)
+	}
+
+	writeJSONResponse(response, checkpoint)
 }
 
 // getURLRootPath trims a URL path.
