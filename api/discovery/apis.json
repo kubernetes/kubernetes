@@ -54,6 +54,10 @@
         {
           "groupVersion": "authentication.k8s.io/v1beta1",
           "version": "v1beta1"
+        },
+        {
+          "groupVersion": "authentication.k8s.io/v1alpha1",
+          "version": "v1alpha1"
         }
       ]
     },
@@ -298,6 +302,10 @@
         {
           "groupVersion": "flowcontrol.apiserver.k8s.io/v1",
           "version": "v1"
+        },
+        {
+          "groupVersion": "flowcontrol.apiserver.k8s.io/v1beta3",
+          "version": "v1beta3"
         }
       ]
     },
