@@ -62,10 +62,9 @@ const (
 	btreeDegree = 16
 )
 
+// storeIndexer is the basic interface for caching latest state.
 type storeIndexer interface {
-	Add(obj interface{}) error
-	Update(obj interface{}) error
-	Delete(obj interface{}) error
+	mutableStore
 	List() []interface{}
 	ListKeys() []string
 	Get(obj interface{}) (item interface{}, exists bool, err error)
@@ -74,8 +73,22 @@ type storeIndexer interface {
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 }
 
-type orderedLister interface {
+// immutableOrderedStore is interface wrapping btree implementation of store, allowing for fast prefix listing and fast lazy cloning.
+type immutableOrderedStore interface {
+	Count(prefix, continueKey string) (count int)
 	ListPrefix(prefix, continueKey string, limit int) (items []interface{}, hasMore bool)
+	Clone() mutableOrderedStore
+}
+
+type mutableOrderedStore interface {
+	mutableStore
+	immutableOrderedStore
+}
+
+type mutableStore interface {
+	Add(obj interface{}) error
+	Update(obj interface{}) error
+	Delete(obj interface{}) error
 }
 
 func newStoreIndexer(indexers *cache.Indexers) storeIndexer {

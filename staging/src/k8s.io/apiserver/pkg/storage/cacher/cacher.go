@@ -784,23 +784,42 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 // NOTICE: Keep in sync with shouldListFromStorage function in
 //
 //	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) bool {
-	resourceVersion := opts.ResourceVersion
-	pred := opts.Predicate
-	match := opts.ResourceVersionMatch
-	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-
-	// Serve consistent reads from storage if ConsistentListFromCache is disabled
-	consistentReadFromStorage := resourceVersion == "" && !(consistentListFromCacheEnabled && requestWatchProgressSupported)
-	// Watch cache doesn't support continuations, so serve them from etcd.
-	hasContinuation := len(pred.Continue) > 0
-	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
+func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
+	nonEmptyResourceVersion := len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0"
+	isLegacyResourceVersionMatchExact := opts.ResourceVersionMatch == "" && opts.Predicate.Limit > 0 && nonEmptyResourceVersion
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	isLegacyExactMatch := opts.Predicate.Limit > 0 && match == "" && len(resourceVersion) > 0 && resourceVersion != "0"
-	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan || isLegacyExactMatch
+	switch {
+	case nonEmptyResourceVersion && len(opts.Predicate.Continue) > 0:
+		_, _, err := storage.DecodeContinue(opts.Predicate.Continue, c.resourcePrefix)
+		if err != nil {
+			return false, err
+		}
+		return false, errors.NewBadRequest("specifying resource version is not allowed when using continue")
+	case opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact || isLegacyResourceVersionMatchExact:
+		rv, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+		if err != nil {
+			return false, err
+		}
+		isCached := c.watchCache.storeSnapshots.Includes(rv)
+		return !isCached, nil
+	case opts.ResourceVersionMatch != "" && opts.ResourceVersionMatch != metav1.ResourceVersionMatchNotOlderThan:
+		return false, fmt.Errorf("unsupported")
+	case len(opts.Predicate.Continue) > 0:
+		_, rv, err := storage.DecodeContinue(opts.Predicate.Continue, c.resourcePrefix)
+		if err != nil {
+			return false, err
+		}
+		isCached := c.watchCache.storeSnapshots.Includes(uint64(rv))
 
-	return consistentReadFromStorage || hasContinuation || unsupportedMatch
+		return !isCached, nil
+	case opts.ResourceVersion == "":
+		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+		cacheCanServeConsistentRead := consistentListFromCacheEnabled && requestWatchProgressSupported
+		return !cacheCanServeConsistentRead, nil
+	default:
+		return false, nil
+	}
 }
 
 // computeListLimit determines whether the cacher should
@@ -825,32 +844,50 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	return noLabelSelector && noFieldSelector && hasLimit
 }
 
-func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {
-	if !recursive {
+func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, opts storage.ListOptions) (listResp, string, error) {
+	if !opts.Recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
 		if err != nil {
-			return nil, 0, "", err
+			return listResp{
+				ResourceVersion: readResourceVersion,
+			}, "", err
 		}
 		if exists {
-			return []interface{}{obj}, readResourceVersion, "", nil
+			return listResp{
+				Items:           []interface{}{obj},
+				ItemCount:       1,
+				ResourceVersion: readResourceVersion,
+			}, "", nil
 		}
-		return nil, readResourceVersion, "", nil
+		return listResp{
+			ResourceVersion: readResourceVersion,
+		}, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, pred.MatcherIndex(ctx))
+	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, opts, opts.Predicate.MatcherIndex(ctx))
+}
+
+type listResp struct {
+	Items   []interface{}
+	HasMore bool
+	// Return ItemCount but only if pred.Empty()
+	ItemCount       int64
+	ResourceVersion uint64
 }
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	recursive := opts.Recursive
 	resourceVersion := opts.ResourceVersion
-	pred := opts.Predicate
-	if shouldDelegateList(opts) {
+	deletage, err := c.shouldDelegateList(opts)
+	if err != nil {
+		return err
+	}
+	if deletage {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
 	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
@@ -914,7 +951,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
+	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, opts)
 	success := "true"
 	fallback := "false"
 	if err != nil {
@@ -933,26 +970,28 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if consistentRead {
 		metrics.ConsistentReadTotal.WithLabelValues(c.resourcePrefix, success, fallback).Add(1)
 	}
-	span.AddEvent("Listed items from cache", attribute.Int("count", len(objs)))
+	span.AddEvent("Listed items from cache", attribute.Int("count", len(resp.Items)))
 	// store pointer of eligible objects,
 	// Why not directly put object in the items of listObj?
 	//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
 	//   so we try to delay this action as much as possible
 	var selectedObjects []runtime.Object
 	var lastSelectedObjectKey string
-	var hasMoreListItems bool
+	hasMoreListItems := resp.HasMore
 	limit := computeListLimit(opts)
-	for i, obj := range objs {
+	for i, obj := range resp.Items {
 		elem, ok := obj.(*storeElement)
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if pred.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+		if opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)
 			lastSelectedObjectKey = elem.Key
 		}
 		if limit > 0 && int64(len(selectedObjects)) >= limit {
-			hasMoreListItems = i < len(objs)-1
+			if i < len(resp.Items)-1 {
+				hasMoreListItems = true
+			}
 			break
 		}
 	}
@@ -969,16 +1008,16 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
-		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(readResourceVersion), int64(len(objs)), hasMoreListItems, opts)
+		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), resp.ItemCount, hasMoreListItems, opts)
 		if err != nil {
 			return err
 		}
 
-		if err = c.versioner.UpdateList(listObj, readResourceVersion, continueValue, remainingItemCount); err != nil {
+		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
 			return err
 		}
 	}
-	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(objs), listVal.Len())
+	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(resp.Items), listVal.Len())
 	return nil
 }
 
