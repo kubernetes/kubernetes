@@ -18,6 +18,9 @@ package cpumanager
 
 import (
 	"fmt"
+	"github.com/blang/semver/v4"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"reflect"
 	"testing"
 
@@ -1057,6 +1060,99 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 
 		})
 	}
+}
+
+func TestStaticPolicyNoSMT(t *testing.T) {
+	testCases := []struct {
+		staticPolicyTest
+		expCSetAfterAlloc     cpuset.CPUSet
+		expCSetAfterRemove    cpuset.CPUSet
+		expCounterMetricValue float64
+	}{
+		{
+			staticPolicyTest: staticPolicyTest{
+				description: "SocketNoSMT",
+				topo:        topoUncoreDualSocketNoSMT,
+				pod: makeMultiContainerPod(
+					[]struct{ request, limit string }{
+						{"4000m", "4000m"}},
+					[]struct{ request, limit string }{
+						{"2000m", "2000m"}}),
+				containerName:   "initContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:     cpuset.New(4, 5, 6, 7),
+			expCSetAfterRemove:    cpuset.New(2, 3, 4, 5, 6, 7),
+			expCounterMetricValue: 2,
+		},
+		{
+			staticPolicyTest: staticPolicyTest{
+				description: "SingleSocketHT",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPod(
+					[]struct{ request, limit string }{
+						{"4000m", "4000m"}},
+					[]struct{ request, limit string }{
+						{"2000m", "2000m"}}),
+				containerName:   "initContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:     cpuset.New(2, 3, 6, 7),
+			expCSetAfterRemove:    cpuset.New(1, 2, 3, 5, 6, 7),
+			expCounterMetricValue: 2,
+		},
+	}
+
+	metrics.ContainerAlignedComputeResources.Reset()
+	metrics.ContainerAlignedComputeResources.Create(&semver.SpecVersion)
+
+	for _, testCase := range testCases {
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+
+		st := &mockState{
+			assignments:   testCase.stAssignments,
+			defaultCPUSet: testCase.stDefaultCPUSet,
+		}
+
+		pod := testCase.pod
+
+		// allocate
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			if err := policy.Allocate(st, pod, &container); err != nil {
+				t.Errorf("StaticPolicy Allocate() error (%v).", err)
+			}
+		}
+		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
+				testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)
+		}
+
+		mValue, err := testutil.GetCounterMetricValue(metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU))
+		if err != nil {
+			t.Errorf("StaticPolicy GetCounterMetricValue() error (%v)", err)
+		}
+
+		if mValue != testCase.expCounterMetricValue {
+			t.Errorf("expected counter metric value  %v but got %v", testCase.expCounterMetricValue, mValue)
+		}
+
+		// remove
+		if err := policy.RemoveContainer(st, string(pod.UID), testCase.containerName); err != nil {
+			t.Errorf("StaticPolicy RemoveContainer() error (%v).", err)
+		}
+
+		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterRemove) {
+			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",
+				testCase.description, testCase.expCSetAfterRemove, st.defaultCPUSet)
+		}
+		if _, found := st.assignments[string(pod.UID)][testCase.containerName]; found {
+			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected (pod %v, container %v) not be in assignments %v",
+				testCase.description, testCase.podUID, testCase.containerName, st.assignments)
+		}
+	}
+
 }
 
 func TestStaticPolicyAddWithResvList(t *testing.T) {
