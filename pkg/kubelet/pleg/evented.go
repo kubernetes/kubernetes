@@ -270,7 +270,10 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			}
 			shouldSendPLEGEvent = true
 		} else {
-			if e.cache.Set(podID, status, err, time.Unix(0, event.GetCreatedAt())) {
+			// Filter some irrelevant Sandbox events to prevent the container lifecycle processing from being triggered by mistake.
+			// Not adding this code will not cause the e2e test to fail,
+			// but it will cause abnormal pod status in parallel testing and pod deletion.
+			if e.cache.Set(podID, status, err, time.Unix(0, event.GetCreatedAt())) && !(event.PodSandboxStatus != nil && event.ContainersStatuses == nil) {
 				shouldSendPLEGEvent = true
 			}
 		}
