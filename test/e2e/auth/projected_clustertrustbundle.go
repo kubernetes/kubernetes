@@ -31,7 +31,7 @@ import (
 	"regexp"
 	"time"
 
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -265,7 +265,7 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 	ginkgo.It("should be able to mount a big number (>100) of CTBs", func(ctx context.Context) {
 		const numCTBs = 150
 
-		var initCTBs []*certificatesv1alpha1.ClusterTrustBundle
+		var initCTBs []*certificatesv1beta1.ClusterTrustBundle
 		var cleanups []func(ctx context.Context)
 		var projections []v1.VolumeProjection
 
@@ -442,7 +442,7 @@ func podForCTBProjection(projectionSources ...v1.VolumeProjection) *v1.Pod {
 //	  "signer.alive=false": <set of all PEMs whose CTBs contain `signer.alive: false` labels>,
 //	  "no-signer": <set of all PEMs that appear in CTBs with no specific signers>,
 //	}
-func initCTBData() ([]*certificatesv1alpha1.ClusterTrustBundle, map[string]sets.Set[string]) {
+func initCTBData() ([]*certificatesv1beta1.ClusterTrustBundle, map[string]sets.Set[string]) {
 	var pemSets = map[string]sets.Set[string]{
 		testSignerOneName: sets.New[string](),
 		testSignerTwoName: sets.New[string](),
@@ -451,7 +451,7 @@ func initCTBData() ([]*certificatesv1alpha1.ClusterTrustBundle, map[string]sets.
 		noSignerKey:       sets.New[string](),
 	}
 
-	var ctbs []*certificatesv1alpha1.ClusterTrustBundle
+	var ctbs []*certificatesv1beta1.ClusterTrustBundle
 
 	for i := range 10 {
 		caPEM := mustMakeCAPEM(fmt.Sprintf("root%d", i))
@@ -486,20 +486,20 @@ func initCTBData() ([]*certificatesv1alpha1.ClusterTrustBundle, map[string]sets.
 	return ctbs, pemSets
 }
 
-func ctbForCA(ctbName, signerName, caPEM string, labels map[string]string) *certificatesv1alpha1.ClusterTrustBundle {
-	return &certificatesv1alpha1.ClusterTrustBundle{
+func ctbForCA(ctbName, signerName, caPEM string, labels map[string]string) *certificatesv1beta1.ClusterTrustBundle {
+	return &certificatesv1beta1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   ctbName,
 			Labels: labels,
 		},
-		Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
 			SignerName:  signerName,
 			TrustBundle: caPEM,
 		},
 	}
 }
 
-func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certificatesv1alpha1.ClusterTrustBundle) func(context.Context) {
+func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certificatesv1beta1.ClusterTrustBundle) func(context.Context) {
 	cleanups := []func(context.Context){}
 	for _, ctb := range ctbs {
 		ctb := ctb
@@ -513,13 +513,13 @@ func mustInitCTBs(ctx context.Context, f *framework.Framework, ctbs []*certifica
 	}
 }
 
-func mustCreateCTB(ctx context.Context, f *framework.Framework, ctb *certificatesv1alpha1.ClusterTrustBundle) func(context.Context) {
-	if _, err := f.ClientSet.CertificatesV1alpha1().ClusterTrustBundles().Create(ctx, ctb, metav1.CreateOptions{}); err != nil {
+func mustCreateCTB(ctx context.Context, f *framework.Framework, ctb *certificatesv1beta1.ClusterTrustBundle) func(context.Context) {
+	if _, err := f.ClientSet.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, ctb, metav1.CreateOptions{}); err != nil {
 		framework.Failf("Error while creating ClusterTrustBundle: %v", err)
 	}
 
 	return func(ctx context.Context) {
-		if err := f.ClientSet.CertificatesV1alpha1().ClusterTrustBundles().Delete(ctx, ctb.Name, metav1.DeleteOptions{}); err != nil {
+		if err := f.ClientSet.CertificatesV1beta1().ClusterTrustBundles().Delete(ctx, ctb.Name, metav1.DeleteOptions{}); err != nil {
 			framework.Logf("failed to remove a cluster trust bundle: %v", err)
 		}
 	}
@@ -581,7 +581,7 @@ func getFileModeRegex(filePath string, mask *int32) string {
 	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
 }
 
-func ctbsToPEMs(ctbs []*certificatesv1alpha1.ClusterTrustBundle) []string {
+func ctbsToPEMs(ctbs []*certificatesv1beta1.ClusterTrustBundle) []string {
 	var certPEMs []string
 	for _, ctb := range ctbs {
 		certPEMs = append(certPEMs, ctb.Spec.TrustBundle)
