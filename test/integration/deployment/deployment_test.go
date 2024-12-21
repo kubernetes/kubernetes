@@ -28,9 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
 	"k8s.io/utils/ptr"
@@ -965,7 +968,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Verify all replicas fields of DeploymentStatus have desired counts
-	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 0, 0, 10); err != nil {
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 0, 0, 10, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -985,7 +988,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Verify all replicas fields of DeploymentStatus have desired counts
-	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 0, 10); err != nil {
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 0, 10, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1008,7 +1011,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	}
 
 	// Verify all replicas fields of DeploymentStatus have desired counts
-	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 10, 0); err != nil {
+	if err = tester.checkDeploymentStatusReplicasFields(10, 10, 10, 10, 0, nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -1301,5 +1304,100 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 		return controllerRef != nil && controllerRef.UID == tester.deployment.UID, nil
 	}); err != nil {
 		t.Fatalf("failed waiting for replicaset adoption by deployment %q to complete: %v", deploymentName, err)
+	}
+}
+
+func TestTerminatingReplicasDeploymentStatus(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	closeFn, rm, dc, informers, c := dcSetup(ctx, t)
+	defer closeFn()
+
+	name := "test-terminating-replica-status"
+	ns := framework.CreateNamespaceOrDie(c, name, t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+
+	deploymentName := "deployment"
+	replicas := int32(6)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
+	tester.deployment.Spec.Strategy.Type = apps.RecreateDeploymentStrategyType
+	tester.deployment.Spec.Strategy.RollingUpdate = nil
+	tester.deployment.Spec.Template.Spec.NodeName = "fake-node"
+	tester.deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(300))
+
+	var err error
+	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(context.TODO(), tester.deployment, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
+	}
+
+	// Start informer and controllers
+	stopControllers := runControllersAndInformers(t, rm, dc, informers)
+	defer stopControllers()
+
+	// Ensure the deployment completes while marking its pods as ready simultaneously
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+	// Should not update terminating replicas when feature gate is disabled
+	// Verify all replicas fields of DeploymentStatus have desired counts
+	if err = tester.checkDeploymentStatusReplicasFields(6, 6, 6, 6, 0, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Scale down the deployment
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
+		update.Spec.Replicas = ptr.To(int32(4))
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", deploymentName, err)
+	}
+	// Wait for number of ready replicas to equal number of replicas.
+	if err = tester.waitForReadyReplicas(); err != nil {
+		t.Fatal(err)
+	}
+	// Verify all replicas fields of DeploymentStatus have desired counts
+	if err = tester.checkDeploymentStatusReplicasFields(4, 4, 4, 4, 0, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// should update terminating replicas when feature gate is enabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, true)
+	// Scale down the deployment
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
+		update.Spec.Replicas = ptr.To(int32(3))
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", deploymentName, err)
+	}
+	// Wait for number of ready replicas to equal number of replicas.
+	if err = tester.waitForReadyReplicas(); err != nil {
+		t.Fatal(err)
+	}
+	// Verify all replicas fields of DeploymentStatus have desired counts
+	if err = tester.checkDeploymentStatusReplicasFields(3, 3, 3, 3, 0, ptr.To[int32](3)); err != nil {
+		t.Fatal(err)
+	}
+
+	// should not update terminating replicas when feature gate is disabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+	// Scale down the deployment
+	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
+		update.Spec.Replicas = ptr.To(int32(2))
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", deploymentName, err)
+	}
+	// Wait for number of ready replicas to equal number of replicas.
+	if err = tester.waitForReadyReplicas(); err != nil {
+		t.Fatal(err)
+	}
+	// Verify all replicas fields of DeploymentStatus have desired counts
+	if err = tester.checkDeploymentStatusReplicasFields(2, 2, 2, 2, 0, nil); err != nil {
+		t.Fatal(err)
 	}
 }
