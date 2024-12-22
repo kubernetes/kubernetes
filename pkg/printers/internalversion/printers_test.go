@@ -4603,7 +4603,7 @@ func TestPrintReplicationController(t *testing.T) {
 					Namespace: "test-namespace",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 5,
+					Replicas: ptr.To[int32](5),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -4639,7 +4639,7 @@ func TestPrintReplicationController(t *testing.T) {
 					Name: "rc1",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 5,
+					Replicas: ptr.To[int32](5),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{

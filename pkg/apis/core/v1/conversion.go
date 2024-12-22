@@ -199,7 +199,9 @@ func Convert_apps_ReplicaSetStatus_To_v1_ReplicationControllerStatus(in *apps.Re
 }
 
 func Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *core.ReplicationControllerSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
-	out.Replicas = &in.Replicas
+	if err := autoConvert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in, out, s); err != nil {
+		return err
+	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
 	if in.Template != nil {
@@ -214,8 +216,8 @@ func Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *
 }
 
 func Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in *v1.ReplicationControllerSpec, out *core.ReplicationControllerSpec, s conversion.Scope) error {
-	if in.Replicas != nil {
-		out.Replicas = *in.Replicas
+	if err := autoConvert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in, out, s); err != nil {
+		return err
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
