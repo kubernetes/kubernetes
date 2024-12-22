@@ -1701,6 +1701,7 @@ var _ = common.SIGDescribe("Services", func() {
 					// This indicates a problem in code and we have a log message to debug it.
 					framework.Failf("Static node port allocator was not able to reserve nodeport: %d", nodePort)
 				}
+				break
 			}
 			if apierrors.IsConflict(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
@@ -3976,6 +3977,7 @@ var _ = common.SIGDescribe("Services", func() {
 					// This indicates a problem in code and we have a log message to debug it.
 					framework.Failf("Static node port allocator was not able to reserve healthcheck nodeport: %d", staticHealthCheckPort)
 				}
+				break
 			}
 			if apierrors.IsConflict(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
