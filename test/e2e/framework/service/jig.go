@@ -64,15 +64,15 @@ var errAllocated = errors.New("provided port is already allocated")
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-network/3668-reserved-service-nodeport-range
 type staticPortRange struct {
 	sync.Mutex
-	baseport      int
-	length        int
-	reservedPorts sets.Set[int]
+	baseport      int32
+	length        int32
+	reservedPorts sets.Set[int32]
 }
 
-func calculateRange(size int) int {
-	minPort := 16
-	step := 32
-	maxPort := 128
+func calculateRange(size int32) int32 {
+	var minPort int32 = 16
+	var step int32 = 32
+	var maxPort int32 = 128
 	return min(max(minPort, size/step), maxPort)
 }
 
@@ -81,9 +81,9 @@ var staticPortAllocator *staticPortRange
 // Initialize only once per test
 func init() {
 	staticPortAllocator = &staticPortRange{
-		baseport:      NodePortRange.Base,
-		length:        calculateRange(NodePortRange.Size),
-		reservedPorts: sets.New[int](),
+		baseport:      int32(NodePortRange.Base),
+		length:        calculateRange(int32(NodePortRange.Size)),
+		reservedPorts: sets.New[int32](),
 	}
 }
 
@@ -113,7 +113,7 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 
 // allocatePort reserves the port provided as input.
 // If an invalid port was provided or if the port is already reserved, it returns false
-func (s *staticPortRange) allocatePort(port int) bool {
+func (s *staticPortRange) allocatePort(port int32) bool {
 	s.Lock()
 	defer s.Unlock()
 	if port < s.baseport || port > s.baseport+s.length || s.reservedPorts.Has(port) {
@@ -126,11 +126,11 @@ func (s *staticPortRange) allocatePort(port int) bool {
 // getUnusedPort returns a free port from the range and returns its number and true
 // the port is not allocated so the consumer should allocate it explicitly calling allocatePort()
 // if none is available then it returns -1 and false
-func (s *staticPortRange) getUnusedPort() (int, error) {
+func (s *staticPortRange) getUnusedPort() (int32, error) {
 	s.Lock()
 	defer s.Unlock()
 	// start in a random offset
-	start := rand.Intn(s.length)
+	start := rand.Int31n(s.length)
 	for i := s.baseport; i < s.baseport+s.length; i++ {
 		port := (start + i) % s.length
 		if !s.reservedPorts.Has(port) {
@@ -141,7 +141,7 @@ func (s *staticPortRange) getUnusedPort() (int, error) {
 }
 
 // releasePort releases the port passed as an argument
-func (s *staticPortRange) releasePort(port int) {
+func (s *staticPortRange) releasePort(port int32) {
 	s.Lock()
 	defer s.Unlock()
 	s.reservedPorts.Delete(port)
@@ -152,7 +152,7 @@ func (s *staticPortRange) releasePort(port int) {
 // Note that it is not guaranteed that the returned port is actually available on the apiserver;
 // You must allocate a port, then attempt to create the service, then call
 // ReserveStaticNodePort.
-func GetUnusedStaticNodePort() (int, error) {
+func GetUnusedStaticNodePort() (int32, error) {
 	return staticPortAllocator.getUnusedPort()
 }
 
@@ -167,14 +167,14 @@ func GetUnusedStaticNodePort() (int, error) {
 // may cause other e2e tests to fail.
 //
 // If an invalid port was provided or if the port is already reserved, it returns false
-func ReserveStaticNodePort(port int) bool {
+func ReserveStaticNodePort(port int32) bool {
 	return staticPortAllocator.allocatePort(port)
 }
 
 // ReleaseStaticNodePort releases the specified port.
 // The corresponding service should have already been deleted, to ensure that the
 // port allocator doesn't try to reuse it before the apiserver considers it available.
-func ReleaseStaticNodePort(port int) {
+func ReleaseStaticNodePort(port int32) {
 	staticPortAllocator.releasePort(port)
 }
 

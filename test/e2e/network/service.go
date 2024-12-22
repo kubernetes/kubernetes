@@ -1688,14 +1688,14 @@ var _ = common.SIGDescribe("Services", func() {
 		for i := 0; i < numberOfRetries; i++ {
 			port, err := e2eservice.GetUnusedStaticNodePort()
 			framework.ExpectNoError(err, "Static node port allocator was not able to find a free nodeport.")
-			service.Spec.Ports[0].NodePort = int32(port)
+			service.Spec.Ports[0].NodePort = port
 			service, err = t.CreateService(service)
 			// We will later delete this service and then recreate it with same nodeport. We need to ensure that
 			// another e2e test doesn't start listening on our old nodeport and conflicts re-creation of service
 			// hence we use ReserveStaticNodePort.
 			if err == nil {
 				nodePort := service.Spec.Ports[0].NodePort
-				ok := e2eservice.ReserveStaticNodePort(int(nodePort))
+				ok := e2eservice.ReserveStaticNodePort(nodePort)
 				if !ok {
 					// We could not reserve the allocated port which means the port was either invalid or was reserved by another test.
 					// This indicates a problem in code and we have a log message to debug it.
@@ -1711,7 +1711,7 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 
 		nodePort := service.Spec.Ports[0].NodePort
-		defer e2eservice.ReleaseStaticNodePort(int(nodePort))
+		defer e2eservice.ReleaseStaticNodePort(nodePort)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
@@ -1749,7 +1749,7 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By(fmt.Sprintf("creating service "+serviceName+" with same NodePort %d", nodePort))
 		service = t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
-		service.Spec.Ports[0].NodePort = int32(nodePort)
+		service.Spec.Ports[0].NodePort = nodePort
 		_, err = t.CreateService(service)
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})
@@ -3963,14 +3963,14 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.ExpectNoError(err, "Static node port allocator was not able to find a free nodeport.")
 			svc, err = jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
 				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
-				svc.Spec.HealthCheckNodePort = int32(port)
+				svc.Spec.HealthCheckNodePort = port
 			})
 			// We will later convert this service to Cluster traffic policy, but we need to ensure that
 			// another e2e test doesn't start listening on our old HealthCheckNodePort when we
 			// do that, so we use ReserveStaticNodePort.
 			if err == nil {
 				staticHealthCheckPort := svc.Spec.HealthCheckNodePort
-				ok := e2eservice.ReserveStaticNodePort(int(staticHealthCheckPort))
+				ok := e2eservice.ReserveStaticNodePort(staticHealthCheckPort)
 				if !ok {
 					// We could not reserve the allocated port which means the port was either invalid or was reserved by another test.
 					// This indicates a problem in code and we have a log message to debug it.
@@ -3985,7 +3985,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		}
 
-		defer e2eservice.ReleaseStaticNodePort(int(svc.Spec.HealthCheckNodePort))
+		defer e2eservice.ReleaseStaticNodePort(svc.Spec.HealthCheckNodePort)
 		nodePortStr := fmt.Sprintf("%d", svc.Spec.Ports[0].NodePort)
 		hcNodePortStr := fmt.Sprintf("%d", svc.Spec.HealthCheckNodePort)
 		framework.Logf("NodePort is %s, HealthCheckNodePort is %s", nodePortStr, hcNodePortStr)
