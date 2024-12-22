@@ -116,54 +116,66 @@ func NewTestJig(client clientset.Interface, namespace, name string) *TestJig {
 func (s *staticPortRange) allocatePort(port int) bool {
 	s.Lock()
 	defer s.Unlock()
-	port -= s.baseport
-	if port < 0 || port > s.length || s.reservedPorts.Has(port) {
+	if port < s.baseport || port > s.baseport+s.length || s.reservedPorts.Has(port) {
 		return false
 	}
 	s.reservedPorts.Insert(port)
 	return true
 }
 
-// nextFreePort returns a free port from the range and returns its number and true
+// getUnusedPort returns a free port from the range and returns its number and true
 // the port is not allocated so the consumer should allocate it explicitly calling allocatePort()
 // if none is available then it returns -1 and false
-func (s *staticPortRange) nextFreePort() (int, bool) {
+func (s *staticPortRange) getUnusedPort() (int, error) {
 	s.Lock()
 	defer s.Unlock()
 	// start in a random offset
 	start := rand.Intn(s.length)
-	for i := 0; i < s.length; i++ {
+	for i := s.baseport; i < s.baseport+s.length; i++ {
 		port := (start + i) % s.length
 		if !s.reservedPorts.Has(port) {
-			return s.baseport + port, true
+			return port, nil
 		}
 	}
-	return -1, false
+	return -1, fmt.Errorf("no free ports were found")
 }
 
-// release the port passed as an argument
-func (s *staticPortRange) release(port int) {
+// releasePort releases the port passed as an argument
+func (s *staticPortRange) releasePort(port int) {
 	s.Lock()
 	defer s.Unlock()
-	port -= s.baseport
 	s.reservedPorts.Delete(port)
 }
 
-// ReserveStaticNodePort reserves the port provided as input.
+// GetUnusedStaticNodePort returns a free port in static range and a nil value
+// If no port in static range is available it returns -1 and an error value
+// Note that it is not guaranteed that the returned port is actually available on the apiserver;
+// You must allocate a port, then attempt to create the service, then call
+// ReserveStaticNodePort.
+func GetUnusedStaticNodePort() (int, error) {
+	return staticPortAllocator.getUnusedPort()
+}
+
+// ReserveStaticNodePort reserves the port provided as input. It is guaranteed
+// that no other test will receive this port from GetUnusedStaticNodePort until
+// after you call ReleaseStaticNodePort.
+//
+// port must have been previously allocated by GetUnusedStaticNodePort, and
+// then successfully used as a NodePort or HealthCheckNodePort when creating
+// a service. Trying to reserve a port that was not allocated by
+// GetUnusedStaticNodePort, or reserving it before creating the associated service
+// may cause other e2e tests to fail.
+//
 // If an invalid port was provided or if the port is already reserved, it returns false
 func ReserveStaticNodePort(port int) bool {
 	return staticPortAllocator.allocatePort(port)
 }
 
-// GetUnusedStaticNodePort returns a free port in static range and a boolean True value
-// If no port in static range is available it returns -1 and a boolean value False
-func GetUnusedStaticNodePort() (int, bool) {
-	return staticPortAllocator.nextFreePort()
-}
-
-// ReleaseStaticNodePort releases the specified port
+// ReleaseStaticNodePort releases the specified port.
+// The corresponding service should have already been deleted, to ensure that the
+// port allocator doesn't try to reuse it before the apiserver considers it available.
 func ReleaseStaticNodePort(port int) {
-	staticPortAllocator.release(port)
+	staticPortAllocator.releasePort(port)
 }
 
 // newServiceTemplate returns the default v1.Service template for this j, but

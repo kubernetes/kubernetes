@@ -1686,22 +1686,21 @@ var _ = common.SIGDescribe("Services", func() {
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		var err error
 		for i := 0; i < numberOfRetries; i++ {
-			port, ok := e2eservice.GetUnusedStaticNodePort()
-			if !ok {
-				framework.Logf("Static node port allocator was not able to reserve nodeport so we use the one assigned by the apiserver")
-			} else {
-				service.Spec.Ports[0].NodePort = int32(port)
-			}
+			port, err := e2eservice.GetUnusedStaticNodePort()
+			framework.ExpectNoError(err, "Static node port allocator was not able to find a free nodeport.")
+			service.Spec.Ports[0].NodePort = int32(port)
 			service, err = t.CreateService(service)
+			// We will later delete this service and then recreate it with same nodeport. We need to ensure that
+			// another e2e test doesn't start listening on our old nodeport and conflicts re-creation of service
+			// hence we use ReserveStaticNodePort.
 			if err == nil {
 				nodePort := service.Spec.Ports[0].NodePort
 				ok := e2eservice.ReserveStaticNodePort(int(nodePort))
 				if !ok {
-					framework.Logf("Static node port allocator was not able to reserve nodeport: %d", nodePort)
+					// We could not reserve the allocated port which means the port was either invalid or was reserved by another test.
+					// This indicates a problem in code and we have a log message to debug it.
+					framework.Failf("Static node port allocator was not able to reserve nodeport: %d", nodePort)
 				}
-				break
-				// We do not retry if port allocator was not able to reserve nodeport.
-				// This indicates a problem in code and we have a log message to debug it.
 			}
 			if apierrors.IsConflict(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
@@ -3960,23 +3959,23 @@ var _ = common.SIGDescribe("Services", func() {
 		var svc *v1.Service
 		numberOfRetries := 5
 		for i := 0; i < numberOfRetries; i++ {
-			port, ok := e2eservice.GetUnusedStaticNodePort()
-			if !ok {
-				framework.Logf("Static node port allocator was not able to reserve nodeport so we use the one assigned by the apiserver")
-			}
+			port, err := e2eservice.GetUnusedStaticNodePort()
+			framework.ExpectNoError(err, "Static node port allocator was not able to find a free nodeport.")
 			svc, err = jig.CreateLoadBalancerServiceWaitForClusterIPOnly(func(svc *v1.Service) {
 				svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 				svc.Spec.HealthCheckNodePort = int32(port)
 			})
+			// We will later convert this service to Cluster traffic policy, but we need to ensure that
+			// another e2e test doesn't start listening on our old HealthCheckNodePort when we
+			// do that, so we use ReserveStaticNodePort.
 			if err == nil {
 				staticHealthCheckPort := svc.Spec.HealthCheckNodePort
 				ok := e2eservice.ReserveStaticNodePort(int(staticHealthCheckPort))
 				if !ok {
-					framework.Logf("Static node port allocator was not able to reserve nodeport: %d", staticHealthCheckPort)
+					// We could not reserve the allocated port which means the port was either invalid or was reserved by another test.
+					// This indicates a problem in code and we have a log message to debug it.
+					framework.Failf("Static node port allocator was not able to reserve healthcheck nodeport: %d", staticHealthCheckPort)
 				}
-				break
-				// We do not retry if port allocator was not able to reserve nodeport.
-				// This indicates a problem in code and we have a log message to debug it.
 			}
 			if apierrors.IsConflict(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
@@ -4094,10 +4093,6 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.Failf("Service HealthCheck NodePort still present")
 		}
 		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
-
-		// We reuse a reserved HCNP here with the e2e framework NodePort allocator that should guarantee
-		// that any node port created by the e2e tests can not collide, but it does not protect against other
-		// services created in the cluster that use node ports.
 
 		ginkgo.By("ensuring that the HealthCheckNodePort no longer responds on the endpoint node when ExternalTrafficPolicy is Cluster")
 		checkOneHealthCheck(endpointNodeIP, false, "", deadline)
