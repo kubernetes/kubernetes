@@ -28,6 +28,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func TestDeclarativeValidateForDeclarative(t *testing.T) {
@@ -121,7 +122,7 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 			// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
 			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
 			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
-			// TODO: remove this once ErrorMatcher has been extended to handle this form of deduplication.
+			// TODO: remove this once RC's validation is fixed to not return duplicate errors.
 			dedupedImperativeErrs := field.ErrorList{}
 			for _, err := range imperativeErrs {
 				found := false
@@ -142,12 +143,13 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 	}
 }
 
-// Helper function for RC tests.
+// mkValidReplicationController produces a ReplicationController which passes
+// validation with no tweaks.
 func mkValidReplicationController(tweaks ...func(rc *api.ReplicationController)) api.ReplicationController {
 	rc := api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: ptr.To[int32](1),
 			Selector: map[string]string{"a": "b"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
