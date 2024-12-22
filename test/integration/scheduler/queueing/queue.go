@@ -33,8 +33,10 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/component-helpers/storage/volume"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -76,6 +78,10 @@ type CoreResourceEnqueueTestCase struct {
 	// EnableSchedulingQueueHint indicates which feature gate value(s) the test case should run with.
 	// By default, it's {true, false}
 	EnableSchedulingQueueHint sets.Set[bool]
+	// EnablePlugins is a list of plugins to enable.
+	// PrioritySort and DefaultPreemption are enabled by default because they are required by the framework.
+	// If empty, all plugins are enabled.
+	EnablePlugins []string
 }
 
 var (
@@ -2063,8 +2069,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
-		Name:         "Pod rejected with PVC by the CSI plugin is requeued when the related PVC is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with PVC by the CSI plugin is requeued when the related PVC is added",
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		EnablePlugins: []string{"VolumeBinding"},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -2076,32 +2083,12 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 				Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
 				PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle2"}}).
 				Obj(),
-			st.MakePersistentVolume().Name("pv3").
-				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
-				Capacity(v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}).
-				PersistentVolumeSource(v1.PersistentVolumeSource{CSI: &v1.CSIPersistentVolumeSource{Driver: "csidriver", VolumeHandle: "volumehandle3"}}).
-				Obj(),
 		},
 		InitialPVCs: []*v1.PersistentVolumeClaim{
 			st.MakePersistentVolumeClaim().
 				Name("pvc1").
 				Annotation(volume.AnnBindCompleted, "true").
 				VolumeName("pv1").
-				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
-				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
-				Obj(),
-			// If we don't have pvc2, it's filtered by the VolumeBinding pluging, so we should create it first and recreate it in a triggerFn.
-			st.MakePersistentVolumeClaim().
-				Name("pvc2").
-				Annotation(volume.AnnBindCompleted, "true").
-				VolumeName("pv2").
-				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
-				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
-				Obj(),
-			st.MakePersistentVolumeClaim().
-				Name("pvc3").
-				Annotation(volume.AnnBindCompleted, "true").
-				VolumeName("pv3").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteOncePod}).
 				Resources(v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}}).
 				Obj(),
@@ -2119,13 +2106,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod2").Container("image").PVC("pvc2").Obj(),
-			st.MakePod().Name("pod3").Container("image").PVC("pvc3").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
-			if err := testCtx.ClientSet.CoreV1().PersistentVolumeClaims(testCtx.NS.Name).Delete(testCtx.Ctx, "pvc2", metav1.DeleteOptions{}); err != nil {
-				return nil, fmt.Errorf("failed to delete pvc2: %w", err)
-			}
-
 			pvc := st.MakePersistentVolumeClaim().
 				Name("pvc2").
 				Annotation(volume.AnnBindCompleted, "true").
@@ -2149,6 +2131,33 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	t.Helper()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
+	opts := []scheduler.Option{scheduler.WithPodInitialBackoffSeconds(0), scheduler.WithPodMaxBackoffSeconds(0)}
+	if tt.EnablePlugins != nil {
+		enablePlugins := []configv1.Plugin{
+			// These are required plugins to start the scheduler.
+			{Name: "PrioritySort"},
+			{Name: "DefaultBinder"},
+		}
+		for _, pluginName := range tt.EnablePlugins {
+			enablePlugins = append(enablePlugins, configv1.Plugin{Name: pluginName})
+		}
+		profile := configv1.KubeSchedulerProfile{
+			SchedulerName: ptr.To("default-scheduler"),
+			Plugins: &configv1.Plugins{
+				MultiPoint: configv1.PluginSet{
+					Enabled: enablePlugins,
+					Disabled: []configv1.Plugin{
+						{Name: "*"},
+					},
+				},
+			},
+		}
+		cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+			Profiles: []configv1.KubeSchedulerProfile{profile},
+		})
+		opts = append(opts, scheduler.WithProfiles(cfg.Profiles...))
+	}
+
 	// Use zero backoff seconds to bypass backoffQ.
 	// It's intended to not start the scheduler's queue, and hence to
 	// not start any flushing logic. We will pop and schedule the Pods manually later.
@@ -2156,8 +2165,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		t,
 		testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
 		0,
-		scheduler.WithPodInitialBackoffSeconds(0),
-		scheduler.WithPodMaxBackoffSeconds(0),
+		opts...,
 	)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 
