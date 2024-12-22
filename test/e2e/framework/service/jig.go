@@ -132,7 +132,7 @@ func (s *staticPortRange) getUnusedPort() (int32, error) {
 	// start in a random offset
 	start := rand.Int31n(s.length)
 	for i := s.baseport; i < s.baseport+s.length; i++ {
-		port := (start + i) % s.length
+		port := (start + i) % (s.baseport + s.length)
 		if !s.reservedPorts.Has(port) {
 			return port, nil
 		}
