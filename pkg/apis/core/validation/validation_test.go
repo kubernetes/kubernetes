@@ -16758,6 +16758,16 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	}, {
 		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.MinReadySeconds = 0
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.MinReadySeconds = 3
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
 			rc.Spec.Replicas = ptr.To[int32](2)
 			rc.Spec.Template.Spec = podtest.MakePodSpec(
 				podtest.SetVolumes(
@@ -16831,6 +16841,15 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
+		"negative minReadySeconds": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.MinReadySeconds = -1
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
 	}
 	for k, tc := range errorCases {
 		t.Run(k, func(t *testing.T) {
@@ -16872,6 +16891,9 @@ func TestValidateReplicationController(t *testing.T) {
 		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](0) }),
 		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](1) }),
 		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](100) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 0 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 1 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 100 }),
 	}
 	for _, tc := range successCases {
 		if errs := ValidateReplicationController(&tc, PodValidationOptions{}); len(errs) != 0 {
@@ -16917,6 +16939,12 @@ func TestValidateReplicationController(t *testing.T) {
 			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"negative minReadySeconds": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = -1 }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
 			},
 		},
 		"nil replicas": {
