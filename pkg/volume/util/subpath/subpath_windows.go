@@ -201,6 +201,12 @@ func lockAndCheckSubPathWithoutSymlink(volumePath, subPath string) ([]uintptr, e
 			break
 		}
 
+		// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
+		if stat.Mode()&os.ModeIrregular != 0 {
+			errorResult = fmt.Errorf("subpath %q is an unexpected irregular file after EvalSymlinks", currentFullPath)
+			break
+		}
+
 		if !mount.PathWithinBase(currentFullPath, volumePath) {
 			errorResult = fmt.Errorf("SubPath %q not within volume path %q", currentFullPath, volumePath)
 			break
@@ -334,6 +340,10 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		}
 		if stat.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("subpath %q is an unexpected symlink after Mkdir", currentPath)
+		}
+		// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
+		if stat.Mode()&os.ModeIrregular != 0 {
+			return fmt.Errorf("subpath %q is an unexpected irregular file after Mkdir", currentPath)
 		}
 	}
 
