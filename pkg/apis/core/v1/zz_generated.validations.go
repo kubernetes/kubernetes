@@ -98,7 +98,13 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 			return
 		}(fldPath.Child("replicas"), obj.Replicas, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return oldObj.Replicas }))...)
 
-	// field corev1.ReplicationControllerSpec.MinReadySeconds has no validation
+	// field corev1.ReplicationControllerSpec.MinReadySeconds
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			return
+		}(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return &oldObj.MinReadySeconds }))...)
+
 	// field corev1.ReplicationControllerSpec.Selector has no validation
 	// field corev1.ReplicationControllerSpec.Template has no validation
 	return errs

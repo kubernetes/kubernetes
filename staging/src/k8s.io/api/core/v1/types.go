@@ -5117,6 +5117,7 @@ type ReplicationControllerSpec struct {
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	// +optional
 	// +default=0
+	// +k8s:minimum=0
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
 
 	// Selector is a label query over pods that should match the Replicas count.
