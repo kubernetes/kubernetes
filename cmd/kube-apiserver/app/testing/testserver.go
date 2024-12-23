@@ -47,6 +47,7 @@ import (
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -193,9 +194,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
 	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
 	featureGate.AddMetrics()
-	effectiveVersion := utilversion.DefaultKubeEffectiveVersion()
+	effectiveVersion := compatibility.DefaultKubeEffectiveVersion()
 	if instanceOptions.BinaryVersion != "" {
-		effectiveVersion = utilversion.NewEffectiveVersion(instanceOptions.BinaryVersion)
+		effectiveVersion = utilversion.NewEffectiveVersionFromString(instanceOptions.BinaryVersion)
 	}
 	componentGlobalsRegistry := featuregate.NewComponentGlobalsRegistry()
 	if err := componentGlobalsRegistry.Register(featuregate.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
