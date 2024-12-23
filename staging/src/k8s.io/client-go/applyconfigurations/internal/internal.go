@@ -7646,6 +7646,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: minReadySeconds
       type:
         scalar: numeric
+      default: 0
     - name: replicas
       type:
         scalar: numeric

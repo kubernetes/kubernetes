@@ -5094,6 +5094,7 @@ message ReplicationControllerSpec {
   // without any of its container crashing, for it to be considered available.
   // Defaults to 0 (pod will be considered available as soon as it is ready)
   // +optional
+  // +default=0
   // +k8s:minimum=0
   optional int32 minReadySeconds = 4;
 
