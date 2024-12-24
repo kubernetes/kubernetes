@@ -1127,13 +1127,12 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 					// this init container is initialized for the first time, start the next one
 					changes.InitContainersToStart = append(changes.InitContainersToStart, i+1)
 				}
-
-				// Restart running sidecar containers which have had their definition changed.
-				if _, _, changed := containerChanged(container, status); changed {
+				// Restart running sidecar containers which have had their image changed.
+				if containerImageChanged(container, status) {
 					changes.ContainersToKill[status.ID] = containerToKillInfo{
 						name:      container.Name,
 						container: container,
-						message:   fmt.Sprintf("Init container %s definition changed", container.Name),
+						message:   fmt.Sprintf("Init container %s image changed", container.Name),
 						reason:    "",
 					}
 					changes.InitContainersToStart = append(changes.InitContainersToStart, i)
