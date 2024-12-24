@@ -27,6 +27,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	resourceapi "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -70,10 +71,15 @@ type AutoscaleOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	Name       string
-	Min        int32
-	Max        int32
-	CPUPercent int32
+	Name               string
+	Min                int32
+	Max                int32
+	CPUPercent         int32
+	MemoryPercent      int32
+	CPUValue           int32
+	CPUAverageValue    int32
+	MemoryValue        int32
+	MemoryAverageValue int32
 
 	createAnnotation bool
 	args             []string
@@ -129,6 +135,15 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *c
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
 	cmd.Flags().Int32Var(&o.CPUPercent, "cpu-percent", -1, "The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used.")
+	cmd.Flags().Int32Var(&o.MemoryPercent, "mem-percent", -1, "The target average memory utilization (represented as a percent of requested memory) over all the pods. If it's not specified or negative, a default autoscaling policy will be used.")
+	cmd.Flags().Int32Var(&o.CPUValue, "cpu-value", -1,
+		"The target CPU value in cores. If it's not specified or negative, this metric is ignored. Example: --cpu-value=10 for 10 cores.")
+	cmd.Flags().Int32Var(&o.CPUAverageValue, "cpu-average-value", -1,
+		"The target average CPU value in cores. If it's not specified or negative, this metric is ignored. Example: --cpu-average-value=5 for 5 cores.")
+	cmd.Flags().Int32Var(&o.MemoryValue, "mem-value", -1,
+		"The target memory value in MiB. If it's not specified or negative, this metric is ignored. Example: --mem-value=500 for 500 MiB.")
+	cmd.Flags().Int32Var(&o.MemoryAverageValue, "mem-average-value", -1,
+		"The target average memory value in MiB. If it's not specified or negative, this metric is ignored. Example: --mem-average-value=1024 for 1024 MiB.")
 	cmd.Flags().StringVar(&o.Name, "name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")
@@ -190,6 +205,42 @@ func (o *AutoscaleOptions) Validate() error {
 		return fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS, max: %d, min: %d", o.Max, o.Min)
 	}
 
+	// helper function to check if a value is set (non-negative and not -1 for percent fields)
+	isValueSet := func(value int32) bool {
+		return value > 0
+	}
+
+	cpuMetricsSet := []bool{
+		isValueSet(o.CPUPercent),
+		isValueSet(o.CPUValue),
+		isValueSet(o.CPUAverageValue),
+	}
+	cpuCount := 0
+	for _, v := range cpuMetricsSet {
+		if v {
+			cpuCount++
+		}
+	}
+	// check if only one CPU metric is specified
+	if cpuCount > 1 {
+		return fmt.Errorf("only one CPU metric can be specified (cpu-percent, cpu-value, cpu-average-value)")
+	}
+
+	memMetricsSet := []bool{
+		isValueSet(o.MemoryPercent),
+		isValueSet(o.MemoryValue),
+		isValueSet(o.MemoryAverageValue),
+	}
+	memCount := 0
+	for _, v := range memMetricsSet {
+		if v {
+			memCount++
+		}
+	}
+	// check if only one Memory metric is specified
+	if memCount > 1 {
+		return fmt.Errorf("only one Memory metric can be specified (mem-percent, mem-value, mem-average-value)")
+	}
 	return nil
 }
 
@@ -224,6 +275,11 @@ func (o *AutoscaleOptions) Run() error {
 		if err := o.handleHPA(hpaV2); err != nil {
 			klog.V(1).Infof("Encountered an error with the v2 HorizontalPodAutoscaler: %v. "+
 				"Falling back to try the v1 HorizontalPodAutoscaler", err)
+			// check if the HPA can be created using v1 API.
+			if !o.canCreateHPAV1() {
+				klog.V(1).Infof("The current configuration cannot be represented using v1 HorizontalPodAutoscaler.")
+				return fmt.Errorf("failed to create v2 HPA and the configuration is incompatible with v1")
+			}
 			hpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)
 			if err := o.handleHPA(hpaV1); err != nil {
 				return err
@@ -239,6 +295,16 @@ func (o *AutoscaleOptions) Run() error {
 		return fmt.Errorf("no objects passed to autoscale")
 	}
 	return nil
+}
+
+func (o *AutoscaleOptions) canCreateHPAV1() bool {
+	// only allow fallback to v1 if CPUPercent is set and no other metrics are configured.
+	return o.CPUPercent >= 0 &&
+		o.CPUValue <= 0 &&
+		o.CPUAverageValue <= 0 &&
+		o.MemoryPercent <= 0 &&
+		o.MemoryValue <= 0 &&
+		o.MemoryAverageValue <= 0
 }
 
 // handleHPA handles the creation and management of a single HPA object.
@@ -312,19 +378,80 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscalerV2(refName string, mappi
 		scaler.Spec.MinReplicas = &o.Min
 	}
 
-	if o.CPUPercent >= 0 {
-		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
-			{
-				Type: autoscalingv2.ResourceMetricSourceType,
-				Resource: &autoscalingv2.ResourceMetricSource{
-					Name: corev1.ResourceCPU,
-					Target: autoscalingv2.MetricTarget{
-						Type:               autoscalingv2.UtilizationMetricType,
-						AverageUtilization: &o.CPUPercent,
-					},
-				},
+	metrics := []autoscalingv2.MetricSpec{}
+
+	quantityPtr := func(value int32, unit string) *resourceapi.Quantity {
+		switch unit {
+		case "core":
+			// convert cores to milli-cores for CPU
+			q := resourceapi.NewQuantity(int64(value*1000), resourceapi.DecimalSI)
+			return q
+		case "m", "milli":
+			// directly use milli-cores for CPU
+			q := resourceapi.NewQuantity(int64(value), resourceapi.DecimalSI)
+			return q
+		case "Mi", "Mib", "MiB":
+			// use MiB for memory
+			q := resourceapi.NewQuantity(int64(value*1024*1024), resourceapi.BinarySI)
+			return q
+		case "Gi", "Gib", "GiB":
+			// use GiB for memory
+			q := resourceapi.NewQuantity(int64(value*1024*1024*1024), resourceapi.BinarySI)
+			return q
+		default:
+			return nil
+		}
+	}
+
+	// add CPU metric if any of the CPU targets are specified
+	if o.CPUPercent > 0 || o.CPUValue > 0 || o.CPUAverageValue > 0 {
+		cpuMetric := autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   corev1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{},
 			},
 		}
+		if o.CPUPercent > 0 {
+			cpuMetric.Resource.Target.Type = autoscalingv2.UtilizationMetricType
+			cpuMetric.Resource.Target.AverageUtilization = &o.CPUPercent
+		} else if o.CPUValue > 0 {
+			cpuMetric.Resource.Target.Type = autoscalingv2.ValueMetricType
+			cpuMetric.Resource.Target.Value = quantityPtr(o.CPUValue, "core")
+		} else if o.CPUAverageValue > 0 {
+			cpuMetric.Resource.Target.Type = autoscalingv2.AverageValueMetricType
+			cpuMetric.Resource.Target.AverageValue = quantityPtr(o.CPUAverageValue, "core")
+		}
+		metrics = append(metrics, cpuMetric)
+	}
+
+	// add Memory metric if any of the memory targets are specified
+	if o.MemoryPercent > 0 || o.MemoryValue > 0 || o.MemoryAverageValue > 0 {
+		memoryMetric := autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   corev1.ResourceMemory,
+				Target: autoscalingv2.MetricTarget{},
+			},
+		}
+		if o.MemoryPercent > 0 {
+			memoryMetric.Resource.Target.Type = autoscalingv2.UtilizationMetricType
+			memoryMetric.Resource.Target.AverageUtilization = &o.MemoryPercent
+		} else if o.MemoryValue > 0 {
+			memoryMetric.Resource.Target.Type = autoscalingv2.ValueMetricType
+			memoryMetric.Resource.Target.Value = quantityPtr(o.MemoryValue, "Mi")
+		} else if o.MemoryAverageValue > 0 {
+			memoryMetric.Resource.Target.Type = autoscalingv2.AverageValueMetricType
+			memoryMetric.Resource.Target.AverageValue = quantityPtr(o.MemoryAverageValue, "Mi")
+		}
+		metrics = append(metrics, memoryMetric)
+	}
+
+	// Only set Metrics if there are any defined
+	if len(metrics) > 0 {
+		scaler.Spec.Metrics = metrics
+	} else {
+		scaler.Spec.Metrics = nil
 	}
 
 	return &scaler

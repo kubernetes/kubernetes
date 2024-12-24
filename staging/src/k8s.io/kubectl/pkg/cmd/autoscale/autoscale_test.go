@@ -26,6 +26,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	resourceapi "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
@@ -353,6 +354,236 @@ func TestCreateHorizontalPodAutoscalerV2(t *testing.T) {
 									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
 									Type:               autoscalingv2.UtilizationMetricType,
 									AverageUtilization: ptr.To(int32(60)),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create with cpu value options",
+			options: &AutoscaleOptions{
+				Name:     "custom-name",
+				Max:      10,
+				Min:      2,
+				CPUValue: 10,
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV2: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "custom-name",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas: ptr.To(int32(2)),
+					MaxReplicas: int32(10),
+					Metrics: []autoscalingv2.MetricSpec{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:  autoscalingv2.ValueMetricType,
+									Value: resourceapi.NewQuantity(10000, resourceapi.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create with cpu average value options",
+			options: &AutoscaleOptions{
+				Name:            "custom-name",
+				Max:             10,
+				Min:             2,
+				CPUAverageValue: 10,
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV2: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "custom-name",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas: ptr.To(int32(2)),
+					MaxReplicas: int32(10),
+					Metrics: []autoscalingv2.MetricSpec{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:         autoscalingv2.AverageValueMetricType,
+									AverageValue: resourceapi.NewQuantity(10000, resourceapi.DecimalSI),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create with mem percent options",
+			options: &AutoscaleOptions{
+				Name:          "custom-name",
+				Max:           10,
+				Min:           2,
+				MemoryPercent: 80,
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV2: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "custom-name",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas: ptr.To(int32(2)),
+					MaxReplicas: int32(10),
+					Metrics: []autoscalingv2.MetricSpec{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceMemory,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:               autoscalingv2.UtilizationMetricType,
+									AverageUtilization: ptr.To(int32(80)),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create with mem value options",
+			options: &AutoscaleOptions{
+				Name:        "custom-name",
+				Max:         10,
+				Min:         2,
+				MemoryValue: 10,
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV2: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "custom-name",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas: ptr.To(int32(2)),
+					MaxReplicas: int32(10),
+					Metrics: []autoscalingv2.MetricSpec{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceMemory,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:  autoscalingv2.ValueMetricType,
+									Value: resourceapi.NewQuantity(10485760, resourceapi.BinarySI),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create with mem average value options",
+			options: &AutoscaleOptions{
+				Name:               "custom-name",
+				Max:                10,
+				Min:                2,
+				MemoryAverageValue: 10,
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV2: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "custom-name",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas: ptr.To(int32(2)),
+					MaxReplicas: int32(10),
+					Metrics: []autoscalingv2.MetricSpec{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceMemory,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:         autoscalingv2.AverageValueMetricType,
+									AverageValue: resourceapi.NewQuantity(10485760, resourceapi.BinarySI),
 								},
 							},
 						},
