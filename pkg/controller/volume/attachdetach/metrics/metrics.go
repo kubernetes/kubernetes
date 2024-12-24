@@ -44,14 +44,42 @@ const (
 )
 
 var (
-	inUseVolumeMetricDesc = metrics.NewDesc(
+	// Deprecated: inUseVolumeMetricDescDeprecated is deprecated,
+	// and will be removed at v1.33. Please use inUseVolumeMetricDesc instead.
+	inUseVolumeMetricDescDeprecated = metrics.NewDesc(
 		metrics.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
 		"Measure number of volumes in use",
 		[]string{"node", "volume_plugin"}, nil,
 		metrics.ALPHA, "")
 
-	totalVolumesMetricDesc = metrics.NewDesc(
+	// Deprecated: totalVolumesMetricDescDeprecated is deprecated,
+	// and will be removed at v1.33. Please use totalVolumesMetricDesc instead.
+	totalVolumesMetricDescDeprecated = metrics.NewDesc(
 		metrics.BuildFQName("", "attachdetach_controller", "total_volumes"),
+		"Number of volumes in A/D Controller",
+		[]string{"plugin_name", "state"}, nil,
+		metrics.ALPHA, "1.33.0")
+
+	// Deprecated: ForceDetachMetricCounterDeprecated is deprecated,
+	// and will be removed at v1.33. Please use ForceDetachMetricCounter instead.
+	ForceDetachMetricCounterDeprecated = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:              "attachdetach_controller_forced_detaches",
+			Help:              "Number of times the A/D Controller performed a forced detach",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.33.0",
+		},
+		[]string{"reason"},
+	)
+
+	inUseVolumeMetricDesc = metrics.NewDesc(
+		metrics.BuildFQName("", attachDetachController, "attachable_volumes_in_use"),
+		"Measure number of volumes in use",
+		[]string{"node", "volume_plugin"}, nil,
+		metrics.ALPHA, "")
+
+	totalVolumesMetricDesc = metrics.NewDesc(
+		metrics.BuildFQName("", attachDetachController, "total_volumes"),
 		"Number of volumes in A/D Controller",
 		[]string{"plugin_name", "state"}, nil,
 		metrics.ALPHA, "")
@@ -59,7 +87,7 @@ var (
 	ForceDetachMetricCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      attachDetachController,
-			Name:           "attachdetach_controller_forced_detaches",
+			Name:           "forced_detaches",
 			Help:           "Number of times the A/D Controller performed a forced detach",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -87,6 +115,8 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 			csiMigratedPluginManager,
 			intreeToCSITranslator))
 		legacyregistry.MustRegister(ForceDetachMetricCounter)
+		//nolint:staticcheck
+		legacyregistry.MustRegister(ForceDetachMetricCounterDeprecated)
 	})
 }
 
@@ -138,6 +168,11 @@ var _ metrics.StableCollector = &attachDetachStateCollector{}
 func (collector *attachDetachStateCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- inUseVolumeMetricDesc
 	ch <- totalVolumesMetricDesc
+	// we intentionally keep them with the deprecation and will remove at v1.33.
+	//nolint:staticcheck
+	ch <- inUseVolumeMetricDescDeprecated
+	//nolint:staticcheck
+	ch <- totalVolumesMetricDescDeprecated
 }
 
 func (collector *attachDetachStateCollector) CollectWithStability(ch chan<- metrics.Metric) {
@@ -222,4 +257,7 @@ func (collector *attachDetachStateCollector) getTotalVolumesCount() volumeCount 
 // RecordForcedDetachMetric register a forced detach metric.
 func RecordForcedDetachMetric(forceDetachReason string) {
 	ForceDetachMetricCounter.WithLabelValues(forceDetachReason).Inc()
+	// we intentionally keep them with the deprecation and will remove at v1.33.
+	//nolint:staticcheck
+	ForceDetachMetricCounterDeprecated.WithLabelValues(forceDetachReason).Inc()
 }
