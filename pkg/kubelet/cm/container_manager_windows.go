@@ -369,3 +369,32 @@ func (cm *containerManagerImpl) UnprepareDynamicResources(ctx context.Context, p
 func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) bool {
 	return false
 }
+
+func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.InitContainers {
+		exclusiveCPUs := cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name)
+		if !exclusiveCPUs.IsEmpty() {
+			klog.V(4).InfoS("Pod contains container with pinned cpus", "podName", pod.Name, "containerName", container.Name)
+			return true
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		exclusiveCPUs := cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name)
+		if !exclusiveCPUs.IsEmpty() {
+			klog.V(4).InfoS("Pod contains container with pinned cpus", "podName", pod.Name, "containerName", container.Name)
+			return true
+		}
+	}
+
+	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
+	return false
+}
+
+func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
+	exclusiveCPUs := cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name)
+	if !exclusiveCPUs.IsEmpty() {
+		klog.V(4).InfoS("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+		return true
+	}
+	return false
+}
