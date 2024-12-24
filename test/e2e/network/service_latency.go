@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
 	"sort"
 	"strings"
 	"time"
@@ -32,9 +33,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -92,7 +92,7 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 		failing := sets.NewString()
 		d, err := runServiceLatencies(ctx, f, parallelTrials, totalTrials, acceptableFailureRatio)
 		if err != nil {
-			failing.Insert(fmt.Sprintf("Not all RC/pod/service trials succeeded: %v", err))
+			failing.Insert(fmt.Sprintf("Not all deployment/pod/service trials succeeded: %v", err))
 		}
 		dSorted := durations(d)
 		sort.Sort(dSorted)
@@ -135,17 +135,18 @@ var _ = common.SIGDescribe("Service endpoints latency", func() {
 })
 
 func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel, total int, acceptableFailureRatio float32) (output []time.Duration, err error) {
-	cfg := testutils.RCConfig{
-		Client:       f.ClientSet,
-		Image:        imageutils.GetPauseImageName(),
-		Name:         "svc-latency-rc",
-		Namespace:    f.Namespace.Name,
-		Replicas:     1,
-		PollInterval: time.Second,
-	}
-	if err := e2erc.RunRC(ctx, cfg); err != nil {
-		return nil, err
-	}
+	deploymentName := "svc-latency-deployment"
+
+	deploymentSpec := e2edeployment.NewDeployment(deploymentName,
+		int32(1),
+		make(map[string]string),
+		deploymentName,
+		imageutils.GetPauseImageName(),
+		appsv1.RollingUpdateDeploymentStrategyType)
+
+	deployment, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx,
+		deploymentSpec,
+		metav1.CreateOptions{})
 
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy
@@ -157,7 +158,7 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 
 	// run one test and throw it away-- this is to make sure that the pod's
 	// ready status has propagated.
-	_, err = singleServiceLatency(ctx, f, cfg.Name, endpointQueries)
+	_, err = singleServiceLatency(ctx, f, deployment.Name, endpointQueries)
 	framework.ExpectNoError(err)
 
 	// These channels are never closed, and each attempt sends on exactly
@@ -172,7 +173,7 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
 			defer func() { <-blocker }()
-			if d, err := singleServiceLatency(ctx, f, cfg.Name, endpointQueries); err != nil {
+			if d, err := singleServiceLatency(ctx, f, deployment.Name, endpointQueries); err != nil {
 				errs <- err
 			} else {
 				durations <- d
