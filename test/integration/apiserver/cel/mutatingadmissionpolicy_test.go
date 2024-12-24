@@ -20,11 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
@@ -41,11 +42,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -492,8 +490,7 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 	}
 
 	// Run all tests in a shared apiserver
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, nil, []string{"--feature-gates=MutatingAdmissionPolicy=true"}, framework.SharedEtcd())
 	require.NoError(t, err)
 	defer server.TearDownFn()
 
@@ -1005,8 +1002,7 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-			server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
+			server, err := apiservertesting.StartTestServer(t, nil, []string{"--feature-gates=MutatingAdmissionPolicy=true"}, framework.SharedEtcd())
 			require.NoError(t, err)
 			defer server.TearDownFn()
 
@@ -1090,8 +1086,7 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 // CRDs are also ideal for testing version conversion since old version are not removed, so version conversion is also
 // tested.
 func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, nil, []string{"--feature-gates=MutatingAdmissionPolicy=true"}, framework.SharedEtcd())
 	etcd.CreateTestCRDs(t, apiextensions.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
 	if err != nil {
 		t.Fatal(err)

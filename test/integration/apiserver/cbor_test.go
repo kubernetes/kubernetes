@@ -36,14 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
@@ -61,11 +58,10 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 	// about 2^-NTrials, so NTrials needs to be big enough to make sure that doesn't happen.
 	const NTrials = 40
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CBORServingAndStorage, true)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsAllowCBOR, true)
 	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.ClientsPreferCBOR, true)
 
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, append(framework.DefaultTestServerFlags(), "--feature-gates=CBORServingAndStorage=true"), framework.SharedEtcd())
 	t.Cleanup(server.TearDownFn)
 
 	config := rest.CopyConfig(server.ClientConfig)

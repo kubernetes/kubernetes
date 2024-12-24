@@ -28,11 +28,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/test/integration/authutil"
@@ -78,9 +75,6 @@ var (
 
 func TestStructuredAuthenticationConfig(t *testing.T) {
 	t.Log("Testing anonymous authenticator with authentication config")
-
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnonymousAuthConfigurableEndpoints, true)
 
 	testCases := []struct {
 		desc            string
@@ -161,7 +155,7 @@ anonymous:
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			flags := []string{"--authorization-mode=RBAC"}
+			flags := []string{"--authorization-mode=RBAC", "--feature-gates=StructuredAuthenticationConfiguration=true,AnonymousAuthConfigurableEndpoints=true"}
 			flags = append(flags, fmt.Sprintf("--authentication-config=%s", writeTempFile(t, tc.authConfig)))
 			flags = append(flags, tc.additionalFlags...)
 

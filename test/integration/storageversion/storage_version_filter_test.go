@@ -30,13 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storageversion"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -166,8 +163,6 @@ func TestStorageVersionBootstrap(t *testing.T) {
 		}
 	}
 	// Restart api server, enable the storage version API and the feature gates.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
 	server = kubeapiservertesting.StartTestServerOrDie(t,
 		&kubeapiservertesting.TestServerInstanceOptions{
 			StorageVersionWrapFunc: wrapperFunc,
@@ -176,6 +171,7 @@ func TestStorageVersionBootstrap(t *testing.T) {
 			// force enable all resources to ensure that the storage updates can handle cross group resources.
 			// TODO: drop these once we stop allowing them to be served.
 			"--runtime-config=api/all=true,extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true,internal.apiserver.k8s.io/v1alpha1=true",
+			"--feature-gates=StorageVersionAPI=true,APIServerIdentity=true",
 		},
 		etcdConfig)
 	defer server.TearDownFn()

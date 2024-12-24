@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"io"
-	"k8s.io/apimachinery/pkg/util/version"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -38,10 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -634,9 +630,9 @@ func TestMatchConditionsWithoutStrictCostEnforcement(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			upCh := recorder.Reset()
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, false)
-			server, err := apiservertesting.StartTestServer(t, &apiservertesting.TestServerInstanceOptions{EmulationVersion: "1.31"}, []string{
+			server, err := apiservertesting.StartTestServer(t, nil, []string{
+				"--emulated-version", "1.31",
+				"--feature-gates", "StrictCostEnforcementForWebhooks=false",
 				"--disable-admission-plugins=ServiceAccount",
 			}, framework.SharedEtcd())
 			if err != nil {
@@ -888,7 +884,6 @@ func TestMatchConditionsWithoutStrictCostEnforcement(t *testing.T) {
 }
 
 func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.StrictCostEnforcementForWebhooks, true)
 
 	testcases := []struct {
 		name            string
@@ -953,6 +948,7 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 		t.Run(testcase.name, func(t *testing.T) {
 			upCh := recorder.Reset()
 			server, err := apiservertesting.StartTestServer(t, nil, []string{
+				"--feature-gates", "StrictCostEnforcementForWebhooks=true",
 				"--disable-admission-plugins=ServiceAccount",
 			}, framework.SharedEtcd())
 			if err != nil {

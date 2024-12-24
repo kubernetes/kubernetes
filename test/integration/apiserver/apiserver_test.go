@@ -60,7 +60,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -69,7 +68,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/pager"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -3348,9 +3346,6 @@ func int32Ptr(i int32) *int32 {
 // TestDefaultStorageEncoding verifies that the storage encoding for all built-in resources is
 // Protobuf.
 func TestDefaultStorageEncoding(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
-
 	protobufRecognizer := protobuf.NewSerializer(runtime.NewScheme(), runtime.NewScheme())
 	var recognizersByGroup map[string]recognizer.RecognizingDecoder
 	{
@@ -3372,6 +3367,7 @@ func TestDefaultStorageEncoding(t *testing.T) {
 		[]string{
 			"--runtime-config=api/all=true",
 			"--disable-admission-plugins=ServiceAccount",
+			"--feature-gates=AllAlpha=true,AllBeta=true",
 		},
 		storageConfig,
 	)

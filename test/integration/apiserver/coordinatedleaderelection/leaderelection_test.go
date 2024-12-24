@@ -25,10 +25,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubernetes "k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controlplane/controller/leaderelection"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -51,10 +48,9 @@ func TestCoordinatedLeaderElectionLeaseTransfer(t *testing.T) {
 	leaderelection.RenewDeadline = 3 * time.Second
 	leaderelection.RetryPeriod = 2 * time.Second
 
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 	etcd := framework.SharedEtcd()
 
-	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), nil, etcd)
+	server := apiservertesting.StartTestServerOrDie(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--feature-gates=CoordinatedLeaderElection=true"}, etcd)
 	defer server.TearDownFn()
 
 	config := server.ClientConfig
