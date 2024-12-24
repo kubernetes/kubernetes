@@ -70,10 +70,11 @@ type AutoscaleOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	Name       string
-	Min        int32
-	Max        int32
-	CPUPercent int32
+	Name          string
+	Min           int32
+	Max           int32
+	CPUPercent    int32
+	MemoryPercent int32
 
 	createAnnotation bool
 	args             []string
@@ -129,6 +130,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *c
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
 	cmd.Flags().Int32Var(&o.CPUPercent, "cpu-percent", -1, "The target average CPU utilization (represented as a percent of requested CPU) over all the pods. If it's not specified or negative, a default autoscaling policy will be used.")
+	cmd.Flags().Int32Var(&o.MemoryPercent, "mem-percent", -1, "The target average memory utilization (represented as a percent of requested memory) over all the pods. If it's not specified or negative, a default autoscaling policy will be used.")
 	cmd.Flags().StringVar(&o.Name, "name", "", i18n.T("The name for the newly created object. If not specified, the name of the input resource will be used."))
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, o.FilenameOptions, "identifying the resource to autoscale.")
@@ -189,7 +191,6 @@ func (o *AutoscaleOptions) Validate() error {
 	if o.Max < o.Min {
 		return fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS, max: %d, min: %d", o.Max, o.Min)
 	}
-
 	return nil
 }
 
@@ -224,6 +225,11 @@ func (o *AutoscaleOptions) Run() error {
 		if err := o.handleHPA(hpaV2); err != nil {
 			klog.V(1).Infof("Encountered an error with the v2 HorizontalPodAutoscaler: %v. "+
 				"Falling back to try the v1 HorizontalPodAutoscaler", err)
+			// check if the HPA can be created using v1 API.
+			if !o.canCreateHPAV1() {
+				klog.V(1).Infof("The current configuration cannot be represented using v1 HorizontalPodAutoscaler.")
+				return fmt.Errorf("failed to create v2 HPA and the configuration is incompatible with v1")
+			}
 			hpaV1 := o.createHorizontalPodAutoscalerV1(info.Name, mapping)
 			if err := o.handleHPA(hpaV1); err != nil {
 				return err
@@ -239,6 +245,11 @@ func (o *AutoscaleOptions) Run() error {
 		return fmt.Errorf("no objects passed to autoscale")
 	}
 	return nil
+}
+
+func (o *AutoscaleOptions) canCreateHPAV1() bool {
+	// only allow fallback to v1 if CPUPercent is set and MemoryPercent is not set.
+	return o.CPUPercent >= 0 && o.MemoryPercent <= 0
 }
 
 // handleHPA handles the creation and management of a single HPA object.
@@ -312,19 +323,45 @@ func (o *AutoscaleOptions) createHorizontalPodAutoscalerV2(refName string, mappi
 		scaler.Spec.MinReplicas = &o.Min
 	}
 
-	if o.CPUPercent >= 0 {
-		scaler.Spec.Metrics = []autoscalingv2.MetricSpec{
-			{
-				Type: autoscalingv2.ResourceMetricSourceType,
-				Resource: &autoscalingv2.ResourceMetricSource{
-					Name: corev1.ResourceCPU,
-					Target: autoscalingv2.MetricTarget{
-						Type:               autoscalingv2.UtilizationMetricType,
-						AverageUtilization: &o.CPUPercent,
-					},
-				},
+	metrics := []autoscalingv2.MetricSpec{}
+
+	// add CPU metric if any of the CPU targets are specified
+	if o.CPUPercent > 0 {
+		cpuMetric := autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   corev1.ResourceCPU,
+				Target: autoscalingv2.MetricTarget{},
 			},
 		}
+		if o.CPUPercent > 0 {
+			cpuMetric.Resource.Target.Type = autoscalingv2.UtilizationMetricType
+			cpuMetric.Resource.Target.AverageUtilization = &o.CPUPercent
+		}
+		metrics = append(metrics, cpuMetric)
+	}
+
+	// add Memory metric if any of the memory targets are specified
+	if o.MemoryPercent > 0 {
+		memoryMetric := autoscalingv2.MetricSpec{
+			Type: autoscalingv2.ResourceMetricSourceType,
+			Resource: &autoscalingv2.ResourceMetricSource{
+				Name:   corev1.ResourceMemory,
+				Target: autoscalingv2.MetricTarget{},
+			},
+		}
+		if o.MemoryPercent > 0 {
+			memoryMetric.Resource.Target.Type = autoscalingv2.UtilizationMetricType
+			memoryMetric.Resource.Target.AverageUtilization = &o.MemoryPercent
+		}
+		metrics = append(metrics, memoryMetric)
+	}
+
+	// Only set Metrics if there are any defined
+	if len(metrics) > 0 {
+		scaler.Spec.Metrics = metrics
+	} else {
+		scaler.Spec.Metrics = nil
 	}
 
 	return &scaler

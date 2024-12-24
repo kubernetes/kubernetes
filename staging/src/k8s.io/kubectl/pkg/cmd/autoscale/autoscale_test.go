@@ -360,6 +360,111 @@ func TestCreateHorizontalPodAutoscalerV2(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "create with mem percent options",
+			options: &AutoscaleOptions{
+				Name:          "custom-name",
+				Max:           10,
+				Min:           2,
+				MemoryPercent: 80,
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV2: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "custom-name",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas: ptr.To(int32(2)),
+					MaxReplicas: int32(10),
+					Metrics: []autoscalingv2.MetricSpec{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceMemory,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:               autoscalingv2.UtilizationMetricType,
+									AverageUtilization: ptr.To(int32(80)),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "create with both cpu percent and mem percent options",
+			options: &AutoscaleOptions{
+				Name:          "custom-name",
+				Max:           10,
+				Min:           2,
+				CPUPercent:    70,
+				MemoryPercent: 80,
+			},
+			refName: "deployment-1",
+			mapping: &meta.RESTMapping{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps",
+					Version: "v1",
+					Kind:    "Deployment",
+				},
+			},
+			expectedHPAV2: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "custom-name",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "deployment-1",
+					},
+					MinReplicas: ptr.To(int32(2)),
+					MaxReplicas: int32(10),
+					Metrics: []autoscalingv2.MetricSpec{
+						// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricSpec
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceCPU,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:               autoscalingv2.UtilizationMetricType,
+									AverageUtilization: ptr.To(int32(70)),
+								},
+							},
+						},
+						{
+							Type: autoscalingv2.ResourceMetricSourceType,
+							Resource: &autoscalingv2.ResourceMetricSource{
+								// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#ResourceMetricSource
+								Name: corev1.ResourceMemory,
+								Target: autoscalingv2.MetricTarget{
+									// Reference: https://pkg.go.dev/k8s.io/api/autoscaling/v2#MetricTarget
+									Type:               autoscalingv2.UtilizationMetricType,
+									AverageUtilization: ptr.To(int32(80)),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
