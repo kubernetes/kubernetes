@@ -1588,7 +1588,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 							},
 							Spec: v1.PodSpec{
 								Containers: []v1.Container{
-									{Name: "test-name", Image: "nonexistant-image"},
+									{Name: "test-name", Image: "nonexistent-image"},
 								},
 							},
 						},
@@ -1623,7 +1623,7 @@ func TestGetSubresourcesAsTables(t *testing.T) {
 							},
 							Spec: v1.PodSpec{
 								Containers: []v1.Container{
-									{Name: "test-name", Image: "nonexistant-image"},
+									{Name: "test-name", Image: "nonexistent-image"},
 								},
 							},
 						},
