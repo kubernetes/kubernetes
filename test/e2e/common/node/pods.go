@@ -851,7 +851,7 @@ var _ = SIGDescribe("Pods", func() {
 		ginkgo.By("Create set of pods")
 		// create a set of pods in test namespace
 		for _, podTestName := range podTestNames {
-			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx,
+			_ = podClient.Create(ctx,
 				e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: podTestName,
@@ -866,8 +866,7 @@ var _ = SIGDescribe("Pods", func() {
 							Name:  "token-test",
 						}},
 						RestartPolicy: v1.RestartPolicyNever,
-					}}), metav1.CreateOptions{})
-			framework.ExpectNoError(err, "failed to create pod")
+					}}))
 			framework.Logf("created %v", podTestName)
 		}
 
@@ -929,8 +928,7 @@ var _ = SIGDescribe("Pods", func() {
 			},
 		})
 		ginkgo.By("creating a Pod with a static label")
-		_, err = f.ClientSet.CoreV1().Pods(testNamespaceName).Create(ctx, testPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, testNamespaceName)
+		_ = podClient.Create(ctx, testPod)
 
 		ginkgo.By("watching for Pod to be ready")
 		ctxUntil, cancel := context.WithTimeout(ctx, f.Timeouts.PodStart)
@@ -1082,8 +1080,6 @@ var _ = SIGDescribe("Pods", func() {
 		the fields MUST equal the new values.
 	*/
 	framework.ConformanceIt("should patch a pod status", func(ctx context.Context) {
-		ns := f.Namespace.Name
-		podClient := f.ClientSet.CoreV1().Pods(ns)
 		podName := "pod-" + utilrand.String(5)
 		label := map[string]string{"e2e": podName}
 
@@ -1103,8 +1099,7 @@ var _ = SIGDescribe("Pods", func() {
 				},
 			},
 		})
-		pod, err := podClient.Create(ctx, testPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, ns)
+		pod := podClient.Create(ctx, testPod)
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "Pod didn't start within time out period")
 
 		ginkgo.By("patching /status")
