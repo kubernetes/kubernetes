@@ -657,7 +657,7 @@ func TestHashContainer(t *testing.T) {
 				"echo abc",
 			},
 			containerPort: int32(8001),
-			expectedHash:  uint64(0x8e45cbd0),
+			expectedHash:  uint64(0x3c42280f),
 		},
 	}
 
@@ -938,7 +938,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0x11a6d6d6,
+			0x5f62cb4c,
 		},
 		{
 			"Burstable pod with memory policy restart required",
@@ -951,7 +951,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0x11a6d6d6,
+			0xcdab9e00,
 		},
 		{
 			"Guaranteed pod with CPU policy restart required",
@@ -964,7 +964,7 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired},
 			},
-			0x11a6d6d6,
+			0x5f62cb4c,
 		},
 		{
 			"Guaranteed pod with memory policy restart required",
@@ -977,13 +977,13 @@ func TestHashContainerWithoutResources(t *testing.T) {
 				},
 				ResizePolicy: []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired},
 			},
-			0x11a6d6d6,
+			0xcdab9e00,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			containerCopy := tc.container.DeepCopy()
-			hash := HashContainer(tc.container)
+			hash := HashContainerWithoutResources(tc.container)
 			assert.Equal(t, tc.expectedHash, hash, "[%s]", tc.name)
 			assert.Equal(t, containerCopy, tc.container, "[%s]", tc.name)
 		})

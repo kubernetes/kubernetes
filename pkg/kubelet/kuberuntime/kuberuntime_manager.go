@@ -526,10 +526,6 @@ func (p podActions) String() string {
 		p.KillPod, p.CreateSandbox, p.UpdatePodResources, p.Attempt, p.InitContainersToStart, p.ContainersToStart, p.EphemeralContainersToStart, p.ContainersToUpdate, p.ContainersToKill)
 }
 
-// containerChanged will determine whether the container has changed based on the fields that will affect the running of the container.
-// Currently, there are only `image` and `name` fields.
-// we don't need to consider the pod UID here, because we find the containerStatus through the pod UID.
-// If the pod UID changes, we will not be able to find the containerStatus to compare against.
 func containerChanged(container *v1.Container, containerStatus *kubecontainer.Status) (uint64, uint64, bool) {
 	expectedHash := kubecontainer.HashContainer(container)
 	return expectedHash, containerStatus.Hash, containerStatus.Hash != expectedHash

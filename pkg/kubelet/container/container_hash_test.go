@@ -68,7 +68,8 @@ var (
 }
 `
 
-	sampleV131HashValue = uint64(0x8e45cbd0)
+	sampleV115HashValue = uint64(0x311670a)
+	sampleV116HashValue = sampleV115HashValue
 )
 
 func TestConsistentHashContainer(t *testing.T) {
@@ -78,7 +79,11 @@ func TestConsistentHashContainer(t *testing.T) {
 	}
 
 	currentHash := HashContainer(container)
-	if currentHash != sampleV131HashValue {
-		t.Errorf("mismatched hash value with v1.31")
+	if currentHash != sampleV116HashValue {
+		t.Errorf("mismatched hash value with v1.16")
+	}
+
+	if currentHash != sampleV115HashValue {
+		t.Errorf("mismatched hash value with v1.15")
 	}
 }
