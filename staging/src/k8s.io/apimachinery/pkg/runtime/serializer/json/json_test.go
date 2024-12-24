@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package json_test
+package json
 
 import (
 	"bytes"
 	"fmt"
+
 	"reflect"
 	"strings"
 	"testing"
@@ -28,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -856,9 +857,9 @@ func TestDecode(t *testing.T) {
 	for i, test := range testCases {
 		var s runtime.Serializer
 		if test.yaml {
-			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, json.SerializerOptions{Yaml: test.yaml, Pretty: false, Strict: test.strict})
+			s = NewSerializerWithOptions(DefaultMetaFactory, test.creater, test.typer, SerializerOptions{Yaml: test.yaml, Pretty: false, Strict: test.strict})
 		} else {
-			s = json.NewSerializerWithOptions(json.DefaultMetaFactory, test.creater, test.typer, json.SerializerOptions{Yaml: test.yaml, Pretty: test.pretty, Strict: test.strict})
+			s = NewSerializerWithOptions(DefaultMetaFactory, test.creater, test.typer, SerializerOptions{Yaml: test.yaml, Pretty: test.pretty, Strict: test.strict})
 		}
 		obj, gvk, err := s.Decode([]byte(test.data), test.defaultGVK, test.into)
 
@@ -905,7 +906,7 @@ func TestCacheableObject(t *testing.T) {
 	gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "MockCacheableObject"}
 	creater := &mockCreater{obj: &runtimetesting.MockCacheableObject{}}
 	typer := &mockTyper{gvk: &gvk}
-	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, creater, typer, json.SerializerOptions{})
+	serializer := NewSerializerWithOptions(DefaultMetaFactory, creater, typer, SerializerOptions{})
 
 	runtimetesting.CacheableObjectTest(t, serializer)
 }
@@ -1032,11 +1033,116 @@ func TestEncode(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var dst bytes.Buffer
-			s := json.NewSerializerWithOptions(json.DefaultMetaFactory, nil, nil, json.SerializerOptions{})
+			s := NewSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{})
 			if err := s.Encode(tc.in, &dst); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if diff := cmp.Diff(tc.want, dst.Bytes()); diff != "" {
+				t.Errorf("unexpected output:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestStreamingListEncode(t *testing.T) {
+	var remainingItems int64 = 1
+	for _, tc := range []struct {
+		name string
+		in   runtime.Object
+	}{
+		{
+			name: "List empty",
+			in: &testapigroupv1.CarpList{
+				Items: []testapigroupv1.Carp{},
+			},
+		},
+		{
+			name: "List just kind",
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+				},
+				Items: []testapigroupv1.Carp{},
+			},
+		},
+		{
+			name: "List just apiVersion",
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+				},
+				Items: []testapigroupv1.Carp{},
+			},
+		},
+		{
+			name: "List no elements",
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "2345",
+				},
+				Items: []testapigroupv1.Carp{},
+			},
+		},
+		{
+			name: "List one element with continue",
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "2345",
+					Continue:           "abc",
+					RemainingItemCount: &remainingItems,
+				},
+				Items: []testapigroupv1.Carp{
+					{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Carp"}, ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod",
+						Namespace: "default",
+					}},
+				},
+			},
+		},
+		{
+			name: "List two elements",
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion:    "2345",
+				},
+				Items: []testapigroupv1.Carp{
+					{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Carp"}, ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod",
+						Namespace: "default",
+					}},
+					{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Carp"}, ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod2",
+						Namespace: "default2",
+					}},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var streamingBuffer bytes.Buffer
+			streamingSerializer := newSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{}, true)
+			if err := streamingSerializer.Encode(tc.in, &streamingBuffer); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			var normalBuffer bytes.Buffer
+			normalEncoder := newSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{}, false)
+			if err := normalEncoder.Encode(tc.in, &normalBuffer); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(string(normalBuffer.Bytes()), string(streamingBuffer.Bytes())); diff != "" {
 				t.Errorf("unexpected output:\n%s", diff)
 			}
 		})
@@ -1051,7 +1157,7 @@ func TestEncode(t *testing.T) {
 // point in the input, it produces a value with concrete type int64 as long as the number can be
 // precisely represented by an int64.
 func TestRoundtripUnstructuredFractionlessFloat64(t *testing.T) {
-	s := json.NewSerializerWithOptions(json.DefaultMetaFactory, runtime.NewScheme(), runtime.NewScheme(), json.SerializerOptions{})
+	s := NewSerializerWithOptions(DefaultMetaFactory, runtime.NewScheme(), runtime.NewScheme(), SerializerOptions{})
 
 	initial := &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion":                    "v1",

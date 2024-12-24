@@ -222,6 +222,10 @@ const (
 	// document.
 	StorageVersionHash featuregate.Feature = "StorageVersionHash"
 
+	// owner: @serathius
+	// Allow apiserver to encode List objects item by item instead of all at once.
+	StreamingJSONListEncoding featuregate.Feature = "StreamingJSONListEncoding"
+
 	// owner: @aramase, @enj, @nabokihms
 	// kep: https://kep.k8s.io/3331
 	//
@@ -401,6 +405,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	StorageVersionHash: {
 		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.15"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StreamingJSONListEncoding: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	StrictCostEnforcementForVAP: {
