@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 func TestStatefulSetStrategy(t *testing.T) {
@@ -134,6 +136,38 @@ func TestStatefulSetStrategy(t *testing.T) {
 		}
 		if validPs.Spec.MinReadySeconds != newMinReadySeconds {
 			t.Errorf("expected minReadySeconds to not be changed %v", errs)
+		}
+	})
+
+	t.Run("StatefulSet revisionHistoryLimit field validations on creation and updation", func(t *testing.T) {
+		// Test creation
+		oldSts := &apps.StatefulSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy:  apps.OrderedReadyPodManagement,
+				Selector:             &metav1.LabelSelector{MatchLabels: validSelector},
+				Template:             validPodTemplate.Template,
+				UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+				RevisionHistoryLimit: ptr.To(int32(-2)),
+			},
+		}
+
+		warnings := Strategy.WarningsOnCreate(ctx, oldSts)
+		if len(warnings) != 1 {
+			t.Errorf("expected one warning got %v", warnings)
+		}
+		if warnings[0] != "spec.revisionHistoryLimit: a negative value retains all historical revisions; a value >= 0 is recommended" {
+			t.Errorf("unexpected warning: %v", warnings)
+		}
+		oldSts.Spec.RevisionHistoryLimit = ptr.To(int32(2))
+		newSts := oldSts.DeepCopy()
+		newSts.Spec.RevisionHistoryLimit = ptr.To(int32(-2))
+		warnings = Strategy.WarningsOnUpdate(ctx, newSts, oldSts)
+		if len(warnings) != 1 {
+			t.Errorf("expected one warning got %v", warnings)
+		}
+		if warnings[0] != "spec.revisionHistoryLimit: a negative value retains all historical revisions; a value >= 0 is recommended" {
+			t.Errorf("unexpected warning: %v", warnings)
 		}
 	})
 
