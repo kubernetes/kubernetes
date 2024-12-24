@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"testing"
@@ -91,7 +92,15 @@ func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 }
 
 func (handler *fakeIOHandler) Lstat(name string) (os.FileInfo, error) {
-	return nil, nil
+	links := map[string]string{
+		"/sys/block/dm-0/slaves/sda": "sda",
+		"/sys/block/dm-0/slaves/sdb": "sdb",
+		"/sys/block/dm-0/slaves/sdc": "sdc",
+	}
+	if dev, ok := links[name]; ok {
+		return &fakeFileInfo{name: dev}, nil
+	}
+	return nil, errors.New("device not found for mock")
 }
 
 func (handler *fakeIOHandler) EvalSymlinks(path string) (string, error) {
@@ -117,6 +126,7 @@ func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.Fi
 }
 
 func TestSearchDisk(t *testing.T) {
+	sysPath := "/sys/block/"
 	tests := []struct {
 		name        string
 		wwns        []string
@@ -177,7 +187,12 @@ func TestSearchDisk(t *testing.T) {
 			if devicePath == "" && !test.expectError {
 				t.Errorf("no fc disk found")
 			}
-			if devicePath != test.disk {
+			// parsing device and disk name
+			devName := parseDeviceName(devicePath)
+			disk := parseDeviceName(test.disk)
+			// checking if device is a multpath devicemapper device
+			_, err = fakeMounter.fcDisk.io.Lstat(sysPath + devName + "/slaves/" + disk)
+			if devicePath != test.disk && err != nil {
 				t.Errorf("matching wrong disk, expected: %s, actual: %s", test.disk, devicePath)
 			}
 		})

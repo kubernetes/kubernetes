@@ -196,6 +196,10 @@ func (util *fcUtil) MakeGlobalVDPDName(fc fcDisk) string {
 	return makeVDPDNameInternal(fc.plugin.host, fc.wwns, fc.lun, fc.wwids)
 }
 
+func parseDeviceName(devicePath string) string {
+	return strings.TrimPrefix(devicePath, "/dev/")
+}
+
 func searchDisk(b fcDiskMounter) (string, error) {
 	var diskIDs []string
 	var disk string
