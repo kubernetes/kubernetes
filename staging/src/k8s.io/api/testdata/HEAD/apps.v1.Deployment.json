@@ -1803,6 +1803,7 @@
     "readyReplicas": 7,
     "availableReplicas": 4,
     "unavailableReplicas": 5,
+    "terminatingReplicas": 9,
     "conditions": [
       {
         "type": "typeValue",
