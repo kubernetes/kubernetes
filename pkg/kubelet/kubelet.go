@@ -404,9 +404,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	experimentalMounterPath string,
 	kernelMemcgNotification bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
-	minimumGCAge metav1.Duration,
-	maxPerPodContainerCount int32,
-	maxContainerCount int32,
 	registerSchedulable bool,
 	nodeLabels map[string]string,
 	nodeStatusMaxImages int32,
@@ -462,9 +459,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	containerGCPolicy := kubecontainer.GCPolicy{
-		MinAge:             minimumGCAge.Duration,
-		MaxPerPodContainer: int(maxPerPodContainerCount),
-		MaxContainers:      int(maxContainerCount),
+		MinAge:             time.Duration(0),
+		MaxPerPodContainer: 1,
+		MaxContainers:      -1,
 	}
 
 	daemonEndpoints := &v1.NodeDaemonEndpoints{
