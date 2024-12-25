@@ -107,7 +107,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
-	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
@@ -475,7 +474,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		return nil, err
 	}
 
-	mounter := mount.New(s.ExperimentalMounterPath)
+	mounter := mount.New("")
 	subpather := subpath.New(mounter)
 	hu := hostutil.NewHostUtil()
 	pluginRunner := exec.New()
@@ -803,14 +802,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
 
-		var hardEvictionThresholds []evictionapi.Threshold
-		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
-		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
-			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
-			if err != nil {
-				return err
-			}
+		hardEvictionThresholds, err := eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
+		if err != nil {
+			return err
 		}
+
 		experimentalQOSReserved, err := cm.ParseQOSReserved(s.QOSReserved)
 		if err != nil {
 			return fmt.Errorf("--qos-reserved value failed to parse: %w", err)
@@ -1329,13 +1325,10 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
-		kubeServer.ExperimentalMounterPath,
 		kubeServer.KernelMemcgNotification,
-		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
 		kubeServer.MinimumGCAge,
 		kubeServer.MaxPerPodContainerCount,
 		kubeServer.MaxContainerCount,
-		kubeServer.RegisterSchedulable,
 		kubeServer.NodeLabels,
 		kubeServer.NodeStatusMaxImages,
 		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault)
