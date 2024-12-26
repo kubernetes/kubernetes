@@ -511,6 +511,52 @@ var _ = SIGDescribe("iholder SwapEviction", "[LinuxOnly]", framework.WithSerial(
 			},
 		})
 	})
+
+	ginkgo.Context("with swapping caused by pod-level pressure by breaching memory limits", func() {
+		const expectedSwapUsagePercentage = 0.05 // just to ensure that some swap is used
+		var memoryForHardEviction resource.Quantity
+
+		setupTest(func(memoryCapacity, swapCapacity resource.Quantity) resource.Quantity {
+			const memorySwapFactor = 0.31
+			memoryAndSwap := memoryCapacity.DeepCopy()
+			memoryAndSwap.Add(swapCapacity)
+
+			memoryForHardEviction = *resource.NewQuantity(int64(float64(memoryAndSwap.Value())*memorySwapFactor), memoryAndSwap.Format)
+			memoryHardEvictionThreshold := *resource.NewQuantity(int64(float64(memoryAndSwap.Value())*(1.0-memorySwapFactor)), memoryAndSwap.Format)
+			return memoryHardEvictionThreshold
+		})
+
+		preCreatePodModificationFunc := func(pod *v1.Pod) {
+			const memoryRequestFactor = 0.3
+			const memorySwapLimitFactor = 0.3
+			pod.Spec.Containers[0].Resources = overrideResources(memoryRequestFactor, memorySwapLimitFactor)
+
+			// stress size should be the average of request and limit
+
+			// The maximum memory that stress would allocate equals to:
+			// timeout_seconds / sleep_seconds * mem_alloc_size == 17 * 60 / 12 * 100Mi == 8500Mi == 8.3Gi
+			pod.Spec.Containers[0].Args = overrideArgsFunc(pod,
+				"--mem-total", strconv.Itoa(int(memoryForHardEviction.Value())),
+				"--mem-alloc-size", "5Mi",
+				"--mem-alloc-sleep", "12s",
+			)
+		}
+
+		postPressureValidationFunc := getPostPressureValidationFunc(expectedSwapUsagePercentage)
+
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logFunc, []podEvictSpec{
+			{
+				evictionPriority:             1,
+				pod:                          getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+				preCreatePodModificationFunc: preCreatePodModificationFunc,
+				postPressureValidationFunc:   postPressureValidationFunc,
+			},
+			{
+				evictionPriority: 0,
+				pod:              innocentPod(),
+			},
+		})
+	})
 })
 
 // Note that memoryRequestEqualLimit is effective only when qosClass is not PodQOSBestEffort.
