@@ -328,6 +328,8 @@ var _ = SIGDescribe("iholder SwapEviction", "[LinuxOnly]", framework.WithSerial(
 
 			err := e2epod.NewPodClient(f).Delete(context.Background(), sleepingPod.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
+
+			framework.Logf("initializing swap capacity: %s", swapCapacity.String())
 		}
 
 		return *swapCapacity
@@ -337,30 +339,44 @@ var _ = SIGDescribe("iholder SwapEviction", "[LinuxOnly]", framework.WithSerial(
 		if memoryCapacity == nil {
 			memoryCapacity = pointer.To(getNodeCPUAndMemoryCapacity(context.Background(), f)[v1.ResourceMemory])
 			gomega.Expect(memoryCapacity).NotTo(gomega.BeNil())
+
+			framework.Logf("initializing memory capacity: %s", memoryCapacity.String())
 		}
 
 		return *memoryCapacity
 	}
 
 	overrideResources := func(memoryRequestFactor, memorySwapLimitFactor float64) v1.ResourceRequirements {
-		memoryCapacity := getMemoryCapacity()
-		memoryRequest := *resource.NewQuantity(int64(float64(memoryCapacity.Value())*memoryRequestFactor), memoryCapacity.Format)
+		ret := v1.ResourceRequirements{}
 
-		memoryLimit := getSwapCapacity()
-		memoryLimit.Add(memoryCapacity)
-		memoryLimit = *resource.NewQuantity(int64(float64(memoryLimit.Value())*memorySwapLimitFactor), memoryLimit.Format)
+		memoryRequestStr := "<not set>"
+		memoryLimitStr := "<not set>"
 
-		framework.Logf("Overriding pod resources. According to memoryCapacity=%s, swapCapacity=%s, setting resources memRequest=%s, memLimits=%s",
-			memoryCapacity.String(), swapCapacity.String(), memoryRequest.String(), memoryLimit.String())
+		if memoryRequestFactor > 0 {
+			memoryCapacity := getMemoryCapacity()
+			memoryRequest := *resource.NewQuantity(int64(float64(memoryCapacity.Value())*memoryRequestFactor), memoryCapacity.Format)
 
-		return v1.ResourceRequirements{
-			Requests: map[v1.ResourceName]resource.Quantity{
+			ret.Requests = map[v1.ResourceName]resource.Quantity{
 				v1.ResourceMemory: memoryRequest,
-			},
-			Limits: map[v1.ResourceName]resource.Quantity{
-				v1.ResourceMemory: memoryLimit,
-			},
+			}
+			memoryRequestStr = memoryRequest.String()
 		}
+
+		if memorySwapLimitFactor > 0 {
+			memoryCapacity := getMemoryCapacity()
+			memoryLimit := getSwapCapacity()
+			memoryLimit.Add(memoryCapacity)
+			memoryLimit = *resource.NewQuantity(int64(float64(memoryLimit.Value())*memorySwapLimitFactor), memoryLimit.Format)
+
+			ret.Limits = map[v1.ResourceName]resource.Quantity{
+				v1.ResourceMemory: memoryLimit,
+			}
+			memoryLimitStr = memoryLimit.String()
+		}
+
+		framework.Logf("Overriding pod resources. Setting resources memRequest=%s, memLimits=%s", memoryRequestStr, memoryLimitStr)
+
+		return ret
 	}
 
 	// Override the args of a given pod.
@@ -463,13 +479,18 @@ var _ = SIGDescribe("iholder SwapEviction", "[LinuxOnly]", framework.WithSerial(
 
 		preCreatePodModificationFunc := func(pod *v1.Pod) {
 			const memoryRequestFactor = 0.7
-			const memorySwapLimitFactor = 1.1
+			const memorySwapLimitFactor = -1.0 // avoid setting a memory limit
 			pod.Spec.Containers[0].Resources = overrideResources(memoryRequestFactor, memorySwapLimitFactor)
 
 			// The maximum memory that stress would allocate equals to:
 			// timeout_seconds / sleep_seconds * mem_alloc_size == 17 * 60 / 12 * 100Mi == 8500Mi == 8.3Gi
+			const stressSizeFactor = 1.1
+			stressSize := getSwapCapacity()
+			stressSize.Add(getMemoryCapacity())
+			stressSize = *resource.NewQuantity(int64(float64(stressSize.Value())*stressSizeFactor), stressSize.Format)
+
 			pod.Spec.Containers[0].Args = overrideArgsFunc(pod,
-				"--mem-total", strconv.Itoa(int(pod.Spec.Containers[0].Resources.Limits.Memory().Value())),
+				"--mem-total", strconv.Itoa(int(stressSize.Value())),
 				"--mem-alloc-size", "100Mi",
 				"--mem-alloc-sleep", "12s",
 			)
