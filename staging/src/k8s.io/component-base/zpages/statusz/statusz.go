@@ -27,6 +27,7 @@ import (
 
 	"github.com/munnerz/goautoneg"
 
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
 
@@ -65,8 +66,8 @@ type mux interface {
 	Handle(path string, handler http.Handler)
 }
 
-func NewRegistry() statuszRegistry {
-	return registry{}
+func NewRegistry(componentGlobalsRegistry featuregate.ComponentGlobalsRegistry) statuszRegistry {
+	return &registry{componentGlobalsRegistry: componentGlobalsRegistry}
 }
 
 func Install(m mux, componentName string, reg statuszRegistry) {
