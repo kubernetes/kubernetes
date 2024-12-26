@@ -11,7 +11,7 @@ across multiple hosts. It provides basic mechanisms for the deployment, maintena
 and scaling of applications.
 
 Kubernetes builds upon a decade and a half of experience at Google running
-production workloads at scale using a system called [Borg],
+production workloads at scale using a system called [Borg](https://research.google/pubs/large-scale-cluster-management-at-google-with-borg/),
 combined with best-of-breed ideas and practices from the community.
 
 Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
