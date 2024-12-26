@@ -153,7 +153,7 @@ func Validate(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldP
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
 	} else if format != nil {
 		if format.feature != LoggingStableOptions {
-			enabled := featureGates()[format.feature].Default
+			enabled := featureGates()[format.feature][0].Default
 			if featureGate != nil {
 				enabled = featureGate.Enabled(format.feature)
 			}
