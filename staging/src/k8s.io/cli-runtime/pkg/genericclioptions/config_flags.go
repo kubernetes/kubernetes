@@ -83,23 +83,25 @@ type ConfigFlags struct {
 	KubeConfig *string
 
 	// config flags
-	ClusterName        *string
-	AuthInfoName       *string
-	Context            *string
-	Namespace          *string
-	APIServer          *string
-	TLSServerName      *string
-	Insecure           *bool
-	CertFile           *string
-	KeyFile            *string
-	CAFile             *string
-	BearerToken        *string
-	Impersonate        *string
-	ImpersonateUID     *string
-	ImpersonateGroup   *[]string
-	Username           *string
-	Password           *string
-	Timeout            *string
+	ClusterName      *string
+	AuthInfoName     *string
+	Context          *string
+	Namespace        *string
+	APIServer        *string
+	TLSServerName    *string
+	Insecure         *bool
+	CertFile         *string
+	KeyFile          *string
+	CAFile           *string
+	BearerToken      *string
+	Impersonate      *string
+	ImpersonateUID   *string
+	ImpersonateGroup *[]string
+	Username         *string
+	Password         *string
+	Timeout          *string
+	// add custom user-agent
+	CustomUserAgent    *string
 	DisableCompression *bool
 	// If non-nil, wrap config function can transform the Config
 	// before it is returned in ToRESTConfig function.
@@ -138,6 +140,9 @@ func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
 	c, err := f.ToRawKubeConfigLoader().ClientConfig()
 	if err != nil {
 		return nil, err
+	}
+	if f.CustomUserAgent != nil && *f.CustomUserAgent != "" {
+		c.UserAgent = *f.CustomUserAgent
 	}
 	if f.WrapConfigFn != nil {
 		return f.WrapConfigFn(c), nil
@@ -410,6 +415,8 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.DisableCompression != nil {
 		flags.BoolVar(f.DisableCompression, flagDisableCompression, *f.DisableCompression, "If true, opt-out of response compression for all requests to the server")
 	}
+	f.CustomUserAgent = new(string)
+	flags.StringVar(f.CustomUserAgent, "custom-user-agent", "", "Set custom user-agent for requests.")
 }
 
 // WithDeprecatedPasswordFlag enables the username and password config flags
