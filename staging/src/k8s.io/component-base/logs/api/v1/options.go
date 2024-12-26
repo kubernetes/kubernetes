@@ -35,10 +35,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/version"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs/internal/setverbositylevel"
 	"k8s.io/component-base/logs/klogflags"
+	baseversion "k8s.io/component-base/version"
 )
 
 const (
@@ -152,13 +154,24 @@ func Validate(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldP
 	if err != nil {
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
 	} else if format != nil {
-		if format.feature != LoggingStableOptions {
-			enabled := featureGates()[format.feature].Default
+		emulatedVersion := version.MustParse(baseversion.Get().String())
+		// only fall back to DefaultKubeBinaryVersion if the gitVersion is not set.
+		if emulatedVersion.Major() == 0 {
+			emulatedVersion = version.MustParse(baseversion.DefaultKubeBinaryVersion)
+		}
+		if featureGate != nil {
+			if fg, ok := featureGate.(featuregate.MutableVersionedFeatureGate); ok {
+				emulatedVersion = fg.EmulationVersion()
+			}
+		}
+		formatFeature := format.featureForVersion(emulatedVersion)
+		if formatFeature != LoggingStableOptions {
+			enabled := true
 			if featureGate != nil {
-				enabled = featureGate.Enabled(format.feature)
+				enabled = featureGate.Enabled(formatFeature)
 			}
 			if !enabled {
-				errs = append(errs, field.Forbidden(fldPath.Child("format"), fmt.Sprintf("Log format %s is disabled, see %s feature", c.Format, format.feature)))
+				errs = append(errs, field.Forbidden(fldPath.Child("format"), fmt.Sprintf("Log format %s is disabled, see %s feature", c.Format, formatFeature)))
 			}
 		}
 	}

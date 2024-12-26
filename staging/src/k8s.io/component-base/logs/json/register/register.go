@@ -17,13 +17,16 @@ limitations under the License.
 package register
 
 import (
+	"k8s.io/apimachinery/pkg/util/version"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	json "k8s.io/component-base/logs/json"
 )
 
 func init() {
 	// JSON format is optional klog format
-	if err := logsapi.RegisterLogFormat(logsapi.JSONLogFormat, json.Factory{}, logsapi.LoggingBetaOptions); err != nil {
+	if err := logsapi.RegisterLogFormat(logsapi.JSONLogFormat, json.Factory{}, logsapi.LoggingStableOptions,
+		logsapi.VersionedFeature{Version: version.MajorMinor(1, 23), Feature: logsapi.LoggingBetaOptions},
+		logsapi.VersionedFeature{Version: version.MajorMinor(1, 33), Feature: logsapi.LoggingStableOptions}); err != nil {
 		panic(err)
 	}
 }
