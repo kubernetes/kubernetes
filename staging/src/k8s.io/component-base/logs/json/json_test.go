@@ -98,7 +98,7 @@ func TestZapLoggerInfo(t *testing.T) {
 
 		logStrLines := strings.Split(logStr, "\n")
 		dataFormatLines := strings.Split(data.format, "\n")
-		if !assert.Equal(t, len(logStrLines), len(dataFormatLines)) {
+		if !assert.Len(t, logStrLines, len(dataFormatLines)) {
 			t.Errorf("Info has wrong format: no. of lines in log is incorrect \n expect:%d\n got:%d", len(dataFormatLines), len(logStrLines))
 		}
 
