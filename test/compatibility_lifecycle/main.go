@@ -14,27 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package main
 
-import (
-	"os"
+import "k8s.io/kubernetes/test/compatibility_lifecycle/cmd"
 
-	"github.com/spf13/cobra"
-)
-
-var rootCmd = &cobra.Command{
-	Use:   "static-analysis",
-	Short: "static-analysis",
-	Long:  `static-analysis runs static analysis of go code.`,
-}
-
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
-}
-
-func init() {
-	rootCmd.AddCommand(NewFeatureGatesCommand())
+func main() {
+	cmd.Execute()
 }
