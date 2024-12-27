@@ -3000,8 +3000,7 @@ func TestEmulatedStorageVersion(t *testing.T) {
 	for emulatedVersion, cases := range groupedCases {
 		t.Run(emulatedVersion, func(t *testing.T) {
 			server := kubeapiservertesting.StartTestServerOrDie(
-				t, &kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: emulatedVersion},
-				[]string{"--emulated-version=kube=" + emulatedVersion, `--storage-media-type=application/json`}, framework.SharedEtcd())
+				t, nil, []string{"--emulated-version=kube=" + emulatedVersion, `--storage-media-type=application/json`}, framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client := clientset.NewForConfigOrDie(server.ClientConfig)
@@ -3139,8 +3138,7 @@ func TestAllowedEmulationVersions(t *testing.T) {
 }
 
 func TestEnableEmulationVersion(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
 		[]string{"--emulated-version=kube=1.31"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -3200,9 +3198,7 @@ func TestEnableEmulationVersion(t *testing.T) {
 }
 
 func TestDisableEmulationVersion(t *testing.T) {
-	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
-		[]string{}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
