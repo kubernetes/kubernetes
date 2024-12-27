@@ -46,6 +46,7 @@ func withKubeEffectiveVersionFloors(effectiveVersion basecompatibility.MutableEf
 
 // DefaultKubeEffectiveVersion returns the MutableEffectiveVersion based on the
 // latest K8s release.
+// Mainly used in tests.
 func DefaultKubeEffectiveVersion() basecompatibility.MutableEffectiveVersion {
 	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion).WithInfo(baseversion.Get())
 	effectiveVersion := basecompatibility.NewEffectiveVersion(binaryVersion)
