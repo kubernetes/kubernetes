@@ -483,9 +483,9 @@ func AddHandlers(h printers.PrintHandler) {
 
 	resourceQuotaColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Request", Type: "string", Description: "Request represents a minimum amount of cpu/memory that a container may consume."},
 		{Name: "Limit", Type: "string", Description: "Limits control the maximum amount of cpu/memory that a container may use independent of contention on the node."},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 	_ = h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuota)
 	_ = h.TableHandler(resourceQuotaColumnDefinitions, printResourceQuotaList)
@@ -2792,7 +2792,7 @@ func printResourceQuota(resourceQuota *api.ResourceQuota, options printers.Gener
 	}
 
 	age := translateTimestampSince(resourceQuota.CreationTimestamp)
-	row.Cells = append(row.Cells, resourceQuota.Name, age, strings.TrimSuffix(requestColumn.String(), ", "), strings.TrimSuffix(limitColumn.String(), ", "))
+	row.Cells = append(row.Cells, resourceQuota.Name, strings.TrimSuffix(requestColumn.String(), ", "), strings.TrimSuffix(limitColumn.String(), ", "), age)
 	return []metav1.TableRow{row}, nil
 }
 
