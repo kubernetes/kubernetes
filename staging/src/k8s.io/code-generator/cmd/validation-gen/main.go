@@ -78,7 +78,7 @@ type Args struct {
 	ReadOnlyPkgs []string // Always consider these as last-ditch possibilities for validations.
 	GoHeaderFile string
 	PrintDocs    bool
-	Lint         bool
+	LintOnly     bool
 }
 
 // AddFlags add the generator flags to the flag set.
@@ -91,7 +91,7 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.BoolVar(&args.PrintDocs, "docs", false,
 		"print documentation for supported declarative validations, and then exit")
-	fs.BoolVar(&args.Lint, "lint", false,
+	fs.BoolVar(&args.LintOnly, "lint", false,
 		"only run linting checks, do not generate code")
 }
 

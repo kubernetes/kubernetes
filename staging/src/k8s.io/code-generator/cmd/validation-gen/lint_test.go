@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"regexp"
 	"testing"
 
 	"k8s.io/gengo/v2/types"
@@ -121,7 +122,6 @@ func TestRuleOptionalAndRequired(t *testing.T) {
 		name     string
 		comments []string
 		wantMsg  string
-		wantErr  bool
 	}{
 		{
 			name:     "no comments",
@@ -139,22 +139,37 @@ func TestRuleOptionalAndRequired(t *testing.T) {
 			wantMsg:  "",
 		},
 		{
-			name:     "optional and required",
+			name:     "optional required",
 			comments: []string{"+k8s:optional", "+k8s:required"},
-			wantMsg:  "conflicting tags: {+k8s:optional, +k8s:required}",
+			wantMsg:  `conflicting tags: {\+k8s:optional, \+k8s:required}`,
 		},
 		{
-			name:     "optional, empty, required",
+			name:     "required optional",
+			comments: []string{"+k8s:optional", "+k8s:required"},
+			wantMsg:  `conflicting tags: {\+k8s:optional, \+k8s:required}`,
+		},
+		{
+			name:     "optional empty required",
 			comments: []string{"+k8s:optional", "", "+k8s:required"},
-			wantMsg:  "conflicting tags: {+k8s:optional, +k8s:required}",
+			wantMsg:  `conflicting tags: {\+k8s:optional, \+k8s:required}`,
+		},
+		{
+			name:     "empty required empty empty optional empty",
+			comments: []string{"", "+k8s:optional", "", "", "+k8s:required", ""},
+			wantMsg:  `conflicting tags: {\+k8s:optional, \+k8s:required}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg, _ := ruleOptionalAndRequired(tt.comments)
-			if msg != tt.wantMsg {
-				t.Errorf("ruleOptionalAndRequired() msg = %v, wantMsg %v", msg, tt.wantMsg)
+			msg, err := ruleOptionalAndRequired(tt.comments)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			} else if tt.wantMsg != "" {
+				re := regexp.MustCompile(tt.wantMsg)
+				if !re.MatchString(msg) {
+					t.Errorf("message:\n\t%s\ndoes not match:\n\t%s", msg, re.String())
+				}
 			}
 		})
 	}
@@ -182,22 +197,37 @@ func TestRuleRequiredAndDefault(t *testing.T) {
 			wantMsg:  "",
 		},
 		{
-			name:     "required and default",
+			name:     "required default",
 			comments: []string{"+k8s:required", "+default=somevalue"},
-			wantMsg:  "conflicting tags: {+k8s:required, +default}",
+			wantMsg:  `conflicting tags: {\+default, \+k8s:required}`,
 		},
 		{
-			name:     "required, empty, default",
+			name:     "default required",
+			comments: []string{"+default=somevalue", "+k8s:required"},
+			wantMsg:  `conflicting tags: {\+default, \+k8s:required}`,
+		},
+		{
+			name:     "required empty default",
 			comments: []string{"+k8s:required", "", "+default=somevalue"},
-			wantMsg:  "conflicting tags: {+k8s:required, +default}",
+			wantMsg:  `conflicting tags: {\+default, \+k8s:required}`,
+		},
+		{
+			name:     "empty default empty empty required empty",
+			comments: []string{"", "+default=somevalue", "", "", "+k8s:required", ""},
+			wantMsg:  `conflicting tags: {\+default, \+k8s:required}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg, _ := ruleRequiredAndDefault(tt.comments)
-			if msg != tt.wantMsg {
-				t.Errorf("ruleRequiredAndDefault() msg = %v, wantMsg %v", msg, tt.wantMsg)
+			msg, err := ruleRequiredAndDefault(tt.comments)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			} else if tt.wantMsg != "" {
+				re := regexp.MustCompile(tt.wantMsg)
+				if !re.MatchString(msg) {
+					t.Errorf("message:\n\t%s\ndoes not match:\n\t%s", msg, re.String())
+				}
 			}
 		})
 	}
@@ -209,7 +239,6 @@ func TestConflictingTagsRule(t *testing.T) {
 		comments []string
 		tags     []string
 		wantMsg  string
-		wantErr  bool
 	}{
 		{
 			name:     "no comments",
@@ -227,32 +256,32 @@ func TestConflictingTagsRule(t *testing.T) {
 			name:     "tag1, empty, tag2",
 			comments: []string{"+tag1", "", "+tag2"},
 			tags:     []string{"+tag1", "+tag2"},
-			wantMsg:  "conflicting tags: {+tag1, +tag2}",
+			wantMsg:  `conflicting tags: {\+tag1, \+tag2}`,
 		},
 		{
-			name:     "3 tags",
-			comments: []string{"tag1", "+tag2", "+tag3=value"},
+			name:     "3 lines 2 tags match",
+			comments: []string{"tag3", "+tag1", "+tag2=value"},
 			tags:     []string{"+tag1", "+tag2", "+tag3"},
-			wantMsg:  "conflicting tags: {+tag1, +tag2, +tag3}",
+			wantMsg:  `conflicting tags: {\+tag1, \+tag2}`,
 		},
 		{
-			name:     "less than 2 tags",
-			comments: []string{"+tag1"},
-			tags:     []string{"+tag1"},
-			wantMsg:  "",
-			wantErr:  true,
+			name:     "3 tags all match",
+			comments: []string{"+tag3", "+tag1", "+tag2=value"},
+			tags:     []string{"+tag1", "+tag2", "+tag3"},
+			wantMsg:  `conflicting tags: {\+tag1, \+tag2, \+tag3}`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg, err := conflictingTagsRule(tt.comments, tt.tags...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("conflictingTagsRule() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if msg != tt.wantMsg {
-				t.Errorf("conflictingTagsRule() msg = %v, wantMsg %v", msg, tt.wantMsg)
+			msg, err := conflictingTagsRule("test", tt.tags...)(tt.comments)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			} else if tt.wantMsg != "" {
+				re := regexp.MustCompile(tt.wantMsg)
+				if !re.MatchString(msg) {
+					t.Errorf("message:\n\t%s\ndoes not match:\n\t%s", msg, re.String())
+				}
 			}
 		})
 	}
