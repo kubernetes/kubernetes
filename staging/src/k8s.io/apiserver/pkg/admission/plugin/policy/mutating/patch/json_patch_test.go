@@ -57,16 +57,6 @@ func TestJSONPatch(t *testing.T) {
 			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
 		},
 		{
-			name: "jsonPatch with false test operation",
-			expression: `[
-						JSONPatch{op: "test", path: "/spec/replicas", value: 100}, 
-						JSONPatch{op: "replace", path: "/spec/replicas", value: 3},
-					]`,
-			gvr:            deploymentGVR,
-			object:         &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Replicas: ptr.To[int32](1)}},
-		},
-		{
 			name: "jsonPatch with true test operation",
 			expression: `[
 						JSONPatch{op: "test", path: "/spec/replicas", value: 1}, 

@@ -156,7 +156,7 @@ func (p *keyCache) syncKeys(ctx context.Context) error {
 		}
 
 		p.verificationKeys.Store(newPublicKeys)
-		externaljwtmetrics.RecordKeyDataTimeStamp(newPublicKeys.DataTimestamp.Unix())
+		externaljwtmetrics.RecordKeyDataTimeStamp(float64(newPublicKeys.DataTimestamp.UnixNano()) / float64(1000000000))
 
 		if keysChanged(oldPublicKeys, newPublicKeys) {
 			p.broadcastUpdate()

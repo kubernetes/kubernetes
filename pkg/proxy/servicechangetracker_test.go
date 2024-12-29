@@ -577,7 +577,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
-			svcTracker := NewServiceChangeTracker(nil, tc.ipFamily, nil, nil)
+			svcTracker := NewServiceChangeTracker(tc.ipFamily, nil, nil)
 			// outputs
 			newServices := svcTracker.serviceToServiceMap(tc.service)
 
@@ -621,20 +621,16 @@ type FakeProxier struct {
 	serviceChanges   *ServiceChangeTracker
 	svcPortMap       ServicePortMap
 	endpointsMap     EndpointsMap
-	hostname         string
 }
 
 func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
+	ect := NewEndpointsChangeTracker(ipFamily, testHostname, nil, nil)
+	ect.trackerStartTime = t
 	return &FakeProxier{
-		svcPortMap:     make(ServicePortMap),
-		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
-		endpointsMap:   make(EndpointsMap),
-		endpointsChanges: &EndpointsChangeTracker{
-			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
-			trackerStartTime:          t,
-			processEndpointsMapChange: nil,
-			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, nil),
-		},
+		svcPortMap:       make(ServicePortMap),
+		serviceChanges:   NewServiceChangeTracker(ipFamily, nil, nil),
+		endpointsMap:     make(EndpointsMap),
+		endpointsChanges: ect,
 	}
 }
 
@@ -898,5 +894,25 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
 	if len(healthCheckNodePorts) != 0 {
 		t.Errorf("expected healthcheck ports length 0, got %v", healthCheckNodePorts)
+	}
+}
+
+func TestServiceCacheLeaks(t *testing.T) {
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
+
+	service := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p2", "TCP", 1235, 5321, 0)
+	})
+	fp.addService(service)
+	if len(fp.serviceChanges.items) != 1 {
+		t.Errorf("Found %d items on the cache, 1 expected", len(fp.serviceChanges.items))
+	}
+
+	fp.deleteService(service)
+	if len(fp.serviceChanges.items) > 0 {
+		t.Errorf("Found %d items on the cache, 0 expected", len(fp.serviceChanges.items))
 	}
 }

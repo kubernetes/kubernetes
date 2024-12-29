@@ -121,6 +121,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.EnableSystemLogHandler = true
 			obj.MemoryThrottlingFactor = ptr.To(rand.Float64())
 			obj.LocalStorageCapacityIsolation = true
+			obj.FeatureGates = map[string]bool{
+				"AllAlpha": false,
+				"AllBeta":  true,
+			}
 		},
 	}
 }

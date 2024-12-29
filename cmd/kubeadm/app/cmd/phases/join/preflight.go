@@ -91,6 +91,10 @@ func runPreflight(c workflow.RunData) error {
 
 	// Start with general checks
 	klog.V(1).Infoln("[preflight] Running general checks")
+	// First, check if we're root separately from the other preflight checks and fail fast.
+	if err := preflight.RunRootCheckOnly(j.IgnorePreflightErrors()); err != nil {
+		return err
+	}
 	if err := preflight.RunJoinNodeChecks(utilsexec.New(), j.Cfg(), j.IgnorePreflightErrors()); err != nil {
 		return err
 	}

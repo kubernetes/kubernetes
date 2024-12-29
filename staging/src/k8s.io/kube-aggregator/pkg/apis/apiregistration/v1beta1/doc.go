@@ -35,4 +35,4 @@ limitations under the License.
 // The return status is a set of conditions for this aggregation. Currently
 // there is only one condition named "Available", if true, it means the
 // api/server requests will be redirected to specified API server.
-package v1beta1 // import "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
+package v1beta1

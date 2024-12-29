@@ -146,8 +146,8 @@ func (pl *PodTopologySpread) EventsToRegister(_ context.Context) ([]framework.Cl
 		//
 		// The Pod rejected by this plugin can be schedulable when the Pod has a spread constraint with NodeTaintsPolicy:Honor
 		// and has got a new toleration.
-		// So, we add UpdatePodTolerations here only when QHint is enabled.
-		podActionType = framework.Add | framework.UpdatePodLabel | framework.UpdatePodTolerations | framework.Delete
+		// So, we add UpdatePodToleration here only when QHint is enabled.
+		podActionType = framework.Add | framework.UpdatePodLabel | framework.UpdatePodToleration | framework.Delete
 	}
 
 	return []framework.ClusterEventWithHint{

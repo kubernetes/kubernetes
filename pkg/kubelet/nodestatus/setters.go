@@ -23,6 +23,7 @@ import (
 	"net"
 	goruntime "runtime"
 	"strings"
+	"sync"
 	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
@@ -56,6 +57,9 @@ const (
 // Setter modifies the node in-place, and returns an error if the modification failed.
 // Setters may partially mutate the node before returning an error.
 type Setter func(ctx context.Context, node *v1.Node) error
+
+// Only emit one reboot event
+var rebootEvent sync.Once
 
 // NodeAddress returns a Setter that updates address-related information on the node.
 func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
@@ -250,6 +254,7 @@ func hasAddressType(addresses []v1.NodeAddress, addressType v1.NodeAddressType) 
 	}
 	return false
 }
+
 func hasAddressValue(addresses []v1.NodeAddress, addressValue string) bool {
 	for _, address := range addresses {
 		if address.Address == addressValue {
@@ -311,8 +316,12 @@ func MachineInfo(nodeName string,
 				node.Status.NodeInfo.BootID != info.BootID {
 				// TODO: This requires a transaction, either both node status is updated
 				// and event is recorded or neither should happen, see issue #6055.
-				recordEventFunc(v1.EventTypeWarning, events.NodeRebooted,
-					fmt.Sprintf("Node %s has been rebooted, boot id: %s", nodeName, info.BootID))
+				//
+				// Only emit one reboot event. recordEventFunc queues events and can emit many superfluous reboot events
+				rebootEvent.Do(func() {
+					recordEventFunc(v1.EventTypeWarning, events.NodeRebooted,
+						fmt.Sprintf("Node %s has been rebooted, boot id: %s", nodeName, info.BootID))
+				})
 			}
 			node.Status.NodeInfo.BootID = info.BootID
 

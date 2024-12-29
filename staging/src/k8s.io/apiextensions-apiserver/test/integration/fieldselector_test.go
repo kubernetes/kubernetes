@@ -200,23 +200,23 @@ func (sf selectableFieldTestCase) Name() string {
 }
 
 func TestSelectableFields(t *testing.T) {
+	// start a conversion webhook
+	handler := conversion.NewObjectConverterWebhookHandler(t, crdConverter)
+	upCh, handler := closeOnCall(handler)
+	whTearDown, webhookClientConfig, err := conversion.StartConversionWebhookServer(handler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(whTearDown)
+
 	_, ctx := ktesting.NewTestContext(t)
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tearDown()
+	t.Cleanup(tearDown)
 
 	crd := selectableFieldFixture.DeepCopy()
-
-	// start a conversion webhook
-	handler := conversion.NewObjectConverterWebhookHandler(t, crdConverter)
-	upCh, handler := closeOnCall(handler)
-	tearDown, webhookClientConfig, err := conversion.StartConversionWebhookServer(handler)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tearDown()
 
 	if webhookClientConfig != nil {
 		crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{

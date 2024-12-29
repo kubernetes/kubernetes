@@ -67,6 +67,49 @@ run_wait_tests() {
     kube::test::if_has_string "${output_message}" 'test-1 condition met'
     kube::test::if_has_string "${output_message}" 'test-2 condition met'
 
+    set +o errexit
+    # Command: Wait with label selector before resource exists 
+    output_message=$(kubectl wait --for=create deploy -l app=test-label --timeout=1s 2>&1)
+    set -o errexit
+
+    # Post-Condition: Should get timeout, not "no resources found"
+    kube::test::if_has_string "${output_message}" 'timed out waiting for the condition'
+
+    # Create deployment with label selector in the background
+
+    ( sleep 2 && cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-label
+  labels:
+    app: test-label
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test-label
+  template:
+    metadata:
+      labels:
+        app: test-label
+    spec:
+      containers:
+      - name: bb
+        image: busybox
+        command: ["/bin/sh", "-c", "sleep infinity"]
+EOF
+    ) &
+
+    # Command: Wait for labeled deployment to be created
+    output_message=$(kubectl wait --for=create deploy -l app=test-label --timeout=40s)
+
+     # Post-Condition: Wait was successful
+    kube::test::if_has_string "${output_message}" 'test-label condition met'
+
+    # Clean up
+    kubectl delete deployment test-label
+
     # create test data to test timeout error is occurred in correct time
     kubectl apply -f - <<EOF
 apiVersion: apps/v1

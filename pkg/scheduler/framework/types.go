@@ -72,9 +72,9 @@ const (
 	UpdatePodLabel
 	// UpdatePodScaleDown is an update for pod's scale down (i.e., any resource request is reduced).
 	UpdatePodScaleDown
-	// UpdatePodTolerations is an addition for pod's tolerations.
+	// UpdatePodToleration is an addition for pod's tolerations.
 	// (Due to API validation, we can add, but cannot modify or remove tolerations.)
-	UpdatePodTolerations
+	UpdatePodToleration
 	// UpdatePodSchedulingGatesEliminated is an update for pod's scheduling gates, which eliminates all scheduling gates in the Pod.
 	UpdatePodSchedulingGatesEliminated
 	// UpdatePodGeneratedResourceClaim is an update of the list of ResourceClaims generated for the pod.
@@ -88,7 +88,7 @@ const (
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodTolerations | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | updatePodOther
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | updatePodOther
 	// none is a special ActionType that is only used internally.
 	none ActionType = 0
 )
@@ -97,7 +97,7 @@ var (
 	// basicActionTypes is a list of basicActionTypes ActionTypes.
 	basicActionTypes = []ActionType{Add, Delete, Update}
 	// podActionTypes is a list of ActionTypes that are only applicable for Pod events.
-	podActionTypes = []ActionType{UpdatePodLabel, UpdatePodScaleDown, UpdatePodTolerations, UpdatePodSchedulingGatesEliminated, UpdatePodGeneratedResourceClaim}
+	podActionTypes = []ActionType{UpdatePodLabel, UpdatePodScaleDown, UpdatePodToleration, UpdatePodSchedulingGatesEliminated, UpdatePodGeneratedResourceClaim}
 	// nodeActionTypes is a list of ActionTypes that are only applicable for Node events.
 	nodeActionTypes = []ActionType{UpdateNodeAllocatable, UpdateNodeLabel, UpdateNodeTaint, UpdateNodeCondition, UpdateNodeAnnotation}
 )
@@ -122,8 +122,8 @@ func (a ActionType) String() string {
 		return "UpdatePodLabel"
 	case UpdatePodScaleDown:
 		return "UpdatePodScaleDown"
-	case UpdatePodTolerations:
-		return "UpdatePodTolerations"
+	case UpdatePodToleration:
+		return "UpdatePodToleration"
 	case UpdatePodSchedulingGatesEliminated:
 		return "UpdatePodSchedulingGatesEliminated"
 	case UpdatePodGeneratedResourceClaim:

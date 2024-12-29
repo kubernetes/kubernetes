@@ -89,7 +89,7 @@ func NewCmdConfigGetContexts(streams genericiooptions.IOStreams, configAccess cl
 
 // Complete assigns GetContextsOptions from the args.
 func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
-	supportedOutputTypes := sets.NewString("", "name")
+	supportedOutputTypes := sets.New[string]("", "name")
 	if !supportedOutputTypes.Has(o.outputFormat) {
 		return fmt.Errorf("--output %v is not available in kubectl config get-contexts; resetting to default output format", o.outputFormat)
 	}

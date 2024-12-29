@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package endpoints contains the generic code that provides a RESTful Kubernetes-style API service.
-package endpoints // import "k8s.io/apiserver/pkg/endpoints"
+package endpoints

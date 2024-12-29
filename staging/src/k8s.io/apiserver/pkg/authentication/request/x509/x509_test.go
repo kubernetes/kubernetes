@@ -19,18 +19,27 @@ package x509
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"errors"
-	"io/ioutil"
 	"net/http"
+	"os"
+	"regexp"
 	"sort"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	asn1util "k8s.io/apimachinery/pkg/apis/asn1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 const (
@@ -124,21 +133,21 @@ const (
 	*/
 
 	rootCACert = `-----BEGIN CERTIFICATE-----
-MIICtjCCAh+gAwIBAgIULXMaLteLiSCDnEKabvf19qHsr4wwDQYJKoZIhvcNAQEF
+MIICtjCCAh+gAwIBAgIUXipc16GmHC8Q64wKx+gegIcA0wAwDQYJKoZIhvcNAQEF
 BQAwZzELMAkGA1UEBhMCVVMxETAPBgNVBAgMCE15IFN0YXRlMRAwDgYDVQQHDAdN
 eSBDaXR5MQ8wDQYDVQQKDAZNeSBPcmcxEDAOBgNVBAsMB015IFVuaXQxEDAOBgNV
-BAMMB1JPT1QgQ0EwIBcNMjQwNTAyMDU0MzUxWhgPMjEyNDA0MDgwNTQzNTFaMGcx
+BAMMB1JPT1QgQ0EwIBcNMjQxMDA2MjAzNTIwWhgPMjEyNDA5MTIyMDM1MjBaMGcx
 CzAJBgNVBAYTAlVTMREwDwYDVQQIDAhNeSBTdGF0ZTEQMA4GA1UEBwwHTXkgQ2l0
 eTEPMA0GA1UECgwGTXkgT3JnMRAwDgYDVQQLDAdNeSBVbml0MRAwDgYDVQQDDAdS
-T09UIENBMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCow9zeGvY+lZcq1b+L
-cpMGhXJLNirZY6ic+4A+my+ExlfS/zMTvzLpkGbbCpoFwePBCbsldbLX/JwJhoAV
-sGxnxRrpdgEyQCJY7E6ht8UFAUlV2E9LiB2/ZtPeWErnJra/rzPYV0LxvDRnRIi0
-MfZKSrMewsprSy5aMiObGz+XNQIDAQABo10wWzAdBgNVHQ4EFgQU0wfNcua+ClrY
-6WAgr8LyNn4zYgswHwYDVR0jBBgwFoAU0wfNcua+ClrY6WAgr8LyNn4zYgswDAYD
-VR0TBAUwAwEB/zALBgNVHQ8EBAMCAQYwDQYJKoZIhvcNAQEFBQADgYEASlQHRnHB
-sqLTMuffSYyvh0argRHGxUu+Cwzqfl84FHlDkvm7gm/2BqZDGeJ8UmY2E28PcxY9
-eV/5pshMGPn/ICvefxXgq65E+mV6horf0GOCsVzz+FwFl04fCdbZVec2/Ag+P2aZ
-aLYxRA9jIGqygVA5GdBH3iCU8KIs62mTk6M=
+T09UIENBMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCt8DHt/ni9y/6lqWss
+uv2eFvW6N9RvYhxRmuuxQK74F5/VRAfhEMvDOU+woG/HBXMyPOgLL1uWt4dk3DGu
+WYNwYP2oN6D04KkWYgcxwYFjcduzWxynr5zT1T2B3bxZFMkvqshyrHWD38Vge080
+NU3Pns7Z53AZu673srH+OSU8WwIDAQABo10wWzAdBgNVHQ4EFgQUSHB11O1rSTtT
+2+mm+ZxVklG9luYwHwYDVR0jBBgwFoAUSHB11O1rSTtT2+mm+ZxVklG9luYwDAYD
+VR0TBAUwAwEB/zALBgNVHQ8EBAMCAQYwDQYJKoZIhvcNAQEFBQADgYEAj/zGCbq+
+POo9thqGg2i2/bzHzAr4X9ylJaeM8oaBhk0pvliTcWGb/usjqwWpcXIqHY8jjBrN
+GFJEH6elL1Q63W+JCwWS14i2jQExjPk7/AWLBv/J7XqgiUhPfF/P9iQp+lGcInNR
+6TGXeFKLtsrySVfQ4TvEW1zNJj9qJ819YwU=
 -----END CERTIFICATE-----
 `
 
@@ -246,9 +255,13 @@ u7ESEaSlma8XEeex
 	   openssl genrsa -out client.key 1024 && \
 	   openssl rsa -in ./client.key -outform PEM \
 	   	-pubout -out ./client.pub && \
+	   OID_CONF="oid_section = my_oids\n\n" && \
+	   OID_CONF="${OID_CONF}[ my_oids ]\n" && \
+	   OID_CONF="${OID_CONF}kube_uid=1.3.6.1.4.1.57683.2\n" && \
 	   openssl req -key ./client.key -new\
+	            -config <(printf "${OID_CONF}") \
 	          	-sha1 -out ./client.csr \
-	          	-subj "/C=US/ST=My State/L=My City/O=My Org/OU=My Unit/CN=client_cn" \
+	          	-subj "/C=US/ST=My State/L=My City/O=My Org/OU=My Unit/CN=client_cn2/CN=client_cn/kube_uid=client_id" \
 	   	&& \
 	   EXTFILE="subjectKeyIdentifier=hash\n" && \
 	   EXTFILE="${EXTFILE}authorityKeyIdentifier=keyid,issuer\n" && \
@@ -277,63 +290,64 @@ u7ESEaSlma8XEeex
         Version: 3 (0x2)
         Serial Number: 1 (0x1)
         Signature Algorithm: sha256WithRSAEncryption
-        Issuer: C = US, ST = My State, L = My City, O = My Org, OU = My Unit, CN = ROOT CA
+        Issuer: C=US, ST=My State, L=My City, O=My Org, OU=My Unit, CN=ROOT CA
         Validity
-            Not Before: May  2 05:46:24 2024 GMT
-            Not After : Apr  8 05:46:24 2124 GMT
-        Subject: C = US, ST = My State, L = My City, O = My Org, OU = My Unit, CN = client_cn
+            Not Before: Oct 27 00:43:31 2024 GMT
+            Not After : Oct  3 00:43:31 2124 GMT
+        Subject: C=US, ST=My State, L=My City, O=My Org, OU=My Unit, CN=client_cn2, CN=client_cn, 1.3.6.1.4.1.57683.2=client_id
         Subject Public Key Info:
             Public Key Algorithm: rsaEncryption
                 Public-Key: (1024 bit)
                 Modulus:
-                    00:bd:3f:2d:d1:86:73:6d:b5:09:9c:ff:42:fb:27:
-                    8e:07:69:a3:b6:d1:c7:72:d1:de:98:14:a5:61:9b:
-                    83:03:1d:da:54:d1:d4:0d:7f:de:98:2e:cc:db:6f:
-                    e4:19:c7:41:43:59:ff:34:7b:82:06:80:01:ab:79:
-                    b3:40:d3:45:1f:52:2d:10:f9:55:40:a7:7a:61:f7:
-                    fd:9c:41:eb:d1:ec:7e:30:ca:1a:fa:0e:9e:0f:1e:
-                    50:93:9a:ca:55:ea:64:80:6e:bb:49:7d:12:15:d8:
-                    6f:a8:aa:3f:b9:10:24:6f:72:22:e9:4f:f3:a4:29:
-                    1e:4e:71:a6:82:af:39:78:a9
+                    00:d1:61:6d:94:0e:a2:7b:3e:ae:2c:d4:39:66:a5:
+                    ec:3a:d1:90:d1:85:fd:de:3c:1d:7d:cc:cd:fd:93:
+                    50:06:26:02:a7:89:e4:92:45:d5:96:ba:b0:04:6b:
+                    29:a9:93:ff:c9:d5:f2:5c:50:b5:1c:5a:1d:48:4f:
+                    eb:a9:bf:f9:28:24:a2:5e:da:08:d1:01:1a:1a:c8:
+                    00:35:d0:4a:51:46:f0:02:2b:89:3b:b2:aa:a9:68:
+                    33:ee:08:d4:61:06:62:e6:ea:53:f6:4a:13:49:66:
+                    67:03:82:22:08:28:2e:be:dd:81:91:28:a5:aa:89:
+                    78:41:33:3b:5d:65:b2:f7:0b
                 Exponent: 65537 (0x10001)
         X509v3 extensions:
-            X509v3 Subject Key Identifier: 
-                FB:77:D6:D0:84:A8:10:DF:FA:4E:A4:E0:F1:2A:BB:B4:80:FD:4F:3F
-            X509v3 Authority Key Identifier: 
-                D3:07:CD:72:E6:BE:0A:5A:D8:E9:60:20:AF:C2:F2:36:7E:33:62:0B
-            X509v3 Basic Constraints: 
+            X509v3 Subject Key Identifier:
+                64:84:5E:B7:37:A2:82:F9:62:1A:01:00:FE:1B:B4:4B:F4:18:92:F6
+            X509v3 Authority Key Identifier:
+                48:70:75:D4:ED:6B:49:3B:53:DB:E9:A6:F9:9C:55:92:51:BD:96:E6
+            X509v3 Basic Constraints:
                 CA:FALSE
-            X509v3 Subject Alternative Name: 
+            X509v3 Subject Alternative Name:
                 <EMPTY>
 
-            X509v3 Extended Key Usage: 
+            X509v3 Extended Key Usage:
                 TLS Web Client Authentication
     Signature Algorithm: sha256WithRSAEncryption
     Signature Value:
-        6b:24:0f:2f:81:46:32:c4:c1:57:09:cd:64:6d:9f:50:ee:29:
-        4d:a7:14:d0:a0:0c:ea:a6:dc:e5:15:52:9a:42:08:eb:a2:91:
-        3c:ce:94:0e:f0:82:bc:fd:d7:23:d1:ad:d1:98:07:94:05:fa:
-        ca:37:45:d7:f0:7d:aa:d2:ec:94:2b:8b:03:85:00:fb:af:1d:
-        35:28:53:a8:1d:f8:44:e1:ea:48:3f:a4:2a:46:3b:f6:19:bf:
-        30:df:b2:0e:8d:79:b0:0a:f5:34:c7:8a:6d:bf:58:39:9d:5d:
-        a1:f5:35:a0:54:87:98:c6:5d:bf:ea:4e:46:f9:47:6d:d7:e6:
-        5a:f3
+        59:a5:81:1c:61:12:ad:1e:b8:3d:a5:e6:c2:dd:dd:8f:09:3c:
+        8f:61:fc:96:e6:ff:70:d1:77:b0:b8:18:7f:f5:9e:e7:61:a1:
+        cc:b6:53:75:d4:b3:a7:cb:77:1c:7f:e2:01:22:6b:30:44:df:
+        e0:c2:9e:f6:56:a8:1e:13:0b:02:a7:fa:25:cb:f8:6c:0b:85:
+        32:be:a7:1d:50:07:5d:76:0c:e5:ec:58:88:3e:ab:21:09:58:
+        1f:af:06:26:80:77:48:1a:a4:37:50:35:e5:b3:d0:d0:4c:d7:
+        ad:bb:29:2b:f5:eb:56:94:c0:8b:4d:69:37:f6:1c:d2:fd:87:
+        d5:af
 -----BEGIN CERTIFICATE-----
-MIICtTCCAh6gAwIBAgIBATANBgkqhkiG9w0BAQsFADBnMQswCQYDVQQGEwJVUzER
+MIIC5TCCAk6gAwIBAgIBATANBgkqhkiG9w0BAQsFADBnMQswCQYDVQQGEwJVUzER
 MA8GA1UECAwITXkgU3RhdGUxEDAOBgNVBAcMB015IENpdHkxDzANBgNVBAoMBk15
-IE9yZzEQMA4GA1UECwwHTXkgVW5pdDEQMA4GA1UEAwwHUk9PVCBDQTAgFw0yNDA1
-MDIwNTQ2MjRaGA8yMTI0MDQwODA1NDYyNFowaTELMAkGA1UEBhMCVVMxETAPBgNV
-BAgMCE15IFN0YXRlMRAwDgYDVQQHDAdNeSBDaXR5MQ8wDQYDVQQKDAZNeSBPcmcx
-EDAOBgNVBAsMB015IFVuaXQxEjAQBgNVBAMMCWNsaWVudF9jbjCBnzANBgkqhkiG
-9w0BAQEFAAOBjQAwgYkCgYEAvT8t0YZzbbUJnP9C+yeOB2mjttHHctHemBSlYZuD
-Ax3aVNHUDX/emC7M22/kGcdBQ1n/NHuCBoABq3mzQNNFH1ItEPlVQKd6Yff9nEHr
-0ex+MMoa+g6eDx5Qk5rKVepkgG67SX0SFdhvqKo/uRAkb3Ii6U/zpCkeTnGmgq85
-eKkCAwEAAaNtMGswHQYDVR0OBBYEFPt31tCEqBDf+k6k4PEqu7SA/U8/MB8GA1Ud
-IwQYMBaAFNMHzXLmvgpa2OlgIK/C8jZ+M2ILMAkGA1UdEwQCMAAwCQYDVR0RBAIw
-ADATBgNVHSUEDDAKBggrBgEFBQcDAjANBgkqhkiG9w0BAQsFAAOBgQBrJA8vgUYy
-xMFXCc1kbZ9Q7ilNpxTQoAzqptzlFVKaQgjropE8zpQO8IK8/dcj0a3RmAeUBfrK
-N0XX8H2q0uyUK4sDhQD7rx01KFOoHfhE4epIP6QqRjv2Gb8w37IOjXmwCvU0x4pt
-v1g5nV2h9TWgVIeYxl2/6k5G+Udt1+Za8w==
+IE9yZzEQMA4GA1UECwwHTXkgVW5pdDEQMA4GA1UEAwwHUk9PVCBDQTAgFw0yNDEw
+MjcwMDQzMzFaGA8yMTI0MTAwMzAwNDMzMVowgZgxCzAJBgNVBAYTAlVTMREwDwYD
+VQQIDAhNeSBTdGF0ZTEQMA4GA1UEBwwHTXkgQ2l0eTEPMA0GA1UECgwGTXkgT3Jn
+MRAwDgYDVQQLDAdNeSBVbml0MRMwEQYDVQQDDApjbGllbnRfY24yMRIwEAYDVQQD
+DAljbGllbnRfY24xGDAWBgkrBgEEAYPCUwIMCWNsaWVudF9pZDCBnzANBgkqhkiG
+9w0BAQEFAAOBjQAwgYkCgYEA0WFtlA6iez6uLNQ5ZqXsOtGQ0YX93jwdfczN/ZNQ
+BiYCp4nkkkXVlrqwBGspqZP/ydXyXFC1HFodSE/rqb/5KCSiXtoI0QEaGsgANdBK
+UUbwAiuJO7KqqWgz7gjUYQZi5upT9koTSWZnA4IiCCguvt2BkSilqol4QTM7XWWy
+9wsCAwEAAaNtMGswHQYDVR0OBBYEFGSEXrc3ooL5YhoBAP4btEv0GJL2MB8GA1Ud
+IwQYMBaAFEhwddTta0k7U9vppvmcVZJRvZbmMAkGA1UdEwQCMAAwCQYDVR0RBAIw
+ADATBgNVHSUEDDAKBggrBgEFBQcDAjANBgkqhkiG9w0BAQsFAAOBgQBZpYEcYRKt
+Hrg9pebC3d2PCTyPYfyW5v9w0XewuBh/9Z7nYaHMtlN11LOny3ccf+IBImswRN/g
+wp72VqgeEwsCp/oly/hsC4UyvqcdUAdddgzl7FiIPqshCVgfrwYmgHdIGqQ3UDXl
+s9DQTNetuykr9etWlMCLTWk39hzS/YfVrw==
 -----END CERTIFICATE-----`
 
 	/*
@@ -374,65 +388,198 @@ v1g5nV2h9TWgVIeYxl2/6k5G+Udt1+Za8w==
         Version: 3 (0x2)
         Serial Number: 7 (0x7)
         Signature Algorithm: sha256WithRSAEncryption
-        Issuer: C = US, ST = My State, L = My City, O = My Org, OU = My Unit, CN = ROOT CA
+        Issuer: C=US, ST=My State, L=My City, O=My Org, OU=My Unit, CN=ROOT CA
         Validity
-            Not Before: May  2 05:47:31 2024 GMT
-            Not After : Apr  8 05:47:31 2124 GMT
-        Subject: C = US, ST = My State, L = My City, O = My Org, OU = My Unit, CN = 127.0.0.1
+            Not Before: Oct  6 20:38:02 2024 GMT
+            Not After : Sep 12 20:38:02 2124 GMT
+        Subject: C=US, ST=My State, L=My City, O=My Org, OU=My Unit, CN=127.0.0.1
         Subject Public Key Info:
             Public Key Algorithm: rsaEncryption
                 Public-Key: (1024 bit)
                 Modulus:
-                    00:9d:1f:c3:9e:ac:51:92:27:df:2a:3a:48:b7:59:
-                    40:23:a5:c3:a1:61:71:7a:00:df:d5:8b:a2:8a:7c:
-                    54:f0:19:69:fe:ae:19:a3:e1:eb:1e:1b:39:2c:61:
-                    fb:7b:21:10:81:b2:ef:29:94:b6:14:6f:ca:eb:4d:
-                    f3:f6:84:93:5f:51:2c:7a:ab:9f:34:05:15:62:c4:
-                    55:54:2e:75:b9:26:d1:0e:c5:63:41:e5:36:02:3f:
-                    1c:5f:fc:1b:07:20:d2:1c:70:a5:a1:e8:08:1d:8f:
-                    4c:c3:57:e0:54:72:a6:c9:24:1b:b0:fa:0d:86:f5:
-                    26:1f:20:e5:1c:1c:c3:8f:d3
+                    00:b6:d5:2f:a6:7a:78:5d:40:a6:0d:76:6f:e9:9d:
+                    54:6d:d9:e9:d6:32:00:f2:8a:fb:da:87:be:05:07:
+                    b4:58:ab:88:25:f8:38:e7:50:25:23:47:99:8f:3c:
+                    ff:8a:cc:61:7c:21:db:39:c9:81:f6:0c:f2:22:a8:
+                    19:65:7a:ae:c6:32:74:63:4d:a5:14:fa:b5:04:ab:
+                    a4:83:c5:0f:26:38:b3:65:9d:68:bb:4f:55:e4:0b:
+                    e5:71:49:dd:5b:b8:a0:ed:7d:13:6f:29:03:44:20:
+                    d0:2d:9c:44:e4:0e:8b:d7:71:79:fe:35:cd:6c:7c:
+                    79:a4:01:08:ae:9e:95:46:d9
                 Exponent: 65537 (0x10001)
         X509v3 extensions:
-            X509v3 Subject Key Identifier: 
-                F2:AE:B7:50:D5:02:C1:E9:8D:38:0E:76:A5:D8:24:0B:1C:DB:08:0E
-            X509v3 Authority Key Identifier: 
-                D3:07:CD:72:E6:BE:0A:5A:D8:E9:60:20:AF:C2:F2:36:7E:33:62:0B
-            X509v3 Basic Constraints: 
+            X509v3 Subject Key Identifier:
+                CA:72:DA:A3:17:BB:56:CC:14:A9:BA:12:F2:88:7F:F4:15:69:33:CB
+            X509v3 Authority Key Identifier:
+                48:70:75:D4:ED:6B:49:3B:53:DB:E9:A6:F9:9C:55:92:51:BD:96:E6
+            X509v3 Basic Constraints:
                 CA:FALSE
-            X509v3 Subject Alternative Name: 
+            X509v3 Subject Alternative Name:
                 <EMPTY>
 
-            X509v3 Extended Key Usage: 
+            X509v3 Extended Key Usage:
                 TLS Web Server Authentication
     Signature Algorithm: sha256WithRSAEncryption
     Signature Value:
-        3f:3d:d1:5d:d5:9f:c1:ab:6e:ba:c1:c2:1b:63:1a:a8:4f:d9:
-        df:03:13:ff:6d:a8:ed:c9:8d:19:a6:8f:a6:e2:a8:23:a0:f7:
-        5d:5e:22:01:d1:29:9b:d0:95:75:66:46:f2:51:a7:08:1c:8c:
-        aa:ca:4a:57:d8:ab:ed:1b:b3:77:25:58:38:1f:89:e0:a4:13:
-        0a:f2:99:d5:3d:24:00:08:06:7e:b3:1a:b0:0b:07:33:a7:c7:
-        ff:f8:ef:bc:7c:c9:2e:aa:3f:7a:3e:8e:8a:49:cf:a4:5a:b5:
-        41:07:57:f1:36:f4:57:dc:6e:3f:70:38:0d:4e:71:9c:24:20:
-        b4:36
+        08:14:37:cd:ec:d6:4e:81:d2:d7:09:ba:5a:50:84:6a:1b:f2:
+        02:49:44:94:5d:e3:41:48:09:dc:88:0b:37:d6:e9:c7:b6:4b:
+        42:58:b3:cb:81:5b:a6:0d:78:47:1b:4a:5a:5f:d5:14:4c:37:
+        bd:b6:64:c4:d5:ac:17:d0:6c:2d:f5:1b:aa:d8:de:27:f1:1e:
+        26:42:dd:45:90:ef:97:0b:e6:c9:01:c5:4b:7c:c3:81:18:c6:
+        28:d9:8a:f5:a5:8c:b4:ec:75:c2:b8:43:83:d0:db:09:e1:58:
+        a6:2a:65:52:97:0b:d0:d6:c7:43:8f:10:63:23:b4:ce:c9:15:
+        4d:4a
 -----BEGIN CERTIFICATE-----
 MIICtTCCAh6gAwIBAgIBBzANBgkqhkiG9w0BAQsFADBnMQswCQYDVQQGEwJVUzER
 MA8GA1UECAwITXkgU3RhdGUxEDAOBgNVBAcMB015IENpdHkxDzANBgNVBAoMBk15
-IE9yZzEQMA4GA1UECwwHTXkgVW5pdDEQMA4GA1UEAwwHUk9PVCBDQTAgFw0yNDA1
-MDIwNTQ3MzFaGA8yMTI0MDQwODA1NDczMVowaTELMAkGA1UEBhMCVVMxETAPBgNV
+IE9yZzEQMA4GA1UECwwHTXkgVW5pdDEQMA4GA1UEAwwHUk9PVCBDQTAgFw0yNDEw
+MDYyMDM4MDJaGA8yMTI0MDkxMjIwMzgwMlowaTELMAkGA1UEBhMCVVMxETAPBgNV
 BAgMCE15IFN0YXRlMRAwDgYDVQQHDAdNeSBDaXR5MQ8wDQYDVQQKDAZNeSBPcmcx
 EDAOBgNVBAsMB015IFVuaXQxEjAQBgNVBAMMCTEyNy4wLjAuMTCBnzANBgkqhkiG
-9w0BAQEFAAOBjQAwgYkCgYEAnR/DnqxRkiffKjpIt1lAI6XDoWFxegDf1YuiinxU
-8Blp/q4Zo+HrHhs5LGH7eyEQgbLvKZS2FG/K603z9oSTX1EsequfNAUVYsRVVC51
-uSbRDsVjQeU2Aj8cX/wbByDSHHCloegIHY9Mw1fgVHKmySQbsPoNhvUmHyDlHBzD
-j9MCAwEAAaNtMGswHQYDVR0OBBYEFPKut1DVAsHpjTgOdqXYJAsc2wgOMB8GA1Ud
-IwQYMBaAFNMHzXLmvgpa2OlgIK/C8jZ+M2ILMAkGA1UdEwQCMAAwCQYDVR0RBAIw
-ADATBgNVHSUEDDAKBggrBgEFBQcDATANBgkqhkiG9w0BAQsFAAOBgQA/PdFd1Z/B
-q266wcIbYxqoT9nfAxP/bajtyY0Zpo+m4qgjoPddXiIB0Smb0JV1ZkbyUacIHIyq
-ykpX2KvtG7N3JVg4H4ngpBMK8pnVPSQACAZ+sxqwCwczp8f/+O+8fMkuqj96Po6K
-Sc+kWrVBB1fxNvRX3G4/cDgNTnGcJCC0Ng==
+9w0BAQEFAAOBjQAwgYkCgYEAttUvpnp4XUCmDXZv6Z1Ubdnp1jIA8or72oe+BQe0
+WKuIJfg451AlI0eZjzz/isxhfCHbOcmB9gzyIqgZZXquxjJ0Y02lFPq1BKukg8UP
+JjizZZ1ou09V5AvlcUndW7ig7X0TbykDRCDQLZxE5A6L13F5/jXNbHx5pAEIrp6V
+RtkCAwEAAaNtMGswHQYDVR0OBBYEFMpy2qMXu1bMFKm6EvKIf/QVaTPLMB8GA1Ud
+IwQYMBaAFEhwddTta0k7U9vppvmcVZJRvZbmMAkGA1UdEwQCMAAwCQYDVR0RBAIw
+ADATBgNVHSUEDDAKBggrBgEFBQcDATANBgkqhkiG9w0BAQsFAAOBgQAIFDfN7NZO
+gdLXCbpaUIRqG/ICSUSUXeNBSAnciAs31unHtktCWLPLgVumDXhHG0paX9UUTDe9
+tmTE1awX0Gwt9Ruq2N4n8R4mQt1FkO+XC+bJAcVLfMOBGMYo2Yr1pYy07HXCuEOD
+0NsJ4VimKmVSlwvQ1sdDjxBjI7TOyRVNSg==
 -----END CERTIFICATE-----
 `
+
+	/*
+	   openssl genrsa -out ca.key 4096 && \
+	   OID_CONF="oid_section = my_oids\n\n" && \
+	   OID_CONF="${OID_CONF}[ my_oids ]\n" && \
+	   OID_CONF="${OID_CONF}kube_uid=1.3.6.1.4.1.57683.2\n" && \
+	   openssl req -new -x509 -days 36500 \
+	       -config <(printf "${OID_CONF}") \
+	       -sha256 -key ca.key \
+	       -out ca.crt \
+	       -subj "/C=US/ST=My State/L=My City/CN=caWithMultiUIDs"/kube_uid=client_uid1/kube_uid=client_uid2 && \
+	   openssl x509 -in ca.crt -text
+	*/
+
+	// A certificate with multiple UIDs.
+	caWithMultiUIDs = `Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            2d:92:d9:46:70:49:59:58:3c:d0:12:06:ed:3e:ee:15:f3:17:62:d4
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=US, ST=My State, L=My City, CN=caWithMultiUIDs, 1.3.6.1.4.1.57683.2=client_uid1, 1.3.6.1.4.1.57683.2=client_uid2
+        Validity
+            Not Before: Nov  2 19:44:52 2024 GMT
+            Not After : Oct  9 19:44:52 2124 GMT
+        Subject: C=US, ST=My State, L=My City, CN=caWithMultiUIDs, 1.3.6.1.4.1.57683.2=client_uid1, 1.3.6.1.4.1.57683.2=client_uid2
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (4096 bit)
+                Modulus:
+                    00:a4:c1:9d:6e:a2:e7:af:07:14:7f:5f:00:60:92:
+                    1b:ec:51:77:3d:ac:93:4d:a8:ac:ee:15:93:9d:5f:
+                    62:44:5d:97:70:a2:c9:63:59:79:79:84:86:98:2e:
+                    4b:cb:fd:99:2e:e7:0c:7d:e2:c3:65:f5:80:5d:bb:
+                    38:3f:0e:09:11:40:9f:56:b0:91:04:2b:66:02:a4:
+                    28:9a:fc:a4:e9:0d:6b:f0:31:41:90:95:f2:4a:d7:
+                    af:5d:50:f8:28:1d:6d:2b:01:e4:38:bf:15:9c:9e:
+                    93:2b:44:7e:29:33:c0:96:66:4f:5f:43:74:c2:eb:
+                    c9:45:e1:16:22:33:b7:d9:93:5f:1c:af:bb:95:f5:
+                    64:15:53:15:c3:a6:4c:0e:2c:6e:f7:45:c1:c5:4a:
+                    c3:8c:29:c3:42:aa:e1:eb:53:da:c2:0d:9c:dc:5a:
+                    e1:01:9c:59:b4:43:1c:2b:c5:ff:d7:cf:cf:4c:76:
+                    a4:7b:ce:00:a1:78:4a:38:0f:f3:ab:48:0f:5e:86:
+                    49:7f:24:85:71:db:c8:3c:7e:dc:f5:26:5f:54:aa:
+                    a6:e2:41:83:3c:5b:eb:e4:f0:e4:76:78:a3:82:68:
+                    46:b1:50:54:a7:d0:c4:aa:12:4d:fd:7f:b4:c2:92:
+                    f1:d0:2d:0a:e9:df:9b:0f:95:88:94:3f:77:35:57:
+                    e6:8e:a7:b1:50:9a:80:51:62:19:49:9b:2c:81:f5:
+                    97:b3:f4:23:b7:94:9e:96:2e:22:d3:6e:6a:56:50:
+                    77:1c:ad:3a:60:52:eb:b6:ba:34:fe:f5:1e:ba:fd:
+                    e3:dc:b8:9d:c1:59:b2:42:fa:5e:88:d3:fe:4a:1a:
+                    3d:1d:a6:55:ce:af:dc:71:e7:8a:4a:dd:37:00:0a:
+                    64:79:14:b3:29:ed:7c:4a:42:c6:f1:38:72:e5:36:
+                    19:64:9f:3c:23:8a:b1:ee:18:a7:7e:cf:12:48:53:
+                    0c:27:fb:12:82:62:bc:9a:7f:fc:5d:97:ae:2d:38:
+                    bd:ff:74:23:1b:62:1c:2e:4a:26:7e:85:6c:6d:82:
+                    01:96:95:86:15:1c:db:40:d9:01:d6:df:68:6d:e9:
+                    5b:0b:6d:cc:6f:40:95:34:f8:b4:1c:13:ab:95:0f:
+                    5b:0b:dc:65:93:87:a0:4c:0d:e6:b0:0a:a6:7e:ac:
+                    0b:04:6d:f9:ee:42:7b:14:0f:b4:22:53:e2:58:bc:
+                    6f:05:41:f0:d3:3a:98:1a:c4:3a:6e:0b:a9:85:fe:
+                    e9:4d:7a:50:b4:4d:28:bd:fc:6a:78:e2:b8:9d:cd:
+                    15:a3:ac:03:a9:94:38:8e:94:b1:00:12:fc:1f:70:
+                    1b:b8:f4:1a:7b:a9:cc:17:c5:2a:42:c6:40:c7:b4:
+                    40:ba:fd
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Subject Key Identifier:
+                87:40:3F:E7:DD:73:C8:A6:62:6A:B2:8E:AF:82:52:F6:8D:26:C1:68
+    Signature Algorithm: sha256WithRSAEncryption
+    Signature Value:
+        3c:9f:c8:86:2b:97:45:ab:10:44:a2:f1:b7:06:d1:2d:54:a3:
+        34:85:40:e2:6f:8b:6f:7f:84:a4:e5:e5:23:6d:f9:e3:b5:63:
+        55:23:f5:14:7f:c1:b9:b4:68:86:c4:75:d9:fa:03:fc:c8:aa:
+        26:a7:38:44:be:7d:c6:3c:1d:60:7b:31:83:6b:76:43:95:f3:
+        2a:9a:2d:71:86:ea:fb:8a:2c:2a:f2:7e:79:a5:78:cf:cf:aa:
+        92:67:1a:01:2b:4f:32:a9:2e:48:10:27:89:77:67:1c:ba:97:
+        3d:05:2e:38:ff:6c:a6:9b:13:2a:20:9c:8e:b3:32:3f:11:51:
+        5f:28:3d:c3:21:64:8f:7a:0b:df:62:8e:7a:27:57:86:90:cd:
+        58:69:4f:51:9d:b3:0e:cb:47:68:1e:2f:8e:a4:58:9a:5b:f2:
+        a9:51:0b:2f:22:8a:14:b7:69:d1:22:bf:10:a8:59:ca:0e:7f:
+        16:18:80:0f:e6:42:5a:7d:2f:b0:2f:c5:c1:35:9d:99:75:57:
+        c4:0d:0d:be:da:23:9e:82:d0:14:c7:12:07:1d:b7:9d:44:09:
+        84:83:d0:31:fc:aa:c5:bb:f3:ba:e9:a0:60:01:df:5d:4b:f6:
+        73:5b:98:62:a0:82:ae:5c:8d:41:6b:e7:d0:62:c2:70:80:51:
+        43:8f:6d:f5:52:3e:1c:a3:18:9b:c1:12:eb:f3:f0:89:59:3b:
+        44:c1:3c:33:fa:30:99:86:7a:1a:01:e7:8a:1e:41:04:7f:96:
+        9d:63:c8:93:ee:76:05:15:8d:16:59:45:e0:99:36:e2:16:68:
+        ea:54:13:3b:98:12:2e:30:84:c5:0f:c1:63:10:0c:a6:d0:93:
+        73:54:c7:5d:10:aa:3b:9a:4d:0a:82:e8:e2:0f:3a:cb:93:a1:
+        97:1c:d7:51:eb:ba:be:ed:84:cc:76:a7:73:e0:9a:18:b5:9b:
+        eb:d4:fc:a7:b2:3a:90:fa:71:d8:c8:e3:88:f9:25:44:a4:63:
+        f1:4d:ab:d5:1e:04:62:d9:40:a0:ea:e7:f7:78:03:12:90:c4:
+        02:58:fd:ef:62:2d:78:85:e5:f6:25:20:85:8e:e5:52:a2:0d:
+        4e:9d:a1:4a:1b:4b:17:9a:ba:9c:42:08:0b:f3:85:8c:8d:00:
+        76:b9:48:4f:11:cb:d2:42:03:06:a5:2c:38:15:40:39:ec:3b:
+        c4:ca:bf:07:c0:33:54:6e:6f:7a:21:f6:47:1f:95:3a:24:56:
+        06:73:c2:84:1e:c1:9d:6c:02:81:61:87:3a:58:f7:62:fb:55:
+        c9:34:9c:c2:52:dd:8c:3a:51:a0:1b:d2:ab:5e:d3:50:a2:e5:
+        2a:ab:85:95:de:a0:a2:fc
+-----BEGIN CERTIFICATE-----
+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
+-----END CERTIFICATE-----`
 
 	/*
 	   openssl genrsa -out ca.key 4096
@@ -584,6 +731,9 @@ func TestX509(t *testing.T) {
 		ExpectOK       bool
 		ExpectResponse *authenticator.Response
 		ExpectErr      bool
+		ExpectErrMsg   *regexp.Regexp
+
+		setupFunc func(t *testing.T)
 	}{
 		"non-tls": {
 			Insecure: true,
@@ -623,14 +773,38 @@ func TestX509(t *testing.T) {
 					Name:   "127.0.0.1",
 					Groups: []string{"My Org"},
 					Extra: map[string][]string{
-						user.CredentialIDKey: {"X509SHA256=92209d1e0dd36a018f244f5e1b88e2d47b049e9cfcd4b7c87c65875866872230"},
+						user.CredentialIDKey: {"X509SHA256=04adf2b65e6325a8c467256eb3a9a373d818398d9a1f1d9eca1cbc2c237fe75f"},
 					},
 				},
 			},
 			ExpectErr: false,
 		},
 
-		"common name": {
+		"common name and UID": {
+			Opts:  getDefaultVerifyOptions(t),
+			Certs: getCerts(t, clientCNCert),
+			User:  CommonNameUserConversion,
+
+			ExpectOK: true,
+			ExpectResponse: &authenticator.Response{
+				User: &user.DefaultInfo{
+					Name:   "client_cn",
+					Groups: []string{"My Org"},
+					UID:    "client_id",
+					Extra: map[string][]string{
+						user.CredentialIDKey: {"X509SHA256=0a016b6c2ff14c5431e4a2b448e941fcaa21fb3d7ad105e9a53d4e8ce12824f0"},
+					},
+				},
+			},
+			ExpectErr: false,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				// This statement can be removed once utilversion.DefaultKubeEffectiveVersion() is >= 1.33
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+
+			},
+		},
+		"common name and empty UID with feature gate disabled": {
 			Opts:  getDefaultVerifyOptions(t),
 			Certs: getCerts(t, clientCNCert),
 			User:  CommonNameUserConversion,
@@ -641,11 +815,61 @@ func TestX509(t *testing.T) {
 					Name:   "client_cn",
 					Groups: []string{"My Org"},
 					Extra: map[string][]string{
-						user.CredentialIDKey: {"X509SHA256=dd0a6a295055fa94455c522b0d54ef0499186f454a7cf978b8b346dc35b254f7"},
+						user.CredentialIDKey: {"X509SHA256=0a016b6c2ff14c5431e4a2b448e941fcaa21fb3d7ad105e9a53d4e8ce12824f0"},
 					},
 				},
 			},
 			ExpectErr: false,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				// This statement can be removed once utilversion.DefaultKubeEffectiveVersion() is >= 1.33
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.AllowParsingUserUIDFromCertAuth, false)
+			},
+		},
+		"ca with empty UID": {
+			Opts:         getDefaultVerifyOptions(t),
+			Certs:        toCertWithUIDValue(t, clientCNCert, ""),
+			User:         CommonNameUserConversion,
+			ExpectOK:     false,
+			ExpectErr:    true,
+			ExpectErrMsg: regexp.MustCompile("UID cannot be an empty string"),
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				// This statement can be removed once utilversion.DefaultKubeEffectiveVersion() is >= 1.33
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+
+			},
+		},
+		"ca with non-string UID": {
+			Opts:         getDefaultVerifyOptions(t),
+			Certs:        toCertWithUIDValue(t, clientCNCert, asn1.RawValue{Tag: 16, Bytes: []byte("custom_value")}),
+			User:         CommonNameUserConversion,
+			ExpectOK:     false,
+			ExpectErr:    true,
+			ExpectErrMsg: regexp.MustCompile("unable to parse UID into a string"),
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				// This statement can be removed once utilversion.DefaultKubeEffectiveVersion() is >= 1.33
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+
+			},
+		},
+		"ca with multiple UIDs": {
+			Opts: x509.VerifyOptions{
+				Roots: getRootCertPoolFor(t, caWithMultiUIDs),
+			},
+			Certs:        getCerts(t, caWithMultiUIDs),
+			User:         CommonNameUserConversion,
+			ExpectOK:     false,
+			ExpectErr:    true,
+			ExpectErrMsg: regexp.MustCompile("expected 1 UID, but found multiple"),
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				// This statement can be removed once utilversion.DefaultKubeEffectiveVersion() is >= 1.33
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
+
+			},
 		},
 		"ca with multiple organizations": {
 			Opts: x509.VerifyOptions{
@@ -744,6 +968,10 @@ func TestX509(t *testing.T) {
 
 	for k, testCase := range testCases {
 		t.Run(k, func(t *testing.T) {
+			if testCase.setupFunc != nil {
+				testCase.setupFunc(t)
+			}
+
 			req, _ := http.NewRequest("GET", "/", nil)
 			if !testCase.Insecure {
 				req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
@@ -759,6 +987,9 @@ func TestX509(t *testing.T) {
 			}
 			if !testCase.ExpectErr && err != nil {
 				t.Fatalf("Got unexpected error: %v", err)
+			}
+			if testCase.ExpectErrMsg != nil && err != nil {
+				assert.Regexp(t, testCase.ExpectErrMsg, err.Error())
 			}
 
 			if testCase.ExpectOK != ok {
@@ -956,7 +1187,7 @@ func getCertsFromFile(t *testing.T, names ...string) []*x509.Certificate {
 	certs := []*x509.Certificate{}
 	for _, name := range names {
 		filename := "testdata/" + name + ".pem"
-		data, err := ioutil.ReadFile(filename)
+		data, err := os.ReadFile(filename)
 		if err != nil {
 			t.Fatalf("error reading %s: %v", filename, err)
 		}
@@ -985,6 +1216,29 @@ func getCerts(t *testing.T, pemData ...string) []*x509.Certificate {
 	return certs
 }
 
+// Modifies the cert's Subject to use custom value for the UID.
+func toCertWithUIDValue(t *testing.T, pemData string, val any) []*x509.Certificate {
+	cert := getCert(t, pemData)
+
+	oid := asn1util.X509UID()
+	attrs := []pkix.AttributeTypeAndValue{}
+	for _, attr := range cert.Subject.Names {
+		if !attr.Type.Equal(oid) {
+			attrs = append(attrs, attr)
+		}
+	}
+	cert.Subject.Names = attrs
+	cert.Subject.Names = append(
+		cert.Subject.Names,
+		pkix.AttributeTypeAndValue{
+			Type:  asn1util.X509UID(),
+			Value: val,
+		},
+	)
+
+	return []*x509.Certificate{cert}
+}
+
 func TestCertificateIdentifier(t *testing.T) {
 	tt := []struct {
 		name               string
@@ -994,7 +1248,7 @@ func TestCertificateIdentifier(t *testing.T) {
 		{
 			name:               "client cert",
 			cert:               getCert(t, clientCNCert),
-			expectedIdentifier: "SN=1, SKID=FB:77:D6:D0:84:A8:10:DF:FA:4E:A4:E0:F1:2A:BB:B4:80:FD:4F:3F, AKID=D3:07:CD:72:E6:BE:0A:5A:D8:E9:60:20:AF:C2:F2:36:7E:33:62:0B",
+			expectedIdentifier: "SN=1, SKID=64:84:5E:B7:37:A2:82:F9:62:1A:01:00:FE:1B:B4:4B:F4:18:92:F6, AKID=48:70:75:D4:ED:6B:49:3B:53:DB:E9:A6:F9:9C:55:92:51:BD:96:E6",
 		},
 		{
 			name: "nil serial",
@@ -1003,7 +1257,7 @@ func TestCertificateIdentifier(t *testing.T) {
 				c.SerialNumber = nil
 				return c
 			}(),
-			expectedIdentifier: "SN=<nil>, SKID=FB:77:D6:D0:84:A8:10:DF:FA:4E:A4:E0:F1:2A:BB:B4:80:FD:4F:3F, AKID=D3:07:CD:72:E6:BE:0A:5A:D8:E9:60:20:AF:C2:F2:36:7E:33:62:0B",
+			expectedIdentifier: "SN=<nil>, SKID=64:84:5E:B7:37:A2:82:F9:62:1A:01:00:FE:1B:B4:4B:F4:18:92:F6, AKID=48:70:75:D4:ED:6B:49:3B:53:DB:E9:A6:F9:9C:55:92:51:BD:96:E6",
 		},
 		{
 			name: "empty SKID",
@@ -1012,7 +1266,7 @@ func TestCertificateIdentifier(t *testing.T) {
 				c.SubjectKeyId = nil
 				return c
 			}(),
-			expectedIdentifier: "SN=1, SKID=, AKID=D3:07:CD:72:E6:BE:0A:5A:D8:E9:60:20:AF:C2:F2:36:7E:33:62:0B",
+			expectedIdentifier: "SN=1, SKID=, AKID=48:70:75:D4:ED:6B:49:3B:53:DB:E9:A6:F9:9C:55:92:51:BD:96:E6",
 		},
 		{
 			name: "empty AKID",
@@ -1021,7 +1275,7 @@ func TestCertificateIdentifier(t *testing.T) {
 				c.AuthorityKeyId = nil
 				return c
 			}(),
-			expectedIdentifier: "SN=1, SKID=FB:77:D6:D0:84:A8:10:DF:FA:4E:A4:E0:F1:2A:BB:B4:80:FD:4F:3F, AKID=",
+			expectedIdentifier: "SN=1, SKID=64:84:5E:B7:37:A2:82:F9:62:1A:01:00:FE:1B:B4:4B:F4:18:92:F6, AKID=",
 		},
 		{
 			name:               "self-signed",

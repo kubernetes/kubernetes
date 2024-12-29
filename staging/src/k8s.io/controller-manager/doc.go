@@ -17,4 +17,4 @@ limitations under the License.
 // Package controllermanager contains the common library code for
 // building a controller-manager. It was based on the common code
 // between the kube-controller-manager and the cloud-controller-manager.
-package controllermanager // import "k8s.io/controller-manager"
+package controllermanager

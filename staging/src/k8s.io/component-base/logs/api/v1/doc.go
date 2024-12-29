@@ -29,4 +29,4 @@ limitations under the License.
 // The LoggingAlphaOptions and LoggingBetaOptions feature gates control whether
 // these unstable features can get enabled. This can be used to ensure that
 // command invocations do not accidentally rely on unstable features.
-package v1 // import "k8s.io/component-base/logs/api/v1"
+package v1

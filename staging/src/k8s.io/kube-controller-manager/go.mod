@@ -6,6 +6,8 @@ go 1.23.0
 
 godebug default=go1.23
 
+godebug winsymlink=0
+
 require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/cloud-provider v0.0.0
@@ -24,7 +26,7 @@ require (
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/component-base v0.0.0 // indirect

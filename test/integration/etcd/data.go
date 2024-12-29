@@ -17,26 +17,54 @@ limitations under the License.
 package etcd
 
 import (
+	"strings"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilversion "k8s.io/component-base/version"
 
 	"k8s.io/kubernetes/test/utils/image"
 )
 
-// GetEtcdStorageData returns etcd data for all persisted objects.
+// GetSupportedEmulatedVersions provides the list of supported emulated versions in the etcd data.
+// Tests aiming for full coverage of versions should test fixtures of all supported versions.
+func GetSupportedEmulatedVersions() []string {
+	return []string{
+		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(2).String(),
+		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(1).String(),
+		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().String(),
+	}
+}
+
+// GetEtcdStorageData returns etcd data for all persisted objects at the latest release version.
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
 func GetEtcdStorageData() map[schema.GroupVersionResource]StorageData {
-	return GetEtcdStorageDataForNamespace("etcdstoragepathtestnamespace")
+	return GetEtcdStorageDataServedAt(utilversion.DefaultKubeBinaryVersion, false)
 }
 
-// GetEtcdStorageDataForNamespace returns etcd data for all persisted objects.
+// GetEtcdStorageDataServedAt returns etcd data for all persisted objects at a particular release version.
+// It is exported so that it can be reused across multiple tests.
+// It returns a new map on every invocation to prevent different tests from mutating shared state.
+func GetEtcdStorageDataServedAt(version string, removeAlphas bool) map[schema.GroupVersionResource]StorageData {
+	return GetEtcdStorageDataForNamespaceServedAt("etcdstoragepathtestnamespace", version, removeAlphas)
+}
+
+// GetEtcdStorageDataForNamespace returns etcd data for all persisted objects at the latest release version.
 // It is exported so that it can be reused across multiple tests.
 // It returns a new map on every invocation to prevent different tests from mutating shared state.
 // Namespaced objects keys are computed for the specified namespace.
 func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionResource]StorageData {
+	return GetEtcdStorageDataForNamespaceServedAt(namespace, utilversion.DefaultKubeBinaryVersion, false)
+}
+
+// GetEtcdStorageDataForNamespaceServedAt returns etcd data for all persisted objects at a particular release version.
+// It is exported so that it can be reused across multiple tests.
+// It returns a new map on every invocation to prevent different tests from mutating shared state.
+// Namespaced objects keys are computed for the specified namespace.
+func GetEtcdStorageDataForNamespaceServedAt(namespace string, version string, removeAlphas bool) map[schema.GroupVersionResource]StorageData {
 	image := image.GetE2EImage(image.BusyBox)
 	etcdStorageData := map[schema.GroupVersionResource]StorageData{
 		// k8s.io/kubernetes/pkg/api/v1
@@ -352,16 +380,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/admissionregistration/v1alpha1
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicies"): {
-			Stub:             `{"metadata":{"name":"vap1a1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"validations":[{"expression":"object.spec.replicas <= params.maxReplicas","message":"Too many replicas"}]}}`,
-			ExpectedEtcdPath: "/registry/validatingadmissionpolicies/vap1a1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicy"),
-		},
-		gvr("admissionregistration.k8s.io", "v1alpha1", "validatingadmissionpolicybindings"): {
-			Stub:             `{"metadata":{"name":"pb1a1","creationTimestamp":null},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com"},"validationActions":["Deny"]}}`,
-			ExpectedEtcdPath: "/registry/validatingadmissionpolicybindings/pb1a1",
-			ExpectedGVK:      gvkP("admissionregistration.k8s.io", "v1", "ValidatingAdmissionPolicyBinding"),
-		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"): {
 			Stub:             `{"metadata":{"name":"map1","creationTimestamp":null},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath: "/registry/mutatingadmissionpolicies/map1",
@@ -475,22 +493,46 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/storage/v1
+		gvr("storage.k8s.io", "v1", "csinodes"): {
+			Stub:             `{"metadata": {"name": "csini2"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
+			ExpectedEtcdPath: "/registry/csinodes/csini2",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/storage/v1
+		gvr("storage.k8s.io", "v1", "csidrivers"): {
+			Stub:             `{"metadata": {"name": "csid2"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
+			ExpectedEtcdPath: "/registry/csidrivers/csid2",
+		},
+		// --
 	}
 
-	// add csinodes
-	// k8s.io/kubernetes/pkg/apis/storage/v1
-	etcdStorageData[gvr("storage.k8s.io", "v1", "csinodes")] = StorageData{
-		Stub:             `{"metadata": {"name": "csini2"}, "spec": {"drivers": [{"name": "test-driver", "nodeID": "localhost", "topologyKeys": ["company.com/zone1", "company.com/zone2"]}]}}`,
-		ExpectedEtcdPath: "/registry/csinodes/csini2",
+	// Delete types no longer served or not yet added at a particular emulated version.
+	// When adding a brand new type non-alpha type in the latest release, please ensure that
+	// it is removed in previous emulated versions otherwise emulated version tests will fail.
+	// TODO: derive this programatically from gvk --> instance --> APILifecycle info
+	switch version {
+	case "1.33":
+		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"))
+		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"))
+	case "1.32":
+		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"))
+		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"))
+	case "1.31":
+		delete(etcdStorageData, gvr("resource.k8s.io", "v1beta1", "deviceclasses"))
+		delete(etcdStorageData, gvr("resource.k8s.io", "v1beta1", "resourceclaims"))
+		delete(etcdStorageData, gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"))
+		delete(etcdStorageData, gvr("resource.k8s.io", "v1beta1", "resourceslices"))
 	}
 
-	// add csidrivers
-	// k8s.io/kubernetes/pkg/apis/storage/v1
-	etcdStorageData[gvr("storage.k8s.io", "v1", "csidrivers")] = StorageData{
-		Stub:             `{"metadata": {"name": "csid2"}, "spec": {"attachRequired": true, "podInfoOnMount": true}}`,
-		ExpectedEtcdPath: "/registry/csidrivers/csid2",
+	if removeAlphas {
+		for key := range etcdStorageData {
+			if strings.Contains(key.Version, "alpha") {
+				delete(etcdStorageData, key)
+			}
+		}
 	}
-
 	return etcdStorageData
 }
 

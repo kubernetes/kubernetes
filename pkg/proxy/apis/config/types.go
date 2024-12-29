@@ -240,10 +240,10 @@ type KubeProxyConfiguration struct {
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
 //
-// Currently, three modes of proxy are available on Linux platforms: 'iptables', 'ipvs',
-// and 'nftables'. One mode of proxy is available on Windows platforms: 'kernelspace'.
+// Three modes of proxy are available on Linux platforms: `iptables`, `ipvs`, and
+// `nftables`. One mode of proxy is available on Windows platforms: `kernelspace`.
 //
-// If the proxy mode is unspecified, the best-available proxy mode will be used (currently this
+// If the proxy mode is unspecified, a default proxy mode will be used (currently this
 // is `iptables` on Linux and `kernelspace` on Windows). If the selected proxy mode cannot be
 // used (due to lack of kernel support, missing userspace components, etc) then kube-proxy
 // will exit with an error.

@@ -332,7 +332,7 @@ func validateAllocationResult(allocation *resource.AllocationResult, fldPath *fi
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceAllocationResult(allocation.Devices, fldPath.Child("devices"), requestNames, stored)...)
 	if allocation.NodeSelector != nil {
-		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.NodeSelector, fldPath.Child("nodeSelector"))...)
+		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(allocation.NodeSelector, false, fldPath.Child("nodeSelector"))...)
 	}
 	return allErrs
 }
@@ -490,7 +490,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 	if spec.NodeSelector != nil {
 		numNodeSelectionFields++
-		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.NodeSelector, false, fldPath.Child("nodeSelector"))...)
 		if len(spec.NodeSelector.NodeSelectorTerms) != 1 {
 			// This additional constraint simplifies merging of different selectors
 			// when devices are allocated from different slices.

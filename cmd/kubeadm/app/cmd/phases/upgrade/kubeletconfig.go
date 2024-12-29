@@ -25,7 +25,13 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+)
+
+const (
+	kubeletConfigDir = ""
 )
 
 var (
@@ -60,9 +66,15 @@ func runKubeletConfigPhase(c workflow.RunData) error {
 	// Write the configuration for the kubelet down to disk and print the generated manifests instead of dry-running.
 	// If not dry-running, the kubelet config file will be backed up to the /etc/kubernetes/tmp/ dir, so that it could be
 	// recovered if anything goes wrong.
-	err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), data.PatchesDir(), data.DryRun(), data.OutputWriter())
+	err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), kubeletConfigDir, data.PatchesDir(), data.DryRun(), data.OutputWriter())
 	if err != nil {
 		return err
+	}
+
+	if features.Enabled(data.InitCfg().ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
+		if err := patchnodephase.RemoveCRISocketAnnotation(data.Client(), data.InitCfg().NodeRegistration.Name); err != nil {
+			return err
+		}
 	}
 
 	fmt.Println("[upgrade/kubelet-config] The kubelet configuration for this node was successfully upgraded!")

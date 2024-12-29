@@ -28,6 +28,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -87,6 +89,7 @@ type initData struct {
 	cfg                         *kubeadmapi.InitConfiguration
 	skipTokenPrint              bool
 	dryRun                      bool
+	kubeconfig                  *clientcmdapi.Config
 	kubeconfigDir               string
 	kubeconfigPath              string
 	ignorePreflightErrors       sets.Set[string]
@@ -456,6 +459,21 @@ func (d *initData) CertificateDir() string {
 	return d.certificatesDir
 }
 
+// KubeConfig returns a kubeconfig after loading it from KubeConfigPath().
+func (d *initData) KubeConfig() (*clientcmdapi.Config, error) {
+	if d.kubeconfig != nil {
+		return d.kubeconfig, nil
+	}
+
+	var err error
+	d.kubeconfig, err = clientcmd.LoadFromFile(d.KubeConfigPath())
+	if err != nil {
+		return nil, err
+	}
+
+	return d.kubeconfig, nil
+}
+
 // KubeConfigDir returns the path of the Kubernetes configuration folder or the temporary folder path in case of DryRun.
 func (d *initData) KubeConfigDir() string {
 	if d.dryRun {
@@ -536,7 +554,11 @@ func (d *initData) Client() (clientset.Interface, error) {
 				d.adminKubeConfigBootstrapped = true
 			} else {
 				// Alternatively, just load the config pointed at the --kubeconfig path
-				d.client, err = kubeconfigutil.ClientSetFromFile(d.KubeConfigPath())
+				cfg, err := d.KubeConfig()
+				if err != nil {
+					return nil, err
+				}
+				d.client, err = kubeconfigutil.ToClientSet(cfg)
 				if err != nil {
 					return nil, err
 				}

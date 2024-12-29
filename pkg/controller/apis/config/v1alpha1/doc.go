@@ -48,4 +48,4 @@ limitations under the License.
 // +k8s:defaulter-gen-input=k8s.io/kube-controller-manager/config/v1alpha1
 // +groupName=kubecontrollermanager.config.k8s.io
 
-package v1alpha1 // import "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
+package v1alpha1

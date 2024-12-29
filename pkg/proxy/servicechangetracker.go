@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -46,7 +45,6 @@ type ServiceChangeTracker struct {
 	processServiceMapChange processServiceMapChangeFunc
 
 	ipFamily v1.IPFamily
-	recorder events.EventRecorder
 }
 
 type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServicePortInfo) ServicePort
@@ -61,11 +59,10 @@ type serviceChange struct {
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
-func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processServiceMapChange processServiceMapChangeFunc) *ServiceChangeTracker {
+func NewServiceChangeTracker(ipFamily v1.IPFamily, makeServiceInfo makeServicePortFunc, processServiceMapChange processServiceMapChangeFunc) *ServiceChangeTracker {
 	return &ServiceChangeTracker{
 		items:                   make(map[types.NamespacedName]*serviceChange),
 		makeServiceInfo:         makeServiceInfo,
-		recorder:                recorder,
 		ipFamily:                ipFamily,
 		processServiceMapChange: processServiceMapChange,
 	}

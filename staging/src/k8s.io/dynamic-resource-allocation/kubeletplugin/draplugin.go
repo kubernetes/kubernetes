@@ -26,7 +26,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -55,22 +54,23 @@ type DRAPlugin interface {
 	// after it returns before all information is actually written
 	// to the API server.
 	//
-	// The caller must not modify the content after the call.
+	// It is the responsibility of the caller to ensure that the pools and
+	// slices described in the driver resources parameters are valid
+	// according to the restrictions defined in the resource.k8s.io API.
 	//
-	// Returns an error if KubeClient or NodeName options were not
-	// set in Start() to create the DRAPlugin instance.
-	PublishResources(ctx context.Context, resources Resources) error
+	// Invalid ResourceSlices will be rejected by the apiserver during
+	// publishing, which happens asynchronously and thus does not
+	// get returned as error here. The only error returned here is
+	// when publishing was not set up properly, for example missing
+	// [KubeClient] or [NodeName] options.
+	//
+	// The caller may modify the resources after this call returns.
+	PublishResources(ctx context.Context, resources resourceslice.DriverResources) error
 
 	// This unexported method ensures that we can modify the interface
 	// without causing an API break of the package
 	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
 	internal()
-}
-
-// Resources currently only supports devices. Might get extended in the
-// future.
-type Resources struct {
-	Devices []resourceapi.Device
 }
 
 // Option implements the functional options pattern for Start.
@@ -407,7 +407,7 @@ func (d *draPlugin) Stop() {
 
 // PublishResources implements [DRAPlugin.PublishResources]. Returns en error if
 // kubeClient or nodeName are unset.
-func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) error {
+func (d *draPlugin) PublishResources(_ context.Context, resources resourceslice.DriverResources) error {
 	if d.kubeClient == nil {
 		return errors.New("no KubeClient found to publish resources")
 	}
@@ -425,14 +425,9 @@ func (d *draPlugin) PublishResources(ctx context.Context, resources Resources) e
 		UID:        d.nodeUID, // Optional, will be determined by controller if empty.
 	}
 	driverResources := &resourceslice.DriverResources{
-		Pools: map[string]resourceslice.Pool{
-			d.nodeName: {
-				Slices: []resourceslice.Slice{{
-					Devices: resources.Devices,
-				}},
-			},
-		},
+		Pools: resources.Pools,
 	}
+
 	if d.resourceSliceController == nil {
 		// Start publishing the information. The controller is using
 		// our background context, not the one passed into this

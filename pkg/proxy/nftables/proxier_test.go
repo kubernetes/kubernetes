@@ -21,6 +21,7 @@ package nftables
 
 import (
 	"fmt"
+	"golang.org/x/time/rate"
 	"net"
 	"reflect"
 	"testing"
@@ -117,9 +118,9 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 	p := &Proxier{
 		ipFamily:            ipFamily,
 		svcPortMap:          make(proxy.ServicePortMap),
-		serviceChanges:      proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
+		serviceChanges:      proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
 		endpointsMap:        make(proxy.EndpointsMap),
-		endpointsChanges:    proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipFamily, nil, nil),
+		endpointsChanges:    proxy.NewEndpointsChangeTracker(ipFamily, testHostname, newEndpointInfo, nil),
 		needFullSync:        true,
 		nftables:            nft,
 		masqueradeMark:      "0x4000",
@@ -132,6 +133,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		networkInterfacer:   networkInterfacer,
 		staleChains:         make(map[string]time.Time),
 		serviceCIDRs:        serviceCIDRs,
+		logRateLimiter:      rate.NewLimiter(rate.Every(24*time.Hour), 1),
 		clusterIPs:          newNFTElementStorage("set", clusterIPsSet),
 		serviceIPs:          newNFTElementStorage("map", serviceIPsMap),
 		firewallIPs:         newNFTElementStorage("map", firewallIPsMap),
@@ -4454,7 +4456,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 
 			fp.OnEndpointSliceAdd(endpointSlice)
 			fp.syncProxyRules()
-			syncProxyRulesNoLocalEndpointsTotalInternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal"))
+			syncProxyRulesNoLocalEndpointsTotalInternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("internal", string(fp.ipFamily)))
 			if err != nil {
 				t.Errorf("failed to get %s value, err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
 			}
@@ -4463,7 +4465,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 				t.Errorf("sync_proxy_rules_no_endpoints_total metric mismatch(internal): got=%d, expected %d", int(syncProxyRulesNoLocalEndpointsTotalInternal), tc.expectedSyncProxyRulesNoLocalEndpointsTotalInternal)
 			}
 
-			syncProxyRulesNoLocalEndpointsTotalExternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external"))
+			syncProxyRulesNoLocalEndpointsTotalExternal, err := testutil.GetGaugeMetricValue(metrics.SyncProxyRulesNoLocalEndpointsTotal.WithLabelValues("external", string(fp.ipFamily)))
 			if err != nil {
 				t.Errorf("failed to get %s value(external), err: %v", metrics.SyncProxyRulesNoLocalEndpointsTotal.Name, err)
 			}

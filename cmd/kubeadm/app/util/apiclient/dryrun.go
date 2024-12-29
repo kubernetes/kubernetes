@@ -568,7 +568,7 @@ func getNode(name string) *corev1.Node {
 				"kubernetes.io/hostname": name,
 			},
 			Annotations: map[string]string{
-				"kubeadm.alpha.kubernetes.io/cri-socket": "dry-run-cri-socket",
+				constants.AnnotationKubeadmCRISocket: "dry-run-cri-socket",
 			},
 		},
 	}
@@ -754,7 +754,7 @@ func getPod(name, nodeName string) corev1.Pod {
 				"tier":      constants.ControlPlaneTier,
 			},
 			Annotations: map[string]string{
-				constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "127.0.0.1:6443",
+				constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "0.0.0.0:6443",
 			},
 		},
 		Spec: corev1.PodSpec{

@@ -9,5 +9,5 @@ spec:
     resources:
       requests:
         cpu: 0.0001
-        memory: 1Mi
+        memory: {{ div 30000 .Count }}Mi
   nodeName: scheduler-perf-node

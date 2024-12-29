@@ -18,4 +18,4 @@ limitations under the License.
 // +groupName=cr.example.apiextensions.k8s.io
 
 // Package v1 is the v1 version of the API.
-package v1 // import "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
+package v1

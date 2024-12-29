@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -53,12 +54,14 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 		stopCh := make(chan struct{})
 		defer close(stopCh)
+
 		secretInformer := cache.NewSharedIndexInformer(
 			&cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					return nil, fmt.Errorf("unexpected list call")
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					options.LabelSelector = "watchlist=true"
 					return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Watch(context.TODO(), options)
 				},
 			},
@@ -101,7 +104,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Streaming secrets from the server")
-		secretList, err := wrappedKubeClient.CoreV1().Secrets(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		secretList, err := wrappedKubeClient.CoreV1().Secrets(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying if the secret list was properly streamed")
@@ -109,8 +112,8 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		gomega.Expect(cmp.Equal(expectedSecrets, streamedSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
-		expectedRequestMadeByKubeClient := getExpectedRequestMadeByClientFor(secretList.ResourceVersion)
-		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByKubeClient))
+		expectedRequestsMadeByKubeClient := getExpectedRequestsMadeByClientFor(secretList.ResourceVersion)
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByKubeClient))
 	})
 	ginkgo.It("should be requested by dynamic client's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
@@ -123,7 +126,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Streaming secrets from the server")
-		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying if the secret list was properly streamed")
@@ -132,8 +135,8 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		gomega.Expect(secretList.GetObjectKind().GroupVersionKind()).To(gomega.Equal(v1.SchemeGroupVersion.WithKind("SecretList")))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
-		expectedRequestMadeByDynamicClient := getExpectedRequestMadeByClientFor(secretList.GetResourceVersion())
-		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByDynamicClient))
+		expectedRequestsMadeByDynamicClient := getExpectedRequestsMadeByClientFor(secretList.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByDynamicClient))
 	})
 	ginkgo.It("should be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
@@ -152,7 +155,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Streaming secrets metadata from the server")
-		secretMetaList, err := wrappedMetaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		secretMetaList, err := wrappedMetaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying if the secret meta list was properly streamed")
@@ -160,8 +163,8 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		gomega.Expect(cmp.Equal(expectedMetaSecrets, streamedMetaSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
-		expectedRequestMadeByMetaClient := getExpectedRequestMadeByClientFor(secretMetaList.GetResourceVersion())
-		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByMetaClient))
+		expectedRequestsMadeByMetaClient := getExpectedRequestsMadeByClientFor(secretMetaList.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByMetaClient))
 	})
 
 	// Validates unsupported Accept headers in WatchList.
@@ -186,14 +189,14 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		// note that the client in case of an error (406) will fall back
 		// to a standard list request thus the overall call passes
 		ginkgo.By("Streaming secrets as Table from the server")
-		secretTable, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		secretTable, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 		gomega.Expect(secretTable.GetObjectKind().GroupVersionKind()).To(gomega.Equal(metav1.SchemeGroupVersion.WithKind("Table")))
 
 		ginkgo.By("Verifying if expected response was sent by the server")
 		gomega.Expect(rt.actualResponseStatuses[0]).To(gomega.Equal("406 Not Acceptable"))
-		expectedRequestMadeByDynamicClient := getExpectedRequestMadeByClientWhenFallbackToListFor(secretTable.GetResourceVersion())
-		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByDynamicClient))
+		expectedRequestsMadeByDynamicClient := getExpectedRequestsMadeByClientWhenFallbackToListFor(secretTable.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByDynamicClient))
 
 	})
 
@@ -217,7 +220,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		wrappedDynamicClient := dynamic.New(restClient)
 
 		ginkgo.By("Streaming secrets from the server")
-		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying if the secret list was properly streamed")
@@ -225,8 +228,8 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithSerial(), fu
 		gomega.Expect(cmp.Equal(expectedSecrets, streamedSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
-		expectedRequestMadeByDynamicClient := getExpectedRequestMadeByClientFor(secretList.GetResourceVersion())
-		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestMadeByDynamicClient))
+		expectedRequestsMadeByDynamicClient := getExpectedRequestsMadeByClientFor(secretList.GetResourceVersion())
+		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByDynamicClient))
 	})
 })
 
@@ -274,28 +277,48 @@ func verifyStore(ctx context.Context, expectedSecrets []v1.Secret, store cache.S
 }
 
 // corresponds to a streaming request made by the client to stream the secrets
-const expectedStreamingRequestMadeByClient string = "allowWatchBookmarks=true&resourceVersionMatch=NotOlderThan&sendInitialEvents=true&watch=true"
+var expectedStreamingRequestMadeByClient = func() string {
+	params := url.Values{}
+	params.Add("allowWatchBookmarks", "true")
+	params.Add("labelSelector", "watchlist=true")
+	params.Add("resourceVersionMatch", "NotOlderThan")
+	params.Add("sendInitialEvents", "true")
+	params.Add("watch", "true")
+	return params.Encode()
+}()
 
-func getExpectedRequestMadeByClientFor(rv string) []string {
+func getExpectedListRequestMadeByConsistencyDetectorFor(rv string) string {
+	params := url.Values{}
+	params.Add("labelSelector", "watchlist=true")
+	params.Add("resourceVersion", rv)
+	params.Add("resourceVersionMatch", "Exact")
+	return params.Encode()
+}
+
+func getExpectedRequestsMadeByClientFor(rv string) []string {
 	expectedRequestMadeByClient := []string{
 		expectedStreamingRequestMadeByClient,
 	}
 	if consistencydetector.IsDataConsistencyDetectionForWatchListEnabled() {
 		// corresponds to a standard list request made by the consistency detector build in into the client
-		expectedRequestMadeByClient = append(expectedRequestMadeByClient, fmt.Sprintf("resourceVersion=%s&resourceVersionMatch=Exact", rv))
+		expectedRequestMadeByClient = append(expectedRequestMadeByClient, getExpectedListRequestMadeByConsistencyDetectorFor(rv))
 	}
 	return expectedRequestMadeByClient
 }
 
-func getExpectedRequestMadeByClientWhenFallbackToListFor(rv string) []string {
+func getExpectedRequestsMadeByClientWhenFallbackToListFor(rv string) []string {
 	expectedRequestMadeByClient := []string{
 		expectedStreamingRequestMadeByClient,
 		// corresponds to a list request made by the client
-		"",
+		func() string {
+			params := url.Values{}
+			params.Add("labelSelector", "watchlist=true")
+			return params.Encode()
+		}(),
 	}
 	if consistencydetector.IsDataConsistencyDetectionForListEnabled() {
 		// corresponds to a standard list request made by the consistency detector build in into the client
-		expectedRequestMadeByClient = append(expectedRequestMadeByClient, fmt.Sprintf("resourceVersion=%s&resourceVersionMatch=Exact", rv))
+		expectedRequestMadeByClient = append(expectedRequestMadeByClient, getExpectedListRequestMadeByConsistencyDetectorFor(rv))
 	}
 	return expectedRequestMadeByClient
 }
@@ -333,6 +356,9 @@ func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func newSecret(name string) *v1.Secret {
 	return &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: map[string]string{"watchlist": "true"},
+		},
 	}
 }

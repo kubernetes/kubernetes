@@ -24,8 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	//nolint:staticcheck //iccheck // SA1019 Keep using deprecated module; it still seems to be maintained and the api of the recommended replacement differs
-	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
@@ -431,7 +429,6 @@ func dataAsString(data []byte) string {
 	dataString := string(data)
 	if !strings.HasPrefix(dataString, "{") {
 		dataString = "\n" + hex.Dump(data)
-		proto.NewBuffer(make([]byte, 0, 1024)).DebugPrint("decoded object", data)
 	}
 	return dataString
 }

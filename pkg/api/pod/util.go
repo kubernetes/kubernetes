@@ -385,6 +385,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowNonLocalProjectedTokenPath:                   false,
 		AllowPodLifecycleSleepActionZeroValue:             utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
 		PodLevelResourcesEnabled:                          utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		AllowInvalidLabelValueInRequiredNodeAffinity:      false,
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -399,6 +400,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
 
 		opts.AllowInvalidLabelValueInSelector = hasInvalidLabelValueInAffinitySelector(oldPodSpec)
+		opts.AllowInvalidLabelValueInRequiredNodeAffinity = hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
 		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
 		// if old spec has an invalid projected token volume path, we must allow it
@@ -416,6 +418,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		}
 
 		opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(podSpec)
+		// If oldPod has resize policy set on the restartable init container, we must allow it
+		opts.AllowSidecarResizePolicy = hasRestartableInitContainerResizePolicy(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -1269,6 +1273,16 @@ func IsRestartableInitContainer(initContainer *api.Container) bool {
 	return *initContainer.RestartPolicy == api.ContainerRestartPolicyAlways
 }
 
+func hasInvalidLabelValueInRequiredNodeAffinity(spec *api.PodSpec) bool {
+	if spec == nil ||
+		spec.Affinity == nil ||
+		spec.Affinity.NodeAffinity == nil ||
+		spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return false
+	}
+	return helper.HasInvalidLabelValueInNodeSelectorTerms(spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
+}
+
 func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
 	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
 		// Update is invalid: ignore changes and let validation handle it
@@ -1372,4 +1386,18 @@ func useOnlyRecursiveSELinuxChangePolicy(oldPodSpec *api.PodSpec) bool {
 	}
 	// No feature gate + no value in the old object -> only Recursive is allowed
 	return true
+}
+
+// hasRestartableInitContainerResizePolicy returns true if the pod spec is non-nil and
+// it has any init container with ContainerRestartPolicyAlways and non-nil ResizePolicy.
+func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, c := range podSpec.InitContainers {
+		if IsRestartableInitContainer(&c) && len(c.ResizePolicy) > 0 {
+			return true
+		}
+	}
+	return false
 }

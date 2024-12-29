@@ -555,6 +555,7 @@ func (cb KeyboardInteractiveChallenge) auth(session []byte, user string, c packe
 	}
 
 	gotMsgExtInfo := false
+	gotUserAuthInfoRequest := false
 	for {
 		packet, err := c.readPacket()
 		if err != nil {
@@ -585,6 +586,9 @@ func (cb KeyboardInteractiveChallenge) auth(session []byte, user string, c packe
 			if msg.PartialSuccess {
 				return authPartialSuccess, msg.Methods, nil
 			}
+			if !gotUserAuthInfoRequest {
+				return authFailure, msg.Methods, unexpectedMessageError(msgUserAuthInfoRequest, packet[0])
+			}
 			return authFailure, msg.Methods, nil
 		case msgUserAuthSuccess:
 			return authSuccess, nil, nil
@@ -596,6 +600,7 @@ func (cb KeyboardInteractiveChallenge) auth(session []byte, user string, c packe
 		if err := Unmarshal(packet, &msg); err != nil {
 			return authFailure, nil, err
 		}
+		gotUserAuthInfoRequest = true
 
 		// Manually unpack the prompt/echo pairs.
 		rest := msg.Prompts

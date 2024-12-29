@@ -31,6 +31,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -63,6 +65,8 @@ type Options struct {
 	proxyServer proxyRun
 	// errCh is the channel that errors will be sent
 	errCh chan error
+	// flagz is the Reader interface to get flags for the flagz page.
+	flagz flagz.Reader
 
 	// The fields below here are placeholders for flags that can't be directly mapped into
 	// config.KubeProxyConfiguration.
@@ -123,7 +127,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"rather than being surprised when they are permanently removed in the release after that. "+
 			"This parameter is ignored if a config file is specified by --config.")
 	fs.BoolVar(&o.InitAndExit, "init-only", o.InitAndExit, "If true, perform any initialization steps that must be done with full root privileges, and then exit. After doing this, you can run kube-proxy again with only the CAP_NET_ADMIN capability.")
-	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: on Linux this can be 'iptables' (default) or 'ipvs'. On Windows the only supported value is 'kernelspace'."+
+	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: on Linux this can be 'iptables' (default), 'ipvs', or 'nftables'. On Windows the only supported value is 'kernelspace'."+
 		"This parameter is ignored if a config file is specified by --config.")
 
 	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", ptr.Deref(o.config.IPTables.MasqueradeBit, 14), "If using the iptables or ipvs proxy mode, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
@@ -233,7 +237,21 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 		return err
 	}
 
-	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
+		return err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		nfs := cliflag.NamedFlagSets{
+			FlagSets: make(map[string]*pflag.FlagSet),
+		}
+		nfs.FlagSets["generic"] = fs
+		o.flagz = flagz.NamedFlagSetsReader{
+			FlagSets: nfs,
+		}
+	}
+
+	return nil
 }
 
 // copyLogsFromFlags applies the logging flags from the given flag set to the given
@@ -353,7 +371,7 @@ func (o *Options) Run(ctx context.Context) error {
 	// We ignore err otherwise; the cleanup is best-effort, and the backends will have
 	// logged messages if they failed in interesting ways.
 
-	proxyServer, err := newProxyServer(ctx, o.config, o.master, o.InitAndExit)
+	proxyServer, err := newProxyServer(ctx, o.config, o.master, o.InitAndExit, o.flagz)
 	if err != nil {
 		return err
 	}

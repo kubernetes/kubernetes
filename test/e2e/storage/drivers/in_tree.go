@@ -43,6 +43,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -1138,19 +1139,54 @@ type localVolume struct {
 var (
 	// capabilities
 	defaultLocalVolumeCapabilities = map[storageframework.Capability]bool{
-		storageframework.CapPersistence:       true,
-		storageframework.CapFsGroup:           true,
-		storageframework.CapBlock:             false,
-		storageframework.CapExec:              true,
+		storageframework.CapPersistence: true,
+		storageframework.CapFsGroup:     true,
+		storageframework.CapBlock:       false,
+		// To test CapExec, we need a volume with a filesystem.
+		// During end-to-end (e2e) testing, we utilize the `/tmp` directory for volume creation.
+		// However, best practices recommend mounting `/tmp` with the `noexec`, `nodev`, and `nosuid` parameters.
+		// This security measure prevents the execution of scripts and binaries within the `/tmp` directory.
+		// This practice, while promoting security, creates a dependency on the infrastructure configuration during e2e tests.
+		// This can result in "Permission Denied" errors when attempting to execute files from `/tmp`.
+		// To address this, we intentionally skip exec tests for certain types of LocalVolumes, such as `dir` or `dir-link`.
+		// This allows us to conduct comprehensive testing without relying on potentially restrictive security configurations.
+		storageframework.CapExec:              false,
 		storageframework.CapMultiPODs:         true,
 		storageframework.CapSingleNodeVolume:  true,
 		storageframework.CapMultiplePVsSameID: true,
 	}
 	localVolumeCapabitilies = map[utils.LocalVolumeType]map[storageframework.Capability]bool{
+		utils.LocalVolumeTmpfs: {
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             false,
+			storageframework.CapExec:              true,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
+		},
 		utils.LocalVolumeBlock: {
 			storageframework.CapPersistence:       true,
 			storageframework.CapFsGroup:           true,
 			storageframework.CapBlock:             true,
+			storageframework.CapExec:              false,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
+		},
+		utils.LocalVolumeBlockFS: {
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             false,
+			storageframework.CapExec:              true,
+			storageframework.CapMultiPODs:         true,
+			storageframework.CapSingleNodeVolume:  true,
+			storageframework.CapMultiplePVsSameID: true,
+		},
+		utils.LocalVolumeGCELocalSSD: {
+			storageframework.CapPersistence:       true,
+			storageframework.CapFsGroup:           true,
+			storageframework.CapBlock:             false,
 			storageframework.CapExec:              true,
 			storageframework.CapMultiPODs:         true,
 			storageframework.CapSingleNodeVolume:  true,

@@ -618,9 +618,6 @@ resources:
         endpoint: unix:///@encrypt-all-kms-provider.sock
 `
 
-	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
-	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
-
 	t.Run("encrypt all resources", func(t *testing.T) {
 		_ = mock.NewBase64Plugin(t, "@encrypt-all-kms-provider.sock")
 		// To ensure we are checking all REST resources

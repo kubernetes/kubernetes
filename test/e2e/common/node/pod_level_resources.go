@@ -52,7 +52,7 @@ var (
 	cmd = []string{"/bin/sh", "-c", "sleep 1d"}
 )
 
-var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, "[NodeAlphaFeature:PodLevelResources]", func() {
+var _ = SIGDescribe("Pod Level Resources", framework.WithSerial(), feature.PodLevelResources, func() {
 	f := framework.NewDefaultFramework("pod-level-resources-tests")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

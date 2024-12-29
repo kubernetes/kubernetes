@@ -22,4 +22,4 @@ limitations under the License.
 
 // Package v1alpha1 contains the v1alpha1 version of the API used by the
 // apiservers themselves.
-package v1alpha1 // import "k8s.io/api/apiserverinternal/v1alpha1"
+package v1alpha1

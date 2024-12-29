@@ -306,7 +306,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.AllowUnsafeMalformedObjectDeletion) {
-			if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, true) {
+			if options != nil && ptr.Deref(options.IgnoreStoreReadErrorWithClusterBreakingPotential, false) {
 				fieldErrList := field.ErrorList{
 					field.Invalid(field.NewPath("ignoreStoreReadErrorWithClusterBreakingPotential"), true, "is not allowed with DELETECOLLECTION, try again after removing the option"),
 				}

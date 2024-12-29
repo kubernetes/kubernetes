@@ -28,7 +28,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	APIServerIdentity = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-lifecycle
+	// This label is used for tests which need the following controllers to be enabled:
+	// - bootstrap-signer-controller
+	// - token-cleaner-controller
 	BootstrapTokens = framework.WithFeature(framework.ValidFeatures.Add("BootstrapTokens"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -42,36 +45,15 @@ var (
 	CloudProvider = framework.WithFeature(framework.ValidFeatures.Add("CloudProvider"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability1 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability1"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability2 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability2"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability3 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability3"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability4 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability4"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability5 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability5"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterAutoscalerScalability6 = framework.WithFeature(framework.ValidFeatures.Add("ClusterAutoscalerScalability6"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterDowngrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterDowngrade"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterScaleUpBypassScheduler = framework.WithFeature(framework.ValidFeatures.Add("ClusterScaleUpBypassScheduler"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterSizeAutoscalingGpu = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingGpu"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-autoscaling
 	ClusterSizeAutoscalingScaleDown = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleDown"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-autoscaling
 	ClusterSizeAutoscalingScaleUp = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -127,6 +109,12 @@ var (
 	// - a container runtime where support for CDI (https://github.com/cncf-tags/container-device-interface)
 	//   is enabled such that passing CDI device IDs through CRI fields is supported
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
+
+	// owning-sig: sig-node
+	// kep: https://kep.k8s.io/4009
+	// DevicePluginCDIDevices tests the CDI feature which is GA.
+	// This label is used for https://testgrid.k8s.io/sig-node-cri-o#ci-crio-cdi-device-plugins
+	DevicePluginCDIDevices = framework.WithFeature(framework.ValidFeatures.Add("DevicePluginCDIDevices"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	EphemeralStorage = framework.WithFeature(framework.ValidFeatures.Add("EphemeralStorage"))
@@ -196,6 +184,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
 
+	// Owner: sig-network
+	// Marks tests that require kube-dns-autoscaler
+	KubeDNSAutoscaler = framework.WithFeature(framework.ValidFeatures.Add("KubeDNSAutoscaler"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
 
@@ -219,11 +211,11 @@ var (
 	LoadBalancer = framework.WithFeature(framework.ValidFeatures.Add("LoadBalancer"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	LocalStorageCapacityIsolation = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolation"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LocalStorageCapacityIsolationQuota = framework.WithFeature(framework.ValidFeatures.Add("LocalStorageCapacityIsolationQuota"))
 
+	// owning-sig: sig-node
+	// Marks a disruptive test for lock contention
+	LockContention = framework.WithFeature(framework.ValidFeatures.Add("LockContention"))
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MasterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("MasterUpgrade"))
 

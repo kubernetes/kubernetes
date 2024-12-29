@@ -21,4 +21,4 @@ limitations under the License.
 // +k8s:defaulter-gen-input=k8s.io/kubelet/config/v1beta1
 // +groupName=kubelet.config.k8s.io
 
-package v1beta1 // import "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+package v1beta1

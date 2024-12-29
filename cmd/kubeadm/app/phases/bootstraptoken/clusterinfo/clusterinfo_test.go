@@ -17,8 +17,8 @@ limitations under the License.
 package clusterinfo
 
 import (
+	"bytes"
 	"context"
-	"os"
 	"testing"
 	"text/template"
 	"time"
@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/clientcmd"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -55,32 +56,22 @@ users:
 func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 	tests := []struct {
 		name      string
-		fileExist bool
 		createErr error
 		expectErr bool
 	}{
 		{
 			"successful case should have no error",
-			true,
 			nil,
 			false,
 		},
 		{
 			"if configmap already exists, return error",
-			true,
 			apierrors.NewAlreadyExists(schema.GroupResource{Resource: "configmaps"}, "test"),
 			true,
 		},
 		{
 			"unexpected error should be returned",
-			true,
 			apierrors.NewUnauthorized("go away!"),
-			true,
-		},
-		{
-			"if the file does not exist, return error",
-			false,
-			nil,
 			true,
 		},
 	}
@@ -93,18 +84,10 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 	}
 
 	for _, server := range servers {
-		file, err := os.CreateTemp("", "")
-		if err != nil {
-			t.Fatalf("could not create tempfile: %v", err)
-		}
-		defer os.Remove(file.Name())
+		var buf bytes.Buffer
 
-		if err := testConfigTempl.Execute(file, server); err != nil {
+		if err := testConfigTempl.Execute(&buf, server); err != nil {
 			t.Fatalf("could not write to tempfile: %v", err)
-		}
-
-		if err := file.Close(); err != nil {
-			t.Fatalf("could not close tempfile: %v", err)
 		}
 
 		// Override the default timeouts to be shorter
@@ -124,11 +107,12 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 					})
 				}
 
-				fileName := file.Name()
-				if !tc.fileExist {
-					fileName = "notexistfile"
+				kubeconfig, err := clientcmd.Load(buf.Bytes())
+				if err != nil {
+					t.Fatal(err)
 				}
-				err := CreateBootstrapConfigMapIfNotExists(client, fileName)
+
+				err = CreateBootstrapConfigMapIfNotExists(client, kubeconfig)
 				if tc.expectErr && err == nil {
 					t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
 				} else if !tc.expectErr && err != nil {

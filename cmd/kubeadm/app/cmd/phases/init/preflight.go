@@ -62,6 +62,10 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	fmt.Println("[preflight] Running pre-flight checks")
+	// First, check if we're root separately from the other preflight checks and fail fast.
+	if err := preflight.RunRootCheckOnly(data.IgnorePreflightErrors()); err != nil {
+		return err
+	}
 	if err := preflight.RunInitNodeChecks(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors(), false, false); err != nil {
 		return err
 	}

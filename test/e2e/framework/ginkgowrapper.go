@@ -97,7 +97,12 @@ func IgnoreNotFound(in any) any {
 	inType := reflect.TypeOf(in)
 	inValue := reflect.ValueOf(in)
 	return reflect.MakeFunc(inType, func(args []reflect.Value) []reflect.Value {
-		out := inValue.Call(args)
+		var out []reflect.Value
+		if inType.IsVariadic() {
+			out = inValue.CallSlice(args)
+		} else {
+			out = inValue.Call(args)
+		}
 		if len(out) > 0 {
 			lastValue := out[len(out)-1]
 			last := lastValue.Interface()

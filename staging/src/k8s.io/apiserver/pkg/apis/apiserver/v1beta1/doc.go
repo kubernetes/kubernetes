@@ -20,4 +20,4 @@ limitations under the License.
 // +groupName=apiserver.k8s.io
 
 // Package v1beta1 is the v1beta1 version of the API.
-package v1beta1 // import "k8s.io/apiserver/pkg/apis/apiserver/v1beta1"
+package v1beta1

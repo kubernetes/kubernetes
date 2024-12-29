@@ -146,7 +146,7 @@ func NewController(
 
 	metrics.RegisterMetrics()
 
-	if _, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, false)
 		},
@@ -156,10 +156,10 @@ func NewController(
 		DeleteFunc: func(obj interface{}) {
 			ec.enqueuePod(logger, obj, true)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
-	if _, err := claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := claimInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			logger.V(6).Info("new claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, nil, obj)
@@ -172,7 +172,7 @@ func NewController(
 			logger.V(6).Info("deleted claim", "claimDump", obj)
 			ec.enqueueResourceClaim(logger, obj, nil)
 		},
-	}); err != nil {
+	}, cache.HandlerOptions{Logger: &logger}); err != nil {
 		return nil, err
 	}
 	if err := ec.podIndexer.AddIndexers(cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc}); err != nil {
@@ -190,7 +190,7 @@ func NewController(
 	if err := claimInformerCache.AddIndexers(cache.Indexers{claimPodOwnerIndex: claimPodOwnerIndexFunc}); err != nil {
 		return nil, fmt.Errorf("could not initialize ResourceClaim controller: %w", err)
 	}
-	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(claimInformerCache, claimInformerCache,
+	ec.claimCache = cache.NewIntegerResourceVersionMutationCache(logger, claimInformerCache, claimInformerCache,
 		// Very long time to live, unlikely to be needed because
 		// the informer cache should get updated soon.
 		time.Hour,

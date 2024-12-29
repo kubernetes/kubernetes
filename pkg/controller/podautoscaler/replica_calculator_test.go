@@ -446,20 +446,6 @@ func TestReplicaCalcDisjointResourcesMetrics(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcMissingContainerMetricError(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas: 1,
-		expectedError:   fmt.Errorf("container container2 not present in metrics for pod test-namespace/test-pod-0"),
-		resource: &resourceInfo{
-			name:     v1.ResourceCPU,
-			requests: []resource.Quantity{resource.MustParse("1.0")},
-			levels:   [][]int64{{0}},
-		},
-		container: "container2",
-	}
-	tc.runTest(t)
-}
-
 func TestReplicaCalcScaleUp(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -602,6 +588,26 @@ func TestReplicaCalcScaleUpIgnoresFailedPods(t *testing.T) {
 			expectedUtilization: 60,
 			expectedValue:       numContainersPerPod * 600,
 		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcMissingContainerMetricScaleUpIgnoresFailedPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 4,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   [][]int64{{1000, 500}, {9000, 700}, {1000}, {9000}},
+
+			targetUtilization:   30,
+			expectedUtilization: 60,
+			expectedValue:       600,
+		},
+		container: "container2",
 	}
 	tc.runTest(t)
 }

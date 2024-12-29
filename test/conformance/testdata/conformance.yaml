@@ -1339,6 +1339,14 @@
     and 3c the ServiceTokenVolume MUST not be auto mounted.
   release: v1.9
   file: test/e2e/auth/service_accounts.go
+- testname: ServiceAccount, create and review token
+  codename: '[sig-auth] ServiceAccounts should create a serviceAccountToken and ensure
+    a successful TokenReview [Conformance]'
+  description: Creating a ServiceAccount MUST succeed. Creating a ServiceAccountToken
+    MUST succeed. The token MUST not be empty. Creating a TokenReview MUST succeed.
+    The TokenReview MUST be authenticated without any errors.
+  release: v1.32
+  file: test/e2e/auth/service_accounts.go
 - testname: RootCA ConfigMap test
   codename: '[sig-auth] ServiceAccounts should guarantee kube-root-ca.crt exist in
     any namespace [Conformance]'

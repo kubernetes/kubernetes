@@ -500,3 +500,18 @@ func validFirstDigit(str string) bool {
 	}
 	return str[0] == '-' || (str[0] == '0' && str == "0") || (str[0] >= '1' && str[0] <= '9')
 }
+
+// HasInvalidLabelValueInNodeSelectorTerms checks if there's an invalid label value
+// in one NodeSelectorTerm's MatchExpression values
+func HasInvalidLabelValueInNodeSelectorTerms(terms []core.NodeSelectorTerm) bool {
+	for _, term := range terms {
+		for _, expression := range term.MatchExpressions {
+			for _, value := range expression.Values {
+				if len(validation.IsValidLabelValue(value)) > 0 {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}

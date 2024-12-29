@@ -17,14 +17,20 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 func TestPodLogValidates(t *testing.T) {
@@ -40,16 +46,86 @@ func TestPodLogValidates(t *testing.T) {
 	}
 	logRest := &LogREST{Store: store, KubeletConn: nil}
 
+	// This test will panic if you don't have a validation failure.
 	negativeOne := int64(-1)
-	testCases := []*api.PodLogOptions{
-		{SinceSeconds: &negativeOne},
-		{TailLines: &negativeOne},
+	testCases := []struct {
+		name               string
+		podOptions         api.PodLogOptions
+		podQueryLogOptions bool
+		invalidStreamMatch string
+	}{
+		{
+			name: "SinceSeconds",
+			podOptions: api.PodLogOptions{
+				SinceSeconds: &negativeOne,
+			},
+		},
+		{
+			name: "TailLines",
+			podOptions: api.PodLogOptions{
+				TailLines: &negativeOne,
+			},
+		},
+		{
+			name: "StreamWithGateOff",
+			podOptions: api.PodLogOptions{
+				SinceSeconds: &negativeOne,
+			},
+			podQueryLogOptions: false,
+		},
+		{
+			name: "StreamWithGateOnDefault",
+			podOptions: api.PodLogOptions{
+				SinceSeconds: &negativeOne,
+			},
+			podQueryLogOptions: true,
+		},
+		{
+			name: "StreamWithGateOnAll",
+			podOptions: api.PodLogOptions{
+				SinceSeconds: &negativeOne,
+				Stream:       ptr.To(api.LogStreamAll),
+			},
+			podQueryLogOptions: true,
+		},
+		{
+			name: "StreamWithGateOnStdErr",
+			podOptions: api.PodLogOptions{
+				SinceSeconds: &negativeOne,
+				Stream:       ptr.To(api.LogStreamStderr),
+			},
+			podQueryLogOptions: true,
+		},
+		{
+			name: "StreamWithGateOnStdOut",
+			podOptions: api.PodLogOptions{
+				SinceSeconds: &negativeOne,
+				Stream:       ptr.To(api.LogStreamStdout),
+			},
+			podQueryLogOptions: true,
+		},
+		{
+			name: "StreamWithGateOnAndBadValue",
+			podOptions: api.PodLogOptions{
+				Stream: ptr.To("nostream"),
+			},
+			podQueryLogOptions: true,
+			invalidStreamMatch: "nostream",
+		},
 	}
 
 	for _, tc := range testCases {
-		_, err := logRest.Get(genericapirequest.NewDefaultContext(), "test", tc)
-		if !errors.IsInvalid(err) {
-			t.Fatalf("Unexpected error: %v", err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLogsQuerySplitStreams, tc.podQueryLogOptions)
+			_, err := logRest.Get(genericapirequest.NewDefaultContext(), "test", &tc.podOptions)
+			if !errors.IsInvalid(err) {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if tc.invalidStreamMatch != "" {
+				if !strings.Contains(err.Error(), "nostream") {
+					t.Error(fmt.Printf("Expected %s got %s", err.Error(), "nostream"))
+				}
+			}
+		})
 	}
 }

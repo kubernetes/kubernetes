@@ -29,4 +29,4 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=cloudcontrollermanager.config.k8s.io
 
-package v1alpha1 // import "k8s.io/cloud-provider/config/v1alpha1"
+package v1alpha1

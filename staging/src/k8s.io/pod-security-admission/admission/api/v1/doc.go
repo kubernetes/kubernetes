@@ -20,4 +20,4 @@ limitations under the License.
 // +groupName=pod-security.admission.config.k8s.io
 
 // Package v1 contains PodSecurity admission configuration file types
-package v1 // import "k8s.io/pod-security-admission/admission/api/v1"
+package v1

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
@@ -91,7 +92,7 @@ func GetWarningsForNodeSelector(nodeSelector *metav1.LabelSelector, fieldPath *f
 }
 
 // GetWarningsForNodeSelectorTerm checks match expressions of node selector term
-func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, fieldPath *field.Path) []string {
+func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, checkLabelValue bool, fieldPath *field.Path) []string {
 	var warnings []string
 	// use of deprecated node labels in matchLabelExpressions
 	for i, expression := range nodeSelectorTerm.MatchExpressions {
@@ -105,6 +106,19 @@ func GetWarningsForNodeSelectorTerm(nodeSelectorTerm api.NodeSelectorTerm, field
 					msg,
 				),
 			)
+		}
+		if checkLabelValue {
+			for index, value := range expression.Values {
+				for _, msg := range validation.IsValidLabelValue(value) {
+					warnings = append(warnings,
+						fmt.Sprintf(
+							"%s: %s is invalid, %s",
+							fieldPath.Child("matchExpressions").Index(i).Child("values").Index(index),
+							value,
+							msg,
+						))
+				}
+			}
 		}
 	}
 	return warnings

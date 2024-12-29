@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:openapi-gen=true
 // +k8s:prerelease-lifecycle-gen=true
 
-package v1alpha1 // import "k8s.io/api/authentication/v1alpha1"
+package v1alpha1

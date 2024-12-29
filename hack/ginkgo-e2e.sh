@@ -44,9 +44,6 @@ CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 # render them properly).
 GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-$(if [ -t 2 ]; then echo n; else echo y; fi)}
 
-# If 'y', will rerun failed tests once to give them a second chance.
-GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
-
 # If set, the command executed will be:
 # - `dlv exec` if set to "delve"
 # - `gdb` if set to "gdb"
@@ -154,12 +151,6 @@ fi
 if [[ "${GINKGO_UNTIL_IT_FAILS:-}" == true ]]; then
   ginkgo_args+=("--until-it-fails=true")
 fi
-
-FLAKE_ATTEMPTS=1
-if [[ "${GINKGO_TOLERATE_FLAKES}" == "y" ]]; then
-  FLAKE_ATTEMPTS=2
-fi
-ginkgo_args+=("--flake-attempts=${FLAKE_ATTEMPTS}")
 
 if [[ "${GINKGO_SILENCE_SKIPS}" == "y" ]]; then
   ginkgo_args+=("--silence-skips")

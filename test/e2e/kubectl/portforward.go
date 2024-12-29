@@ -587,7 +587,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 				for sentBodySize := 0; sentBodySize < 1024*1024*1024; {
 					size := rand.Intn(4 * 1024 * 1024)
 					url := fmt.Sprintf("http://localhost:%d/header", cmd.port)
-					_, err := post(url, strings.NewReader(strings.Repeat("x", size)), nil)
+					_, err := post(url, strings.NewReader(strings.Repeat("x", size)), 10*time.Second)
 					if err != nil {
 						errorChan <- err
 					}
@@ -611,7 +611,10 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 
 			ginkgo.By("Check the client error")
 			gomega.Expect(err).To(gomega.HaveOccurred())
-			gomega.Expect(err.Error()).To(gomega.Or(gomega.ContainSubstring("connection reset by peer"), gomega.ContainSubstring("EOF")))
+			gomega.Expect(err.Error()).To(gomega.Or(
+				gomega.ContainSubstring("connection reset by peer"),
+				gomega.ContainSubstring("EOF"),
+				gomega.ContainSubstring("context deadline exceeded")))
 
 			ginkgo.By("Check kubectl port-forward exit code")
 			gomega.Expect(cmd.cmd.ProcessState.ExitCode()).To(gomega.BeNumerically("<", 0), "kubectl port-forward should finish with non-zero exit code")
@@ -695,11 +698,11 @@ func wsWrite(conn *websocket.Conn, channel byte, data []byte) error {
 	return err
 }
 
-func post(url string, reader io.Reader, transport *http.Transport) (string, error) {
-	if transport == nil {
-		transport = utilnet.SetTransportDefaults(&http.Transport{})
+func post(url string, reader io.Reader, timeout time.Duration) (string, error) {
+	client := &http.Client{
+		Transport: utilnet.SetTransportDefaults(&http.Transport{}),
+		Timeout:   timeout,
 	}
-	client := &http.Client{Transport: transport}
 	req, err := http.NewRequest(http.MethodPost, url, reader)
 	if err != nil {
 		return "", err

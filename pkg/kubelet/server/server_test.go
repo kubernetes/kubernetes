@@ -57,6 +57,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
@@ -572,6 +573,7 @@ func TestAuthzCoverage(t *testing.T) {
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -1617,6 +1619,8 @@ func TestServePortForward(t *testing.T) {
 }
 
 func TestMetricBuckets(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+
 	tests := map[string]struct {
 		url    string
 		bucket string
@@ -1648,6 +1652,7 @@ func TestMetricBuckets(t *testing.T) {
 		"runningpods":                     {url: "/runningpods/", bucket: "runningpods"},
 		"stats":                           {url: "/stats/", bucket: "stats"},
 		"stats summary sub":               {url: "/stats/summary", bucket: "stats"},
+		"statusz":                         {url: "/statusz", bucket: "statusz"},
 		"invalid path":                    {url: "/junk", bucket: "other"},
 		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
 	}

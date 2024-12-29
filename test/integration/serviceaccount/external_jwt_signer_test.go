@@ -27,17 +27,19 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
-
 	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/features"
 	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
+	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestExternalJWTSigningAndAuth(t *testing.T) {
@@ -94,29 +96,29 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 
 	testCases := []struct {
 		desc                      string
-		preTestSignerUpdate       func()
-		preValidationSignerUpdate func()
+		preTestSignerUpdate       func(t *testing.T)
+		preValidationSignerUpdate func(t *testing.T)
 		wantTokenReqErr           error
 		shouldPassAuth            bool
 	}{
 		{
 			desc:                      "signing key supported.",
-			preTestSignerUpdate:       func() { /*no-op*/ },
-			preValidationSignerUpdate: func() { /*no-op*/ },
+			preTestSignerUpdate:       func(_ *testing.T) { /*no-op*/ },
+			preValidationSignerUpdate: func(_ *testing.T) { /*no-op*/ },
 			shouldPassAuth:            true,
 		},
 		{
 			desc: "signing key not among supported set",
-			preTestSignerUpdate: func() {
+			preTestSignerUpdate: func(t *testing.T) {
 				mockSigner.SigningKey = key1
 				mockSigner.SigningKeyID = "updated-kid-1"
 			},
-			preValidationSignerUpdate: func() { /*no-op*/ },
+			preValidationSignerUpdate: func(_ *testing.T) { /*no-op*/ },
 			shouldPassAuth:            false,
 		},
 		{
 			desc: "signing key corresponds to public key that is excluded from OIDC",
-			preTestSignerUpdate: func() {
+			preTestSignerUpdate: func(t *testing.T) {
 				mockSigner.SigningKey = key1
 				mockSigner.SigningKeyID = "updated-kid-1"
 
@@ -130,56 +132,57 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				}
 				mockSigner.SetSupportedKeys(cpy)
 			},
-			preValidationSignerUpdate: func() { /*no-op*/ },
+			preValidationSignerUpdate: func(_ *testing.T) { /*no-op*/ },
 			wantTokenReqErr:           fmt.Errorf("failed to generate token: while validating header: key used for signing JWT (kid: updated-kid-1) is excluded from OIDC discovery docs"),
 		},
 		{
 			desc: "different signing and supported keys with same id",
-			preTestSignerUpdate: func() {
+			preTestSignerUpdate: func(t *testing.T) {
 				mockSigner.SigningKey = key1
 			},
-			preValidationSignerUpdate: func() { /*no-op*/ },
+			preValidationSignerUpdate: func(_ *testing.T) { /*no-op*/ },
 			shouldPassAuth:            false,
 		},
 		{
 			desc: "token gen failure with un-supported Alg type",
-			preTestSignerUpdate: func() {
+			preTestSignerUpdate: func(t *testing.T) {
 				mockSigner.SigningAlg = "ABC"
 			},
-			preValidationSignerUpdate: func() { /*no-op*/ },
+			preValidationSignerUpdate: func(_ *testing.T) { /*no-op*/ },
 			wantTokenReqErr:           fmt.Errorf("failed to generate token: while validating header: bad signing algorithm \"ABC\""),
 		},
 		{
 			desc: "token gen failure with un-supported token type",
-			preTestSignerUpdate: func() {
+			preTestSignerUpdate: func(t *testing.T) {
 				mockSigner.TokenType = "ABC"
 			},
-			preValidationSignerUpdate: func() { /*no-op*/ },
+			preValidationSignerUpdate: func(_ *testing.T) { /*no-op*/ },
 			wantTokenReqErr:           fmt.Errorf("failed to generate token: while validating header: bad type"),
 		},
 		{
 			desc: "change of supported keys not picked immediately",
-			preTestSignerUpdate: func() {
+			preTestSignerUpdate: func(t *testing.T) {
 				mockSigner.SigningKey = key1
 			},
-			preValidationSignerUpdate: func() {
+			preValidationSignerUpdate: func(_ *testing.T) {
 				mockSigner.SetSupportedKeys(map[string]v1alpha1testing.KeyT{})
 			},
 			shouldPassAuth: false,
 		},
 		{
 			desc: "change of supported keys picked up after periodic sync",
-			preTestSignerUpdate: func() {
+			preTestSignerUpdate: func(t *testing.T) {
 				mockSigner.SigningKey = key1
 			},
-			preValidationSignerUpdate: func() {
+			preValidationSignerUpdate: func(t *testing.T) {
+				t.Helper()
 				cpy := make(map[string]v1alpha1testing.KeyT)
 				for key, value := range mockSigner.GetSupportedKeys() {
 					cpy[key] = value
 				}
 				cpy["kid-1"] = v1alpha1testing.KeyT{Key: pubKey1Bytes}
 				mockSigner.SetSupportedKeys(cpy)
-				mockSigner.WaitForSupportedKeysFetch()
+				waitForDataTimestamp(t, client, time.Now())
 			},
 			shouldPassAuth: true,
 		},
@@ -195,7 +198,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			mockSigner.WaitForSupportedKeysFetch()
 
 			// Adjust parameters on mock signer for the test.
-			tc.preTestSignerUpdate()
+			tc.preTestSignerUpdate(t)
 
 			// Request a token for ns-1:sa-1.
 			tokenExpirationSec := int64(2 * 60 * 60) // 2h
@@ -214,7 +217,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			}
 
 			// Adjust parameters on mock signer for the test.
-			tc.preValidationSignerUpdate()
+			tc.preValidationSignerUpdate(t)
 
 			// Try Validating the token.
 			tokenReviewResult, err := client.AuthenticationV1().TokenReviews().Create(ctx, &authv1.TokenReview{
@@ -232,6 +235,36 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				t.Fatal("Expected Authentication to fail")
 			}
 		})
+	}
+}
+
+func waitForDataTimestamp(t *testing.T, client kubernetes.Interface, minimumDataTimestamp time.Time) {
+	t.Helper()
+	minimumSample := float64(minimumDataTimestamp.UnixNano()) / float64(1000000000)
+	t.Logf("waiting for >=%f", minimumSample)
+	err := wait.PollImmediate(time.Second, wait.ForeverTestTimeout, func() (bool, error) {
+		rawMetrics, err := client.CoreV1().RESTClient().Get().AbsPath("/metrics").DoRaw(context.TODO())
+		if err != nil {
+			return false, err
+		}
+		metrics := testutil.NewMetrics()
+		if err := testutil.ParseMetrics(string(rawMetrics), &metrics); err != nil {
+			return false, err
+		}
+		samples, ok := metrics["apiserver_externaljwt_fetch_keys_data_timestamp"]
+		if !ok || len(samples) == 0 {
+			t.Log("no samples found for apiserver_externaljwt_fetch_keys_data_timestamp, retrying...")
+			return false, nil
+		}
+		if minimumSample > float64(samples[0].Value) {
+			t.Logf("apiserver_externaljwt_fetch_keys_data_timestamp at %f, waiting until >=%f...", samples[0].Value, minimumSample)
+			return false, nil
+		}
+		t.Logf("saw %f", samples[0].Value)
+		return true, nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

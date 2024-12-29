@@ -84,6 +84,20 @@ var _ = SIGDescribe(feature.CriProxy, framework.WithSerial(), func() {
 		})
 	})
 
+	ginkgo.Context("Image pull backoff", func() {
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			err := resetCRIProxyInjector(e2eCriProxy)
+			framework.ExpectNoError(err)
+		})
+
+	})
+
 	ginkgo.Context("Inject a pull image timeout exception into the CriProxy", func() {
 		ginkgo.BeforeEach(func() {
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {

@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -160,9 +161,10 @@ func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysReque
 	m.supportedKeysFetched.Broadcast()
 	m.supportedKeysLock.RUnlock()
 
+	now := time.Now()
 	return &v1alpha1.FetchKeysResponse{
 		RefreshHintSeconds: 5,
-		DataTimestamp:      &timestamppb.Timestamp{Seconds: time.Now().Unix()},
+		DataTimestamp:      &timestamppb.Timestamp{Seconds: now.Unix(), Nanos: int32(now.Nanosecond())},
 		Keys:               keys,
 	}, nil
 }
@@ -225,7 +227,7 @@ func (m *MockSigner) start(t *testing.T) error {
 
 	klog.Infof("Starting Mock Signer at socketPath %s", m.socketPath)
 	go func() {
-		if err := m.server.Serve(m.listener); err != nil {
+		if err := m.server.Serve(m.listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			t.Error(err)
 		}
 	}()
@@ -264,7 +266,7 @@ func (m *MockSigner) waitForMockServerToStart() error {
 
 // CleanUp stops gRPC server and the underlying listener.
 func (m *MockSigner) CleanUp() {
-	m.server.Stop()
+	m.server.GracefulStop()
 	_ = m.listener.Close()
 	_ = os.Remove(m.socketPath)
 }

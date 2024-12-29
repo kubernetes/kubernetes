@@ -20,4 +20,4 @@ limitations under the License.
 // +k8s:prerelease-lifecycle-gen=true
 // +groupName=admission.k8s.io
 
-package v1 // import "k8s.io/api/admission/v1"
+package v1
