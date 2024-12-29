@@ -1003,10 +1003,20 @@ type ResourceClaimTemplateList struct {
 }
 
 const (
-	AllocatedDeviceStatusMaxConditions        int = 8
-	AllocatedDeviceStatusDataMaxLength        int = OpaqueParametersMaxLength
-	NetworkDeviceDataMaxIPs                   int = 16
-	NetworkDeviceDataInterfaceNameMaxLength   int = 256
+	// AllocatedDeviceStatusMaxConditions represents the maximum number of
+	// conditions in a device status.
+	AllocatedDeviceStatusMaxConditions int = 8
+	// AllocatedDeviceStatusDataMaxLength represents the maximum length of the
+	// raw data in the Data field in a device status.
+	AllocatedDeviceStatusDataMaxLength int = 10 * 1024
+	// NetworkDeviceDataMaxIPs represents the maximum number of IPs in the networkData
+	// field in a device status.
+	NetworkDeviceDataMaxIPs int = 16
+	// NetworkDeviceDataInterfaceNameMaxLength represents the maximum number of characters
+	// for the networkData.interfaceName field in a device status.
+	NetworkDeviceDataInterfaceNameMaxLength int = 256
+	// NetworkDeviceDataHardwareAddressMaxLength represents the maximum number of characters
+	// for the networkData.hardwareAddress field in a device status.
 	NetworkDeviceDataHardwareAddressMaxLength int = 128
 )
 
