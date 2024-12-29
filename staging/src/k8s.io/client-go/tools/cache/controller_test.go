@@ -232,7 +232,12 @@ func TestHammerController(t *testing.T) {
 	// Run the controller and run it until we cancel.
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
-	go controller.RunWithContext(ctx)
+	var controllerWG sync.WaitGroup
+	controllerWG.Add(1)
+	go func() {
+		defer controllerWG.Done()
+		controller.RunWithContext(ctx)
+	}()
 
 	// Let's wait for the controller to do its initial sync
 	wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -293,8 +298,11 @@ func TestHammerController(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	cancel()
 
-	// TODO: Verify that no goroutines were leaked here and that everything shut
-	// down cleanly.
+	// Before we permanently lock this mutex, we have to be sure
+	// that the controller has stopped running. At this point,
+	// all goroutines should have stopped. Leak checking is
+	// done by TestMain.
+	controllerWG.Wait()
 
 	outputSetLock.Lock()
 	t.Logf("got: %#v", outputSet)
