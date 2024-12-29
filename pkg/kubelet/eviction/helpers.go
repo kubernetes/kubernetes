@@ -699,6 +699,7 @@ func exceedMemoryRequests(stats statsFunc) cmpFunc {
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
+			klog.InfoS("DEBUG: exceedMemoryRequests() NOT FOUND", "p1Found", p1Found, "p2Found", p2Found)
 			// prioritize evicting the pod for which no stats were found
 			return cmpBool(!p1Found, !p2Found)
 		}
@@ -730,6 +731,7 @@ func exceedMemoryLimitsWithSwap(stats statsFunc) cmpFunc {
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
+			klog.InfoS("DEBUG: exceedMemoryLimitsWithSwap() NOT FOUND", "p1Found", p1Found, "p2Found", p2Found)
 			// prioritize evicting the pod for which no stats were found
 			return cmpBool(!p1Found, !p2Found)
 		}
@@ -778,6 +780,7 @@ func memory(stats statsFunc) cmpFunc {
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
 		if !p1Found || !p2Found {
+			klog.InfoS("DEBUG: memory() NOT FOUND", "p1Found", p1Found, "p2Found", p2Found)
 			// prioritize evicting the pod for which no stats were found
 			return cmpBool(!p1Found, !p2Found)
 		}
@@ -888,6 +891,7 @@ func cmpBool(a, b bool) int {
 // It ranks by whether or not the pod's usage exceeds its requests, then by priority, and
 // finally by memory usage above requests.
 func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
+	klog.InfoS("DEBUG: rankMemoryPressure()")
 	orderedBy(exceedMemoryLimitsWithSwap(stats), exceedMemoryRequests(stats), priority, memory(stats)).Sort(pods)
 }
 
