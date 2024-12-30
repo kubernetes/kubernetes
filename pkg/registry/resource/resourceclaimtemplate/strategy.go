@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,18 +29,33 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 
+const (
+	DRAAdminNamespaceLabel = "kubernetes.io/dra-admin-access"
+)
+
+type NamespaceGetter interface {
+	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
+}
+
 // resourceClaimTemplateStrategy implements behavior for ResourceClaimTemplate objects
 type resourceClaimTemplateStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
+	namespaceRest NamespaceGetter
 }
 
-var Strategy = resourceClaimTemplateStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = resourceClaimTemplateStrategy{legacyscheme.Scheme, names.SimpleNameGenerator, nil}
+
+// SetNamespaceStore sets the namespace store rest object for the strategy.
+func (s *resourceClaimTemplateStrategy) SetNamespaceStore(rest NamespaceGetter) {
+	s.namespaceRest = rest
+}
 
 func (resourceClaimTemplateStrategy) NamespaceScoped() bool {
 	return true
@@ -50,9 +66,10 @@ func (resourceClaimTemplateStrategy) PrepareForCreate(ctx context.Context, obj r
 	dropDisabledFields(claimTemplate, nil)
 }
 
-func (resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+func (s resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	resourceClaimTemplate := obj.(*resource.ResourceClaimTemplate)
-	return validation.ValidateResourceClaimTemplate(resourceClaimTemplate)
+	allErrs := authorizedForAdmin(ctx, resourceClaimTemplate, s.namespaceRest)
+	return append(allErrs, validation.ValidateResourceClaimTemplate(resourceClaimTemplate)...)
 }
 
 func (resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -71,9 +88,12 @@ func (resourceClaimTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	dropDisabledFields(claimTemplate, oldClaimTemplate)
 }
 
-func (resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateResourceClaimTemplate(obj.(*resource.ResourceClaimTemplate))
-	return append(errorList, validation.ValidateResourceClaimTemplateUpdate(obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate))...)
+func (s resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	claimTemplate, oldClaimTemplate := obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate)
+
+	allErrs := authorizedForAdmin(ctx, claimTemplate, s.namespaceRest)
+	allErrs = append(allErrs, validation.ValidateResourceClaimTemplate(claimTemplate)...)
+	return append(allErrs, validation.ValidateResourceClaimTemplateUpdate(claimTemplate, oldClaimTemplate)...)
 }
 
 func (resourceClaimTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -97,6 +117,49 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
 	fields := generic.ObjectMetaFieldsSet(&template.ObjectMeta, true)
 	return fields
+}
+
+// authorizedForAdmin checks if the request is authorized to get admin access to devices
+// based on namespace label
+func authorizedForAdmin(ctx context.Context, template *resource.ResourceClaimTemplate, namespaceRest NamespaceGetter) field.ErrorList {
+	allErrs := field.ErrorList{}
+	adminRequested := false
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
+		// No need to validate unless feature gate is enabled
+		return allErrs
+	}
+
+	for i := range template.Spec.Spec.Devices.Requests {
+		value := template.Spec.Spec.Devices.Requests[i].AdminAccess
+		if value != nil && *value {
+			adminRequested = true
+			break
+		}
+	}
+	if !adminRequested {
+		// No need to validate unless admin access is requested
+		return allErrs
+	}
+	if namespaceRest == nil {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace store is nil"))
+	}
+
+	namespaceName := template.Namespace
+	// Retrieve the namespace object from the store
+	obj, err := namespaceRest.Get(ctx, namespaceName, &metav1.GetOptions{ResourceVersion: "0"})
+	if err != nil {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object cannot be retrieved"))
+	}
+	ns, ok := obj.(*core.Namespace)
+	if !ok {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object is not of type core.Namespace"))
+	}
+	if value, exists := ns.Labels[DRAAdminNamespaceLabel]; !(exists && value == "true") {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "admin access to devices is not allowed in namespace without DRA Admin Access label"))
+	}
+
+	return allErrs
 }
 
 func dropDisabledFields(newClaimTemplate, oldClaimTemplate *resource.ResourceClaimTemplate) {

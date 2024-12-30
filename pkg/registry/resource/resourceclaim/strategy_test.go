@@ -17,14 +17,18 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -33,7 +37,7 @@ import (
 var obj = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
@@ -51,7 +55,7 @@ var obj = &resource.ResourceClaim{
 var objWithStatus = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
@@ -83,6 +87,25 @@ var objWithStatus = &resource.ResourceClaim{
 var objWithAdminAccess = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "req-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+					AdminAccess:     ptr.To(true),
+				},
+			},
+		},
+	},
+}
+
+var objWithAdminAccessInNonAdminNamespace = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
 		Namespace: "default",
 	},
 	Spec: resource.ResourceClaimSpec{
@@ -102,7 +125,7 @@ var objWithAdminAccess = &resource.ResourceClaim{
 var objWithAdminAccessStatus = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
@@ -133,6 +156,29 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 	},
 }
 
+// MockNamespaceREST mocks the behavior of namespaceREST.
+type MockNamespaceREST struct{}
+
+func (m *MockNamespaceREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	if name == "default" {
+		return &core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "default",
+				Labels: map[string]string{"key": "value"},
+			},
+		}, nil
+	}
+	if name == "kube-system" {
+		return &core.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "default",
+				Labels: map[string]string{DRAAdminNamespaceLabel: "true"},
+			},
+		}, nil
+	}
+	return nil, errors.New("namespace not found")
+}
+
 const (
 	testRequest = "test-request"
 	testDriver  = "test-driver"
@@ -147,6 +193,10 @@ func TestStrategy(t *testing.T) {
 	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("ResourceClaim should not allow create on update")
 	}
+	Strategy.SetNamespaceStore(nil)
+	if Strategy.namespaceRest != nil {
+		t.Errorf("ResourceClaim namespace store should be nil")
+	}
 }
 
 func TestStrategyCreate(t *testing.T) {
@@ -157,6 +207,7 @@ func TestStrategyCreate(t *testing.T) {
 		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
+		namespaceRest         NamespaceGetter
 	}{
 		"simple": {
 			obj:       obj,
@@ -176,9 +227,23 @@ func TestStrategyCreate(t *testing.T) {
 			expectObj:   obj,
 		},
 		"keep-fields-admin-access": {
-			obj:         objWithAdminAccess,
-			adminAccess: true,
-			expectObj:   objWithAdminAccess,
+			obj:           objWithAdminAccess,
+			adminAccess:   true,
+			expectObj:     objWithAdminAccess,
+			namespaceRest: &MockNamespaceREST{},
+		},
+		"admin-access-nil-namespace": {
+			obj:                   objWithAdminAccess,
+			adminAccess:           true,
+			expectObj:             objWithAdminAccess,
+			expectValidationError: true,
+		},
+		"admin-access-non-admin-namespace": {
+			obj:                   objWithAdminAccessInNonAdminNamespace,
+			adminAccess:           true,
+			expectObj:             objWithAdminAccessInNonAdminNamespace,
+			expectValidationError: true,
+			namespaceRest:         &MockNamespaceREST{},
 		},
 	}
 
@@ -187,6 +252,7 @@ func TestStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
 
 			obj := tc.obj.DeepCopy()
+			Strategy.SetNamespaceStore(tc.namespaceRest)
 			Strategy.PrepareForCreate(ctx, obj)
 			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
 				if !tc.expectValidationError {
@@ -214,6 +280,7 @@ func TestStrategyUpdate(t *testing.T) {
 		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
+		namespaceRest         NamespaceGetter
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -242,10 +309,11 @@ func TestStrategyUpdate(t *testing.T) {
 			expectValidationError: true, // Spec is immutable.
 		},
 		"keep-existing-fields-admin-access": {
-			oldObj:      objWithAdminAccess,
-			newObj:      objWithAdminAccess,
-			adminAccess: true,
-			expectObj:   objWithAdminAccess,
+			oldObj:        objWithAdminAccess,
+			newObj:        objWithAdminAccess,
+			adminAccess:   true,
+			expectObj:     objWithAdminAccess,
+			namespaceRest: &MockNamespaceREST{},
 		},
 	}
 
@@ -257,6 +325,7 @@ func TestStrategyUpdate(t *testing.T) {
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
 
+			Strategy.SetNamespaceStore(tc.namespaceRest)
 			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
 			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
 				if !tc.expectValidationError {

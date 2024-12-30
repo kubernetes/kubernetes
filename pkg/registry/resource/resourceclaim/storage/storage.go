@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
 	"k8s.io/kubernetes/pkg/registry/resource/resourceclaim"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -39,6 +40,15 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against ResourceClaims.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
+	var err error
+	namespaceRest, _, _, err := namespacestore.NewREST(optsGetter)
+	if err != nil {
+		return nil, nil, err
+	}
+	if namespaceRest != nil {
+		resourceclaim.Strategy.SetNamespaceStore(namespaceRest)
+	}
+
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.ResourceClaim{} },
 		NewListFunc:               func() runtime.Object { return &resource.ResourceClaimList{} },

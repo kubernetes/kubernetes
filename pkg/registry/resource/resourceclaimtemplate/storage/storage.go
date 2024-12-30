@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
 	"k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate"
 )
 
@@ -34,6 +35,13 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against ResourceClass.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
+	namespaceRest, _, _, err := namespacestore.NewREST(optsGetter)
+	if err != nil {
+		return nil, err
+	}
+	if namespaceRest != nil {
+		resourceclaimtemplate.Strategy.SetNamespaceStore(namespaceRest)
+	}
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.ResourceClaimTemplate{} },
 		NewListFunc:               func() runtime.Object { return &resource.ResourceClaimTemplateList{} },

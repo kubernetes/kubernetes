@@ -32,21 +32,36 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
+const (
+	DRAAdminNamespaceLabel = "kubernetes.io/dra-admin-access"
+)
+
+type NamespaceGetter interface {
+	Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error)
+}
+
 // resourceclaimStrategy implements behavior for ResourceClaim objects
 type resourceclaimStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
+	namespaceRest NamespaceGetter
 }
 
 // Strategy is the default logic that applies when creating and updating
 // ResourceClaim objects via the REST API.
-var Strategy = resourceclaimStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = resourceclaimStrategy{legacyscheme.Scheme, names.SimpleNameGenerator, nil}
+
+// SetNamespaceStore sets the namespace store rest object for the strategy.
+func (s *resourceclaimStrategy) SetNamespaceStore(rest NamespaceGetter) {
+	s.namespaceRest = rest
+}
 
 func (resourceclaimStrategy) NamespaceScoped() bool {
 	return true
@@ -76,9 +91,11 @@ func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	dropDisabledFields(claim, nil)
 }
 
-func (resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+func (s resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	claim := obj.(*resource.ResourceClaim)
-	return validation.ValidateResourceClaim(claim)
+
+	allErrs := authorizedForAdmin(ctx, claim, s.namespaceRest)
+	return append(allErrs, validation.ValidateResourceClaim(claim)...)
 }
 
 func (resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -100,11 +117,12 @@ func (resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	dropDisabledFields(newClaim, oldClaim)
 }
 
-func (resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+func (s resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
-	errorList := validation.ValidateResourceClaim(newClaim)
-	return append(errorList, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
+	allErrs := authorizedForAdmin(ctx, newClaim, s.namespaceRest)
+	allErrs = append(allErrs, validation.ValidateResourceClaim(newClaim)...)
+	return append(allErrs, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
 }
 
 func (resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -179,6 +197,49 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 	fields := generic.ObjectMetaFieldsSet(&claim.ObjectMeta, true)
 	return fields
+}
+
+// authorizedForAdmin checks if the request is authorized to get admin access to devices
+// based on namespace label
+func authorizedForAdmin(ctx context.Context, newClaim *resource.ResourceClaim, namespaceRest NamespaceGetter) field.ErrorList {
+	allErrs := field.ErrorList{}
+	adminRequested := false
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
+		// No need to validate unless feature gate is enabled
+		return allErrs
+	}
+
+	for i := range newClaim.Spec.Devices.Requests {
+		value := newClaim.Spec.Devices.Requests[i].AdminAccess
+		if value != nil && *value {
+			adminRequested = true
+			break
+		}
+	}
+	if !adminRequested {
+		// No need to validate unless admin access is requested
+		return allErrs
+	}
+	if namespaceRest == nil {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace store is nil"))
+	}
+
+	namespaceName := newClaim.Namespace
+	// Retrieve the namespace object from the store
+	obj, err := namespaceRest.Get(ctx, namespaceName, &metav1.GetOptions{ResourceVersion: "0"})
+	if err != nil {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object cannot be retrieved"))
+	}
+	ns, ok := obj.(*core.Namespace)
+	if !ok {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object is not of type core.Namespace"))
+	}
+	if value, exists := ns.Labels[DRAAdminNamespaceLabel]; !(exists && value == "true") {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "admin access to devices is not allowed in namespace without DRA Admin Access label"))
+	}
+
+	return allErrs
 }
 
 // dropDisabledFields removes fields which are covered by a feature gate.
