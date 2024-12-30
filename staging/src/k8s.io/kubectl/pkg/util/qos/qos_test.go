@@ -194,7 +194,7 @@ func TestGetPodQOS(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := GetPodQOS(tt.pod); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetPodQOS() = %v, want %v", got, tt.want)
+				t.Errorf("unexpected PodQOSClass actual %s, expected %s", got, tt.want)
 			}
 		})
 	}
