@@ -96,7 +96,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	// gets ClusterConfiguration from kubeadm-config
 	clusterConfigurationData, ok := configMap.Data[constants.ClusterConfigurationConfigMapKey]
 	if !ok {
-		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
+		return nil, fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
 	}
 	// If ClusterConfiguration was patched by something other than kubeadm, it may have errors. Warn about them.
 	if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme},
@@ -179,7 +179,7 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 	var (
 		criSocket              string
 		ok                     bool
-		missingAnnotationError = errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
+		missingAnnotationError = fmt.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
 	)
 	if features.Enabled(clusterCfg.FeatureGates, features.NodeLocalCRISocket) {
 		_, err = os.Stat(filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName))
@@ -225,11 +225,11 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 	// gets the info about the current user
 	currentContext, exists := config.Contexts[config.CurrentContext]
 	if !exists {
-		return "", errors.Errorf("invalid kubeconfig file %s: missing context %s", fileName, config.CurrentContext)
+		return "", fmt.Errorf("invalid kubeconfig file %s: missing context %s", fileName, config.CurrentContext)
 	}
 	authInfo, exists := config.AuthInfos[currentContext.AuthInfo]
 	if !exists {
-		return "", errors.Errorf("invalid kubeconfig file %s: missing AuthInfo %s", fileName, currentContext.AuthInfo)
+		return "", fmt.Errorf("invalid kubeconfig file %s: missing AuthInfo %s", fileName, currentContext.AuthInfo)
 	}
 
 	// gets the X509 certificate with current user credentials
@@ -245,7 +245,7 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 			return "", err
 		}
 	} else {
-		return "", errors.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
+		return "", fmt.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
 	}
 
 	// Safely pick the first one because the sender's certificate must come first in the list.
@@ -266,7 +266,7 @@ func getNodeNameFromSSR(client clientset.Interface) (string, error) {
 	}
 	user := ssr.Status.UserInfo.Username
 	if !strings.HasPrefix(user, constants.NodesUserPrefix) {
-		return "", errors.Errorf("%q is not a node client, must have %q prefix in the name",
+		return "", fmt.Errorf("%q is not a node client, must have %q prefix in the name",
 			user, constants.NodesUserPrefix)
 	}
 	return strings.TrimPrefix(user, constants.NodesUserPrefix), nil
@@ -323,12 +323,12 @@ func getRawAPIEndpointFromPodAnnotationWithoutRetry(ctx context.Context, client 
 		return "", errors.Wrap(err, "could not retrieve list of pods to determine api server endpoints")
 	}
 	if len(podList.Items) != 1 {
-		return "", errors.Errorf("API server pod for node name %q has %d entries, only one was expected", nodeName, len(podList.Items))
+		return "", fmt.Errorf("API server pod for node name %q has %d entries, only one was expected", nodeName, len(podList.Items))
 	}
 	if apiServerEndpoint, ok := podList.Items[0].Annotations[constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey]; ok {
 		return apiServerEndpoint, nil
 	}
-	return "", errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
+	return "", fmt.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
 }
 
 // readKubeletConfig reads a KubeletConfiguration from the specified file.

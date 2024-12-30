@@ -20,6 +20,7 @@ limitations under the License.
 package preflight
 
 import (
+	"fmt"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -40,7 +41,7 @@ func (mc MemCheck) Check() (warnings, errorList []error) {
 	// Totalram holds the total usable memory. Unit holds the size of a memory unit in bytes. Multiply them and convert to MB
 	actual := uint64(info.Totalram) * uint64(info.Unit) / 1024 / 1024
 	if actual < mc.Mem {
-		errorList = append(errorList, errors.Errorf("the system RAM (%d MB) is less than the minimum %d MB", actual, mc.Mem))
+		errorList = append(errorList, fmt.Errorf("the system RAM (%d MB) is less than the minimum %d MB", actual, mc.Mem))
 	}
 	return warnings, errorList
 }

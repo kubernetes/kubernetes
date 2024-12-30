@@ -18,6 +18,7 @@ package file
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -142,7 +143,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, error) {
 	kubeConfigString, ok := cm.Data[bootstrapapi.KubeConfigKey]
 	if !ok || len(kubeConfigString) == 0 {
-		return nil, errors.Errorf("no %s key in ConfigMap", bootstrapapi.KubeConfigKey)
+		return nil, fmt.Errorf("no %s key in ConfigMap", bootstrapapi.KubeConfigKey)
 	}
 	parsedKubeConfig, err := clientcmd.Load([]byte(kubeConfigString))
 	if err != nil {

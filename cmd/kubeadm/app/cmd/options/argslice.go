@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 )
 
@@ -58,7 +56,7 @@ func (s *argSlice) Set(value string) error {
 	for _, p := range pairs {
 		m := strings.Split(p, "=")
 		if len(m) != 2 {
-			return errors.Errorf("malformed key=value pair in flag value: %s", value)
+			return fmt.Errorf("malformed key=value pair in flag value: %s", value)
 		}
 		arg := kubeadmapiv1.Arg{Name: m[0], Value: m[1]}
 		*s.args = append(*s.args, arg)

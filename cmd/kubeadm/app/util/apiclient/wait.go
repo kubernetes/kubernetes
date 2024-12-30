@@ -181,7 +181,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfig
 						_ = resp.Body.Close()
 					}()
 					if resp.StatusCode != http.StatusOK {
-						lastError = errors.Errorf("%s check failed at %s with status: %d",
+						lastError = fmt.Errorf("%s check failed at %s with status: %d",
 							comp.name, comp.url, resp.StatusCode)
 						return false, nil
 					}
@@ -282,7 +282,7 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 		healthzEndpoint, w.timeout)
 
 	formatError := func(cause string) error {
-		return errors.Errorf("The HTTP call equal to 'curl -sSL %s' returned %s\n",
+		return fmt.Errorf("The HTTP call equal to 'curl -sSL %s' returned %s\n",
 			healthzEndpoint, cause)
 	}
 

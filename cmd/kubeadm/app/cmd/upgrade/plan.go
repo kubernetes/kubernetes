@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -256,7 +257,7 @@ type upgradePlanTextPrinter struct {
 func (printer *upgradePlanTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 	plan, ok := obj.(*outputapiv1alpha3.UpgradePlan)
 	if !ok {
-		return errors.Errorf("expected UpgradePlan, but got %+v", obj)
+		return fmt.Errorf("expected UpgradePlan, but got %+v", obj)
 	}
 
 	for _, au := range plan.AvailableUpgrades {

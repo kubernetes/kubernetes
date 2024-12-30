@@ -18,6 +18,7 @@ package renewal
 
 import (
 	"crypto/x509"
+	"fmt"
 	"sort"
 
 	"github.com/pkg/errors"
@@ -218,7 +219,7 @@ func (rm *Manager) CAs() []*CAExpirationHandler {
 func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return false, errors.Errorf("%s is not a valid certificate for this cluster", name)
+		return false, fmt.Errorf("%s is not a valid certificate for this cluster", name)
 	}
 
 	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
@@ -290,7 +291,7 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return errors.Errorf("%s is not a known certificate", name)
+		return fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	// reads the current certificate
@@ -331,7 +332,7 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 func (rm *Manager) CertificateExists(name string) (bool, error) {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return false, errors.Errorf("%s is not a known certificate", name)
+		return false, fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	return handler.readwriter.Exists()
@@ -344,7 +345,7 @@ func (rm *Manager) CertificateExists(name string) (bool, error) {
 func (rm *Manager) GetCertificateExpirationInfo(name string) (*ExpirationInfo, error) {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return nil, errors.Errorf("%s is not a known certificate", name)
+		return nil, fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
@@ -367,7 +368,7 @@ func (rm *Manager) GetCertificateExpirationInfo(name string) (*ExpirationInfo, e
 func (rm *Manager) CAExists(name string) (bool, error) {
 	handler, ok := rm.cas[name]
 	if !ok {
-		return false, errors.Errorf("%s is not a known certificate", name)
+		return false, fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	return handler.readwriter.Exists()
@@ -377,7 +378,7 @@ func (rm *Manager) CAExists(name string) (bool, error) {
 func (rm *Manager) GetCAExpirationInfo(name string) (*ExpirationInfo, error) {
 	handler, ok := rm.cas[name]
 	if !ok {
-		return nil, errors.Errorf("%s is not a known CA", name)
+		return nil, fmt.Errorf("%s is not a known CA", name)
 	}
 
 	// checks if the CA is externally managed (CA certificate provided without the certificate key)
@@ -418,7 +419,7 @@ func (rm *Manager) IsExternallyManaged(caBaseName string) (bool, error) {
 		}
 		return externallyManaged, nil
 	default:
-		return false, errors.Errorf("unknown certificate authority %s", caBaseName)
+		return false, fmt.Errorf("unknown certificate authority %s", caBaseName)
 	}
 }
 

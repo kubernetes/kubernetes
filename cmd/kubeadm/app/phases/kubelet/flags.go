@@ -154,7 +154,7 @@ func ReadKubeletDynamicEnvFile(kubeletEnvFilePath string) ([]string, error) {
 	// Check if the content starts with the expected kubelet environment variable prefix.
 	const prefix = constants.KubeletEnvFileVariableName + "="
 	if !strings.HasPrefix(content, prefix) {
-		return nil, errors.Errorf("the file %q does not contain the  expected prefix %q", kubeletEnvFilePath, prefix)
+		return nil, fmt.Errorf("the file %q does not contain the  expected prefix %q", kubeletEnvFilePath, prefix)
 	}
 
 	// Trim the prefix and the surrounding double quotes.
@@ -164,7 +164,7 @@ func ReadKubeletDynamicEnvFile(kubeletEnvFilePath string) ([]string, error) {
 	// Split the flags string by whitespace to get individual arguments.
 	trimmedFlags := strings.Fields(flags)
 	if len(trimmedFlags) == 0 {
-		return nil, errors.Errorf("no flags found in file %q", kubeletEnvFilePath)
+		return nil, fmt.Errorf("no flags found in file %q", kubeletEnvFilePath)
 	}
 
 	var updatedFlags []string

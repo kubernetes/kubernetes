@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -99,7 +100,7 @@ func validateManifestsPath(manifests ...string) (err error) {
 			return errors.Wrapf(err, "error obtaining stats for manifest file %q", manifestPath)
 		}
 		if s.IsDir() {
-			return errors.Errorf("%q is a directory", manifestPath)
+			return fmt.Errorf("%q is a directory", manifestPath)
 		}
 	}
 	return nil

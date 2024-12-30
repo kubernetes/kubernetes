@@ -19,6 +19,7 @@ package renewal
 import (
 	"crypto"
 	"crypto/x509"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -153,29 +154,29 @@ func (rw *kubeConfigReadWriter) Read() (*x509.Certificate, error) {
 
 	// get current context
 	if _, ok := kubeConfig.Contexts[kubeConfig.CurrentContext]; !ok {
-		return nil, errors.Errorf("invalid kubeConfig file %s: missing context %s", rw.kubeConfigFilePath, kubeConfig.CurrentContext)
+		return nil, fmt.Errorf("invalid kubeConfig file %s: missing context %s", rw.kubeConfigFilePath, kubeConfig.CurrentContext)
 	}
 
 	// get cluster info for current context and ensure a server certificate is embedded in it
 	clusterName := kubeConfig.Contexts[kubeConfig.CurrentContext].Cluster
 	if _, ok := kubeConfig.Clusters[clusterName]; !ok {
-		return nil, errors.Errorf("invalid kubeConfig file %s: missing cluster %s", rw.kubeConfigFilePath, clusterName)
+		return nil, fmt.Errorf("invalid kubeConfig file %s: missing cluster %s", rw.kubeConfigFilePath, clusterName)
 	}
 
 	cluster := kubeConfig.Clusters[clusterName]
 	if len(cluster.CertificateAuthorityData) == 0 {
-		return nil, errors.Errorf("kubeConfig file %s does not have an embedded server certificate", rw.kubeConfigFilePath)
+		return nil, fmt.Errorf("kubeConfig file %s does not have an embedded server certificate", rw.kubeConfigFilePath)
 	}
 
 	// get auth info for current context and ensure a client certificate is embedded in it
 	authInfoName := kubeConfig.Contexts[kubeConfig.CurrentContext].AuthInfo
 	if _, ok := kubeConfig.AuthInfos[authInfoName]; !ok {
-		return nil, errors.Errorf("invalid kubeConfig file %s: missing authInfo %s", rw.kubeConfigFilePath, authInfoName)
+		return nil, fmt.Errorf("invalid kubeConfig file %s: missing authInfo %s", rw.kubeConfigFilePath, authInfoName)
 	}
 
 	authInfo := kubeConfig.AuthInfos[authInfoName]
 	if len(authInfo.ClientCertificateData) == 0 {
-		return nil, errors.Errorf("kubeConfig file %s does not have an embedded client certificate", rw.kubeConfigFilePath)
+		return nil, fmt.Errorf("kubeConfig file %s does not have an embedded client certificate", rw.kubeConfigFilePath)
 	}
 
 	// parse the client certificate, retrieve the cert config and then renew it
@@ -195,7 +196,7 @@ func (rw *kubeConfigReadWriter) Read() (*x509.Certificate, error) {
 func (rw *kubeConfigReadWriter) Write(newCert *x509.Certificate, newKey crypto.Signer) error {
 	// check if Read was called before Write
 	if rw.kubeConfig == nil {
-		return errors.Errorf("failed to Write kubeConfig file with renewed certs. It is necessary to call Read before Write")
+		return fmt.Errorf("failed to Write kubeConfig file with renewed certs. It is necessary to call Read before Write")
 	}
 
 	// encodes the new key

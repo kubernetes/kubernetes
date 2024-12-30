@@ -161,7 +161,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 	// Process the shutdown only when it is running as a windows service
 	isServiceInitialized := service.IsServiceInitialized()
 	if !isServiceInitialized {
-		return nil, errors.Errorf("%s is NOT running as a Windows service", serviceKubelet)
+		return nil, fmt.Errorf("%s is NOT running as a Windows service", serviceKubelet)
 	}
 
 	// Update the registry key to add the kubelet dependencies to the existing order

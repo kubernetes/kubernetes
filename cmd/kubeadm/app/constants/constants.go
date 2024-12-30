@@ -565,7 +565,7 @@ func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString s
 		if desiredVersion > max {
 			etcdStringVersion = supportedEtcdVersion[max]
 		}
-		warning = errors.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
+		warning = fmt.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
 			versionString, etcdStringVersion)
 	}
 

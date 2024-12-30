@@ -17,6 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 
@@ -32,7 +33,7 @@ func APIEndpointFromString(apiEndpoint string) (APIEndpoint, error) {
 		return APIEndpoint{}, errors.Wrapf(err, "invalid advertise address endpoint: %s", apiEndpoint)
 	}
 	if netutils.ParseIPSloppy(apiEndpointHost) == nil {
-		return APIEndpoint{}, errors.Errorf("invalid API endpoint IP: %s", apiEndpointHost)
+		return APIEndpoint{}, fmt.Errorf("invalid API endpoint IP: %s", apiEndpointHost)
 	}
 	apiEndpointPort, err := net.LookupPort("tcp", apiEndpointPortStr)
 	if err != nil {

@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/lithammer/dedent"
@@ -122,7 +123,7 @@ func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args [
 	}
 	run, found := completionShells[args[0]]
 	if !found {
-		return errors.Errorf("unsupported shell type %q, the supported shell types are %v", args[0], GetSupportedShells())
+		return fmt.Errorf("unsupported shell type %q, the supported shell types are %v", args[0], GetSupportedShells())
 	}
 
 	if len(boilerPlate) == 0 {

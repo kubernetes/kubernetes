@@ -18,13 +18,13 @@ package apiclient
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,7 +138,7 @@ func TestReactors(t *testing.T) {
 					return err
 				}
 				if diff := cmp.Diff(getJob(name, namespace), obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -166,7 +166,7 @@ func TestReactors(t *testing.T) {
 					return err
 				}
 				if diff := cmp.Diff(getNode(name), obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -188,7 +188,7 @@ func TestReactors(t *testing.T) {
 					return err
 				}
 				if diff := cmp.Diff(getNode(name), obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -211,7 +211,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getClusterInfoConfigMap()
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -240,7 +240,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getKubeadmConfigMap()
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -269,7 +269,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getKubeletConfigMap()
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -298,7 +298,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getKubeProxyConfigMap()
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -327,7 +327,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getCoreDNSConfigMap()
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -381,7 +381,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getKubeadmCertsSecret()
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -410,7 +410,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getPodList("foo")
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},
@@ -437,7 +437,7 @@ func TestReactors(t *testing.T) {
 				}
 				expectedObj := getDeploymentList()
 				if diff := cmp.Diff(expectedObj, obj); diff != "" {
-					return errors.Errorf("object differs (-want,+got):\n%s", diff)
+					return fmt.Errorf("object differs (-want,+got):\n%s", diff)
 				}
 				return nil
 			},

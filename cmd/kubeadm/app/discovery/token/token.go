@@ -106,7 +106,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 
 	// The ConfigMap should contain a single cluster
 	if len(insecureConfig.Clusters) != 1 {
-		return nil, errors.Errorf("expected the kubeconfig file in the %s ConfigMap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
+		return nil, fmt.Errorf("expected the kubeconfig file in the %s ConfigMap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
 	}
 
 	// If no TLS root CA pinning was specified, we're done
@@ -139,7 +139,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 	// Pull the kubeconfig from the securely-obtained ConfigMap and validate that it's the same as what we found the first time
 	secureKubeconfigBytes := []byte(secureClusterInfo.Data[bootstrapapi.KubeConfigKey])
 	if !bytes.Equal(secureKubeconfigBytes, insecureKubeconfigBytes) {
-		return nil, errors.Errorf("the second kubeconfig from the %s ConfigMap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
+		return nil, fmt.Errorf("the second kubeconfig from the %s ConfigMap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
 	}
 
 	secureKubeconfig, err := clientcmd.Load(secureKubeconfigBytes)
@@ -172,13 +172,13 @@ func buildSecureBootstrapKubeConfig(endpoint string, caCert []byte, clustername 
 func validateClusterInfoToken(insecureClusterInfo *v1.ConfigMap, token *bootstraptokenv1.BootstrapTokenString) ([]byte, error) {
 	insecureKubeconfigString, ok := insecureClusterInfo.Data[bootstrapapi.KubeConfigKey]
 	if !ok || len(insecureKubeconfigString) == 0 {
-		return nil, errors.Errorf("there is no %s key in the %s ConfigMap. This API Server isn't set up for token bootstrapping, can't connect",
+		return nil, fmt.Errorf("there is no %s key in the %s ConfigMap. This API Server isn't set up for token bootstrapping, can't connect",
 			bootstrapapi.KubeConfigKey, bootstrapapi.ConfigMapClusterInfo)
 	}
 
 	detachedJWSToken, ok := insecureClusterInfo.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]
 	if !ok || len(detachedJWSToken) == 0 {
-		return nil, errors.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the control-plane node to create a new valid token", token.ID)
+		return nil, fmt.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the control-plane node to create a new valid token", token.ID)
 	}
 
 	if !bootstrap.DetachedTokenIsValid(detachedJWSToken, insecureKubeconfigString, token.ID, token.Secret) {
@@ -239,7 +239,7 @@ func getClusterInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, inter
 			}
 			// Even if the ConfigMap is available the JWS signature is patched-in a bit later.
 			if _, ok := cm.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]; !ok {
-				lastError = errors.Errorf("could not find a JWS signature in the cluster-info ConfigMap"+
+				lastError = fmt.Errorf("could not find a JWS signature in the cluster-info ConfigMap"+
 					" for token ID %q", token.ID)
 				if dryRun {
 					// Assume the user is dry-running with a token that will never appear in the cluster-info

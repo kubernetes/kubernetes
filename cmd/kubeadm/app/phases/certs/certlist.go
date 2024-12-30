@@ -162,7 +162,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 
 			// Cert exists already, make sure it's valid
 			if !caCert.IsCA {
-				return errors.Errorf("certificate %q is not a CA", ca.Name)
+				return fmt.Errorf("certificate %q is not a CA", ca.Name)
 			}
 			// Try and load a CA Key
 			caKey, err = pkiutil.TryLoadKeyFromDisk(ic.CertificatesDir, ca.BaseName)
@@ -224,7 +224,7 @@ func (m CertificateMap) CertTree() (CertificateTree, error) {
 		} else {
 			ca, ok := m[cert.CAName]
 			if !ok {
-				return nil, errors.Errorf("certificate %q references unknown CA %q", cert.Name, cert.CAName)
+				return nil, fmt.Errorf("certificate %q references unknown CA %q", cert.Name, cert.CAName)
 			}
 			caMap[ca] = append(caMap[ca], cert)
 		}
@@ -478,15 +478,15 @@ func leafCertificates(c Certificates) (Certificates, error) {
 
 func createKeyAndCSR(kubeadmConfig *kubeadmapi.InitConfiguration, cert *KubeadmCert) error {
 	if kubeadmConfig == nil {
-		return errors.Errorf("%s: kubeadmConfig was nil", errInvalid)
+		return fmt.Errorf("%s: kubeadmConfig was nil", errInvalid)
 	}
 	if cert == nil {
-		return errors.Errorf("%s: cert was nil", errInvalid)
+		return fmt.Errorf("%s: cert was nil", errInvalid)
 	}
 	certDir := kubeadmConfig.CertificatesDir
 	name := cert.BaseName
 	if pkiutil.CSROrKeyExist(certDir, name) {
-		return errors.Errorf("%s: key or CSR %s/%s", errExist, certDir, name)
+		return fmt.Errorf("%s: key or CSR %s/%s", errExist, certDir, name)
 	}
 	cfg, err := cert.GetConfig(kubeadmConfig)
 	if err != nil {

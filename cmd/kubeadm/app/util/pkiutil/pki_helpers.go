@@ -162,7 +162,7 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 func WriteCertBundle(pkiPath, name string, certs []*x509.Certificate) error {
 	for i, cert := range certs {
 		if cert == nil {
-			return errors.Errorf("found nil certificate at position %d when writing bundle to file", i)
+			return fmt.Errorf("found nil certificate at position %d when writing bundle to file", i)
 		}
 	}
 
@@ -320,7 +320,7 @@ func TryLoadKeyFromDisk(pkiPath, name string) (crypto.Signer, error) {
 	case *ecdsa.PrivateKey:
 		key = k
 	default:
-		return nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
+		return nil, fmt.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}
 
 	return key, nil
@@ -351,7 +351,7 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, c
 	case *ecdsa.PrivateKey:
 		return k, pubKeys[0].(*ecdsa.PublicKey), nil
 	default:
-		return nil, nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
+		return nil, nil, fmt.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}
 }
 
@@ -381,7 +381,7 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 	// advertise address
 	advertiseAddress := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
+		return nil, fmt.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
 			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
@@ -442,7 +442,7 @@ func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.
 	// advertise address
 	advertiseAddress := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
+		return nil, fmt.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
 			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
@@ -584,7 +584,7 @@ func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Sign
 
 	rsaKeySize := rsaKeySizeFromAlgorithmType(keyType)
 	if rsaKeySize == 0 {
-		return nil, errors.Errorf("cannot obtain key size from unknown RSA algorithm: %q", keyType)
+		return nil, fmt.Errorf("cannot obtain key size from unknown RSA algorithm: %q", keyType)
 	}
 	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
 }
@@ -709,10 +709,10 @@ func ValidateCertPeriod(cert *x509.Certificate, offset time.Duration) error {
 	period := fmt.Sprintf("NotBefore: %v, NotAfter: %v", cert.NotBefore, cert.NotAfter)
 	now := time.Now().Add(offset).UTC()
 	if now.Before(cert.NotBefore) {
-		return errors.Errorf("the certificate is not valid yet: %s", period)
+		return fmt.Errorf("the certificate is not valid yet: %s", period)
 	}
 	if now.After(cert.NotAfter) {
-		return errors.Errorf("the certificate has expired: %s", period)
+		return fmt.Errorf("the certificate has expired: %s", period)
 	}
 	return nil
 }

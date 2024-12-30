@@ -145,7 +145,7 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 		}
 		for _, f := range e.Options.FilterPhases {
 			if _, ok := phaseRunFlags[f]; !ok {
-				return phaseRunFlags, errors.Errorf("invalid phase name: %s", f)
+				return phaseRunFlags, fmt.Errorf("invalid phase name: %s", f)
 			}
 			phaseRunFlags[f] = true
 			for _, c := range phaseHierarchy[f] {
@@ -158,7 +158,7 @@ func (e *Runner) computePhaseRunFlags() (map[string]bool, error) {
 	// to false and apply the same change to the underlying hierarchy
 	for _, f := range e.Options.SkipPhases {
 		if _, ok := phaseRunFlags[f]; !ok {
-			return phaseRunFlags, errors.Errorf("invalid phase name: %s", f)
+			return phaseRunFlags, fmt.Errorf("invalid phase name: %s", f)
 		}
 		phaseRunFlags[f] = false
 		for _, c := range phaseHierarchy[f] {
@@ -240,7 +240,7 @@ func (e *Runner) Run(args []string) error {
 		// Errors if phases that are meant to create special subcommands only
 		// are wrongly assigned Run Methods
 		if p.RunAllSiblings && (p.RunIf != nil || p.Run != nil) {
-			return errors.Errorf("phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
+			return fmt.Errorf("phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
 		}
 
 		// If the phase defines a condition to be checked before executing the phase action.

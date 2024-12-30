@@ -122,7 +122,7 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 		// retrieves the StaticPodSpec for given component
 		spec, exists := specs[componentName]
 		if !exists {
-			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
+			return fmt.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
 		}
 
 		// print all volumes that are mounted

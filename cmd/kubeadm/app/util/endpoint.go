@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -95,7 +96,7 @@ func ParseHostPort(hostport string) (string, string, error) {
 	// if port is defined, parse and validate it
 	if port != "" {
 		if _, err := ParsePort(port); err != nil {
-			return "", "", errors.Errorf("hostport %s: port %s must be a valid number between 1 and 65535, inclusive", hostport, port)
+			return "", "", fmt.Errorf("hostport %s: port %s must be a valid number between 1 and 65535, inclusive", hostport, port)
 		}
 	}
 
@@ -109,7 +110,7 @@ func ParseHostPort(hostport string) (string, string, error) {
 		return host, port, nil
 	}
 
-	return "", "", errors.Errorf("hostport %s: host '%s' must be a valid IP address or a valid RFC-1123 DNS subdomain", hostport, host)
+	return "", "", fmt.Errorf("hostport %s: host '%s' must be a valid IP address or a valid RFC-1123 DNS subdomain", hostport, host)
 }
 
 // ParsePort parses a string representing a TCP port.
@@ -135,7 +136,7 @@ func parseAPIEndpoint(localEndpoint *kubeadmapi.APIEndpoint) (net.IP, string, er
 	// parse the AdvertiseAddress
 	var ip = netutils.ParseIPSloppy(localEndpoint.AdvertiseAddress)
 	if ip == nil {
-		return nil, "", errors.Errorf("invalid value `%s` given for api.advertiseAddress", localEndpoint.AdvertiseAddress)
+		return nil, "", fmt.Errorf("invalid value `%s` given for api.advertiseAddress", localEndpoint.AdvertiseAddress)
 	}
 
 	return ip, bindPortString, nil

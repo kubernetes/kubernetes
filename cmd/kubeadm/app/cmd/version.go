@@ -82,7 +82,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 		}
 		fmt.Fprintln(out, string(y))
 	default:
-		return errors.Errorf("invalid output format: %s", of)
+		return fmt.Errorf("invalid output format: %s", of)
 	}
 
 	return nil

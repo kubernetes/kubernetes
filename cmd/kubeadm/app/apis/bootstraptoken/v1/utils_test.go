@@ -18,6 +18,7 @@ package v1
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -117,7 +118,7 @@ func roundtrip(input string, bts *BootstrapTokenString) error {
 			return errors.Wrap(err, "expected no marshal error, got error")
 		}
 		if input != string(b) {
-			return errors.Errorf(
+			return fmt.Errorf(
 				"expected token: %s\n\t  actual: %s",
 				input,
 				string(b),
@@ -131,7 +132,7 @@ func roundtrip(input string, bts *BootstrapTokenString) error {
 			return errors.Wrap(err, "expected no unmarshal error, got error")
 		}
 		if !reflect.DeepEqual(bts, newbts) {
-			return errors.Errorf(
+			return fmt.Errorf(
 				"expected object: %v\n\t  actual: %v",
 				bts,
 				newbts,

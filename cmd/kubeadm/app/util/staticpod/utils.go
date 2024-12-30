@@ -218,12 +218,12 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 
 	obj, err := kubeadmutil.UniversalUnmarshal(buf)
 	if err != nil {
-		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q: %v", manifestPath, err)
+		return &v1.Pod{}, fmt.Errorf("failed to unmarshal manifest for %q: %v", manifestPath, err)
 	}
 
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		return &v1.Pod{}, errors.Errorf("failed to parse Pod object defined in %q", manifestPath)
+		return &v1.Pod{}, fmt.Errorf("failed to parse Pod object defined in %q", manifestPath)
 	}
 
 	return pod, nil

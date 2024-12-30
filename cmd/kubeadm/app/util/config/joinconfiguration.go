@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -123,7 +124,7 @@ func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	}
 
 	if len(joinBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
+		return nil, fmt.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.JoinConfiguration{}

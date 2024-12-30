@@ -57,7 +57,7 @@ func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 		return nil, errors.Wrap(err, "failed to list kube-apiserver Pod from cluster")
 	}
 	if len(pods.Items) == 0 {
-		return nil, errors.Errorf("cannot find kube-apiserver Pod by label selector: %v", selector.String())
+		return nil, fmt.Errorf("cannot find kube-apiserver Pod by label selector: %v", selector.String())
 	}
 
 	nodeImageMap := map[string]string{}
@@ -72,13 +72,13 @@ func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 			}
 		}
 		if !found {
-			return nil, errors.Errorf("cannot find container by name %q for Pod %v", kubeadmconstants.KubeAPIServer, klog.KObj(&pod))
+			return nil, fmt.Errorf("cannot find container by name %q for Pod %v", kubeadmconstants.KubeAPIServer, klog.KObj(&pod))
 		}
 	}
 
 	upgradedImage, ok := nodeImageMap[nodeName]
 	if !ok {
-		return nil, errors.Errorf("cannot find kube-apiserver image for current control plane instance %v", nodeName)
+		return nil, fmt.Errorf("cannot find kube-apiserver image for current control plane instance %v", nodeName)
 	}
 
 	unupgradedNodes := sets.New[string]()
@@ -215,7 +215,7 @@ func UpdateKubeletLocalMode(cfg *kubeadmapi.InitConfiguration, dryRun bool) erro
 
 	configContext, ok := config.Contexts[config.CurrentContext]
 	if !ok {
-		return errors.Errorf("cannot find cluster for active context in kubeconfig %q", kubeletKubeConfigFilePath)
+		return fmt.Errorf("cannot find cluster for active context in kubeconfig %q", kubeletKubeConfigFilePath)
 	}
 
 	localAPIEndpoint, err := kubeadmutil.GetLocalAPIEndpoint(&cfg.LocalAPIEndpoint)

@@ -207,7 +207,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 				return true, nil
 			}
 		}
-		lastError = errors.Errorf("no condition of type %v", batchv1.JobComplete)
+		lastError = fmt.Errorf("no condition of type %v", batchv1.JobComplete)
 		klog.V(2).Infof("Job %q in the namespace %q is not yet complete, retrying", jobName, ns)
 		return false, nil
 	})
@@ -234,7 +234,7 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 
 	notReadyControlPlanes := getNotReadyNodes(nodes.Items)
 	if len(notReadyControlPlanes) != 0 {
-		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
+		return fmt.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}
 	return nil
 }
@@ -255,7 +255,7 @@ func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfigu
 	if len(nonExistentManifests) == 0 {
 		return nil
 	}
-	return errors.Errorf("manifest files not found: %v", nonExistentManifests)
+	return fmt.Errorf("manifest files not found: %v", nonExistentManifests)
 }
 
 // getNotReadyNodes returns a string slice of nodes in the cluster that are NotReady

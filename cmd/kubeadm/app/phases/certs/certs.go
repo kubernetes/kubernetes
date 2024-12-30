@@ -107,7 +107,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(certsDir string, keyType kubeadmap
 // The certSpec should be one of the variables from this package.
 func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
 	if certSpec.CAName != "" {
-		return errors.Errorf("this function should only be used for CAs, but cert %s has CA %s", certSpec.Name, certSpec.CAName)
+		return fmt.Errorf("this function should only be used for CAs, but cert %s has CA %s", certSpec.Name, certSpec.CAName)
 	}
 	klog.V(1).Infof("creating a new certificate authority for %s", certSpec.Name)
 
@@ -133,7 +133,7 @@ func CreateCACertAndKeyFiles(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigur
 // The certSpec and caCertSpec should both be one of the variables from this package.
 func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration) error {
 	if certSpec.CAName != caCertSpec.Name {
-		return errors.Errorf("expected CAname for %s to be %q, but was %s", certSpec.Name, certSpec.CAName, caCertSpec.Name)
+		return fmt.Errorf("expected CAname for %s to be %q, but was %s", certSpec.Name, certSpec.CAName, caCertSpec.Name)
 	}
 
 	caCert, caKey, err := LoadCertificateAuthority(cfg.CertificatesDir, caCertSpec.BaseName)
@@ -148,7 +148,7 @@ func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert,
 func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, crypto.Signer, error) {
 	// Checks if certificate authority exists in the PKI directory
 	if !pkiutil.CertOrKeyExist(pkiDir, baseName) {
-		return nil, nil, errors.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)
+		return nil, nil, fmt.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)
 	}
 
 	// Try to load certificate authority .crt and .key from the PKI directory
@@ -161,7 +161,7 @@ func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate
 
 	// Make sure the loaded CA cert actually is a CA
 	if !caCert.IsCA {
-		return nil, nil, errors.Errorf("%s certificate is not a certificate authority", baseName)
+		return nil, nil, fmt.Errorf("%s certificate is not a certificate authority", baseName)
 	}
 
 	return caCert, caKey, nil
@@ -186,7 +186,7 @@ func writeCertificateAuthorityFilesIfNotExist(pkiDir string, baseName string, ca
 
 		// Check if the existing cert is a CA
 		if !caCert.IsCA {
-			return errors.Errorf("certificate %s is not a CA", baseName)
+			return fmt.Errorf("certificate %s is not a CA", baseName)
 		}
 
 		// kubeadm doesn't validate the existing certificate Authority more than this;
@@ -228,7 +228,7 @@ func writeCertificateFilesIfNotExist(pkiDir string, baseName string, signingCert
 
 		// Check if the existing cert is signed by the given CA
 		if err := pkiutil.VerifyCertChain(signedCert, intermediates, signingCert); err != nil {
-			return errors.Errorf("certificate %s is not signed by corresponding CA", baseName)
+			return fmt.Errorf("certificate %s is not signed by corresponding CA", baseName)
 		}
 
 		// Check if the certificate has the correct attributes
@@ -379,7 +379,7 @@ func validateCACert(l certKeyLocation) error {
 
 	// Check if cert is a CA
 	if !caCert.IsCA {
-		return errors.Errorf("certificate %s is not a CA", l.uxName)
+		return fmt.Errorf("certificate %s is not a CA", l.uxName)
 	}
 	return nil
 }

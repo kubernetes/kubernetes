@@ -65,7 +65,7 @@ func DeployedDNSAddon(client clientset.Interface) (string, error) {
 	case 1:
 		return image.TagFromImage(deployments.Items[0].Spec.Template.Spec.Containers[0].Image), nil
 	default:
-		return "", errors.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
+		return "", fmt.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
 	}
 }
 
@@ -82,7 +82,7 @@ func deployedDNSReplicas(client clientset.Interface, replicas int32) (*int32, er
 	case 1:
 		return deployments.Items[0].Spec.Replicas, nil
 	default:
-		return &replicas, errors.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
+		return &replicas, fmt.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
 	}
 }
 

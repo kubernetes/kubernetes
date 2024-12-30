@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 
@@ -47,7 +48,7 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
 		secret, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
 		if secret != nil && err == nil && failIfExists {
-			return errors.Errorf("a token with id %q already exists", token.Token.ID)
+			return fmt.Errorf("a token with id %q already exists", token.Token.ID)
 		}
 
 		updatedOrNewSecret := bootstraptokenv1.BootstrapTokenToSecret(&token)

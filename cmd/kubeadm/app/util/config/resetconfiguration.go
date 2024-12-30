@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -127,7 +128,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 	}
 
 	if len(resetBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
+		return nil, fmt.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.ResetConfiguration{}

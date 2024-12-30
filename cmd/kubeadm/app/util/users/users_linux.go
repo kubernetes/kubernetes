@@ -344,7 +344,7 @@ func parseLoginDefs(file string) (*limits, error) {
 // https://www.cyberciti.biz/faq/understanding-etcgroup-file/
 func parseEntries(file string, totalFields int) ([]*entry, error) {
 	if totalFields != totalFieldsUser && totalFields != totalFieldsGroup {
-		return nil, errors.Errorf("unsupported total fields for entry parsing: %d", totalFields)
+		return nil, fmt.Errorf("unsupported total fields for entry parsing: %d", totalFields)
 	}
 	lines := strings.Split(file, "\n")
 	entries := []*entry{}
@@ -355,7 +355,7 @@ func parseEntries(file string, totalFields int) ([]*entry, error) {
 		}
 		fields := strings.Split(line, ":")
 		if len(fields) != totalFields {
-			return nil, errors.Errorf("entry must have %d fields separated by ':', "+
+			return nil, fmt.Errorf("entry must have %d fields separated by ':', "+
 				"got %d at line %d: %s", totalFields, len(fields), i, line)
 		}
 		id, err := strconv.ParseInt(fields[2], 10, 64)
@@ -392,11 +392,11 @@ func validateEntries(users, groups []*entry, limits *limits) ([]*entry, []*entry
 			}
 			// Found existing user
 			if user.id < limits.minUID || user.id > limits.maxUID {
-				return nil, nil, errors.Errorf("UID %d for user %q is outside the system UID range: %d - %d",
+				return nil, nil, fmt.Errorf("UID %d for user %q is outside the system UID range: %d - %d",
 					user.id, user.name, limits.minUID, limits.maxUID)
 			}
 			if user.shell != noshell {
-				return nil, nil, errors.Errorf("user %q has unexpected shell %q; expected %q",
+				return nil, nil, fmt.Errorf("user %q has unexpected shell %q; expected %q",
 					user.name, user.shell, noshell)
 			}
 			for _, g := range groups {
@@ -405,12 +405,12 @@ func validateEntries(users, groups []*entry, limits *limits) ([]*entry, []*entry
 				}
 				// Found matching group GID for user GID
 				if g.name != uc.name {
-					return nil, nil, errors.Errorf("user %q has GID %d but the group with that GID is not named %q",
+					return nil, nil, fmt.Errorf("user %q has GID %d but the group with that GID is not named %q",
 						uc.name, g.id, uc.name)
 				}
 				goto skipUser // Valid group GID and name; skip
 			}
-			return nil, nil, errors.Errorf("could not find group with GID %d for user %q", user.gid, user.name)
+			return nil, nil, fmt.Errorf("could not find group with GID %d for user %q", user.gid, user.name)
 		}
 		u = append(u, uc)
 	skipUser:
@@ -422,13 +422,13 @@ func validateEntries(users, groups []*entry, limits *limits) ([]*entry, []*entry
 				continue
 			}
 			if group.id < limits.minGID || group.id > limits.maxGID {
-				return nil, nil, errors.Errorf("GID %d for user %q is outside the system UID range: %d - %d",
+				return nil, nil, fmt.Errorf("GID %d for user %q is outside the system UID range: %d - %d",
 					group.id, group.name, limits.minGID, limits.maxGID)
 			}
 			u1 := strings.Join(gc.userNames, ",")
 			u2 := strings.Join(group.userNames, ",")
 			if u1 != u2 {
-				return nil, nil, errors.Errorf("expected users %q for group %q; got %q",
+				return nil, nil, fmt.Errorf("expected users %q for group %q; got %q",
 					u1, gc.name, u2)
 			}
 			goto skipGroup // group has valid users; skip
@@ -458,7 +458,7 @@ func allocateIDs(entries []*entry, min, max int64, total int) ([]int64, error) {
 		}
 	continueLoop:
 	}
-	return nil, errors.Errorf("could not allocate %d IDs based on existing entries in the range: %d - %d",
+	return nil, fmt.Errorf("could not allocate %d IDs based on existing entries in the range: %d - %d",
 		total, min, max)
 }
 
@@ -508,10 +508,10 @@ func removeEntries(file string, entries []*entry) (string, int) {
 // Returns an error if not enough UIDs or GIDs are passed. It does not perform any other validation.
 func assignUserAndGroupIDs(groups, usersToCreate, groupsToCreate []*entry, uids, gids []int64) error {
 	if len(gids) < len(groupsToCreate) {
-		return errors.Errorf("not enough GIDs to assign to groups: have %d, want %d", len(gids), len(groupsToCreate))
+		return fmt.Errorf("not enough GIDs to assign to groups: have %d, want %d", len(gids), len(groupsToCreate))
 	}
 	if len(uids) < len(usersToCreate) {
-		return errors.Errorf("not enough UIDs to assign to users: have %d, want %d", len(uids), len(usersToCreate))
+		return fmt.Errorf("not enough UIDs to assign to users: have %d, want %d", len(uids), len(usersToCreate))
 	}
 	for i := range groupsToCreate {
 		groupsToCreate[i].id = gids[i]
@@ -552,7 +552,7 @@ func entriesToEntryMap(entries, spec []*entry) (*EntryMap, error) {
 				goto continueLoop
 			}
 		}
-		return nil, errors.Errorf("could not find entry %q in the list", spec.name)
+		return nil, fmt.Errorf("could not find entry %q in the list", spec.name)
 	continueLoop:
 	}
 	return &EntryMap{entries: m}, nil

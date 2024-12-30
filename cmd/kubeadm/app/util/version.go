@@ -130,7 +130,7 @@ func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration
 		// Re-validate received version and return.
 		return kubernetesReleaseVersion(body, fetcher)
 	}
-	return "", errors.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
+	return "", fmt.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
 }
 
 // KubernetesVersionToImageTag is helper function that replaces all
@@ -171,7 +171,7 @@ func splitVersion(version string) (string, string, error) {
 	var bucketURL, urlSuffix string
 	subs := kubeBucketPrefixes.FindAllStringSubmatch(version, 1)
 	if len(subs) != 1 || len(subs[0]) != 4 {
-		return "", "", errors.Errorf("invalid version %q", version)
+		return "", "", fmt.Errorf("invalid version %q", version)
 	}
 
 	switch {
@@ -193,12 +193,12 @@ func fetchFromURL(url string, timeout time.Duration) (string, error) {
 	client := &http.Client{Timeout: timeout, Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 	resp, err := client.Get(url)
 	if err != nil {
-		return "", errors.Errorf("unable to get URL %q: %s", url, err.Error())
+		return "", fmt.Errorf("unable to get URL %q: %s", url, err.Error())
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", errors.Errorf("unable to read content of URL %q: %s", url, err.Error())
+		return "", fmt.Errorf("unable to read content of URL %q: %s", url, err.Error())
 	}
 	bodyString := strings.TrimSpace(string(body))
 

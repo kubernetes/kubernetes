@@ -20,6 +20,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -106,7 +107,7 @@ func (runtime *CRIRuntime) IsRunning() error {
 	for _, condition := range res.GetStatus().GetConditions() {
 		if condition.GetType() == runtimeapi.RuntimeReady && // NetworkReady will not be tested on purpose
 			!condition.GetStatus() {
-			return errors.Errorf(
+			return fmt.Errorf(
 				"container runtime condition %q is not true. reason: %s, message: %s",
 				condition.GetType(), condition.GetReason(), condition.GetMessage(),
 			)
@@ -259,7 +260,7 @@ func detectCRISocketImpl(isSocket func(string) bool, knownCRISockets []string) (
 		return foundCRISockets[0], nil
 	default:
 		// Multiple CRIs installed?
-		return "", errors.Errorf("found multiple CRI endpoints on the host. Please define which one do you wish "+
+		return "", fmt.Errorf("found multiple CRI endpoints on the host. Please define which one do you wish "+
 			"to use by setting the 'criSocket' field in the kubeadm configuration file: %s",
 			strings.Join(foundCRISockets, ", "))
 	}
@@ -281,7 +282,7 @@ func (runtime *CRIRuntime) SandboxImage() (string, error) {
 
 	infoConfig, ok := status.GetInfo()["config"]
 	if !ok {
-		return "", errors.Errorf("no 'config' field in CRI info: %+v", status)
+		return "", fmt.Errorf("no 'config' field in CRI info: %+v", status)
 	}
 
 	type config struct {

@@ -370,7 +370,7 @@ type pulledStruct struct {
 func getDurationsFromPulledEventMsg(msg string) (*pulledStruct, error) {
 	splits := strings.Split(msg, " ")
 	if len(splits) != 13 {
-		return nil, errors.Errorf("pull event message should be spilted to 13: %d", len(splits))
+		return nil, fmt.Errorf("pull event message should be spilted to 13: %d", len(splits))
 	}
 	pulledDuration, err := time.ParseDuration(splits[5])
 	if err != nil {

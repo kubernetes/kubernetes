@@ -64,7 +64,7 @@ func (sysd WindowsInitSystem) ServiceStart(service string) error {
 	timeout := time.Now().Add(10 * time.Second)
 	for status.State != svc.Stopped {
 		if timeout.Before(time.Now()) {
-			return errors.Errorf("timeout waiting for %s service to stop", service)
+			return fmt.Errorf("timeout waiting for %s service to stop", service)
 		}
 		time.Sleep(300 * time.Millisecond)
 		status, err = s.Query()
@@ -87,7 +87,7 @@ func (sysd WindowsInitSystem) ServiceStart(service string) error {
 	timeout = time.Now().Add(10 * time.Second)
 	for status.State != svc.Running {
 		if timeout.Before(time.Now()) {
-			return errors.Errorf("timeout waiting for %s service to start", service)
+			return fmt.Errorf("timeout waiting for %s service to start", service)
 		}
 		time.Sleep(300 * time.Millisecond)
 		status, err = s.Query()
@@ -140,7 +140,7 @@ func (sysd WindowsInitSystem) ServiceStop(service string) error {
 		timeout := time.Now().Add(10 * time.Second)
 		for status.State != svc.Stopped {
 			if timeout.Before(time.Now()) {
-				return errors.Errorf("timeout waiting for %s service to stop", service)
+				return fmt.Errorf("timeout waiting for %s service to stop", service)
 			}
 			time.Sleep(300 * time.Millisecond)
 			status, err = s.Query()
@@ -165,7 +165,7 @@ func (sysd WindowsInitSystem) ServiceStop(service string) error {
 	timeout := time.Now().Add(10 * time.Second)
 	for status.State != svc.Stopped {
 		if timeout.Before(time.Now()) {
-			return errors.Errorf("timeout waiting for %s service to stop", service)
+			return fmt.Errorf("timeout waiting for %s service to stop", service)
 		}
 		time.Sleep(300 * time.Millisecond)
 		status, err = s.Query()

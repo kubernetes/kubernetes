@@ -596,7 +596,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	})
 
 	if len(mixedInvalidFlags) != 0 {
-		return errors.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
+		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
 }
@@ -787,18 +787,18 @@ func ValidateCertValidity(cfg *kubeadm.ClusterConfiguration) []error {
 	var allErrs []error
 	if cfg.CertificateValidityPeriod != nil && cfg.CertificateValidityPeriod.Duration > constants.CertificateValidityPeriod {
 		allErrs = append(allErrs,
-			errors.Errorf("certificateValidityPeriod: the value %v is more than the recommended default for certificate expiration: %v",
+			fmt.Errorf("certificateValidityPeriod: the value %v is more than the recommended default for certificate expiration: %v",
 				cfg.CertificateValidityPeriod.Duration, constants.CertificateValidityPeriod))
 	}
 	if cfg.CACertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod.Duration > constants.CACertificateValidityPeriod {
 		allErrs = append(allErrs,
-			errors.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
+			fmt.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
 				cfg.CACertificateValidityPeriod.Duration, constants.CACertificateValidityPeriod))
 	}
 	if cfg.CertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod != nil {
 		if cfg.CertificateValidityPeriod.Duration > cfg.CACertificateValidityPeriod.Duration {
 			allErrs = append(allErrs,
-				errors.Errorf("certificateValidityPeriod: the value %v is more than the caCertificateValidityPeriod: %v",
+				fmt.Errorf("certificateValidityPeriod: the value %v is more than the caCertificateValidityPeriod: %v",
 					cfg.CertificateValidityPeriod.Duration, cfg.CACertificateValidityPeriod.Duration))
 		}
 	}

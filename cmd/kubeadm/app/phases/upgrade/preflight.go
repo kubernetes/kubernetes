@@ -99,7 +99,7 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 			"Once ready, the upgrade can be initiated by skipping the preflight check. During the upgrade, " +
 			"kubeadm will migrate the configuration while leaving the listed plugin configs untouched, " +
 			"but cannot guarantee that they will work with the newer version of CoreDNS.")
-		return errors.Errorf("CoreDNS cannot migrate the following plugins:\n%s", UnsupportedPlugins)
+		return fmt.Errorf("CoreDNS cannot migrate the following plugins:\n%s", UnsupportedPlugins)
 	}
 	return nil
 }

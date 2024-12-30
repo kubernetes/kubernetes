@@ -161,7 +161,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	} else {
 		client, err = kubeconfigutil.ToClientSet(tlsBootstrapCfg)
 		if err != nil {
-			return errors.Errorf("could not create client from bootstrap kubeconfig")
+			return fmt.Errorf("could not create client from bootstrap kubeconfig")
 		}
 	}
 
@@ -218,7 +218,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	}
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
-			return errors.Errorf("a Node with name %q and status %q already exists in the cluster. "+
+			return fmt.Errorf("a Node with name %q and status %q already exists in the cluster. "+
 				"You must delete the existing Node or change the name of this new joining Node", nodeName, v1.NodeReady)
 		}
 	}

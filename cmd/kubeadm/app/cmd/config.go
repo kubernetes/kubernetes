@@ -166,7 +166,7 @@ func getDefaultComponentConfigBytes(group string) ([]byte, error) {
 
 	componentCfg, ok := defaultedInitConfig.ComponentConfigs[group]
 	if !ok {
-		return []byte{}, errors.Errorf("cannot get defaulted config for component group %q", group)
+		return []byte{}, fmt.Errorf("cannot get defaulted config for component group %q", group)
 	}
 
 	return componentCfg.Marshal()
@@ -195,7 +195,7 @@ func mapLegacyKindsToGroups(kinds []string) ([]string, error) {
 		if ok {
 			groups = append(groups, group)
 		} else {
-			return nil, errors.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigKinds())
+			return nil, fmt.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigKinds())
 		}
 	}
 	return groups, nil
@@ -328,7 +328,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 		`), kubeadmapiv1.SchemeGroupVersion),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(cfgPath) == 0 {
-				return errors.Errorf("the --%s flag is mandatory", options.CfgPath)
+				return fmt.Errorf("the --%s flag is mandatory", options.CfgPath)
 			}
 
 			cfgBytes, err := os.ReadFile(cfgPath)
