@@ -525,6 +525,10 @@ var _ = SIGDescribe("SwapEviction", "[LinuxOnly]", framework.WithSerial(), nodef
 			gomega.Expect(usedSwapBytes).To(gomega.BeNumerically("<", 200*1024*1024), "swap usage after reset should be less than 200Mi")
 
 			framework.Logf("Swap is reset. Used swap bytes (should be near 0): %d", usedSwapBytes)
+
+			secondsToSleep := 10
+			ginkgo.By(fmt.Sprintf("Sleeping for %d seconds to allow swap to settle", secondsToSleep))
+			time.Sleep(time.Duration(secondsToSleep) * time.Second)
 		})
 	}
 
