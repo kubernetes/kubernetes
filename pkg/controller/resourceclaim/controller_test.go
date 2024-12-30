@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -61,13 +62,15 @@ var (
 	testClaimReserved      = reserveClaim(testClaimAllocated, testPodWithResource)
 	testClaimReservedTwice = reserveClaim(testClaimReserved, otherTestPod)
 
-	generatedTestClaim          = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true))
+	generatedTestClaim          = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), nil)
+	generatedTestClaimWithAdmin = makeGeneratedClaim(podResourceClaimName, testPodName+"-"+podResourceClaimName+"-", testNamespace, className, 1, makeOwnerReference(testPodWithResource, true), ptr.To(true))
 	generatedTestClaimAllocated = allocateClaim(generatedTestClaim)
 	generatedTestClaimReserved  = reserveClaim(generatedTestClaimAllocated, testPodWithResource)
 
-	conflictingClaim    = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, nil)
-	otherNamespaceClaim = makeClaim(testPodName+"-"+podResourceClaimName, otherNamespace, className, nil)
-	template            = makeTemplate(templateName, testNamespace, className)
+	conflictingClaim        = makeClaim(testPodName+"-"+podResourceClaimName, testNamespace, className, nil)
+	otherNamespaceClaim     = makeClaim(testPodName+"-"+podResourceClaimName, otherNamespace, className, nil)
+	template                = makeTemplate(templateName, testNamespace, className, nil)
+	templateWithAdminAccess = makeTemplate(templateName, testNamespace, className, ptr.To(true))
 
 	testPodWithNodeName = func() *v1.Pod {
 		pod := testPodWithResource.DeepCopy()
@@ -78,6 +81,7 @@ var (
 		})
 		return pod
 	}()
+	adminAccessFeatureOffError = "admin access is requested, but the feature is disabled"
 )
 
 func TestSyncHandler(t *testing.T) {
@@ -93,7 +97,7 @@ func TestSyncHandler(t *testing.T) {
 		templates              []*resourceapi.ResourceClaimTemplate
 		expectedClaims         []resourceapi.ResourceClaim
 		expectedStatuses       map[string][]v1.PodResourceClaimStatus
-		expectedError          bool
+		expectedError          string
 		expectedMetrics        expectedMetrics
 	}{
 		{
@@ -108,6 +112,27 @@ func TestSyncHandler(t *testing.T) {
 				},
 			},
 			expectedMetrics: expectedMetrics{1, 0},
+		},
+		{
+			name:          "create with admin and feature gate off",
+			pods:          []*v1.Pod{testPodWithResource},
+			templates:     []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
+			key:           podKey(testPodWithResource),
+			expectedError: adminAccessFeatureOffError,
+		},
+		{
+			name:           "create with admin and feature gate on",
+			pods:           []*v1.Pod{testPodWithResource},
+			templates:      []*resourceapi.ResourceClaimTemplate{templateWithAdminAccess},
+			key:            podKey(testPodWithResource),
+			expectedClaims: []resourceapi.ResourceClaim{*generatedTestClaimWithAdmin},
+			expectedStatuses: map[string][]v1.PodResourceClaimStatus{
+				testPodWithResource.Name: {
+					{Name: testPodWithResource.Spec.ResourceClaims[0].Name, ResourceClaimName: &generatedTestClaimWithAdmin.Name},
+				},
+			},
+			adminAccessEnabled: true,
+			expectedMetrics:    expectedMetrics{1, 0},
 		},
 		{
 			name: "nop",
@@ -153,7 +178,7 @@ func TestSyncHandler(t *testing.T) {
 			pods:          []*v1.Pod{testPodWithResource},
 			templates:     nil,
 			key:           podKey(testPodWithResource),
-			expectedError: true,
+			expectedError: "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
 		},
 		{
 			name:           "find-existing-claim-by-label",
@@ -219,7 +244,7 @@ func TestSyncHandler(t *testing.T) {
 			key:            podKey(testPodWithResource),
 			claims:         []*resourceapi.ResourceClaim{conflictingClaim},
 			expectedClaims: []resourceapi.ResourceClaim{*conflictingClaim},
-			expectedError:  true,
+			expectedError:  "resource claim template \"my-template\": resourceclaimtemplate.resource.k8s.io \"my-template\" not found",
 		},
 		{
 			name:            "create-conflict",
@@ -227,7 +252,7 @@ func TestSyncHandler(t *testing.T) {
 			templates:       []*resourceapi.ResourceClaimTemplate{template},
 			key:             podKey(testPodWithResource),
 			expectedMetrics: expectedMetrics{1, 1},
-			expectedError:   true,
+			expectedError:   "create ResourceClaim : Operation cannot be fulfilled on resourceclaims.resource.k8s.io \"fake name\": fake conflict",
 		},
 		{
 			name:            "stay-reserved-seen",
@@ -424,11 +449,12 @@ func TestSyncHandler(t *testing.T) {
 			}
 
 			err = ec.syncHandler(tCtx, tc.key)
-			if err != nil && !tc.expectedError {
-				t.Fatalf("unexpected error while running handler: %v", err)
+			if err != nil {
+				assert.ErrorContains(t, err, tc.expectedError, "the error message should have contained the expected error message")
+				return
 			}
-			if err == nil && tc.expectedError {
-				t.Fatalf("unexpected success")
+			if tc.expectedError != "" {
+				t.Fatalf("expected error, got none")
 			}
 
 			claims, err := fakeKubeClient.ResourceV1beta1().ResourceClaims("").List(tCtx, metav1.ListOptions{})
@@ -558,7 +584,7 @@ func makeClaim(name, namespace, classname string, owner *metav1.OwnerReference) 
 	return claim
 }
 
-func makeGeneratedClaim(podClaimName, generateName, namespace, classname string, createCounter int, owner *metav1.OwnerReference) *resourceapi.ResourceClaim {
+func makeGeneratedClaim(podClaimName, generateName, namespace, classname string, createCounter int, owner *metav1.OwnerReference, adminAccess *bool) *resourceapi.ResourceClaim {
 	claim := &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:         fmt.Sprintf("%s-%d", generateName, createCounter),
@@ -569,6 +595,19 @@ func makeGeneratedClaim(podClaimName, generateName, namespace, classname string,
 	}
 	if owner != nil {
 		claim.OwnerReferences = []metav1.OwnerReference{*owner}
+	}
+	if adminAccess != nil {
+		claim.Spec = resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{
+					{
+						Name:            "req-0",
+						DeviceClassName: "class",
+						AdminAccess:     adminAccess,
+					},
+				},
+			},
+		}
 	}
 
 	return claim
@@ -618,9 +657,24 @@ func makePod(name, namespace string, uid types.UID, podClaims ...v1.PodResourceC
 	return pod
 }
 
-func makeTemplate(name, namespace, classname string) *resourceapi.ResourceClaimTemplate {
+func makeTemplate(name, namespace, classname string, adminAccess *bool) *resourceapi.ResourceClaimTemplate {
 	template := &resourceapi.ResourceClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+	}
+	if adminAccess != nil {
+		template.Spec = resourceapi.ResourceClaimTemplateSpec{
+			Spec: resourceapi.ResourceClaimSpec{
+				Devices: resourceapi.DeviceClaim{
+					Requests: []resourceapi.DeviceRequest{
+						{
+							Name:            "req-0",
+							DeviceClassName: "class",
+							AdminAccess:     adminAccess,
+						},
+					},
+				},
+			},
+		}
 	}
 	return template
 }

@@ -389,6 +389,7 @@ const (
 	DeviceRequestsMaxSize    = AllocationResultsMaxSize
 	DeviceConstraintsMaxSize = 32
 	DeviceConfigMaxSize      = 32
+	DRAAdminNamespaceLabel   = "resource.k8s.io/admin-access"
 )
 
 // DeviceRequest is a request for devices required for a claim.

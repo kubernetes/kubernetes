@@ -21,10 +21,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -33,7 +37,7 @@ import (
 var obj = &resource.ResourceClaimTemplate{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim-template",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimTemplateSpec{
 		Spec: resource.ResourceClaimSpec{
@@ -51,6 +55,27 @@ var obj = &resource.ResourceClaimTemplate{
 }
 
 var objWithAdminAccess = &resource.ResourceClaimTemplate{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim-template",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimTemplateSpec{
+		Spec: resource.ResourceClaimSpec{
+			Devices: resource.DeviceClaim{
+				Requests: []resource.DeviceRequest{
+					{
+						Name:            "req-0",
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						AdminAccess:     ptr.To(true),
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithAdminAccessInNonAdminNamespace = &resource.ResourceClaimTemplate{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim-template",
 		Namespace: "default",
@@ -97,23 +122,56 @@ var objWithPrioritizedList = &resource.ResourceClaimTemplate{
 	},
 }
 
+var ns1 = &corev1.Namespace{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:   "default",
+		Labels: map[string]string{"key": "value"},
+	},
+}
+var ns2 = &corev1.Namespace{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:   "kube-system",
+		Labels: map[string]string{resource.DRAAdminNamespaceLabel: "true"},
+	},
+}
+var adminAccessError = "Forbidden: admin access to devices is not allowed in namespace without Resource Admin Access label"
+var fieldImmutableError = "field is immutable"
+var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
+var deviceRequestError = "exactly one of `deviceClassName` or `firstAvailable` must be specified"
+
 func TestClaimTemplateStrategy(t *testing.T) {
-	if !Strategy.NamespaceScoped() {
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
+
+	if !strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaimTemplate must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate() {
 		t.Errorf("ResourceClaimTemplate should not allow create on update")
 	}
 }
 
 func TestClaimTemplateStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	fakeClient := fake.NewSimpleClientset(ns1, ns2)
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	defaultNs, err := mockNSClient.Get(ctx, "default", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("expected default namespace, got %v", err)
+	}
+	assert.Equal(t, ns1, defaultNs)
+	adminNs, err := mockNSClient.Get(ctx, "kube-system", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("expected admin namespace, got %v", err)
+	}
+	assert.Equal(t, ns2, adminNs)
 
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaimTemplate
 		adminAccess           bool
+		expectValidationError string
 		prioritizedList       bool
-		expectValidationError bool
 		expectObj             *resource.ResourceClaimTemplate
 	}{
 		"simple": {
@@ -126,7 +184,7 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 				obj.Name = "%#@$%$"
 				return obj
 			}(),
-			expectValidationError: true,
+			expectValidationError: metadataError,
 		},
 		"drop-fields-admin-access": {
 			obj:         objWithAdminAccess,
@@ -141,12 +199,23 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		"drop-fields-prioritized-list": {
 			obj:                   objWithPrioritizedList,
 			prioritizedList:       false,
-			expectValidationError: true,
+			expectValidationError: deviceRequestError,
 		},
 		"keep-fields-prioritized-list": {
 			obj:             objWithPrioritizedList,
 			prioritizedList: true,
 			expectObj:       objWithPrioritizedList,
+		},
+		"admin-access-admin-namespace": {
+			obj:         objWithAdminAccess,
+			adminAccess: true,
+			expectObj:   objWithAdminAccess,
+		},
+		"admin-access-non-admin-namespace": {
+			obj:                   objWithAdminAccessInNonAdminNamespace,
+			adminAccess:           true,
+			expectObj:             objWithAdminAccessInNonAdminNamespace,
+			expectValidationError: adminAccessError,
 		},
 	}
 
@@ -154,21 +223,21 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
+			strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 
 			obj := tc.obj.DeepCopy()
-			Strategy.PrepareForCreate(ctx, obj)
-			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
-				if !tc.expectValidationError {
-					t.Fatalf("unexpected validation errors: %q", errs)
-				}
+			strategy.PrepareForCreate(ctx, obj)
+			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
+				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
 				return
-			} else if tc.expectValidationError {
+			}
+			if tc.expectValidationError != "" {
 				t.Fatal("expected validation error(s), got none")
 			}
-			if warnings := Strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
+			if warnings := strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
 				t.Fatalf("unexpected warnings: %q", warnings)
 			}
-			Strategy.Canonicalize(obj)
+			strategy.Canonicalize(obj)
 			assert.Equal(t, tc.expectObj, obj)
 		})
 	}
@@ -177,12 +246,25 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 func TestClaimTemplateStrategyUpdate(t *testing.T) {
 	t.Run("no-changes-okay", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
+		fakeClient := fake.NewSimpleClientset(ns1, ns2)
+		mockNSClient := fakeClient.CoreV1().Namespaces()
+		defaultNs, err := mockNSClient.Get(ctx, "default", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("expected default namespace, got %v", err)
+		}
+		assert.Equal(t, ns1, defaultNs)
+		adminNs, err := mockNSClient.Get(ctx, "kube-system", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("expected admin namespace, got %v", err)
+		}
+		assert.Equal(t, ns2, adminNs)
+		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 		resourceClaimTemplate := obj.DeepCopy()
 		newClaimTemplate := resourceClaimTemplate.DeepCopy()
 		newClaimTemplate.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
-		errs := Strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
 		if len(errs) != 0 {
 			t.Errorf("unexpected validation errors: %v", errs)
 		}
@@ -190,15 +272,58 @@ func TestClaimTemplateStrategyUpdate(t *testing.T) {
 
 	t.Run("name-change-not-allowed", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
+		fakeClient := fake.NewSimpleClientset(ns1, ns2)
+		mockNSClient := fakeClient.CoreV1().Namespaces()
+		defaultNs, err := mockNSClient.Get(ctx, "default", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("expected default namespace, got %v", err)
+		}
+		assert.Equal(t, ns1, defaultNs)
+		adminNs, err := mockNSClient.Get(ctx, "kube-system", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("expected admin namespace, got %v", err)
+		}
+		assert.Equal(t, ns2, adminNs)
+		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 		resourceClaimTemplate := obj.DeepCopy()
 		newClaimTemplate := resourceClaimTemplate.DeepCopy()
 		newClaimTemplate.Name = "valid-class-2"
 		newClaimTemplate.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
-		errs := Strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
 		if len(errs) == 0 {
 			t.Errorf("expected a validation error")
+		}
+	})
+
+	t.Run("adminaccess-update-not-allowed", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, true)
+		ctx := genericapirequest.NewDefaultContext()
+		fakeClient := fake.NewSimpleClientset(ns1, ns2)
+		mockNSClient := fakeClient.CoreV1().Namespaces()
+		defaultNs, err := mockNSClient.Get(ctx, "default", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("expected default namespace, got %v", err)
+		}
+		assert.Equal(t, ns1, defaultNs)
+		adminNs, err := mockNSClient.Get(ctx, "kube-system", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("expected admin namespace, got %v", err)
+		}
+		assert.Equal(t, ns2, adminNs)
+		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
+		resourceClaimTemplate := obj.DeepCopy()
+		newClaimTemplate := resourceClaimTemplate.DeepCopy()
+		newClaimTemplate.ResourceVersion = "4"
+		newClaimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+
+		strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		if len(errs) == 0 {
+			t.Errorf("expected a validation error")
+		} else {
+			assert.ErrorContains(t, errs[0], fieldImmutableError, "the error message should have contained the expected error message")
 		}
 	})
 }
