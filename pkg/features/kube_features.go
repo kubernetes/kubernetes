@@ -628,6 +628,11 @@ const (
 	// Enables specifying resources at pod-level.
 	PodLevelResources featuregate.Feature = "PodLevelResources"
 
+	// owner: @Huutomerkki
+	//
+	// Enables pods starting in the order of their priorities
+	PodStartingOrderByPriority featuregate.Feature = "PodStartingOrderByPriority"
+
 	// owner: @AxeZhan
 	// kep: http://kep.k8s.io/3960
 	//
