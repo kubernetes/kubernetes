@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -62,6 +63,12 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
+		availableSwap, err := exec.Command("/bin/sh", "-c", "free -b | grep Swap | awk '{print $2}'").Output()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		swapBytes, err := strconv.Atoi(strings.TrimSpace(string(availableSwap)))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(swapBytes).To(gomega.BeNumerically(">", 0), "swap should be provisioned on the node")
+
 		gomega.Expect(isSwapFeatureGateEnabled()).To(gomega.BeTrueBecause("NodeSwap feature should be on"))
 	})
 
