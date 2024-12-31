@@ -359,6 +359,14 @@ func addHealthChecksWithoutLivez(c *server.Config, healthChecks ...healthz.Healt
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
+	if s.EtcdServersOverrides != nil {
+		for _, override := range s.EtcdServersOverrides {
+			tokens := strings.Split(override, "#")
+			servers := strings.Split(tokens[1], ";")
+			s.StorageConfig.Transport.ServerList = append(s.StorageConfig.Transport.ServerList, servers...)
+		}
+	}
+
 	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig, c.DrainedNotify())
 	if err != nil {
 		return err
