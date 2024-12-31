@@ -71,28 +71,30 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 	ginkgo.BeforeEach(func() {
 		gomega.Expect(isSwapFeatureGateEnabled()).To(gomega.BeTrueBecause("NodeSwap feature should be on"))
 
-		ginkgo.BeforeEach(func() {
-			ginkgo.By("Checking that swap is available on the node")
-			isSwapEnabled, err := isSwapEnabledOnNode()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(isSwapEnabled).To(gomega.BeTrueBecause("swap should be enabled on the node"))
+		ginkgo.By("Checking that swap is available on the node")
+		isSwapEnabled, err := isSwapEnabledOnNode()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(isSwapEnabled).To(gomega.BeTrueBecause("swap should be enabled on the node"))
 
-			ginkgo.By("Resetting the swap")
-			err = resetSwap()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.By("Resetting the swap")
+		err = resetSwap()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Re-checking that swap is available on the node after swap reset")
-			isSwapEnabled, err = isSwapEnabledOnNode()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(isSwapEnabled).To(gomega.BeTrueBecause("swap should be enabled on the node after reset"))
+		ginkgo.By("Re-checking that swap is available on the node after swap reset")
+		isSwapEnabled, err = isSwapEnabledOnNode()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(isSwapEnabled).To(gomega.BeTrueBecause("swap should be enabled on the node after reset"))
 
-			ginkgo.By("Checking that swap usage is near zero")
-			usedSwapBytes, err := getUsedSwapOnNode()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(usedSwapBytes).To(gomega.BeNumerically("<", 200*1024*1024), "swap usage after reset should be less than 200Mi")
+		ginkgo.By("Checking that swap usage is near zero")
+		usedSwapBytes, err := getUsedSwapOnNode()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(usedSwapBytes).To(gomega.BeNumerically("<", 200*1024*1024), "swap usage after reset should be less than 200Mi")
 
-			framework.Logf("Swap is reset. Used swap bytes (should be near 0): %d", usedSwapBytes)
-		})
+		framework.Logf("Swap is reset. Used swap bytes (should be near 0): %d", usedSwapBytes)
+
+		secondsToSleep := 10
+		ginkgo.By(fmt.Sprintf("Sleeping for %d seconds to allow swap to settle", secondsToSleep))
+		time.Sleep(time.Duration(secondsToSleep) * time.Second)
 	})
 
 	f.Context(framework.WithNodeConformance(), func() {
