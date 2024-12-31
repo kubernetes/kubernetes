@@ -375,6 +375,46 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 		return readyCheck()
 	}))
 
+	if len(s.EtcdServersOverrides) != 0 {
+		if err := s.addOverrideEtcdHealthEndpoint(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *EtcdOptions) addOverrideEtcdHealthEndpoint(c *server.Config) error {
+	sc := s.StorageConfig
+	serverSet := sets.Set[string]{}
+
+	for _, override := range s.EtcdServersOverrides {
+		tokens := strings.Split(override, "#")
+		servers := strings.Split(tokens[1], ";")
+		for _, server := range servers {
+			serverSet.Insert(server)
+		}
+	}
+	if serverSet.Len() != 0 {
+		sc.Transport.ServerList = serverSet.UnsortedList()
+	}
+
+	healthCheck, err := storagefactory.CreateHealthCheck(sc, c.DrainedNotify())
+	if err != nil {
+		return err
+	}
+	c.AddHealthChecks(healthz.NamedCheck("etcd-override", func(r *http.Request) error {
+		return healthCheck()
+	}))
+
+	readyCheck, err := storagefactory.CreateReadyCheck(sc, c.DrainedNotify())
+	if err != nil {
+		return err
+	}
+	c.AddReadyzChecks(healthz.NamedCheck("etcd-override-readiness", func(r *http.Request) error {
+		return readyCheck()
+	}))
+
 	return nil
 }
 
