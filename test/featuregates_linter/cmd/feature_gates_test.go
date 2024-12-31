@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -111,6 +110,7 @@ func TestVerifyOrUpdateFeatureListUnversioned(t *testing.T) {
 	tests := []struct {
 		name                          string
 		goFileContent                 string
+		featureListFileContent        string
 		updatedFeatureListFileContent string
 		expectVerifyErr               bool
 		expectUpdateErr               bool
@@ -132,7 +132,47 @@ var otherFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	AppArmorFields: {Default: true, PreRelease: featuregate.Beta},
 }
 `,
+			featureListFileContent:        featureListFileContent,
 			updatedFeatureListFileContent: featureListFileContent,
+		},
+		{
+			name: "semantically equivalent, formatting wrong",
+			goFileContent: `
+package features
+
+import (
+	"k8s.io/component-base/featuregate"
+)
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	AppArmorFields: {Default: true, PreRelease: featuregate.Beta},
+	CPUCFSQuotaPeriod: {Default: false, PreRelease: featuregate.Alpha},
+	ClusterTrustBundleProjection: {Default: false, PreRelease: featuregate.Alpha},
+}
+var otherFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	AppArmorFields: {Default: true, PreRelease: featuregate.Beta},
+}
+`,
+			featureListFileContent: `- name: AppArmorFields
+  versionedSpecs:
+    - default: true
+      lockToDefault: false
+      preRelease: Beta
+      version: ""
+- name: ClusterTrustBundleProjection
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: ""
+- name: CPUCFSQuotaPeriod
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: ""
+`,
+			updatedFeatureListFileContent: featureListFileContent,
+			expectVerifyErr:               true,
 		},
 		{
 			name: "same feature added twice with different lifecycle",
@@ -151,8 +191,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AppArmorFields: {Default: true, PreRelease: featuregate.Alpha},
 }
 `,
-			expectVerifyErr: true,
-			expectUpdateErr: true,
+			featureListFileContent: featureListFileContent,
+			expectVerifyErr:        true,
+			expectUpdateErr:        true,
 		},
 		{
 			name: "new feature added",
@@ -169,8 +210,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SELinuxMount: {Default: false, PreRelease: featuregate.Alpha},
 }
 `,
-			expectVerifyErr: true,
-			expectUpdateErr: true,
+			featureListFileContent: featureListFileContent,
+			expectVerifyErr:        true,
+			expectUpdateErr:        true,
 		},
 		{
 			name: "delete feature",
@@ -185,7 +227,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ClusterTrustBundleProjection: {Default: false, PreRelease: featuregate.Alpha},
 }
 `,
-			expectVerifyErr: true,
+			featureListFileContent: featureListFileContent,
+			expectVerifyErr:        true,
 			updatedFeatureListFileContent: `- name: AppArmorFields
   versionedSpecs:
   - default: true
@@ -214,13 +257,14 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ClusterTrustBundleProjection: {Default: false, PreRelease: featuregate.Alpha},
 }
 			`,
-			expectVerifyErr: true,
-			expectUpdateErr: true,
+			featureListFileContent: featureListFileContent,
+			expectVerifyErr:        true,
+			expectUpdateErr:        true,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featureListFile := writeContentToTmpFile(t, "", "feature_list.yaml", strings.TrimSpace(featureListFileContent))
+			featureListFile := writeContentToTmpFile(t, "", "feature_list.yaml", tc.featureListFileContent)
 			tmpDir := filepath.Dir(featureListFile.Name())
 			_ = writeContentToTmpFile(t, tmpDir, "pkg/new_features.go", tc.goFileContent)
 			err := verifyOrUpdateFeatureList(tmpDir, filepath.Base(featureListFile.Name()), false, false)
@@ -229,7 +273,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 			}
 			err = verifyOrUpdateFeatureList(tmpDir, filepath.Base(featureListFile.Name()), true, false)
 			if tc.expectUpdateErr != (err != nil) {
-				t.Errorf("expectVerifyErr=%v, got err: %s", tc.expectVerifyErr, err)
+				t.Errorf("expectUpdateErr=%v, got err: %s", tc.expectUpdateErr, err)
 			}
 			if tc.expectUpdateErr {
 				return
@@ -272,6 +316,7 @@ func TestVerifyOrUpdateFeatureListVersioned(t *testing.T) {
 	tests := []struct {
 		name                          string
 		goFileContent                 string
+		featureListFileContent        string
 		updatedFeatureListFileContent string
 		expectVerifyErr               bool
 		expectUpdateErr               bool
@@ -303,7 +348,61 @@ var otherFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	},
 }
 `,
+			featureListFileContent:        featureListFileContent,
 			updatedFeatureListFileContent: featureListFileContent,
+		},
+		{
+			name: "semantically equivalent, formatting wrong",
+			goFileContent: `
+package features
+
+import (
+	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/component-base/featuregate"
+)
+var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	AppArmorFields: {
+		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
+	},
+	CPUCFSQuotaPeriod: {
+		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+	},
+	genericfeatures.APIListChunking: {
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+}
+var otherFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	AppArmorFields: {
+		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
+	},
+}
+`,
+			featureListFileContent: `- name: APIListChunking
+  versionedSpecs:
+    - default: true
+      lockToDefault: true
+      preRelease: GA
+      version: "1.30"
+- name: AppArmorFields
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
+- name: CPUCFSQuotaPeriod
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.31"
+`,
+			updatedFeatureListFileContent: featureListFileContent,
+			expectVerifyErr:               true,
 		},
 		{
 			name: "same feature added twice with different lifecycle",
@@ -332,8 +431,9 @@ var otherFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	},
 }
 `,
-			expectVerifyErr: true,
-			expectUpdateErr: true,
+			featureListFileContent: featureListFileContent,
+			expectVerifyErr:        true,
+			expectUpdateErr:        true,
 		},
 		{
 			name: "VersionedSpecs not ordered by version",
@@ -357,8 +457,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 }
 `,
-			expectVerifyErr: true,
-			expectUpdateErr: true,
+			featureListFileContent: featureListFileContent,
+			expectVerifyErr:        true,
+			expectUpdateErr:        true,
 		},
 		{
 			name: "add new feature",
@@ -385,7 +486,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 }
 `,
-			expectVerifyErr: true,
+			expectVerifyErr:        true,
+			featureListFileContent: featureListFileContent,
 			updatedFeatureListFileContent: `- name: APIListChunking
   versionedSpecs:
   - default: true
@@ -435,7 +537,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 }
 `,
-			expectVerifyErr: true,
+			expectVerifyErr:        true,
+			featureListFileContent: featureListFileContent,
 			updatedFeatureListFileContent: `- name: APIListChunking
   versionedSpecs:
   - default: true
@@ -477,7 +580,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 }
 `,
-			expectVerifyErr: true,
+			expectVerifyErr:        true,
+			featureListFileContent: featureListFileContent,
 			updatedFeatureListFileContent: `- name: APIListChunking
   versionedSpecs:
   - default: true
@@ -509,7 +613,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featureListFile := writeContentToTmpFile(t, "", "feature_list.yaml", strings.TrimSpace(featureListFileContent))
+			featureListFile := writeContentToTmpFile(t, "", "feature_list.yaml", tc.featureListFileContent)
 			tmpDir := filepath.Dir(featureListFile.Name())
 			_ = writeContentToTmpFile(t, tmpDir, "pkg/new_features.go", tc.goFileContent)
 			err := verifyOrUpdateFeatureList(tmpDir, filepath.Base(featureListFile.Name()), false, true)
