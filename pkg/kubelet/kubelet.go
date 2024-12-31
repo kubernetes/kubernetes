@@ -2842,7 +2842,11 @@ func handleProbeSync(ctx context.Context, kl *Kubelet, update proberesults.Updat
 func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
-	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodStartingOrderByPriority) {
+		sort.Sort(sliceutils.PodsByPriority(pods))
+	} else {
+		sort.Sort(sliceutils.PodsByCreationTime(pods))
+	}
 	var pendingResizes []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
