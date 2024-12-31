@@ -375,10 +375,10 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	return replicaCount, usage, timestamp, nil
 }
 
-func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, unreadyPods, missingPods, ignoredPods sets.String) {
-	missingPods = sets.NewString()
-	unreadyPods = sets.NewString()
-	ignoredPods = sets.NewString()
+func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, unreadyPods, missingPods, ignoredPods sets.Set[string]) {
+	missingPods = sets.New[string]()
+	unreadyPods = sets.New[string]()
+	ignoredPods = sets.New[string]()
 	for _, pod := range pods {
 		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
 			ignoredPods.Insert(pod.Name)
@@ -446,7 +446,7 @@ func calculatePodRequests(pods []*v1.Pod, container string, resource v1.Resource
 	return requests, nil
 }
 
-func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.String) {
+func removeMetricsForPods(metrics metricsclient.PodMetricsInfo, pods sets.Set[string]) {
 	for _, pod := range pods.UnsortedList() {
 		delete(metrics, pod)
 	}

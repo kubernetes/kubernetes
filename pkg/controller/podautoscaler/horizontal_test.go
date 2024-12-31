@@ -54,7 +54,7 @@ import (
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/stretchr/testify/assert"
 
@@ -876,7 +876,7 @@ func (m *mockMonitor) ObserveMetricComputationResult(action monitor.ActionLabel,
 
 // waitUntilRecorded waits for the HPA controller to reconcile at least once.
 func (m *mockMonitor) waitUntilRecorded(t *testing.T) {
-	if err := wait.Poll(20*time.Millisecond, 100*time.Millisecond, func() (done bool, err error) {
+	if err := wait.PollUntilContextTimeout(context.Background(), 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
 		m.RWMutex.RLock()
 		defer m.RWMutex.RUnlock()
 		if len(m.reconciliationActionLabels) == 0 || len(m.reconciliationErrorLabels) == 0 {
@@ -925,7 +925,7 @@ func TestScaleUpContainer(t *testing.T) {
 				Name: v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: pointer.Int32(30),
+					AverageUtilization: ptr.To(int32(30)),
 				},
 				Container: "container1",
 			},
@@ -1619,7 +1619,7 @@ func TestScaleDownContainerResource(t *testing.T) {
 				Name:      v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: pointer.Int32(50),
+					AverageUtilization: ptr.To(int32(50)),
 				},
 			},
 		}},
@@ -3848,7 +3848,7 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: pointer.Int32(300),
+		StabilizationWindowSeconds: ptr.To(int32(300)),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3870,7 +3870,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: pointer.Int32(300),
+		StabilizationWindowSeconds: ptr.To(int32(300)),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3891,7 +3891,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: pointer.Int32(stabilizationWindow),
+		StabilizationWindowSeconds: ptr.To(int32(stabilizationWindow)),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {
