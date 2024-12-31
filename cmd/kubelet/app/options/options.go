@@ -29,8 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubelet/config/v1beta1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -510,4 +513,13 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.BoolVar(&c.RegisterNode, "register-node", c.RegisterNode, "Register the node with the apiserver. If --kubeconfig is not provided, this flag is irrelevant, as the Kubelet won't have an apiserver to register with.")
 
 	fs.Var(&utilflag.RegisterWithTaintsVar{Value: &c.RegisterWithTaints}, "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
+
+	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
+		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefault(featuregate.Feature(clientgofeaturegate.WatchListClient), true); err != nil {
+			// it turns out that there are some integration tests that start multiple control plane components which
+			// share global DefaultFeatureGate/DefaultMutableFeatureGate variables.
+			// in those cases, the above call will fail (FG already registered and cannot be overridden), and the error will be logged.
+			klog.ErrorS(err, "unable to set WatchListClient feature gate") // nolint:logcheck
+		}
+	}
 }

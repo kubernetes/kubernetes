@@ -29,7 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/component-base/zpages/flagz"
@@ -176,6 +178,15 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	_ = fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
 
 	logsapi.AddFlags(&o.config.Logging, fs)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
+		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefault(featuregate.Feature(clientgofeaturegate.WatchListClient), true); err != nil {
+			// it turns out that there are some integration tests that start multiple control plane components which
+			// share global DefaultFeatureGate/DefaultMutableFeatureGate variables.
+			// in those cases, the above call will fail (FG already registered and cannot be overridden), and the error will be logged.
+			klog.ErrorS(err, "unable to set WatchListClient feature gate") // nolint:logcheck
+		}
+	}
 }
 
 // newKubeProxyConfiguration returns a KubeProxyConfiguration with default values
