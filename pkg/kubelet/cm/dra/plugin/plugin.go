@@ -138,6 +138,34 @@ func (p *Plugin) NodePrepareResources(
 	return response, err
 }
 
+func (p *Plugin) CheckDeviceAllocation(
+	ctx context.Context,
+	req *drapbv1beta1.CheckDeviceAllocationRequest,
+	opts ...grpc.CallOption,
+) (*drapbv1beta1.CheckDeviceAllocationResponse, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Calling CheckDeviceAllocation rpc", "request", req)
+
+	conn, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, p.clientCallTimeout)
+	defer cancel()
+
+	var response *drapbv1beta1.CheckDeviceAllocationResponse
+	switch p.chosenService {
+	case drapbv1beta1.DRAPluginService:
+		nodeClient := drapbv1beta1.NewDRAPluginClient(conn)
+		response, err = nodeClient.CheckDeviceAllocation(ctx, req)
+	default:
+		return nil, nil
+	}
+	logger.V(4).Info("Done calling CheckDeviceAllocation rpc", "response", response, "err", err)
+	return response, err
+}
+
 func (p *Plugin) NodeUnprepareResources(
 	ctx context.Context,
 	req *drapbv1beta1.NodeUnprepareResourcesRequest,
