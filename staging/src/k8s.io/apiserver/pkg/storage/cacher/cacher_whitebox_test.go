@@ -198,34 +198,80 @@ func (d *dummyStorage) injectError(err error) {
 }
 
 func TestGetListCacheBypass(t *testing.T) {
-	type testCase struct {
-		opts         storage.ListOptions
-		expectBypass bool
+	type opts struct {
+		ResourceVersion      string
+		ResourceVersionMatch metav1.ResourceVersionMatch
+		Limit                int64
+		Continue             string
 	}
-	commonTestCases := []testCase{
-		{opts: storage.ListOptions{ResourceVersion: "0"}, expectBypass: false},
-		{opts: storage.ListOptions{ResourceVersion: "1"}, expectBypass: false},
-
-		{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Continue: "a"}}, expectBypass: true},
-
-		{opts: storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: false},
-		{opts: storage.ListOptions{ResourceVersion: "1", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
-
-		{opts: storage.ListOptions{ResourceVersion: "", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
-		{opts: storage.ListOptions{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}, expectBypass: true},
+	testCases := map[opts]bool{}
+	for _, rv := range []string{"", "0", "1"} {
+		for _, match := range []metav1.ResourceVersionMatch{"", "Invalid", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
+			for _, c := range []string{"", "continue"} {
+				for _, limit := range []int64{0, 100} {
+					testCases[opts{
+						ResourceVersion:      rv,
+						ResourceVersionMatch: match,
+						Continue:             c,
+						Limit:                limit,
+					}] = false
+				}
+			}
+		}
 	}
+	testCases[opts{ResourceVersion: "0", Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid", Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid", Limit: 100}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", Limit: 100}] = true
+	testCases[opts{ResourceVersion: "1", Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid", Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid", Limit: 100}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = true
+	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Continue: "continue"}] = true
+	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
+	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact, Continue: "continue"}] = true
+	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersionMatch: "Invalid"}] = true
+	testCases[opts{ResourceVersionMatch: "Invalid", Continue: "continue"}] = true
+	testCases[opts{ResourceVersionMatch: "Invalid", Limit: 100}] = true
+	testCases[opts{ResourceVersionMatch: "Invalid", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{Limit: 100, Continue: "continue"}] = true
+	testCases[opts{Continue: "continue"}] = true
 
 	t.Run("ConsistentListFromStorage", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-		testCases := append(commonTestCases,
-			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: true},
-			testCase{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: true},
-		)
-		for _, tc := range testCases {
-			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		testCases[opts{}] = true
+		testCases[opts{Limit: 100}] = true
+		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = true
+		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
+		for opt, expectBypass := range testCases {
+			testGetListCacheBypass(t, storage.ListOptions{
+				ResourceVersion:      opt.ResourceVersion,
+				ResourceVersionMatch: opt.ResourceVersionMatch,
+				Predicate: storage.SelectionPredicate{
+					Continue: opt.Continue,
+					Limit:    opt.Limit,
+				},
+			}, expectBypass)
 		}
 
 	})
@@ -240,12 +286,19 @@ func TestGetListCacheBypass(t *testing.T) {
 		// initialize the storage layer so that the mentioned method evaluates to true
 		forceRequestWatchProgressSupport(t)
 
-		testCases := append(commonTestCases,
-			testCase{opts: storage.ListOptions{ResourceVersion: ""}, expectBypass: false},
-			testCase{opts: storage.ListOptions{ResourceVersion: "", Predicate: storage.SelectionPredicate{Limit: 500}}, expectBypass: false},
-		)
-		for _, tc := range testCases {
-			testGetListCacheBypass(t, tc.opts, tc.expectBypass)
+		testCases[opts{}] = false
+		testCases[opts{Limit: 100}] = false
+		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
+		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
+		for opt, expectBypass := range testCases {
+			testGetListCacheBypass(t, storage.ListOptions{
+				ResourceVersion:      opt.ResourceVersion,
+				ResourceVersionMatch: opt.ResourceVersionMatch,
+				Predicate: storage.SelectionPredicate{
+					Continue: opt.Continue,
+					Limit:    opt.Limit,
+				},
+			}, expectBypass)
 		}
 	})
 }
