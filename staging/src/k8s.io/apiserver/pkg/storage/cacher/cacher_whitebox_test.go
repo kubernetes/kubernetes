@@ -199,10 +199,10 @@ func (d *dummyStorage) injectError(err error) {
 
 func TestGetListCacheBypass(t *testing.T) {
 	type opts struct {
-		ResourceVersion string
+		ResourceVersion      string
 		ResourceVersionMatch metav1.ResourceVersionMatch
-		Limit               int64
-		Continue            string
+		Limit                int64
+		Continue             string
 	}
 	testCases := map[opts]bool{}
 	for _, rv := range []string{"", "0", "1"} {
@@ -210,10 +210,10 @@ func TestGetListCacheBypass(t *testing.T) {
 			for _, c := range []string{"", "continue"} {
 				for _, limit := range []int64{0, 100} {
 					testCases[opts{
-						ResourceVersion: rv,
+						ResourceVersion:      rv,
 						ResourceVersionMatch: match,
-						Continue: c,
-						Limit: limit,
+						Continue:             c,
+						Limit:                limit,
 					}] = false
 				}
 			}
@@ -267,9 +267,9 @@ func TestGetListCacheBypass(t *testing.T) {
 			testGetListCacheBypass(t, storage.ListOptions{
 				ResourceVersion:      opt.ResourceVersion,
 				ResourceVersionMatch: opt.ResourceVersionMatch,
-				Predicate:            storage.SelectionPredicate{
+				Predicate: storage.SelectionPredicate{
 					Continue: opt.Continue,
-					Limit: opt.Limit,
+					Limit:    opt.Limit,
 				},
 			}, expectBypass)
 		}
@@ -294,9 +294,9 @@ func TestGetListCacheBypass(t *testing.T) {
 			testGetListCacheBypass(t, storage.ListOptions{
 				ResourceVersion:      opt.ResourceVersion,
 				ResourceVersionMatch: opt.ResourceVersionMatch,
-				Predicate:            storage.SelectionPredicate{
+				Predicate: storage.SelectionPredicate{
 					Continue: opt.Continue,
-					Limit: opt.Limit,
+					Limit:    opt.Limit,
 				},
 			}, expectBypass)
 		}
