@@ -266,7 +266,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed(), "swap usage is above zero: %s", swapUsage.String())
 
 					// Better to delete the stress pod ASAP to avoid node failures
-					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
+					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{GracePeriodSeconds: pointer.To(int64(0))})
 					framework.ExpectNoError(err)
 				})
 
@@ -316,7 +316,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed())
 
 					// Better to delete the stress pod ASAP to avoid node failures
-					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
+					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{GracePeriodSeconds: pointer.To(int64(0))})
 					framework.ExpectNoError(err)
 				})
 			})
