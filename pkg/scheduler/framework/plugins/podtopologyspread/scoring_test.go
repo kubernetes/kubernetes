@@ -156,9 +156,12 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
+				TopologyValueToPodCounts: []map[string]*int64{
+					{
+						"zone1": ptr.To[int64](0),
+						"zone2": ptr.To[int64](0),
+					},
+					{},
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2), topologyNormalizingWeight(3)},
 			},
@@ -188,10 +191,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"zone1": ptr.To[int64](0),
+					"zone2": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 		},
@@ -229,8 +232,11 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New("node-x"),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
+				TopologyValueToPodCounts: []map[string]*int64{
+					{
+						"zone1": ptr.To[int64](0),
+					},
+					{},
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(2)},
 			},
@@ -271,9 +277,12 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: v1.LabelTopologyZone, value: "mars"}: ptr.To[int64](0),
-					{key: v1.LabelTopologyZone, value: ""}:     ptr.To[int64](0),
+				TopologyValueToPodCounts: []map[string]*int64{
+					{},
+					{
+						"mars": ptr.To[int64](0),
+						"":     ptr.To[int64](0),
+					},
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(4), topologyNormalizingWeight(2)},
 			},
@@ -322,8 +331,11 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "planet", value: "mars"}: ptr.To[int64](0),
+				TopologyValueToPodCounts: []map[string]*int64{
+					{},
+					{
+						"mars": ptr.To[int64](0),
+					},
 				},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
 			},
@@ -363,9 +375,9 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{"planet", "mars"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"mars": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1)},
 			},
 		},
@@ -395,10 +407,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"zone1": ptr.To[int64](0),
+					"zone2": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 			enableNodeInclusionPolicy: true,
@@ -429,10 +441,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"zone1": ptr.To[int64](0),
+					"zone2": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 			enableNodeInclusionPolicy: true,
@@ -463,10 +475,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"zone1": ptr.To[int64](0),
+					"zone2": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 			enableNodeInclusionPolicy: true,
@@ -497,10 +509,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"zone1": ptr.To[int64](0),
+					"zone2": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 			enableNodeInclusionPolicy: true,
@@ -530,10 +542,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"zone1": ptr.To[int64](0),
+					"zone2": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 			enableNodeInclusionPolicy: true,
@@ -563,10 +575,10 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 					},
 				},
 				IgnoredNodes: sets.New[string](),
-				TopologyPairToPodCounts: map[topologyPair]*int64{
-					{key: "zone", value: "zone1"}: ptr.To[int64](0),
-					{key: "zone", value: "zone2"}: ptr.To[int64](0),
-				},
+				TopologyValueToPodCounts: []map[string]*int64{{
+					"zone1": ptr.To[int64](0),
+					"zone2": ptr.To[int64](0),
+				}},
 				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(2)},
 			},
 			enableNodeInclusionPolicy: true,
@@ -951,6 +963,33 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			want: []framework.NodeScore{
 				{Name: "node-a", Score: 100},
 				{Name: "node-x", Score: 63},
+			},
+		},
+		{
+			name: "two Constraints on zone, 2 out of 4 nodes are candidates",
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, fooSelector, nil, nil, nil, nil).
+				SpreadConstraint(1, "zone", v1.ScheduleAnyway, barSelector, nil, nil, nil, nil).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Obj(),
+			},
+			failedNodes: []*v1.Node{
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Obj(),
+			},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 85},
+				{Name: "node-x", Score: 100},
 			},
 		},
 		{
