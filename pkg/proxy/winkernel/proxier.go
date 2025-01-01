@@ -712,11 +712,6 @@ func NewProxier(
 	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
-	if nodeIP == nil {
-		klog.InfoS("Invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
-	}
-
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
