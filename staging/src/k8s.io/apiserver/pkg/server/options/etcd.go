@@ -359,14 +359,6 @@ func addHealthChecksWithoutLivez(c *server.Config, healthChecks ...healthz.Healt
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
-	if s.EtcdServersOverrides != nil {
-		for _, override := range s.EtcdServersOverrides {
-			tokens := strings.Split(override, "#")
-			servers := strings.Split(tokens[1], ";")
-			s.StorageConfig.Transport.ServerList = append(s.StorageConfig.Transport.ServerList, servers...)
-		}
-	}
-
 	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig, c.DrainedNotify())
 	if err != nil {
 		return err
@@ -380,6 +372,39 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 		return err
 	}
 	c.AddReadyzChecks(healthz.NamedCheck("etcd-readiness", func(r *http.Request) error {
+		return readyCheck()
+	}))
+
+	if s.EtcdServersOverrides != nil {
+		if err := s.addOverrideEtcdHealthEndpoint(c); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *EtcdOptions) addOverrideEtcdHealthEndpoint(c *server.Config) error {
+	sc := s.StorageConfig.DeepCopy()
+	for _, override := range s.EtcdServersOverrides {
+		tokens := strings.Split(override, "#")
+		servers := strings.Split(tokens[1], ";")
+		sc.Transport.ServerList = servers
+	}
+
+	healthCheck, err := storagefactory.CreateHealthCheck(*sc, c.DrainedNotify())
+	if err != nil {
+		return err
+	}
+	c.AddHealthChecks(healthz.NamedCheck("etcd-override", func(r *http.Request) error {
+		return healthCheck()
+	}))
+
+	readyCheck, err := storagefactory.CreateReadyCheck(*sc, c.DrainedNotify())
+	if err != nil {
+		return err
+	}
+	c.AddReadyzChecks(healthz.NamedCheck("etcd-override-readiness", func(r *http.Request) error {
 		return readyCheck()
 	}))
 
