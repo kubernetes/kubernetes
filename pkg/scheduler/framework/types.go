@@ -397,6 +397,13 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	}
 }
 
+// podResource contains the result of calculateResource and is used only internally.
+type podResource struct {
+	resource Resource
+	non0CPU  int64
+	non0Mem  int64
+}
+
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).
@@ -406,6 +413,15 @@ type PodInfo struct {
 	RequiredAntiAffinityTerms  []AffinityTerm
 	PreferredAffinityTerms     []WeightedAffinityTerm
 	PreferredAntiAffinityTerms []WeightedAffinityTerm
+	// cachedResource contains precomputed resources for Pod (podResource).
+	// The value can change only if InPlacePodVerticalScaling is enabled.
+	// In that case, the whole PodInfo object is recreated (for assigned pods in cache).
+	// cachedResource contains a podResource, computed when adding a scheduled pod to NodeInfo.
+	// When removing a pod from a NodeInfo, i.e. finding victims for preemption or removing a pod from a cluster,
+	// cachedResource is used instead, what provides a noticeable performance boost.
+	// Note: cachedResource field shouldn't be accessed directly.
+	// Use calculateResource method to obtain it instead.
+	cachedResource *podResource
 }
 
 // DeepCopy returns a deep copy of the PodInfo object.
@@ -416,6 +432,7 @@ func (pi *PodInfo) DeepCopy() *PodInfo {
 		RequiredAntiAffinityTerms:  pi.RequiredAntiAffinityTerms,
 		PreferredAffinityTerms:     pi.PreferredAffinityTerms,
 		PreferredAntiAffinityTerms: pi.PreferredAntiAffinityTerms,
+		cachedResource:             pi.cachedResource,
 	}
 }
 
@@ -464,6 +481,7 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 	pi.RequiredAntiAffinityTerms = requiredAntiAffinityTerms
 	pi.PreferredAffinityTerms = weightedAffinityTerms
 	pi.PreferredAntiAffinityTerms = weightedAntiAffinityTerms
+	pi.cachedResource = nil
 	return utilerrors.NewAggregate(parseErrs)
 }
 
@@ -963,7 +981,7 @@ func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
 	if podWithRequiredAntiAffinity(podInfo.Pod) {
 		n.PodsWithRequiredAntiAffinity = append(n.PodsWithRequiredAntiAffinity, podInfo)
 	}
-	n.update(podInfo.Pod, 1)
+	n.update(podInfo, 1)
 }
 
 // AddPod is a wrapper around AddPodInfo.
@@ -985,8 +1003,8 @@ func podWithRequiredAntiAffinity(p *v1.Pod) bool {
 		len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0
 }
 
-func removeFromSlice(logger klog.Logger, s []*PodInfo, k string) ([]*PodInfo, bool) {
-	var removed bool
+func removeFromSlice(logger klog.Logger, s []*PodInfo, k string) ([]*PodInfo, *PodInfo) {
+	var removedPod *PodInfo
 	for i := range s {
 		tmpKey, err := GetPodKey(s[i].Pod)
 		if err != nil {
@@ -994,18 +1012,18 @@ func removeFromSlice(logger klog.Logger, s []*PodInfo, k string) ([]*PodInfo, bo
 			continue
 		}
 		if k == tmpKey {
+			removedPod = s[i]
 			// delete the element
 			s[i] = s[len(s)-1]
 			s = s[:len(s)-1]
-			removed = true
 			break
 		}
 	}
 	// resets the slices to nil so that we can do DeepEqual in unit tests.
 	if len(s) == 0 {
-		return nil, removed
+		return nil, removedPod
 	}
-	return s, removed
+	return s, removedPod
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
@@ -1021,33 +1039,33 @@ func (n *NodeInfo) RemovePod(logger klog.Logger, pod *v1.Pod) error {
 		n.PodsWithRequiredAntiAffinity, _ = removeFromSlice(logger, n.PodsWithRequiredAntiAffinity, k)
 	}
 
-	var removed bool
-	if n.Pods, removed = removeFromSlice(logger, n.Pods, k); removed {
-		n.update(pod, -1)
+	var removedPod *PodInfo
+	if n.Pods, removedPod = removeFromSlice(logger, n.Pods, k); removedPod != nil {
+		n.update(removedPod, -1)
 		return nil
 	}
 	return fmt.Errorf("no corresponding pod %s in pods of node %s", pod.Name, n.node.Name)
 }
 
-// update node info based on the pod and sign.
+// update node info based on the pod, and sign.
 // The sign will be set to `+1` when AddPod and to `-1` when RemovePod.
-func (n *NodeInfo) update(pod *v1.Pod, sign int64) {
-	res, non0CPU, non0Mem := calculateResource(pod)
-	n.Requested.MilliCPU += sign * res.MilliCPU
-	n.Requested.Memory += sign * res.Memory
-	n.Requested.EphemeralStorage += sign * res.EphemeralStorage
-	if n.Requested.ScalarResources == nil && len(res.ScalarResources) > 0 {
+func (n *NodeInfo) update(podInfo *PodInfo, sign int64) {
+	podResource := podInfo.calculateResource()
+	n.Requested.MilliCPU += sign * podResource.resource.MilliCPU
+	n.Requested.Memory += sign * podResource.resource.Memory
+	n.Requested.EphemeralStorage += sign * podResource.resource.EphemeralStorage
+	if n.Requested.ScalarResources == nil && len(podResource.resource.ScalarResources) > 0 {
 		n.Requested.ScalarResources = map[v1.ResourceName]int64{}
 	}
-	for rName, rQuant := range res.ScalarResources {
+	for rName, rQuant := range podResource.resource.ScalarResources {
 		n.Requested.ScalarResources[rName] += sign * rQuant
 	}
-	n.NonZeroRequested.MilliCPU += sign * non0CPU
-	n.NonZeroRequested.Memory += sign * non0Mem
+	n.NonZeroRequested.MilliCPU += sign * podResource.non0CPU
+	n.NonZeroRequested.Memory += sign * podResource.non0Mem
 
 	// Consume ports when pod added or release ports when pod removed.
-	n.updateUsedPorts(pod, sign > 0)
-	n.updatePVCRefCounts(pod, sign > 0)
+	n.updateUsedPorts(podInfo.Pod, sign > 0)
+	n.updatePVCRefCounts(podInfo.Pod, sign > 0)
 
 	n.Generation = nextGeneration()
 }
@@ -1103,20 +1121,25 @@ func getNonMissingContainerRequests(requests v1.ResourceList, podLevelResourcesS
 
 }
 
-func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
-	requests := resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+func (pi *PodInfo) calculateResource() podResource {
+	if pi.cachedResource != nil {
+		return *pi.cachedResource
+	}
+	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
+	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
+	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
+		UseStatusResources: inPlacePodVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources: !podLevelResourcesEnabled,
 	})
-	isPodLevelResourcesSet := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelRequestsSet(pod)
+	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
 	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
 	non0Requests := requests
 	if len(nonMissingContainerRequests) > 0 {
-		non0Requests = resourcehelper.PodRequests(pod, resourcehelper.PodResourcesOptions{
-			UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		non0Requests = resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
+			UseStatusResources: inPlacePodVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:       !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+			SkipPodLevelResources:       !podLevelResourcesEnabled,
 			NonMissingContainerRequests: nonMissingContainerRequests,
 		})
 	}
@@ -1125,7 +1148,13 @@ func calculateResource(pod *v1.Pod) (Resource, int64, int64) {
 
 	var res Resource
 	res.Add(requests)
-	return res, non0CPU.MilliValue(), non0Mem.Value()
+	podResource := podResource{
+		resource: res,
+		non0CPU:  non0CPU.MilliValue(),
+		non0Mem:  non0Mem.Value(),
+	}
+	pi.cachedResource = &podResource
+	return podResource
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
