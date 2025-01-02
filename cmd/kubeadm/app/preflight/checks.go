@@ -1091,6 +1091,15 @@ func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
+// RunUpgradeChecks initializes checks slice of structs and call RunChecks
+func RunUpgradeChecks(ignorePreflightErrors sets.Set[string]) error {
+	checks := []Checker{
+		SystemVerificationCheck{},
+	}
+
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	containerRuntime := utilruntime.NewContainerRuntime(cfg.NodeRegistration.CRISocket)
