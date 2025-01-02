@@ -87,6 +87,13 @@ func newCmdNode(out io.Writer) *cobra.Command {
 				return err
 			}
 
+			data, err := nodeRunner.InitData(args)
+			if err != nil {
+				return err
+			}
+			if _, ok := data.(*nodeData); !ok {
+				return errors.New("invalid data struct")
+			}
 			if err := nodeRunner.Run(args); err != nil {
 				return err
 			}
