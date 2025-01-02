@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -83,7 +84,22 @@ func newCmdNode(out io.Writer) *cobra.Command {
 				return err
 			}
 
-			return nodeRunner.Run(args)
+			data, err := nodeRunner.InitData(args)
+			if err != nil {
+				return err
+			}
+			if _, ok := data.(*nodeData); !ok {
+				return errors.New("invalid data struct")
+			}
+			if err := nodeRunner.Run(args); err != nil {
+				return err
+			}
+			if nodeOptions.dryRun {
+				fmt.Println("[upgrade/successful] Finished dryrunning successfully!")
+				return nil
+			}
+
+			return nil
 		},
 		Args: cobra.NoArgs,
 	}
