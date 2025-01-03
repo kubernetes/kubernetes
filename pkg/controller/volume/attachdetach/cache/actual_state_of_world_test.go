@@ -1315,7 +1315,7 @@ func Test_SetNodeStatusUpdateNeededError(t *testing.T) {
 	asw.SetNodeStatusUpdateNeeded(logger, nodeName)
 
 	// Assert
-	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
+	nodesToUpdateStatusFor := asw.(*actualStateOfWorld).nodesToUpdateStatusFor
 	if len(nodesToUpdateStatusFor) != 0 {
 		t.Fatalf("nodesToUpdateStatusFor should be empty as nodeName does not exist")
 	}
@@ -1346,8 +1346,8 @@ func Test_updateNodeStatusUpdateNeeded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("updateNodeStatusUpdateNeeded should not return error, but got: %v", err)
 	}
-	nodesToUpdateStatusFor := asw.GetNodesToUpdateStatusFor()
-	if nodesToUpdateStatusFor[nodeName].statusUpdateNeeded {
+
+	if asw.nodesToUpdateStatusFor[nodeName].statusUpdateNeeded {
 		t.Fatalf("nodesToUpdateStatusFor should be updated to: false, but got: true")
 	}
 }
