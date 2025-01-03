@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] ##
 
+## [0.3.5] - 2024-12-06 ##
+### Fixed ###
+- `MkdirAll` will now no longer return an `EEXIST` error if two racing
+  processes are creating the same directory. We will still verify that the path
+  is a directory, but this will avoid spurious errors when multiple threads or
+  programs are trying to `MkdirAll` the same path. opencontainers/runc#4543
+
 ## [0.3.4] - 2024-10-09 ##
 
 ### Fixed ###
@@ -164,8 +171,9 @@ This is our first release of `github.com/cyphar/filepath-securejoin`,
 containing a full implementation with a coverage of 93.5% (the only missing
 cases are the error cases, which are hard to mocktest at the moment).
 
-[Unreleased]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.4...HEAD
-[0.3.3]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.3...v0.3.4
+[Unreleased]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.4...v0.3.5
+[0.3.4]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/cyphar/filepath-securejoin/compare/v0.3.0...v0.3.1
