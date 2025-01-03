@@ -57,6 +57,9 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/feature"
 	_ "k8s.io/kubernetes/test/e2e/nodefeature"
 
+	// node subtests
+	_ "k8s.io/kubernetes/test/e2e_node/lifecyclehooks"
+
 	// reconfigure framework
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
