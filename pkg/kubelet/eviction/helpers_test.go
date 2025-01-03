@@ -3257,6 +3257,28 @@ func newPodMemoryStats(pod *v1.Pod, workingSet resource.Quantity) statsapi.PodSt
 	}
 }
 
+func newPodSwapStats(pod *v1.Pod, swapUsage resource.Quantity, swapAvailable resource.Quantity) statsapi.PodStats {
+	swapBytes := uint64(swapUsage.Value())
+	sA := uint64(swapAvailable.Value())
+	return statsapi.PodStats{
+		PodRef: statsapi.PodReference{
+			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+		},
+		Swap: &statsapi.SwapStats{
+			SwapUsageBytes:     &swapBytes,
+			SwapAvailableBytes: &sA,
+		},
+		Containers: []statsapi.ContainerStats{
+			{
+				Swap: &statsapi.SwapStats{
+					SwapUsageBytes:     &swapBytes,
+					SwapAvailableBytes: &sA,
+				},
+			},
+		},
+	}
+}
+
 func newPodProcessStats(pod *v1.Pod, num uint64) statsapi.PodStats {
 	return statsapi.PodStats{
 		PodRef: statsapi.PodReference{
