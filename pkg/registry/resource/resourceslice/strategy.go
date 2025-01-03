@@ -49,6 +49,8 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	slice := obj.(*resource.ResourceSlice)
 	slice.Generation = 1
+
+	dropDisabledFields(slice, nil)
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -75,6 +77,8 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	if !apiequality.Semantic.DeepEqual(oldSlice.Spec, slice.Spec) {
 		slice.Generation = oldSlice.Generation + 1
 	}
+
+	dropDisabledFields(slice, oldSlice)
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -146,4 +150,13 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
+}
+
+// dropDisabledFields removes fields which are covered by a feature gate.
+func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
+	dropDisabledDRAPartitionableDevices(newSlice, oldSlice)
+}
+
+func dropDisabledDRAPartitionableDevices(newSlice, oldSlice *resource.ResourceSlice) {
+	// TODO
 }

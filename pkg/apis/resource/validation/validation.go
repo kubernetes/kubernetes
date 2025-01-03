@@ -508,10 +508,18 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
 	}
 
-	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices, validateDevice,
+	// Warn about exceeding the maximum length only once. If any individual
+	// field is too large, then so is the combination.
+	allErrs = append(allErrs, validateSet(spec.Devices, -1, validateDevice,
 		func(device resource.Device) (string, string) {
 			return device.Name, "name"
 		}, fldPath.Child("devices"))...)
+
+	if combinedLen, max := len(spec.Devices)+len(spec.DeviceMixins), resource.ResourceSliceMaxDevicesAndMixins; combinedLen > max {
+		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of devices and mixins must not exceed %d", max)))
+	}
+
+	// TODO: complete validation
 
 	return allErrs
 }
