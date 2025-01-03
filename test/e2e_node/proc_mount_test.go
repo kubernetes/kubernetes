@@ -46,7 +46,7 @@ var _ = SIGDescribe("DefaultProcMount [LinuxOnly]", framework.WithNodeConformanc
 	})
 })
 
-var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
+var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, feature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("proc-mount-baseline-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -77,7 +77,7 @@ var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, nodefeat
 	})
 })
 
-var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
+var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, feature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("proc-mount-privileged-test")
 
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
