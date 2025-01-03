@@ -85,7 +85,7 @@ type CorrelatorOptions struct {
 	// If not specified (zero value), clock.RealClock{} will be used
 	Clock clock.PassiveClock
 	// The func used by EventFilterFunc, which returns a key for given event, based on which filtering will take place
-	// If not specified (zero value), getSpamKey will be used
+	// If not specified (zero value), each aggregated event will be filtered individually
 	SpamKeyFunc EventSpamKeyFunc
 }
 
