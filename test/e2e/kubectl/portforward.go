@@ -606,7 +606,7 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			ginkgo.By("Wait for client being interrupted")
 			select {
 			case err = <-errorChan:
-			case <-time.After(e2epod.DefaultPodDeletionTimeout):
+			case <-time.After(f.Timeouts.PodDelete):
 			}
 
 			ginkgo.By("Check the client error")

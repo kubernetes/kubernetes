@@ -365,7 +365,7 @@ var _ = SIGDescribe("HugePages", framework.WithSerial(), feature.HugePages, func
 		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
 		ginkgo.JustAfterEach(func(ctx context.Context) {
 			ginkgo.By(fmt.Sprintf("deleting test pod %s", testpod.Name))
-			e2epod.NewPodClient(f).DeleteSync(ctx, testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, testpod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			releaseHugepages(ctx)
 
