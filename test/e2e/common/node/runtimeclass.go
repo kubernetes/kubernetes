@@ -33,12 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2eruntimeclass "k8s.io/kubernetes/test/e2e/framework/node/runtimeclass"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -60,7 +60,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	})
 
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler not being installed.
-	f.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", nodefeature.RuntimeHandler, func(ctx context.Context) {
+	f.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", feature.RuntimeHandler, func(ctx context.Context) {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(ctx, f, "unconfigured-handler", handler, nil)
 		ginkgo.DeferCleanup(deleteRuntimeClass, f, rcName)
@@ -84,7 +84,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 	// This test requires that the PreconfiguredRuntimeClassHandler has already been set up on nodes.
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler installed and working.
-	f.It("should run a Pod requesting a RuntimeClass with a configured handler", nodefeature.RuntimeHandler, func(ctx context.Context) {
+	f.It("should run a Pod requesting a RuntimeClass with a configured handler", feature.RuntimeHandler, func(ctx context.Context) {
 		if err := e2eruntimeclass.NodeSupportsPreconfiguredRuntimeClassHandler(ctx, f); err != nil {
 			e2eskipper.Skipf("Skipping test as node does not have E2E runtime class handler preconfigured in container runtime config: %v", err)
 		}
