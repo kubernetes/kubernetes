@@ -197,7 +197,7 @@ func (o *CreateSecretTLSOptions) Run() error {
 		}
 		secretTLS, err = o.Client.Secrets(o.Namespace).Create(context.TODO(), secretTLS, createOptions)
 		if err != nil {
-			return fmt.Errorf("failed to create secret %v", err)
+			return fmt.Errorf("failed to create secret: %v", err)
 		}
 	}
 	return o.PrintObj(secretTLS)
