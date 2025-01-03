@@ -1080,19 +1080,18 @@ func printConfigMapVolumeSource(configMap *corev1.ConfigMapVolumeSource, w Prefi
 
 func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tProjected (a volume that contains injected data from multiple sources)\n")
+	w.Write(LEVEL_2, "Sources:\n")
 	for _, source := range projected.Sources {
 		if source.Secret != nil {
-			w.Write(LEVEL_2, "SecretName:\t%v\n"+
-				"    SecretOptionalName:\t%v\n",
-				source.Secret.Name, source.Secret.Optional)
+			optional := source.Secret.Optional != nil && *source.Secret.Optional
+			w.Write(LEVEL_3, "SecretName:\t%v (Optional:\t%v)\n", source.Secret.Name, optional)
 		} else if source.DownwardAPI != nil {
-			w.Write(LEVEL_2, "DownwardAPI:\ttrue\n")
+			w.Write(LEVEL_3, "DownwardAPI:\ttrue\n")
 		} else if source.ConfigMap != nil {
-			w.Write(LEVEL_2, "ConfigMapName:\t%v\n"+
-				"    ConfigMapOptional:\t%v\n",
-				source.ConfigMap.Name, source.ConfigMap.Optional)
+			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
+			w.Write(LEVEL_3, "ConfigMapName:\t%v (Optional:\t%v)\n", source.ConfigMap.Name, optional)
 		} else if source.ServiceAccountToken != nil {
-			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
+			w.Write(LEVEL_3, "TokenExpirationSeconds:\t%d\n",
 				*source.ServiceAccountToken.ExpirationSeconds)
 		}
 	}
