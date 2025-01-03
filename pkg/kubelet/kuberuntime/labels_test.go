@@ -155,7 +155,6 @@ func TestContainerAnnotations(t *testing.T) {
 		PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
 		PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
 		Hash:                      kubecontainer.HashContainer(container),
-		RestartCount:              restartCount,
 		TerminationMessagePath:    container.TerminationMessagePath,
 		PreStopHandler:            container.Lifecycle.PreStop,
 	}
