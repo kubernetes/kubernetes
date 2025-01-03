@@ -28,8 +28,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/Microsoft/hnslib"
+        "github.com/Microsoft/hnslib"
 	"github.com/Microsoft/hnslib/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -635,6 +634,7 @@ type Proxier struct {
 	rootHnsEndpointName   string
 	mapStaleLoadbalancers map[string]bool // This maintains entries of stale load balancers which are pending delete in last iteration
 	terminatedEndpoints   map[string]bool // This maintains entries of endpoints which are terminated. Key is ip address:portnumber
+	lastFullSync          time.Time
 }
 
 type localPort struct {
@@ -945,7 +945,34 @@ func (proxier *Proxier) SyncLoop() {
 	}
 	// synthesize "last change queued" time as the informers are syncing.
 	metrics.SyncProxyRulesLastQueuedTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
+	go proxier.FullSyncLoop()
 	proxier.syncRunner.Loop(wait.NeverStop)
+}
+
+func (proxier *Proxier) FullSyncLoop() {
+	timer := time.NewTimer(proxyutil.FullSyncPeriod)
+	<-timer.C
+	for {
+		select {
+		case <-wait.NeverStop:
+			klog.V(3).Infof("IPVS Proxier Full Sync Loop stopped")
+			return
+		case <-timer.C:
+			proxier.tryFullSync(timer)
+		}
+	}
+}
+
+func (proxier *Proxier) tryFullSync(timer *time.Timer) {
+	now := time.Now()
+	nextFullSync := proxier.lastFullSync.Add(proxyutil.FullSyncPeriod)
+	if now.Before(nextFullSync) {
+		timer.Reset(nextFullSync.Sub(now))
+		return
+	}
+	klog.V(3).Infof("IPVS Proxier Full Sync")
+	proxier.syncProxyRules()
+	timer.Reset(proxyutil.FullSyncPeriod)
 }
 
 func (proxier *Proxier) setInitialized(value bool) {
@@ -1141,6 +1168,7 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
+		proxier.lastFullSync = time.Now()
 		klog.V(4).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
 	}()
 

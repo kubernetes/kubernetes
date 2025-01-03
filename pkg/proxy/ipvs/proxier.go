@@ -253,6 +253,8 @@ type Proxier struct {
 	// (ref: https://github.com/kubernetes/kubernetes/issues/119656)
 	lbNoNodeAccessIPPortProtocolEntries []*utilipset.Entry
 
+	lastFullSync time.Time
+
 	logger klog.Logger
 }
 
@@ -756,7 +758,34 @@ func (proxier *Proxier) SyncLoop() {
 	}
 	// synthesize "last change queued" time as the informers are syncing.
 	metrics.SyncProxyRulesLastQueuedTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
+	go proxier.FullSyncLoop()
 	proxier.syncRunner.Loop(wait.NeverStop)
+}
+
+func (proxier *Proxier) FullSyncLoop() {
+	timer := time.NewTimer(proxyutil.FullSyncPeriod)
+	<-timer.C
+	for {
+		select {
+		case <-wait.NeverStop:
+			klog.V(3).Infof("IPVS Proxier Full Sync Loop stopped")
+			return
+		case <-timer.C:
+			proxier.tryFullSync(timer)
+		}
+	}
+}
+
+func (proxier *Proxier) tryFullSync(timer *time.Timer) {
+	now := time.Now()
+	nextFullSync := proxier.lastFullSync.Add(proxyutil.FullSyncPeriod)
+	if now.Before(nextFullSync) {
+		timer.Reset(nextFullSync.Sub(now))
+		return
+	}
+	klog.V(3).Infof("IPVS Proxier Full Sync")
+	proxier.syncProxyRules()
+	timer.Reset(proxyutil.FullSyncPeriod)
 }
 
 func (proxier *Proxier) setInitialized(value bool) {
@@ -920,6 +949,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// and the mutex is held.
 	defer func() {
 		proxier.initialSync = false
+		proxier.lastFullSync = time.Now()
 	}()
 
 	// Keep track of how long syncs take.

@@ -37,6 +37,8 @@ type Provider interface {
 	// This is expected to run as a goroutine or as the main loop of the app.
 	// It does not return.
 	SyncLoop()
+
+	FullSyncLoop()
 }
 
 // ServicePortName carries a namespace + name + portname.  This is the unique

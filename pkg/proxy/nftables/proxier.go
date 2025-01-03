@@ -204,6 +204,8 @@ type Proxier struct {
 	noEndpointServices  *nftElementStorage
 	noEndpointNodePorts *nftElementStorage
 	serviceNodePorts    *nftElementStorage
+
+	lastFullSync time.Time
 }
 
 // Proxier implements proxy.Provider
@@ -760,7 +762,34 @@ func (proxier *Proxier) SyncLoop() {
 
 	// synthesize "last change queued" time as the informers are syncing.
 	metrics.SyncProxyRulesLastQueuedTimestamp.WithLabelValues(string(proxier.ipFamily)).SetToCurrentTime()
+	go proxier.FullSyncLoop()
 	proxier.syncRunner.Loop(wait.NeverStop)
+}
+
+func (proxier *Proxier) FullSyncLoop() {
+	timer := time.NewTimer(proxyutil.FullSyncPeriod)
+	for {
+		select {
+		case <-wait.NeverStop:
+			klog.V(3).Infof("Iptables Proxier Full Sync Loop stopped")
+			return
+		case <-timer.C:
+			proxier.tryFullSync(timer)
+		}
+	}
+}
+
+func (proxier *Proxier) tryFullSync(timer *time.Timer) {
+	now := time.Now()
+	nextFullSync := proxier.lastFullSync.Add(proxyutil.FullSyncPeriod)
+	if now.Before(nextFullSync) {
+		timer.Reset(nextFullSync.Sub(now))
+		return
+	}
+	klog.V(3).Infof("IPVS Proxier Full Sync")
+	proxier.needFullSync = true
+	proxier.syncProxyRules()
+	timer.Reset(proxyutil.FullSyncPeriod)
 }
 
 func (proxier *Proxier) setInitialized(value bool) {
@@ -1183,6 +1212,7 @@ func (proxier *Proxier) syncProxyRules() {
 			metrics.SyncPartialProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
 		} else {
 			metrics.SyncFullProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
+			proxier.lastFullSync = time.Now()
 		}
 		proxier.logger.V(2).Info("SyncProxyRules complete", "elapsed", time.Since(start))
 	}()
