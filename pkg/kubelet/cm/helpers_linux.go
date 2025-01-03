@@ -18,6 +18,7 @@ package cm
 
 import (
 	"bufio"
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -340,4 +341,30 @@ func GetKubeletContainer(kubeletCgroups string) (string, error) {
 		return cont, nil
 	}
 	return kubeletCgroups, nil
+}
+
+// CompareCPULimits compares the 2 cpu limits, factoring in platform-specific minimums and rounding.
+// Compare returns 0 if the limits x and y are equivalent, and otherwise -1 if x < y, or 1 if x > y.
+func CompareCPULimits(x, y int64) int {
+	if x == y {
+		return 0
+	}
+	// If both x and y are at or bellow the minimum, they are equivalent.
+	if x <= MinMilliCPULimit && y <= MinMilliCPULimit {
+		return 0
+	}
+	return cmp.Compare(x, y)
+}
+
+// CompareCPURequests compares the 2 cpu requests, factoring in platform-specific minimums and rounding.
+// Compare returns 0 if the requests x and y are equivalent, and otherwise -1 if x < y, or 1 if x > y.
+func CompareCPURequests(x, y int64) int {
+	if x == y {
+		return 0
+	}
+	// If both x and y are at or bellow the minimum, they are equivalent.
+	if x <= MinShares && y <= MinShares {
+		return 0
+	}
+	return cmp.Compare(x, y)
 }
