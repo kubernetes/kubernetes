@@ -785,22 +785,30 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 //
 //	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
 func shouldDelegateList(opts storage.ListOptions) bool {
-	resourceVersion := opts.ResourceVersion
-	pred := opts.Predicate
-	match := opts.ResourceVersionMatch
-	consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-
-	// Serve consistent reads from storage if ConsistentListFromCache is disabled
-	consistentReadFromStorage := resourceVersion == "" && !(consistentListFromCacheEnabled && requestWatchProgressSupported)
-	// Watch cache doesn't support continuations, so serve them from etcd.
-	hasContinuation := len(pred.Continue) > 0
-	// Watch cache only supports ResourceVersionMatchNotOlderThan (default).
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	isLegacyExactMatch := opts.Predicate.Limit > 0 && match == "" && len(resourceVersion) > 0 && resourceVersion != "0"
-	unsupportedMatch := match != "" && match != metav1.ResourceVersionMatchNotOlderThan || isLegacyExactMatch
-
-	return consistentReadFromStorage || hasContinuation || unsupportedMatch
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchExact:
+		return true
+	case metav1.ResourceVersionMatchNotOlderThan:
+	case "":
+		// Legacy exact match
+		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return true
+		}
+	default:
+		return true
+	}
+	// Continue
+	if len(opts.Predicate.Continue) > 0 {
+		return true
+	}
+	// Consistent Read
+	if opts.ResourceVersion == "" {
+		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
+	}
+	return false
 }
 
 // computeListLimit determines whether the cacher should
