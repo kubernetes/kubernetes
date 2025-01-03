@@ -204,6 +204,11 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 	BackoffUntil(f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding, stopCh)
 }
 
+// Function that changes the sleep period during runtime (based on conditions)
+func DyanmicPeriodUntil(ctx context.Context, f func(), period func() time.Duration, jitterFactor float64, sliding bool) {
+	BackoffUntil(f, NewDynamicPeriodBackoffManagerImpl(period, jitterFactor, &clock.RealClock{}), sliding, ctx.Done())
+}
+
 // BackoffUntil loops until stop channel is closed, run f every duration given by BackoffManager.
 //
 // If sliding is true, the period is computed after f runs. If it is false then
@@ -228,6 +233,12 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 
 		if sliding {
 			t = backoff.Backoff()
+		}
+
+		// dynamically change the sleep period
+		dynamicPeriod, ok := backoff.(*dynamicPeriodBackoffManagerImpl)
+		if ok {
+			t.Reset(dynamicPeriod.duration())
 		}
 
 		// NOTE: b/c there is no priority selection in golang
@@ -399,6 +410,22 @@ type jitteredBackoffManagerImpl struct {
 	backoffTimer clock.Timer
 }
 
+type dynamicPeriodBackoffManagerImpl struct {
+	clock        clock.Clock
+	duration     func() time.Duration
+	jitter       float64
+	backoffTimer clock.Timer
+}
+
+func NewDynamicPeriodBackoffManagerImpl(duration func() time.Duration, jitter float64, c clock.Clock) BackoffManager {
+	return &dynamicPeriodBackoffManagerImpl{
+		clock:        c,
+		duration:     duration,
+		jitter:       jitter,
+		backoffTimer: nil,
+	}
+}
+
 // NewJitteredBackoffManager returns a BackoffManager that backoffs with given duration plus given jitter. If the jitter
 // is negative, backoff will not be jittered.
 //
@@ -423,6 +450,14 @@ func NewJitteredBackoffManager(duration time.Duration, jitter float64, c clock.C
 	}
 }
 
+func (d *dynamicPeriodBackoffManagerImpl) getNextBackoff() time.Duration {
+	jitteredPeriod := d.duration()
+	if d.jitter > 0.0 {
+		jitteredPeriod = Jitter(d.duration(), d.jitter)
+	}
+	return jitteredPeriod
+}
+
 func (j *jitteredBackoffManagerImpl) getNextBackoff() time.Duration {
 	jitteredPeriod := j.duration
 	if j.jitter > 0.0 {
@@ -441,6 +476,16 @@ func (j *jitteredBackoffManagerImpl) Backoff() clock.Timer {
 		j.backoffTimer.Reset(backoff)
 	}
 	return j.backoffTimer
+}
+
+func (d *dynamicPeriodBackoffManagerImpl) Backoff() clock.Timer {
+	backoff := d.getNextBackoff()
+	if d.backoffTimer == nil {
+		d.backoffTimer = d.clock.NewTimer(backoff)
+	} else {
+		d.backoffTimer.Reset(backoff)
+	}
+	return d.backoffTimer
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
