@@ -825,18 +825,23 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	return noLabelSelector && noFieldSelector && hasLimit
 }
 
-func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) ([]interface{}, uint64, string, error) {
+func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) (listResp, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
 		if err != nil {
-			return nil, 0, "", err
+			return listResp{}, "", err
 		}
 		if exists {
-			return []interface{}{obj}, readResourceVersion, "", nil
+			return listResp{Items: []interface{}{obj}, ResourceVersion: readResourceVersion}, "", nil
 		}
-		return nil, readResourceVersion, "", nil
+		return listResp{ResourceVersion: readResourceVersion}, "", nil
 	}
 	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, pred.MatcherIndex(ctx))
+}
+
+type listResp struct {
+	Items           []interface{}
+	ResourceVersion uint64
 }
 
 // GetList implements storage.Interface
@@ -914,7 +919,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
+	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
 	success := "true"
 	fallback := "false"
 	if err != nil {
@@ -933,7 +938,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if consistentRead {
 		metrics.ConsistentReadTotal.WithLabelValues(c.resourcePrefix, success, fallback).Add(1)
 	}
-	span.AddEvent("Listed items from cache", attribute.Int("count", len(objs)))
+	span.AddEvent("Listed items from cache", attribute.Int("count", len(resp.Items)))
 	// store pointer of eligible objects,
 	// Why not directly put object in the items of listObj?
 	//   the elements in ListObject are Struct type, making slice will bring excessive memory consumption.
@@ -942,7 +947,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	var lastSelectedObjectKey string
 	var hasMoreListItems bool
 	limit := computeListLimit(opts)
-	for i, obj := range objs {
+	for i, obj := range resp.Items {
 		elem, ok := obj.(*storeElement)
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
@@ -952,7 +957,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			lastSelectedObjectKey = elem.Key
 		}
 		if limit > 0 && int64(len(selectedObjects)) >= limit {
-			hasMoreListItems = i < len(objs)-1
+			hasMoreListItems = i < len(resp.Items)-1
 			break
 		}
 	}
@@ -969,16 +974,16 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	span.AddEvent("Filtered items", attribute.Int("count", listVal.Len()))
 	if c.versioner != nil {
-		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(readResourceVersion), int64(len(objs)), hasMoreListItems, opts)
+		continueValue, remainingItemCount, err := storage.PrepareContinueToken(lastSelectedObjectKey, key, int64(resp.ResourceVersion), int64(len(resp.Items)), hasMoreListItems, opts)
 		if err != nil {
 			return err
 		}
 
-		if err = c.versioner.UpdateList(listObj, readResourceVersion, continueValue, remainingItemCount); err != nil {
+		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
 			return err
 		}
 	}
-	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(objs), listVal.Len())
+	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(resp.Items), listVal.Len())
 	return nil
 }
 
