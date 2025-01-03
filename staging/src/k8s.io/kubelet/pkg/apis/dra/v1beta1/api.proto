@@ -43,6 +43,13 @@ service DRAPlugin {
   // The same error handling rules apply,
   rpc NodeUnprepareResources (NodeUnprepareResourcesRequest)
     returns (NodeUnprepareResourcesResponse) {}
+
+  // CheckDeviceAllocation prevent from that same device to be assigned to different claims.
+  // DRA plugin authors should check for the fellow situation:
+  // i. allocation by different schedulers without coordination
+  // ii. device state change
+  rpc CheckDeviceAllocation (CheckDeviceAllocationRequest)
+    returns (CheckDeviceAllocationResponse) {}
 }
 
 message NodePrepareResourcesRequest {
@@ -114,4 +121,17 @@ message Claim {
     // The name of the Resource claim (ResourceClaim.meta.Name)
     // This field is REQUIRED.
     string name = 3;
+}
+
+message CheckDeviceAllocationRequest {
+    // The list of ResourceClaims that are to be prepared.
+    repeated Claim claims = 1;
+}
+
+
+message CheckDeviceAllocationResponse {
+    bool allocated = 1;
+    // If non-empty, preparing the ResourceClaim failed.
+    // Devices are ignored in that case.
+    string error = 2;
 }
