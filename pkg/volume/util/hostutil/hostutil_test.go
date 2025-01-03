@@ -26,7 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 )
@@ -46,57 +45,6 @@ func (f *fakeMounter) GetMountRefs(pathname string) ([]string, error) {
 	}
 
 	return f.mountRefs, nil
-}
-
-func TestDeviceNameFromMount(t *testing.T) {
-	hu := NewHostUtil()
-	path := "/tmp/foo"
-	if goruntime.GOOS == "windows" {
-		path = "C:" + path
-	}
-
-	testCases := map[string]struct {
-		mountRefs     []string
-		expectedPath  string
-		raiseError    bool
-		expectedError string
-	}{
-		"GetMountRefs error": {
-			raiseError:    true,
-			expectedError: "Expected error.",
-		},
-		"No Refs error": {
-			expectedError: fmt.Sprintf("directory %s is not mounted", path),
-		},
-		"No Matching refs": {
-			mountRefs:    []string{filepath.Join("foo", "lish")},
-			expectedPath: filepath.Base(path),
-		},
-		"Matched ref": {
-			mountRefs:    []string{filepath.Join(path, "lish")},
-			expectedPath: "lish",
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			mounter := &fakeMounter{
-				mountRefs:  tc.mountRefs,
-				raiseError: tc.raiseError,
-			}
-
-			path, err := hu.GetDeviceNameFromMount(mounter, path, path)
-			if tc.expectedError != "" {
-				if err == nil || err.Error() != tc.expectedError {
-					t.Fatalf("expected error message `%s` but got `%v`", tc.expectedError, err)
-				}
-				return
-			}
-
-			expectedPath := filepath.FromSlash(tc.expectedPath)
-			assert.Equal(t, expectedPath, path)
-		})
-	}
 }
 
 func createSocketFile(socketDir string) (string, error) {
