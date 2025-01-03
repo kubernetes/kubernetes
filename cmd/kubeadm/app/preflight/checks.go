@@ -809,6 +809,35 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 	return err
 }
 
+// ImageExistsCheck will check container images used by kubeadm
+type ImageExistsCheck struct {
+	runtime         utilruntime.ContainerRuntime
+	imageList       []string
+	imagePullPolicy v1.PullPolicy
+}
+
+// Name returns the label for ImageExistsCheck
+func (ImageExistsCheck) Name() string {
+	return "ImageExists"
+}
+
+// Check checks images required by kubeadm.
+func (ipc ImageExistsCheck) Check() (warnings, errorList []error) {
+	policy := ipc.imagePullPolicy
+	for _, image := range ipc.imageList {
+		if policy == v1.PullAlways {
+			errorList = append(errorList, errors.Errorf("need to pull image %s", image))
+			continue
+		}
+		klog.V(1).Infof("validating the existence of image %s", image)
+		if ipc.runtime.ImageExists(image) {
+			continue
+		}
+		errorList = append(errorList, errors.Errorf("image does not exist %s", image))
+	}
+	return warnings, errorList
+}
+
 // ImagePullCheck will pull container images used by kubeadm
 type ImagePullCheck struct {
 	runtime         utilruntime.ContainerRuntime
@@ -1096,7 +1125,23 @@ func RunUpgradeChecks(ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
 	}
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
 
+// RunImagesExistCheck will check if all images kubeadm needs are found on the system
+func RunImagesExistCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
+	containerRuntime := utilruntime.NewContainerRuntime(cfg.NodeRegistration.CRISocket)
+	if err := containerRuntime.Connect(); err != nil {
+		return &Error{Msg: err.Error()}
+	}
+
+	checks := []Checker{
+		ImageExistsCheck{
+			runtime:         containerRuntime,
+			imageList:       images.GetControlPlaneImages(&cfg.ClusterConfiguration),
+			imagePullPolicy: cfg.NodeRegistration.ImagePullPolicy,
+		},
+	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 

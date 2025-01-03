@@ -67,6 +67,10 @@ func runPreflight(c workflow.RunData) error {
 		initConfig.NodeRegistration.ImagePullSerial = data.Cfg().Node.ImagePullSerial
 
 		if !data.DryRun() {
+			if err := preflight.RunImagesExistCheck(utilsexec.New(), initConfig, data.IgnorePreflightErrors()); err == nil {
+				fmt.Println("[upgrade/preflight] All images required for setting up a Kubernetes cluster exist")
+				return nil
+			}
 			fmt.Println("[upgrade/preflight] Pulling images required for setting up a Kubernetes cluster")
 			fmt.Println("[upgrade/preflight] This might take a minute or two, depending on the speed of your internet connection")
 			fmt.Println("[upgrade/preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
