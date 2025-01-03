@@ -9265,10 +9265,18 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 			SuccessThreshold: 1,
 		},
+	}, {
+		Name:                     "container-4-allowed-resize-policy",
+		Image:                    "image",
+		ImagePullPolicy:          "IfNotPresent",
+		TerminationMessagePolicy: "File",
+		ResizePolicy: []core.ContainerResizePolicy{
+			{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+		},
 	},
 	}
 	var PodRestartPolicy core.RestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9644,6 +9652,20 @@ func TestValidateInitContainers(t *testing.T) {
 		}},
 		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].lifecycle.preStop", BadValue: ""}},
 	},
+		{
+			"Not supported ResizePolicy: invalid",
+			line(),
+			[]core.Container{{
+				Name:                     "init",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				ResizePolicy: []core.ContainerResizePolicy{
+					{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+				},
+			}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "initContainers[0].resizePolicy", BadValue: []core.ContainerResizePolicy{{ResourceName: "cpu", RestartPolicy: "NotRequired"}}}},
+		},
 	}
 
 	for _, tc := range errorCases {
