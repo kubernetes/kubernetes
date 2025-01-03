@@ -214,8 +214,8 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/google/btree v1.0.1
-## explicit; go 1.12
+# github.com/google/btree v1.1.3
+## explicit; go 1.18
 github.com/google/btree
 # github.com/google/cadvisor v0.51.0
 ## explicit; go 1.21

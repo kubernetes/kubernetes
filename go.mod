@@ -157,7 +157,7 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/btree v1.0.1 // indirect
+	github.com/google/btree v1.1.3 // indirect
 	github.com/google/pprof v0.0.0-20241029153458-d1b30febd7db // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
