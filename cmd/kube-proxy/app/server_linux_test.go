@@ -38,6 +38,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientgotesting "k8s.io/client-go/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -575,6 +577,7 @@ detectLocalMode: "BridgeInterface"`)
 }
 
 func Test_waitForPodCIDR(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
 	_, ctx := ktesting.NewTestContext(t)
 	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
 	nodeName := "test-node"
@@ -672,6 +675,7 @@ func TestGetConntrackMax(t *testing.T) {
 }
 
 func TestProxyServer_platformSetup(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, false)
 	tests := []struct {
 		name         string
 		node         *v1.Node

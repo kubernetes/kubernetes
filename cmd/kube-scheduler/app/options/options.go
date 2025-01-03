@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	clientgofeaturegate "k8s.io/client-go/features"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -209,6 +210,15 @@ func (o *Options) initFlags() {
 	logsapi.AddFlags(o.Logs, nfs.FlagSet("logs"))
 
 	o.Flags = &nfs
+
+	if !utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(clientgofeaturegate.WatchListClient)) {
+		if err := utilfeature.DefaultMutableFeatureGate.OverrideDefault(featuregate.Feature(clientgofeaturegate.WatchListClient), true); err != nil {
+			// it turns out that there are some integration tests that start multiple control plane components which
+			// share global DefaultFeatureGate/DefaultMutableFeatureGate variables.
+			// in those cases, the above call will fail (FG already registered and cannot be overridden), and the error will be logged.
+			klog.ErrorS(err, "unable to set WatchListClient feature gate") // nolint:logcheck
+		}
+	}
 }
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.
