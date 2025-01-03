@@ -18,10 +18,12 @@ package transport
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -460,6 +462,7 @@ func TestHeaderEscapeRoundTrip(t *testing.T) {
 	}
 }
 
+//nolint:logcheck // Intentionally tests with global logging.
 func TestDebuggingRoundTripper(t *testing.T) {
 	t.Parallel()
 
@@ -471,6 +474,10 @@ func TestDebuggingRoundTripper(t *testing.T) {
 			"X-Test-Request": {"test"},
 		},
 	}
+	reqHeaderString := `headers=<
+	Authorization: bearer <masked>
+	X-Test-Request: test
+ >`
 	res := &http.Response{
 		Status:     "OK",
 		StatusCode: http.StatusOK,
@@ -478,60 +485,97 @@ func TestDebuggingRoundTripper(t *testing.T) {
 			"X-Test-Response": {"test"},
 		},
 	}
+	resHeaderString := `headers=<
+	X-Test-Response: test
+ >`
 	tcs := []struct {
 		levels              []DebugLevel
+		v                   int
 		expectedOutputLines []string
 	}{
 		{
 			levels:              []DebugLevel{DebugJustURL},
-			expectedOutputLines: []string{fmt.Sprintf("%s %s", req.Method, rawURL)},
+			expectedOutputLines: []string{fmt.Sprintf(`"Request" verb=%q url=%q`, req.Method, rawURL)},
 		},
 		{
-			levels: []DebugLevel{DebugRequestHeaders},
-			expectedOutputLines: func() []string {
-				lines := []string{fmt.Sprintf("Request Headers:\n")}
-				for key, values := range req.Header {
-					for _, value := range values {
-						if key == "Authorization" {
-							value = "bearer <masked>"
-						}
-						lines = append(lines, fmt.Sprintf("    %s: %s\n", key, value))
-					}
-				}
-				return lines
-			}(),
+			levels:              []DebugLevel{DebugRequestHeaders},
+			expectedOutputLines: []string{`"Request" ` + reqHeaderString},
 		},
 		{
-			levels: []DebugLevel{DebugResponseHeaders},
-			expectedOutputLines: func() []string {
-				lines := []string{fmt.Sprintf("Response Headers:\n")}
-				for key, values := range res.Header {
-					for _, value := range values {
-						lines = append(lines, fmt.Sprintf("    %s: %s\n", key, value))
-					}
-				}
-				return lines
-			}(),
+			levels:              []DebugLevel{DebugResponseHeaders},
+			expectedOutputLines: []string{`"Response" ` + resHeaderString},
 		},
 		{
 			levels:              []DebugLevel{DebugURLTiming},
-			expectedOutputLines: []string{fmt.Sprintf("%s %s %s", req.Method, rawURL, res.Status)},
+			expectedOutputLines: []string{fmt.Sprintf(`"Response" verb=%q url=%q status=%q`, req.Method, rawURL, res.Status)},
 		},
 		{
 			levels:              []DebugLevel{DebugResponseStatus},
-			expectedOutputLines: []string{fmt.Sprintf("Response Status: %s", res.Status)},
+			expectedOutputLines: []string{fmt.Sprintf(`"Response" status=%q`, res.Status)},
 		},
 		{
 			levels:              []DebugLevel{DebugCurlCommand},
 			expectedOutputLines: []string{fmt.Sprintf("curl -v -X")},
 		},
+		{
+			levels:              []DebugLevel{DebugURLTiming, DebugResponseStatus},
+			expectedOutputLines: []string{fmt.Sprintf(`"Response" verb=%q url=%q status=%q milliseconds=`, req.Method, rawURL, res.Status)},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      5,
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      6,
+			expectedOutputLines: []string{
+				`"Request"
+`,
+				fmt.Sprintf(`"Response" verb=%q url=%q status=%q milliseconds=`, req.Method, rawURL, res.Status),
+			},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      7,
+			expectedOutputLines: []string{
+				fmt.Sprintf(`"Request" verb=%q url=%q %s
+`, req.Method, rawURL, reqHeaderString),
+				fmt.Sprintf(`"Response" status=%q milliseconds=`, res.Status),
+			},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      8,
+			expectedOutputLines: []string{
+				fmt.Sprintf(`"Request" verb=%q url=%q %s
+`, req.Method, rawURL, reqHeaderString),
+				fmt.Sprintf(`"Response" status=%q %s milliseconds=`, res.Status, resHeaderString),
+			},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      9,
+			expectedOutputLines: []string{
+				fmt.Sprintf(`"Request" curlCommand="curl -v -X%s`, req.Method),
+				fmt.Sprintf(`"Response" verb=%q url=%q status=%q %s milliseconds=`, req.Method, rawURL, res.Status, resHeaderString),
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		// hijack the klog output
+		state := klog.CaptureState()
 		tmpWriteBuffer := bytes.NewBuffer(nil)
 		klog.SetOutput(tmpWriteBuffer)
 		klog.LogToStderr(false)
+		var fs flag.FlagSet
+		klog.InitFlags(&fs)
+		if err := fs.Set("one_output", "true"); err != nil {
+			t.Errorf("unexpected error setting -one_output: %v", err)
+		}
+		if err := fs.Set("v", fmt.Sprintf("%d", tc.v)); err != nil {
+			t.Errorf("unexpected error setting -v: %v", err)
+		}
 
 		// parse rawURL
 		parsedURL, err := url.Parse(rawURL)
@@ -544,7 +588,11 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		rt := &testRoundTripper{
 			Response: res,
 		}
-		NewDebuggingRoundTripper(rt, tc.levels...).RoundTrip(req)
+		if len(tc.levels) == 1 && tc.levels[0] == DebugByContext {
+			DebugWrappers(rt).RoundTrip(req)
+		} else {
+			NewDebuggingRoundTripper(rt, tc.levels...).RoundTrip(req)
+		}
 
 		// call Flush to ensure the text isn't still buffered
 		klog.Flush()
@@ -553,8 +601,15 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		actual := tmpWriteBuffer.String()
 		for _, expected := range tc.expectedOutputLines {
 			if !strings.Contains(actual, expected) {
-				t.Errorf("%q does not contain expected output %q", actual, expected)
+				t.Errorf("verbosity %d: expected this substring:\n%s\n\ngot:\n%s", tc.v, expected, actual)
 			}
 		}
+		// These test cases describe all expected lines.
+		entries := regexp.MustCompile(`(?m)^I`).FindAllStringIndex(actual, -1)
+		if tc.v > 0 && len(entries) != len(tc.expectedOutputLines) {
+			t.Errorf("expected %d output lines, got:\n%s", len(tc.expectedOutputLines), actual)
+		}
+
+		state.Restore()
 	}
 }
