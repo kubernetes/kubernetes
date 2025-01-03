@@ -456,6 +456,30 @@ type DeploymentSpec struct {
 	// not be estimated during the time a deployment is paused. Defaults to 600s.
 	// +optional
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty" protobuf:"varint,9,opt,name=progressDeadlineSeconds"`
+
+	// podReplacementPolicy specifies when to create replacement Pods.
+	// Possible values are:
+	// - TerminationStarted policy creates replacement Pods when the old Pods start
+	//   terminating (have a non-null .metadata.deletionTimestamp). The total number
+	//   of Deployment Pods can be greater than specified by the Deployment's
+	//   .spec.replicas and the DeploymentStrategy.
+	// - TerminationComplete policy creates replacement Pods only when the old Pods
+	//   are fully terminated (reach Succeeded or Failed phase). The old Pods are
+	//   subsequently removed. The total number of the Deployment Pods is
+	//   limited by the Deployment's .spec.replicas and the DeploymentStrategy.
+	//   This policy will also delay declaring the deployment as complete until all
+	//   of its terminating replicas have been fully terminated.
+	//
+	// The default behavior when the policy is not specified depends on the DeploymentStrategy:
+	// - Recreate strategy uses TerminationComplete behavior when recreating the deployment,
+	//   but uses TerminationStarted when scaling the deployment.
+	// - RollingUpdate strategy uses TerminationStarted behavior for both rolling out and
+	//   scaling the deployments.
+	//
+	// This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to
+	// use this field.
+	// +optional
+	PodReplacementPolicy *DeploymentPodReplacementPolicy `json:"podReplacementPolicy,omitempty" protobuf:"bytes,10,opt,name=podReplacementPolicy,casttype=podReplacementPolicy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -546,35 +570,62 @@ type RollingUpdateDeployment struct {
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 
+// DeploymentPodReplacementPolicy specifies the policy for creating Deployment Pod replacements.
+// Default is a mixed behavior depending on the DeploymentStrategy
+// +enum
+type DeploymentPodReplacementPolicy string
+
+const (
+	// TerminationStarted policy creates replacement Pods when the old Pods start
+	// terminating (have a non-null .metadata.deletionTimestamp). The total number
+	// of Deployment Pods can be greater than specified by the Deployment's
+	// .spec.replicas and the DeploymentStrategy.
+	TerminationStarted DeploymentPodReplacementPolicy = "TerminationStarted"
+	// TerminationComplete policy creates replacement Pods only when the old Pods
+	// are fully terminated (reach Succeeded or Failed phase). The old Pods are
+	// subsequently removed. The total number of the Deployment Pods is
+	// limited by the Deployment's .spec.replicas and the DeploymentStrategy.
+	//
+	// This policy will also delay declaring the deployment as complete until all
+	// of its terminating replicas have been fully terminated.
+	TerminationComplete DeploymentPodReplacementPolicy = "TerminationComplete"
+)
+
 // DeploymentStatus is the most recently observed status of the Deployment.
 type DeploymentStatus struct {
-	// observedGeneration is the generation observed by the deployment controller.
+	// The generation observed by the deployment controller.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
-	// replicas is the total number of non-terminated pods targeted by this deployment (their labels match the selector).
+	// Total number of non-terminating pods targeted by this deployment (their labels match the selector).
 	// +optional
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,2,opt,name=replicas"`
 
-	// updatedReplicas is the total number of non-terminated pods targeted by this deployment that have the desired template spec.
+	// Total number of non-terminating pods targeted by this deployment that have the desired template spec.
 	// +optional
 	UpdatedReplicas int32 `json:"updatedReplicas,omitempty" protobuf:"varint,3,opt,name=updatedReplicas"`
 
-	// readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.
+	// Total number of non-terminating pods targeted by this Deployment with a Ready Condition.
 	// +optional
 	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,7,opt,name=readyReplicas"`
 
-	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
+	// Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.
 	// +optional
 	AvailableReplicas int32 `json:"availableReplicas,omitempty" protobuf:"varint,4,opt,name=availableReplicas"`
 
-	// unavailableReplicas is the total number of unavailable pods targeted by this deployment. This is the total number of
+	// Total number of unavailable pods targeted by this deployment. This is the total number of
 	// pods that are still required for the deployment to have 100% available capacity. They may
 	// either be pods that are running but not yet available or pods that still have not been created.
 	// +optional
 	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty" protobuf:"varint,5,opt,name=unavailableReplicas"`
 
-	// Conditions represent the latest available observations of a deployment's current state.
+	// Total number of terminating pods (have a non-null .metadata.deletionTimestamp) targeted by this deployment.
+	//
+	// This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.
+	// +optional
+	TerminatingReplicas *int32 `json:"terminatingReplicas,omitempty" protobuf:"varint,9,opt,name=terminatingReplicas"`
+
+	// Represents the latest available observations of a deployment's current state.
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	// +listType=map
