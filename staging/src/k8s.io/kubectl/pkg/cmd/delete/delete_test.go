@@ -972,3 +972,39 @@ func TestResourceErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestDeleteMessageOutput(t *testing.T) {
+	cmdtesting.InitTestErrorHandler(t)
+	_, _, rc := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test-specific")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test-specific/replicationcontrollers/redis-master" && m == "DELETE":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdDelete(tf, streams)
+	err := cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	cmd.Run(cmd, []string{})
+
+	if buf.String() != "replicationcontroller \"redis-master\" deleted from test-specific namespace\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+
+}
