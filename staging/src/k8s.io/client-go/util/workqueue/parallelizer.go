@@ -26,7 +26,8 @@ import (
 type DoWorkPieceFunc func(piece int)
 
 type options struct {
-	chunkSize int
+	chunkSize    int
+	workerMetric GaugeMetric
 }
 
 type Options func(*options)
@@ -38,6 +39,14 @@ type Options func(*options)
 func WithChunkSize(c int) func(*options) {
 	return func(o *options) {
 		o.chunkSize = c
+	}
+}
+
+// WithWorkerMetric allows to set a metric that will be incremented
+// at the beginning of a worker (goroutine) and decremented at its end.
+func WithWorkerMetric(m GaugeMetric) func(*options) {
+	return func(o *options) {
+		o.workerMetric = m
 	}
 }
 
@@ -76,6 +85,12 @@ func ParallelizeUntil(ctx context.Context, workers, pieces int, doWorkPiece DoWo
 		go func() {
 			defer utilruntime.HandleCrash()
 			defer wg.Done()
+
+			if o.workerMetric != nil {
+				o.workerMetric.Inc()
+				defer o.workerMetric.Dec()
+			}
+
 			for chunk := range toProcess {
 				start := chunk * chunkSize
 				end := start + chunkSize
