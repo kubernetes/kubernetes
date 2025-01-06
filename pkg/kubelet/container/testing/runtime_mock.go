@@ -200,7 +200,7 @@ func (_c *MockRuntime_DeleteContainer_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// GarbageCollect provides a mock function with given fields: ctx, gcPolicy, allSourcesReady, evictNonDeletedPods
+// GarbageCollect provides a mock function with given fields: ctx, allSourcesReady, evictNonDeletedPods
 func (_m *MockRuntime) GarbageCollect(ctx context.Context, allSourcesReady bool, evictNonDeletedPods bool) error {
 	ret := _m.Called(ctx, allSourcesReady, evictNonDeletedPods)
 
