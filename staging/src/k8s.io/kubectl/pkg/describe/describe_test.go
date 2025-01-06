@@ -6941,7 +6941,7 @@ func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expectedOut := "SecretName:  optional-secret (Optional:  true)"
+	expectedOut := "SecretName:  optional-secret\n    Optional:    true"
 	if !strings.Contains(out, expectedOut) {
 		t.Errorf("expected to find %q in output: %q", expectedOut, out)
 	}
