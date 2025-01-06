@@ -326,12 +326,8 @@ func newTestKubeletWithImageList(
 		ImageGCManager:   imageGCManager,
 	}
 	kubelet.containerLogManager = logs.NewStubContainerLogManager()
-	containerGCPolicy := kubecontainer.GCPolicy{
-		MinAge:             time.Duration(0),
-		MaxPerPodContainer: 1,
-		MaxContainers:      -1,
-	}
-	containerGC, err := kubecontainer.NewContainerGC(fakeRuntime, containerGCPolicy, kubelet.sourcesReady)
+
+	containerGC, err := kubecontainer.NewContainerGC(fakeRuntime, kubelet.sourcesReady)
 	assert.NoError(t, err)
 	kubelet.containerGC = containerGC
 
