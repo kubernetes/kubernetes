@@ -19,6 +19,8 @@ package stats
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -503,6 +505,39 @@ func checkFsStats(t *testing.T, label string, seed int, stats *statsapi.FsStats)
 	assert.EqualValues(t, seed+offsetFsAvailable, *stats.AvailableBytes, label+".AvailableBytes")
 	assert.EqualValues(t, seed+offsetFsInodes, *stats.Inodes, label+".Inodes")
 	assert.EqualValues(t, seed+offsetFsInodesFree, *stats.InodesFree, label+".InodesFree")
+}
+
+func checkContainersSwapStats(t *testing.T, podStats statsapi.PodStats, containerStats ...cadvisorapiv2.ContainerInfo) {
+	if runtime.GOOS != "linux" {
+		return
+	}
+
+	podContainers := make(map[string]struct{}, len(podStats.Containers))
+	for _, container := range podStats.Containers {
+		podContainers[container.Name] = struct{}{}
+	}
+
+	for _, container := range containerStats {
+		found := false
+		containerName := container.Spec.Labels["io.kubernetes.container.name"]
+		for _, containerPodStats := range podStats.Containers {
+			if containerPodStats.Name == containerName {
+				assert.Equal(t, container.Stats[0].Memory.Swap, *containerPodStats.Swap.SwapUsageBytes)
+				found = true
+			}
+		}
+		assert.True(t, found, "container %s not found in pod stats", container.Spec.Labels["io.kubernetes.container.name"])
+		delete(podContainers, containerName)
+	}
+
+	var missingContainerNames []string
+	for containerName := range podContainers {
+		missingContainerNames = append(missingContainerNames, containerName)
+	}
+	assert.Emptyf(t, podContainers, "containers not found in pod stats: %v", strings.Join(missingContainerNames, " "))
+	if len(missingContainerNames) > 0 {
+		assert.FailNow(t, "containers not found in pod stats")
+	}
 }
 
 func checkEphemeralStats(t *testing.T, label string, containerSeeds []int, volumeSeeds []int, containerLogStats []*volume.Metrics, stats *statsapi.FsStats) {
