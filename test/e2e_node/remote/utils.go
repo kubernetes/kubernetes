@@ -80,7 +80,7 @@ func getCNIURL() string {
 	if builder.IsTargetArchArm64() {
 		cniArch = "arm64"
 	}
-	cniURL := fmt.Sprintf("https://storage.googleapis.com/k8s-artifacts-cni/release/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
+	cniURL := fmt.Sprintf("https://github.com/containernetworking/plugins/releases/download/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
 	return cniURL
 
 }
