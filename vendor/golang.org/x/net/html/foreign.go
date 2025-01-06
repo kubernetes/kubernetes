@@ -40,8 +40,7 @@ func htmlIntegrationPoint(n *Node) bool {
 		if n.Data == "annotation-xml" {
 			for _, a := range n.Attr {
 				if a.Key == "encoding" {
-					val := strings.ToLower(a.Val)
-					if val == "text/html" || val == "application/xhtml+xml" {
+					if strings.EqualFold(a.Val, "text/html") || strings.EqualFold(a.Val, "application/xhtml+xml") {
 						return true
 					}
 				}
