@@ -6906,3 +6906,43 @@ func TestDescribeSeccompProfile(t *testing.T) {
 		})
 	}
 }
+
+func TestDescribeProjectedVolumesOptionalSecret(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			Volumes: []corev1.Volume{
+				{
+					Name: "optional-secret",
+					VolumeSource: corev1.VolumeSource{
+						Projected: &corev1.ProjectedVolumeSource{
+							Sources: []corev1.VolumeProjection{
+								{
+									Secret: &corev1.SecretProjection{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: "optional-secret",
+										},
+										Optional: ptr.To(true),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOut := "SecretName:  optional-secret\n    Optional:    true"
+	if !strings.Contains(out, expectedOut) {
+		t.Errorf("expected to find %q in output: %q", expectedOut, out)
+	}
+}
