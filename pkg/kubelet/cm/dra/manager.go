@@ -271,10 +271,6 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		if err != nil {
 			return fmt.Errorf("failed to get gRPC client for driver %s: %w", driverName, err)
 		}
-		_, checkErr := client.CheckDeviceAllocation(ctx, &drapb.CheckDeviceAllocationRequest{Claims: claims})
-		if checkErr != nil {
-			return fmt.Errorf("CheckDeviceAllocation failed: %w", err)
-		}
 		response, err := client.NodePrepareResources(ctx, &drapb.NodePrepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
