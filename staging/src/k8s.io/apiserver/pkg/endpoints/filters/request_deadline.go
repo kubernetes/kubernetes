@@ -119,7 +119,7 @@ func withFailedRequestAudit(failedHandler http.Handler, statusErr *apierrors.Sta
 			failedHandler.ServeHTTP(w, req)
 			return
 		}
-		ev := &ac.Event
+		ev := ac.Event.DeepCopy()
 
 		ev.ResponseStatus = &metav1.Status{}
 		ev.Stage = auditinternal.StageResponseStarted
