@@ -746,6 +746,11 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 				returnStatus = s
 				continue
 			}
+			if s.Code() == framework.Pending {
+				// In the case if plugin is in the pending state, we will return that state.
+				// So no need to convert that into an error.
+				return nil, s, nil
+			}
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name()), nil
 		}
 		if !r.AllNodes() {
