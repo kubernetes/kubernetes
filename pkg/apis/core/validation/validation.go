@@ -5657,21 +5657,21 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 				dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
 				if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
 					// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
-					specDiff := cmp.Diff(oldPod.Spec.InitContainers[ix], container)
-					errs := field.Forbidden(specPath, fmt.Sprintf("only cpu and memory resources for sidecar containers are mutable\n%v", specDiff))
+					errs := field.Forbidden(specPath, "only cpu and memory resources for sidecar containers are mutable")
 					allErrs = append(allErrs, errs)
-					return allErrs
 				}
 			} else if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) { // non-restartable init container
 				// This likely means that the user has modified resources of non-sidecar init container.
-				specDiff := cmp.Diff(oldPod.Spec.InitContainers[ix], container)
-				errs := field.Forbidden(specPath, fmt.Sprintf("resources for non-sidecar init containers are immutable\n%v", specDiff))
+				errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
 				allErrs = append(allErrs, errs)
-				return allErrs
 			}
 			newInitContainers = append(newInitContainers, container)
 		}
 		originalCPUMemPodSpec.InitContainers = newInitContainers
+	}
+
+	if len(allErrs) > 0 {
+		return allErrs
 	}
 
 	if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec, oldPod.Spec) {
