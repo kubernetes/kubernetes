@@ -32,11 +32,11 @@ type stateMemory struct {
 var _ State = &stateMemory{}
 
 // NewStateMemory creates new State to track resources allocated to pods
-func NewStateMemory() State {
+func NewStateMemory(alloc PodResourceAllocation, stats PodResizeStatus) State {
 	klog.V(2).InfoS("Initialized new in-memory state store for pod resource allocation tracking")
 	return &stateMemory{
-		podAllocation:   PodResourceAllocation{},
-		podResizeStatus: PodResizeStatus{},
+		podAllocation:   alloc,
+		podResizeStatus: stats,
 	}
 }
 
@@ -74,12 +74,15 @@ func (s *stateMemory) SetContainerResourceAllocation(podUID string, containerNam
 	return nil
 }
 
-func (s *stateMemory) SetPodResourceAllocation(a PodResourceAllocation) error {
+func (s *stateMemory) SetPodResourceAllocation(podUID string, alloc map[string]v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
-	s.podAllocation = a.Clone()
-	klog.V(3).InfoS("Updated pod resource allocation", "allocation", a)
+	for containerName, containerAlloc := range alloc {
+		s.podAllocation[podUID][containerName] = containerAlloc
+	}
+
+	klog.V(3).InfoS("Updated pod resource allocation", "podUID", podUID, "allocation", alloc)
 	return nil
 }
 

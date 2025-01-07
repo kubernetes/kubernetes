@@ -93,6 +93,6 @@ func (m *fakeManager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodRe
 // NewFakeManager creates empty/fake memory manager
 func NewFakeManager() Manager {
 	return &fakeManager{
-		state: state.NewStateMemory(),
+		state: state.NewStateMemory(state.PodResourceAllocation{}, state.PodResizeStatus{}),
 	}
 }
