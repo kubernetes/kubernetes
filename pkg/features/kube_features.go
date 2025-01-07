@@ -455,12 +455,6 @@ const (
 	// Permits kubelet to run with swap enabled.
 	NodeSwap featuregate.Feature = "NodeSwap"
 
-	// owner: @mortent, @atiratree, @ravig
-	// kep: http://kep.k8s.io/3018
-	//
-	// Enables PDBUnhealthyPodEvictionPolicy for PodDisruptionBudgets
-	PDBUnhealthyPodEvictionPolicy featuregate.Feature = "PDBUnhealthyPodEvictionPolicy"
-
 	// owner: @RomanBednar
 	// kep: https://kep.k8s.io/3762
 	//
