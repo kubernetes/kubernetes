@@ -22,11 +22,17 @@ import (
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	"k8s.io/apiserver/pkg/cel/common"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 type statusStrategy struct {
@@ -94,8 +100,17 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 		return field.ErrorList{field.Invalid(field.NewPath(""), old, fmt.Sprintf("has type %T. Must be a pointer to an Unstructured type", old))}
 	}
 
+	var options []validation.ValidationOption
+	var celOptions []cel.Option
+	var correlatedObject *common.CorrelatedObject
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+		correlatedObject = common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
+		options = append(options, validation.WithRatcheting(correlatedObject))
+		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
+	}
+
 	var errs field.ErrorList
-	errs = append(errs, a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, uNew, uOld, a.scale)...)
+	errs = append(errs, a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, uNew, uOld, a.scale, options...)...)
 
 	// ratcheting validation of x-kubernetes-list-type value map and set
 	if newErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchema, uNew.Object); len(newErrs) > 0 {
@@ -109,9 +124,14 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 		if has, err := hasBlockingErr(errs); has {
 			errs = append(errs, err)
 		} else {
-			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget)
+			err, _ := celValidator.Validate(ctx, nil, a.customResourceStrategy.structuralSchema, uNew.Object, uOld.Object, celconfig.RuntimeCELCostBudget, celOptions...)
 			errs = append(errs, err...)
 		}
+	}
+
+	// No-op if not attached to context
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
+		validation.Metrics.ObserveRatchetingTime(*correlatedObject.Duration)
 	}
 	return errs
 }
