@@ -281,9 +281,9 @@
 - name: InheritDefaultEvictionValues
   versionedSpecs:
   - default: true
-    lockToDefault: true
+    lockToDefault: false
     preRelease: Beta
-    version: "1.32"
+    version: "1.33"
 - name: InTreePluginPortworxUnregister
   versionedSpecs:
   - default: false
