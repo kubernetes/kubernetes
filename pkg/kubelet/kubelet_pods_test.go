@@ -6878,6 +6878,9 @@ func TestAllocatedResourcesMatchStatus(t *testing.T) {
 
 	for _, test := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
+			if isSidecarContainer {
+				test.name += " " + "for sidecar containers"
+			}
 			t.Run(test.name, func(t *testing.T) {
 				var podStatus *kubecontainer.PodStatus
 				state := kubecontainer.ContainerStateRunning
