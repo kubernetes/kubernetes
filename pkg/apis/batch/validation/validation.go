@@ -743,11 +743,7 @@ func validateCronJobSpec(spec, oldSpec *batch.CronJobSpec, fldPath *field.Path, 
 	if len(spec.Schedule) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("schedule"), ""))
 	} else {
-		allowTZInSchedule := false
-		if oldSpec != nil {
-			allowTZInSchedule = strings.Contains(oldSpec.Schedule, "TZ")
-		}
-		allErrs = append(allErrs, validateScheduleFormat(spec.Schedule, allowTZInSchedule, spec.TimeZone, fldPath.Child("schedule"))...)
+		allErrs = append(allErrs, validateScheduleFormat(spec.Schedule, fldPath.Child("schedule"))...)
 	}
 
 	if spec.StartingDeadlineSeconds != nil {
@@ -788,15 +784,12 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 	return allErrs
 }
 
-func validateScheduleFormat(schedule string, allowTZInSchedule bool, timeZone *string, fldPath *field.Path) field.ErrorList {
+func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if _, err := cron.ParseStandard(schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
 	}
-	switch {
-	case allowTZInSchedule && strings.Contains(schedule, "TZ") && timeZone != nil:
-		allErrs = append(allErrs, field.Invalid(fldPath, schedule, "cannot use both timeZone field and TZ or CRON_TZ in schedule"))
-	case !allowTZInSchedule && strings.Contains(schedule, "TZ"):
+	if strings.Contains(schedule, "TZ") {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, "cannot use TZ or CRON_TZ in schedule, use timeZone field instead"))
 	}
 

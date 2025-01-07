@@ -2946,7 +2946,7 @@ func TestValidateCronJobScheduleTZ(t *testing.T) {
 	}{
 		"update removing TZ should work": {
 			cronJob:   invalidCronJob,
-			createErr: "cannot use TZ or CRON_TZ in schedule",
+			createErr: "cannot use TZ or CRON_TZ in schedule, use timeZone field instead",
 			update: func(cj *batch.CronJob) {
 				cj.Spec.Schedule = validSchedule
 			},
@@ -2957,6 +2957,7 @@ func TestValidateCronJobScheduleTZ(t *testing.T) {
 			update: func(cj *batch.CronJob) {
 				cj.Spec.Schedule = invalidSchedule
 			},
+			updateErr: "cannot use TZ or CRON_TZ in schedule, use timeZone field instead",
 		},
 		"update not modifying TZ but adding .spec.timeZone should fail": {
 			cronJob:   invalidCronJob,
@@ -2964,14 +2965,14 @@ func TestValidateCronJobScheduleTZ(t *testing.T) {
 			update: func(cj *batch.CronJob) {
 				cj.Spec.TimeZone = &timeZoneUTC
 			},
-			updateErr: "cannot use both timeZone field and TZ or CRON_TZ in schedule",
+			updateErr: "cannot use TZ or CRON_TZ in schedule, use timeZone field instead",
 		},
 		"update adding TZ should fail": {
 			cronJob: validCronJob,
 			update: func(cj *batch.CronJob) {
 				cj.Spec.Schedule = invalidSchedule
 			},
-			updateErr: "cannot use TZ or CRON_TZ in schedule",
+			updateErr: "cannot use TZ or CRON_TZ in schedule, use timeZone field instead",
 		},
 	}
 

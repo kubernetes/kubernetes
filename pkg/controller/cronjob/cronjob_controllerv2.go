@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -759,14 +758,6 @@ func getRef(object runtime.Object) (*corev1.ObjectReference, error) {
 }
 
 func formatSchedule(cj *batchv1.CronJob, recorder record.EventRecorder) string {
-	if strings.Contains(cj.Spec.Schedule, "TZ") {
-		if recorder != nil {
-			recorder.Eventf(cj, corev1.EventTypeWarning, "UnsupportedSchedule", "CRON_TZ or TZ used in schedule %q is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", cj.Spec.Schedule)
-		}
-
-		return cj.Spec.Schedule
-	}
-
 	if cj.Spec.TimeZone != nil {
 		if _, err := time.LoadLocation(*cj.Spec.TimeZone); err != nil {
 			return cj.Spec.Schedule
