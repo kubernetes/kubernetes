@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -81,6 +82,7 @@ type ratchetingTestContext struct {
 	*testing.T
 	DynamicClient       dynamic.Interface
 	APIExtensionsClient clientset.Interface
+	SkipStatus          bool
 }
 
 type ratchetingTestOperation interface {
@@ -95,6 +97,12 @@ type expectError struct {
 func (e expectError) Do(ctx *ratchetingTestContext) error {
 	err := e.op.Do(ctx)
 	if err != nil {
+		// If there is an error, it should happen when updating the CR
+		// and also when updating the CR status subresource.
+		if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) != 2 {
+			return fmt.Errorf("expected 2 errors, got %v", len(agg.Errors()))
+		}
+
 		return nil
 	}
 	return errors.New("expected error")
@@ -190,8 +198,51 @@ func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
 				FieldManager: "manager",
 			})
 
-	return err
+	if ctx.SkipStatus {
+		return err
+	}
 
+	errs := []error{}
+
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	statusPatch := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"status": patch.Object,
+		},
+	}
+
+	statusPatch.SetKind(kind)
+	statusPatch.SetAPIVersion(a.gvr.GroupVersion().String())
+	statusPatch.SetName(a.name)
+	statusPatch.SetNamespace("default")
+
+	delete(patch.Object, "metadata")
+	delete(patch.Object, "apiVersion")
+	delete(patch.Object, "kind")
+
+	_, err = ctx.DynamicClient.
+		Resource(a.gvr).
+		Namespace(statusPatch.GetNamespace()).
+		ApplyStatus(
+			context.TODO(),
+			statusPatch.GetName(),
+			statusPatch,
+			metav1.ApplyOptions{
+				FieldManager: "manager",
+			})
+
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return utilerrors.NewAggregate(errs)
+	}
+
+	return nil
 }
 
 func (a applyPatchOperation) Description() string {
@@ -228,10 +279,21 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			}},
 		}
 
+		if !ctx.SkipStatus {
+			// Duplicate the schema as a status schema
+			statusSchema := sch.DeepCopy()
+			sch.Properties["status"] = *statusSchema
+		}
+
 		for _, v := range myCRD.Spec.Versions {
 			if v.Name != myCRDV1Beta1.Version {
 				continue
 			}
+
+			*v.Subresources = apiextensionsv1.CustomResourceSubresources{
+				Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+			}
+
 			v.Schema.OpenAPIV3Schema = sch
 		}
 
@@ -288,6 +350,16 @@ func (p patchMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 		return err
 	}
 
+	statusPatch := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"status": p.patch,
+		},
+	}
+	statusPatchJSON, err := json.Marshal(statusPatch)
+	if err != nil {
+		return err
+	}
+
 	myCRD, err := ctx.APIExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), myCRDV1Beta1.Resource+"."+myCRDV1Beta1.Group, metav1.GetOptions{})
 	if err != nil {
 		return err
@@ -308,8 +380,13 @@ func (p patchMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			return err
 		}
 
+		mergedStatus, err := jsonpatch.MergePatch(merged, statusPatchJSON)
+		if err != nil {
+			return err
+		}
+
 		var parsed apiextensionsv1.JSONSchemaProps
-		if err := json.Unmarshal(merged, &parsed); err != nil {
+		if err := json.Unmarshal(mergedStatus, &parsed); err != nil {
 			return err
 		}
 
@@ -329,6 +406,7 @@ type ratchetingTestCase struct {
 	Name       string
 	Disabled   bool
 	Operations []ratchetingTestOperation
+	SkipStatus bool
 }
 
 func runTests(t *testing.T, cases []ratchetingTestCase) {
@@ -372,8 +450,14 @@ func runTests(t *testing.T, cases []ratchetingTestCase) {
 									},
 								},
 							},
+							"status": {
+								Type: "object",
+							},
 						},
 					},
+				},
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
 				},
 			}},
 			Names: apiextensionsv1.CustomResourceDefinitionNames{
@@ -399,6 +483,7 @@ func runTests(t *testing.T, cases []ratchetingTestCase) {
 				T:                   t,
 				DynamicClient:       dynamicClient,
 				APIExtensionsClient: apiExtensionClient,
+				SkipStatus:          c.SkipStatus,
 			}
 
 			for i, op := range c.Operations {
@@ -1330,7 +1415,8 @@ func TestRatchetingFunctionality(t *testing.T) {
 			},
 		},
 		{
-			Name: "CEL Optional OldSelf",
+			Name:       "CEL Optional OldSelf",
+			SkipStatus: true, // oldSelf can never be null for a status update.
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type: "object",
@@ -1387,7 +1473,8 @@ func TestRatchetingFunctionality(t *testing.T) {
 			Name: "Not_should_not_ratchet",
 		},
 		{
-			Name: "CEL_transition_rules_should_not_ratchet",
+			Name:       "CEL_transition_rules_should_not_ratchet",
+			SkipStatus: true, // Adding a broken status transition rule prevents the object from being updated.
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type:                   "object",
