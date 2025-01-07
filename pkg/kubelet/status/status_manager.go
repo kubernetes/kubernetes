@@ -297,16 +297,14 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
 
-	podUID := string(pod.UID)
-	podAlloc := state.PodResourceAllocation{}
-	podAlloc[podUID] = make(map[string]v1.ResourceRequirements)
+	podAlloc := make(map[string]v1.ResourceRequirements)
 
 	for _, container := range pod.Spec.Containers {
 		alloc := *container.Resources.DeepCopy()
-		podAlloc[podUID][container.Name] = alloc
+		podAlloc[container.Name] = alloc
 	}
 
-	return m.state.SetPodResourceAllocation(podUID, podAlloc)
+	return m.state.SetPodResourceAllocation(string(pod.UID), podAlloc)
 }
 
 // SetPodResizeStatus checkpoints the last resizing decision for the pod.
