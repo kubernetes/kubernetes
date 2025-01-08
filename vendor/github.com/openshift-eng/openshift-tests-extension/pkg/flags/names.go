@@ -16,7 +16,7 @@ func NewNamesFlags() *NamesFlags {
 }
 
 func (f *NamesFlags) BindFlags(fs *pflag.FlagSet) {
-	fs.StringSliceVarP(&f.Names,
+	fs.StringArrayVarP(&f.Names,
 		"names",
 		"n",
 		f.Names,

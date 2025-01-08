@@ -48,7 +48,7 @@ require (
 	github.com/onsi/gomega v1.33.1
 	github.com/opencontainers/runc v1.1.13
 	github.com/opencontainers/selinux v1.11.0
-	github.com/openshift-eng/openshift-tests-extension v0.0.0-20241028125658-76ee2532d0bf
+	github.com/openshift-eng/openshift-tests-extension v0.0.0-20250107173107-6278f9d4f8d8
 	github.com/openshift/api v0.0.0-20241001152557-e415140e5d5f
 	github.com/openshift/apiserver-library-go v0.0.0-20241001175710-6064b62894a6
 	github.com/openshift/client-go v0.0.0-20241001162912-da6d55e4611f

@@ -12,13 +12,15 @@ import (
 
 func NewListCommand(registry *extension.Registry) *cobra.Command {
 	opts := struct {
-		componentFlags *flags.ComponentFlags
-		suiteFlags     *flags.SuiteFlags
-		outputFlags    *flags.OutputFlags
+		componentFlags     *flags.ComponentFlags
+		suiteFlags         *flags.SuiteFlags
+		outputFlags        *flags.OutputFlags
+		environmentalFlags *flags.EnvironmentalFlags
 	}{
-		suiteFlags:     flags.NewSuiteFlags(),
-		componentFlags: flags.NewComponentFlags(),
-		outputFlags:    flags.NewOutputFlags(),
+		suiteFlags:         flags.NewSuiteFlags(),
+		componentFlags:     flags.NewComponentFlags(),
+		outputFlags:        flags.NewOutputFlags(),
+		environmentalFlags: flags.NewEnvironmentalFlags(),
 	}
 
 	// Tests
@@ -51,6 +53,11 @@ func NewListCommand(registry *extension.Registry) *cobra.Command {
 				}
 			}
 
+			specs, err = specs.FilterByEnvironment(*opts.environmentalFlags)
+			if err != nil {
+				return err
+			}
+
 			data, err := opts.outputFlags.Marshal(specs)
 			if err != nil {
 				return err
@@ -61,6 +68,7 @@ func NewListCommand(registry *extension.Registry) *cobra.Command {
 	}
 	opts.suiteFlags.BindFlags(listTestsCmd.Flags())
 	opts.componentFlags.BindFlags(listTestsCmd.Flags())
+	opts.environmentalFlags.BindFlags(listTestsCmd.Flags())
 	opts.outputFlags.BindFlags(listTestsCmd.Flags())
 
 	// Suites
@@ -118,6 +126,7 @@ func NewListCommand(registry *extension.Registry) *cobra.Command {
 	opts.suiteFlags.BindFlags(listCmd.Flags())
 	opts.componentFlags.BindFlags(listCmd.Flags())
 	opts.outputFlags.BindFlags(listCmd.Flags())
+	opts.environmentalFlags.BindFlags(listCmd.Flags())
 	listCmd.AddCommand(listTestsCmd, listComponentsCmd, listSuitesCommand)
 
 	return listCmd
