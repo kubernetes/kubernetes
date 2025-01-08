@@ -44,13 +44,13 @@ func (e ErrRequeue) Error() string {
 	return e.Err.Error()
 }
 
-// Queue extends Store with a collection of Store keys to "process".
+// Queue extends ReflectorStore with a collection of Store keys to "process".
 // Every Add, Update, or Delete may put the object's key in that collection.
 // A Queue has a way to derive the corresponding key given an accumulator.
 // A Queue can be accessed concurrently from multiple goroutines.
 // A Queue can be "closed", after which Pop operations return an error.
 type Queue interface {
-	Store
+	ReflectorStore
 
 	// Pop blocks until there is at least one key to process or the
 	// Queue is closed.  In the latter case Pop returns with an error.
@@ -225,46 +225,6 @@ func (f *FIFO) Delete(obj interface{}) error {
 	f.populated = true
 	delete(f.items, id)
 	return err
-}
-
-// List returns a list of all the items.
-func (f *FIFO) List() []interface{} {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	list := make([]interface{}, 0, len(f.items))
-	for _, item := range f.items {
-		list = append(list, item)
-	}
-	return list
-}
-
-// ListKeys returns a list of all the keys of the objects currently
-// in the FIFO.
-func (f *FIFO) ListKeys() []string {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	list := make([]string, 0, len(f.items))
-	for key := range f.items {
-		list = append(list, key)
-	}
-	return list
-}
-
-// Get returns the requested item, or sets exists=false.
-func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	key, err := f.keyFunc(obj)
-	if err != nil {
-		return nil, false, KeyError{obj, err}
-	}
-	return f.GetByKey(key)
-}
-
-// GetByKey returns the requested item, or sets exists=false.
-func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	item, exists = f.items[key]
-	return item, exists, nil
 }
 
 // IsClosed checks if the queue is closed

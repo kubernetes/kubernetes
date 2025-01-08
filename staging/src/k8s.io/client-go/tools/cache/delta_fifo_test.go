@@ -25,6 +25,66 @@ import (
 	"time"
 )
 
+// List returns a list of all the items; it returns the object
+// from the most recent Delta.
+// You should treat the items returned inside the deltas as immutable.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *DeltaFIFO) List() []interface{} {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	return f.listLocked()
+}
+
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *DeltaFIFO) listLocked() []interface{} {
+	list := make([]interface{}, 0, len(f.items))
+	for _, item := range f.items {
+		list = append(list, item.Newest().Object)
+	}
+	return list
+}
+
+// ListKeys returns a list of all the keys of the objects currently
+// in the FIFO.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *DeltaFIFO) ListKeys() []string {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	list := make([]string, 0, len(f.queue))
+	for _, key := range f.queue {
+		list = append(list, key)
+	}
+	return list
+}
+
+// Get returns the complete list of deltas for the requested item,
+// or sets exists=false.
+// You should treat the items returned inside the deltas as immutable.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *DeltaFIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	key, err := f.KeyOf(obj)
+	if err != nil {
+		return nil, false, KeyError{obj, err}
+	}
+	return f.GetByKey(key)
+}
+
+// GetByKey returns the complete list of deltas for the requested item,
+// setting exists=false if that list is empty.
+// You should treat the items returned inside the deltas as immutable.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	d, exists := f.items[key]
+	if exists {
+		// Copy item's slice so operations on this slice
+		// won't interfere with the object we return.
+		d = copyDeltas(d)
+	}
+	return d, exists, nil
+}
+
 // helper function to reduce stuttering
 func testPop(f *DeltaFIFO) testFifoObject {
 	return Pop(f).(Deltas).Newest().Object.(testFifoObject)
