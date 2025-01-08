@@ -55,6 +55,28 @@ var (
 	defaultMinWatchTimeout = 5 * time.Minute
 )
 
+// ReflectorStore is the subset of cache.Store that the reflector uses
+type ReflectorStore interface {
+	// Add adds the given object to the accumulator associated with the given object's key
+	Add(obj interface{}) error
+
+	// Update updates the given object in the accumulator associated with the given object's key
+	Update(obj interface{}) error
+
+	// Delete deletes the given object from the accumulator associated with the given object's key
+	Delete(obj interface{}) error
+
+	// Replace will delete the contents of the store, using instead the
+	// given list. Store takes ownership of the list, you should not reference
+	// it after calling this function.
+	Replace([]interface{}, string) error
+
+	// Resync is meaningless in the terms appearing here but has
+	// meaning in some implementations that have non-trivial
+	// additional behavior (e.g., DeltaFIFO).
+	Resync() error
+}
+
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
 	// name identifies this reflector. By default, it will be a file:line if possible.
@@ -72,7 +94,7 @@ type Reflector struct {
 	// The GVK of the object we expect to place in the store if unstructured.
 	expectedGVK *schema.GroupVersionKind
 	// The destination to sync up with the watch source
-	store Store
+	store ReflectorStore
 	// listerWatcher is used to perform lists and watches.
 	listerWatcher ListerWatcher
 	// backoff manages backoff of ListWatch
@@ -189,13 +211,13 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 
 // NewReflector creates a new Reflector with its name defaulted to the closest source_file.go:line in the call stack
 // that is outside this package. See NewReflectorWithOptions for further information.
-func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+func NewReflector(lw ListerWatcher, expectedType interface{}, store ReflectorStore, resyncPeriod time.Duration) *Reflector {
 	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{ResyncPeriod: resyncPeriod})
 }
 
 // NewNamedReflector creates a new Reflector with the specified name. See NewReflectorWithOptions for further
 // information.
-func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
+func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store ReflectorStore, resyncPeriod time.Duration) *Reflector {
 	return NewReflectorWithOptions(lw, expectedType, store, ReflectorOptions{Name: name, ResyncPeriod: resyncPeriod})
 }
 
@@ -234,7 +256,7 @@ type ReflectorOptions struct {
 // "yes".  This enables you to use reflectors to periodically process
 // everything as well as incrementally processing the things that
 // change.
-func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store Store, options ReflectorOptions) *Reflector {
+func NewReflectorWithOptions(lw ListerWatcher, expectedType interface{}, store ReflectorStore, options ReflectorOptions) *Reflector {
 	reflectorClock := options.Clock
 	if reflectorClock == nil {
 		reflectorClock = clock.RealClock{}
@@ -798,7 +820,7 @@ func handleWatch(
 	ctx context.Context,
 	start time.Time,
 	w watch.Interface,
-	store Store,
+	store ReflectorStore,
 	expectedType reflect.Type,
 	expectedGVK *schema.GroupVersionKind,
 	name string,
@@ -826,7 +848,7 @@ func handleAnyWatch(
 	ctx context.Context,
 	start time.Time,
 	w watch.Interface,
-	store Store,
+	store ReflectorStore,
 	expectedType reflect.Type,
 	expectedGVK *schema.GroupVersionKind,
 	name string,
