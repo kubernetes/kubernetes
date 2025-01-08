@@ -105,7 +105,7 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 	var correlatedObject *common.CorrelatedObject
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) {
 		correlatedObject = common.NewCorrelatedObject(uNew.Object, uOld.Object, &model.Structural{Structural: a.structuralSchema})
-		options = append(options, validation.WithRatcheting(correlatedObject))
+		options = append(options, validation.WithRatcheting(correlatedObject.Key("status")))
 		celOptions = append(celOptions, cel.WithRatcheting(correlatedObject))
 	}
 
