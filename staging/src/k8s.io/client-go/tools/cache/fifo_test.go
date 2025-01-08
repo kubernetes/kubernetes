@@ -24,6 +24,50 @@ import (
 	"time"
 )
 
+// List returns a list of all the items.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) List() []interface{} {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	list := make([]interface{}, 0, len(f.items))
+	for _, item := range f.items {
+		list = append(list, item)
+	}
+	return list
+}
+
+// ListKeys returns a list of all the keys of the objects currently
+// in the FIFO.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) ListKeys() []string {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	list := make([]string, 0, len(f.items))
+	for key := range f.items {
+		list = append(list, key)
+	}
+	return list
+}
+
+// Get returns the requested item, or sets exists=false.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	key, err := f.keyFunc(obj)
+	if err != nil {
+		return nil, false, KeyError{obj, err}
+	}
+	return f.GetByKey(key)
+}
+
+// GetByKey returns the requested item, or sets exists=false.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	item, exists = f.items[key]
+	return item, exists, nil
+}
+
 func testFifoObjectKeyFunc(obj interface{}) (string, error) {
 	return obj.(testFifoObject).name, nil
 }
