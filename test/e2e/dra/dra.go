@@ -922,7 +922,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			_, claimTemplate := b.podInline()
 			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
-			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled" /* in namespace " + b.f.Namespace.Name */))
+			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled in namespace " + b.f.Namespace.Name))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
 				if err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
