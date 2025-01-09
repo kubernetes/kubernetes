@@ -263,7 +263,7 @@ func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds b
 
 func checkAffinityFailed(tracker affinityTracker, err string) {
 	framework.Logf("%v", tracker.hostTrace)
-	framework.Failf(err)
+	framework.Fail(err)
 }
 
 // StartServeHostnameService creates a replication controller that serves its

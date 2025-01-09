@@ -1363,7 +1363,7 @@ func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event, strictO
 			if !valid {
 				t.Logf("(called from line %d)", line)
 				for _, err := range errors {
-					t.Errorf(err)
+					t.Error(err)
 				}
 			}
 		}

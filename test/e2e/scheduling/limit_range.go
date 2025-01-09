@@ -297,7 +297,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		lrNamespace, err := f.CreateNamespace(ctx, lrName, nil)
 		framework.ExpectNoError(err, "failed creating Namespace")
 		framework.Logf("Namespace %q created", lrNamespace.ObjectMeta.Name)
-		framework.Logf(fmt.Sprintf("Creating LimitRange %q in namespace %q", lrName, lrNamespace.Name))
+		framework.Logf("Creating LimitRange %q in namespace %q", lrName, lrNamespace.Name)
 		_, err = f.ClientSet.CoreV1().LimitRanges(lrNamespace.ObjectMeta.Name).Create(ctx, limitRange2, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create limitRange %q in %q namespace", lrName, lrNamespace.ObjectMeta.Name)
 

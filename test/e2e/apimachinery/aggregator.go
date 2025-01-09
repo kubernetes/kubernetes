@@ -553,13 +553,13 @@ func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient
 	locatedWardle := false
 	for _, item := range list.Items {
 		if item.Name == apiServiceName {
-			framework.Logf("Found " + apiServiceName + " in APIServiceList")
+			framework.Logf("Found %s in APIServiceList", apiServiceName)
 			locatedWardle = true
 			break
 		}
 	}
 	if !locatedWardle {
-		framework.Failf("Unable to find " + apiServiceName + " in APIServiceList")
+		framework.Failf("Unable to find %s in APIServiceList", apiServiceName)
 	}
 
 	// As the APIService doesn't have any labels currently set we need to
@@ -773,7 +773,7 @@ func validateErrorWithDebugInfo(ctx context.Context, f *framework.Framework, err
 			msg += fmt.Sprintf("\nOriginal pods in %s:\n%v", namespace, pods)
 		}
 
-		framework.Failf(msg)
+		framework.Fail(msg)
 	}
 }
 

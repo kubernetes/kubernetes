@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -52,7 +53,7 @@ func (p *NamePrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
 	// we need an actual value in order to retrieve the package path for an object.
 	if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
-		return fmt.Errorf(InternalObjectPrinterErr)
+		return errors.New(InternalObjectPrinterErr)
 	}
 
 	if meta.IsListType(obj) {
