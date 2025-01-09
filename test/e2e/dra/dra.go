@@ -554,43 +554,6 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			wg.Wait()
 		})
 
-		f.It("supports sharing a claim sequentially", f.WithSlow(), func(ctx context.Context) {
-			var objects []klog.KMetadata
-			objects = append(objects, b.externalClaim())
-
-			// This test used to test usage of the claim by one pod
-			// at a time. After removing the "not sharable"
-			// feature, we have to create more pods than supported
-			// at the same time to get the same effect.
-			numPods := resourceapi.ResourceClaimReservedForMaxSize + 10
-			pods := make([]*v1.Pod, numPods)
-			for i := 0; i < numPods; i++ {
-				pod := b.podExternal()
-				pods[i] = pod
-				objects = append(objects, pod)
-			}
-
-			b.create(ctx, objects...)
-
-			// We don't know the order. All that matters is that all of them get scheduled eventually.
-			f.Timeouts.PodStartSlow *= time.Duration(numPods)
-			var wg sync.WaitGroup
-			wg.Add(numPods)
-			for i := 0; i < numPods; i++ {
-				pod := pods[i]
-				go func() {
-					defer ginkgo.GinkgoRecover()
-					defer wg.Done()
-					b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
-					// We need to delete each running pod, otherwise the others cannot use the claim.
-					err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err, "delete pod")
-					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow))
-				}()
-			}
-			wg.Wait()
-		})
-
 		ginkgo.It("retries pod scheduling after creating device class", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pod, template := b.podInline()
@@ -667,7 +630,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 	// The following tests only make sense when there is more than one node.
 	// They get skipped when there's only one node.
 	multiNodeTests := func() {
-		nodes := NewNodes(f, 2, 8)
+		nodes := NewNodes(f, 3, 8)
 
 		ginkgo.Context("with different ResourceSlices", func() {
 			firstDevice := "pre-defined-device-01"
@@ -788,6 +751,117 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					}
 					used[nodeName] = pod
 				}
+			})
+		})
+
+		ginkgo.Context("with network-attached resources", func() {
+			driver := NewDriver(f, nodes, networkResources)
+			b := newBuilder(f, driver)
+
+			f.It("supports sharing a claim sequentially", f.WithSlow(), func(ctx context.Context) {
+				var objects []klog.KMetadata
+				objects = append(objects, b.externalClaim())
+
+				// This test used to test usage of the claim by one pod
+				// at a time. After removing the "not sharable"
+				// feature and bumping up the maximum number of
+				// consumers this is now a stress test which runs
+				// the maximum number of pods per claim in parallel.
+				// This only works on clusters with >= 3 nodes.
+				numMaxPods := resourceapi.ResourceClaimReservedForMaxSize
+				ginkgo.By(fmt.Sprintf("Creating %d pods sharing the same claim", numMaxPods))
+				pods := make([]*v1.Pod, numMaxPods)
+				for i := 0; i < numMaxPods; i++ {
+					pod := b.podExternal()
+					pods[i] = pod
+					objects = append(objects, pod)
+				}
+				b.create(ctx, objects...)
+
+				timeout := f.Timeouts.PodStartSlow * time.Duration(numMaxPods)
+				ensureDuration := f.Timeouts.PodStart // Don't check for too long, even if it is less precise.
+				podIsPending := gomega.HaveField("Spec.NodeName", gomega.BeEmpty())
+				waitForPodScheduled := func(pod *v1.Pod) {
+					ginkgo.GinkgoHelper()
+					gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{})).
+						WithTimeout(timeout).
+						WithPolling(10*time.Second).
+						ShouldNot(podIsPending, "Pod should get scheduled.")
+				}
+				ensurePodNotScheduled := func(pod *v1.Pod) {
+					ginkgo.GinkgoHelper()
+					gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{})).
+						WithTimeout(ensureDuration).
+						WithPolling(10*time.Second).
+						Should(podIsPending, "Pod should remain pending.")
+				}
+
+				// We don't know the order. All that matters is that all of them get scheduled eventually.
+				ginkgo.By(fmt.Sprintf("Waiting for %d pods to be scheduled", numMaxPods))
+				f.Timeouts.PodStartSlow *= time.Duration(numMaxPods)
+				var wg sync.WaitGroup
+				wg.Add(numMaxPods)
+				for i := 0; i < numMaxPods; i++ {
+					pod := pods[i]
+					go func() {
+						defer ginkgo.GinkgoRecover()
+						defer wg.Done()
+						waitForPodScheduled(pod)
+					}()
+				}
+				wg.Wait()
+
+				numMorePods := 10
+				ginkgo.By(fmt.Sprintf("Creating %d additional pods for the same claim", numMorePods))
+				morePods := make([]*v1.Pod, numMorePods)
+				objects = nil
+				for i := 0; i < numMorePods; i++ {
+					pod := b.podExternal()
+					morePods[i] = pod
+					objects = append(objects, pod)
+				}
+				b.create(ctx, objects...)
+
+				// None of the additional pods can run because of the ReservedFor limit.
+				ginkgo.By(fmt.Sprintf("Check for %s that the additional pods don't get scheduled", ensureDuration))
+				wg.Add(numMorePods)
+				for i := 0; i < numMorePods; i++ {
+					pod := morePods[i]
+					go func() {
+						defer ginkgo.GinkgoRecover()
+						defer wg.Done()
+						ensurePodNotScheduled(pod)
+					}()
+				}
+				wg.Wait()
+
+				// We need to delete each running pod, otherwise the new ones cannot use the claim.
+				ginkgo.By(fmt.Sprintf("Deleting the initial %d pods", numMaxPods))
+				wg.Add(numMaxPods)
+				for i := 0; i < numMaxPods; i++ {
+					pod := pods[i]
+					go func() {
+						defer ginkgo.GinkgoRecover()
+						defer wg.Done()
+						err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+						framework.ExpectNoError(err, "delete pod")
+						framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStartSlow))
+					}()
+				}
+				wg.Wait()
+
+				// Now those should also run - eventually...
+				ginkgo.By(fmt.Sprintf("Waiting for the additional %d pods to be scheduled", numMorePods))
+				wg.Add(numMorePods)
+				for i := 0; i < numMorePods; i++ {
+					pod := morePods[i]
+					go func() {
+						defer ginkgo.GinkgoRecover()
+						defer wg.Done()
+						waitForPodScheduled(pod)
+					}()
+				}
+				wg.Wait()
 			})
 		})
 	}
