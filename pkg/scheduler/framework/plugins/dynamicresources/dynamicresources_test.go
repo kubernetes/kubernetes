@@ -59,7 +59,6 @@ var (
 	resourceName  = "my-resource"
 	resourceName2 = resourceName + "-2"
 	claimName     = podName + "-" + resourceName
-	claimName2    = podName + "-" + resourceName + "-2"
 	className     = "my-resource-class"
 	namespace     = "default"
 	attrName      = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
@@ -88,11 +87,6 @@ var (
 		}
 		return pod
 	}()
-	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
-				Obj()
 	podWithTwoClaimTemplates = st.MakePod().Name(podName).Namespace(namespace).
 					UID(podUID).
 					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
@@ -123,14 +117,8 @@ var (
 		Namespace(namespace).
 		Request(className).
 		Obj()
-	deleteClaim = st.FromResourceClaim(claim).
-			OwnerReference(podName, podUID, podKind).
-			Deleting(metav1.Now()).Obj()
 	pendingClaim = st.FromResourceClaim(claim).
 			OwnerReference(podName, podUID, podKind).
-			Obj()
-	pendingClaim2 = st.FromResourceClaim(pendingClaim).
-			Name(claimName2).
 			Obj()
 	allocationResult = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
@@ -167,9 +155,6 @@ var (
 	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
 				Allocation(allocationResult).
 				Obj()
-
-	resourceSlice        = st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
-	resourceSliceUpdated = st.FromResourceSlice(resourceSlice).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 )
 
 func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
