@@ -1703,7 +1703,7 @@ var _ = common.SIGDescribe("Services", func() {
 				}
 				break
 			}
-			if apierrors.IsConflict(err) {
+			if apierrors.IsInvalid(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
 				continue
 			}
@@ -3979,7 +3979,7 @@ var _ = common.SIGDescribe("Services", func() {
 				}
 				break
 			}
-			if apierrors.IsConflict(err) {
+			if apierrors.IsInvalid(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
 				continue
 			}
@@ -3987,7 +3987,12 @@ var _ = common.SIGDescribe("Services", func() {
 
 		}
 
-		defer e2eservice.ReleaseStaticNodePort(svc.Spec.HealthCheckNodePort)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := cs.CoreV1().Services(namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, namespace)
+			e2eservice.ReleaseStaticNodePort(svc.Spec.HealthCheckNodePort)
+		})
+
 		nodePortStr := fmt.Sprintf("%d", svc.Spec.Ports[0].NodePort)
 		hcNodePortStr := fmt.Sprintf("%d", svc.Spec.HealthCheckNodePort)
 		framework.Logf("NodePort is %s, HealthCheckNodePort is %s", nodePortStr, hcNodePortStr)
