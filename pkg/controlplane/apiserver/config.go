@@ -140,6 +140,9 @@ func BuildGenericConfig(
 	if lastErr != nil {
 		return
 	}
+	// storageFactory.StorageConfig is copied from etcdOptions.StorageConfig,
+	// the StorageObjectCountTracker is still nil. Here we copy from genericConfig.
+	storageFactory.StorageConfig.StorageObjectCountTracker = genericConfig.StorageObjectCountTracker
 	if lastErr = s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); lastErr != nil {
 		return
 	}
