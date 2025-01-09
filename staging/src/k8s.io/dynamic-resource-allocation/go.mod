@@ -2,7 +2,7 @@
 
 module k8s.io/dynamic-resource-allocation
 
-go 1.22.0
+go 1.23.0
 
 godebug default=go1.22
 

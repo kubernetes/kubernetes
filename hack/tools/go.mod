@@ -1,6 +1,6 @@
 module k8s.io/kubernetes/hack/tools
 
-go 1.22.1
+go 1.23.0
 
 godebug default=go1.22
 
