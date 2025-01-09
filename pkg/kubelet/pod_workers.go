@@ -964,7 +964,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 	select {
 	case podUpdates <- struct{}{}:
 	default:
-		klog.V(4).InfoS("Pending update already queued", "podUID", podUID, "updateType", options.UpdateType)
+		klog.V(4).InfoS("Pending update already queued", "podUID", uid, "updateType", options.UpdateType)
 	}
 
 	if (becameTerminating || wasGracePeriodShortened) && status.cancelFn != nil {
