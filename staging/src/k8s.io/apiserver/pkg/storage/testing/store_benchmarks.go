@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 )
 
@@ -149,6 +150,11 @@ func runBenchmarkStoreList(ctx context.Context, b *testing.B, store storage.Inte
 				objectCount.Add(uint64(objects))
 				pageCount.Add(uint64(pages))
 			case namespace:
+				ctx := ctx
+				if useIndex {
+					opts.Predicate.IndexFields = []string{"metadata.namespace"}
+					ctx = request.WithRequestInfo(ctx, &request.RequestInfo{Namespace: namespaceName})
+				}
 				objects, pages := paginateList(ctx, store, "/pods/"+namespaceName, opts)
 				objectCount.Add(uint64(objects))
 				pageCount.Add(uint64(pages))
