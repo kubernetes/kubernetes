@@ -83,7 +83,7 @@ func TestValidate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			binaryVersion := version.MustParseGeneric(test.binaryVersion)
-			effective := NewEffectiveVersion(binaryVersion)
+			effective := NewEffectiveVersion(binaryVersion, false)
 			emulationVersion := version.MustParseGeneric(test.emulationVersion)
 			minCompatibilityVersion := version.MustParseGeneric(test.minCompatibilityVersion)
 			effective.Set(binaryVersion, emulationVersion, minCompatibilityVersion)
