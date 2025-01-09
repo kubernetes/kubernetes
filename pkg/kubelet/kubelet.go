@@ -2922,7 +2922,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := kl.statusManager.SetPodAllocation(pod); err != nil {
-			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
+			return nil, err
 		}
 		for i, container := range pod.Spec.Containers {
 			if !apiequality.Semantic.DeepEqual(container.Resources, allocatedPod.Spec.Containers[i].Resources) {
