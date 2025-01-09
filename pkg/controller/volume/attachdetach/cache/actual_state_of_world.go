@@ -22,6 +22,7 @@ reference them.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"k8s.io/klog/v2"
 	"sync"
@@ -531,7 +532,7 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 		// should not happen
 		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t, because nodeName=%q does not exist",
 			needed, nodeName)
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	nodeToUpdate.statusUpdateNeeded = needed

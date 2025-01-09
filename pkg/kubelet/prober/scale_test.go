@@ -80,7 +80,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 		{"HTTP", true},
 	}
 	for _, tt := range tests {
-		t.Run(fmt.Sprintf(tt.name), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			testRootDir := ""
 			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
 				t.Fatalf("can't make a temp rootdir: %v", err)

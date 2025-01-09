@@ -19,6 +19,7 @@ package printers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -36,13 +37,13 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	// we need an actual value in order to retrieve the package path for an object.
 	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
 	if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
-		return fmt.Errorf(InternalObjectPrinterErr)
+		return errors.New(InternalObjectPrinterErr)
 	}
 
 	switch obj := obj.(type) {
 	case *metav1.WatchEvent:
 		if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj.Object.Object)).Type().PkgPath()) {
-			return fmt.Errorf(InternalObjectPrinterErr)
+			return errors.New(InternalObjectPrinterErr)
 		}
 		data, err := json.Marshal(obj)
 		if err != nil {

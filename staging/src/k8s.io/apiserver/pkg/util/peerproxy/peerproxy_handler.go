@@ -176,7 +176,7 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		// TODO: maintain locally serviceable GVRs somewhere so that we dont have to
 		// consult the storageversion-informed map for those
 		if len(serviceableByResp.peerEndpoints) == 0 {
-			klog.Errorf(fmt.Sprintf("GVR %v is not served by anything in this cluster", gvr))
+			klog.Error(fmt.Sprintf("GVR %v is not served by anything in this cluster", gvr))
 			handler.ServeHTTP(w, r)
 			return
 		}

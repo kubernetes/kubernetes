@@ -50,7 +50,7 @@ var (
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	errorMsg := fmt.Sprintf("Internal Server Error: %#v", r.RequestURI)
 	http.Error(w, errorMsg, http.StatusInternalServerError)
-	klog.Errorf(err.Error())
+	klog.Error(err.Error())
 }
 
 // requestWatermark is used to track maximal numbers of requests in a particular phase of handling

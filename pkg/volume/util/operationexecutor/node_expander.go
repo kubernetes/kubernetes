@@ -116,7 +116,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 
 		if err != nil {
 			msg := ne.vmt.GenerateErrorDetailed("MountVolume.NodeExpandVolume failed to mark node expansion in progress: %v", err)
-			klog.Errorf(msg.Error())
+			klog.Error(msg.Error())
 			return false, err, testResponseData{}
 		}
 	}
@@ -126,7 +126,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 			var markFailedError error
 			ne.pvc, markFailedError = util.MarkNodeExpansionFailed(ne.pvc, ne.kubeClient)
 			if markFailedError != nil {
-				klog.Errorf(ne.vmt.GenerateErrorDetailed("MountMount.NodeExpandVolume failed to mark node expansion as failed: %v", err).Error())
+				klog.Error(ne.vmt.GenerateErrorDetailed("MountMount.NodeExpandVolume failed to mark node expansion as failed: %v", err).Error())
 			}
 		}
 
