@@ -50,6 +50,7 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 		framework.ExpectNoError(err, "Error finding Windows node")
 		framework.Logf("Using node: %v", targetNode.Name)
 
+		bootID := targetNode.Status.NodeInfo.BootID
 		windowsImage := imageutils.GetE2EImage(imageutils.Agnhost)
 
 		// Create Windows pod on the selected Windows node Using Agnhost
@@ -195,6 +196,11 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 				time.Sleep(time.Second * 30)
 			}
 		}
+
+		ginkgo.By("Checking whether node is rebooted")
+		refreshNode, err := f.ClientSet.CoreV1().Nodes().Get(ctx, targetNode.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Error finding refreshed Windows node")
+		gomega.Expect(refreshNode.Status.NodeInfo.BootID).NotTo(gomega.Equal(bootID), "node does not get rebooted")
 
 		ginkgo.By("Checking whether agn-test-pod is rebooted")
 		gomega.Expect(restartCount).To(gomega.Equal(1), "restart count of agn-test-pod is 1")
