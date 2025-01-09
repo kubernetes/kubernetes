@@ -4,6 +4,8 @@ module k8s.io/apimachinery
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc

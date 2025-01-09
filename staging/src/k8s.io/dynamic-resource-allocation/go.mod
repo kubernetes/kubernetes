@@ -4,6 +4,8 @@ module k8s.io/dynamic-resource-allocation
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/go-logr/logr v1.4.2

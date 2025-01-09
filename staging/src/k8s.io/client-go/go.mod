@@ -4,6 +4,8 @@ module k8s.io/client-go
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da

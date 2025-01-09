@@ -4,6 +4,8 @@ module k8s.io/apiserver
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/coreos/go-oidc v2.2.1+incompatible

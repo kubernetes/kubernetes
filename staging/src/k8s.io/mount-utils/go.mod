@@ -4,6 +4,8 @@ module k8s.io/mount-utils
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/moby/sys/mountinfo v0.7.1
 	github.com/opencontainers/runc v1.1.13

@@ -4,6 +4,8 @@ module k8s.io/cri-client
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/fsnotify/fsnotify v1.7.0

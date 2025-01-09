@@ -4,6 +4,8 @@ module k8s.io/sample-apiserver
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/google/gofuzz v1.2.0
 	github.com/spf13/cobra v1.8.1

@@ -4,6 +4,8 @@ module k8s.io/kubectl
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/chai2010/gettext-go v1.0.2

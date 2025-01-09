@@ -4,6 +4,8 @@ module k8s.io/kube-controller-manager
 
 go 1.22.0
 
+godebug default=go1.22
+
 require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/cloud-provider v0.0.0
