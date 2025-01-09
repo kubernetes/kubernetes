@@ -79,18 +79,12 @@ func (pb *prober) recordContainerEvent(pod *v1.Pod, container *v1.Container, eve
 }
 
 // probe probes the container.
-func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
-	var probeSpec *v1.Probe
-	switch probeType {
-	case readiness:
-		probeSpec = container.ReadinessProbe
-	case liveness:
-		probeSpec = container.LivenessProbe
-	case startup:
-		probeSpec = container.StartupProbe
-	default:
-		return results.Failure, fmt.Errorf("unknown probe type: %q", probeType)
-	}
+func (pb *prober) probe(ctx context.Context, w *worker, status v1.PodStatus) (results.Result, error) {
+	probeType := w.probeType
+	pod := w.pod
+	container := w.container
+	containerID := w.containerID
+	probeSpec := w.spec
 
 	if probeSpec == nil {
 		klog.InfoS("Probe is nil", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)

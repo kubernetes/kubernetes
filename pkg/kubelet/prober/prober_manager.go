@@ -21,12 +21,15 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -188,38 +191,50 @@ func (m *manager) AddPod(pod *v1.Pod) {
 
 		if c.StartupProbe != nil {
 			key.probeType = startup
-			if _, ok := m.workers[key]; ok {
-				klog.V(8).ErrorS(nil, "Startup probe already exists for container",
+			if existWorker, ok := m.workers[key]; ok {
+				if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) &&
+					!apiequality.Semantic.DeepEqual(existWorker.spec, c.StartupProbe) {
+					existWorker.spec = c.StartupProbe.DeepCopy()
+				}
+				klog.V(8).ErrorS(nil, "Startup probe already exists for container, update worker spec if need",
 					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
+			} else {
+				w := newWorker(m, startup, pod, c)
+				m.workers[key] = w
+				go w.run()
 			}
-			w := newWorker(m, startup, pod, c)
-			m.workers[key] = w
-			go w.run()
 		}
 
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
-			if _, ok := m.workers[key]; ok {
-				klog.V(8).ErrorS(nil, "Readiness probe already exists for container",
+			if existWorker, ok := m.workers[key]; ok {
+				if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) &&
+					!apiequality.Semantic.DeepEqual(existWorker.spec, c.ReadinessProbe) {
+					existWorker.spec = c.ReadinessProbe.DeepCopy()
+				}
+				klog.V(8).ErrorS(nil, "Readiness probe already exists for container, update worker spec if need",
 					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
+			} else {
+				w := newWorker(m, readiness, pod, c)
+				m.workers[key] = w
+				go w.run()
 			}
-			w := newWorker(m, readiness, pod, c)
-			m.workers[key] = w
-			go w.run()
 		}
 
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
-			if _, ok := m.workers[key]; ok {
-				klog.V(8).ErrorS(nil, "Liveness probe already exists for container",
+			if existWorker, ok := m.workers[key]; ok {
+				if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) &&
+					!apiequality.Semantic.DeepEqual(existWorker.spec, c.LivenessProbe) {
+					existWorker.spec = c.LivenessProbe.DeepCopy()
+				}
+				klog.V(8).ErrorS(nil, "Liveness probe already exists for container, update worker spec if need",
 					"pod", klog.KObj(pod), "containerName", c.Name)
-				return
+			} else {
+				w := newWorker(m, liveness, pod, c)
+				m.workers[key] = w
+				go w.run()
 			}
-			w := newWorker(m, liveness, pod, c)
-			m.workers[key] = w
-			go w.run()
 		}
 	}
 }

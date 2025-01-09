@@ -236,7 +236,14 @@ func TestProbe(t *testing.T) {
 				prober.exec = fakeExecProber{test.execResult, nil}
 			}
 
-			result, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+			w := &worker{
+				probeType:   probeType,
+				pod:         &v1.Pod{},
+				container:   testContainer,
+				spec:        test.probe,
+				containerID: containerID,
+			}
+			result, err := prober.probe(ctx, w, v1.PodStatus{})
 			if test.expectError && err == nil {
 				t.Errorf("[%s] Expected probe error but no error was returned.", testID)
 			}
@@ -250,7 +257,14 @@ func TestProbe(t *testing.T) {
 			if len(test.expectCommand) > 0 {
 				prober.exec = execprobe.New()
 				prober.runner = &containertest.FakeContainerCommandRunner{}
-				_, err := prober.probe(ctx, probeType, &v1.Pod{}, v1.PodStatus{}, testContainer, containerID)
+				w := &worker{
+					probeType:   probeType,
+					pod:         &v1.Pod{},
+					container:   testContainer,
+					spec:        test.probe,
+					containerID: containerID,
+				}
+				_, err := prober.probe(ctx, w, v1.PodStatus{})
 				if err != nil {
 					t.Errorf("[%s] Didn't expect probe error but got: %v", testID, err)
 					continue
