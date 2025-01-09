@@ -39,6 +39,9 @@ type ContainerStatusApplyConfiguration struct {
 	VolumeMounts             []VolumeMountStatusApplyConfiguration   `json:"volumeMounts,omitempty"`
 	User                     *ContainerUserApplyConfiguration        `json:"user,omitempty"`
 	AllocatedResourcesStatus []ResourceStatusApplyConfiguration      `json:"allocatedResourcesStatus,omitempty"`
+	LivenessProbeStatus      *ProbeStatusApplyConfiguration          `json:"livenessProbeStatus,omitempty"`
+	ReadinessProbeStatus     *ProbeStatusApplyConfiguration          `json:"readinessProbeStatus,omitempty"`
+	StartupProbeStatus       *ProbeStatusApplyConfiguration          `json:"startupProbeStatus,omitempty"`
 }
 
 // ContainerStatusApplyConfiguration constructs a declarative configuration of the ContainerStatus type for use with
@@ -166,5 +169,29 @@ func (b *ContainerStatusApplyConfiguration) WithAllocatedResourcesStatus(values 
 		}
 		b.AllocatedResourcesStatus = append(b.AllocatedResourcesStatus, *values[i])
 	}
+	return b
+}
+
+// WithLivenessProbeStatus sets the LivenessProbeStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the LivenessProbeStatus field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithLivenessProbeStatus(value *ProbeStatusApplyConfiguration) *ContainerStatusApplyConfiguration {
+	b.LivenessProbeStatus = value
+	return b
+}
+
+// WithReadinessProbeStatus sets the ReadinessProbeStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ReadinessProbeStatus field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithReadinessProbeStatus(value *ProbeStatusApplyConfiguration) *ContainerStatusApplyConfiguration {
+	b.ReadinessProbeStatus = value
+	return b
+}
+
+// WithStartupProbeStatus sets the StartupProbeStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the StartupProbeStatus field is set to the value of the last call.
+func (b *ContainerStatusApplyConfiguration) WithStartupProbeStatus(value *ProbeStatusApplyConfiguration) *ContainerStatusApplyConfiguration {
+	b.StartupProbeStatus = value
 	return b
 }

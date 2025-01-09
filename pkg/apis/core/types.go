@@ -2757,6 +2757,9 @@ type ContainerState struct {
 	Terminated *ContainerStateTerminated
 }
 
+// ProbeStatus is another name about Probe, just for avoiding apply SetDefaults_Probe method for ProbeStatus
+type ProbeStatus Probe
+
 // ContainerStatus contains details for the current status of this container.
 type ContainerStatus struct {
 	// Name is a DNS_LABEL representing the unique name of the container.
@@ -2833,6 +2836,18 @@ type ContainerStatus struct {
 	// +featureGate=ResourceHealthStatus
 	// +optional
 	AllocatedResourcesStatus []ResourceStatus
+	// current liveness probe configuration.
+	// +featureGate=AllowContainerProbeModification
+	// +optional
+	LivenessProbeStatus *ProbeStatus
+	// current readiness probe configuration.
+	// +featureGate=AllowContainerProbeModification
+	// +optional
+	ReadinessProbeStatus *ProbeStatus
+	// current startup probe configuration.
+	// +featureGate=AllowContainerProbeModification
+	// +optional
+	StartupProbeStatus *ProbeStatus
 }
 
 type ResourceStatus struct {

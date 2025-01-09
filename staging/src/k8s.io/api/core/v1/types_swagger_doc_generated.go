@@ -474,6 +474,9 @@ var map_ContainerStatus = map[string]string{
 	"volumeMounts":             "Status of volume mounts.",
 	"user":                     "User represents user identity information initially attached to the first process of the container",
 	"allocatedResourcesStatus": "AllocatedResourcesStatus represents the status of various resources allocated for this Pod.",
+	"livenessProbeStatus":      "current liveness probe configuration.",
+	"readinessProbeStatus":     "current readiness probe configuration.",
+	"startupProbeStatus":       "current startup probe configuration.",
 }
 
 func (ContainerStatus) SwaggerDoc() map[string]string {

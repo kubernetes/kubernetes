@@ -193,15 +193,21 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			key.probeType = startup
 			if existWorker, ok := m.workers[key]; ok {
 				if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) &&
-					!apiequality.Semantic.DeepEqual(existWorker.spec, c.StartupProbe) {
-					existWorker.spec = c.StartupProbe.DeepCopy()
+					!apiequality.Semantic.DeepEqual(existWorker.expectSpec, c.StartupProbe) {
+					existWorker.expectSpec = c.StartupProbe.DeepCopy()
 				}
-				klog.V(8).ErrorS(nil, "Startup probe already exists for container, update worker spec if need",
+				klog.V(8).InfoS("Startup probe already exists for container, update worker spec if need",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 			} else {
 				w := newWorker(m, startup, pod, c)
 				m.workers[key] = w
 				go w.run()
+			}
+		} else {
+			key.probeType = startup
+			if existWorker, ok := m.workers[key]; ok {
+				close(existWorker.stopCh)
+				delete(m.workers, probeKey{pod.UID, c.Name, key.probeType})
 			}
 		}
 
@@ -209,15 +215,21 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			key.probeType = readiness
 			if existWorker, ok := m.workers[key]; ok {
 				if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) &&
-					!apiequality.Semantic.DeepEqual(existWorker.spec, c.ReadinessProbe) {
-					existWorker.spec = c.ReadinessProbe.DeepCopy()
+					!apiequality.Semantic.DeepEqual(existWorker.expectSpec, c.ReadinessProbe) {
+					existWorker.expectSpec = c.ReadinessProbe.DeepCopy()
 				}
-				klog.V(8).ErrorS(nil, "Readiness probe already exists for container, update worker spec if need",
+				klog.V(8).InfoS("Readiness probe already exists for container, update worker spec if need",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 			} else {
 				w := newWorker(m, readiness, pod, c)
 				m.workers[key] = w
 				go w.run()
+			}
+		} else {
+			key.probeType = readiness
+			if existWorker, ok := m.workers[key]; ok {
+				close(existWorker.stopCh)
+				delete(m.workers, probeKey{pod.UID, c.Name, key.probeType})
 			}
 		}
 
@@ -225,15 +237,21 @@ func (m *manager) AddPod(pod *v1.Pod) {
 			key.probeType = liveness
 			if existWorker, ok := m.workers[key]; ok {
 				if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) &&
-					!apiequality.Semantic.DeepEqual(existWorker.spec, c.LivenessProbe) {
-					existWorker.spec = c.LivenessProbe.DeepCopy()
+					!apiequality.Semantic.DeepEqual(existWorker.expectSpec, c.LivenessProbe) {
+					existWorker.expectSpec = c.LivenessProbe.DeepCopy()
 				}
-				klog.V(8).ErrorS(nil, "Liveness probe already exists for container, update worker spec if need",
+				klog.V(8).InfoS("Liveness probe already exists for container, update worker spec if need",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 			} else {
 				w := newWorker(m, liveness, pod, c)
 				m.workers[key] = w
 				go w.run()
+			}
+		} else {
+			key.probeType = liveness
+			if existWorker, ok := m.workers[key]; ok {
+				close(existWorker.stopCh)
+				delete(m.workers, probeKey{pod.UID, c.Name, key.probeType})
 			}
 		}
 	}
@@ -303,6 +321,9 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 
 func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 	for i, c := range podStatus.ContainerStatuses {
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) {
+			m.updateContainerProbeStatus(pod, &podStatus.ContainerStatuses[i])
+		}
 		started := m.isContainerStarted(pod, &podStatus.ContainerStatuses[i])
 		podStatus.ContainerStatuses[i].Started = &started
 
@@ -332,6 +353,9 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 	}
 
 	for i, c := range podStatus.InitContainerStatuses {
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) {
+			m.updateContainerProbeStatus(pod, &podStatus.InitContainerStatuses[i])
+		}
 		started := m.isContainerStarted(pod, &podStatus.InitContainerStatuses[i])
 		podStatus.InitContainerStatuses[i].Started = &started
 
@@ -370,6 +394,30 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 			}
 		}
 		podStatus.InitContainerStatuses[i].Ready = ready
+	}
+}
+
+func (m *manager) updateContainerProbeStatus(pod *v1.Pod, containerStatus *v1.ContainerStatus) {
+	// status of startup probe
+	w, exist := m.getWorker(pod.UID, containerStatus.Name, startup)
+	if exist {
+		containerStatus.StartupProbeStatus = (*v1.ProbeStatus)(w.currentSpec)
+	} else {
+		containerStatus.StartupProbeStatus = nil
+	}
+	// status of readiness probe
+	w, exist = m.getWorker(pod.UID, containerStatus.Name, readiness)
+	if exist {
+		containerStatus.ReadinessProbeStatus = (*v1.ProbeStatus)(w.currentSpec)
+	} else {
+		containerStatus.ReadinessProbeStatus = nil
+	}
+	// status of liveness probe
+	w, exist = m.getWorker(pod.UID, containerStatus.Name, liveness)
+	if exist {
+		containerStatus.LivenessProbeStatus = (*v1.ProbeStatus)(w.currentSpec)
+	} else {
+		containerStatus.LivenessProbeStatus = nil
 	}
 }
 

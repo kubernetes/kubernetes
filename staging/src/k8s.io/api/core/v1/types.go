@@ -3071,6 +3071,9 @@ type ContainerState struct {
 	Terminated *ContainerStateTerminated `json:"terminated,omitempty" protobuf:"bytes,3,opt,name=terminated"`
 }
 
+// ProbeStatus is another name about Probe, just for avoiding apply SetDefaults_Probe method for ProbeStatus
+type ProbeStatus Probe
+
 // ContainerStatus contains details for the current status of this container.
 type ContainerStatus struct {
 	// Name is a DNS_LABEL representing the unique name of the container.
@@ -3154,6 +3157,18 @@ type ContainerStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	AllocatedResourcesStatus []ResourceStatus `json:"allocatedResourcesStatus,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,14,rep,name=allocatedResourcesStatus"`
+	// current liveness probe configuration.
+	// +featureGate=AllowContainerProbeModification
+	// +optional
+	LivenessProbeStatus *ProbeStatus `json:"livenessProbeStatus,omitempty" protobuf:"bytes,15,name=livenessProbeStatus"`
+	// current readiness probe configuration.
+	// +featureGate=AllowContainerProbeModification
+	// +optional
+	ReadinessProbeStatus *ProbeStatus `json:"readinessProbeStatus,omitempty" protobuf:"bytes,16,name=readinessProbeStatus"`
+	// current startup probe configuration.
+	// +featureGate=AllowContainerProbeModification
+	// +optional
+	StartupProbeStatus *ProbeStatus `json:"startupProbeStatus,omitempty" protobuf:"bytes,17,name=startupProbeStatus"`
 }
 
 // ResourceStatus represents the status of a single resource allocated to a Pod.

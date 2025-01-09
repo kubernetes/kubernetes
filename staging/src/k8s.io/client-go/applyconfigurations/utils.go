@@ -922,6 +922,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ProbeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ProbeHandler"):
 		return &applyconfigurationscorev1.ProbeHandlerApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ProbeStatus"):
+		return &applyconfigurationscorev1.ProbeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ProjectedVolumeSource"):
 		return &applyconfigurationscorev1.ProjectedVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("QuobyteVolumeSource"):

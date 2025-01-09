@@ -5223,10 +5223,16 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ContainerState
       default: {}
+    - name: livenessProbeStatus
+      type:
+        namedType: io.k8s.api.core.v1.ProbeStatus
     - name: name
       type:
         scalar: string
       default: ""
+    - name: readinessProbeStatus
+      type:
+        namedType: io.k8s.api.core.v1.ProbeStatus
     - name: ready
       type:
         scalar: boolean
@@ -5241,6 +5247,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: started
       type:
         scalar: boolean
+    - name: startupProbeStatus
+      type:
+        namedType: io.k8s.api.core.v1.ProbeStatus
     - name: state
       type:
         namedType: io.k8s.api.core.v1.ContainerState
@@ -7376,6 +7385,39 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: numeric
       default: 0
 - name: io.k8s.api.core.v1.Probe
+  map:
+    fields:
+    - name: exec
+      type:
+        namedType: io.k8s.api.core.v1.ExecAction
+    - name: failureThreshold
+      type:
+        scalar: numeric
+    - name: grpc
+      type:
+        namedType: io.k8s.api.core.v1.GRPCAction
+    - name: httpGet
+      type:
+        namedType: io.k8s.api.core.v1.HTTPGetAction
+    - name: initialDelaySeconds
+      type:
+        scalar: numeric
+    - name: periodSeconds
+      type:
+        scalar: numeric
+    - name: successThreshold
+      type:
+        scalar: numeric
+    - name: tcpSocket
+      type:
+        namedType: io.k8s.api.core.v1.TCPSocketAction
+    - name: terminationGracePeriodSeconds
+      type:
+        scalar: numeric
+    - name: timeoutSeconds
+      type:
+        scalar: numeric
+- name: io.k8s.api.core.v1.ProbeStatus
   map:
     fields:
     - name: exec

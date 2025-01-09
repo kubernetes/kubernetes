@@ -553,6 +553,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.PreferredSchedulingTerm":                                                            schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref),
 		"k8s.io/api/core/v1.Probe":                                                                              schema_k8sio_api_core_v1_Probe(ref),
 		"k8s.io/api/core/v1.ProbeHandler":                                                                       schema_k8sio_api_core_v1_ProbeHandler(ref),
+		"k8s.io/api/core/v1.ProbeStatus":                                                                        schema_k8sio_api_core_v1_ProbeStatus(ref),
 		"k8s.io/api/core/v1.ProjectedVolumeSource":                                                              schema_k8sio_api_core_v1_ProjectedVolumeSource(ref),
 		"k8s.io/api/core/v1.QuobyteVolumeSource":                                                                schema_k8sio_api_core_v1_QuobyteVolumeSource(ref),
 		"k8s.io/api/core/v1.RBDPersistentVolumeSource":                                                          schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref),
@@ -21753,12 +21754,30 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 							},
 						},
 					},
+					"livenessProbeStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current liveness probe configuration.",
+							Ref:         ref("k8s.io/api/core/v1.ProbeStatus"),
+						},
+					},
+					"readinessProbeStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current readiness probe configuration.",
+							Ref:         ref("k8s.io/api/core/v1.ProbeStatus"),
+						},
+					},
+					"startupProbeStatus": {
+						SchemaProps: spec.SchemaProps{
+							Description: "current startup probe configuration.",
+							Ref:         ref("k8s.io/api/core/v1.ProbeStatus"),
+						},
+					},
 				},
 				Required: []string{"name", "ready", "restartCount", "image", "imageID"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.ContainerState", "k8s.io/api/core/v1.ContainerUser", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.ResourceStatus", "k8s.io/api/core/v1.VolumeMountStatus", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/core/v1.ContainerState", "k8s.io/api/core/v1.ContainerUser", "k8s.io/api/core/v1.ProbeStatus", "k8s.io/api/core/v1.ResourceRequirements", "k8s.io/api/core/v1.ResourceStatus", "k8s.io/api/core/v1.VolumeMountStatus", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -29252,6 +29271,87 @@ func schema_k8sio_api_core_v1_ProbeHandler(ref common.ReferenceCallback) common.
 						SchemaProps: spec.SchemaProps{
 							Description: "GRPC specifies a GRPC HealthCheckRequest.",
 							Ref:         ref("k8s.io/api/core/v1.GRPCAction"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.ExecAction", "k8s.io/api/core/v1.GRPCAction", "k8s.io/api/core/v1.HTTPGetAction", "k8s.io/api/core/v1.TCPSocketAction"},
+	}
+}
+
+func schema_k8sio_api_core_v1_ProbeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ProbeStatus is another name about Probe, just for avoiding apply SetDefaults_Probe method for ProbeStatus",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"exec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Exec specifies a command to execute in the container.",
+							Ref:         ref("k8s.io/api/core/v1.ExecAction"),
+						},
+					},
+					"httpGet": {
+						SchemaProps: spec.SchemaProps{
+							Description: "HTTPGet specifies an HTTP GET request to perform.",
+							Ref:         ref("k8s.io/api/core/v1.HTTPGetAction"),
+						},
+					},
+					"tcpSocket": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TCPSocket specifies a connection to a TCP port.",
+							Ref:         ref("k8s.io/api/core/v1.TCPSocketAction"),
+						},
+					},
+					"grpc": {
+						SchemaProps: spec.SchemaProps{
+							Description: "GRPC specifies a GRPC HealthCheckRequest.",
+							Ref:         ref("k8s.io/api/core/v1.GRPCAction"),
+						},
+					},
+					"initialDelaySeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"timeoutSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"periodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"successThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"failureThreshold": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"terminationGracePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},

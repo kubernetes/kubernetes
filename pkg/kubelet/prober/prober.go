@@ -84,7 +84,7 @@ func (pb *prober) probe(ctx context.Context, w *worker, status v1.PodStatus) (re
 	pod := w.pod
 	container := w.container
 	containerID := w.containerID
-	probeSpec := w.spec
+	probeSpec := w.currentSpec
 
 	if probeSpec == nil {
 		klog.InfoS("Probe is nil", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)

@@ -47,8 +47,19 @@ type worker struct {
 	// The container to probe (read-only)
 	container v1.Container
 
-	// Describes the probe configuration (read-only)
-	spec *v1.Probe
+	// Describes the current probe configuration(dynamic)
+	currentSpec *v1.Probe
+
+	// e.g.
+	// readinessProbe(v1):                                 readinessProbe(v2):
+	//   exec:                                               exec:
+	//     command:                  ----->                    command:
+	//     - COMMAND1                                          - COMMAND2
+	//   failureThreshold: 9                                 failureThreshold: 1
+	//   successThreshold: 1                                 successThreshold: 9
+	// Introduce expectSpec(dynamic) to avoid worker do probe using COMMAND1 with failureThreshold=9 and successThreshold=9
+	// This is a hybrid and incorrect configuration from readinessProbe(v1) and readinessProbe(v2)
+	expectSpec *v1.Probe
 
 	// The type of the worker.
 	probeType probeType
@@ -99,15 +110,15 @@ func newWorker(
 
 	switch probeType {
 	case readiness:
-		w.spec = container.ReadinessProbe
+		w.expectSpec = container.ReadinessProbe
 		w.resultsManager = m.readinessManager
 		w.initialValue = results.Failure
 	case liveness:
-		w.spec = container.LivenessProbe
+		w.expectSpec = container.LivenessProbe
 		w.resultsManager = m.livenessManager
 		w.initialValue = results.Success
 	case startup:
-		w.spec = container.StartupProbe
+		w.expectSpec = container.StartupProbe
 		w.resultsManager = m.startupManager
 		w.initialValue = results.Unknown
 	}
@@ -145,7 +156,7 @@ func newWorker(
 // run periodically probes the container.
 func (w *worker) run() {
 	ctx := context.Background()
-	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
+	probeTickerPeriod := time.Duration(w.expectSpec.PeriodSeconds) * time.Second
 
 	// If kubelet restarted the probes could be started in rapid succession.
 	// Let the worker wait for a random portion of tickerPeriod before probing.
@@ -173,11 +184,12 @@ func (w *worker) run() {
 
 probeLoop:
 	for {
+		w.currentSpec = w.expectSpec
 		probeTicker.Reset(probeTickerPeriod)
 		if !w.doProbe(ctx) {
 			break
 		}
-		probeTickerPeriod = time.Duration(w.spec.PeriodSeconds) * time.Second
+		probeTickerPeriod = time.Duration(w.currentSpec.PeriodSeconds) * time.Second
 		// Wait for next probe tick.
 		select {
 		case <-w.stopCh:
@@ -276,7 +288,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Probe disabled for InitialDelaySeconds.
-	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
+	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.currentSpec.InitialDelaySeconds {
 		return true
 	}
 
@@ -318,8 +330,8 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		w.resultRun = 1
 	}
 
-	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
-		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
+	if (result == results.Failure && w.resultRun < int(w.currentSpec.FailureThreshold)) ||
+		(result == results.Success && w.resultRun < int(w.currentSpec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
 		return true
 	}

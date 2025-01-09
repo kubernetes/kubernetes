@@ -511,6 +511,39 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.LivenessProbeStatus != nil {
+			if a.LivenessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.LivenessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.LivenessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.LivenessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.ReadinessProbeStatus != nil {
+			if a.ReadinessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.ReadinessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.ReadinessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.StartupProbeStatus != nil {
+			if a.StartupProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.StartupProbeStatus.ProbeHandler.GRPC != nil {
+				if a.StartupProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.StartupProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
 	}
 	for i := range in.Status.ContainerStatuses {
 		a := &in.Status.ContainerStatuses[i]
@@ -519,6 +552,39 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.LivenessProbeStatus != nil {
+			if a.LivenessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.LivenessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.LivenessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.LivenessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.ReadinessProbeStatus != nil {
+			if a.ReadinessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.ReadinessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.ReadinessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.StartupProbeStatus != nil {
+			if a.StartupProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.StartupProbeStatus.ProbeHandler.GRPC != nil {
+				if a.StartupProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.StartupProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
 	}
 	for i := range in.Status.EphemeralContainerStatuses {
 		a := &in.Status.EphemeralContainerStatuses[i]
@@ -526,6 +592,39 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 		if a.Resources != nil {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
+		}
+		if a.LivenessProbeStatus != nil {
+			if a.LivenessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.LivenessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.LivenessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.LivenessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.ReadinessProbeStatus != nil {
+			if a.ReadinessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.ReadinessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.ReadinessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.StartupProbeStatus != nil {
+			if a.StartupProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.StartupProbeStatus.ProbeHandler.GRPC != nil {
+				if a.StartupProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.StartupProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
 		}
 	}
 }
@@ -549,6 +648,39 @@ func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.LivenessProbeStatus != nil {
+			if a.LivenessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.LivenessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.LivenessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.LivenessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.ReadinessProbeStatus != nil {
+			if a.ReadinessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.ReadinessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.ReadinessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.StartupProbeStatus != nil {
+			if a.StartupProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.StartupProbeStatus.ProbeHandler.GRPC != nil {
+				if a.StartupProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.StartupProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
 	}
 	for i := range in.Status.ContainerStatuses {
 		a := &in.Status.ContainerStatuses[i]
@@ -557,6 +689,39 @@ func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.LivenessProbeStatus != nil {
+			if a.LivenessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.LivenessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.LivenessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.LivenessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.ReadinessProbeStatus != nil {
+			if a.ReadinessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.ReadinessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.ReadinessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.StartupProbeStatus != nil {
+			if a.StartupProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.StartupProbeStatus.ProbeHandler.GRPC != nil {
+				if a.StartupProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.StartupProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
 	}
 	for i := range in.Status.EphemeralContainerStatuses {
 		a := &in.Status.EphemeralContainerStatuses[i]
@@ -564,6 +729,39 @@ func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 		if a.Resources != nil {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
+		}
+		if a.LivenessProbeStatus != nil {
+			if a.LivenessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.LivenessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.LivenessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.LivenessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.LivenessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.ReadinessProbeStatus != nil {
+			if a.ReadinessProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.ReadinessProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.ReadinessProbeStatus.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.ReadinessProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
+		}
+		if a.StartupProbeStatus != nil {
+			if a.StartupProbeStatus.ProbeHandler.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.StartupProbeStatus.ProbeHandler.HTTPGet)
+			}
+			if a.StartupProbeStatus.ProbeHandler.GRPC != nil {
+				if a.StartupProbeStatus.ProbeHandler.GRPC.Service == nil {
+					var ptrVar1 string = ""
+					a.StartupProbeStatus.ProbeHandler.GRPC.Service = &ptrVar1
+				}
+			}
 		}
 	}
 }
