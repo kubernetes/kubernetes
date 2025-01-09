@@ -5218,6 +5218,8 @@ func validateSeccompAnnotationsAndFieldsMatch(annotationValue string, seccompFie
 var updatablePodSpecFields = []string{
 	"`spec.containers[*].image`",
 	"`spec.initContainers[*].image`",
+	"`spec.containers[*].livenessProbe/readinessProbe/startupProbe.*`",
+	"`spec.initContainers[*].livenessProbe/readinessProbe/startupProbe.*`",
 	"`spec.activeDeadlineSeconds`",
 	"`spec.tolerations` (only additions to existing tolerations)",
 	"`spec.terminationGracePeriodSeconds` (allow it to be set to 1 if it was previously negative)",
@@ -5287,7 +5289,12 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// munge spec.containers[*].image
 	var newContainers []core.Container
 	for ix, container := range mungedPodSpec.Containers {
-		container.Image = oldPod.Spec.Containers[ix].Image // +k8s:verify-mutation:reason=clone
+		container.Image = oldPod.Spec.Containers[ix].Image
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) {
+			container.LivenessProbe = oldPod.Spec.Containers[ix].LivenessProbe
+			container.ReadinessProbe = oldPod.Spec.Containers[ix].ReadinessProbe
+			container.StartupProbe = oldPod.Spec.Containers[ix].StartupProbe
+		}
 		newContainers = append(newContainers, container)
 	}
 	mungedPodSpec.Containers = newContainers
@@ -5295,6 +5302,11 @@ func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	var newInitContainers []core.Container
 	for ix, container := range mungedPodSpec.InitContainers {
 		container.Image = oldPod.Spec.InitContainers[ix].Image // +k8s:verify-mutation:reason=clone
+		if utilfeature.DefaultFeatureGate.Enabled(features.AllowContainerProbeModification) {
+			container.LivenessProbe = oldPod.Spec.InitContainers[ix].LivenessProbe
+			container.ReadinessProbe = oldPod.Spec.InitContainers[ix].ReadinessProbe
+			container.StartupProbe = oldPod.Spec.InitContainers[ix].StartupProbe
+		}
 		newInitContainers = append(newInitContainers, container)
 	}
 	mungedPodSpec.InitContainers = newInitContainers

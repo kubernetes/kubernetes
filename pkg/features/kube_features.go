@@ -36,6 +36,12 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @chaunceyctx
+	// kep: https://kep.k8s.io/5002
+	//
+	// Enables the modification of container probe.
+	AllowContainerProbeModification featuregate.Feature = "AllowContainerProbeModification"
+
 	// owner: @aojea
 	// Deprecated: v1.31
 	//
