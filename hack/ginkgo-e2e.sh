@@ -142,7 +142,7 @@ ginkgo_args=(
 
 # NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
 # for backward compatibility purpose.
-ginkgo_args+=("--timeout=${GINKGO_TIMEOUT:-24h}")
+ginkgo_args+=(--timeout=24h)
 
 if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
   ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
