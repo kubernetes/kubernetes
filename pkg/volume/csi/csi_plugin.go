@@ -97,7 +97,7 @@ var PluginHandler = &RegistrationHandler{}
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
 func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
-	klog.Infof(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s",
+	klog.Info(log("Trying to validate a new CSI Driver with name: %s endpoint: %s versions: %s",
 		pluginName, endpoint, strings.Join(versions, ",")))
 
 	_, err := h.validateVersions("ValidatePlugin", pluginName, endpoint, versions)
@@ -110,7 +110,7 @@ func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string,
 
 // RegisterPlugin is called when a plugin can be registered
 func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
-	klog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
+	klog.Info(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
 	if err != nil {
@@ -432,7 +432,7 @@ func (p *csiPlugin) NewMounter(
 }
 
 func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
-	klog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
+	klog.V(4).Info(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
 
 	kvh, ok := p.host.(volume.KubeletVolumeHost)
 	if !ok {
@@ -697,7 +697,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod) (vo
 }
 
 func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
-	klog.V(4).Infof(log("setting up block unmapper for [Spec=%v, podUID=%v]", volName, podUID))
+	klog.V(4).Info(log("setting up block unmapper for [Spec=%v, podUID=%v]", volName, podUID))
 	unmapper := &csiBlockMapper{
 		plugin:   p,
 		podUID:   podUID,
@@ -839,7 +839,7 @@ func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
 	csiDriver, err := p.getCSIDriver(driverName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", driverName))
+			klog.V(4).Info(log("CSIDriver %q not found, not adding pod information", driverName))
 			return false, nil
 		}
 		return false, err
@@ -847,7 +847,7 @@ func (p *csiPlugin) podInfoEnabled(driverName string) (bool, error) {
 
 	// if PodInfoOnMount is not set or false we do not set pod attributes
 	if csiDriver.Spec.PodInfoOnMount == nil || *csiDriver.Spec.PodInfoOnMount == false {
-		klog.V(4).Infof(log("CSIDriver %q does not require pod information", driverName))
+		klog.V(4).Info(log("CSIDriver %q does not require pod information", driverName))
 		return false, nil
 	}
 	return true, nil

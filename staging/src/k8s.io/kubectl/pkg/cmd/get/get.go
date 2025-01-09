@@ -290,7 +290,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 				usageString = fmt.Sprintf("%s\nUse \"%s explain <resource>\" for a detailed description of that resource (e.g. %[2]s explain pods).", usageString, fullCmdName)
 			}
 
-			return cmdutil.UsageErrorf(cmd, usageString)
+			return cmdutil.UsageErrorf(cmd, "%s", usageString)
 		}
 	}
 

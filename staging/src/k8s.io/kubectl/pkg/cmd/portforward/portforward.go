@@ -331,7 +331,7 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 
 	getPodTimeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageErrorf(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, "%s", err.Error())
 	}
 
 	resourceName := args[0]

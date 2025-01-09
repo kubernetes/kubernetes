@@ -370,13 +370,13 @@ func (volume *VolumeToAttach) GenerateMsg(prefixMsg, suffixMsg string) (simpleMs
 
 // GenerateErrorDetailed returns detailed errors for volumes to attach
 func (volume *VolumeToAttach) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for volumes to attach
 func (volume *VolumeToAttach) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // String combines key fields of the volume for logging in text format.
@@ -535,13 +535,13 @@ func (volume *VolumeToMount) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg
 
 // GenerateErrorDetailed returns detailed errors for volumes to mount
 func (volume *VolumeToMount) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for volumes to mount
 func (volume *VolumeToMount) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // AttachedVolume represents a volume that is attached to a node.
@@ -597,13 +597,13 @@ func (volume *AttachedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMs
 
 // GenerateErrorDetailed returns detailed errors for attached volumes
 func (volume *AttachedVolume) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for attached volumes
 func (volume *AttachedVolume) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 // String combines key fields of the volume for logging in text format.
@@ -769,13 +769,13 @@ func (volume *MountedVolume) GenerateMsg(prefixMsg, suffixMsg string) (simpleMsg
 
 // GenerateErrorDetailed returns simple and detailed errors for mounted volumes
 func (volume *MountedVolume) GenerateErrorDetailed(prefixMsg string, err error) (detailedErr error) {
-	return fmt.Errorf(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
+	return errors.New(volume.GenerateMsgDetailed(prefixMsg, errSuffix(err)))
 }
 
 // GenerateError returns simple and detailed errors for mounted volumes
 func (volume *MountedVolume) GenerateError(prefixMsg string, err error) (simpleErr, detailedErr error) {
 	simpleMsg, detailedMsg := volume.GenerateMsg(prefixMsg, errSuffix(err))
-	return fmt.Errorf(simpleMsg), fmt.Errorf(detailedMsg)
+	return errors.New(simpleMsg), errors.New(detailedMsg)
 }
 
 type operationExecutor struct {

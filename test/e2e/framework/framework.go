@@ -311,7 +311,7 @@ func printSummaries(summaries []TestDataSummary, testBaseName string) {
 		switch TestContext.OutputPrintType {
 		case "hr":
 			if TestContext.ReportDir == "" {
-				Logf(summaries[i].PrintHumanReadable())
+				Logf("%s", summaries[i].PrintHumanReadable())
 			} else {
 				// TODO: learn to extract test name and append it to the kind instead of timestamp.
 				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
@@ -393,7 +393,7 @@ func (f *Framework) AfterEach(ctx context.Context) {
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
 				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
-			Failf(strings.Join(messages, ","))
+			Fail(strings.Join(messages, ","))
 		}
 	}()
 

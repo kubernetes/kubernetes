@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -123,7 +124,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	case "cluster-dns-ipv6":
 		cmd = append(cmd, "AAAA")
 	default:
-		panic(fmt.Errorf("invalid target: " + target))
+		panic(errors.New("invalid target: " + target))
 	}
 	cmd = append(cmd, dnsName)
 

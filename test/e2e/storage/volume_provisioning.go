@@ -550,7 +550,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("not all in phase Bound")))
-			framework.Logf(err.Error())
+			framework.Logf("%s", err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(claim.Status.Phase).To(gomega.Equal(v1.ClaimPending))
@@ -589,7 +589,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = e2epv.WaitForPersistentVolumeClaimPhase(ctx, v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("not all in phase Bound")))
-			framework.Logf(err.Error())
+			framework.Logf("%s", err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(ctx, claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(claim.Status.Phase).To(gomega.Equal(v1.ClaimPending))

@@ -82,7 +82,7 @@ func statusOkWithOverrides(overrides ...autoscalingv2.HorizontalPodAutoscalerCon
 	resv2 := make([]autoscalingv2.HorizontalPodAutoscalerCondition, len(statusOk))
 	copy(resv2, statusOk)
 	for _, override := range overrides {
-		resv2 = setConditionInList(resv2, override.Type, override.Status, override.Reason, override.Message)
+		resv2 = setConditionInList(resv2, override.Type, override.Status, override.Reason, "%s", override.Message)
 	}
 
 	// copy to a v1 slice

@@ -338,7 +338,7 @@ func (a *HorizontalController) computeReplicasForMetrics(ctx context.Context, hp
 	// return an error and set the condition of the hpa based on the first invalid metric.
 	// Otherwise set the condition as scaling active as we're going to scale
 	if invalidMetricsCount >= len(metricSpecs) || (invalidMetricsCount > 0 && replicas < specReplicas) {
-		setCondition(hpa, invalidMetricCondition.Type, invalidMetricCondition.Status, invalidMetricCondition.Reason, invalidMetricCondition.Message)
+		setCondition(hpa, invalidMetricCondition.Type, invalidMetricCondition.Status, invalidMetricCondition.Reason, "%s", invalidMetricCondition.Message)
 		return -1, "", statuses, time.Time{}, invalidMetricError
 	}
 	setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionTrue, "ValidMetricFound", "the HPA was able to successfully calculate a replica count from %s", metric)
@@ -385,15 +385,15 @@ func (a *HorizontalController) validateAndParseSelector(hpa *autoscalingv2.Horiz
 		errMsg := "selector is required"
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "SelectorRequired", errMsg)
 		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "the HPA target's scale is missing a selector")
-		return nil, fmt.Errorf(errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	parsedSelector, err := labels.Parse(selector)
 	if err != nil {
 		errMsg := fmt.Sprintf("couldn't convert selector into a corresponding internal selector object: %v", err)
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "InvalidSelector", errMsg)
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", errMsg)
-		return nil, fmt.Errorf(errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidSelector", "%s", errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
@@ -413,8 +413,8 @@ func (a *HorizontalController) validateAndParseSelector(hpa *autoscalingv2.Horiz
 	if len(selectingHpas) > 1 {
 		errMsg := fmt.Sprintf("pods by selector %v are controlled by multiple HPAs: %v", selector, selectingHpas)
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "AmbiguousSelector", errMsg)
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "AmbiguousSelector", errMsg)
-		return nil, fmt.Errorf(errMsg)
+		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "AmbiguousSelector", "%s", errMsg)
+		return nil, errors.New(errMsg)
 	}
 
 	return parsedSelector, nil
@@ -570,7 +570,7 @@ func (a *HorizontalController) computeStatusForObjectMetric(specReplicas, status
 		return replicaCountProposal, timestampProposal, fmt.Sprintf("external metric %s(%+v)", metricSpec.Object.Metric.Name, metricSpec.Object.Metric.Selector), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
 	errMsg := "invalid object metric source: neither a value target nor an average value target was set"
-	err = fmt.Errorf(errMsg)
+	err = errors.New(errMsg)
 	condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetObjectMetric", err)
 	return 0, time.Time{}, "", condition, err
 }
@@ -617,7 +617,7 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 
 	if target.AverageUtilization == nil {
 		errMsg := "invalid resource metric source: neither an average utilization target nor an average value (usage) target was set"
-		return 0, nil, time.Time{}, "", condition, fmt.Errorf(errMsg)
+		return 0, nil, time.Time{}, "", condition, errors.New(errMsg)
 	}
 
 	targetUtilization := *target.AverageUtilization
@@ -719,9 +719,9 @@ func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, stat
 		return replicaCountProposal, timestampProposal, fmt.Sprintf("external metric %s(%+v)", metricSpec.External.Metric.Name, metricSpec.External.Metric.Selector), autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
 	errMsg := "invalid external metric source: neither a value target nor an average value target was set"
-	err = fmt.Errorf(errMsg)
+	err = errors.New(errMsg)
 	condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetExternalMetric", err)
-	return 0, time.Time{}, "", condition, fmt.Errorf(errMsg)
+	return 0, time.Time{}, "", condition, errors.New(errMsg)
 }
 
 func (a *HorizontalController) recordInitialRecommendation(currentReplicas int32, key string) {
@@ -950,12 +950,12 @@ func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.Horiz
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "ReadyForNewScale", "recommended size matches current size")
 	}
 
-	desiredReplicas, condition, reason := convertDesiredReplicasWithRules(currentReplicas, stabilizedRecommendation, minReplicas, hpa.Spec.MaxReplicas)
+	desiredReplicas, reason, message := convertDesiredReplicasWithRules(currentReplicas, stabilizedRecommendation, minReplicas, hpa.Spec.MaxReplicas)
 
 	if desiredReplicas == stabilizedRecommendation {
-		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, condition, reason)
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, reason, "%s", message)
 	} else {
-		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, condition, reason)
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, reason, "%s", message)
 	}
 
 	return desiredReplicas
@@ -991,15 +991,15 @@ func (a *HorizontalController) normalizeDesiredReplicasWithBehaviors(hpa *autosc
 	normalizationArg.DesiredReplicas = stabilizedRecommendation
 	if stabilizedRecommendation != prenormalizedDesiredReplicas {
 		// "ScaleUpStabilized" || "ScaleDownStabilized"
-		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, reason, message)
+		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, reason, "%s", message)
 	} else {
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "ReadyForNewScale", "recommended size matches current size")
 	}
 	desiredReplicas, reason, message := a.convertDesiredReplicasWithBehaviorRate(normalizationArg)
 	if desiredReplicas == stabilizedRecommendation {
-		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, reason, message)
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, reason, "%s", message)
 	} else {
-		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, reason, message)
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, reason, "%s", message)
 	}
 
 	return desiredReplicas

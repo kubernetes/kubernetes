@@ -176,7 +176,7 @@ func LoadAndValidateData(data []byte, requireNonWebhookTypes sets.Set[authzconfi
 		sets.NewString(modes.AuthorizationModeChoices...),
 		sets.NewString(repeatableAuthorizerTypes...),
 	); len(errors) != 0 {
-		return nil, fmt.Errorf(errors.ToAggregate().Error())
+		return nil, errors.ToAggregate()
 	}
 
 	// test to check if the authorizer names passed conform to the authorizers for type!=Webhook

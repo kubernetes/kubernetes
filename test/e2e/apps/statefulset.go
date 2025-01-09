@@ -2012,7 +2012,7 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf("%s", e2ekubectl.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
@@ -2047,7 +2047,7 @@ func (m *mysqlGaleraTester) deploy(ctx context.Context, ns string) *appsv1.State
 		"create database statefulset;",
 		"use statefulset; create table foo (k varchar(20), v varchar(20));",
 	} {
-		framework.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
+		framework.Logf("%s", m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
 	}
 	return m.ss
 }
@@ -2056,7 +2056,7 @@ func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
-		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
+		framework.Logf(cmd, m.mysqlExec(cmd, m.ss.Namespace, name))
 	}
 }
 
@@ -2087,7 +2087,7 @@ func (m *redisTester) deploy(ctx context.Context, ns string) *appsv1.StatefulSet
 func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
-		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
+		framework.Logf("%s", m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
 	}
 }
 
@@ -2117,7 +2117,7 @@ func (c *cockroachDBTester) deploy(ctx context.Context, ns string) *appsv1.State
 		"CREATE DATABASE IF NOT EXISTS foo;",
 		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
 	} {
-		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
+		framework.Logf("%s", c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
 	}
 	return c.ss
 }
@@ -2126,7 +2126,7 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
-		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
+		framework.Logf("%s", c.cockroachDBExec(cmd, c.ss.Namespace, name))
 	}
 }
 func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {

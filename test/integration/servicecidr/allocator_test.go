@@ -68,7 +68,7 @@ func TestServiceAllocation(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf(tc.name), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			etcdOptions := framework.SharedEtcd()
 			apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 			s1 := kubeapiservertesting.StartTestServerOrDie(t,

@@ -762,7 +762,7 @@ func ensureTopologyRequirements(ctx context.Context, nodeSelection *e2epod.NodeS
 	nodes, err := e2enode.GetReadySchedulableNodes(ctx, cs)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) < minCount {
-		e2eskipper.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", minCount))
+		e2eskipper.Skipf("Number of available nodes is less than %d - skipping", minCount)
 	}
 
 	topologyKeys := driverInfo.TopologyKeys

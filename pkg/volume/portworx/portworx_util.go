@@ -366,7 +366,7 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
 		err := fmt.Errorf("failed to get kubeclient when creating portworx client")
-		klog.Errorf(err.Error())
+		klog.Error(err.Error())
 		return nil, err
 	}
 
@@ -379,7 +379,7 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 
 	if svc == nil {
 		err = fmt.Errorf("service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
-		klog.Errorf(err.Error())
+		klog.Error(err.Error())
 		return nil, err
 	}
 

@@ -131,7 +131,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 
 		if err != nil {
 			msg := ne.vmt.GenerateErrorDetailed("MountVolume.NodeExpandVolume failed to mark node expansion in progress: %v", err)
-			klog.Errorf(msg.Error())
+			klog.Error(msg.Error())
 			return false, err, testResponseData{}
 		}
 	}
@@ -143,12 +143,12 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 			if volumetypes.IsInfeasibleError(resizeErr) || ne.markExpansionInfeasibleOnFailure {
 				ne.pvc, markFailedError = util.MarkNodeExpansionInfeasible(ne.pvc, ne.kubeClient, resizeErr)
 				if markFailedError != nil {
-					klog.Errorf(ne.vmt.GenerateErrorDetailed("MountMount.NodeExpandVolume failed to mark node expansion as failed: %v", err).Error())
+					klog.Error(ne.vmt.GenerateErrorDetailed("MountMount.NodeExpandVolume failed to mark node expansion as failed: %v", err).Error())
 				}
 			} else {
 				ne.pvc, markFailedError = util.MarkNodeExpansionFailedCondition(ne.pvc, ne.kubeClient, resizeErr)
 				if markFailedError != nil {
-					klog.Errorf(ne.vmt.GenerateErrorDetailed("MountMount.NodeExpandVolume failed to mark node expansion as failed: %v", err).Error())
+					klog.Error(ne.vmt.GenerateErrorDetailed("MountMount.NodeExpandVolume failed to mark node expansion as failed: %v", err).Error())
 				}
 			}
 		}
@@ -158,7 +158,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, error, testResponseData) {
 		// expansion operation should not block mounting
 		if volumetypes.IsFailedPreconditionError(resizeErr) {
 			ne.actualStateOfWorld.MarkForInUseExpansionError(ne.vmt.VolumeName)
-			klog.Errorf(ne.vmt.GenerateErrorDetailed("MountVolume.NodeExapndVolume failed with %v", resizeErr).Error())
+			klog.Error(ne.vmt.GenerateErrorDetailed("MountVolume.NodeExapndVolume failed with %v", resizeErr).Error())
 			return false, nil, testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: true}
 		}
 		return false, resizeErr, testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: true}
