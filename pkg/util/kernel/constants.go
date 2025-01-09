@@ -46,7 +46,8 @@ const IPVSConnReuseModeFixedKernelVersion = "5.9"
 
 // UserNamespacesSupportKernelVersion is the kernel version where idmap for tmpfs support was added
 // (ref: https://github.com/torvalds/linux/commit/05e6295f7b5e05f09e369a3eb2882ec5b40fff20)
-const UserNamespacesSupportKernelVersion = "6.3"
+// This was pulled back to RHEL 9.4 for Openshift, so it is present after 5.14.
+const UserNamespacesSupportKernelVersion = "5.14"
 
 const TmpfsNoswapSupportKernelVersion = "6.4"
 
