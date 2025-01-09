@@ -198,11 +198,26 @@ func device(name string, capacity map[resourceapi.QualifiedName]resource.Quantit
 	return device
 }
 
+// generate a CompositeDevice object with the given name, capacity and attributes.
+func compositeDevice(name string, capacity map[resourceapi.QualifiedName]resource.Quantity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) resourceapi.Device {
+	device := resourceapi.Device{
+		Name: name,
+		Composite: &resourceapi.CompositeDevice{
+			Attributes: attributes,
+		},
+	}
+	device.Composite.Capacity = make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, len(capacity))
+	for name, quantity := range capacity {
+		device.Composite.Capacity[name] = resourceapi.DeviceCapacity{Value: quantity}
+	}
+	return device
+}
+
 // generate a ResourceSlice object with the given name, node,
-// driver and pool names, generation and a list of devices.
+// driver and pool names, generation and a list of devices or mixins
 // The nodeSelection parameter may be a string (= node name),
 // true (= all nodes), or a node selector (= specific nodes).
-func slice(name string, nodeSelection any, pool, driver string, devices ...resourceapi.Device) *resourceapi.ResourceSlice {
+func slice(name string, nodeSelection any, pool, driver string, devicesOrMixins ...any) *resourceapi.ResourceSlice {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -214,8 +229,18 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...resou
 				ResourceSliceCount: 1,
 				Generation:         1,
 			},
-			Devices: devices,
 		},
+	}
+
+	for _, item := range devicesOrMixins {
+		switch item := item.(type) {
+		case resourceapi.Device:
+			slice.Spec.Devices = append(slice.Spec.Devices, item)
+		case resourceapi.DeviceMixin:
+			slice.Spec.DeviceMixins = append(slice.Spec.DeviceMixins, item)
+		default:
+			panic(fmt.Sprintf("unexpected item: want resourceapi.Device or resourceapi.DeviceMixin, got %T", item))
+		}
 	}
 
 	switch nodeSelection := nodeSelection.(type) {
@@ -371,6 +396,57 @@ func TestAllocator(t *testing.T) {
 			classes:          objects(class(classA, driverA)),
 			slices:           objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
 			node:             node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"composite-device": {
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				compositeDevice(device1, map[resourceapi.QualifiedName]resource.Quantity{
+					"memory": resource.MustParse("1Gi"),
+				}, nil),
+			)),
+			node: node(node1, region1),
+
+			// TODO: a lot more test cases for partitionable devices (mixins, partitions, etc.)
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"mixin": {
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				nil,
+				request(req0, classA, 1, resourceapi.DeviceSelector{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.capacity["%s"].memory.compareTo(quantity("1Gi")) >= 0`, driverA),
+					}}),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				func() resourceapi.Device {
+					device := compositeDevice(device1, nil, nil)
+					device.Composite.Includes = []resourceapi.DeviceMixinRef{{Name: "1Gi-mixin"}}
+					return device
+				}(),
+				func() resourceapi.DeviceMixin {
+					mixin := resourceapi.DeviceMixin{
+						Name: "1Gi-mixin",
+						Composite: &resourceapi.CompositeDeviceMixin{
+							Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+								"memory": {Value: resource.MustParse("1Gi")},
+							},
+						},
+					}
+					return mixin
+				}(),
+			)),
+			node: node(node1, region1),
 
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
