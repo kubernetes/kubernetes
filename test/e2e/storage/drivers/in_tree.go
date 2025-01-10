@@ -369,6 +369,12 @@ type hostPathDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
+type hostPathVolume struct {
+	targetPath string
+	prepPod    *v1.Pod
+	f          *framework.Framework
+}
+
 var _ storageframework.TestDriver = &hostPathDriver{}
 var _ storageframework.PreprovisionedVolumeTestDriver = &hostPathDriver{}
 var _ storageframework.InlineVolumeTestDriver = &hostPathDriver{}
@@ -403,13 +409,18 @@ func (h *hostPathDriver) SkipUnsupportedTest(pattern storageframework.TestPatter
 }
 
 func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
+	hv, ok := e2evolume.(*hostPathVolume)
+	if !ok {
+		framework.Failf("Failed to cast test volume of type %T to the Hostpath test volume", e2evolume)
+	}
+
 	// hostPath doesn't support readOnly volume
 	if readOnly {
 		return nil
 	}
 	return &v1.VolumeSource{
 		HostPath: &v1.HostPathVolumeSource{
-			Path: "/tmp",
+			Path: hv.targetPath,
 		},
 	}
 }
@@ -426,11 +437,86 @@ func (h *hostPathDriver) CreateVolume(ctx context.Context, config *storageframew
 	f := config.Framework
 	cs := f.ClientSet
 
+	targetPath := fmt.Sprintf("/tmp/%v", f.Namespace.Name)
+	volumeName := "test-volume"
+
 	// pods should be scheduled on the node
 	node, err := e2enode.GetRandomReadySchedulableNode(ctx, cs)
 	framework.ExpectNoError(err)
 	config.ClientNodeSelection = e2epod.NodeSelection{Name: node.Name}
-	return nil
+
+	cmd := fmt.Sprintf("mkdir %v -m 777", targetPath)
+	privileged := true
+
+	// Launch pod to initialize hostPath directory
+	prepPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("hostpath-prep-%s", f.Namespace.Name),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"/bin/sh", "-ec", cmd},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: "/tmp",
+						},
+					},
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &privileged,
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: volumeName,
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/tmp",
+						},
+					},
+				},
+			},
+			NodeName: node.Name,
+		},
+	}
+	// h.prepPod will be reused in cleanupDriver.
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, prepPod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "while creating hostPath init pod")
+
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
+
+	err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+	framework.ExpectNoError(err, "while deleting hostPath init pod")
+	return &hostPathVolume{
+		targetPath: targetPath,
+		prepPod:    prepPod,
+		f:          f,
+	}
+}
+
+var _ storageframework.TestVolume = &hostPathVolume{}
+
+// DeleteVolume implements the storageframework.TestVolume interface method
+func (v *hostPathVolume) DeleteVolume(ctx context.Context) {
+	f := v.f
+
+	cmd := fmt.Sprintf("rm -rf %v", v.targetPath)
+	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
+
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, v.prepPod, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "while creating hostPath teardown pod")
+
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
+
+	err = e2epod.DeletePodWithWait(ctx, f.ClientSet, pod)
+	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 
 // HostPathSymlink
@@ -572,6 +658,9 @@ func (h *hostPathSymlinkDriver) CreateVolume(ctx context.Context, config *storag
 	}
 }
 
+var _ storageframework.TestVolume = &hostPathSymlinkVolume{}
+
+// DeleteVolume implements the storageframework.TestVolume interface method
 func (v *hostPathSymlinkVolume) DeleteVolume(ctx context.Context) {
 	f := v.f
 
