@@ -603,11 +603,12 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KnownObjects:          clientState,
-		EmitDeltaTypeReplaced: true,
-		Transformer:           options.Transform,
-	})
+	//fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+	//	KnownObjects:          clientState,
+	//	EmitDeltaTypeReplaced: true,
+	//	Transformer:           options.Transform,
+	//})
+	fifo := NewRealFIFO(MetaNamespaceKeyFunc, clientState)
 
 	cfg := &Config{
 		Queue:            fifo,

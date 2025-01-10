@@ -540,11 +540,12 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-			KnownObjects:          s.indexer,
-			EmitDeltaTypeReplaced: true,
-			Transformer:           s.transform,
-		})
+		//fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		//	KnownObjects:          s.indexer,
+		//	EmitDeltaTypeReplaced: true,
+		//	Transformer:           s.transform,
+		//})
+		fifo := NewRealFIFO(MetaNamespaceKeyFunc, s.indexer)
 
 		cfg := &Config{
 			Queue:             fifo,
