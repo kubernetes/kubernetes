@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"errors"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"sync"
 	"time"
 
@@ -592,11 +593,17 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KnownObjects:          clientState,
-		EmitDeltaTypeReplaced: true,
-		Transformer:           options.Transform,
-	})
+
+	var fifo Queue
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
+		fifo = NewRealFIFO(MetaNamespaceKeyFunc, clientState, options.Transform)
+	} else {
+		fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			KnownObjects:          clientState,
+			EmitDeltaTypeReplaced: true,
+			Transformer:           options.Transform,
+		})
+	}
 
 	cfg := &Config{
 		Queue:            fifo,

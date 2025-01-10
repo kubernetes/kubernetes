@@ -49,10 +49,7 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KeyFunction:  MetaNamespaceKeyFunc,
-		KnownObjects: downstream,
-	})
+	fifo := NewRealFIFO(MetaNamespaceKeyFunc, downstream, nil)
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -87,7 +84,7 @@ func Example() {
 
 				// fifo's KeyOf is easiest, because it handles
 				// DeletedFinalStateUnknown markers.
-				key, err := fifo.KeyOf(newest.Object)
+				key, err := fifo.keyOf(newest.Object)
 				if err != nil {
 					return err
 				}
