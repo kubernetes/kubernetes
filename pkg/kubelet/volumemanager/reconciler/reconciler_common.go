@@ -169,9 +169,11 @@ func (rc *reconciler) mountOrAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
 		if rc.operationExecutor.IsOperationPending(volumeToMount.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
+			klog.InfoS("----debug log---", "volumeToMount.PodName", volumeToMount.PodName, "volumeToMount.VolumeName", volumeToMount.VolumeName)
 			continue
 		}
 		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.DesiredPersistentVolumeSize, volumeToMount.SELinuxLabel)
+		klog.InfoS("----debug log---", "volMounted", volMounted, "devicePath", devicePath, "err", err)
 		volumeToMount.DevicePath = devicePath
 		if cache.IsSELinuxMountMismatchError(err) {
 			// The volume is mounted, but with an unexpected SELinux context.
