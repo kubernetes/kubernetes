@@ -277,8 +277,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 				},
 				NodeSelector: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{{
-						MatchFields: []v1.NodeSelectorRequirement{{
-							Key:      "metadata.name",
+						// MatchExpressions allow multiple values,
+						// MatchFields don't.
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "kubernetes.io/hostname",
 							Operator: v1.NodeSelectorOpIn,
 							Values:   nodes.NodeNames,
 						}},
