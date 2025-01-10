@@ -113,14 +113,14 @@ func (hs *ProxyHealthServer) isHealthy() (bool, time.Time) {
 	defer hs.lock.RUnlock()
 
 	var lastUpdated time.Time
-	currentTime := hs.clock.Now()
-
-	for ipFamily, proxierLastUpdated := range hs.lastUpdatedMap {
-
+	for _, proxierLastUpdated := range hs.lastUpdatedMap {
 		if proxierLastUpdated.After(lastUpdated) {
 			lastUpdated = proxierLastUpdated
 		}
+	}
 
+	currentTime := hs.clock.Now()
+	for ipFamily, _ := range hs.lastUpdatedMap {
 		if _, set := hs.oldestPendingQueuedMap[ipFamily]; !set {
 			// the proxier is healthy while it's starting up
 			// or the proxier is fully synced.
@@ -131,7 +131,7 @@ func (hs *ProxyHealthServer) isHealthy() (bool, time.Time) {
 			// there's an unprocessed update queued for this proxier, but it's not late yet.
 			continue
 		}
-		return false, proxierLastUpdated
+		return false, lastUpdated
 	}
 	return true, lastUpdated
 }
