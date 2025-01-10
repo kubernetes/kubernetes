@@ -852,6 +852,28 @@ func TestAllocator(t *testing.T) {
 			),
 			node: node(node1, region1),
 		},
+		"all-devices-empty-slice": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name:            req0,
+				AllocationMode:  resourceapi.DeviceAllocationModeAll,
+				DeviceClassName: classA,
+			})),
+			classes:       objects(class(classA, driverA)),
+			slices:        []*resourceapi.ResourceSlice{},
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"all-devices-no-slices": {
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name:            req0,
+				AllocationMode:  resourceapi.DeviceAllocationModeAll,
+				DeviceClassName: classA,
+			})),
+			classes:       objects(class(classA, driverA)),
+			slices:        nil,
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
 		"network-attached-device": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
