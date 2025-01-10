@@ -190,7 +190,7 @@ func (f *RealFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		if f.initialPopulationCount > 0 {
 			f.initialPopulationCount--
 		}
-		err := process(item, isInInitialList)
+		err := process(Deltas{item}, isInInitialList)
 		if e, ok := err.(ErrRequeue); ok {
 			panic(fmt.Sprintf("figure out end up here in CI, %v", e))
 		}
