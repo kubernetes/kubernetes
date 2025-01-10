@@ -89,7 +89,7 @@ func (pl *CSILimits) EventsToRegister(_ context.Context) ([]framework.ClusterEve
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterPVCAdded},
-		{Event: framework.ClusterEvent{Resource: framework.VolumeAttachment, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.VolumeAttachment, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterVolumeAttachmentDeleted},
 	}, nil
 }
 
@@ -147,6 +147,87 @@ func (pl *CSILimits) isSchedulableAfterPVCAdded(logger klog.Logger, pod *v1.Pod,
 
 	logger.V(5).Info("PVC irrelevant to the Pod was created, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(addedPvc))
 	return framework.QueueSkip, nil
+}
+
+func (pl *CSILimits) isSchedulableAfterVolumeAttachmentDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	deletedVolumeAttachment, _, err := util.As[*storagev1.VolumeAttachment](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterVolumeAttachmentDeleted: %w", err)
+	}
+
+	if deletedVolumeAttachment.Spec.NodeName == "" {
+		logger.V(5).Info("The deleted VolumeAttachment does not specify a NodeName and does not impact scheduling",
+			"volumeAttachment", klog.KRef(deletedVolumeAttachment.Namespace, deletedVolumeAttachment.Name))
+		return framework.QueueSkip, nil
+	}
+
+	// Check if the Pod is affected by the deletion of the VolumeAttachment.
+	// This requires checking whether the Pod references the deleted VolumeAttachment or if it's scheduled on the same node.
+	isAffected, err := pl.isPodAffectedByVolumeAttachment(logger, pod, deletedVolumeAttachment)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("failed to determine if pod is affected by volume attachment deletion: %w", err)
+	}
+
+	if !isAffected {
+		logger.V(5).Info("Deleted VolumeAttachment irrelevant to the Pod was removed, which doesn't make this pod schedulable",
+			"pod", klog.KObj(pod),
+			"volumeAttachment", klog.KObj(deletedVolumeAttachment))
+		return framework.QueueSkip, nil
+	}
+
+	// The Pod is affected by the VolumeAttachment deletion; requeue for scheduling.
+	logger.Info("VolumeAttachment that impacts the pod's scheduling was deleted, which might make this pod schedulable",
+		"pod", klog.KObj(pod),
+		"volumeAttachment", klog.KObj(deletedVolumeAttachment))
+	return framework.Queue, nil
+}
+
+func (pl *CSILimits) isPodAffectedByVolumeAttachment(logger klog.Logger, pod *v1.Pod, volumeAttachment *storagev1.VolumeAttachment) (bool, error) {
+	// Helper function to check if a PVC claims the PV associated with the deleted VolumeAttachment.
+	checkPVC := func(pvcName string) (bool, error) {
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				logger.V(5).Info("PVC not found", "pod", klog.KObj(pod), "pvcName", pvcName)
+				return false, nil // Skip non-existent PVCs.
+			}
+			return false, fmt.Errorf("failed to get PVC %s: %w", pvcName, err)
+		}
+
+		if pvc.Spec.VolumeName != "" && pvc.Spec.VolumeName == *volumeAttachment.Spec.Source.PersistentVolumeName {
+			logger.V(4).Info("Found matching PVC for this VolumeAttachment",
+				"pod", klog.KObj(pod),
+				"volumeAttachment", klog.KObj(volumeAttachment))
+			return true, nil
+		}
+		return false, nil
+	}
+
+	for _, volume := range pod.Spec.Volumes {
+		var pvcName string
+
+		switch {
+		case volume.PersistentVolumeClaim != nil:
+			pvcName = volume.PersistentVolumeClaim.ClaimName
+		case volume.Ephemeral != nil:
+			pvcName = ephemeral.VolumeClaimName(pod, &volume)
+		default:
+			continue // Ignore volumes that do not use PVCs or Ephemeral Volumes.
+		}
+
+		affected, err := checkPVC(pvcName)
+		if err != nil {
+			return false, err
+		}
+		if affected {
+			return true, nil
+		}
+	}
+
+	logger.V(5).Info("No relevant VolumeAttachment found for the Pod",
+		"pod", klog.KObj(pod),
+		"volumeAttachment", klog.KObj(volumeAttachment))
+	return false, nil
 }
 
 // PreFilter invoked at the prefilter extension point
