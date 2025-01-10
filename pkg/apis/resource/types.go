@@ -689,7 +689,7 @@ type ResourceClaimStatus struct {
 	// which issued it knows that it must put the pod back into the queue,
 	// waiting for the ResourceClaim to become usable again.
 	//
-	// There can be at most 32 such reservations. This may get increased in
+	// There can be at most 256 such reservations. This may get increased in
 	// the future, but not reduced.
 	//
 	// +optional
@@ -717,9 +717,9 @@ type ResourceClaimStatus struct {
 	Devices []AllocatedDeviceStatus
 }
 
-// ReservedForMaxSize is the maximum number of entries in
+// ResourceClaimReservedForMaxSize is the maximum number of entries in
 // claim.status.reservedFor.
-const ResourceClaimReservedForMaxSize = 32
+const ResourceClaimReservedForMaxSize = 256
 
 // ResourceClaimConsumerReference contains enough information to let you
 // locate the consumer of a ResourceClaim. The user must be a resource in the same

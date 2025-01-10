@@ -683,7 +683,7 @@ message ResourceClaimStatus {
   // which issued it knows that it must put the pod back into the queue,
   // waiting for the ResourceClaim to become usable again.
   //
-  // There can be at most 32 such reservations. This may get increased in
+  // There can be at most 256 such reservations. This may get increased in
   // the future, but not reduced.
   //
   // +optional
