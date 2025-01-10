@@ -339,10 +339,6 @@ type Cacher struct {
 	expiredBookmarkWatchers []*cacheWatcher
 }
 
-func (c *Cacher) RequestWatchProgress(ctx context.Context) error {
-	return c.storage.RequestWatchProgress(ctx)
-}
-
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
 // its internal cache and updating its cache in the background based on the
 // given configuration.
@@ -495,56 +491,13 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	}
 }
 
-// Versioner implements storage.Interface.
-func (c *Cacher) Versioner() storage.Versioner {
-	return c.storage.Versioner()
-}
-
-// Create implements storage.Interface.
-func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	return c.storage.Create(ctx, key, obj, out, ttl)
-}
-
-// Delete implements storage.Interface.
-func (c *Cacher) Delete(
-	ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions,
-	validateDeletion storage.ValidateObjectFunc, _ runtime.Object, opts storage.DeleteOptions) error {
-	// Ignore the suggestion and try to pass down the current version of the object
-	// read from cache.
-	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
-		klog.Errorf("GetByKey returned error: %v", err)
-	} else if exists {
-		// DeepCopy the object since we modify resource version when serializing the
-		// current object.
-		currObj := elem.(*storeElement).Object.DeepCopyObject()
-		return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, currObj, opts)
-	}
-	// If we couldn't get the object, fallback to no-suggestion.
-	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
-}
-
 type namespacedName struct {
 	namespace string
 	name      string
 }
 
-// Watch implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	pred := opts.Predicate
-	// if the watch-list feature wasn't set and the resourceVersion is unset
-	// ensure that the rv from which the watch is being served, is the latest
-	// one. "latest" is ensured by serving the watch from
-	// the underlying storage.
-	//
-	// it should never happen due to our validation but let's just be super-safe here
-	// and disable sendingInitialEvents when the feature wasn't enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.WatchList) && opts.SendInitialEvents != nil {
-		opts.SendInitialEvents = nil
-	}
-	// TODO: we should eventually get rid of this legacy case
-	if utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutResourceVersion) && opts.SendInitialEvents == nil && opts.ResourceVersion == "" {
-		return c.storage.Watch(ctx, key, opts)
-	}
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
@@ -709,50 +662,10 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	return watcher, nil
 }
 
-// Get implements storage.Interface.
 func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
-	ctx, span := tracing.Start(ctx, "cacher.Get",
-		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
-		attribute.String("key", key),
-		attribute.String("resource-version", opts.ResourceVersion))
-	defer span.End(500 * time.Millisecond)
-	if opts.ResourceVersion == "" {
-		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility).
-		span.AddEvent("About to Get from underlying storage")
-		return c.storage.Get(ctx, key, opts, objPtr)
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if !c.ready.check() {
-			// If Cache is not initialized, delegate Get requests to storage
-			// as described in https://kep.k8s.io/4568
-			span.AddEvent("About to Get from underlying storage - cache not initialized")
-			return c.storage.Get(ctx, key, opts, objPtr)
-		}
-	}
-
-	// If resourceVersion is specified, serve it from cache.
-	// It's guaranteed that the returned value is at least that
-	// fresh as the given resourceVersion.
 	getRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return err
-	}
-
-	// Do not create a trace - it's not for free and there are tons
-	// of Get requests. We can add it if it will be really needed.
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if getRV == 0 && !c.ready.check() {
-			// If Cacher is not yet initialized and we don't require any specific
-			// minimal resource version, simply forward the request to storage.
-			span.AddEvent("About to Get from underlying storage - cache not initialized and no resourceVersion set")
-			return c.storage.Get(ctx, key, opts, objPtr)
-		}
-		if err := c.ready.wait(ctx); err != nil {
-			return errors.NewServiceUnavailable(err.Error())
-		}
 	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
@@ -760,7 +673,6 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 		return err
 	}
 
-	span.AddEvent("About to fetch object from cache")
 	obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, getRV, key)
 	if err != nil {
 		return err
@@ -853,32 +765,9 @@ type listResp struct {
 }
 
 // GetList implements storage.Interface
-func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, listRV uint64) error {
 	recursive := opts.Recursive
-	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
-	if shouldDelegateList(opts) {
-		return c.storage.GetList(ctx, key, opts, listObj)
-	}
-
-	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
-	if err != nil {
-		return err
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if !c.ready.check() && shouldDelegateListOnNotReadyCache(opts) {
-			// If Cacher is not initialized, delegate List requests to storage
-			// as described in https://kep.k8s.io/4568
-			return c.storage.GetList(ctx, key, opts, listObj)
-		}
-	} else {
-		if listRV == 0 && !c.ready.check() {
-			// If Cacher is not yet initialized and we don't require any specific
-			// minimal resource version, simply forward the request to storage.
-			return c.storage.GetList(ctx, key, opts, listObj)
-		}
-	}
 	// For recursive lists, we need to make sure the key ended with "/" so that we only
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
 	// with prefix "/a" will return all three, while with prefix "/a/" will return only
@@ -886,14 +775,6 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	preparedKey := key
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		preparedKey += "/"
-	}
-	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-	consistentRead := resourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported
-	if consistentRead {
-		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.newListFunc, c.resourcePrefix, c.objectType.String())
-		if err != nil {
-			return err
-		}
 	}
 
 	ctx, span := tracing.Start(ctx, "cacher.GetList",
@@ -928,23 +809,8 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 
 	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
-	success := "true"
-	fallback := "false"
 	if err != nil {
-		if consistentRead {
-			if storage.IsTooLargeResourceVersion(err) {
-				fallback = "true"
-				err = c.storage.GetList(ctx, key, opts, listObj)
-			}
-			if err != nil {
-				success = "false"
-			}
-			metrics.ConsistentReadTotal.WithLabelValues(c.resourcePrefix, success, fallback).Add(1)
-		}
 		return err
-	}
-	if consistentRead {
-		metrics.ConsistentReadTotal.WithLabelValues(c.resourcePrefix, success, fallback).Add(1)
 	}
 	span.AddEvent("Listed items from cache", attribute.Int("count", len(resp.Items)))
 	// store pointer of eligible objects,
@@ -992,37 +858,6 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		}
 	}
 	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(resp.Items), listVal.Len())
-	return nil
-}
-
-// GuaranteedUpdate implements storage.Interface.
-func (c *Cacher) GuaranteedUpdate(
-	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
-	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ runtime.Object) error {
-	// Ignore the suggestion and try to pass down the current version of the object
-	// read from cache.
-	if elem, exists, err := c.watchCache.GetByKey(key); err != nil {
-		klog.Errorf("GetByKey returned error: %v", err)
-	} else if exists {
-		// DeepCopy the object since we modify resource version when serializing the
-		// current object.
-		currObj := elem.(*storeElement).Object.DeepCopyObject()
-		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, currObj)
-	}
-	// If we couldn't get the object, fallback to no-suggestion.
-	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
-}
-
-// Count implements storage.Interface.
-func (c *Cacher) Count(pathPrefix string) (int64, error) {
-	return c.storage.Count(pathPrefix)
-}
-
-// ReadinessCheck implements storage.Interface.
-func (c *Cacher) ReadinessCheck() error {
-	if !c.ready.check() {
-		return storage.ErrStorageNotReady
-	}
 	return nil
 }
 
@@ -1500,6 +1335,10 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 
 		cacheInterval.initialEventsEndBookmark = initialEventsEndBookmark
 	}
+}
+
+func (c *Cacher) Ready() bool {
+	return c.ready.check()
 }
 
 // errWatcher implements watch.Interface to return a single error
