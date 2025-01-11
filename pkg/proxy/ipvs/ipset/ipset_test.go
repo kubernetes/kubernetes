@@ -28,6 +28,10 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
+func newInternal(fexec *fakeexec.FakeExec) Interface {
+	return &runner{fexec}
+}
+
 func TestCheckIPSetVersion(t *testing.T) {
 	testCases := []struct {
 		vstring string
@@ -83,7 +87,7 @@ func TestFlushSet(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec)
+	runner := newInternal(fexec)
 	// Success.
 	err := runner.FlushSet("FOOBAR")
 	if err != nil {
@@ -119,7 +123,7 @@ func TestDestroySet(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec)
+	runner := newInternal(fexec)
 	// Success
 	err := runner.DestroySet("FOOBAR")
 	if err != nil {
@@ -153,7 +157,7 @@ func TestDestroyAllSets(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec)
+	runner := newInternal(fexec)
 	// Success
 	err := runner.DestroyAllSets()
 	if err != nil {
@@ -198,7 +202,7 @@ func TestCreateSet(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec)
+	runner := newInternal(fexec)
 	// Create with ignoreExistErr = false, expect success
 	err := runner.CreateSet(&testSet, false)
 	if err != nil {
@@ -388,7 +392,7 @@ func TestAddEntry(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		runner := New(fexec)
+		runner := newInternal(fexec)
 		// Create with ignoreExistErr = false, expect success
 		err := runner.AddEntry(testCases[i].entry.String(), testCases[i].set, false)
 		if err != nil {
@@ -437,7 +441,7 @@ func TestDelEntry(t *testing.T) {
 				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			},
 		}
-		runner := New(fexec)
+		runner := newInternal(fexec)
 
 		err := runner.DelEntry(testCases[i].entry.String(), testCases[i].set.Name)
 		if err != nil {
@@ -482,7 +486,7 @@ func TestTestEntry(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec)
+	runner := newInternal(fexec)
 	// Success
 	ok, err := runner.TestEntry(testEntry.String(), setName)
 	if err != nil {
@@ -530,7 +534,7 @@ func TestTestEntryIPv6(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec)
+	runner := newInternal(fexec)
 	// Success
 	ok, err := runner.TestEntry(testEntry.String(), setName)
 	if err != nil {
@@ -604,7 +608,7 @@ Members:
 				},
 			},
 		}
-		runner := New(fexec)
+		runner := newInternal(fexec)
 		// Success
 		entries, err := runner.ListEntries("foobar")
 		if err != nil {
@@ -643,7 +647,7 @@ baz`
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	runner := New(fexec)
+	runner := newInternal(fexec)
 	// Success
 	list, err := runner.ListSets()
 	if err != nil {
