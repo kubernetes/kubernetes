@@ -28,7 +28,6 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"golang.org/x/time/rate"
 	"net"
 	"os"
 	"os/exec"
@@ -39,7 +38,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"golang.org/x/time/rate"
+
+	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"

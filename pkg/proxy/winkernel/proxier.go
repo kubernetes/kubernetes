@@ -31,6 +31,7 @@ import (
 
 	"github.com/Microsoft/hnslib"
 	"github.com/Microsoft/hnslib/hcn"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
