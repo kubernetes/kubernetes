@@ -651,7 +651,6 @@ type Proxier struct {
 	// These are effectively const and do not need the mutex to be held.
 	hostname string
 	nodeIP   net.IP
-	recorder events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
@@ -813,7 +812,6 @@ func NewProxier(
 		endpointsMap:          make(proxy.EndpointsMap),
 		hostname:              hostname,
 		nodeIP:                nodeIP,
-		recorder:              recorder,
 		serviceHealthServer:   serviceHealthServer,
 		healthzServer:         healthzServer,
 		hns:                   hns,

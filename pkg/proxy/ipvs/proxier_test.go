@@ -149,7 +149,6 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 		ipvs:                  ipvs,
 		ipset:                 ipset,
 		conntrack:             conntrack.NewFake(),
-		strictARP:             false,
 		localDetector:         proxyutil.NewNoOpLocalDetector(),
 		hostname:              testHostname,
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
