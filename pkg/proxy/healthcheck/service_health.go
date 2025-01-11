@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/lithammer/dedent"
 
@@ -55,7 +54,7 @@ type ServiceHealthServer interface {
 
 type proxyHealthChecker interface {
 	// Health returns the proxy's health state and last updated time.
-	Health() (bool, time.Time)
+	Health() ProxyHealth
 }
 
 func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
@@ -231,7 +230,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 	count := svc.endpoints
 	h.hcs.lock.RUnlock()
-	kubeProxyHealthy, _ := h.hcs.healthzServer.Health()
+	kubeProxyHealthy := h.hcs.healthzServer.Health().Healthy
 
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
