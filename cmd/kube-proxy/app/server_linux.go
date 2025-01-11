@@ -217,8 +217,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	} else if config.Mode == proxyconfigapi.ProxyModeIPVS {
-		execer := exec.New()
-		ipsetInterface := utilipset.New(execer)
+		ipsetInterface := utilipset.New()
 		ipvsInterface := utilipvs.New()
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
@@ -511,8 +510,7 @@ func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanup
 	// Clean up iptables and ipvs rules if switching to nftables, or if cleanupAndExit
 	if !isIPTablesBased(mode) || cleanupAndExit {
 		ipts, _ := getIPTables(v1.IPFamilyUnknown)
-		execer := exec.New()
-		ipsetInterface := utilipset.New(execer)
+		ipsetInterface := utilipset.New()
 		ipvsInterface := utilipvs.New()
 
 		for _, ipt := range ipts {
