@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -46,7 +47,7 @@ const (
 	maxStatsAge = time.Minute
 )
 
-var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, func() {
+var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, feature.ResourceMetrics, func() {
 	f := framework.NewDefaultFramework("resource-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {
