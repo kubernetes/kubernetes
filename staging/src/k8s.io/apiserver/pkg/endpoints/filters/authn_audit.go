@@ -47,7 +47,7 @@ func WithFailedAuthenticationAudit(failedHandler http.Handler, sink audit.Sink, 
 			failedHandler.ServeHTTP(w, req)
 			return
 		}
-		ev := &ac.Event
+		ev := ac.Event.DeepCopy()
 
 		ev.ResponseStatus = &metav1.Status{}
 		ev.ResponseStatus.Message = getAuthMethods(req)

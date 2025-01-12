@@ -55,7 +55,7 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 			handler.ServeHTTP(w, req)
 			return
 		}
-		ev := &ac.Event
+		ev := ac.Event.DeepCopy()
 
 		ctx := req.Context()
 		omitStages := ac.RequestAuditConfig.OmitStages
