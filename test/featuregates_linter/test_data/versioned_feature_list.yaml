@@ -274,6 +274,16 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: ContextualLogging
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.24"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
 - name: CoordinatedLeaderElection
   versionedSpecs:
   - default: false
@@ -770,6 +780,18 @@
     lockToDefault: true
     preRelease: GA
     version: "1.31"
+- name: LoggingAlphaOptions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.24"
+- name: LoggingBetaOptions
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.24"
 - name: MatchLabelKeysInPodAffinity
   versionedSpecs:
   - default: false
@@ -964,10 +986,10 @@
     version: "1.32"
 - name: PodLogsQuerySplitStreams
   versionedSpecs:
-    - default: false
-      lockToDefault: false
-      preRelease: Alpha
-      version: "1.32"
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: PodReadyToStartContainersCondition
   versionedSpecs:
   - default: false
