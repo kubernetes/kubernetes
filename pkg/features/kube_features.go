@@ -241,13 +241,6 @@ const (
 	// containers (aka containers in CrashLoopBackOff)
 	KubeletCrashLoopBackOffMax featuregate.Feature = "KubeletCrashLoopBackOffMax"
 
-	// owner: @harche
-	// kep: http://kep.k8s.io/3386
-	//
-	// Allows using event-driven PLEG (pod lifecycle event generator) through kubelet
-	// which avoids frequent relisting of containers which helps optimize performance.
-	EventedPLEG featuregate.Feature = "EventedPLEG"
-
 	// owner: @andrewsykim @SergeyKanzhelev
 	//
 	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads

@@ -1629,43 +1629,15 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		if idx == 0 && resp.Status.State == runtimeapi.PodSandboxState_SANDBOX_READY {
 			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
-
-		if idx == 0 && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-			if resp.Timestamp == 0 {
-				// If the Evented PLEG is enabled in the kubelet, but not in the runtime
-				// then the pod status we get will not have the timestamp set.
-				// e.g. CI job 'pull-kubernetes-e2e-gce-alpha-features' will runs with
-				// features gate enabled, which includes Evented PLEG, but uses the
-				// runtime without Evented PLEG support.
-				klog.V(4).InfoS("Runtime does not set pod status timestamp", "pod", klog.KObj(pod))
-				containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
-				if err != nil {
-					if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
-						klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
-					}
-					return nil, err
-				}
-			} else {
-				// Get the statuses of all containers visible to the pod and
-				// timestamp from sandboxStatus.
-				timestamp = time.Unix(0, resp.Timestamp)
-				for _, cs := range resp.ContainersStatuses {
-					cStatus := m.convertToKubeContainerStatus(cs)
-					containerStatuses = append(containerStatuses, cStatus)
-				}
-			}
-		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		// Get statuses of all containers visible in the pod.
-		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
-		if err != nil {
-			if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
-				klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
-			}
-			return nil, err
+	// Get statuses of all containers visible in the pod.
+	containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
+	if err != nil {
+		if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
+			klog.ErrorS(err, "getPodContainerStatuses for pod failed", "pod", klog.KObj(pod))
 		}
+		return nil, err
 	}
 
 	m.logReduction.ClearID(podFullName)

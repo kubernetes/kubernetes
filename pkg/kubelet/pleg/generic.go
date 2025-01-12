@@ -26,10 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/clock"
@@ -296,7 +294,7 @@ func (g *GenericPLEG) Relist() {
 		// inspecting the pod and getting the PodStatus to update the cache
 		// serially may take a while. We should be aware of this and
 		// parallelize if needed.
-		status, updated, err := g.updateCache(ctx, pod, pid)
+		status, _, err := g.updateCache(ctx, pod, pid)
 		if err != nil {
 			// Rely on updateCache calling GetPodStatus to log the actual error.
 			g.logger.V(4).Error(err, "PLEG: Ignoring events for pod", "pod", klog.KRef(pod.Namespace, pod.Name))
@@ -305,10 +303,6 @@ func (g *GenericPLEG) Relist() {
 			needsReinspection[pid] = pod
 
 			continue
-		} else if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-			if !updated {
-				continue
-			}
 		}
 
 		var completedConditions []versionedWatchCondition
@@ -469,20 +463,6 @@ func (g *GenericPLEG) updateCache(ctx context.Context, pod *kubecontainer.Pod, p
 		// a pod status after network teardown, but the kubernetes API expects
 		// the completed pod's IP to be available after the pod is dead.
 		status.IPs = g.getPodIPs(pid, status)
-	}
-
-	// When we use Generic PLEG only, the PodStatus is saved in the cache without
-	// any validation of the existing status against the current timestamp.
-	// This works well when there is only Generic PLEG setting the PodStatus in the cache however,
-	// if we have multiple entities, such as Evented PLEG, while trying to set the PodStatus in the
-	// cache we may run into the racy timestamps given each of them were to calculate the timestamps
-	// in their respective execution flow. While Generic PLEG calculates this timestamp and gets
-	// the PodStatus, we can only calculate the corresponding timestamp in
-	// Evented PLEG after the event has been received by the Kubelet.
-	// For more details refer to:
-	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/3386-kubelet-evented-pleg#timestamp-of-the-pod-status
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && isEventedPLEGInUse() && status != nil {
-		timestamp = status.TimeStamp
 	}
 
 	return status, g.cache.Set(pod.ID, status, err, timestamp), err
