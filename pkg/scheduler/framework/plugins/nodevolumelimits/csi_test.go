@@ -792,6 +792,110 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 	}
 }
 
+func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
+	tests := []struct {
+		test        string
+		newPod      *v1.Pod
+		existingPvc *v1.PersistentVolumeClaim
+		deletedVA   *storagev1.VolumeAttachment
+		wantQHint   framework.QueueingHint
+	}{
+
+		{
+			test: "a pod has the same PVC as an existing PVC when VolumeAttachment is deleting",
+			newPod: st.MakePod().Namespace("ns1").Volume(
+				v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc1",
+						},
+					},
+				},
+			).Obj(),
+			existingPvc: st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").
+				VolumeName("pv1").Obj(),
+			deletedVA: st.MakeVolumeAttachment().Name("volumeattachment1").
+				NodeName("fake-node").
+				Attacher("test.storage.gke.io").
+				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("pv1")}).Obj(),
+			wantQHint: framework.Queue,
+		},
+		{
+			test: "a pod doesn't have the same PVC as an existing PVC when VolumeAttachment is deleting",
+			newPod: st.MakePod().Namespace("ns1").Volume(
+				v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc1",
+						},
+					},
+				},
+			).Obj(),
+			existingPvc: st.MakePersistentVolumeClaim().Name("pvc2").Namespace("ns1").
+				VolumeName("pv1").Obj(),
+			deletedVA: st.MakeVolumeAttachment().Name("volumeattachment1").
+				NodeName("fake-node").
+				Attacher("test.storage.gke.io").
+				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("pv1")}).Obj(),
+			wantQHint: framework.QueueSkip,
+		},
+		{
+			test: "a pod's PVC matches a deleted VolumeAttachment without a NodeName",
+			newPod: st.MakePod().Namespace("ns1").Volume(
+				v1.Volume{
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "pvc1",
+						},
+					},
+				},
+			).Obj(),
+			existingPvc: st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").
+				VolumeName("pv1").Obj(),
+			deletedVA: st.MakeVolumeAttachment().Name("volumeattachment1").
+				NodeName("").
+				Attacher("test.storage.gke.io").
+				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("pv1")}).Obj(),
+			wantQHint: framework.QueueSkip,
+		},
+		{
+			test: "a pod has an ephemeral volume related to an existing PVC and deleted VolumeAttachment",
+			newPod: st.MakePod().Name("pod1").Namespace("ns1").Volume(
+				v1.Volume{
+					Name: "ephemeral",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{},
+					},
+				},
+			).Obj(),
+			existingPvc: st.MakePersistentVolumeClaim().Name("pod1-ephemeral").Namespace("ns1").
+				VolumeName("pod1-ephemeral-pv").Obj(),
+			deletedVA: st.MakeVolumeAttachment().Name("volumeattachment1").
+				NodeName("fake-node").
+				Attacher("test.storage.gke.io").
+				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("pod1-ephemeral-pv")}).Obj(),
+			wantQHint: framework.Queue,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.test, func(t *testing.T) {
+			p := &CSILimits{
+				pvcLister: tf.PersistentVolumeClaimLister{*test.existingPvc},
+			}
+			logger, _ := ktesting.NewTestContext(t)
+
+			qhint, err := p.isSchedulableAfterVolumeAttachmentDeleted(logger, test.newPod, test.deletedVA, nil)
+			if err != nil {
+				t.Errorf("isSchedulableAfterVolumeAttachmentDeleted failed: %v", err)
+			}
+			if qhint != test.wantQHint {
+				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
+			}
+		})
+	}
+}
+
 func getFakeVolumeAttachmentLister(count int, driverNames ...string) tf.VolumeAttachmentLister {
 	vaLister := tf.VolumeAttachmentLister{}
 	for _, driver := range driverNames {
