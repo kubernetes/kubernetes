@@ -63,7 +63,6 @@ func RecordBugs() {
 var (
 	validFeature     = framework.ValidFeatures.Add("feature-foo")
 	validEnvironment = framework.ValidEnvironments.Add("Linux")
-	validNodeFeature = framework.ValidNodeFeatures.Add("node-feature-foo")
 )
 
 func Describe() {
@@ -78,8 +77,6 @@ func Describe() {
 		framework.WithFeature(validFeature),
 		framework.WithEnvironment("no-such-env"),
 		framework.WithEnvironment(validEnvironment),
-		framework.WithNodeFeature("no-such-node-env"),
-		framework.WithNodeFeature(validNodeFeature),
 		framework.WithFeatureGate("no-such-feature-gate"),
 		framework.WithFeatureGate(features.Alpha),
 		framework.WithFeatureGate(features.Beta),
@@ -113,21 +110,20 @@ const (
 	numBugs   = 3
 	bugOutput = `ERROR: bugs.go:53: new bug
 ERROR: bugs.go:58: parent
-ERROR: bugs.go:72: empty strings as separators are unnecessary and need to be removed
-ERROR: bugs.go:72: trailing or leading spaces are unnecessary and need to be removed: " space1"
-ERROR: bugs.go:72: trailing or leading spaces are unnecessary and need to be removed: "space2 "
-ERROR: bugs.go:77: WithFeature: unknown feature "no-such-feature"
-ERROR: bugs.go:79: WithEnvironment: unknown environment "no-such-env"
-ERROR: bugs.go:81: WithNodeFeature: unknown environment "no-such-node-env"
-ERROR: bugs.go:83: WithFeatureGate: the feature gate "no-such-feature-gate" is unknown
-ERROR: bugs.go:109: SIG label must be lowercase, no spaces and no sig- prefix, got instead: "123"
+ERROR: bugs.go:71: empty strings as separators are unnecessary and need to be removed
+ERROR: bugs.go:71: trailing or leading spaces are unnecessary and need to be removed: " space1"
+ERROR: bugs.go:71: trailing or leading spaces are unnecessary and need to be removed: "space2 "
+ERROR: bugs.go:76: WithFeature: unknown feature "no-such-feature"
+ERROR: bugs.go:78: WithEnvironment: unknown environment "no-such-env"
+ERROR: bugs.go:80: WithFeatureGate: the feature gate "no-such-feature-gate" is unknown
+ERROR: bugs.go:106: SIG label must be lowercase, no spaces and no sig- prefix, got instead: "123"
 ERROR: buggy/buggy.go:100: hello world
 ERROR: some/relative/path/buggy.go:200: with spaces
 `
 	// Used by unittests/list-tests. It's sorted by test name, not source code location.
 	ListTestsOutput = `The following spec names can be used with 'ginkgo run --focus/skip':
-    ../bugs/bugs.go:103: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [NodeFeature:no-such-node-env] [NodeFeature:node-feature-foo] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
-    ../bugs/bugs.go:98: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [NodeFeature:no-such-node-env] [NodeFeature:node-feature-foo] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
+    ../bugs/bugs.go:100: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
+    ../bugs/bugs.go:95: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
 
 `
 
@@ -146,8 +142,6 @@ ERROR: some/relative/path/buggy.go:200: with spaces
     FeatureGate:TestGAFeature
     FeatureGate:no-such-feature-gate
     NodeConformance
-    NodeFeature:no-such-node-env
-    NodeFeature:node-feature-foo
     Serial
     Slow
     bar
