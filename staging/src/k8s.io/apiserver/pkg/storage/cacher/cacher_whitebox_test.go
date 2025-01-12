@@ -31,6 +31,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	"k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -205,64 +207,71 @@ func TestGetListCacheBypass(t *testing.T) {
 		Continue             string
 	}
 	testCases := map[opts]bool{}
+	testCases[opts{}] = false
+	testCases[opts{Limit: 100}] = false
+	testCases[opts{Continue: "continue"}] = true
+	testCases[opts{Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0"}] = false
+	testCases[opts{ResourceVersion: "0", Limit: 100}] = false
+	testCases[opts{ResourceVersion: "0", Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
+	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
+	testCases[opts{ResourceVersion: "1"}] = false
+	testCases[opts{ResourceVersion: "1", Limit: 100}] = true
+	testCases[opts{ResourceVersion: "1", Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
+	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
+
 	for _, rv := range []string{"", "0", "1"} {
-		for _, match := range []metav1.ResourceVersionMatch{"", "Invalid", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
+		for _, match := range []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
 			for _, c := range []string{"", "continue"} {
 				for _, limit := range []int64{0, 100} {
-					testCases[opts{
+					errs := validation.ValidateListOptions(&internalversion.ListOptions{
 						ResourceVersion:      rv,
 						ResourceVersionMatch: match,
-						Continue:             c,
 						Limit:                limit,
-					}] = false
+						Continue:             c,
+					}, false)
+					if len(errs) != 0 {
+						continue
+					}
+					opt := opts{
+						ResourceVersion:      rv,
+						ResourceVersionMatch: match,
+						Limit:                limit,
+						Continue:             c,
+					}
+					_, found := testCases[opt]
+					if !found {
+						t.Errorf("Test case not covered, but passes validation: %+v", opt)
+					}
+
 				}
 			}
 		}
 	}
-	testCases[opts{ResourceVersion: "0", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid"}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid", Limit: 100}] = true
-	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: "Invalid", Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid", Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: "Invalid", Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = true
-	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Continue: "continue"}] = true
-	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
-	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact, Continue: "continue"}] = true
-	testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersionMatch: "Invalid"}] = true
-	testCases[opts{ResourceVersionMatch: "Invalid", Continue: "continue"}] = true
-	testCases[opts{ResourceVersionMatch: "Invalid", Limit: 100}] = true
-	testCases[opts{ResourceVersionMatch: "Invalid", Limit: 100, Continue: "continue"}] = true
-	testCases[opts{Limit: 100, Continue: "continue"}] = true
-	testCases[opts{Continue: "continue"}] = true
+
+	for opt := range testCases {
+		errs := validation.ValidateListOptions(&internalversion.ListOptions{
+			ResourceVersion:      opt.ResourceVersion,
+			ResourceVersionMatch: opt.ResourceVersionMatch,
+			Limit:                opt.Limit,
+			Continue:             opt.Continue,
+		}, false)
+		if len(errs) != 0 {
+			t.Errorf("Invalid LIST request that should not be tested %+v", opt)
+			continue
+		}
+	}
 
 	t.Run("ConsistentListFromStorage", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 		testCases[opts{}] = true
 		testCases[opts{Limit: 100}] = true
-		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = true
-		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
 		for opt, expectBypass := range testCases {
 			testGetListCacheBypass(t, storage.ListOptions{
 				ResourceVersion:      opt.ResourceVersion,
@@ -288,8 +297,6 @@ func TestGetListCacheBypass(t *testing.T) {
 
 		testCases[opts{}] = false
 		testCases[opts{Limit: 100}] = false
-		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
-		testCases[opts{ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
 		for opt, expectBypass := range testCases {
 			testGetListCacheBypass(t, storage.ListOptions{
 				ResourceVersion:      opt.ResourceVersion,
