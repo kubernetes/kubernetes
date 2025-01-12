@@ -37,6 +37,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 		t.Run(tt.Name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
 			queueing.RunTestCoreResourceEnqueue(t, tt)
 		})
 	}
