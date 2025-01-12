@@ -125,3 +125,38 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		Transport:            TransportConfig{TracerProvider: noopoteltrace.NewTracerProvider()},
 	}
 }
+
+// DeepCopy returns a deep copy of the Config.
+func (c *Config) DeepCopy() *Config {
+	if c == nil {
+		return nil
+	}
+	// Deep copy the transport config
+	transport := c.Transport
+	transportCopy := TransportConfig{
+		ServerList:     make([]string, len(transport.ServerList)),
+		KeyFile:        transport.KeyFile,
+		CertFile:       transport.CertFile,
+		TrustedCAFile:  transport.TrustedCAFile,
+		EgressLookup:   transport.EgressLookup,
+		TracerProvider: transport.TracerProvider,
+	}
+	copy(transportCopy.ServerList, transport.ServerList)
+
+	return &Config{
+		Type:                      c.Type,
+		Prefix:                    c.Prefix,
+		Transport:                 transportCopy,
+		Codec:                     c.Codec,
+		EncodeVersioner:           c.EncodeVersioner,
+		Transformer:               c.Transformer,
+		CompactionInterval:        c.CompactionInterval,
+		CountMetricPollPeriod:     c.CountMetricPollPeriod,
+		DBMetricPollInterval:      c.DBMetricPollInterval,
+		EventsHistoryWindow:       c.EventsHistoryWindow,
+		HealthcheckTimeout:        c.HealthcheckTimeout,
+		ReadycheckTimeout:         c.ReadycheckTimeout,
+		LeaseManagerConfig:        c.LeaseManagerConfig,
+		StorageObjectCountTracker: c.StorageObjectCountTracker,
+	}
+}
