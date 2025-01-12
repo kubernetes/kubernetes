@@ -23,6 +23,7 @@ import (
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilversion "k8s.io/component-base/version"
 
 	"k8s.io/kubernetes/test/utils/image"
@@ -32,9 +33,9 @@ import (
 // Tests aiming for full coverage of versions should test fixtures of all supported versions.
 func GetSupportedEmulatedVersions() []string {
 	return []string{
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(2).String(),
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(1).String(),
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().String(),
+		compatibility.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(2).String(),
+		compatibility.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(1).String(),
+		compatibility.DefaultKubeEffectiveVersion().BinaryVersion().String(),
 	}
 }
 

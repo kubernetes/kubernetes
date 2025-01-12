@@ -22,7 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apimachineryversion "k8s.io/apimachinery/pkg/util/version"
-	version "k8s.io/component-base/version"
+	"k8s.io/apiserver/pkg/util/compatibility"
+	basecompatibility "k8s.io/component-base/compatibility"
 )
 
 type ResourceEncodingConfig interface {
@@ -43,7 +44,7 @@ type DefaultResourceEncodingConfig struct {
 	// resources records the overriding encoding configs for individual resources.
 	resources        map[schema.GroupResource]*OverridingResourceEncoding
 	scheme           *runtime.Scheme
-	effectiveVersion version.EffectiveVersion
+	effectiveVersion basecompatibility.EffectiveVersion
 }
 
 type OverridingResourceEncoding struct {
@@ -54,7 +55,8 @@ type OverridingResourceEncoding struct {
 var _ ResourceEncodingConfig = &DefaultResourceEncodingConfig{}
 
 func NewDefaultResourceEncodingConfig(scheme *runtime.Scheme) *DefaultResourceEncodingConfig {
-	return &DefaultResourceEncodingConfig{resources: map[schema.GroupResource]*OverridingResourceEncoding{}, scheme: scheme, effectiveVersion: version.DefaultKubeEffectiveVersion()}
+	return &DefaultResourceEncodingConfig{resources: map[schema.GroupResource]*OverridingResourceEncoding{}, scheme: scheme,
+		effectiveVersion: compatibility.DefaultComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)}
 }
 
 func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored schema.GroupResource, externalEncodingVersion, internalVersion schema.GroupVersion) {
@@ -64,7 +66,7 @@ func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored 
 	}
 }
 
-func (o *DefaultResourceEncodingConfig) SetEffectiveVersion(effectiveVersion version.EffectiveVersion) {
+func (o *DefaultResourceEncodingConfig) SetEffectiveVersion(effectiveVersion basecompatibility.EffectiveVersion) {
 	o.effectiveVersion = effectiveVersion
 }
 
@@ -121,7 +123,7 @@ type replacementInterface interface {
 	APILifecycleReplacement() schema.GroupVersionKind
 }
 
-func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example runtime.Object, effectiveVersion version.EffectiveVersion, scheme *runtime.Scheme) (schema.GroupVersion, error) {
+func emulatedStorageVersion(binaryVersionOfResource schema.GroupVersion, example runtime.Object, effectiveVersion basecompatibility.EffectiveVersion, scheme *runtime.Scheme) (schema.GroupVersion, error) {
 	if example == nil || effectiveVersion == nil {
 		return binaryVersionOfResource, nil
 	}
