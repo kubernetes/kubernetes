@@ -76,11 +76,17 @@ type cache struct {
 	timestamp *time.Time
 	// Map that stores the subscriber records.
 	subscribers map[types.UID][]*subRecord
+
+	processingPods map[types.UID]*data
 }
 
 // NewCache creates a pod cache.
 func NewCache() Cache {
-	return &cache{pods: map[types.UID]*data{}, subscribers: map[types.UID][]*subRecord{}}
+	return &cache{
+		pods:           map[types.UID]*data{},
+		subscribers:    map[types.UID][]*subRecord{},
+		processingPods: map[types.UID]*data{},
+	}
 }
 
 // Get returns the PodStatus for the pod; callers are expected not to
@@ -88,14 +94,49 @@ func NewCache() Cache {
 func (c *cache) Get(id types.UID) (*PodStatus, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		if processingData, ok := c.processingPods[id]; ok {
+			if data, ok := c.pods[id]; ok {
+				if processingData.modified.After(data.modified) {
+					return processingData.status, processingData.err
+				}
+				return data.status, data.err
+			}
+		}
+	}
 	d := c.get(id)
 	return d.status, d.err
 }
 
 func (c *cache) GetNewerThan(id types.UID, minTime time.Time) (*PodStatus, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		d := c.getNewerStatus(id, minTime)
+		if d != nil {
+			return d.status, d.err
+		}
+	}
+
 	ch := c.subscribe(id, minTime)
 	d := <-ch
 	return d.status, d.err
+}
+
+func (c *cache) getNewerStatus(id types.UID, minTime time.Time) *data {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	data := c.getIfNewerThan(id, minTime)
+	if data != nil {
+		processingData, ok := c.processingPods[id]
+		if ok && processingData.modified.After(data.modified) {
+			return processingData
+		}
+		return data
+	}
+
+	if processingData, ok := c.processingPods[id]; ok {
+		return processingData
+	}
+	return nil
 }
 
 // Set sets the PodStatus for the pod only if the data is newer than the cache
@@ -104,11 +145,16 @@ func (c *cache) Set(id types.UID, status *PodStatus, err error, timestamp time.T
 	defer c.lock.Unlock()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+		if cachedVal, ok := c.processingPods[id]; ok && cachedVal.modified.After(timestamp) {
+			return false
+		}
 		// Set the value in the cache only if it's not present already
 		// or the timestamp in the cache is older than the current update timestamp
 		if cachedVal, ok := c.pods[id]; ok && cachedVal.modified.After(timestamp) {
 			return false
 		}
+
+		c.processingPods[id] = &data{status: status, err: err, modified: timestamp}
 	}
 
 	c.pods[id] = &data{status: status, err: err, modified: timestamp}
@@ -121,6 +167,7 @@ func (c *cache) Delete(id types.UID) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.pods, id)
+	delete(c.processingPods, id)
 }
 
 // UpdateTime modifies the global timestamp of the cache and notify
