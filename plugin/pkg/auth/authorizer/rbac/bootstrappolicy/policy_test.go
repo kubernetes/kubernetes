@@ -28,14 +28,18 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/auth/rbac/validation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -257,6 +261,71 @@ func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 			t.Logf("If the change is expected, re-run with %s=true to update the fixtures", updateEnvVar)
 		}
 	}
+}
+
+func TestClusterRoleKubeletAPIAdmin(t *testing.T) {
+	testCases := []struct {
+		name            string
+		featureGate     bool
+		wantClusterRole rbacv1.ClusterRole
+	}{
+		{
+			name:        "Checkpoint feature gate disabled",
+			featureGate: false,
+			wantClusterRole: rbacv1.ClusterRole{
+				// a role to use for full access to the kubelet API
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "system:kubelet-api-admin",
+					Labels:      map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"},
+					Annotations: map[string]string{"rbac.authorization.kubernetes.io/autoupdate": "true"},
+				},
+				Rules: []rbacv1.PolicyRule{
+					// Allow read-only access to the Node API objects
+					rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("nodes").RuleOrDie(),
+					// Allow all API calls to the nodes
+					rbacv1helpers.NewRule("proxy").Groups("").Resources("nodes").RuleOrDie(),
+					rbacv1helpers.NewRule("*").Groups("").Resources("nodes/proxy", "nodes/metrics", "nodes/stats", "nodes/log").RuleOrDie(),
+				},
+			},
+		},
+		{
+			name:        "Checkpoint feature gate enabled",
+			featureGate: true,
+			wantClusterRole: rbacv1.ClusterRole{
+				// a role to use for full access to the kubelet API
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "system:kubelet-api-admin",
+					Labels:      map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"},
+					Annotations: map[string]string{"rbac.authorization.kubernetes.io/autoupdate": "true"},
+				},
+				Rules: []rbacv1.PolicyRule{
+					// Allow read-only access to the Node API objects
+					rbacv1helpers.NewRule("get", "list", "watch").Groups("").Resources("nodes").RuleOrDie(),
+					// Allow all API calls to the nodes
+					rbacv1helpers.NewRule("proxy").Groups("").Resources("nodes").RuleOrDie(),
+					rbacv1helpers.NewRule("*").Groups("").Resources("nodes/proxy", "nodes/metrics", "nodes/stats", "nodes/log").RuleOrDie(),
+					rbacv1helpers.NewRule("*").Groups("").Resources("nodes/checkpoint").RuleOrDie(),
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, tc.featureGate)
+			clusterRoles := bootstrappolicy.ClusterRoles()
+			for _, cr := range clusterRoles {
+				if cr.GetName() != "system:kubelet-api-admin" {
+					continue
+				}
+
+				if diff := cmp.Diff(tc.wantClusterRole, cr); diff != "" {
+					t.Errorf("Unexpected diff \n%s", diff)
+				}
+			}
+		})
+	}
+
 }
 
 func TestClusterRoleLabel(t *testing.T) {
