@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -27,10 +28,10 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_WebhookConfiguration(obj *WebhookConfiguration) {
-	if obj.AuthorizedTTL.Duration == 0 {
-		obj.AuthorizedTTL.Duration = 5 * time.Minute
+	if obj.AuthorizedTTL == nil {
+		obj.AuthorizedTTL = &metav1.Duration{Duration: 5 * time.Minute}
 	}
-	if obj.UnauthorizedTTL.Duration == 0 {
-		obj.UnauthorizedTTL.Duration = 30 * time.Second
+	if obj.UnauthorizedTTL == nil {
+		obj.UnauthorizedTTL = &metav1.Duration{Duration: 30 * time.Second}
 	}
 }
