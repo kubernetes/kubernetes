@@ -35,7 +35,7 @@ Warning: This endpoint is not meant to be machine parseable, has no formatting c
 
 func TestFlagz(t *testing.T) {
 	componentName := "test-server"
-	flagzSeparators = []string{"="}
+	delimiters = []string{"="}
 	wantHeaderLines := strings.Split(fmt.Sprintf(wantTmpl, componentName), "\n")
 	tests := []struct {
 		name        string
