@@ -224,6 +224,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 						}
 					}
 				}
+				// If we don't have any devices, then we cannot allocate here as "all" means "at least one" in this case.
+				if len(requestData.allDevices) == 0 {
+					return nil, nil
+				}
 				requestData.numDevices = len(requestData.allDevices)
 				alloc.logger.V(6).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.Name, "numDevicesPerRequest", requestData.numDevices)
 			default:
