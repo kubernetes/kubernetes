@@ -76,10 +76,14 @@ func (sc *stateCheckpoint) restoreState() error {
 	if err != nil {
 		return fmt.Errorf("failed to get pod resource allocation info: %w", err)
 	}
-	err = sc.cache.SetPodResourceAllocation(praInfo.AllocationEntries)
-	if err != nil {
-		return fmt.Errorf("failed to set pod resource allocation: %w", err)
+
+	for podUID, alloc := range praInfo.AllocationEntries {
+		err = sc.cache.SetPodResourceAllocation(podUID, alloc)
+		if err != nil {
+			return fmt.Errorf("failed to set pod resource allocation: %w", err)
+		}
 	}
+
 	klog.V(2).InfoS("State checkpoint: restored pod resource allocation state from checkpoint")
 	return nil
 }
@@ -132,10 +136,13 @@ func (sc *stateCheckpoint) SetContainerResourceAllocation(podUID string, contain
 }
 
 // SetPodResourceAllocation sets pod resource allocation
-func (sc *stateCheckpoint) SetPodResourceAllocation(a PodResourceAllocation) error {
+func (sc *stateCheckpoint) SetPodResourceAllocation(podUID string, alloc map[string]v1.ResourceRequirements) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	sc.cache.SetPodResourceAllocation(a)
+	err := sc.cache.SetPodResourceAllocation(podUID, alloc)
+	if err != nil {
+		return err
+	}
 	return sc.storeState()
 }
 
@@ -185,7 +192,7 @@ func (sc *noopStateCheckpoint) SetContainerResourceAllocation(_ string, _ string
 	return nil
 }
 
-func (sc *noopStateCheckpoint) SetPodResourceAllocation(_ PodResourceAllocation) error {
+func (sc *noopStateCheckpoint) SetPodResourceAllocation(_ string, _ map[string]v1.ResourceRequirements) error {
 	return nil
 }
 

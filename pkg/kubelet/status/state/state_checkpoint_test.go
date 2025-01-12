@@ -110,8 +110,10 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 			originalSC, err := NewStateCheckpoint(testDir, testCheckpoint)
 			require.NoError(t, err)
 
-			err = originalSC.SetPodResourceAllocation(tt.args.podResourceAllocation)
-			require.NoError(t, err)
+			for podUID, alloc := range tt.args.podResourceAllocation {
+				err = originalSC.SetPodResourceAllocation(podUID, alloc)
+				require.NoError(t, err)
+			}
 
 			actual := originalSC.GetPodResourceAllocation()
 			verifyPodResourceAllocation(t, &tt.args.podResourceAllocation, &actual, "stored pod resource allocation is not equal to original pod resource allocation")
