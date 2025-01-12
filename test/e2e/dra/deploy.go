@@ -107,6 +107,11 @@ func NewNodesNow(ctx context.Context, f *framework.Framework, minNodes, maxNodes
 
 func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, maxNodes int) {
 	ginkgo.By("selecting nodes")
+	// Cause all tests to time out.
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		return false
+	}).WithTimeout(2 * time.Hour).Should(gomega.BeTrueBecause("fake error to block tests"))
+
 	// The kubelet plugin is harder. We deploy the builtin manifest
 	// after patching in the driver name and all nodes on which we
 	// want the plugin to run.

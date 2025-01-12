@@ -21,6 +21,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "$0 pid: $$"
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/init.sh"
@@ -35,7 +37,6 @@ GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 GINKGO_SILENCE_SKIPS=${GINKGO_SILENCE_SKIPS:-y} # set to 'n' to see S character for each skipped test
 GINKGO_FORCE_NEWLINES=${GINKGO_FORCE_NEWLINES:-$( if [ "${CI:-false}" = "true" ]; then echo "y"; else echo "n"; fi )} # set to 'y' to print a newline after each S or o character
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
-
 
 # If 'y', Ginkgo's reporter will not use escape sequence to color output.
 #
@@ -141,7 +142,7 @@ ginkgo_args=(
 
 # NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
 # for backward compatibility purpose.
-ginkgo_args+=("--timeout=${GINKGO_TIMEOUT:-24h}")
+ginkgo_args+=(--timeout=24h)
 
 if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
   ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
@@ -204,6 +205,45 @@ fi
 # is not used.
 suite_args+=(--report-complete-ginkgo --report-complete-junit)
 
+# When SIGTERM doesn't reach the E2E test suite binaries, ginkgo will exit
+# without collecting information from about the currently running and
+# potentially stuck tests. This seems to happen when Prow shuts down a test
+# job because of a timeout.
+#
+# It's useful to print one final progress report in that case,
+# so GINKGO_PROGRESS_REPORT_ON_SIGTERM (enabled by default when CI=true)
+# catches SIGTERM and forwards it to all processes spawned by ginkgo.
+#
+# Manual invocations can trigger a similar report with `killall -USR1 e2e.test`
+# without having to kill the test run.
+GINKGO_CLI_PID=
+signal_handler() {
+  if [ -n "${GINKGO_CLI_PID}" ]; then
+    cat <<EOF
+
+*** $0: received termination signal -> asking Ginkgo to stop.
+***
+*** Beware that a timeout may have been caused by some earlier test,
+*** not necessarily the one which gets interrupted now.
+*** See the "Spec runtime" for information about how long the
+*** interrupted test was running.
+
+EOF
+    # This goes to the process group, which is important because we
+    # need to reach the e2e.test processes forked by the Ginkgo CLI.
+    kill -TERM -$GINKGO_CLI_PID || true
+    wait $GINKGO_CLI_PID
+  fi
+}
+case "${GINKGO_PROGRESS_REPORT_ON_SIGTERM:-${CI:-no}}" in
+  y|yes|true)
+    kube::util::trap_add signal_handler INT TERM
+    # Job control is needed to make the Ginkgo CLI and all workers run
+    # in their own process group.
+    set -m
+    ;;
+esac
+
 # The following invocation is fairly complex. Let's dump it to simplify
 # determining what the final options are. Enabled by default in CI
 # environments like Prow.
@@ -236,4 +276,8 @@ case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
   "${suite_args[@]:+${suite_args[@]}}" \
-  "${@}"
+  "${@}" &
+
+set +x
+GINKGO_CLI_PID=$!
+wait ${GINKGO_CLI_PID}
