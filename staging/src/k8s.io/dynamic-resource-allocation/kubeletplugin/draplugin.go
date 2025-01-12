@@ -73,6 +73,11 @@ type DRAPlugin interface {
 	internal()
 }
 
+type CheckDRAPlugin interface {
+	DRAPlugin
+	CheckDeviceAllocation(ctx context.Context, claim *drapbv1beta1.Claim)
+}
+
 // Option implements the functional options pattern for Start.
 type Option func(o *options) error
 
@@ -277,7 +282,7 @@ type draPlugin struct {
 // is required. Implementing drapbv1beta1.DRAPluginServer is recommended for
 // DRA driver targeting Kubernetes >= 1.32. To be compatible with Kubernetes 1.31,
 // DRA drivers must implement only [drapbv1alpha4.NodeServer].
-func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
+func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (result CheckDRAPlugin, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
 		logger:        klog.Background(),
@@ -465,3 +470,5 @@ func (d *draPlugin) RegistrationStatus() *registerapi.RegistrationStatus {
 }
 
 func (d *draPlugin) internal() {}
+
+func (d *draPlugin) CheckDeviceAllocation(_ context.Context, _ *drapbv1beta1.Claim) {}
