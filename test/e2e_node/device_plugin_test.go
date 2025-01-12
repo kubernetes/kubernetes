@@ -197,7 +197,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Deleting the device plugin pod")
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
@@ -208,7 +208,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 				}
 
 				framework.Logf("Deleting pod: %s", p.Name)
-				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			}
 
 			restartKubelet(ctx, true)
@@ -492,7 +492,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)).To(gomega.Succeed())
 
 			ginkgo.By("Deleting the device plugin")
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
 			gomega.Eventually(getNodeResourceValues, devicePluginGracefulTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(SampleDeviceResourceName).Should(gomega.Equal(ResourceValue{Allocatable: 0, Capacity: int(expectedSampleDevsAmount)}))
@@ -539,7 +539,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			deleteOptions := metav1.DeleteOptions{
 				GracePeriodSeconds: &gp,
 			}
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, deleteOptions, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, deleteOptions, f.Timeouts.PodDelete)
 			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
 			ginkgo.By("Recreating the plugin pod")
@@ -616,7 +616,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			deleteOptions := metav1.DeleteOptions{
 				GracePeriodSeconds: &gp,
 			}
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, deleteOptions, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, deleteOptions, f.Timeouts.PodDelete)
 			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
 			ginkgo.By("Recreating the plugin pod")
@@ -901,7 +901,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Deleting the device plugin pod")
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("Deleting any Pods created by the test")
 			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
@@ -915,7 +915,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				e2epod.NewPodClient(f).RemoveFinalizer(context.TODO(), p.Name, testFinalizer)
 
 				framework.Logf("Deleting pod: %s", p.Name)
-				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			}
 
 			err = os.Remove(triggerPathDir)

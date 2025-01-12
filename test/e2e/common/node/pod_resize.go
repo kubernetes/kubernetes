@@ -1197,7 +1197,7 @@ func doPodResizeErrorTests() {
 			framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPod, tc.expected))
 
 			ginkgo.By("deleting pod")
-			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
+			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		})
 	}
 }

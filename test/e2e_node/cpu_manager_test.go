@@ -148,7 +148,7 @@ func deletePodSyncByName(ctx context.Context, f *framework.Framework, podName st
 	delOpts := metav1.DeleteOptions{
 		GracePeriodSeconds: &gp,
 	}
-	e2epod.NewPodClient(f).DeleteSync(ctx, podName, delOpts, e2epod.DefaultPodDeletionTimeout)
+	e2epod.NewPodClient(f).DeleteSync(ctx, podName, delOpts, f.Timeouts.PodDelete)
 }
 
 func deletePods(ctx context.Context, f *framework.Framework, podNames []string) {
