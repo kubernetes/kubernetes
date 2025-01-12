@@ -33,6 +33,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +44,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
+	pointer "k8s.io/utils/ptr"
 )
 
 const (
@@ -286,6 +288,68 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSeria
 					// Better to delete the stress pod ASAP to avoid node failures
 					err := podClient.Delete(context.Background(), stressPod.Name, metav1.DeleteOptions{})
 					framework.ExpectNoError(err)
+				})
+
+				ginkgo.It("ensure summary API properly reports swap", func() {
+					ginkgo.By("Creating a pod that will use some swap memory")
+					memoryLimit := resource.MustParse("1024Mi")
+					memoryRequest := memoryLimit.DeepCopy()
+					memoryRequest.Sub(resource.MustParse("50Mi"))
+					stressSize := memoryLimit.DeepCopy()
+					stressSize.Add(resource.MustParse("50Mi"))
+
+					stressPod := getStressPod(pointer.To(memoryLimit))
+					setPodMemoryResources(stressPod, pointer.To(memoryRequest), pointer.To(memoryLimit))
+
+					stressPod = runPodAndWaitUntilScheduled(f, stressPod)
+
+					ginkgo.By("Ensuring the pod is using swap")
+					var swapUsage *resource.Quantity
+					gomega.Eventually(func() error {
+						stressPod = getUpdatedPod(f, stressPod)
+						gomega.Expect(stressPod.Status.Phase).To(gomega.Equal(v1.PodRunning), "pod should be running")
+
+						var err error
+						swapUsage, err = getSwapUsage(f, stressPod)
+						if err != nil {
+							return err
+						}
+
+						if swapUsage.IsZero() {
+							return fmt.Errorf("swap usage is zero")
+						}
+
+						return nil
+					}, 5*time.Minute, 1*time.Second).Should(gomega.Succeed())
+
+					ginkgo.By("Waiting 15 seconds for cAdvisor to collect 2 stats points")
+					time.Sleep(15 * time.Second)
+
+					getSwapExpectation := func() gomega.OmegaMatcher {
+						return gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+							"Time":           recent(maxStatsAge),
+							"SwapUsageBytes": bounded(1, memoryLimit.Value()),
+						}))
+					}
+
+					matchExpectations := gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+						"Pods": gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
+							fmt.Sprintf("%s::%s", f.Namespace.Name, stressPod.Name): gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+								"Containers": gstruct.MatchElements(summaryObjectID, gstruct.IgnoreExtras, gstruct.Elements{
+									stressPod.Spec.Containers[0].Name: gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+										"Swap": getSwapExpectation(),
+									}),
+								}),
+								"Swap": getSwapExpectation(),
+							}),
+						}),
+					}))
+
+					ginkgo.By("Validating /stats/summary")
+					// Give pods a minute to actually start up.
+					gomega.Eventually(context.Background(), getNodeSummary, 180*time.Second, 15*time.Second).Should(matchExpectations)
+					// Then the summary should match the expectations a few more times.
+					gomega.Consistently(context.Background(), getNodeSummary, 30*time.Second, 15*time.Second).Should(matchExpectations)
 				})
 			})
 		})

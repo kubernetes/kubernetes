@@ -279,6 +279,8 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
 	checkCRIPodSwapStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
 
+	checkContainersSwapStats(t, p0, infos[container0.Id], infos[container1.Id])
+
 	p1 := podStatsMap[statsapi.PodReference{Name: "sandbox1-name", UID: "sandbox1-uid", Namespace: "sandbox1-ns"}]
 	assert.Equal(sandbox1.CreatedAt, p1.StartTime.UnixNano())
 	assert.Len(p1.Containers, 1)
@@ -295,6 +297,8 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRINetworkStats(assert, p1.Network, infos[sandbox1.PodSandboxStatus.Id].Stats[0].Network)
 	checkCRIPodCPUAndMemoryStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
 	checkCRIPodSwapStats(assert, p1, infos[sandbox1Cgroup].Stats[0])
+
+	checkContainersSwapStats(t, p1, infos[container2.Id])
 
 	p2 := podStatsMap[statsapi.PodReference{Name: "sandbox2-name", UID: "sandbox2-uid", Namespace: "sandbox2-ns"}]
 	assert.Equal(sandbox2.CreatedAt, p2.StartTime.UnixNano())
@@ -314,6 +318,8 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRINetworkStats(assert, p2.Network, infos[sandbox2.PodSandboxStatus.Id].Stats[0].Network)
 	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
 	checkCRIPodSwapStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
+
+	checkContainersSwapStats(t, p2, infos[container4.Id])
 
 	p3 := podStatsMap[statsapi.PodReference{Name: "sandbox3-name", UID: "sandbox3-uid", Namespace: "sandbox3-ns"}]
 	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
