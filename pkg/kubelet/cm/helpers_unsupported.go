@@ -20,6 +20,8 @@ limitations under the License.
 package cm
 
 import (
+	"cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -73,4 +75,16 @@ func NodeAllocatableRoot(cgroupRoot string, cgroupsPerQOS bool, cgroupDriver str
 // GetKubeletContainer returns the cgroup the kubelet will use
 func GetKubeletContainer(kubeletCgroups string) (string, error) {
 	return "", nil
+}
+
+// CompareCPULimits compares the 2 cpu limits, factoring in platform-specific minimums and rounding.
+// Compare returns 0 if the limits x and y are equivalent, and otherwise -1 if x < y, or 1 if x > y.
+func CompareCPULimits(x, y int64) int {
+	return cmp.Compare(x, y)
+}
+
+// CompareCPURequests compares the 2 cpu requests, factoring in platform-specific minimums and rounding.
+// Compare returns 0 if the requests x and y are equivalent, and otherwise -1 if x < y, or 1 if x > y.
+func CompareCPURequests(x, y int64) int {
+	return cmp.Compare(x, y)
 }
