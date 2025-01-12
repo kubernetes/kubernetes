@@ -32,7 +32,7 @@ const testCheckpoint = "pod_status_manager_state"
 
 func newTestStateCheckpoint(t *testing.T) *stateCheckpoint {
 	testingDir := getTestDir(t)
-	cache := NewStateMemory()
+	cache := NewStateMemory(PodResourceAllocation{})
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoError(t, err, "failed to create checkpoint manager")
 	checkpointName := "pod_state_checkpoint"
@@ -110,8 +110,12 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 			originalSC, err := NewStateCheckpoint(testDir, testCheckpoint)
 			require.NoError(t, err)
 
-			err = originalSC.SetPodResourceAllocation(tt.args.podResourceAllocation)
-			require.NoError(t, err)
+			for podUID, containerAlloc := range tt.args.podResourceAllocation {
+				for containerName, alloc := range containerAlloc {
+					err = originalSC.SetContainerResourceAllocation(podUID, containerName, alloc)
+					require.NoError(t, err)
+				}
+			}
 
 			actual := originalSC.GetPodResourceAllocation()
 			verifyPodResourceAllocation(t, &tt.args.podResourceAllocation, &actual, "stored pod resource allocation is not equal to original pod resource allocation")
@@ -154,11 +158,15 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	require.NoError(t, err, "failed to create old checkpoint")
 
-	err = sc.restoreState()
+	actualPodResourceAllocationInfo, err := restoreState(sc.checkpointManager, sc.checkpointName)
 	require.NoError(t, err, "failed to restore state")
 
-	actualPodResourceAllocationInfo := &PodResourceAllocationInfo{}
+	require.Equal(t, expectedPodResourceAllocationInfo, actualPodResourceAllocationInfo, "pod resource allocation info is not equal")
+
+	sc.cache = NewStateMemory(actualPodResourceAllocationInfo.AllocationEntries)
+
+	actualPodResourceAllocationInfo = &PodResourceAllocationInfo{}
 	actualPodResourceAllocationInfo.AllocationEntries = sc.cache.GetPodResourceAllocation()
-	require.NoError(t, err, "failed to get pod resource allocation info")
+
 	require.Equal(t, expectedPodResourceAllocationInfo, actualPodResourceAllocationInfo, "pod resource allocation info is not equal")
 }
