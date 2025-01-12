@@ -45,7 +45,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
@@ -1097,101 +1096,6 @@ func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Re
 	}
 
 	return client.Get(url)
-}
-
-// TestUnderTemporaryNetworkFailure blocks outgoing network traffic on 'node'. Then runs testFunc and returns its status.
-// At the end (even in case of errors), the network traffic is brought back to normal.
-// This function executes commands on a node so it will work only for some
-// environments.
-func TestUnderTemporaryNetworkFailure(ctx context.Context, c clientset.Interface, ns string, node *v1.Node, testFunc func(ctx context.Context)) {
-	host, err := e2enode.GetSSHExternalIP(node)
-	if err != nil {
-		framework.Failf("Error getting node external ip : %v", err)
-	}
-	controlPlaneAddresses := framework.GetControlPlaneAddresses(ctx, c)
-	ginkgo.By(fmt.Sprintf("block network traffic from node %s to the control plane", node.Name))
-	defer func() {
-		// This code will execute even if setting the iptables rule failed.
-		// It is on purpose because we may have an error even if the new rule
-		// had been inserted. (yes, we could look at the error code and ssh error
-		// separately, but I prefer to stay on the safe side).
-		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the control plane", node.Name))
-		for _, instanceAddress := range controlPlaneAddresses {
-			UnblockNetwork(ctx, host, instanceAddress)
-		}
-	}()
-
-	framework.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !e2enode.WaitConditionToBe(ctx, c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
-		framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
-	}
-	for _, instanceAddress := range controlPlaneAddresses {
-		BlockNetwork(ctx, host, instanceAddress)
-	}
-
-	framework.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !e2enode.WaitConditionToBe(ctx, c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
-		framework.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
-	}
-
-	testFunc(ctx)
-	// network traffic is unblocked in a deferred function
-}
-
-// BlockNetwork blocks network between the given from value and the given to value.
-// The following helper functions can block/unblock network from source
-// host to destination host by manipulating iptable rules.
-// This function assumes it can ssh to the source host.
-//
-// Caution:
-// Recommend to input IP instead of hostnames. Using hostnames will cause iptables to
-// do a DNS lookup to resolve the name to an IP address, which will
-// slow down the test and cause it to fail if DNS is absent or broken.
-//
-// Suggested usage pattern:
-//
-//	func foo() {
-//		...
-//		defer UnblockNetwork(from, to)
-//		BlockNetwork(from, to)
-//		...
-//	}
-func BlockNetwork(ctx context.Context, from string, to string) {
-	framework.Logf("block network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := e2essh.SSH(ctx, dropCmd, from, framework.TestContext.Provider); result.Code != 0 || err != nil {
-		e2essh.LogResult(result)
-		framework.Failf("Unexpected error: %v", err)
-	}
-}
-
-// UnblockNetwork unblocks network between the given from value and the given to value.
-func UnblockNetwork(ctx context.Context, from string, to string) {
-	framework.Logf("Unblock network traffic from %s to %s", from, to)
-	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
-	undropCmd := fmt.Sprintf("sudo iptables --delete %s", iptablesRule)
-	// Undrop command may fail if the rule has never been created.
-	// In such case we just lose 30 seconds, but the cluster is healthy.
-	// But if the rule had been created and removing it failed, the node is broken and
-	// not coming back. Subsequent tests will run or fewer nodes (some of the tests
-	// may fail). Manual intervention is required in such case (recreating the
-	// cluster solves the problem too).
-	err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*30, false, func(ctx context.Context) (bool, error) {
-		result, err := e2essh.SSH(ctx, undropCmd, from, framework.TestContext.Provider)
-		if result.Code == 0 && err == nil {
-			return true, nil
-		}
-		e2essh.LogResult(result)
-		if err != nil {
-			framework.Logf("Unexpected error: %v", err)
-		}
-		return false, nil
-	})
-	if err != nil {
-		framework.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
-			"required on host %s: remove rule %s, if exists", from, iptablesRule)
-	}
 }
 
 // WaitForService waits until the service appears (exist == true), or disappears (exist == false)
