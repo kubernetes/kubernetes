@@ -235,6 +235,16 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, version string, re
 			Stub:             `{"metadata": {"name": "np2"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
 			ExpectedEtcdPath: "/registry/networkpolicies/" + namespace + "/np2",
 		},
+		gvr("networking.k8s.io", "v1", "ipaddresses"): {
+			Stub:             `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath: "/registry/ipaddresses/192.168.2.3",
+			ExpectedGVK:      gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
+		},
+		gvr("networking.k8s.io", "v1", "servicecidrs"): {
+			Stub:             `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
+			ExpectedEtcdPath: "/registry/servicecidrs/range-b2",
+			ExpectedGVK:      gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/networking/v1beta1
@@ -517,9 +527,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, version string, re
 		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"))
 		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"))
 	case "1.32":
+		delete(etcdStorageData, gvr("networking.k8s.io", "v1", "ipaddresses"))
+		delete(etcdStorageData, gvr("networking.k8s.io", "v1", "servicecidrs"))
 		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "flowschemas"))
 		delete(etcdStorageData, gvr("flowcontrol.apiserver.k8s.io", "v1beta3", "prioritylevelconfigurations"))
 	case "1.31":
+		delete(etcdStorageData, gvr("networking.k8s.io", "v1", "ipaddresses"))
+		delete(etcdStorageData, gvr("networking.k8s.io", "v1", "servicecidrs"))
 		delete(etcdStorageData, gvr("resource.k8s.io", "v1beta1", "deviceclasses"))
 		delete(etcdStorageData, gvr("resource.k8s.io", "v1beta1", "resourceclaims"))
 		delete(etcdStorageData, gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"))
