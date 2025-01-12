@@ -160,7 +160,8 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 		//
 		// For example: Given a system with 8 CPUs available and HT enabled,
 		// if numReservedCPUs=2, then reserved={0,4}
-		reserved, _ = policy.takeByTopology(allCPUs, numReservedCPUs)
+		cpuAlloc, _ := policy.takeByTopology(allCPUs, numReservedCPUs)
+		reserved = cpuAlloc.CPUs
 	}
 
 	if reserved.Size() != numReservedCPUs {
@@ -378,15 +379,15 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
 
 	// Allocate CPUs according to the NUMA affinity contained in the hint.
-	cpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
+	cpuAllocation, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)])
 	if err != nil {
 		klog.ErrorS(err, "Unable to allocate CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
 		return err
 	}
 
-	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
-	p.updateCPUsToReuse(pod, container, cpuset)
-	p.updateMetricsOnAllocate(cpuset)
+	s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
+	p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
+	p.updateMetricsOnAllocate(cpuAllocation)
 
 	return nil
 }
@@ -417,13 +418,13 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 	return nil
 }
 
-func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (cpuset.CPUSet, error) {
+func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bitmask.BitMask, reusableCPUs cpuset.CPUSet) (cpuAllocation, error) {
 	klog.InfoS("AllocateCPUs", "numCPUs", numCPUs, "socket", numaAffinity)
 
 	allocatableCPUs := p.GetAvailableCPUs(s).Union(reusableCPUs)
 
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
-	result := cpuset.New()
+	result := emptyCpuAllocation()
 	if numaAffinity != nil {
 		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
 
@@ -432,25 +433,25 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 			numAlignedToAlloc = numCPUs
 		}
 
-		alignedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
+		allocatedCPUs, err := p.takeByTopology(alignedCPUs, numAlignedToAlloc)
 		if err != nil {
-			return cpuset.New(), err
+			return emptyCpuAllocation(), err
 		}
 
-		result = result.Union(alignedCPUs)
+		result = result.Union(allocatedCPUs)
 	}
 
 	// Get any remaining CPUs from what's leftover after attempting to grab aligned ones.
-	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result), numCPUs-result.Size())
+	remainingCPUs, err := p.takeByTopology(allocatableCPUs.Difference(result.CPUs), numCPUs-result.CPUs.Size())
 	if err != nil {
-		return cpuset.New(), err
+		return emptyCpuAllocation(), err
 	}
 	result = result.Union(remainingCPUs)
 
 	// Remove allocated CPUs from the shared CPUSet.
-	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
+	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result.CPUs))
 
-	klog.InfoS("AllocateCPUs", "result", result)
+	klog.InfoS("AllocateCPUs", "result", result.String())
 	return result, nil
 }
 
@@ -511,7 +512,7 @@ func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 	return requestedByLongRunningContainers
 }
 
-func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuAllocation, error) {
 	cpuSortingStrategy := CPUSortingStrategyPacked
 	if p.options.DistributeCPUsAcrossCores {
 		cpuSortingStrategy = CPUSortingStrategySpread
@@ -743,8 +744,10 @@ func (p *staticPolicy) initializeMetrics(s state.State) {
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(countExclusiveCPUs(s)))
 }
 
-func (p *staticPolicy) updateMetricsOnAllocate(cset cpuset.CPUSet) {
-	ncpus := cset.Size()
+func (p *staticPolicy) updateMetricsOnAllocate(cpuAlloc cpuAllocation) {
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
+
+	ncpus := cpuAlloc.CPUs.Size()
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(ncpus))
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(-ncpus * 1000))
 }

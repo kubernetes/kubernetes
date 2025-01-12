@@ -754,7 +754,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
 			}
-			if !result.Equals(tc.expResult) {
+			if !result.EqualsCPUSet(tc.expResult) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
 			}
 		})
@@ -855,7 +855,7 @@ func TestTakeByTopologyWithSpreadPhysicalCPUsPreferredOption(t *testing.T) {
 		if tc.expErr != "" && err.Error() != tc.expErr {
 			t.Errorf("testCase %q failed, expected error to be [%v] but it was [%v]", tc.description, tc.expErr, err)
 		}
-		if !result.Equals(tc.expResult) {
+		if !result.EqualsCPUSet(tc.expResult) {
 			t.Errorf("testCase %q failed, expected result [%s] to equal [%s]", tc.description, result, tc.expResult)
 		}
 	}
@@ -1063,7 +1063,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 				}
 				return
 			}
-			if !result.Equals(tc.expResult) {
+			if !result.EqualsCPUSet(tc.expResult) {
 				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
 			}
 		})

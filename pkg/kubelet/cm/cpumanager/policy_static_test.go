@@ -69,7 +69,10 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 }
 
 func TestStaticPolicyName(t *testing.T) {
-	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	policy, err := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	if err != nil {
+		t.Fatalf("NewStaticP{olicy() failed: %v", err)
+	}
 
 	policyName := policy.Name()
 	if policyName != "static" {
@@ -944,16 +947,16 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			continue
 		}
 
-		cset, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, cpuset.New())
+		cpuAlloc, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, cpuset.New())
 		if err != nil {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v not error %v",
 				tc.description, tc.expCSet, err)
 			continue
 		}
 
-		if !reflect.DeepEqual(tc.expCSet, cset) {
+		if !reflect.DeepEqual(tc.expCSet, cpuAlloc.CPUs) {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v but got %v",
-				tc.description, tc.expCSet, cset)
+				tc.description, tc.expCSet, cpuAlloc.CPUs)
 		}
 	}
 }
