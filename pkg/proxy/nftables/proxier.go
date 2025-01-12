@@ -549,11 +549,17 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Comment: ptr.To("Active ClusterIPs"),
 	})
 
+	// add named counter.
+	tx.Add(&knftables.Counter{
+		Name:    "traffic-to-invalid-ports",
+		Comment: ptr.To("tarck packets sent to invalid ports of cluster ips"),
+	})
+
 	// reject traffic to invalid ports of ClusterIPs.
 	tx.Add(&knftables.Rule{
 		Chain: clusterIPsCheckChain,
 		Rule: knftables.Concat(
-			ipX, "daddr", "@", clusterIPsSet, "reject",
+			ipX, "daddr", "@", clusterIPsSet, "counter name traffic-to-invalid-ports", "reject",
 		),
 		Comment: ptr.To("Reject traffic to invalid ports of ClusterIPs"),
 	})
