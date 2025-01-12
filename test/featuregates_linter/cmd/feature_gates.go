@@ -162,15 +162,15 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, update, version
 		}
 	}
 
+	featureListBytes, err := yaml.Marshal(featureList)
+	if err != nil {
+		return err
+	}
 	if update {
-		data, err := yaml.Marshal(featureList)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(filePath, data, 0644)
+		return os.WriteFile(filePath, featureListBytes, 0644)
 	}
 
-	if diff := cmp.Diff(featureList, baseFeatureList); diff != "" {
+	if diff := cmp.Diff(featureListBytes, baseFeatureListBytes); diff != "" {
 		if versioned {
 			return fmt.Errorf("detected diff in versioned feature list (%s), diff: \n%s", versionedFeatureListFile, diff)
 		} else {
