@@ -6,8 +6,6 @@ go 1.23.0
 
 godebug default=go1.23
 
-godebug winsymlink=0
-
 require (
 	github.com/stretchr/testify v1.9.0
 	k8s.io/api v0.0.0
