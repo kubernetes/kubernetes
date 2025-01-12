@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"net"
 	"net/http"
 	"strconv"
@@ -113,6 +114,41 @@ func getReadySchedulableWorkerNode(ctx context.Context, c clientset.Interface) (
 	return nil, fmt.Errorf("there are currently no ready, schedulable worker nodes in the cluster")
 }
 
+func waitForSvcStatus(ctx context.Context, cs clientset.Interface, ns string, serviceName string, timeout time.Duration, statusFn func(service *v1.Service) (bool, error)) error {
+	return wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, true, func(ctx context.Context) (bool, error) {
+		svc, err := cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
+
+		if err != nil {
+			framework.Logf("Retrying .... error trying to get Service %s: %v", serviceName, err)
+
+			return false, err
+		}
+
+		return statusFn(svc)
+	})
+}
+
+func changeServiceNodePort(ctx context.Context, cs clientset.Interface, ns string, serviceName string, initial int) (*v1.Service, error) {
+	var err error
+	var svc *v1.Service
+	for i := 1; i < e2eservice.NodePortRange.Size; i++ {
+		offs1 := initial - e2eservice.NodePortRange.Base
+		offs2 := (offs1 + i) % e2eservice.NodePortRange.Size
+		newPort := e2eservice.NodePortRange.Base + offs2
+
+		svc, err = e2eservice.UpdateService(ctx, cs, ns, serviceName, func(s *v1.Service) {
+			s.Spec.Ports[0].NodePort = int32(newPort)
+		})
+		if err != nil && strings.Contains(err.Error(), "provided port is already allocated") {
+			framework.Logf("tried nodePort %d, but it is in use, will try another", newPort)
+			continue
+		}
+		// Otherwise err was nil or err was a real error
+		break
+	}
+	return svc, err
+}
+
 var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	f := framework.NewDefaultFramework("loadbalancers")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -129,295 +165,250 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		}
 	})
 
-	f.It("should be able to change the type and ports of a TCP service", f.WithSlow(), func(ctx context.Context) {
-		// FIXME: need a better platform-independent timeout
-		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutAWS
-		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
+	protocols := []struct {
+		name               string
+		protocol           v1.Protocol
+		lbLagTimeout       time.Duration
+		testReachableFn    func(ctx context.Context, host string, port int, timeout time.Duration)
+		testNotReachableFn func(ctx context.Context, host string, port int, timeout time.Duration)
+	}{
+		{"TCP", v1.ProtocolTCP, e2eservice.LoadBalancerLagTimeoutAWS, e2eservice.TestReachableHTTP, testNotReachableHTTP},
+		//{"UDP", v1.ProtocolUDP, e2eservice.LoadBalancerLagTimeoutDefault, testReachableUDP, testNotReachableUDP},
+	}
 
-		// This test is more monolithic than we'd like because LB turnup can be
-		// very slow, so we lumped all the tests into one LB lifecycle.
+	for _, protocolTest := range protocols {
+		f.It(fmt.Sprintf("[%s] should be able to change the type and ports of the service", protocolTest.name),
+			f.WithSlow(),
+			func(ctx context.Context) {
+				// FIXME: need a better platform-independent timeout
+				loadBalancerLagTimeout := protocolTest.lbLagTimeout
+				loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
 
-		serviceName := "mutability-test"
-		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
-		framework.Logf("namespace for TCP test: %s", ns1)
+				// This test is more monolithic than we'd like because LB turnup can be
+				// very slow, so we lumped all the tests into one LB lifecycle.
 
-		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
-		tcpJig := e2eservice.NewTestJig(cs, ns1, serviceName)
-		tcpService, err := tcpJig.CreateTCPService(ctx, nil)
-		framework.ExpectNoError(err)
+				serviceName := fmt.Sprintf("mutability-test-%s", strings.ToLower(protocolTest.name))
+				serviceSelector := map[string]string{"testid": serviceName}
+				ns := f.Namespace.Name // LB1 in ns on TCP
+				framework.Logf("[%s] namespace for test: %s", protocolTest.name, ns)
 
-		svcPort := int(tcpService.Spec.Ports[0].Port)
-		framework.Logf("service port TCP: %d", svcPort)
+				// Setup test service
+				ginkgo.By(fmt.Sprintf("[%s] creating service %s with type=ClusterIP in namespace %s",
+					protocolTest.name,
+					serviceName,
+					ns))
+				svcSpec := e2eservice.CreateServiceSpec(serviceName, "", false, serviceSelector)
+				svcSpec.Spec.Ports[0].Protocol = protocolTest.protocol
 
-		ginkgo.By("creating a pod to be part of the TCP service " + serviceName)
-		_, err = tcpJig.Run(ctx, nil)
-		framework.ExpectNoError(err)
+				svc, err := cs.CoreV1().Services(ns).Create(ctx, svcSpec, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
 
-		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns1, "execpod", nil)
-		err = tcpJig.CheckServiceReachability(ctx, tcpService, execPod)
-		framework.ExpectNoError(err)
+				svcPort := int(svc.Spec.Ports[0].Port)
+				framework.Logf("[%s] service port: %d", protocolTest.name, svcPort)
 
-		// Change the services to NodePort.
+				// Setup test deployment
+				ginkgo.By(fmt.Sprintf("[%s] creating a deployment to be part of the service %s",
+					protocolTest.name,
+					serviceName))
 
-		ginkgo.By("changing the TCP service to type=NodePort")
-		tcpService, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeNodePort
-		})
-		framework.ExpectNoError(err)
-		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
-		framework.Logf("TCP node port: %d", tcpNodePort)
+				deploymentSpec := e2edeployment.NewDeployment(serviceName,
+					1,
+					serviceSelector,
+					serviceName,
+					imageutils.GetE2EImage(imageutils.Agnhost),
+					appsv1.RollingUpdateDeploymentStrategyType)
+				deploymentSpec.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80", "--udp-port=80"}
+				deploymentSpec.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+					PeriodSeconds: 3,
+					ProbeHandler: v1.ProbeHandler{
+						HTTPGet: &v1.HTTPGetAction{
+							Port: svc.Spec.Ports[0].TargetPort,
+							Path: "/hostName",
+						},
+					},
+				}
 
-		err = tcpJig.CheckServiceReachability(ctx, tcpService, execPod)
-		framework.ExpectNoError(err)
+				deployment, err := cs.AppsV1().Deployments(ns).Create(ctx, deploymentSpec, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
 
-		// Change the services to LoadBalancer.
-		ginkgo.By("changing the TCP service to type=LoadBalancer")
-		_, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeLoadBalancer
-		})
-		framework.ExpectNoError(err)
+				// Create test bastion pod
+				execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
 
-		ginkgo.By("waiting for the TCP service to have a load balancer")
-		// Wait for the load balancer to be created asynchronously
-		tcpService, err = tcpJig.WaitForLoadBalancer(ctx, loadBalancerCreateTimeout)
-		framework.ExpectNoError(err)
-		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
-			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
-		}
-		tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
-		framework.Logf("TCP load balancer: %s", tcpIngressIP)
+				// Start running tests
 
-		err = tcpJig.CheckServiceReachability(ctx, tcpService, execPod)
-		framework.ExpectNoError(err)
+				// Check ClusterIP service is reachable
+				err = e2eservice.TestAllEndpointsReachable(ctx, cs, svc, execPod)
+				framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the TCP service's LoadBalancer")
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+				// Change the service to NodePort.
+				ginkgo.By(fmt.Sprintf("[%s] changing the service to type=NodePort", protocolTest.name))
+				svc, err = e2eservice.UpdateService(ctx, cs, ns, serviceName, func(s *v1.Service) {
+					s.Spec.Type = v1.ServiceTypeNodePort
+				})
+				framework.ExpectNoError(err)
 
-		// Change the services' node ports.
+				tcpNodePort := int(svc.Spec.Ports[0].NodePort)
+				framework.Logf("[%s] node port: %d", protocolTest.name, tcpNodePort)
 
-		ginkgo.By("changing the TCP service's NodePort")
-		tcpService, err = tcpJig.ChangeServiceNodePort(ctx, tcpNodePort)
-		framework.ExpectNoError(err)
-		tcpNodePortOld := tcpNodePort
-		tcpNodePort = int(tcpService.Spec.Ports[0].NodePort)
-		if tcpNodePort == tcpNodePortOld {
-			framework.Failf("TCP Spec.Ports[0].NodePort (%d) did not change", tcpNodePort)
-		}
-		if e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != tcpIngressIP {
-			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
-		}
-		framework.Logf("TCP node port: %d", tcpNodePort)
+				// Check NodePort service is reachable
+				err = e2eservice.TestAllEndpointsReachable(ctx, cs, svc, execPod)
+				framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the TCP service's LoadBalancer")
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+				// Change the service to LoadBalancer.
+				ginkgo.By(fmt.Sprintf("[%s] changing the service to type=LoadBalancer", protocolTest.name))
+				svc, err = e2eservice.UpdateService(ctx, cs, ns, serviceName, func(s *v1.Service) {
+					s.Spec.Type = v1.ServiceTypeLoadBalancer
+				})
+				framework.ExpectNoError(err)
 
-		// Change the services' main ports.
+				// Wait for the load balancer to be created asynchronously
+				ginkgo.By(fmt.Sprintf("[%s] waiting for the service to have a load balancer", protocolTest.name))
+				err = waitForSvcStatus(ctx, cs, ns, serviceName, loadBalancerCreateTimeout, func(service *v1.Service) (bool, error) {
+					return len(service.Status.LoadBalancer.Ingress) > 0, nil
+				})
+				framework.ExpectNoError(err)
 
-		ginkgo.By("changing the TCP service's port")
-		tcpService, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Ports[0].Port++
-		})
-		framework.ExpectNoError(err)
-		svcPortOld := svcPort
-		svcPort = int(tcpService.Spec.Ports[0].Port)
-		if svcPort == svcPortOld {
-			framework.Failf("TCP Spec.Ports[0].Port (%d) did not change", svcPort)
-		}
-		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
-			framework.Failf("TCP Spec.Ports[0].NodePort (%d) changed", tcpService.Spec.Ports[0].NodePort)
-		}
-		if e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != tcpIngressIP {
-			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
-		}
+				// If the NodePort has changed, fail
+				if int(svc.Spec.Ports[0].NodePort) != tcpNodePort {
+					framework.Failf("[%s] Spec.Ports[0].NodePort changed (%d -> %d) when not expected",
+						protocolTest.name,
+						tcpNodePort,
+						svc.Spec.Ports[0].NodePort)
+				}
 
-		framework.Logf("service port TCP: %d", svcPort)
+				svc, err = cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the TCP service's LoadBalancer")
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+				ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+				framework.Logf("[%s] load balancer: %s", protocolTest.name, ingressIP)
 
-		ginkgo.By("Scaling the pods to 0")
-		err = tcpJig.Scale(ctx, 0)
-		framework.ExpectNoError(err)
+				// Check LoadBalancer service is reachable
+				err = e2eservice.TestAllEndpointsReachable(ctx, cs, svc, execPod)
+				framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the TCP service's LoadBalancer with no backends, no answer expected")
-		testNotReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+				// Additionally, check that the LoadBalancer is reachable
+				ginkgo.By(fmt.Sprintf("[%s] hitting the service's LoadBalancer", protocolTest.name))
+				protocolTest.testReachableFn(ctx, ingressIP, svcPort, loadBalancerLagTimeout)
 
-		ginkgo.By("Scaling the pods to 1")
-		err = tcpJig.Scale(ctx, 1)
-		framework.ExpectNoError(err)
+				// Change the service node ports.
+				ginkgo.By(fmt.Sprintf("[%s] changing the service's NodePort", protocolTest.name))
+				svc, err = changeServiceNodePort(ctx, cs, ns, serviceName, tcpNodePort)
+				framework.ExpectNoError(err)
 
-		ginkgo.By("hitting the TCP service's LoadBalancer")
-		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
+				// If the NodePort has not changed, fail
+				tcpNodePortOld := tcpNodePort
+				tcpNodePort = int(svc.Spec.Ports[0].NodePort)
+				if tcpNodePort == tcpNodePortOld {
+					framework.Failf("[%s] Spec.Ports[0].NodePort (%d) did not change", protocolTest.name, tcpNodePort)
+				}
 
-		// Change the services back to ClusterIP.
+				// If the LoadBalancer Ingress has changed, fail
+				if e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0]) != ingressIP {
+					framework.Failf("[%s] Status.LoadBalancer.Ingress changed (%s -> %s) when not expected",
+						protocolTest.name,
+						ingressIP,
+						e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0]))
+				}
+				framework.Logf("[%s] node port: %d", protocolTest.name, tcpNodePort)
 
-		ginkgo.By("changing TCP service back to type=ClusterIP")
-		tcpReadback, err := tcpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeClusterIP
-		})
-		framework.ExpectNoError(err)
-		if tcpReadback.Spec.Ports[0].NodePort != 0 {
-			framework.Fail("TCP Spec.Ports[0].NodePort was not cleared")
-		}
-		// Wait for the load balancer to be destroyed asynchronously
-		_, err = tcpJig.WaitForLoadBalancerDestroy(ctx, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
-		framework.ExpectNoError(err)
+				// Check that the LoadBalancer is still reachable
+				ginkgo.By(fmt.Sprintf("[%s] hitting the service's LoadBalancer", protocolTest.name))
+				protocolTest.testReachableFn(ctx, ingressIP, svcPort, loadBalancerLagTimeout)
 
-		ginkgo.By("checking the TCP LoadBalancer is closed")
-		testNotReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
-	})
+				// Change the service main ports.
+				ginkgo.By(fmt.Sprintf("[%s] changing the service's port", protocolTest.name))
+				svc, err = e2eservice.UpdateService(ctx, cs, ns, serviceName, func(s *v1.Service) {
+					s.Spec.Ports[0].Port++
+				})
+				framework.ExpectNoError(err)
 
-	f.It("should be able to change the type and ports of a UDP service", f.WithSlow(), func(ctx context.Context) {
-		// FIXME: some cloud providers do not support UDP LoadBalancers
+				// If the port has not changed, fail
+				// If the NodePort has changed, fail
+				// If the LoadBalancer Ingress has changed, fail
+				svcPortOld := svcPort
+				svcPort = int(svc.Spec.Ports[0].Port)
+				if svcPort == svcPortOld {
+					framework.Failf("[%s] Spec.Ports[0].Port (%d) did not change", protocolTest.name, svcPort)
+				}
+				if int(svc.Spec.Ports[0].NodePort) != tcpNodePort {
+					framework.Failf("[%s] Spec.Ports[0].NodePort (%d) changed",
+						protocolTest.name,
+						svc.Spec.Ports[0].NodePort)
+				}
+				if e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0]) != ingressIP {
+					framework.Failf("[%s] Status.LoadBalancer.Ingress changed (%s -> %s) when not expected",
+						protocolTest.name,
+						ingressIP,
+						e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0]))
+				}
 
-		loadBalancerLagTimeout := e2eservice.LoadBalancerLagTimeoutDefault
-		loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
+				framework.Logf("[%s] service port: %d", protocolTest.name, svcPort)
 
-		// This test is more monolithic than we'd like because LB turnup can be
-		// very slow, so we lumped all the tests into one LB lifecycle.
+				// Check that the LoadBalancer is still reachable
+				ginkgo.By(fmt.Sprintf("[%s] hitting the service's LoadBalancer", protocolTest.name))
+				protocolTest.testReachableFn(ctx, ingressIP, svcPort, loadBalancerLagTimeout)
 
-		serviceName := "mutability-test"
-		ns2 := f.Namespace.Name // LB1 in ns2 on TCP
-		framework.Logf("namespace for TCP test: %s", ns2)
+				// Scale the deployment to 0 replicas
+				ginkgo.By("Scaling the pods to 0")
+				deployment, err = e2edeployment.UpdateDeploymentWithRetries(cs,
+					ns,
+					deployment.Name,
+					func(d *appsv1.Deployment) {
+						newReplicas := int32(0)
+						d.Spec.Replicas = &newReplicas
+					})
+				framework.ExpectNoError(err)
 
-		ginkgo.By("creating a UDP service " + serviceName + " with type=ClusterIP in namespace " + ns2)
-		udpJig := e2eservice.NewTestJig(cs, ns2, serviceName)
-		udpService, err := udpJig.CreateUDPService(ctx, nil)
-		framework.ExpectNoError(err)
+				err = e2edeployment.WaitForDeploymentComplete(cs, deployment)
+				framework.ExpectNoError(err)
 
-		svcPort := int(udpService.Spec.Ports[0].Port)
-		framework.Logf("service port UDP: %d", svcPort)
+				// Check that the LoadBalancer is not reachable anymore
+				ginkgo.By(fmt.Sprintf("[%s] hitting the service's LoadBalancer with no backends, no answer expected",
+					protocolTest.name))
+				protocolTest.testNotReachableFn(ctx, ingressIP, svcPort, loadBalancerLagTimeout)
 
-		ginkgo.By("creating a pod to be part of the UDP service " + serviceName)
-		_, err = udpJig.Run(ctx, nil)
-		framework.ExpectNoError(err)
+				// Scale the deployment to 1 replica
+				ginkgo.By("Scaling the pods to 1")
+				deployment, err = e2edeployment.UpdateDeploymentWithRetries(cs,
+					ns,
+					deployment.Name,
+					func(d *appsv1.Deployment) {
+						newReplicas := int32(1)
+						d.Spec.Replicas = &newReplicas
+					})
+				framework.ExpectNoError(err)
 
-		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns2, "execpod", nil)
-		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
-		framework.ExpectNoError(err)
+				err = e2edeployment.WaitForDeploymentComplete(cs, deployment)
+				framework.ExpectNoError(err)
 
-		// Change the services to NodePort.
+				// Check that the LoadBalancer is reachable again
+				ginkgo.By(fmt.Sprintf("[%s] hitting the service's LoadBalancer", protocolTest.name))
+				protocolTest.testReachableFn(ctx, ingressIP, svcPort, loadBalancerLagTimeout)
 
-		ginkgo.By("changing the UDP service to type=NodePort")
-		udpService, err = udpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeNodePort
-		})
-		framework.ExpectNoError(err)
-		udpNodePort := int(udpService.Spec.Ports[0].NodePort)
-		framework.Logf("UDP node port: %d", udpNodePort)
+				// Change the services back to ClusterIP.
+				ginkgo.By(fmt.Sprintf("[%s] changing service back to type=ClusterIP", protocolTest.name))
+				svc, err = e2eservice.UpdateService(ctx, cs, ns, serviceName, func(s *v1.Service) {
+					s.Spec.Type = v1.ServiceTypeClusterIP
+				})
+				framework.ExpectNoError(err)
 
-		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
-		framework.ExpectNoError(err)
+				// Check that the service doesn't have a NodePort anymore
+				if svc.Spec.Ports[0].NodePort != 0 {
+					framework.Failf("[%s] Spec.Ports[0].NodePort was not cleared", protocolTest.name)
+				}
 
-		// Change the services to LoadBalancer.
-		ginkgo.By("changing the UDP service to type=LoadBalancer")
-		_, err = udpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeLoadBalancer
-		})
-		framework.ExpectNoError(err)
+				// Wait for the LoadBalancer to be gone
+				err = waitForSvcStatus(ctx, cs, ns, serviceName, loadBalancerCreateTimeout, func(service *v1.Service) (bool, error) {
+					return len(service.Status.LoadBalancer.Ingress) == 0, nil
+				})
 
-		var udpIngressIP string
-		ginkgo.By("waiting for the UDP service to have a load balancer")
-		// 2nd one should be faster since they ran in parallel.
-		udpService, err = udpJig.WaitForLoadBalancer(ctx, loadBalancerCreateTimeout)
-		framework.ExpectNoError(err)
-		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
-			framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
-		}
-		udpIngressIP = e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0])
-		framework.Logf("UDP load balancer: %s", udpIngressIP)
+				framework.ExpectNoError(err)
 
-		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerLagTimeout)
-
-		// Change the services' node ports.
-
-		ginkgo.By("changing the UDP service's NodePort")
-		udpService, err = udpJig.ChangeServiceNodePort(ctx, udpNodePort)
-		framework.ExpectNoError(err)
-		udpNodePortOld := udpNodePort
-		udpNodePort = int(udpService.Spec.Ports[0].NodePort)
-		if udpNodePort == udpNodePortOld {
-			framework.Failf("UDP Spec.Ports[0].NodePort (%d) did not change", udpNodePort)
-		}
-		if e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
-			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
-		}
-		framework.Logf("UDP node port: %d", udpNodePort)
-
-		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerLagTimeout)
-
-		// Change the services' main ports.
-		framework.Logf("Service Status: %v", udpService.Status)
-		ginkgo.By("changing the UDP service's port")
-		udpService, err = udpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Ports[0].Port++
-		})
-		framework.ExpectNoError(err)
-		svcPortOld := svcPort
-		svcPort = int(udpService.Spec.Ports[0].Port)
-		if svcPort == svcPortOld {
-			framework.Failf("UDP Spec.Ports[0].Port (%d) did not change", svcPort)
-		}
-		if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
-			framework.Failf("UDP Spec.Ports[0].NodePort (%d) changed", udpService.Spec.Ports[0].NodePort)
-		}
-		framework.Logf("Service Status: %v", udpService.Status)
-		if e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]) != udpIngressIP {
-			framework.Failf("UDP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", udpIngressIP, e2eservice.GetIngressPoint(&udpService.Status.LoadBalancer.Ingress[0]))
-		}
-
-		framework.Logf("service port UDP: %d", svcPort)
-
-		ginkgo.By("hitting the UDP service's NodePort")
-		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
-
-		ginkgo.By("Scaling the pods to 0")
-		err = udpJig.Scale(ctx, 0)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("checking that the UDP service's LoadBalancer is not reachable")
-		testNotReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
-
-		ginkgo.By("Scaling the pods to 1")
-		err = udpJig.Scale(ctx, 1)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the UDP service's NodePort")
-		err = udpJig.CheckServiceReachability(ctx, udpService, execPod)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("hitting the UDP service's LoadBalancer")
-		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
-
-		// Change the services back to ClusterIP.
-
-		ginkgo.By("changing UDP service back to type=ClusterIP")
-		udpReadback, err := udpJig.UpdateService(ctx, func(s *v1.Service) {
-			s.Spec.Type = v1.ServiceTypeClusterIP
-		})
-		framework.ExpectNoError(err)
-		if udpReadback.Spec.Ports[0].NodePort != 0 {
-			framework.Fail("UDP Spec.Ports[0].NodePort was not cleared")
-		}
-		// Wait for the load balancer to be destroyed asynchronously
-		_, err = udpJig.WaitForLoadBalancerDestroy(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("checking the UDP LoadBalancer is closed")
-		testNotReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerLagTimeout)
-	})
+				// Check that the LoadBalancer is not reachable anymore
+				ginkgo.By(fmt.Sprintf("[%s] checking the LoadBalancer is closed", protocolTest.name))
+				protocolTest.testNotReachableFn(ctx, ingressIP, svcPort, loadBalancerLagTimeout)
+			})
+	}
 
 	f.It("should only allow access from service loadbalancer source ranges", f.WithSlow(), func(ctx context.Context) {
 		// FIXME: need a better platform-independent timeout
@@ -426,32 +417,51 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 
 		namespace := f.Namespace.Name
 		serviceName := "lb-sourcerange"
-		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+		serviceSelector := map[string]string{"testid": serviceName}
 
 		ginkgo.By("creating a LoadBalancer Service (with no LoadBalancerSourceRanges)")
-		svc, err := jig.CreateTCPService(ctx, func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		})
+		svcSpec := e2eservice.CreateServiceSpec(serviceName, "", false, serviceSelector)
+
+		svc, err := cs.CoreV1().Services(namespace).Create(ctx, svcSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating LoadBalancer")
+
 		ginkgo.DeferCleanup(func(ctx context.Context) {
 			ginkgo.By("Clean up loadbalancer service")
 			e2eservice.WaitForServiceDeletedWithFinalizer(ctx, cs, svc.Namespace, svc.Name)
 		})
 
 		// Provisioning the LB may take some time, so create pods while we wait.
-
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
-		_, err = jig.Run(ctx, nil)
+		deploymentSpec := e2edeployment.NewDeployment(serviceName,
+			1,
+			serviceSelector,
+			serviceName,
+			imageutils.GetE2EImage(imageutils.Agnhost),
+			appsv1.RollingUpdateDeploymentStrategyType)
+		deploymentSpec.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80", "--udp-port=80"}
+		deploymentSpec.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+			PeriodSeconds: 3,
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Port: svc.Spec.Ports[0].TargetPort,
+					Path: "/hostName",
+				},
+			},
+		}
+
+		_, err = cs.AppsV1().Deployments(namespace).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "creating service backend")
 
 		ginkgo.By("creating client pods on two different nodes")
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, 2)
 		framework.ExpectNoError(err, "getting list of nodes")
+
 		if len(nodes.Items) < 2 {
 			e2eskipper.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %d nodes",
 				len(nodes.Items))
 		}
+
 		acceptPod := e2epod.CreateExecPodOrFail(ctx, cs, namespace, "execpod-accept",
 			func(pod *v1.Pod) {
 				pod.Spec.NodeName = nodes.Items[0].Name
@@ -469,8 +479,11 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		framework.ExpectNoError(err, "getting IP of dropPod")
 
 		ginkgo.By("waiting for the LoadBalancer to be provisioned")
-		svc, err = jig.WaitForLoadBalancer(ctx, loadBalancerCreateTimeout)
+		err = waitForSvcStatus(ctx, cs, namespace, serviceName, loadBalancerCreateTimeout, func(service *v1.Service) (bool, error) {
+			return len(service.Status.LoadBalancer.Ingress) > 0, nil
+		})
 		framework.ExpectNoError(err, "waiting for LoadBalancer to be provisioned")
+
 		ingress := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		svcPort := int(svc.Spec.Ports[0].Port)
 		framework.Logf("Load balancer is at %s, port %d", ingress, svcPort)
@@ -494,8 +507,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 			ipToSourceRange(acceptPod.Status.HostIP),
 		}
 		ginkgo.By(fmt.Sprintf("setting LoadBalancerSourceRanges to %v", sourceRanges))
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.Spec.LoadBalancerSourceRanges = sourceRanges
+		svc, err = e2eservice.UpdateService(ctx, cs, namespace, serviceName, func(s *v1.Service) {
+			s.Spec.LoadBalancerSourceRanges = sourceRanges
 		})
 		framework.ExpectNoError(err)
 
@@ -515,8 +528,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("setting LoadBalancerSourceRanges to %v", sourceRanges))
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.Spec.LoadBalancerSourceRanges = sourceRanges
+		svc, err = e2eservice.UpdateService(ctx, cs, namespace, serviceName, func(s *v1.Service) {
+			s.Spec.LoadBalancerSourceRanges = sourceRanges
 		})
 		framework.ExpectNoError(err, "updating LoadBalancerSourceRanges")
 
@@ -535,8 +548,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("setting LoadBalancerSourceRanges to %v", sourceRanges))
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.Spec.LoadBalancerSourceRanges = sourceRanges
+		svc, err = e2eservice.UpdateService(ctx, cs, namespace, serviceName, func(s *v1.Service) {
+			s.Spec.LoadBalancerSourceRanges = sourceRanges
 		})
 		framework.ExpectNoError(err, "updating LoadBalancerSourceRanges")
 
@@ -548,8 +561,8 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		checkReachabilityFromPod(ctx, false, e2eservice.KubeProxyEndpointLagTimeout, namespace, dropPod.Name, ingress)
 
 		ginkgo.By("clearing LoadBalancerSourceRanges")
-		_, err = jig.UpdateService(ctx, func(svc *v1.Service) {
-			svc.Spec.LoadBalancerSourceRanges = nil
+		svc, err = e2eservice.UpdateService(ctx, cs, namespace, serviceName, func(s *v1.Service) {
+			s.Spec.LoadBalancerSourceRanges = nil
 		})
 		framework.ExpectNoError(err, "updating LoadBalancerSourceRanges")
 
@@ -648,24 +661,44 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		// very slow, so we lumped all the tests into one LB lifecycle.
 
 		serviceName := "reallocate-nodeport-test"
-		ns1 := f.Namespace.Name // LB1 in ns1 on TCP
-		framework.Logf("namespace for TCP test: %s", ns1)
+		ns := f.Namespace.Name // LB1 in ns on TCP
+		serviceSelector := map[string]string{"testid": serviceName}
 
-		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns1)
-		tcpJig := e2eservice.NewTestJig(cs, ns1, serviceName)
-		tcpService, err := tcpJig.CreateTCPService(ctx, nil)
+		framework.Logf("namespace for TCP test: %s", ns)
+
+		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		svcSpec := e2eservice.CreateServiceSpec(serviceName, "", false, serviceSelector)
+
+		svc, err := cs.CoreV1().Services(ns).Create(ctx, svcSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		svcPort := int(tcpService.Spec.Ports[0].Port)
+		svcPort := int(svc.Spec.Ports[0].Port)
 		framework.Logf("service port TCP: %d", svcPort)
 
 		ginkgo.By("creating a pod to be part of the TCP service " + serviceName)
-		_, err = tcpJig.Run(ctx, nil)
+		deploymentSpec := e2edeployment.NewDeployment(serviceName,
+			1,
+			serviceSelector,
+			serviceName,
+			imageutils.GetE2EImage(imageutils.Agnhost),
+			appsv1.RollingUpdateDeploymentStrategyType)
+		deploymentSpec.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80", "--udp-port=80"}
+		deploymentSpec.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+			PeriodSeconds: 3,
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Port: svc.Spec.Ports[0].TargetPort,
+					Path: "/hostName",
+				},
+			},
+		}
+
+		_, err = cs.AppsV1().Deployments(ns).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		// Change the services to LoadBalancer.
 		ginkgo.By("changing the TCP service to type=LoadBalancer")
-		_, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
+		svc, err = e2eservice.UpdateService(ctx, cs, ns, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
 			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 		})
@@ -673,12 +706,15 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 
 		ginkgo.By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
-		tcpService, err = tcpJig.WaitForLoadBalancer(ctx, loadBalancerCreateTimeout)
+		err = waitForSvcStatus(ctx, cs, ns, serviceName, loadBalancerCreateTimeout, func(service *v1.Service) (bool, error) {
+			return len(service.Status.LoadBalancer.Ingress) > 0, nil
+		})
 		framework.ExpectNoError(err)
-		if int(tcpService.Spec.Ports[0].NodePort) != 0 {
-			framework.Failf("TCP Spec.Ports[0].NodePort allocated %d when not expected", tcpService.Spec.Ports[0].NodePort)
+
+		if int(svc.Spec.Ports[0].NodePort) != 0 {
+			framework.Failf("TCP Spec.Ports[0].NodePort allocated %d when not expected", svc.Spec.Ports[0].NodePort)
 		}
-		tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
+		tcpIngressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		framework.Logf("TCP load balancer: %s", tcpIngressIP)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
@@ -687,17 +723,20 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		// Change the services' node ports.
 
 		ginkgo.By("adding a TCP service's NodePort")
-		tcpService, err = tcpJig.UpdateService(ctx, func(s *v1.Service) {
+		svc, err = e2eservice.UpdateService(ctx, cs, ns, serviceName, func(s *v1.Service) {
 			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
 		})
 		framework.ExpectNoError(err)
-		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)
+
+		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
+
 		if tcpNodePort == 0 {
 			framework.Failf("TCP Spec.Ports[0].NodePort (%d) not allocated", tcpNodePort)
 		}
-		if e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]) != tcpIngressIP {
-			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0]))
+		if e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0]) != tcpIngressIP {
+			framework.Failf("TCP Status.LoadBalancer.Ingress changed (%s -> %s) when not expected", tcpIngressIP, e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0]))
 		}
+
 		framework.Logf("TCP node port: %d", tcpNodePort)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
@@ -1077,24 +1116,40 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 	ginkgo.It("should only target nodes with endpoints", func(ctx context.Context) {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodes"
-		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+		serviceSelector := map[string]string{"testid": serviceName}
+
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
 
-		svc, err := jig.CreateOnlyLocalLoadBalancerService(ctx, loadBalancerCreateTimeout, false,
-			func(svc *v1.Service) {
-				// Change service port to avoid collision with opened hostPorts
-				// in other tests that run in parallel.
-				if len(svc.Spec.Ports) != 0 {
-					svc.Spec.Ports[0].TargetPort = intstr.FromInt32(svc.Spec.Ports[0].Port)
-					svc.Spec.Ports[0].Port = 8081
-				}
+		svcSpec := e2eservice.CreateServiceSpec(serviceName, "", false, serviceSelector)
+		svcSpec.Spec.Type = v1.ServiceTypeLoadBalancer
+		svcSpec.Spec.SessionAffinity = v1.ServiceAffinityNone
+		svcSpec.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyLocal
 
-			})
+		// Change service port to avoid collision with opened hostPorts
+		// in other tests that run in parallel.
+		svcSpec.Spec.Ports[0].TargetPort = intstr.FromInt32(svcSpec.Spec.Ports[0].Port)
+		svcSpec.Spec.Ports[0].Port = 8081
+
+		svc, err := cs.CoreV1().Services(namespace).Create(ctx, svcSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
+
+		err = waitForSvcStatus(ctx, cs, namespace, serviceName, loadBalancerCreateTimeout, func(service *v1.Service) (bool, error) {
+			return len(service.Status.LoadBalancer.Ingress) > 0, nil
+		})
+		framework.ExpectNoError(err)
+
 		ginkgo.DeferCleanup(func(ctx context.Context) {
-			err = jig.ChangeServiceType(ctx, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
+			svc, err = e2eservice.UpdateService(ctx, cs, namespace, serviceName, func(s *v1.Service) {
+				s.Spec.Type = v1.ServiceTypeClusterIP
+			})
 			framework.ExpectNoError(err)
+
+			err = waitForSvcStatus(ctx, cs, namespace, serviceName, loadBalancerCreateTimeout, func(service *v1.Service) (bool, error) {
+				return len(service.Status.LoadBalancer.Ingress) == 0, nil
+			})
+			framework.ExpectNoError(err)
+
 			err := cs.CoreV1().Services(svc.Namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		})
@@ -1106,6 +1161,9 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 
 		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 
+		svc, err = cs.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
 
@@ -1115,16 +1173,56 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 			endpointNodeName := nodes.Items[i].Name
 
 			ginkgo.By("creating a pod to be part of the service " + serviceName + " on node " + endpointNodeName)
-			_, err = jig.Run(ctx, func(rc *v1.ReplicationController) {
-				rc.Name = serviceName
-				if endpointNodeName != "" {
-					rc.Spec.Template.Spec.NodeName = endpointNodeName
-				}
-			})
+			deploymentSpec := e2edeployment.NewDeployment(serviceName,
+				1,
+				serviceSelector,
+				serviceName,
+				imageutils.GetE2EImage(imageutils.Agnhost),
+				appsv1.RollingUpdateDeploymentStrategyType)
+			deploymentSpec.Spec.Template.Spec.Containers[0].Args = []string{"netexec", "--http-port=80", "--udp-port=80"}
+			deploymentSpec.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+				PeriodSeconds: 3,
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Port: svc.Spec.Ports[0].TargetPort,
+						Path: "/hostName",
+					},
+				},
+			}
+			deploymentSpec.Spec.Template.Spec.NodeName = endpointNodeName
+
+			_, err := cs.AppsV1().Deployments(namespace).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("waiting for service endpoint on node %v", endpointNodeName))
-			err = jig.WaitForEndpointOnNode(ctx, endpointNodeName)
+			err = wait.PollUntilContextTimeout(ctx, framework.Poll, e2eservice.KubeProxyLagTimeout, true, func(ctx context.Context) (bool, error) {
+				endpoints, err := cs.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+
+				if err != nil {
+					framework.Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
+					return false, nil
+				}
+
+				if len(endpoints.Subsets) == 0 {
+					framework.Logf("Expect endpoints with subsets, got none.")
+					return false, nil
+				}
+
+				// TODO: Handle multiple endpoints
+				if len(endpoints.Subsets[0].Addresses) == 0 {
+					framework.Logf("Expected Ready endpoints - found none")
+					return false, nil
+				}
+
+				epHostName := *endpoints.Subsets[0].Addresses[0].NodeName
+				framework.Logf("Pod for service %s/%s is on node %s", namespace, serviceName, epHostName)
+				if epHostName != endpointNodeName {
+					framework.Logf("Found endpoint on wrong node, expected %v, got %v", endpointNodeName, epHostName)
+					return false, nil
+				}
+
+				return true, nil
+			})
 			framework.ExpectNoError(err)
 
 			// HealthCheck should pass only on the node where num(endpoints) > 0

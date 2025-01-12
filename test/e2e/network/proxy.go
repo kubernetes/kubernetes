@@ -23,6 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/test/e2e/framework/resource"
 	"math"
 	"net/http"
 	"strings"
@@ -38,11 +41,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -133,52 +135,52 @@ var _ = common.SIGDescribe("Proxy", func() {
 			}, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
-			// Make an RC with a single pod. The 'porter' image is
+			// Make a Deployment with a single pod. The 'porter' image is
 			// a simple server which serves the values of the
 			// environmental variables below.
 			ginkgo.By("starting an echo server on multiple ports")
-			pods := []*v1.Pod{}
-			cfg := testutils.RCConfig{
-				Client:       f.ClientSet,
-				Image:        imageutils.GetE2EImage(imageutils.Agnhost),
-				Command:      []string{"/agnhost", "porter"},
-				Name:         service.Name,
-				Namespace:    f.Namespace.Name,
-				Replicas:     1,
-				PollInterval: time.Second,
-				Env: map[string]string{
-					"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
-					"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,
-					"SERVE_PORT_160":  "foo",
-					"SERVE_PORT_162":  "bar",
 
-					"SERVE_TLS_PORT_443": `<a href="/tlsrewriteme">test</a>`,
-					"SERVE_TLS_PORT_460": `tls baz`,
-					"SERVE_TLS_PORT_462": `tls qux`,
-				},
-				Ports: map[string]int{
-					"dest1": 160,
-					"dest2": 162,
-
-					"tlsdest1": 460,
-					"tlsdest2": 462,
-				},
-				ReadinessProbe: &v1.Probe{
-					ProbeHandler: v1.ProbeHandler{
-						HTTPGet: &v1.HTTPGetAction{
-							Port: intstr.FromInt32(80),
-						},
-					},
-					InitialDelaySeconds: 1,
-					TimeoutSeconds:      5,
-					PeriodSeconds:       10,
-				},
-				Labels:      labels,
-				CreatedPods: &pods,
+			deploymentSpec := e2edeployment.NewDeployment(service.Name,
+				int32(1),
+				labels,
+				service.Name,
+				imageutils.GetE2EImage(imageutils.Agnhost),
+				appsv1.RollingUpdateDeploymentStrategyType)
+			deploymentSpec.Spec.Template.Spec.Containers[0].Command = []string{"/agnhost", "porter"}
+			deploymentSpec.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
+				{Name: "SERVE_PORT_80", Value: `<a href="/rewriteme">test</a>`},
+				{Name: "SERVE_PORT_1080", Value: `<a href="/rewriteme">test</a>`},
+				{Name: "SERVE_PORT_160", Value: "foo"},
+				{Name: "SERVE_PORT_162", Value: "bar"},
+				{Name: "SERVE_TLS_PORT_443", Value: `<a href="/tlsrewriteme">test</a>`},
+				{Name: "SERVE_TLS_PORT_460", Value: "tls baz"},
+				{Name: "SERVE_TLS_PORT_462", Value: "tls qux"},
 			}
-			err = e2erc.RunRC(ctx, cfg)
+			deploymentSpec.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{
+				{ContainerPort: 160, Name: "dest1"},
+				{ContainerPort: 162, Name: "dest2"},
+				{ContainerPort: 460, Name: "tlsdest1"},
+				{ContainerPort: 462, Name: "tlsdest2"},
+			}
+			deploymentSpec.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
+				ProbeHandler: v1.ProbeHandler{
+					HTTPGet: &v1.HTTPGetAction{
+						Port: intstr.FromInt32(80),
+					},
+				},
+				InitialDelaySeconds: 1,
+				TimeoutSeconds:      5,
+				PeriodSeconds:       10,
+			}
+
+			deployment, err := f.ClientSet.AppsV1().Deployments(f.Namespace.Name).Create(ctx, deploymentSpec, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-			ginkgo.DeferCleanup(e2erc.DeleteRCAndWaitForGC, f.ClientSet, f.Namespace.Name, cfg.Name)
+			ginkgo.DeferCleanup(resource.DeleteResourceAndWaitForGC, f.ClientSet, schema.GroupKind{Kind: "Deployment"}, f.Namespace.Name, deployment.Name)
+
+			podList, err := e2edeployment.GetPodsForDeployment(ctx, f.ClientSet, deployment)
+			framework.ExpectNoError(err)
+
+			pods := podList.Items
 
 			err = waitForEndpoint(ctx, f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)
