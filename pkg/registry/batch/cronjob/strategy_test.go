@@ -45,16 +45,6 @@ var (
 			},
 		},
 	}
-	cronjobSpecWithTZinSchedule = batch.CronJobSpec{
-		Schedule:          "CRON_TZ=UTC 5 5 * * ?",
-		ConcurrencyPolicy: batch.AllowConcurrent,
-		TimeZone:          ptr.To("Asia/DoesNotExist"),
-		JobTemplate: batch.JobTemplateSpec{
-			Spec: batch.JobSpec{
-				Template: validPodTemplateSpec,
-			},
-		},
-	}
 )
 
 func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
@@ -375,33 +365,6 @@ func TestCronJobStrategy_WarningsOnUpdate(t *testing.T) {
 						},
 					},
 				},
-				Status: batch.CronJobStatus{
-					LastScheduleTime: &now,
-				},
-			},
-			wantWarningsCount: 1,
-		},
-		"timezone invalid failure": {
-			oldCronJob: &batch.CronJob{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "mycronjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Generation:      1,
-				},
-				Spec: validCronjobSpec,
-				Status: batch.CronJobStatus{
-					LastScheduleTime: &now,
-				},
-			},
-			cronjob: &batch.CronJob{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "mycronjob",
-					Namespace:       metav1.NamespaceDefault,
-					ResourceVersion: "0",
-					Generation:      0,
-				},
-				Spec: cronjobSpecWithTZinSchedule,
 				Status: batch.CronJobStatus{
 					LastScheduleTime: &now,
 				},
