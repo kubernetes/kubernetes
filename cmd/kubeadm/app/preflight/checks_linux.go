@@ -82,8 +82,11 @@ func addExecChecks(checks []Checker, execer utilsexec.Interface, k8sVersion stri
 		}
 	}
 
-	checks = append(checks,
-		InPathCheck{executable: "mount", mandatory: true, exec: execer},
-		InPathCheck{executable: "nsenter", mandatory: true, exec: execer})
+	// kubelet requires losetup to be present in PATH for block volume support since 1.9.0.
+	// (ref: https://github.com/kubernetes/kubernetes/pull/51494)
+	checks = append(checks, InPathCheck{executable: "losetup", mandatory: true, exec: execer})
+
+	// kubelet requires mount to be present in PATH for in-tree volume plugins.
+	checks = append(checks, InPathCheck{executable: "mount", mandatory: true, exec: execer})
 	return checks
 }
