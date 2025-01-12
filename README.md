@@ -1,3 +1,15 @@
+## Table of Contents 
+1. Kubernetes 
+2. To start using K8s
+3. Key Concepts to Know about Kubernetes 
+4. Benefits of Integrating Kubernetes in application infrastructure
+5. To start developing K8s
+6. Support 
+7. Community Meetings 
+8. Adopters
+9. Governance
+10. Roadmaps
+
 # Kubernetes (K8s)
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes/kubernetes)](https://goreportcard.com/report/github.com/kubernetes/kubernetes) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes?sort=semver)
@@ -31,6 +43,19 @@ Take a free course on [Scalable Microservices with Kubernetes].
 
 To use Kubernetes code as a library in other applications, see the [list of published components](https://git.k8s.io/kubernetes/staging/README.md).
 Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
+
+## Key Concepts to Know about Kubernetes 
+While the previous section provides links to documentation, below are some fundamental concepts to understand about Kubernetes that is useful when working with this repository: 
+1. Cluster - consists of one or more master nodes and worker nodes
+2. Pods - deployable units in Kubernetes that contain storage and network resources 
+3. ConfigMaps - used to store non-sensitive configuration data, like environment variables
+4. StatefulSets - used in certain full stack applications to manage data, ensuring successful deployments after changes that are made 
+
+## Benefits of Integrating Kubernetes in application infrastructure 
+Kubernetes automates deployment and management of containerized applications, which makes it more convenient for developers to redeploy changes made to the applications. 
+Kubernetes helps efficiently use system resources by placing containers on nodes depending on needs of such resources. 
+Kubernetes integrates well with CI/CD pipelines, common pipelines in the software industry. This allows for automated unit testing, building, and deployment of applications. 
+As a result of this integration, Kubernetes minimizes cloud infrastructure costs due to the testing, building, and deployment processes being automated rather than manual. 
 
 ## To start developing K8s
 
