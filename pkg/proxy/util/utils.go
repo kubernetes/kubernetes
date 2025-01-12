@@ -18,9 +18,6 @@ package util
 
 import (
 	"fmt"
-	"net"
-	"strings"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -29,6 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
+	"net"
+	"strings"
+	"time"
 )
 
 const (
@@ -37,6 +37,9 @@ const (
 
 	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
+
+	// FullSyncPeriod is iptables and nftables proxier full sync period
+	FullSyncPeriod = 1 * time.Hour
 )
 
 // IsZeroCIDR checks whether the input CIDR string is either
