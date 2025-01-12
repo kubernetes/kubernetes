@@ -27,9 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -471,7 +473,7 @@ func (dc *DeploymentController) cleanupDeployment(ctx context.Context, oldRSs []
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
 func (dc *DeploymentController) syncDeploymentStatus(ctx context.Context, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
-	newStatus := calculateStatus(allRSs, newRS, d)
+	newStatus := calculateStatus(ctx, allRSs, newRS, d)
 
 	if reflect.DeepEqual(d.Status, newStatus) {
 		return nil
@@ -484,7 +486,8 @@ func (dc *DeploymentController) syncDeploymentStatus(ctx context.Context, allRSs
 }
 
 // calculateStatus calculates the latest status for the provided deployment by looking into the provided replica sets.
-func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployment *apps.Deployment) apps.DeploymentStatus {
+func calculateStatus(ctx context.Context, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployment *apps.Deployment) apps.DeploymentStatus {
+	logger := klog.FromContext(ctx)
 	availableReplicas := deploymentutil.GetAvailableReplicaCountForReplicaSets(allRSs)
 	totalReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 	unavailableReplicas := totalReplicas - availableReplicas
@@ -503,6 +506,13 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: unavailableReplicas,
 		CollisionCount:      deployment.Status.CollisionCount,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		if terminatingReplica, err := deploymentutil.GetTerminatingReplicaCountForReplicaSets(allRSs); err != nil {
+			logger.Error(err, "failed to calculate .status.terminatingReplicas", "deployment", klog.KObj(deployment))
+		} else {
+			status.TerminatingReplicas = terminatingReplica
+		}
 	}
 
 	// Copy conditions one by one so we won't mutate the original object.
