@@ -386,7 +386,7 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 		if replicaCountResult > float64(math.MaxInt32) {
 			replicaCount = math.MaxInt32
 		} else {
-			replicaCount = int32(replicaCountResult)
+			replicaCount = int32(math.Ceil(replicaCountResult))
 		}
 	}
 	usageResult := math.Ceil(float64(usage) / float64(statusReplicas))
