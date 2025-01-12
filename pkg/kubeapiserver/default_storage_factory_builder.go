@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -73,7 +72,6 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		coordination.Resource("leasecandidates").WithVersion("v1alpha2"),
 		networking.Resource("ipaddresses").WithVersion("v1beta1"),
 		networking.Resource("servicecidrs").WithVersion("v1beta1"),
 		admissionregistration.Resource("mutatingadmissionpolicies").WithVersion("v1alpha1"),
