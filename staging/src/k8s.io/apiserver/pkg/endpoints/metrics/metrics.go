@@ -138,8 +138,9 @@ var (
 	)
 	fieldValidationRequestLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Name: "field_validation_request_duration_seconds",
-			Help: "Response latency distribution in seconds for each field validation value",
+			Subsystem: APIServerComponent,
+			Name:      "field_validation_request_duration_seconds",
+			Help:      "Response latency distribution in seconds for each field validation value",
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request durations for the various field validation
 			// values.
