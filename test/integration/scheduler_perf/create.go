@@ -92,21 +92,28 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 		count = *c.Count
 	}
 	for index := 0; index < count; index++ {
-		c.create(tCtx, map[string]any{"Index": index, "Count": count})
+		err := c.create(tCtx, map[string]any{"Index": index, "Count": count}, getSpecFromTextTemplateFile, restMappingFromUnstructuredObj)
+		if err != nil {
+			tCtx.Fatalf("failed to create resource at index %d: %w", index, err)
+		}
 	}
 }
 
-func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
-	var obj *unstructured.Unstructured
-	if err := getSpecFromTextTemplateFile(c.TemplatePath, env, &obj); err != nil {
-		tCtx.Fatalf("%s: parsing failed: %v", c.TemplatePath, err)
+func (c *createAny) create(
+	tCtx ktesting.TContext,
+	env map[string]any,
+	getSpecFunc func(path string, env map[string]any, spec interface{}) error,
+	restMappingFunc func(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error)) error {
+	obj := &unstructured.Unstructured{}
+	if err := getSpecFunc(c.TemplatePath, env, obj); err != nil {
+		return fmt.Errorf("%s: parsing failed: %w", c.TemplatePath, err)
 	}
 
 	// Not caching the discovery result isn't very efficient, but good enough when
 	// createAny isn't done often.
-	mapping, err := restMappingFromUnstructuredObj(tCtx, obj)
+	mapping, err := restMappingFunc(tCtx, obj)
 	if err != nil {
-		tCtx.Fatalf("%s: %v", c.TemplatePath, err)
+		return fmt.Errorf("%s: %w", c.TemplatePath, err)
 	}
 	resourceClient := tCtx.Dynamic().Resource(mapping.Resource)
 
@@ -137,11 +144,14 @@ func (c *createAny) create(tCtx ktesting.TContext, env map[string]any) {
 	for {
 		err := create()
 		if err == nil {
-			return
+			return nil
 		}
 		select {
 		case <-ctx.Done():
-			tCtx.Fatalf("%s: timed out (%q) while creating %q, last error was: %v", c.TemplatePath, context.Cause(ctx), klog.KObj(obj), err)
+			return fmt.Errorf(
+				"%s: timed out (%q) while creating %q, last error was: %v",
+				c.TemplatePath, context.Cause(ctx), obj, err,
+			)
 		case <-time.After(time.Second):
 		}
 	}

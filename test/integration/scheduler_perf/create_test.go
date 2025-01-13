@@ -7,10 +7,13 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	discofake "k8s.io/client-go/discovery/fake"
+	dyfake "k8s.io/client-go/dynamic/fake"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -173,12 +176,146 @@ func TestRequiredNamespaces(t *testing.T) {
 	}
 }
 
-// func TestRun(t *testing.T) {
-// 	testCases := []strunct {
-// 		desc: string,
-// 		want:
-// 	}
-// }
+func TestCreate(t *testing.T) {
+	// モック用の動的クライアントを初期化
+	dynamicClient := dyfake.NewSimpleDynamicClient(runtime.NewScheme())
+
+	// モック用の TContext を初期化
+	tCtx := ktesting.Init(t)
+	tCtx = ktesting.WithClients(tCtx, nil, nil, nil, dynamicClient, nil)
+
+	// テストケース定義
+	testCases := []struct {
+		desc             string
+		templatePath     string
+		namespace        string
+		env              map[string]any
+		getSpecFunc      func(string, map[string]any, interface{}) error
+		restMappingFunc  func(ktesting.TContext, *unstructured.Unstructured) (*meta.RESTMapping, error)
+		expectedErrorMsg string
+	}{
+		{
+			desc:         "getSpecFromTextTemplateFile fails",
+			templatePath: "invalid-template.yaml",
+			getSpecFunc: func(path string, env map[string]any, spec interface{}) error {
+				return fmt.Errorf("failed to parse template: %s", path)
+			},
+			restMappingFunc: func(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
+				return nil, nil
+			},
+			expectedErrorMsg: "parsing failed",
+		},
+		{
+			desc:         "restMappingFromUnstructuredObj fails",
+			templatePath: "hoge.yaml",
+			getSpecFunc: func(path string, env map[string]any, spec interface{}) error {
+				// spec をチェックして初期化
+				u, ok := spec.(*unstructured.Unstructured)
+				if !ok {
+					return fmt.Errorf("spec is not of type *unstructured.Unstructured")
+				}
+				*u = unstructured.Unstructured{} // 明示的に初期化
+				u.SetAPIVersion("v1")
+				u.SetKind("Pod")
+				u.SetName("test-pod")
+				u.SetNamespace("default")
+				return nil
+			},
+			restMappingFunc: func(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
+				return nil, fmt.Errorf("failed to map object: %s", obj.GetKind())
+			},
+			expectedErrorMsg: "failed to map object",
+		},
+		{
+			desc:         "namespace set, scope is root (error case)",
+			templatePath: "valid-template.yaml",
+			namespace:    "default",
+			getSpecFunc: func(path string, env map[string]any, spec interface{}) error {
+				obj := &unstructured.Unstructured{}
+				obj.SetAPIVersion("v1")
+				obj.SetKind("Pod")
+				obj.SetName("test-pod")
+				if u, ok := spec.(*unstructured.Unstructured); ok {
+					*u = *obj
+				}
+				return nil
+			},
+			restMappingFunc: func(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
+				return &meta.RESTMapping{
+					GroupVersionKind: schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+					Resource:         schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"},
+					Scope:            meta.RESTScopeRoot,
+				}, nil
+			},
+			expectedErrorMsg: "namespace \"default\" set for \"valid-template.yaml\", but \"/v1, Kind=Pod\" has scope \"root\"",
+		},
+		{
+			desc:         "namespace not set, scope is namespace (error case)",
+			templatePath: "valid-template.yaml",
+			namespace:    "",
+			getSpecFunc: func(path string, env map[string]any, spec interface{}) error {
+				obj := &unstructured.Unstructured{}
+				obj.SetAPIVersion("v1")
+				obj.SetKind("Pod")
+				obj.SetName("test-pod")
+				if u, ok := spec.(*unstructured.Unstructured); ok {
+					*u = *obj
+				}
+				return nil
+			},
+			restMappingFunc: func(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
+				return &meta.RESTMapping{
+					GroupVersionKind: schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+					Resource:         schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"},
+					Scope:            meta.RESTScopeNamespace,
+				}, nil
+			},
+			expectedErrorMsg: "namespace not set for \"valid-template.yaml\", but \"/v1, Kind=Pod\" has scope \"namespace\"",
+		},
+		{
+			desc:         "success",
+			templatePath: "valid-template.yaml",
+			namespace:    "default",
+			getSpecFunc: func(path string, env map[string]any, spec interface{}) error {
+				obj := &unstructured.Unstructured{}
+				obj.SetAPIVersion("v1")
+				obj.SetKind("Pod")
+				obj.SetName("test-pod")
+				if u, ok := spec.(*unstructured.Unstructured); ok {
+					*u = *obj
+				}
+				return nil
+			},
+			restMappingFunc: func(tCtx ktesting.TContext, obj *unstructured.Unstructured) (*meta.RESTMapping, error) {
+				return &meta.RESTMapping{
+					GroupVersionKind: schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+					Resource:         schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"},
+					Scope:            meta.RESTScopeNamespace,
+				}, nil
+			},
+			expectedErrorMsg: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			op := &createAny{
+				TemplatePath: tc.templatePath,
+				Namespace:    tc.namespace,
+			}
+
+			err := op.create(tCtx, tc.env, tc.getSpecFunc, tc.restMappingFunc)
+
+			if tc.expectedErrorMsg != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedErrorMsg) {
+					t.Errorf("expected error message %q, but got %v", tc.expectedErrorMsg, err)
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
 
 func TestGetSpecFromTextTemplateFile(t *testing.T) {
 	testCases := []struct {
