@@ -278,11 +278,6 @@ run_tests() {
   kubectl apply -f test/e2e/testing-manifests/storage-csi/external-snapshotter/groupsnapshot.storage.k8s.io_volumegroupsnapshotcontents.yaml || exit 1
   kubectl apply -f test/e2e/testing-manifests/storage-csi/external-snapshotter/groupsnapshot.storage.k8s.io_volumegroupsnapshots.yaml || exit 1
 
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml || exit 1
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml || exit 1
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml || exit 1
- 
-
   kubectl apply -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/deploy/kubernetes/snapshot-controller/rbac-snapshot-controller.yaml || exit 1
   curl -s https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/refs/tags/v8.2.0/deploy/kubernetes/snapshot-controller/setup-snapshot-controller.yaml | \
 awk '/--leader-election=true/ {print; print "            - \"--feature-gates=CSIVolumeGroupSnapshot=true\""; next}1' |  \
