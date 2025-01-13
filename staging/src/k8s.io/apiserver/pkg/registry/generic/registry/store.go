@@ -1240,7 +1240,6 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 
 	var items []runtime.Object
 
-	// TODO(wojtek-t): Decide if we don't want to start workers more opportunistically.
 	workersNumber := e.DeleteCollectionWorkers
 	if workersNumber < 1 {
 		workersNumber = 1
