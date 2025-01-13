@@ -8,11 +8,14 @@ resources:
           apiVersion: v2
           name: kms-provider-1
           endpoint: unix:///@provider1.sock
+          timeout: 100ms
       - kms:
           apiVersion: v2
           name: kms-provider-2
           endpoint: unix:///@provider2.sock
+          timeout: 100ms
       - kms:
           apiVersion: v2
           name: kms-provider-3
           endpoint: unix:///@provider2.sock
+          timeout: 100ms
