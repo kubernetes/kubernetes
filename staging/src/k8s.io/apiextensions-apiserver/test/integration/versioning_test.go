@@ -91,6 +91,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 		t.Logf("patch of handler version v1beta1 (non-storage version) should succeed")
 		i := 0
 		err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+			var err error
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 
@@ -115,6 +116,7 @@ func TestInternalVersionIsHandlerVersion(t *testing.T) {
 		i := 0
 		noxuNamespacedResourceClientV1beta2 := newNamespacedCustomResourceVersionedClient(ns, dynamicClient, noxuDefinition, "v1beta2") // use the storage version v1beta2
 		err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+			var err error
 			patch := []byte(fmt.Sprintf(`{"i": %d}`, i))
 			i++
 

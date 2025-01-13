@@ -73,6 +73,7 @@ func TestAPIApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		var err error
 		approvedKubeAPI, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, approvedKubeAPI.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err

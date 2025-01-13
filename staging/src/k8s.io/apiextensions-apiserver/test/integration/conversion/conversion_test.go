@@ -220,6 +220,7 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 
 			// wait until new webhook is called the first time
 			if err := wait.PollUntilContextTimeout(context.Background(), time.Millisecond*100, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
+				var err error
 				_, err = ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(ctx, marker.GetName(), metav1.GetOptions{})
 				select {
 				case <-upCh:
