@@ -374,6 +374,11 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	}
 	usage = 0
 	for _, val := range metrics {
+		// Check for overflow in summation
+		if val > math.MaxInt64-usage {
+			usage = math.MaxInt64
+			break
+		}
 		usage = usage + val
 	}
 
@@ -387,7 +392,6 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 		if replicaCountResult > float64(math.MaxInt32) {
 =======
 	if math.Abs(1.0-usageRatio) > c.tolerance {
-		// Protect against overflow when calculating replica count
 		replicaCountFloat := float64(usage) / float64(targetUsagePerPod)
 		if replicaCountFloat > float64(math.MaxInt32) {
 >>>>>>> eb3340755aa (try now)
@@ -396,15 +400,20 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 			replicaCount = int32(math.Ceil(replicaCountFloat))
 		}
 	}
-	// Protect against overflow when calculating usage
-	if float64(usage) > float64(math.MaxInt64) || float64(usage)/float64(statusReplicas) > float64(math.MaxInt64) {
+	// Handle usage overflow cases
+	if usage == math.MaxInt64 || float64(usage) >= float64(math.MaxInt64) {
+		usage = math.MaxInt64
+		return replicaCount, usage, timestamp, nil
+	}
+	usageFloat := float64(usage) / float64(statusReplicas)
+	if usageFloat >= float64(math.MaxInt64) {
 		usage = math.MaxInt64
 	} else {
-		usageFloat := math.Ceil(float64(usage) / float64(statusReplicas))
-		if usageFloat > float64(math.MaxInt64) {
+		ceiledUsage := math.Ceil(usageFloat)
+		if ceiledUsage >= float64(math.MaxInt64) {
 			usage = math.MaxInt64
 		} else {
-			usage = int64(usageFloat)
+			usage = int64(ceiledUsage)
 		}
 	}
 	return replicaCount, usage, timestamp, nil
