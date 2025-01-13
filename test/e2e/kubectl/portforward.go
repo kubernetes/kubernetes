@@ -612,9 +612,12 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 			ginkgo.By("Check the client error")
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err.Error()).To(gomega.Or(
-				gomega.ContainSubstring("connection reset by peer"),
-				gomega.ContainSubstring("EOF"),
-				gomega.ContainSubstring("context deadline exceeded")))
+				// these two errors indicates remote connection is closed
+				gomega.ContainSubstring("connection reset by peer"), gomega.ContainSubstring("EOF"),
+				// this error indicates timeout when POST-ing data
+				gomega.ContainSubstring("context deadline exceeded"),
+				// this will happen when trying to write to a closed connection
+				gomega.ContainSubstring("write: broken pipe")))
 
 			ginkgo.By("Check kubectl port-forward exit code")
 			gomega.Expect(cmd.cmd.ProcessState.ExitCode()).To(gomega.BeNumerically("<", 0), "kubectl port-forward should finish with non-zero exit code")
