@@ -232,17 +232,6 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			sch.Properties = map[string]apiextensionsv1.JSONSchemaProps{}
 		}
 
-		if ctx.StatusSubresource {
-			sch = &apiextensionsv1.JSONSchemaProps{
-				Type: "object",
-				Properties: map[string]apiextensionsv1.JSONSchemaProps{
-					"status": *sch,
-				},
-			}
-		}
-
-		// sentinel must be in the root level of the schema.
-		// Do not include this in the status schema.
 		uuidString := string(uuid.NewUUID())
 		sentinelName := "__ratcheting_sentinel_field__"
 		sch.Properties[sentinelName] = apiextensionsv1.JSONSchemaProps{
@@ -250,6 +239,15 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			Enum: []apiextensionsv1.JSON{{
 				Raw: []byte(`"` + uuidString + `"`),
 			}},
+		}
+
+		if ctx.StatusSubresource {
+			sch = &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"status": *sch,
+				},
+			}
 		}
 
 		for _, v := range myCRD.Spec.Versions {
@@ -278,12 +276,7 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 				name: "sentinel-resource",
 				patch: map[string]interface{}{
 					sentinelName: fmt.Sprintf("invalid-%d", counter),
-				}}.Do(&ratchetingTestContext{
-				T:                   ctx.T,
-				DynamicClient:       ctx.DynamicClient,
-				APIExtensionsClient: ctx.APIExtensionsClient,
-				StatusSubresource:   false, // Do not carry this over, sentinel check is in the root level.
-			})
+				}}.Do(ctx)
 
 			if err == nil {
 				return false, errors.New("expected error when creating sentinel resource")
