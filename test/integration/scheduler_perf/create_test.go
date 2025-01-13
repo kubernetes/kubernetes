@@ -7,6 +7,12 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	discofake "k8s.io/client-go/discovery/fake"
+	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -231,6 +237,103 @@ func TestGetSpecFromTextTemplateFile(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Fatalf("unexpected error: %v (path=%s)", err, tc.path)
+				}
+			}
+		})
+	}
+}
+
+func TestRestMappingFromUnstructuredObj(t *testing.T) {
+	successResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{
+					Kind:       "Pod",
+					Name:       "pods",
+					Namespaced: true,
+				},
+			},
+		},
+	}
+
+	clientset := fakeclientset.NewSimpleClientset()
+
+	fakeDisco, ok := clientset.Discovery().(*discofake.FakeDiscovery)
+	if !ok {
+		t.Fatalf("unable to cast Discovery() to *discofake.FakeDiscovery")
+	}
+	fakeDisco.Fake.Resources = successResources
+
+	tCtx := ktesting.Init(t)
+	tCtx = ktesting.WithClients(tCtx, nil, nil, clientset, nil, nil)
+
+	// テストケース定義
+	testCases := []struct {
+		name        string
+		obj         *unstructured.Unstructured
+		wantErr     bool
+		wantErrMsg  string
+		wantMapping *schema.GroupVersionResource
+	}{
+		{
+			name: "Invalid API version",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "hoge/hoge/hoge",
+					"kind":       "Pod",
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "extract group+version",
+		},
+		{
+			name: "Unknown GVK",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+				},
+			},
+			wantErr:    true,
+			wantErrMsg: "failed mapping",
+		},
+		{
+			name: "Success mapping for Pod",
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+				},
+			},
+			wantErr: false,
+			wantMapping: &schema.GroupVersionResource{
+				Group:    "",
+				Version:  "v1",
+				Resource: "pods",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mapping, err := restMappingFromUnstructuredObj(tCtx, tc.obj)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error but got none (name=%s)", tc.name)
+				}
+				if tc.wantErrMsg != "" && !strings.Contains(err.Error(), tc.wantErrMsg) {
+					t.Errorf("expected error message to contain %q, but got %q", tc.wantErrMsg, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v (name=%s)", err, tc.name)
+			}
+
+			if tc.wantMapping != nil {
+				if !reflect.DeepEqual(mapping.Resource, *tc.wantMapping) {
+					t.Errorf("got mapping.Resource = %v, want %v", mapping.Resource, *tc.wantMapping)
 				}
 			}
 		})
