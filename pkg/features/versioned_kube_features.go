@@ -368,12 +368,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	genericfeatures.WatchBookmark: {
-		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.17"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	genericfeatures.WatchCacheInitializationPostStartHook: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 	},
