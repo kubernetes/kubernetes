@@ -181,4 +181,4 @@ google.golang.org/appengine v1.6.7 h1:FZR1q0exgwxzPzp/aF+VccGrSfxfPpkBqjIIEq3ru6
 gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=
 gotest.tools/v3 v3.0.2 h1:kG1BFyqVHuQoVQiR1bWGnfz/fmHvvuiSPIV7rvl360E=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc h1:/hemPrYIhOhy8zYrNj+069zDB68us2sMGsfkFJO0iZs=
-sigs.k8s.io/kustomize/cmd/config v0.15.0 h1:WkdY8V2+8J+W00YbImXa2ke9oegfrHH79e+kywW7EdU=
+sigs.k8s.io/kustomize/cmd/config v0.19.0 h1:D3uASwjHWHmNiEHu3pPJBJMBIsb+auFvHrHql3HAarU=
