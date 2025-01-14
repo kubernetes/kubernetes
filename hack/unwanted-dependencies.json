@@ -10,6 +10,7 @@
       "github.com/GoogleCloudPlatform/k8s-cloud-provider": "cloud dependency",
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
+      "github.com/asaskevich/govalidator": "see https://github.com/kubernetes/kubernetes/issues/128573",
       "github.com/bketelsen/crypt": "unused, crypto",
       "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
       "github.com/davecgh/go-spew": "refer to #103942",
