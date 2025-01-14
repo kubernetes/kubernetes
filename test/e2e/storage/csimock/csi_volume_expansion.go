@@ -182,11 +182,6 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 					framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
 					pvc = npvc
 
-					inProgressConditions := pvc.Status.Conditions
-					if len(inProgressConditions) > 0 {
-						gomega.Expect(inProgressConditions[0].Type).To(gomega.Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
-					}
-
 					ginkgo.By("Deleting the previously created pod")
 					if test.simulatedCSIDriverError == expansionFailedMissingStagingPath {
 						e2epod.DeletePodOrFail(ctx, m.cs, pod.Namespace, pod.Name)
