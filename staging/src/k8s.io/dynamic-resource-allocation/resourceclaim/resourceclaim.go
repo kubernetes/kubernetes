@@ -30,6 +30,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
 
 var (
@@ -105,4 +107,16 @@ func IsReservedForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
 func CanBeReserved(claim *resourceapi.ResourceClaim) bool {
 	// Currently no restrictions on sharing...
 	return true
+}
+
+func ConvertV1alpha4ClaimToV1beta1Claim(claims []*drapbv1alpha4.Claim) []*drapbv1beta1.Claim {
+	var rc []*drapbv1beta1.Claim
+	for _, claim := range claims {
+		rc = append(rc, &drapbv1beta1.Claim{
+			Namespace: claim.GetNamespace(),
+			Name:      claim.GetName(),
+			UID:       claim.GetUID(),
+		})
+	}
+	return rc
 }

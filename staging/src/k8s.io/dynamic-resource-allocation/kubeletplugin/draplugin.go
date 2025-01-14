@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -71,6 +72,10 @@ type DRAPlugin interface {
 	// without causing an API break of the package
 	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
 	internal()
+}
+
+type DRADriverWithCheck interface {
+	CheckDeviceAllocation(ctx context.Context, claims []*drapbv1beta1.Claim) (map[string]*drapbv1beta1.NodePrepareResourceResponse, error)
 }
 
 // Option implements the functional options pattern for Start.
@@ -334,6 +339,33 @@ func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (resu
 			d.Stop()
 		}
 	}()
+
+	for _, nodeServer := range nodeServers {
+		if _, ok := nodeServer.(DRADriverWithCheck); !ok {
+			return nil, errors.New("dra driver should implement DRADriverWithCheck interface")
+		}
+	}
+
+	for _, nodeServer := range nodeServers {
+		o.unaryInterceptors = append(o.unaryInterceptors, func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+			driver, _ := nodeServer.(DRADriverWithCheck)
+			if info.FullMethod != "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodePrepareResources" && info.FullMethod != "/v1alpha3.Node/NodePrepareResources" {
+				return handler(ctx, req)
+			}
+			var claims []*drapbv1beta1.Claim
+			if info.FullMethod == "/k8s.io.kubelet.pkg.apis.dra.v1beta1.DRAPlugin/NodePrepareResources" {
+				claims = req.(drapbv1beta1.NodePrepareResourcesRequest).Claims
+			} else if info.FullMethod == "/v1alpha3.Node/NodePrepareResources" {
+				claims = resourceclaim.ConvertV1alpha4ClaimToV1beta1Claim(req.(drapbv1alpha4.NodePrepareResourcesRequest).Claims)
+			}
+			allocatedClaims, checkErr := driver.CheckDeviceAllocation(ctx, claims)
+			if checkErr != nil {
+				return resp, err
+			}
+			ctx = context.WithValue(ctx, "allocatedClaims", allocatedClaims)
+			return handler(ctx, req)
+		})
+	}
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	var supportedServices []string

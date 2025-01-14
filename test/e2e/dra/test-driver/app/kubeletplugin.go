@@ -40,7 +40,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
 
@@ -172,8 +171,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	// The options are a bit redundant now because a single instance cannot
 	// implement both, but that might be different in the future.
 	nodeServers := []any{
-		drapb.DRAPluginServer(ex), // Casting is done only for clarity here, it's not needed.
-		drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: ex},
+		ex, // Casting is done only for clarity here, it's not needed.
 	}
 	d, err := kubeletplugin.Start(ctx, nodeServers, opts...)
 	if err != nil {
@@ -432,12 +430,17 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapb.No
 	resp := &drapb.NodePrepareResourcesResponse{
 		Claims: make(map[string]*drapb.NodePrepareResourceResponse),
 	}
+	allocatedClaims := ctx.Value("allocatedClaims").(map[string]*drapb.NodePrepareResourceResponse)
 
 	if failure := ex.getPrepareResourcesFailure(); failure != nil {
 		return resp, failure
 	}
 
 	for _, claimReq := range req.Claims {
+		if res, ok := allocatedClaims[claimReq.UID]; ok {
+			resp.Claims[claimReq.UID] = res
+			continue
+		}
 		devices, err := ex.nodePrepareResource(ctx, claimReq)
 		if err != nil {
 			resp.Claims[claimReq.UID] = &drapb.NodePrepareResourceResponse{
@@ -458,6 +461,44 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapb.No
 		}
 	}
 	return resp, nil
+}
+
+func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*drapb.Claim) (map[string]*drapb.NodePrepareResourceResponse, error) {
+	allocatedClaims := make(map[string]*drapb.NodePrepareResourceResponse)
+	for _, claimReq := range claims {
+		claim, err := ex.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
+		}
+		if claim.Status.Allocation == nil {
+			return nil, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
+		}
+		if claim.UID != types.UID(claimReq.UID) {
+			return nil, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
+		}
+
+		ex.mutex.Lock()
+		defer ex.mutex.Unlock()
+		ex.blockPrepareResourcesMutex.Lock()
+		defer ex.blockPrepareResourcesMutex.Unlock()
+
+		claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+		if devices, ok := ex.prepared[claimID]; ok {
+			// Idempotent call, nothing to do.
+			r := &drapb.NodePrepareResourceResponse{}
+			for _, device := range devices {
+				pbDevice := &drapb.Device{
+					PoolName:     device.PoolName,
+					DeviceName:   device.DeviceName,
+					RequestNames: []string{device.RequestName},
+					CDIDeviceIDs: []string{device.CDIDeviceID},
+				}
+				r.Devices = append(r.Devices, pbDevice)
+			}
+			allocatedClaims[claimReq.UID] = r
+		}
+	}
+	return allocatedClaims, nil
 }
 
 // NodeUnprepareResource removes the CDI file created by
