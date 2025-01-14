@@ -163,6 +163,7 @@ type Proxier struct {
 	// updating nftables with some partial data after kube-proxy restart.
 	endpointSlicesSynced bool
 	servicesSynced       bool
+	lastFullSync         time.Time
 	needFullSync         bool
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
@@ -281,7 +282,7 @@ func NewProxier(ctx context.Context,
 	burstSyncs := 2
 	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
 	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner. time.Hour is arbitrary.
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, time.Hour, burstSyncs)
+	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, proxyutil.FullSyncPeriod, burstSyncs)
 
 	return proxier, nil
 }
@@ -1167,19 +1168,18 @@ func (proxier *Proxier) syncProxyRules() {
 		return
 	}
 
+	// Keep track of how long syncs take.
+	start := time.Now()
+
 	//
 	// Below this point we will not return until we try to write the nftables rules.
 	//
 
-	// The value of proxier.needFullSync may change before the defer funcs run, so
-	// we need to keep track of whether it was set at the *start* of the sync.
-	tryPartialSync := !proxier.needFullSync
+	doFullSync := proxier.needFullSync || (time.Since(proxier.lastFullSync) > proxyutil.FullSyncPeriod)
 
-	// Keep track of how long syncs take.
-	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
-		if tryPartialSync {
+		if !doFullSync {
 			metrics.SyncPartialProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
 		} else {
 			metrics.SyncFullProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
@@ -1190,7 +1190,7 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
-	proxier.logger.V(2).Info("Syncing nftables rules")
+	proxier.logger.V(2).Info("Syncing nftables rules", "fullSync", doFullSync)
 
 	success := false
 	defer func() {
@@ -1201,6 +1201,8 @@ func (proxier *Proxier) syncProxyRules() {
 			// been flushed, so we've lost the state needed to be able to do
 			// a partial sync.
 			proxier.needFullSync = true
+		} else if doFullSync {
+			proxier.lastFullSync = time.Now()
 		}
 	}()
 
@@ -1228,7 +1230,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// (with a later timestamp) at the end of the sync.
 				proxier.logger.Error(err, "Unable to delete stale chains; will retry later")
 				metrics.NFTablesCleanupFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
-				tryPartialSync = false
+				doFullSync = true
 
 				// Log failed transaction and list full kube-proxy table.
 				proxier.logFailure(tx)
@@ -1238,7 +1240,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Now start the actual syncing transaction
 	tx := proxier.nftables.NewTransaction()
-	if !tryPartialSync {
+	if doFullSync {
 		proxier.setupNFTables(tx)
 	}
 
@@ -1286,7 +1288,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// skipServiceUpdate is used for all service-related chains and their elements.
 		// If no changes were done to the service or its endpoints, these objects may be skipped.
-		skipServiceUpdate := tryPartialSync &&
+		skipServiceUpdate := !doFullSync &&
 			!serviceUpdateResult.UpdatedServices.Has(svcName.NamespacedName) &&
 			!endpointUpdateResult.UpdatedServices.Has(svcName.NamespacedName)
 
