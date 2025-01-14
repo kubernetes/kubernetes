@@ -53,14 +53,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -179,18 +177,18 @@ func NewNFSServerWithNodeName(ctx context.Context, cs clientset.Interface, names
 // Restart the passed-in nfs-server by issuing a `rpc.nfsd 1` command in the
 // pod's (only) container. This command changes the number of nfs server threads from
 // (presumably) zero back to 1, and therefore allows nfs to open connections again.
-func RestartNFSServer(f *framework.Framework, serverPod *v1.Pod) {
+func RestartNFSServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
 	const startcmd = "rpc.nfsd 1"
-	_, _, err := PodExec(f, serverPod, startcmd)
+	_, _, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, serverPod.Name, startcmd)
 	framework.ExpectNoError(err)
 }
 
 // Stop the passed-in nfs-server by issuing a `rpc.nfsd 0` command in the
 // pod's (only) container. This command changes the number of nfs server threads to 0,
 // thus closing all open nfs connections.
-func StopNFSServer(f *framework.Framework, serverPod *v1.Pod) {
+func StopNFSServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
 	const stopcmd = "rpc.nfsd 0 && for i in $(seq 200); do rpcinfo -p | grep -q nfs || break; sleep 1; done"
-	_, _, err := PodExec(f, serverPod, stopcmd)
+	_, _, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, serverPod.Name, stopcmd)
 	framework.ExpectNoError(err)
 }
 
@@ -501,7 +499,7 @@ func runVolumeTesterPod(ctx context.Context, client clientset.Interface, timeout
 	return clientPod, nil
 }
 
-func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string, fsGroup *int64, fsType string, tests []Test) {
+func testVolumeContent(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		if test.Mode == v1.PersistentVolumeBlock {
@@ -512,7 +510,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
-			CheckVolumeModeOfPath(f, pod, test.Mode, deviceName)
+			CheckVolumeModeOfPath(ctx, f, pod, test.Mode, deviceName)
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
@@ -522,7 +520,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string
 
 			// Check that a directory has been mounted
 			dirName := filepath.Dir(fileName)
-			CheckVolumeModeOfPath(f, pod, test.Mode, dirName)
+			CheckVolumeModeOfPath(ctx, f, pod, test.Mode, dirName)
 
 			if !framework.NodeOSDistroIs("windows") {
 				// Filesystem: check fsgroup
@@ -576,7 +574,7 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, clientPod.Name, clientPod.Namespace, timeouts.PodDelete))
 	}()
 
-	testVolumeContent(f, clientPod, "", fsGroup, fsType, tests)
+	testVolumeContent(ctx, f, clientPod, "", fsGroup, fsType, tests)
 
 	ginkgo.By("Repeating the test on an ephemeral container (if enabled)")
 	ec := &v1.EphemeralContainer{
@@ -587,7 +585,7 @@ func testVolumeClient(ctx context.Context, f *framework.Framework, config TestCo
 	err = e2epod.NewPodClient(f).AddEphemeralContainerSync(ctx, clientPod, ec, timeouts.PodStart)
 	// The API server will return NotFound for the subresource when the feature is disabled
 	framework.ExpectNoError(err, "failed to add ephemeral container for re-test")
-	testVolumeContent(f, clientPod, ec.Name, fsGroup, fsType, tests)
+	testVolumeContent(ctx, f, clientPod, ec.Name, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
@@ -630,7 +628,7 @@ func InjectContent(ctx context.Context, f *framework.Framework, config TestConfi
 
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
-	testVolumeContent(f, injectorPod, "", fsGroup, fsType, tests)
+	testVolumeContent(ctx, f, injectorPod, "", fsGroup, fsType, tests)
 }
 
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
@@ -665,64 +663,18 @@ func generateWriteFileCmd(content, fullPath string) []string {
 }
 
 // CheckVolumeModeOfPath check mode of volume
-func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+func CheckVolumeModeOfPath(ctx context.Context, f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
 	if volMode == v1.PersistentVolumeBlock {
 		// Check if block exists
-		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -b %s", path))
+		e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("test -b %s", path))
 
 		// Double check that it's not directory
-		VerifyExecInPodFail(f, pod, fmt.Sprintf("test -d %s", path), 1)
+		e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("test -d %s", path), 1)
 	} else {
 		// Check if directory exists
-		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -d %s", path))
+		e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("test -d %s", path))
 
 		// Double check that it's not block
-		VerifyExecInPodFail(f, pod, fmt.Sprintf("test -b %s", path), 1)
+		e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("test -b %s", path), 1)
 	}
-}
-
-// PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
-// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
-// is resolved. Otherwise there will be dependency issue.
-func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
-	return e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
-}
-
-// VerifyExecInPodSucceed verifies shell cmd in target pod succeed
-// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
-// is resolved. Otherwise there will be dependency issue.
-func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
-	stdout, stderr, err := PodExec(f, pod, shExec)
-	if err != nil {
-		if exiterr, ok := err.(uexec.CodeExitError); ok {
-			exitCode := exiterr.ExitStatus()
-			framework.ExpectNoError(err,
-				"%q should succeed, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
-				shExec, exitCode, exiterr, stdout, stderr)
-		} else {
-			framework.ExpectNoError(err,
-				"%q should succeed, but failed with error message %q\nstdout: %s\nstderr: %s",
-				shExec, err, stdout, stderr)
-		}
-	}
-}
-
-// VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
-// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
-// is resolved. Otherwise there will be dependency issue.
-func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
-	stdout, stderr, err := PodExec(f, pod, shExec)
-	if err != nil {
-		if exiterr, ok := err.(clientexec.ExitError); ok {
-			actualExitCode := exiterr.ExitStatus()
-			gomega.Expect(actualExitCode).To(gomega.Equal(exitCode),
-				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
-				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
-		} else {
-			framework.ExpectNoError(err,
-				"%q should fail with exit code %d, but failed with error message %q\nstdout: %s\nstderr: %s",
-				shExec, exitCode, err, stdout, stderr)
-		}
-	}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }
