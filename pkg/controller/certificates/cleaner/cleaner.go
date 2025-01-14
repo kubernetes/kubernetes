@@ -176,7 +176,7 @@ func isIssuedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	return false
 }
 
-// isOlderThan checks that t is a non-zero time after time.Now() - d.
+// isOlderThan checks that t is a non-zero and older than d from time.Now().
 func isOlderThan(t metav1.Time, d time.Duration) bool {
 	return !t.IsZero() && time.Until(t.Time) < -1*d
 }
