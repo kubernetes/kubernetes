@@ -178,10 +178,7 @@
         "google.golang.org/genproto",
         "google.golang.org/grpc",
         "google.golang.org/protobuf",
-        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client",
-        "sigs.k8s.io/kustomize/api",
-        "sigs.k8s.io/kustomize/kustomize/v5",
-        "sigs.k8s.io/kustomize/kyaml"
+        "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go",
@@ -194,7 +191,6 @@
         "k8s.io/kube-openapi",
         "k8s.io/kubernetes",
         "k8s.io/sample-apiserver",
-        "sigs.k8s.io/kustomize/kyaml",
         "sigs.k8s.io/structured-merge-diff/v4"
       ],
       "github.com/google/shlex": [

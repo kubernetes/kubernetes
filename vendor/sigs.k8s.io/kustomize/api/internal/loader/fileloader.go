@@ -169,7 +169,7 @@ func (fl *FileLoader) New(path string) (ifc.Loader, error) {
 	}
 	root, err := filesys.ConfirmDir(fl.fSys, fl.root.Join(path))
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, ErrRtNotDir.Error())
+		return nil, errors.WrapPrefixf(err, ErrRtNotDir.Error()) //nolint:govet
 	}
 	if err = fl.errIfGitContainmentViolation(root); err != nil {
 		return nil, err
