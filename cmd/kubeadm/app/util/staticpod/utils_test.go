@@ -21,9 +21,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -687,6 +690,88 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 					(actualErr != nil),
 					actualErr,
 				)
+			}
+		})
+	}
+}
+
+func TestReadMultipleStaticPodsFromDisk(t *testing.T) {
+	getTestPod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: "v1",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		}
+	}
+
+	testCases := []struct {
+		name                  string
+		setup                 func(dir string)
+		components            []string
+		expected              []*v1.Pod
+		expectedErrorContains []string
+	}{
+		{
+			name: "valid: all pods are written and read",
+			setup: func(dir string) {
+				var pod *v1.Pod
+				pod = getTestPod("a")
+				_ = WriteStaticPodToDisk(kubeadmconstants.KubeAPIServer, dir, *pod)
+				pod = getTestPod("b")
+				_ = WriteStaticPodToDisk(kubeadmconstants.KubeControllerManager, dir, *pod)
+				pod = getTestPod("c")
+				_ = WriteStaticPodToDisk(kubeadmconstants.KubeScheduler, dir, *pod)
+			},
+			components: kubeadmconstants.ControlPlaneComponents,
+			expected: []*v1.Pod{
+				getTestPod("a"),
+				getTestPod("b"),
+				getTestPod("c"),
+			},
+		},
+		{
+			name:       "invalid: all pods returned errors",
+			setup:      func(dir string) {},
+			components: kubeadmconstants.ControlPlaneComponents,
+			expectedErrorContains: []string{
+				"kube-apiserver.yaml: no such file or directory",
+				"kube-controller-manager.yaml: no such file or directory",
+				"kube-scheduler.yaml: no such file or directory",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tc.setup(dir)
+			m, err := ReadMultipleStaticPodsFromDisk(dir, tc.components...)
+			if err != nil {
+				for _, ec := range tc.expectedErrorContains {
+					if !strings.Contains(err.Error(), ec) {
+						t.Fatalf("expected error to contain string: %s\nerror:\n%v", ec, err)
+					}
+				}
+			}
+
+			// Compare sorted result to expected result.
+			var actual []*v1.Pod
+			for _, v := range m {
+				actual = append(actual, v)
+			}
+			sort.Slice(actual, func(a, b int) bool {
+				return actual[a].Name < actual[b].Name
+			})
+			sort.Slice(tc.expected, func(a, b int) bool {
+				return actual[a].Name < actual[b].Name
+			})
+
+			if diff := cmp.Diff(tc.expected, actual); diff != "" {
+				t.Fatalf("unexpected difference (-want,+got):\n%s", diff)
 			}
 		})
 	}
