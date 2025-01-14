@@ -40,6 +40,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -135,12 +136,6 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	var tokenGenerator serviceaccount.TokenGenerator
 
 	tCtx := ktesting.Init(t)
-
-	// Enable the node token improvements feature gates prior to starting the apiserver, as the node getter is
-	// conditionally passed to the service account token generator based on feature enablement.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenPodNodeInfo, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBindingValidation, true)
 
 	// Start the server
 	var serverAddress string
@@ -475,7 +470,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	t.Run("bound to service account and a pod with an assigned nodeName", testPodWithAssignedNode(node))
 
 	t.Run("fails to bind to a Node if the feature gate is disabled", func(t *testing.T) {
-		// Disable node binding
+		// Disable node binding, emulating 1.32
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParseMajorMinor("1.32"))
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, false)
 
 		// Create ServiceAccount and Node objects

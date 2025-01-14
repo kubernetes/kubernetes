@@ -29,10 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func init() {
@@ -88,8 +85,6 @@ func TestClaims(t *testing.T) {
 		// desired
 		sc *jwt.Claims
 		pc *privateClaims
-
-		featureNodeBinding bool
 	}{
 		{
 			// pod and secret
@@ -197,21 +192,9 @@ func TestClaims(t *testing.T) {
 			},
 		},
 		{
-			// node with feature gate disabled
-			sa:   sa,
-			node: node,
-			// really fast
-			exp: 0,
-			// nil audience
-			aud: nil,
-			err: "token bound to Node object requested, but \"ServiceAccountTokenNodeBinding\" feature gate is disabled",
-		},
-		{
 			// node alone
 			sa:   sa,
 			node: node,
-			// enable node binding feature
-			featureNodeBinding: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -263,8 +246,6 @@ func TestClaims(t *testing.T) {
 			sa:   sa,
 			sec:  sec,
 			node: node,
-			// enable embedding node info feature
-			featureNodeBinding: true,
 			// really fast
 			exp: 0,
 			// nil audience
@@ -293,18 +274,6 @@ func TestClaims(t *testing.T) {
 				},
 			},
 		},
-		{
-			// ensure it fails if node binding gate is disabled
-			sa:                 sa,
-			node:               node,
-			featureNodeBinding: false,
-			// really fast
-			exp: 0,
-			// nil audience
-			aud: nil,
-
-			err: "token bound to Node object requested, but \"ServiceAccountTokenNodeBinding\" feature gate is disabled",
-		},
 	}
 	for i, c := range cs {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
@@ -318,9 +287,6 @@ func TestClaims(t *testing.T) {
 				}
 				return string(b)
 			}
-
-			// set feature flags for the duration of the test case
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAccountTokenNodeBinding, c.featureNodeBinding)
 
 			sc, pc, err := Claims(c.sa, c.pod, c.sec, c.node, c.exp, c.warnafter, c.aud)
 			if err != nil && err.Error() != c.err {
