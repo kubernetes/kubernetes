@@ -213,4 +213,3 @@ func TestCELReservedSymbolsNoDoubleUnderscore(t *testing.T) {
 		}
 	}
 }
-
