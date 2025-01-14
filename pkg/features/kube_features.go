@@ -524,7 +524,8 @@ const (
 	// alpha: v1.27
 	// beta: v1.30
 	//
-	// Enables querying logs of node services using the /logs endpoint
+	// Enables querying logs of node services using the /logs endpoint. Enabling this feature has security implications.
+	// The recommendation is to enable it on a need basis for debugging purposes and disabling otherwise.
 	NodeLogQuery featuregate.Feature = "NodeLogQuery"
 
 	// owner: @xing-yang @sonasingh46
