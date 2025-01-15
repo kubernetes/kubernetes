@@ -22,6 +22,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// We are deprecating this.
+// These features will be kept around for a short period so we can switch over test-infra to use WithFeature.
 var (
 	// Please keep the list in alphabetical order.
 
@@ -41,6 +43,7 @@ var (
 	DownwardAPIHugePages = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DownwardAPIHugePages"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// not used anywhere
 	DynamicResourceAllocation = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("DynamicResourceAllocation"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)

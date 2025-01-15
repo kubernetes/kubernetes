@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -40,7 +41,7 @@ import (
 
 // Run this single test locally using a running CRI-O instance by:
 // make test-e2e-node CONTAINER_RUNTIME_ENDPOINT="unix:///var/run/crio/crio.sock" TEST_ARGS='--ginkgo.focus="ImageVolume" --feature-gates=ImageVolume=true --service-feature-gates=ImageVolume=true --kubelet-flags="--cgroup-root=/ --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service --fail-swap-on=false"'
-var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, func() {
+var _ = SIGDescribe("ImageVolume", nodefeature.ImageVolume, feature.ImageVolume, func() {
 	f := framework.NewDefaultFramework("image-volume-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

@@ -27,6 +27,7 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
@@ -44,7 +45,7 @@ const (
 	bestEffortPodName = "best-effort"
 )
 
-var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisruptive(), nodefeature.CriticalPod, func() {
+var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisruptive(), nodefeature.CriticalPod, feature.CriticalPod, func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {

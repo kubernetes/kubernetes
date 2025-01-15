@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/test/e2e/feature"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -56,7 +57,7 @@ var (
 	noLimits *resource.Quantity = nil
 )
 
-var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, framework.WithSerial(), func() {
+var _ = SIGDescribe("Swap", "[LinuxOnly]", nodefeature.Swap, feature.Swap, framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("swap-qos")
 	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
