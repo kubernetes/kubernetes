@@ -24,13 +24,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gregjones/httpcache"
+	"github.com/gohugoio/httpcache"
 	"github.com/peterbourgon/diskv"
 	"k8s.io/klog/v2"
 )
 
 type cacheRoundTripper struct {
 	rt *httpcache.Transport
+}
+
+func NewTransport(c httpcache.Cache) *httpcache.Transport {
+	return &httpcache.Transport{Cache: c, MarkCachedResponses: true}
 }
 
 // newCacheRoundTripper creates a roundtripper that reads the ETag on
@@ -43,7 +47,7 @@ func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripp
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})
-	t := httpcache.NewTransport(&sumDiskCache{disk: d})
+	t := NewTransport(&sumDiskCache{disk: d})
 	t.Transport = rt
 
 	return &cacheRoundTripper{rt: t}
