@@ -92,7 +92,7 @@ var _ = SIGDescribe("Swap", "[LinuxOnly]", ginkgo.Ordered, nodefeature.Swap, fea
 
 		framework.Logf("Swap is reset. Used swap bytes (should be near 0): %d", usedSwapBytes)
 
-		secondsToSleep := 5
+		secondsToSleep := 3
 		ginkgo.By(fmt.Sprintf("Sleeping for %d seconds to allow swap to settle", secondsToSleep))
 		time.Sleep(time.Duration(secondsToSleep) * time.Second)
 	})
