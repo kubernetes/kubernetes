@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -26,6 +28,11 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+
+	// These flags are used to pull in the default values to test context - required
+	// so tests run correctly, even if the underlying flags aren't used.
+	framework.RegisterCommonFlags(flag.CommandLine)
+	framework.RegisterClusterFlags(flag.CommandLine)
 
 	// Get version info from kube
 	kubeVersion := version.Get()

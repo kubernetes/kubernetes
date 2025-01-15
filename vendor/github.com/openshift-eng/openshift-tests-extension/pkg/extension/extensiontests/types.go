@@ -38,6 +38,9 @@ type ExtensionTestSpec struct {
 	// Tests must not remain informing forever.
 	Lifecycle Lifecycle `json:"lifecycle"`
 
+	// EnvironmentSelector allows for CEL expressions to be used to control test inclusion
+	EnvironmentSelector EnvironmentSelector `json:"environmentSelector,omitempty"`
+
 	// Run invokes a test
 	Run func() *ExtensionTestResult `json:"-"`
 
@@ -58,6 +61,15 @@ type Resources struct {
 type Isolation struct {
 	Mode     string   `json:"mode,omitempty"`
 	Conflict []string `json:"conflict,omitempty"`
+}
+
+type EnvironmentSelector struct {
+	Include string `json:"include,omitempty"`
+	Exclude string `json:"exclude,omitempty"`
+}
+
+func (e EnvironmentSelector) IsEmpty() bool {
+	return e.Include == "" && e.Exclude == ""
 }
 
 type ExtensionTestResults []*ExtensionTestResult
