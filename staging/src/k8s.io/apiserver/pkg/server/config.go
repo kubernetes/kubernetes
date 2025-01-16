@@ -574,13 +574,27 @@ type CompletedConfig struct {
 func (c *Config) AddHealthChecks(healthChecks ...healthz.HealthChecker) {
 	c.HealthzChecks = append(c.HealthzChecks, healthChecks...)
 	c.LivezChecks = append(c.LivezChecks, healthChecks...)
-	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
+	c.AddReadyzChecks(healthChecks...)
 }
 
 // AddReadyzChecks adds a health check to our config to be exposed by the readyz endpoint
 // of our configured apiserver.
 func (c *Config) AddReadyzChecks(healthChecks ...healthz.HealthChecker) {
-	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
+	// Info(ingvagabund): Explicitly exclude etcd and etcd-readiness checks (OCPBUGS-48177)
+	// and have etcd operator take responsibility for properly reporting etcd readiness.
+	// Justification: kube-apiserver instances get removed from a load balancer when etcd starts
+	// to report not ready (as will KA's /readyz). Client connections can withstand etcd unreadiness
+	// longer than the readiness timeout is. Thus, it is not necessary to drop connections
+	// in case etcd resumes its readiness before a client connection times out naturally.
+	// This is a downstream patch only as OpenShift's way of using etcd is unique.
+	readyzChecks := []healthz.HealthChecker{}
+	for _, check := range healthChecks {
+		if check.Name() == "etcd" || check.Name() == "etcd-readiness" {
+			continue
+		}
+		readyzChecks = append(readyzChecks, check)
+	}
+	c.ReadyzChecks = append(c.ReadyzChecks, readyzChecks...)
 }
 
 // AddPostStartHook allows you to add a PostStartHook that will later be added to the server itself in a New call.
