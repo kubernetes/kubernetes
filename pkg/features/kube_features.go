@@ -68,7 +68,7 @@ const (
 	AppArmorFields featuregate.Feature = "AppArmorFields"
 
 	// owner: @liggitt
-	// kep:
+	// kep: https://kep.k8s.io/4601
 	//
 	// Make the Node authorizer use fine-grained selector authorization.
 	// Requires AuthorizeWithSelectors to be enabled.
