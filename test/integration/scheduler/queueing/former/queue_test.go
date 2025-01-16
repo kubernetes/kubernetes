@@ -17,6 +17,7 @@ limitations under the License.
 package queueing
 
 import (
+	"strings"
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -35,7 +36,7 @@ func TestCoreResourceEnqueueWithQueueingHints(t *testing.T) {
 		}
 		// Note: if EnableSchedulingQueueHint is nil, we assume the test should be run both with/without the feature gate.
 
-		t.Run(tt.Name, func(t *testing.T) {
+		t.Run(strings.Join(append(tt.EnablePlugins, tt.Name), "/"), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
 			queueing.RunTestCoreResourceEnqueue(t, tt)
 		})
