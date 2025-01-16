@@ -266,7 +266,7 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 
 	// Call down into the policy to assign this container memory if required.
 	if err := m.policy.Allocate(m.state, pod, container); err != nil {
-		klog.ErrorS(err, "Allocate error")
+		klog.ErrorS(err, "Allocate error", "pod", klog.KObj(pod), "containerName", container.Name)
 		return err
 	}
 	return nil
