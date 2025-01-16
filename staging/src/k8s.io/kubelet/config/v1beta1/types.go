@@ -530,6 +530,7 @@ type KubeletConfiguration struct {
 	EvictionSoftGracePeriod map[string]string `json:"evictionSoftGracePeriod,omitempty"`
 	// evictionPressureTransitionPeriod is the duration for which the kubelet has to wait
 	// before transitioning out of an eviction pressure condition.
+	// A duration of 0s will be converted to the default value of 5m
 	// Default: "5m"
 	// +optional
 	EvictionPressureTransitionPeriod metav1.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
