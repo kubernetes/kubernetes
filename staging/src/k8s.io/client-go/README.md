@@ -75,14 +75,14 @@ We will backport bugfixes--but not new features--into older versions of
 
 #### Compatibility matrix
 
-|                               | Kubernetes 1.23 | Kubernetes 1.24 | Kubernetes 1.25 | Kubernetes 1.26 | Kubernetes 1.27 | Kubernetes 1.28 |
+|                               | Kubernetes 1.27 | Kubernetes 1.28 | Kubernetes 1.29 | Kubernetes 1.30 | Kubernetes 1.31 | Kubernetes 1.32 |
 | ----------------------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
-| `kubernetes-1.23.0`/`v0.23.0` | ✓               | +-              | +-              | +-              | +-              | +-              |
-| `kubernetes-1.24.0`/`v0.24.0` | +-              | ✓               | +-              | +-              | +-              | +-              |
-| `kubernetes-1.25.0`/`v0.25.0` | +-              | +-              | ✓               | +-              | +-              | +-              |
-| `kubernetes-1.26.0`/`v0.26.0` | +-              | +-              | +-              | ✓               | +-              | +-              |
-| `kubernetes-1.27.0`/`v0.27.0` | +-              | +-              | +-              | +-              | ✓               | +-              |
-| `kubernetes-1.28.0`/`v0.28.0` | +-              | +-              | +-              | +-              | +-              | ✓               |
+| `kubernetes-1.27.0`/`v0.27.0` | ✓               | +-              | +-              | +-              | +-              | +-              |
+| `kubernetes-1.28.0`/`v0.28.0` | +-              | ✓               | +-              | +-              | +-              | +-              |
+| `kubernetes-1.29.0`/`v0.29.0` | +-              | +-              | ✓               | +-              | +-              | +-              |
+| `kubernetes-1.30.0`/`v0.30.0` | +-              | +-              | +-              | ✓               | +-              | +-              |
+| `kubernetes-1.31.0`/`v0.31.0` | +-              | +-              | +-              | +-              | ✓               | +-              |
+| `kubernetes-1.32.0`/`v0.32.0` | +-              | +-              | +-              | +-              | +-              | ✓               |
 | `HEAD`                        | +-              | +-              | +-              | +-              | +-              | +-              |
 
 Key:
@@ -104,16 +104,16 @@ between client-go versions.
 
 | Branch         | Canonical source code location      | Maintenance status |
 | -------------- | ----------------------------------- | ------------------ |
-| `release-1.19` | Kubernetes main repo, 1.19 branch   | =-                 |
-| `release-1.20` | Kubernetes main repo, 1.20 branch   | =-                 |
-| `release-1.21` | Kubernetes main repo, 1.21 branch   | =-                 |
-| `release-1.22` | Kubernetes main repo, 1.22 branch   | =-                 |
 | `release-1.23` | Kubernetes main repo, 1.23 branch   | =-                 |
 | `release-1.24` | Kubernetes main repo, 1.24 branch   | =-                 |
-| `release-1.25` | Kubernetes main repo, 1.25 branch   | ✓                  |
-| `release-1.26` | Kubernetes main repo, 1.26 branch   | ✓                  |
-| `release-1.27` | Kubernetes main repo, 1.27 branch   | ✓                  |
-| `release-1.28` | Kubernetes main repo, 1.28 branch   | ✓                  |
+| `release-1.25` | Kubernetes main repo, 1.25 branch   | =-                 |
+| `release-1.26` | Kubernetes main repo, 1.26 branch   | =-                 |
+| `release-1.27` | Kubernetes main repo, 1.27 branch   | =-                 |
+| `release-1.28` | Kubernetes main repo, 1.28 branch   | =-                 |
+| `release-1.29` | Kubernetes main repo, 1.29 branch   | ✓                  |
+| `release-1.30` | Kubernetes main repo, 1.30 branch   | ✓                  |
+| `release-1.31` | Kubernetes main repo, 1.31 branch   | ✓                  |
+| `release-1.32` | Kubernetes main repo, 1.32 branch   | ✓                  |
 | client-go HEAD | Kubernetes main repo, master branch | ✓                  |
 
 Key:
