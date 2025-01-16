@@ -392,7 +392,7 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 		store.Add(elem)
 	}
 
-	wci, err := newCacheIntervalFromStore(rv, store, getAttrsFunc, "", false)
+	wci, err := newCacheIntervalFromStore(rv, store, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
