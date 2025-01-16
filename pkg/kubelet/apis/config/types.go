@@ -604,7 +604,7 @@ type CredentialProviderConfig struct {
 	// Multiple providers may match against a single image, in which case credentials
 	// from all providers will be returned to the kubelet. If multiple providers are called
 	// for a single image, the results are combined. If providers return overlapping
-	// auth keys, the value from the provider earlier in this list is used.
+	// auth keys, the value from the provider earlier in this list is attempted first.
 	Providers []CredentialProvider
 }
 
@@ -614,6 +614,7 @@ type CredentialProvider struct {
 	// name is the required name of the credential provider. It must match the name of the
 	// provider executable as seen by the kubelet. The executable must be in the kubelet's
 	// bin directory (set by the --credential-provider-bin-dir flag).
+	// Required to be unique across all providers.
 	Name string
 
 	// matchImages is a required list of strings used to match against images in order to
