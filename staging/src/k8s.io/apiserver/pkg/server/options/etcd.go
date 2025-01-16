@@ -355,7 +355,7 @@ func (s *EtcdOptions) maybeApplyResourceTransformers(c *server.Config) (err erro
 
 func addHealthChecksWithoutLivez(c *server.Config, healthChecks ...healthz.HealthChecker) {
 	c.HealthzChecks = append(c.HealthzChecks, healthChecks...)
-	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
+	c.AddReadyzChecks(healthChecks...)
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
