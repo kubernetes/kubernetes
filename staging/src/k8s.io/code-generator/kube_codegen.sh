@@ -65,6 +65,7 @@ function kube::codegen::internal::grep() {
 function kube::codegen::gen_helpers() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
+    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
     local extra_peers=()
 
@@ -76,6 +77,10 @@ function kube::codegen::gen_helpers() {
                 ;;
             "--extra-peer-dir")
                 extra_peers+=("$2")
+                shift 2
+                ;;
+            "--version")
+                version="$2"
                 shift 2
                 ;;
             *)
@@ -103,9 +108,9 @@ function kube::codegen::gen_helpers() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            conversion-gen
-            deepcopy-gen
-            defaulter-gen
+            conversion-gen@${version}
+            deepcopy-gen@${version}
+            defaulter-gen@${version}
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
@@ -257,6 +262,7 @@ function kube::codegen::gen_openapi() {
     local report="/dev/null"
     local update_report=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
+    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
 
     while [ "$#" -gt 0 ]; do
@@ -283,6 +289,10 @@ function kube::codegen::gen_openapi() {
                 ;;
             "--boilerplate")
                 boilerplate="$2"
+                shift 2
+                ;;
+            "--version")
+                version="$2"
                 shift 2
                 ;;
             *)
@@ -324,7 +334,7 @@ function kube::codegen::gen_openapi() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            openapi-gen
+            openapi-gen@${version}
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/kube-openapi/cmd/%s " "${BINS[@]}")
@@ -433,9 +443,6 @@ function kube::codegen::gen_openapi() {
 #   --plural-exceptions <string = "">
 #     An optional list of comma separated plural exception definitions in Type:PluralizedType form.
 #
-#   --prefers-protobuf
-#     Enables generation of clientsets that use protobuf for API requests.
-#
 function kube::codegen::gen_client() {
     local in_dir=""
     local one_input_api=""
@@ -452,6 +459,7 @@ function kube::codegen::gen_client() {
     local informers_subdir="informers"
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local plural_exceptions=""
+    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
     local prefers_protobuf="false"
 
@@ -513,9 +521,13 @@ function kube::codegen::gen_client() {
                 plural_exceptions="$2"
                 shift 2
                 ;;
-            "--prefers-protobuf")
+              "--prefers-protobuf")
                 prefers_protobuf="true"
                 shift
+                ;;
+            "--version")
+                version="$2"
+                shift 2
                 ;;
             *)
                 if [[ "$1" =~ ^-- ]]; then
@@ -551,10 +563,10 @@ function kube::codegen::gen_client() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            applyconfiguration-gen
-            client-gen
-            informer-gen
-            lister-gen
+            applyconfiguration-gen@${version}
+            client-gen@${version}
+            informer-gen@${version}
+            lister-gen@${version}
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
@@ -693,12 +705,17 @@ function kube::codegen::gen_client() {
 function kube::codegen::gen_register() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
+    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
             "--boilerplate")
                 boilerplate="$2"
+                shift 2
+                ;;
+            "--version")
+                version="$2"
                 shift 2
                 ;;
             *)
@@ -726,7 +743,7 @@ function kube::codegen::gen_register() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            register-gen
+            register-gen@${version}
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
