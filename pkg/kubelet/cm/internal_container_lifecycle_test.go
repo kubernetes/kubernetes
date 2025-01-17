@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
@@ -31,7 +33,7 @@ type mockCPUManager struct {
 	cpumanager.Manager
 }
 
-func (cpuManager *mockCPUManager) AddContainer(*v1.Pod, *v1.Container, string) {
+func (cpuManager *mockCPUManager) AddContainer(logr.Logger, *v1.Pod, *v1.Container, string) {
 	cpuManager.called = true
 }
 
