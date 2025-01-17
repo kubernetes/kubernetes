@@ -4083,7 +4083,7 @@ type EphemeralContainerCommon struct {
 	// already allocated to the pod.
 	// +optional
 	Resources ResourceRequirements
-	// Resources resize policy for ephemeral containers are not allowed.
+	// Resources resize policy for containers. Ephemeral containers are not allowed.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	ResizePolicy []ContainerResizePolicy
