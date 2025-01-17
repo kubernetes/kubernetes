@@ -595,8 +595,8 @@ func (EndpointsList) SwaggerDoc() map[string]string {
 }
 
 var map_EnvFromSource = map[string]string{
-	"":             "EnvFromSource represents the source of a set of ConfigMaps",
-	"prefix":       "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+	"":             "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
+	"prefix":       "Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.",
 	"configMapRef": "The ConfigMap to select from",
 	"secretRef":    "The Secret to select from",
 }

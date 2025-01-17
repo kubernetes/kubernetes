@@ -2115,7 +2115,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.EnvFromSource": {
-        "description": "EnvFromSource represents the source of a set of ConfigMaps",
+        "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
         "properties": {
           "configMapRef": {
             "allOf": [
@@ -2126,7 +2126,7 @@
             "description": "The ConfigMap to select from"
           },
           "prefix": {
-            "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+            "description": "Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.",
             "type": "string"
           },
           "secretRef": {
