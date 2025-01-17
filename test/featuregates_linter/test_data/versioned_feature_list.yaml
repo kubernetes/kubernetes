@@ -102,20 +102,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
-- name: APIListChunking
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.8"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.9"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.29"
 - name: APIResponseCompression
   versionedSpecs:
   - default: false
