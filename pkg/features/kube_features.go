@@ -384,13 +384,6 @@ const (
 	// Add support for distributed tracing in the kubelet
 	KubeletTracing featuregate.Feature = "KubeletTracing"
 
-	// owner: @alexanderConstantinescu
-	// kep: http://kep.k8s.io/3836
-	//
-	// Implement connection draining for terminating nodes for
-	// `externalTrafficPolicy: Cluster` services.
-	KubeProxyDrainingTerminatingNodes featuregate.Feature = "KubeProxyDrainingTerminatingNodes"
-
 	// owner: @RobertKrawitz
 	//
 	// Allow use of filesystems for ephemeral storage monitoring.

@@ -592,11 +592,9 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(ctx, s.podCIDRs))
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyDrainingTerminatingNodes) {
-		nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
-			HealthServer: s.HealthzServer,
-		})
-	}
+	nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
+		HealthServer: s.HealthzServer,
+	})
 	nodeConfig.RegisterEventHandler(s.Proxier)
 
 	go nodeConfig.Run(wait.NeverStop)
