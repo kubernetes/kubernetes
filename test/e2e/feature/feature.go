@@ -149,7 +149,11 @@ var (
 	// Testing eviction manager
 	Eviction = framework.WithFeature(framework.ValidFeatures.Add("Eviction"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// OWNER: sig-storage
+	// These tests need kube-controller-manager that can execute a shell (bash). Most Kubernetes e2e
+	// tests run with kube-controller-manager as a distroless container without such a shell.
+	// If you need to run these tests,  please build your own image with required packages (like bash).
+	// See https://github.com/kubernetes/kubernetes/issues/78737 for more details.
 	Flexvolumes = framework.WithFeature(framework.ValidFeatures.Add("Flexvolumes"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
