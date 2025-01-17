@@ -710,7 +710,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		runSMTAlignmentPositiveTests(ctx, f, smtLevel)
 	})
 
-	f.It("should not reuse CPUs of restartable init containers", nodefeature.SidecarContainers, func(ctx context.Context) {
+	f.It("should not reuse CPUs of restartable init containers", nodefeature.SidecarContainers, feature.SidecarContainers, func(ctx context.Context) {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
 
 		// Skip rest of the tests if CPU capacity < 3.

@@ -293,5 +293,9 @@ func (runtime *CRIRuntime) SandboxImage() (string, error) {
 		return "", errors.Wrap(err, "failed to unmarshal CRI info config")
 	}
 
+	if c.SandboxImage == "" {
+		return "", errors.New("no 'sandboxImage' field in CRI info config")
+	}
+
 	return c.SandboxImage, nil
 }

@@ -28,7 +28,7 @@ func NewLoader(
 	}
 	root, err := filesys.ConfirmDir(fSys, target)
 	if err != nil {
-		return nil, errors.WrapPrefixf(err, ErrRtNotDir.Error())
+		return nil, errors.WrapPrefixf(err, ErrRtNotDir.Error()) //nolint:govet
 	}
 	return newLoaderAtConfirmedDir(
 		lr, root, fSys, nil, git.ClonerUsingGitExec), nil

@@ -316,7 +316,7 @@ func (n *nodeLogQuery) splitNativeVsFileLoggers(ctx context.Context) ([]string, 
 // copyServiceLogs invokes journalctl or Get-WinEvent with the provided args. Note that
 // services are explicitly passed here to account for the heuristics.
 func (n *nodeLogQuery) copyServiceLogs(ctx context.Context, w io.Writer, services []string, previousBoot int) {
-	cmdStr, args, err := getLoggingCmd(n, services)
+	cmdStr, args, cmdEnv, err := getLoggingCmd(n, services)
 	if err != nil {
 		fmt.Fprintf(w, "\nfailed to get logging cmd: %v\n", err)
 		return
@@ -324,6 +324,7 @@ func (n *nodeLogQuery) copyServiceLogs(ctx context.Context, w io.Writer, service
 	cmd := exec.CommandContext(ctx, cmdStr, args...)
 	cmd.Stdout = w
 	cmd.Stderr = w
+	cmd.Env = append(os.Environ(), cmdEnv...)
 
 	if err := cmd.Run(); err != nil {
 		if _, ok := err.(*exec.ExitError); ok {

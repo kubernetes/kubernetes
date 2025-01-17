@@ -530,6 +530,7 @@ type KubeletConfiguration struct {
 	EvictionSoftGracePeriod map[string]string `json:"evictionSoftGracePeriod,omitempty"`
 	// evictionPressureTransitionPeriod is the duration for which the kubelet has to wait
 	// before transitioning out of an eviction pressure condition.
+	// A duration of 0s will be converted to the default value of 5m
 	// Default: "5m"
 	// +optional
 	EvictionPressureTransitionPeriod metav1.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
@@ -726,6 +727,8 @@ type KubeletConfiguration struct {
 	EnableSystemLogHandler *bool `json:"enableSystemLogHandler,omitempty"`
 	// enableSystemLogQuery enables the node log query feature on the /logs endpoint.
 	// EnableSystemLogHandler has to be enabled in addition for this feature to work.
+	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
+	// purposes and disabling otherwise.
 	// Default: false
 	// +featureGate=NodeLogQuery
 	// +optional

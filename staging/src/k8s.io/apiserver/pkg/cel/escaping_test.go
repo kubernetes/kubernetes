@@ -19,6 +19,7 @@ package cel
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	fuzz "github.com/google/gofuzz"
@@ -202,5 +203,13 @@ func TestCanSkipRegex(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCELReservedSymbolsNoDoubleUnderscore(t *testing.T) {
+	for symbol := range celReservedSymbols {
+		if strings.Contains(symbol, "__") {
+			t.Errorf("CEL reserved symbol '%s' contains '__', which is not allowed as it would interfere with escaping", symbol)
+		}
 	}
 }

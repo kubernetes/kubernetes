@@ -59,7 +59,6 @@ var (
 	resourceName  = "my-resource"
 	resourceName2 = resourceName + "-2"
 	claimName     = podName + "-" + resourceName
-	claimName2    = podName + "-" + resourceName + "-2"
 	className     = "my-resource-class"
 	namespace     = "default"
 	attrName      = resourceapi.QualifiedName("healthy") // device attribute only available on non-default node
@@ -88,11 +87,6 @@ var (
 		}
 		return pod
 	}()
-	podWithTwoClaimNames = st.MakePod().Name(podName).Namespace(namespace).
-				UID(podUID).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
-				PodResourceClaims(v1.PodResourceClaim{Name: resourceName2, ResourceClaimName: &claimName2}).
-				Obj()
 	podWithTwoClaimTemplates = st.MakePod().Name(podName).Namespace(namespace).
 					UID(podUID).
 					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimTemplateName: &claimName}).
@@ -123,14 +117,8 @@ var (
 		Namespace(namespace).
 		Request(className).
 		Obj()
-	deleteClaim = st.FromResourceClaim(claim).
-			OwnerReference(podName, podUID, podKind).
-			Deleting(metav1.Now()).Obj()
 	pendingClaim = st.FromResourceClaim(claim).
 			OwnerReference(podName, podUID, podKind).
-			Obj()
-	pendingClaim2 = st.FromResourceClaim(pendingClaim).
-			Name(claimName2).
 			Obj()
 	allocationResult = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
@@ -167,9 +155,6 @@ var (
 	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
 				Allocation(allocationResult).
 				Obj()
-
-	resourceSlice        = st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
-	resourceSliceUpdated = st.FromResourceSlice(resourceSlice).Device("instance-1", map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{attrName: {BoolValue: ptr.To(true)}}).Obj()
 )
 
 func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
@@ -1396,111 +1381,6 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			}
 			testCtx := setup(t, nil, tc.claims, nil, tc.objs, features)
 			gotHint, err := testCtx.p.isSchedulableAfterPodChange(logger, tc.pod, nil, tc.obj)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("want an error, got none")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("want no error, got: %v", err)
-			}
-			if tc.wantHint != gotHint {
-				t.Fatalf("want %#v, got %#v", tc.wantHint.String(), gotHint.String())
-			}
-		})
-	}
-}
-
-func Test_isSchedulableAfterResourceSliceChange(t *testing.T) {
-	testcases := map[string]struct {
-		pod            *v1.Pod
-		claims         []*resourceapi.ResourceClaim
-		oldObj, newObj interface{}
-		wantHint       framework.QueueingHint
-		wantErr        bool
-	}{
-		"queue-new-resource-slice": {
-			pod:      podWithClaimName,
-			claims:   []*resourceapi.ResourceClaim{pendingClaim},
-			newObj:   resourceSlice,
-			wantHint: framework.Queue,
-		},
-		"queue1-update-resource-slice-with-claim-is-allocated": {
-			pod:      podWithClaimName,
-			claims:   []*resourceapi.ResourceClaim{allocatedClaim},
-			oldObj:   resourceSlice,
-			newObj:   resourceSliceUpdated,
-			wantHint: framework.Queue,
-		},
-		"queue-update-resource-slice-with-claim-is-deleting": {
-			pod:      podWithClaimName,
-			claims:   []*resourceapi.ResourceClaim{deleteClaim},
-			oldObj:   resourceSlice,
-			newObj:   resourceSliceUpdated,
-			wantHint: framework.QueueSkip,
-		},
-		"queue-new-resource-slice-with-two-claim": {
-			pod:      podWithTwoClaimNames,
-			claims:   []*resourceapi.ResourceClaim{pendingClaim, pendingClaim2},
-			oldObj:   resourceSlice,
-			newObj:   resourceSliceUpdated,
-			wantHint: framework.Queue,
-		},
-		"queue-update-resource-slice-with-two-claim-but-one-hasn't-been-created": {
-			pod:      podWithTwoClaimNames,
-			claims:   []*resourceapi.ResourceClaim{pendingClaim},
-			oldObj:   resourceSlice,
-			newObj:   resourceSliceUpdated,
-			wantHint: framework.QueueSkip,
-		},
-		"queue-update-resource-slice": {
-			pod:      podWithClaimName,
-			claims:   []*resourceapi.ResourceClaim{pendingClaim},
-			oldObj:   resourceSlice,
-			newObj:   resourceSliceUpdated,
-			wantHint: framework.Queue,
-		},
-		"skip-not-find-resource-claim": {
-			pod:      podWithClaimName,
-			claims:   []*resourceapi.ResourceClaim{},
-			oldObj:   resourceSlice,
-			newObj:   resourceSliceUpdated,
-			wantHint: framework.QueueSkip,
-		},
-		"backoff-unexpected-object-with-oldObj-newObj": {
-			pod:     podWithClaimName,
-			claims:  []*resourceapi.ResourceClaim{pendingClaim},
-			oldObj:  pendingClaim,
-			newObj:  pendingClaim,
-			wantErr: true,
-		},
-		"backoff-unexpected-object-with-oldObj": {
-			pod:     podWithClaimName,
-			claims:  []*resourceapi.ResourceClaim{pendingClaim},
-			oldObj:  pendingClaim,
-			newObj:  resourceSlice,
-			wantErr: true,
-		},
-		"backoff-unexpected-object-with-newObj": {
-			pod:     podWithClaimName,
-			claims:  []*resourceapi.ResourceClaim{pendingClaim},
-			oldObj:  resourceSlice,
-			newObj:  pendingClaim,
-			wantErr: true,
-		},
-	}
-	for name, tc := range testcases {
-		tc := tc
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			logger, _ := ktesting.NewTestContext(t)
-			features := feature.Features{
-				EnableDynamicResourceAllocation: true,
-			}
-			testCtx := setup(t, nil, tc.claims, nil, nil, features)
-			gotHint, err := testCtx.p.isSchedulableAfterResourceSliceChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("want an error, got none")

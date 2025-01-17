@@ -1082,15 +1082,17 @@ func printProjectedVolumeSource(projected *corev1.ProjectedVolumeSource, w Prefi
 	w.Write(LEVEL_2, "Type:\tProjected (a volume that contains injected data from multiple sources)\n")
 	for _, source := range projected.Sources {
 		if source.Secret != nil {
+			optional := source.Secret.Optional != nil && *source.Secret.Optional
 			w.Write(LEVEL_2, "SecretName:\t%v\n"+
-				"    SecretOptionalName:\t%v\n",
-				source.Secret.Name, source.Secret.Optional)
+				"    Optional:\t%v\n",
+				source.Secret.Name, optional)
 		} else if source.DownwardAPI != nil {
 			w.Write(LEVEL_2, "DownwardAPI:\ttrue\n")
 		} else if source.ConfigMap != nil {
+			optional := source.ConfigMap.Optional != nil && *source.ConfigMap.Optional
 			w.Write(LEVEL_2, "ConfigMapName:\t%v\n"+
-				"    ConfigMapOptional:\t%v\n",
-				source.ConfigMap.Name, source.ConfigMap.Optional)
+				"    Optional:\t%v\n",
+				source.ConfigMap.Name, optional)
 		} else if source.ServiceAccountToken != nil {
 			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%d\n",
 				*source.ServiceAccountToken.ExpirationSeconds)

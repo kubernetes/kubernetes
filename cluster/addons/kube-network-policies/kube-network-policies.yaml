@@ -27,11 +27,10 @@ spec:
       serviceAccountName: kube-network-policies
       containers:
       - name: kube-network-policies
-        image: registry.k8s.io/networking/kube-network-policies:v0.6.0
+        image: registry.k8s.io/networking/kube-network-policies:v0.7.0
         command:
-        - /bin/sh
-        - -c
-        - /bin/netpol -v 4 1>>/var/log/kube-network-policies.log 2>&1
+        - /bin/netpol
+        - --v=4
         resources:
           requests:
             cpu: "100m"
@@ -39,16 +38,10 @@ spec:
         securityContext:
           privileged: true
         volumeMounts:
-        - mountPath: /var/log
-          name: varlog
-          readOnly: false
         - mountPath: /lib/modules
           name: lib-modules
           readOnly: true
       volumes:
-      - name: varlog
-        hostPath:
-          path: /var/log
       - name: lib-modules
         hostPath:
           path: /lib/modules

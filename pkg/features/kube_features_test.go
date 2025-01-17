@@ -73,3 +73,27 @@ func TestAllRegisteredFeaturesExpected(t *testing.T) {
 		}
 	}
 }
+func TestEnsureAlphaGatesAreNotSwitchedOnByDefault(t *testing.T) {
+	checkAlphaGates := func(feature featuregate.Feature, spec featuregate.FeatureSpec) {
+		// FIXME(dims): remove this check when WindowsHostNetwork is fixed up or removed
+		// entirely. Please do NOT add more entries here.
+		if feature == "WindowsHostNetwork" {
+			return
+		}
+		if spec.PreRelease == featuregate.Alpha && spec.Default {
+			t.Errorf("The alpha feature gate %q is switched on by default", feature)
+		}
+		if spec.PreRelease == featuregate.Alpha && spec.LockToDefault {
+			t.Errorf("The alpha feature gate %q is locked to default", feature)
+		}
+	}
+
+	for feature, spec := range defaultKubernetesFeatureGates {
+		checkAlphaGates(feature, spec)
+	}
+	for feature, specs := range defaultVersionedKubernetesFeatureGates {
+		for _, spec := range specs {
+			checkAlphaGates(feature, spec)
+		}
+	}
+}

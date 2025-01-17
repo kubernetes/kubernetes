@@ -863,9 +863,6 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 				klog.V(1).Infof("image exists: %s", image)
 				continue
 			}
-			if err != nil {
-				errorList = append(errorList, errors.Wrapf(err, "failed to check if image %s exists", image))
-			}
 			fallthrough // Proceed with pulling the image if it does not exist
 		case v1.PullAlways:
 			klog.V(1).Infof("pulling: %s", image)

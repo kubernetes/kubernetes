@@ -2459,7 +2459,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			}
 		}
 		d := destroyFunc
-		s = cacher
+		s = cacherstorage.NewCacheProxy(cacher, s)
 		destroyFunc = func() {
 			cacher.Stop()
 			d()

@@ -1680,16 +1680,17 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 		}()
 
-		service := t.BuildServiceSpec()
-		service.Spec.Type = v1.ServiceTypeNodePort
+		var service *v1.Service
+		baseService := t.BuildServiceSpec()
+		baseService.Spec.Type = v1.ServiceTypeNodePort
 		numberOfRetries := 5
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		var err error
 		for i := 0; i < numberOfRetries; i++ {
 			port, err := e2eservice.GetUnusedStaticNodePort()
 			framework.ExpectNoError(err, "Static node port allocator was not able to find a free nodeport.")
-			service.Spec.Ports[0].NodePort = port
-			service, err = t.CreateService(service)
+			baseService.Spec.Ports[0].NodePort = port
+			service, err = t.CreateService(baseService)
 			// We will later delete this service and then recreate it with same nodeport. We need to ensure that
 			// another e2e test doesn't start listening on our old nodeport and conflicts re-creation of service
 			// hence we use ReserveStaticNodePort.
@@ -1703,7 +1704,7 @@ var _ = common.SIGDescribe("Services", func() {
 				}
 				break
 			}
-			if apierrors.IsConflict(err) {
+			if apierrors.IsInvalid(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
 				continue
 			}
@@ -3979,7 +3980,7 @@ var _ = common.SIGDescribe("Services", func() {
 				}
 				break
 			}
-			if apierrors.IsConflict(err) {
+			if apierrors.IsInvalid(err) {
 				framework.Logf("node port %d is already allocated to other service, retrying ... : %v", port, err)
 				continue
 			}
@@ -3987,7 +3988,12 @@ var _ = common.SIGDescribe("Services", func() {
 
 		}
 
-		defer e2eservice.ReleaseStaticNodePort(svc.Spec.HealthCheckNodePort)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err := cs.CoreV1().Services(namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, namespace)
+			e2eservice.ReleaseStaticNodePort(svc.Spec.HealthCheckNodePort)
+		})
+
 		nodePortStr := fmt.Sprintf("%d", svc.Spec.Ports[0].NodePort)
 		hcNodePortStr := fmt.Sprintf("%d", svc.Spec.HealthCheckNodePort)
 		framework.Logf("NodePort is %s, HealthCheckNodePort is %s", nodePortStr, hcNodePortStr)

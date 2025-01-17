@@ -68,7 +68,7 @@ const (
 	AppArmorFields featuregate.Feature = "AppArmorFields"
 
 	// owner: @liggitt
-	// kep:
+	// kep: https://kep.k8s.io/4601
 	//
 	// Make the Node authorizer use fine-grained selector authorization.
 	// Requires AuthorizeWithSelectors to be enabled.
@@ -446,7 +446,8 @@ const (
 	// owner: @aravindhp @LorbusChris
 	// kep: http://kep.k8s.io/2271
 	//
-	// Enables querying logs of node services using the /logs endpoint
+	// Enables querying logs of node services using the /logs endpoint. Enabling this feature has security implications.
+	// The recommendation is to enable it on a need basis for debugging purposes and disabling otherwise.
 	NodeLogQuery featuregate.Feature = "NodeLogQuery"
 
 	// owner: @iholder101 @kannon92
@@ -454,12 +455,6 @@ const (
 
 	// Permits kubelet to run with swap enabled.
 	NodeSwap featuregate.Feature = "NodeSwap"
-
-	// owner: @mortent, @atiratree, @ravig
-	// kep: http://kep.k8s.io/3018
-	//
-	// Enables PDBUnhealthyPodEvictionPolicy for PodDisruptionBudgets
-	PDBUnhealthyPodEvictionPolicy featuregate.Feature = "PDBUnhealthyPodEvictionPolicy"
 
 	// owner: @RomanBednar
 	// kep: https://kep.k8s.io/3762
