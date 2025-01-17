@@ -152,9 +152,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Flexvolumes = framework.WithFeature(framework.ValidFeatures.Add("Flexvolumes"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	FSGroup = framework.WithFeature(framework.ValidFeatures.Add("FSGroup"))
-
 	// OWNER: sig-node
 	// Testing garbage collection of images/containers
 	GarbageCollect = framework.WithFeature(framework.ValidFeatures.Add("GarbageCollect"))
