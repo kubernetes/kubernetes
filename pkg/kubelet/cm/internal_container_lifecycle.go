@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -41,7 +42,7 @@ type internalContainerLifecycleImpl struct {
 
 func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
 	if i.cpuManager != nil {
-		i.cpuManager.AddContainer(pod, container, containerID)
+		i.cpuManager.AddContainer(klog.TODO(), pod, container, containerID)
 	}
 
 	if i.memoryManager != nil {

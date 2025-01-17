@@ -98,7 +98,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	containerMap, containerRunningSet := buildContainerMapAndRunningSetFromRuntime(ctx, runtimeService)
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
-		err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
+		err := cm.cpuManager.Start(ctx, cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
 		if err != nil {
 			return fmt.Errorf("start cpu manager error: %v", err)
 		}
@@ -140,7 +140,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	logger := klog.TODO()
 
 	cm.topologyManager = topologymanager.NewFakeManager()
-	cm.cpuManager = cpumanager.NewFakeManager()
+	cm.cpuManager = cpumanager.NewFakeManager(klog.TODO())
 	cm.memoryManager = memorymanager.NewFakeManager(context.TODO())
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
@@ -156,6 +156,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 		klog.InfoS("Creating cpu manager")
 		cm.cpuManager, err = cpumanager.NewManager(
+			klog.TODO(),
 			nodeConfig.CPUManagerPolicy,
 			nodeConfig.CPUManagerPolicyOptions,
 			nodeConfig.CPUManagerReconcilePeriod,

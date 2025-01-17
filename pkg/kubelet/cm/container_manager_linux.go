@@ -327,6 +327,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	// Initialize CPU manager
 	cm.cpuManager, err = cpumanager.NewManager(
+		logger,
 		nodeConfig.CPUManagerPolicy,
 		nodeConfig.CPUManagerPolicyOptions,
 		nodeConfig.CPUManagerReconcilePeriod,
@@ -625,7 +626,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Initialize CPU manager
-	err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
+	err := cm.cpuManager.Start(ctx, cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap.Clone())
 	if err != nil {
 		return fmt.Errorf("start cpu manager error: %w", err)
 	}
