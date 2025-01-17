@@ -1338,36 +1338,6 @@ func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*cor
 	}
 }
 
-func updateMoo(graph *Graph, oldPod *corev1.Pod) {
-	p := &graphPopulator{}
-	p.graph = graph
-	p.addPod(oldPod)
-	newPod := oldPod
-	newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, corev1.EphemeralContainer{
-		TargetContainerName: "targetContainerName",
-		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
-			Image:   "imageURL",
-			Name:    "eph",
-			Command: []string{"command"},
-			EnvFrom: []corev1.EnvFromSource{
-				{
-					SecretRef: &corev1.SecretEnvSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: "new-secret",
-						},
-						Optional: nil,
-					},
-				},
-			},
-			SecurityContext: &corev1.SecurityContext{
-				Privileged: &[]bool{true}[0],
-			},
-		},
-	})
-
-	p.updatePod(oldPod, newPod)
-}
-
 func randomSubset(a, b int) []int {
 	if b < a {
 		b = a
