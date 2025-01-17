@@ -19,14 +19,15 @@ package cpumanager
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
+	"github.com/go-logr/logr"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/utils/cpuset"
 )
 
-type nonePolicy struct{}
+type nonePolicy struct {
+}
 
 var _ Policy = &nonePolicy{}
 
@@ -45,24 +46,24 @@ func (p *nonePolicy) Name() string {
 	return string(PolicyNone)
 }
 
-func (p *nonePolicy) Start(s state.State) error {
-	klog.InfoS("None policy: Start")
+func (p *nonePolicy) Start(logger logr.Logger, s state.State) error {
+	logger.Info("Start")
 	return nil
 }
 
-func (p *nonePolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
+func (p *nonePolicy) Allocate(_ logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
-func (p *nonePolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
+func (p *nonePolicy) RemoveContainer(_ logr.Logger, s state.State, podUID string, containerName string) error {
 	return nil
 }
 
-func (p *nonePolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
-func (p *nonePolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (p *nonePolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
 
