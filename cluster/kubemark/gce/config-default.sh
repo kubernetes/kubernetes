@@ -56,6 +56,4 @@ fi
 
 #Optional: Enable kube dns.
 ENABLE_KUBEMARK_KUBE_DNS="${ENABLE_KUBEMARK_KUBE_DNS:-true}"
-KUBE_DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
-
-CLEANUP_KUBEMARK_IMAGE=false
+KUBE_DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.loca
