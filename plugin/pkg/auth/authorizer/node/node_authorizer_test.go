@@ -856,6 +856,118 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 	}
 }
 
+func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
+	g := NewGraph()
+	g.destinationEdgeThreshold = 1
+	identifier := nodeidentifier.NewDefaultNodeIdentifier()
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+
+	node1 := &user.DefaultInfo{Name: "system:node:node1", Groups: []string{"system:nodes"}}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1"},
+		Spec: corev1.PodSpec{
+			NodeName: "node1",
+			Volumes: []corev1.Volume{
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "node1-only"}}},
+			},
+		},
+	}
+
+	ecNewSecret := corev1.EphemeralContainer{
+		TargetContainerName: "targetContainerName",
+		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+			Image:   "imageURL",
+			Name:    "eph",
+			Command: []string{"command"},
+			EnvFrom: []corev1.EnvFromSource{
+				{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "new-secret",
+						},
+						Optional: nil,
+					},
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: &[]bool{true}[0],
+			},
+		},
+	}
+
+	ecNewConfigMap := corev1.EphemeralContainer{
+		TargetContainerName: "targetContainerName",
+		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+			Image:   "imageURL",
+			Name:    "eph",
+			Command: []string{"command"},
+			EnvFrom: []corev1.EnvFromSource{
+				{
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "new-config-map",
+						},
+						Optional: nil,
+					},
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: &[]bool{true}[0],
+			},
+		},
+	}
+	p := &graphPopulator{}
+	p.graph = g
+	p.addPod(pod)
+
+	testcases := []struct {
+		User      user.Info
+		Secret    string
+		ConfigMap string
+		Decision  authorizer.Decision
+		EphCont   *corev1.EphemeralContainer
+	}{
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "node1-only"},
+		{User: node1, Decision: authorizer.DecisionNoOpinion, Secret: "new-secret"},
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "new-secret", EphCont: &ecNewSecret},
+		{User: node1, Decision: authorizer.DecisionNoOpinion, ConfigMap: "new-config-map"},
+		{User: node1, Decision: authorizer.DecisionAllow, ConfigMap: "new-config-map", EphCont: &ecNewConfigMap},
+	}
+
+	for i, tc := range testcases {
+		var (
+			decision authorizer.Decision
+			err      error
+		)
+		if tc.EphCont != nil {
+			newPod := &corev1.Pod{}
+			pod.DeepCopyInto(newPod)
+			newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, *tc.EphCont)
+			p.updatePod(pod, newPod)
+		}
+
+		if len(tc.Secret) > 0 {
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+		} else if len(tc.ConfigMap) > 0 {
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+		} else {
+			t.Fatalf("test case must include a request for a Secret")
+		}
+
+		if decision != tc.Decision {
+			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
+		}
+	}
+}
+
 type sampleDataOpts struct {
 	nodes       int
 	namespaces  int
@@ -1224,6 +1336,36 @@ func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*cor
 	for _, slice := range slices {
 		p.addResourceSlice(slice)
 	}
+}
+
+func updateMoo(graph *Graph, oldPod *corev1.Pod) {
+	p := &graphPopulator{}
+	p.graph = graph
+	p.addPod(oldPod)
+	newPod := oldPod
+	newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, corev1.EphemeralContainer{
+		TargetContainerName: "targetContainerName",
+		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+			Image:   "imageURL",
+			Name:    "eph",
+			Command: []string{"command"},
+			EnvFrom: []corev1.EnvFromSource{
+				{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "new-secret",
+						},
+						Optional: nil,
+					},
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: &[]bool{true}[0],
+			},
+		},
+	})
+
+	p.updatePod(oldPod, newPod)
 }
 
 func randomSubset(a, b int) []int {
