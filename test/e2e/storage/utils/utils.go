@@ -722,23 +722,23 @@ func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.Gr
 	return err
 }
 
-// VerifyFilePathGidInPod verfies expected GID of the target filepath
-func VerifyFilePathGidInPod(ctx context.Context, f *framework.Framework, filePath, expectedGid string, pod *v1.Pod) {
+// VerifyFilePathGIDInPod verfies expected GID of the target filepath
+func VerifyFilePathGIDInPod(ctx context.Context, f *framework.Framework, filePath, expectedGID string, pod *v1.Pod) {
 	cmd := fmt.Sprintf("ls -l %s", filePath)
 	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 	framework.ExpectNoError(err)
 	framework.Logf("pod %s/%s exec for cmd %s, stdout: %s, stderr: %s", pod.Namespace, pod.Name, cmd, stdout, stderr)
 	ll := strings.Fields(stdout)
-	framework.Logf("stdout split: %v, expected gid: %v", ll, expectedGid)
-	gomega.Expect(ll[3]).To(gomega.Equal(expectedGid))
+	framework.Logf("stdout split: %v, expected gid: %v", ll, expectedGID)
+	gomega.Expect(ll[3]).To(gomega.Equal(expectedGID))
 }
 
-// ChangeFilePathGidInPod changes the GID of the target filepath.
-func ChangeFilePathGidInPod(ctx context.Context, f *framework.Framework, filePath, targetGid string, pod *v1.Pod) {
-	cmd := fmt.Sprintf("chgrp %s %s", targetGid, filePath)
+// ChangeFilePathGIDInPod changes the GID of the target filepath.
+func ChangeFilePathGIDInPod(ctx context.Context, f *framework.Framework, filePath, targetGID string, pod *v1.Pod) {
+	cmd := fmt.Sprintf("chgrp %s %s", targetGID, filePath)
 	_, _, err := e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 	framework.ExpectNoError(err)
-	VerifyFilePathGidInPod(ctx, f, filePath, targetGid, pod)
+	VerifyFilePathGIDInPod(ctx, f, filePath, targetGID, pod)
 }
 
 // DeleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"

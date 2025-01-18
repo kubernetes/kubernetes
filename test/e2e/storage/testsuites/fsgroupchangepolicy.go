@@ -250,12 +250,12 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			// Change the ownership of files in the initial pod.
 			if test.changedRootDirFileOwnership != 0 {
 				ginkgo.By(fmt.Sprintf("Changing the root directory file ownership to %s", strconv.Itoa(test.changedRootDirFileOwnership)))
-				storageutils.ChangeFilePathGidInPod(ctx, f, rootDirFilePath, strconv.Itoa(test.changedRootDirFileOwnership), pod)
+				storageutils.ChangeFilePathGIDInPod(ctx, f, rootDirFilePath, strconv.Itoa(test.changedRootDirFileOwnership), pod)
 			}
 
 			if test.changedSubDirFileOwnership != 0 {
 				ginkgo.By(fmt.Sprintf("Changing the sub-directory file ownership to %s", strconv.Itoa(test.changedSubDirFileOwnership)))
-				storageutils.ChangeFilePathGidInPod(ctx, f, subDirFilePath, strconv.Itoa(test.changedSubDirFileOwnership), pod)
+				storageutils.ChangeFilePathGIDInPod(ctx, f, subDirFilePath, strconv.Itoa(test.changedSubDirFileOwnership), pod)
 			}
 
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
@@ -283,7 +283,7 @@ func createPodAndVerifyContentGid(ctx context.Context, f *framework.Framework, p
 		var err error
 		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		framework.ExpectNoError(err)
-		storageutils.VerifyFilePathGidInPod(ctx, f, rootDirFilePath, podFsGroup, pod)
+		storageutils.VerifyFilePathGIDInPod(ctx, f, rootDirFilePath, podFsGroup, pod)
 
 		cmd = fmt.Sprintf("mkdir %s", subdir)
 		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
@@ -291,14 +291,14 @@ func createPodAndVerifyContentGid(ctx context.Context, f *framework.Framework, p
 		cmd = fmt.Sprintf("touch %s", subDirFilePath)
 		_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, f, pod.Name, cmd)
 		framework.ExpectNoError(err)
-		storageutils.VerifyFilePathGidInPod(ctx, f, subDirFilePath, podFsGroup, pod)
+		storageutils.VerifyFilePathGIDInPod(ctx, f, subDirFilePath, podFsGroup, pod)
 		return pod
 	}
 
 	// Verify existing contents of the volume
 	ginkgo.By(fmt.Sprintf("Verifying the ownership of root directory file is %s", expectedRootDirFileOwnership))
-	storageutils.VerifyFilePathGidInPod(ctx, f, rootDirFilePath, expectedRootDirFileOwnership, pod)
+	storageutils.VerifyFilePathGIDInPod(ctx, f, rootDirFilePath, expectedRootDirFileOwnership, pod)
 	ginkgo.By(fmt.Sprintf("Verifying the ownership of sub directory file is %s", expectedSubDirFileOwnership))
-	storageutils.VerifyFilePathGidInPod(ctx, f, subDirFilePath, expectedSubDirFileOwnership, pod)
+	storageutils.VerifyFilePathGIDInPod(ctx, f, subDirFilePath, expectedSubDirFileOwnership, pod)
 	return pod
 }
