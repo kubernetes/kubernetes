@@ -1019,10 +1019,20 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	for idx, container := range pod.Spec.Containers {
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 
+		// In some cases, after syncPod completes,
+		// there may be a delay in container events reported by the container runtime.
+		// This can result in the inability to obtain the latest pod status when entering syncPod again.
+		// This aims to prevent delayed states from interfering with the behavior of syncPod.
+		if containerStatus != nil && pleg.IsEventedPLEGInUse() && kubecontainer.IsContainerPendingStart(containerStatus) {
+			klog.V(4).InfoS("The container's status is Created, but it did not enter the Running state within the grace period. Waiting for the next cycle.", "pod", klog.KObj(pod), "containerName", container.Name)
+			keepCount++
+			continue
+		}
+
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
-		// to it. Don't remove/stop CREATED container.
-		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning && containerStatus.State != kubecontainer.ContainerStateCreated {
+		// to it.
+		if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateRunning {
 			if err := m.internalLifecycle.PostStopContainer(containerStatus.ID.ID); err != nil {
 				klog.ErrorS(err, "Internal container post-stop lifecycle hook failed for container in pod with error",
 					"containerName", container.Name, "pod", klog.KObj(pod))
@@ -1032,9 +1042,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// If container does not exist, or is not running, check whether we
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			// when Evented PLEG is in use, don't restart immediately
-			// for Generic PLEG, restart as is
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus, !pleg.IsEventedPLEGInUse()) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				klog.V(3).InfoS("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
@@ -1049,9 +1057,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 						reason: reasonUnknown,
 					}
 				}
-			} else if pleg.IsEventedPLEGInUse() && containerStatus.State == kubecontainer.ContainerStateCreated {
-				// keep CREATED container when evented PLEG is in use
-				keepCount++
 			}
 			continue
 		}
