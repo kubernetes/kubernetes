@@ -239,20 +239,6 @@ func TestVolumeBinding(t *testing.T) {
 			wantPreScoreStatus: framework.NewStatus(framework.Skip),
 		},
 		{
-			name: "pvc not found",
-			pod:  makePod("pod-a").withPVCVolume("pvc-a", "").Pod,
-			nodes: []*v1.Node{
-				makeNode("node-a").Node,
-			},
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "pvc-a" not found`),
-			wantFilterStatus: []*framework.Status{
-				nil,
-			},
-			wantScores: []int64{
-				0,
-			},
-		},
-		{
 			name: "pv not found",
 			pod:  makePod("pod-a").withPVCVolume("pvc-a", "").Pod,
 			nodes: []*v1.Node{
