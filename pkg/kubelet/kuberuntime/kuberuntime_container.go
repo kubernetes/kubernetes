@@ -1093,14 +1093,16 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 
 		switch status.State {
 		case kubecontainer.ContainerStateCreated:
-			// if EventedPLEG is enabled, the Created state can be ignored in the first loop.
-			// if the container keeps in Created state after 60s, we should start it.
-			if !pleg.IsEventedPLEGInUse() || time.Since(status.CreatedAt).Seconds() > 60 {
-				// The main sync loop should have created and started the container
-				// in one step. If the init container is in the 'created' state,
-				// it is likely that the container runtime failed to start it. To
-				// prevent the container from getting stuck in the 'created' state,
-				// restart it.
+			// The main sync loop should have created and started the container
+			// in one step. If the init container is in the 'created' state,
+			// it is likely that the container runtime failed to start it. To
+			// prevent the container from getting stuck in the 'created' state,
+			// restart it.
+			shouldStart := true
+			if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
+				shouldStart = !(pleg.IsEventedPLEGInUse() && kubecontainer.IsContainerPendingStart(status))
+			}
+			if shouldStart {
 				changes.InitContainersToStart = append(changes.InitContainersToStart, i)
 			}
 
