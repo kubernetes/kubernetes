@@ -401,9 +401,6 @@ var (
 	ResourceMetrics = framework.WithFeature(framework.ValidFeatures.Add("ResourceMetrics"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	Recreate = framework.WithFeature(framework.ValidFeatures.Add("Recreate"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RegularResourceUsageTracking = framework.WithFeature(framework.ValidFeatures.Add("RegularResourceUsageTracking"))
 
 	// Owner: sig-node
