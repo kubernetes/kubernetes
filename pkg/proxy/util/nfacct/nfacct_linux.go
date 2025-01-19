@@ -148,7 +148,7 @@ func (r *runner) Get(name string) (*Counter, error) {
 func (r *runner) List() ([]*Counter, error) {
 	req := r.handler.newRequest(cmdGet, unix.NLM_F_REQUEST|unix.NLM_F_DUMP)
 	msgs, err := req.Execute(unix.NETLINK_NETFILTER, 0)
-	if err != nil {
+	if err != nil && !errors.Is(err, unix.EINTR) {
 		return nil, handleError(err)
 	}
 
@@ -160,7 +160,7 @@ func (r *runner) List() ([]*Counter, error) {
 		}
 		counters = append(counters, counter)
 	}
-	return counters, nil
+	return counters, err
 }
 
 var ErrObjectNotFound = errors.New("object not found")
