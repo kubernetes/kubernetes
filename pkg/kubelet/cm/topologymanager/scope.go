@@ -42,7 +42,7 @@ type podTopologyHints map[string]map[string]TopologyHint
 type Scope interface {
 	Name() string
 	GetPolicy() Policy
-	Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(ctx context.Context, pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(h HintProvider)
@@ -140,9 +140,9 @@ func (s *scope) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *scope) admitPolicyNone(pod *v1.Pod, operation lifecycle.Operation) lifecycle.PodAdmitResult {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		err := s.allocateAlignedResources(pod, &container)
+		err := s.allocateAlignedResources(pod, &container, operation)
 		if err != nil {
 			return admission.GetPodAdmitResult(err)
 		}
@@ -151,10 +151,10 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 }
 
 // It would be better to implement this function in topologymanager instead of scope
-// but topologymanager does not track providers anymore
-func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
+// but topologymanager do not track providers anymore
+func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error {
 	for _, provider := range s.hintProviders {
-		err := provider.Allocate(pod, container)
+		err := provider.Allocate(pod, container, operation)
 		if err != nil {
 			return err
 		}
@@ -162,9 +162,9 @@ func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) e
 	return nil
 }
 
-func (s *scope) allocatePodAlignedResources(pod *v1.Pod) error {
+func (s *scope) allocatePodAlignedResources(pod *v1.Pod, operation lifecycle.Operation) error {
 	for _, provider := range s.hintProviders {
-		err := provider.AllocatePod(pod)
+		err := provider.AllocatePod(pod, operation)
 		if err != nil {
 			return err
 		}

@@ -25,6 +25,7 @@ import (
 )
 
 // ContainerCPUAssignments type used in cpu manager state
+// without InPlacePodVerticalScalingExclusiveCPUs
 type ContainerCPUAssignments map[string]map[string]cpuset.CPUSet
 
 // Clone returns a copy of ContainerCPUAssignments
@@ -81,6 +82,27 @@ func (a PodCPUAssignments) Clone() PodCPUAssignments {
 	return clone
 }
 
+// ContainerCPUAllocation and ContainerCPUAllocations types are used in cpu manager state
+// with InPlacePodVerticalScalingExclusiveCPUs to store original and most recents resized
+// CPU allocation, ContainerCPUAllocations replaces ContainerCPUAssignments when
+// InPlacePodVerticalScalingExclusiveCPUs is enabled.
+
+type ContainerCPUAllocation struct {
+	Original cpuset.CPUSet
+	Resized  cpuset.CPUSet
+}
+
+type ContainerCPUAllocations map[string]map[string]ContainerCPUAllocation
+
+// Clone returns a copy of ContainerCPUAllocations
+func (as ContainerCPUAllocations) Clone() ContainerCPUAllocations {
+	ret := make(ContainerCPUAllocations, len(as))
+	for pod := range as {
+		ret[pod] = maps.Clone(as[pod])
+	}
+	return ret
+}
+
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
@@ -91,6 +113,12 @@ type Reader interface {
 	GetPodCPUSet(podUID string) (cpuset.CPUSet, bool)
 	// GetPodCPUAssignments returns all pod-level CPU assignments
 	GetPodCPUAssignments() PodCPUAssignments
+	// GetCPUAllocations, GetOriginalCPUSet and GetResizedCPUSet are used
+	// with InPlacePodVerticalScalingExclusiveCPUs to checkpoint CPU
+	// original and most recent resize assigments.
+	GetCPUAllocations() ContainerCPUAllocations
+	GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
+	GetResizedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool)
 }
 
 type writer interface {
@@ -105,6 +133,8 @@ type writer interface {
 	SetPodCPUAssignments(PodCPUAssignments)
 	// DeletePod deletes pod-level CPU assignments for specified pod
 	DeletePod(podUID string)
+	// SetCPUAllocations is used with InPlacePodVerticalScalingExclusiveCPUs
+	SetCPUAllocations(ContainerCPUAllocations)
 }
 
 // State interface provides methods for tracking and setting cpu/pod assignment

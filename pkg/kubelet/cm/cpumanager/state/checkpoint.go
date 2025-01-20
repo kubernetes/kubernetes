@@ -33,19 +33,46 @@ import (
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV1{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV2{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV3{}
+var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV4{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
 
-// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v3 format
+// ContainerCPUs struct is used in a checkpoint in v4 format,
+// to support In place update pod resources alongside Static CPU Manager policy
+type ContainerCPUs struct {
+	Original string `json:"original"`
+	Resized  string `json:"resized"`
+}
+
+// CPUManagerCheckpointData struct is used to store cpu/pod assignments, which is part of a checkpoint in v4 format
+type CPUManagerCheckpointData struct {
+	PolicyName    string                              `json:"policyName"`
+	DefaultCPUSet string                              `json:"defaultCpuSet"`
+	Entries       map[string]map[string]string        `json:"entries,omitempty"`
+	PodEntries    PodCPUAssignments                   `json:"podEntries,omitempty"`
+	Allocations   map[string]map[string]ContainerCPUs `json:"ResizeEntries,omitempty"`
+}
+
+// CPUManagerCheckpoint represents a structure to store cpu manager checkpoint data
 type CPUManagerCheckpoint struct {
+	// CPUManagerCheckpointData embedded actual data, not serialized directly
+	CPUManagerCheckpointData `json:"-"`
+	// Data is a serialized CPUManagerCheckpointData
+	Data string `json:"data"`
+	// Checksum is a checksum of Data
+	Checksum checksum.Checksum `json:"checksum"`
+}
+
+// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v4 format
+type CPUManagerCheckpointV4 = CPUManagerCheckpoint
+
+// CPUManagerCheckpointV3 struct is used to store cpu/pod assignments in a checkpoint in v3 format
+type CPUManagerCheckpointV3 struct {
 	PolicyName    string                       `json:"policyName"`
 	DefaultCPUSet string                       `json:"defaultCpuSet"`
 	Entries       map[string]map[string]string `json:"entries,omitempty"`
 	PodEntries    PodCPUAssignments            `json:"podEntries,omitempty"`
 	Checksum      checksum.Checksum            `json:"checksum"`
 }
-
-// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v3 format
-type CPUManagerCheckpointV3 = CPUManagerCheckpoint
 
 // CPUManagerCheckpointV2 struct is used to store cpu/pod assignments in a checkpoint in v2 format
 type CPUManagerCheckpointV2 struct {
@@ -66,7 +93,7 @@ type CPUManagerCheckpointV1 struct {
 // NewCPUManagerCheckpoint returns an instance of Checkpoint
 func newCPUManagerCheckpoint() *CPUManagerCheckpoint {
 	//nolint:staticcheck // unexported-type-in-api user-facing error message
-	return newCPUManagerCheckpointV3()
+	return newCPUManagerCheckpointV4()
 }
 
 func newCPUManagerCheckpointV1() *CPUManagerCheckpointV1 {
@@ -81,10 +108,19 @@ func newCPUManagerCheckpointV2() *CPUManagerCheckpointV2 {
 	}
 }
 
-func newCPUManagerCheckpointV3() *CPUManagerCheckpoint {
-	return &CPUManagerCheckpoint{
+func newCPUManagerCheckpointV3() *CPUManagerCheckpointV3 {
+	return &CPUManagerCheckpointV3{
 		Entries:    make(map[string]map[string]string),
 		PodEntries: make(PodCPUAssignments),
+	}
+}
+
+func newCPUManagerCheckpointV4() *CPUManagerCheckpointV4 {
+	return &CPUManagerCheckpoint{
+		CPUManagerCheckpointData: CPUManagerCheckpointData{
+			Entries:    make(map[string]map[string]string),
+			PodEntries: make(PodCPUAssignments),
+		},
 	}
 }
 
@@ -115,10 +151,22 @@ func (cp *CPUManagerCheckpointV2) MarshalCheckpoint() ([]byte, error) {
 }
 
 // MarshalCheckpoint returns marshalled checkpoint in v3 format
-func (cp *CPUManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
+func (cp *CPUManagerCheckpointV3) MarshalCheckpoint() ([]byte, error) {
 	// make sure checksum wasn't set before so it doesn't affect output checksum
 	cp.Checksum = 0
 	cp.Checksum = checksum.New(cp)
+	return json.Marshal(*cp)
+}
+
+// MarshalCheckpoint returns marshalled checkpoint in v4 format
+func (cp *CPUManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
+	data, err := json.Marshal(cp.CPUManagerCheckpointData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize cpu manager checkpoint data: %w", err)
+	}
+	cp.Data = string(data)
+	cp.Checksum = checksum.New(cp.Data)
+
 	return json.Marshal(*cp)
 }
 
@@ -133,8 +181,19 @@ func (cp *CPUManagerCheckpointV2) UnmarshalCheckpoint(blob []byte) error {
 }
 
 // UnmarshalCheckpoint tries to unmarshal passed bytes to checkpoint in v3 format
-func (cp *CPUManagerCheckpoint) UnmarshalCheckpoint(blob []byte) error {
+func (cp *CPUManagerCheckpointV3) UnmarshalCheckpoint(blob []byte) error {
 	return json.Unmarshal(blob, cp)
+}
+
+// UnmarshalCheckpoint tries to unmarshal passed bytes to checkpoint in v4 format
+func (cp *CPUManagerCheckpoint) UnmarshalCheckpoint(blob []byte) error {
+	if err := json.Unmarshal(blob, cp); err != nil {
+		return fmt.Errorf("failed to deserialize cpu manager checkpoint: %w", err)
+	}
+	if err := json.Unmarshal([]byte(cp.Data), &cp.CPUManagerCheckpointData); err != nil {
+		return fmt.Errorf("failed to deserialize cpu manager checkpoint data: %w", err)
+	}
+	return nil
 }
 
 // VerifyChecksum verifies that current checksum of checkpoint is valid in v1 format
@@ -200,10 +259,15 @@ func (cp *CPUManagerCheckpointV2) VerifyChecksum() error {
 }
 
 // VerifyChecksum verifies that current checksum of checkpoint is valid in v3 format
-func (cp *CPUManagerCheckpoint) VerifyChecksum() error {
+func (cp *CPUManagerCheckpointV3) VerifyChecksum() error {
 	ck := cp.Checksum
 	cp.Checksum = 0
 	err := ck.Verify(cp)
 	cp.Checksum = ck
 	return err
+}
+
+// VerifyChecksum verifies that current checksum of checkpoint is valid in v4 format
+func (cp *CPUManagerCheckpoint) VerifyChecksum() error {
+	return cp.Checksum.Verify(cp.Data)
 }

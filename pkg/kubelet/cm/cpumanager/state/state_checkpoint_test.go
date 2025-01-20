@@ -36,33 +36,37 @@ import (
 )
 
 const testingCheckpoint = "cpumanager_checkpoint_test"
+const podLevelResourceManagersDisabled = false
+const podLevelResourceManagersEnabled = true
+const inPlacePodVerticalScalingExclusiveCPUsDisabled = false
+const inPlacePodVerticalScalingExclusiveCPUsEnabled = true
 
 func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
-		description                     string
-		checkpointContent               string
-		policyName                      string
-		initialContainers               containermap.ContainerMap
-		expectedError                   string
-		expectedState                   *stateMemory
-		podLevelResourceManagersEnabled bool
+		description                                   string
+		checkpointContent                             string
+		policyName                                    string
+		initialContainers                             containermap.ContainerMap
+		expectedError                                 string
+		expectedState                                 *stateMemory
+		podLevelResourceManagersEnabled               bool
+		inPlacePodVerticalScalingExclusiveCPUsEnabled bool
 	}{
 		{
-			"Restore non-existing checkpoint",
+			"Restore non-existing checkpoint, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs disabled",
 			"",
 			"none",
 			containermap.ContainerMap{},
 			"",
 			&stateMemory{},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore default cpu set",
+			"Restore default cpu set, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "4-6",
-				"entries": {},
-				"checksum": 354655845
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 657950972
 			}`,
 			"none",
 			containermap.ContainerMap{},
@@ -70,20 +74,14 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				defaultCPUSet: cpuset.New(4, 5, 6),
 			},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore valid checkpoint",
+			"Restore valid checkpoint, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "1-3",
-				"entries": {
-					"pod": {
-						"container1": "4-6",
-						"container2": "1-3"
-					}
-				},
-				"checksum": 3610638499
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}",
+				"checksum": 1401970430
 			}`,
 			"none",
 			containermap.ContainerMap{},
@@ -97,80 +95,73 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint with invalid checksum",
+			"Restore checkpoint with invalid checksum, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "4-6",
-				"entries": {},
-				"checksum": 1337
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 1234
 			}`,
 			"none",
 			containermap.ContainerMap{},
 			"checkpoint is corrupted",
 			&stateMemory{},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint with invalid JSON",
+			"Restore checkpoint with invalid JSON, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{`,
 			"none",
 			containermap.ContainerMap{},
 			"unexpected end of JSON input",
 			&stateMemory{},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint with invalid policy name",
+			"Restore checkpoint with invalid policy name, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "other",
-				"defaultCPUSet": "1-3",
-				"entries": {},
-				"checksum": 1394507217
+				"data": "{\"policyName\":\"other\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 633188390
 			}`,
 			"none",
 			containermap.ContainerMap{},
 			`configured policy "none" differs from state checkpoint policy "other"`,
 			&stateMemory{},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint with unparsable default cpu set",
+			"Restore checkpoint with unparsable default cpu set, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "1.3",
-				"entries": {},
-				"checksum": 3021697696
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1.3\"}",
+				"checksum": 3033143655
 			}`,
 			"none",
 			containermap.ContainerMap{},
 			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
 			&stateMemory{},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint with unparsable assignment entry",
+			"Restore checkpoint with unparsable assignment entry, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "1-3",
-				"entries": {
-					"pod": {
-						"container1": "4-6",
-						"container2": "asd"
-					}
-				},
-				"checksum": 962272150
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"asd\"}}}",
+				"checksum": 350330669
 			}`,
 			"none",
 			containermap.ContainerMap{},
 			`could not parse cpuset "asd" for container "container2" in pod "pod": strconv.Atoi: parsing "asd": invalid syntax`,
 			&stateMemory{},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint from checkpoint with v1 checksum",
+			"Restore checkpoint from checkpoint with v1 checksum, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
@@ -182,10 +173,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint with migration",
+			"Restore checkpoint with migration, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
@@ -212,10 +204,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint from v1 (migration) with PodLevelResourceManagers enabled",
+			"Restore checkpoint from v1 (migration) with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
@@ -242,10 +235,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			true,
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers enabled",
+			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
@@ -269,10 +263,49 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			true,
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers disabled",
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod1": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"podEntries": {
+					"pod2": {
+						"cpuSet":"7-9"
+					}
+				},
+				"checksum": 751755688
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod1": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					"pod2": PodEntry{
+						CPUSet: cpuset.New(7, 8, 9),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
+		},
+		{
+			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
@@ -296,25 +329,47 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore valid v3 checkpoint with PodLevelResourceManagers enabled",
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
 				"entries": {
-					"pod": {
+					"pod1": {
 						"container1": "4-6",
 						"container2": "1-3"
 					}
 				},
 				"podEntries": {
-					"pod": {
-						"cpuSet": "4-6"
+					"pod2": {
+						"cpuSet":"7-9"
 					}
 				},
-				"checksum": 2649431787
+				"checksum": 751755688
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod1": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
+		},
+		{
+			"Restore valid v4 checkpoint with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}}}",
+				"checksum": 3246418529
 			}`,
 			"none",
 			containermap.ContainerMap{},
@@ -333,29 +388,18 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			true,
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore valid v3 checkpoint with PodLevelResourceManagers disabled",
+			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled, withInPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "1-3",
-				"entries": {
-					"pod": {
-						"container1": "4-6",
-						"container2": "1-3"
-					}
-				},
-				"podEntries": {
-					"pod": {
-						"cpuSet": "4-6"
-					}
-				},
-				"checksum": 2649431787
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}}}",
+				"checksum": 3246418529
 			}`,
 			"none",
 			containermap.ContainerMap{},
-			"could not restore state from checkpoint",
+			"",
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
 					"pod": map[string]cpuset.CPUSet{
@@ -363,38 +407,494 @@ func TestCheckpointStateRestore(t *testing.T) {
 						"container2": cpuset.New(1, 2, 3),
 					},
 				},
-				podAssignments: PodCPUAssignments{
-					"pod": PodEntry{
-						CPUSet: cpuset.New(4, 5, 6),
-					},
-				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			false,
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore non-existing checkpoint with PodLevelResourceManagers enabled",
+			"Restore non-existing checkpoint with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			"",
 			"none",
 			containermap.ContainerMap{},
 			"",
 			&stateMemory{},
-			true,
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
 		},
 		{
-			"Restore corrupt checkpoint with PodLevelResourceManagers enabled",
+			"Restore corrupt checkpoint with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "1-3",
-				"entries": {},
-				"podEntries": {},
-				"checksum": 12345
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 1234
 			}`,
 			"none",
 			containermap.ContainerMap{},
 			"checkpoint is corrupted",
 			&stateMemory{},
-			true,
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
+		},
+		{
+			"Restore checkpoint without data section, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs disabled",
+			`{
+				"checksum": 1234
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"checkpoint is corrupted",
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
+		},
+		{
+			"Restore checkpoint without checksum section falls back to empty v2 version, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}"
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			`configured policy "none" differs from state checkpoint policy ""`,
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
+		},
+		{
+			"Restore checkpoint ignoring unknown fields in data section, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\",\"unknownField\":\"value\"}",
+				"checksum": 3492408555
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				defaultCPUSet: cpuset.New(4, 5, 6),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsDisabled,
+		},
+		{
+			"Restore non-existing checkpoint, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs enabled",
+			"",
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore default cpu set, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 657950972
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				defaultCPUSet: cpuset.New(4, 5, 6),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore valid checkpoint, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}",
+				"checksum": 1401970430
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint with invalid checksum, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 1234
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"checkpoint is corrupted",
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint with invalid JSON, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{`,
+			"none",
+			containermap.ContainerMap{},
+			"unexpected end of JSON input",
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint with invalid policy name, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"other\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 633188390
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			`configured policy "none" differs from state checkpoint policy "other"`,
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint with unparsable default cpu set, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1.3\"}",
+				"checksum": 3033143655
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint with unparsable assignment entry, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"asd\"}}}",
+				"checksum": 350330669
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			`could not parse cpuset "asd" for container "container2" in pod "pod": strconv.Atoi: parsing "asd": invalid syntax`,
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint from checkpoint with v1 checksum, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"checksum": 1694838852
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint with migration, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"containerID1": "4-6",
+					"containerID2": "1-3"
+				},
+				"checksum": 3680390589
+			}`,
+			"none",
+			func() containermap.ContainerMap {
+				cm := containermap.NewContainerMap()
+				cm.Add("pod", "container1", "containerID1")
+				cm.Add("pod", "container2", "containerID2")
+				return cm
+			}(),
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint from v1 (migration) with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"containerID1": "4-6",
+					"containerID2": "1-3"
+				},
+				"checksum": 3680390589
+			}`,
+			"none",
+			func() containermap.ContainerMap {
+				cm := containermap.NewContainerMap()
+				cm.Add("pod", "container1", "containerID1")
+				cm.Add("pod", "container2", "containerID2")
+				return cm
+			}(),
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 3610638499
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod1": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"podEntries": {
+					"pod2": {
+						"cpuSet":"7-9"
+					}
+				},
+				"checksum": 751755688
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod1": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					"pod2": PodEntry{
+						CPUSet: cpuset.New(7, 8, 9),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 3610638499
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod1": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"podEntries": {
+					"pod2": {
+						"cpuSet":"7-9"
+					}
+				},
+				"checksum": 751755688
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod1": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore valid v4 checkpoint with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}}}",
+				"checksum": 3246418529
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					"pod": PodEntry{
+						CPUSet: cpuset.New(4, 5, 6),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled, withInPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}}}",
+				"checksum": 3246418529
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore non-existing checkpoint with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			"",
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{},
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore corrupt checkpoint with PodLevelResourceManagers enabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
+				"checksum": 1234
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"checkpoint is corrupted",
+			&stateMemory{},
+			podLevelResourceManagersEnabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint without data section, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"checksum": 1234
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"checkpoint is corrupted",
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint without checksum section falls back to empty v2 version, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}"
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			`configured policy "none" differs from state checkpoint policy ""`,
+			&stateMemory{},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
+		},
+		{
+			"Restore checkpoint ignoring unknown fields in data section, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\",\"unknownField\":\"value\"}",
+				"checksum": 3492408555
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				defaultCPUSet: cpuset.New(4, 5, 6),
+			},
+			podLevelResourceManagersDisabled,
+			inPlacePodVerticalScalingExclusiveCPUsEnabled,
 		},
 	}
 
@@ -637,6 +1137,12 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	cpuassignmentSm := sm.GetCPUAssignments()
 	if !reflect.DeepEqual(cpuassignmentSf, cpuassignmentSm) {
 		t.Errorf("State CPU assignments mismatch. Have %s, want %s", cpuassignmentSf, cpuassignmentSm)
+	}
+
+	podcpuassignmentSf := sf.GetPodCPUAssignments()
+	podcpuassignmentSm := sm.GetPodCPUAssignments()
+	if !reflect.DeepEqual(podcpuassignmentSf, podcpuassignmentSm) {
+		t.Errorf("State CPU assignments mismatch. Have %s, want %s", podcpuassignmentSf, podcpuassignmentSm)
 	}
 }
 
