@@ -60,7 +60,7 @@ var _ = SIGDescribe("Upgrade", feature.Upgrade, func() {
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 	})
 
 	// Create the frameworks here because we can only create them
@@ -103,7 +103,7 @@ var _ = SIGDescribe("Downgrade", feature.Downgrade, func() {
 	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 	})
 
 	ginkgo.Describe("cluster downgrade", func() {

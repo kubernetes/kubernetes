@@ -556,11 +556,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 			})
 
 			ginkgo.It("should handle in-cluster config", func(ctx context.Context) {
-				// This test does not work for dynamically linked kubectl binaries; only statically linked ones. The
-				// problem happens when the kubectl binary is copied to a pod in the cluster. For dynamically linked
-				// binaries, the necessary libraries are not also copied. For this reason, the test can not be
-				// guaranteed to work with GKE, which sometimes run tests using a dynamically linked kubectl.
-				e2eskipper.SkipIfProviderIs("gke")
 				// TODO: Find a way to download and copy the appropriate kubectl binary, or maybe a multi-arch kubectl image
 				// for now this only works on amd64
 				e2eskipper.SkipUnlessNodeOSArchIs("amd64")

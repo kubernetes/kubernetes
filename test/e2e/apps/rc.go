@@ -73,7 +73,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 	ginkgo.It("should serve a basic image on each replica with a private image", func(ctx context.Context) {
 		// requires private images
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		privateimage := imageutils.GetConfig(imageutils.AgnhostPrivate)
 		TestReplicationControllerServeImageOrFail(ctx, f, "private", privateimage.GetE2EImage())
 	})

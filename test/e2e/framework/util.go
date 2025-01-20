@@ -135,7 +135,7 @@ const (
 
 var (
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
-	ProvidersWithSSH = []string{"gce", "gke", "aws", "local", "azure"}
+	ProvidersWithSSH = []string{"gce", "aws", "local", "azure"}
 )
 
 // RunID is a unique identifier of the e2e run.
@@ -746,7 +746,7 @@ func GetControlPlaneAddresses(ctx context.Context, c clientset.Interface) []stri
 
 	ips := sets.NewString()
 	switch TestContext.Provider {
-	case "gce", "gke":
+	case "gce":
 		for _, ip := range externalIPs {
 			ips.Insert(ip)
 		}

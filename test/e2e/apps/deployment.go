@@ -161,7 +161,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testProportionalScalingDeployment(ctx, f)
 	})
 	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce")
 		e2eskipper.SkipIfIPv6("aws")
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)

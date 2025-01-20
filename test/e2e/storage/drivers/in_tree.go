@@ -890,7 +890,7 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 }
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
-	e2eskipper.SkipUnlessProviderIs("gce", "gke")
+	e2eskipper.SkipUnlessProviderIs("gce")
 	for _, tag := range pattern.TestTags {
 		if tag == feature.Windows {
 			e2eskipper.SkipUnlessNodeOSDistroIs("windows")

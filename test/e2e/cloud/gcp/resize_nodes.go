@@ -70,25 +70,14 @@ var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 		var originalNodeCount int32
 
 		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessProviderIs("gce", "gke")
+			e2eskipper.SkipUnlessProviderIs("gce")
 			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				ginkgo.By("restoring the original node instance group size")
 				if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 					framework.Failf("Couldn't restore the original node instance group size: %v", err)
 				}
-				// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
-				// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.
-				// Most tests make use of some proxy feature to verify functionality. So, if a reboot test runs
-				// right before a test that tries to get logs, for example, we may get unlucky and try to use a
-				// closed tunnel to a node that was recently rebooted. There's no good way to framework.Poll for proxies
-				// being closed, so we sleep.
-				//
-				// TODO(cjcullen) reduce this sleep (#19314)
-				if framework.ProviderIs("gke") {
-					ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
-					time.Sleep(5 * time.Minute)
-				}
+
 				if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 					framework.Failf("Couldn't restore the original node instance group size: %v", err)
 				}

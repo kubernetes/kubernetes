@@ -65,7 +65,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	e2eproviders "k8s.io/kubernetes/test/e2e/framework/providers"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -1210,9 +1209,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 	f.It("should work after restarting apiserver", f.WithDisruptive(), func(ctx context.Context) {
 
-		if !framework.ProviderIs("gke") {
-			e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx, kubeAPIServerLabelName, cs, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
-		}
+		e2eskipper.SkipUnlessComponentRunsAsPodsAndClientCanDeleteThem(ctx, kubeAPIServerLabelName, cs, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
 
 		// TODO: use the ServiceTestJig here
 		ns := f.Namespace.Name
@@ -4638,15 +4635,6 @@ func validateEndpointsPortsOrFail(ctx context.Context, c clientset.Interface, na
 }
 
 func restartApiserver(ctx context.Context, namespace string, cs clientset.Interface) error {
-	if framework.ProviderIs("gke") {
-		// GKE use a same-version master upgrade to teardown/recreate master.
-		v, err := cs.Discovery().ServerVersion()
-		if err != nil {
-			return err
-		}
-		return e2eproviders.MasterUpgradeGKE(ctx, namespace, v.GitVersion[1:]) // strip leading 'v'
-	}
-
 	return restartComponent(ctx, cs, kubeAPIServerLabelName, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
 }
 

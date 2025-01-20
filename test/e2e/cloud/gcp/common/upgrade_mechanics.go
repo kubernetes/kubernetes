@@ -75,8 +75,6 @@ func controlPlaneUpgrade(ctx context.Context, f *framework.Framework, v string, 
 	switch framework.TestContext.Provider {
 	case "gce":
 		return controlPlaneUpgradeGCE(v, extraEnvs)
-	case "gke":
-		return e2eproviders.MasterUpgradeGKE(ctx, f.Namespace.Name, v)
 	default:
 		return fmt.Errorf("controlPlaneUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
@@ -151,8 +149,6 @@ func nodeUpgrade(ctx context.Context, f *framework.Framework, v string, img stri
 	switch framework.TestContext.Provider {
 	case "gce":
 		err = nodeUpgradeGCE(v, img, extraEnvs)
-	case "gke":
-		err = nodeUpgradeGKE(ctx, f.Namespace.Name, v, img)
 	default:
 		err = fmt.Errorf("nodeUpgrade() is not implemented for provider %s", framework.TestContext.Provider)
 	}
@@ -173,59 +169,6 @@ func nodeUpgradeGCE(rawV, img string, extraEnvs []string) error {
 	}
 	_, _, err := framework.RunCmdEnv(env, e2eproviders.GCEUpgradeScript(), "-N", v)
 	return err
-}
-
-func nodeUpgradeGKE(ctx context.Context, namespace string, v string, img string) error {
-	framework.Logf("Upgrading nodes to version %q and image %q", v, img)
-	nps, err := nodePoolsGKE()
-	if err != nil {
-		return err
-	}
-	framework.Logf("Found node pools %v", nps)
-	for _, np := range nps {
-		args := []string{
-			"container",
-			"clusters",
-			fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-			e2eproviders.LocationParamGKE(),
-			"upgrade",
-			framework.TestContext.CloudConfig.Cluster,
-			fmt.Sprintf("--node-pool=%s", np),
-			fmt.Sprintf("--cluster-version=%s", v),
-			"--quiet",
-		}
-		if len(img) > 0 {
-			args = append(args, fmt.Sprintf("--image-type=%s", img))
-		}
-		_, _, err = framework.RunCmd("gcloud", framework.AppendContainerCommandGroupIfNeeded(args)...)
-
-		if err != nil {
-			return err
-		}
-
-		e2enode.WaitForSSHTunnels(ctx, namespace)
-	}
-	return nil
-}
-
-func nodePoolsGKE() ([]string, error) {
-	args := []string{
-		"container",
-		"node-pools",
-		fmt.Sprintf("--project=%s", framework.TestContext.CloudConfig.ProjectID),
-		e2eproviders.LocationParamGKE(),
-		"list",
-		fmt.Sprintf("--cluster=%s", framework.TestContext.CloudConfig.Cluster),
-		"--format=get(name)",
-	}
-	stdout, _, err := framework.RunCmd("gcloud", framework.AppendContainerCommandGroupIfNeeded(args)...)
-	if err != nil {
-		return nil, err
-	}
-	if len(strings.TrimSpace(stdout)) == 0 {
-		return []string{}, nil
-	}
-	return strings.Fields(stdout), nil
 }
 
 func waitForNodesReadyAfterUpgrade(ctx context.Context, f *framework.Framework) error {
