@@ -98,7 +98,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 		expectedState     *stateMemory
 	}{
 		{
-			"Restore non-existing checkpoint",
+			"Restore non-existing checkpoint, with PodLevelResourceManagers disabled, InPlacePodVerticalScalingExclusiveCPUs disabled",
 			nil,
 			"",
 			"none",
@@ -148,7 +148,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore default CPU set",
+			"Restore default CPU set, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			nil,
 			`{
 				"policyName": "other",
@@ -166,7 +166,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below test case V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore valid checkpoint",
+			"Restore valid checkpoint, with PodLevelResourceManagers disabled, with InPlacePodVerticalScalingExclusiveCPUs disabled",
 			nil,
 			`{
 				"policyName": "other",

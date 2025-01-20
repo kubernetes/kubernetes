@@ -35,3 +35,16 @@ func TestClone(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestCloneWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
+	expect := ContainerCPUAllocations{
+		"pod": map[string]ContainerCPUAllocation{
+			"container1": {Original: cpuset.New(4, 5, 6), Resized: cpuset.New()},
+			"container2": {Original: cpuset.New(1, 2, 3), Resized: cpuset.New()},
+		},
+	}
+	actual := expect.Clone()
+	if &expect == &actual || !reflect.DeepEqual(expect, actual) {
+		t.Fail()
+	}
+}

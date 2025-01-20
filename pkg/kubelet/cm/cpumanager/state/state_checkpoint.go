@@ -127,7 +127,10 @@ func (sc *stateCheckpoint) restoreState() error {
 
 	var tmpDefaultCPUSet cpuset.CPUSet
 	var tmpContainerCPUSet cpuset.CPUSet
+	var tmpContainerOriginalCPUSet cpuset.CPUSet
+	var tmpContainerResizedCPUSet cpuset.CPUSet
 	tmpAssignments := ContainerCPUAssignments{}
+	tmpAllocations := ContainerCPUAllocations{}
 
 	if sc.policyName != cp.CheckpointData.PolicyName {
 		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, cp.CheckpointData.PolicyName)
@@ -135,18 +138,37 @@ func (sc *stateCheckpoint) restoreState() error {
 	if tmpDefaultCPUSet, err = cpuset.Parse(cp.CheckpointData.DefaultCPUSet); err != nil {
 		return fmt.Errorf("could not parse default CPU set %q: %w", cp.CheckpointData.DefaultCPUSet, err)
 	}
-	for pod := range cp.CheckpointData.Entries {
-		tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(cp.CheckpointData.Entries[pod]))
-		for container, cpuString := range cp.CheckpointData.Entries[pod] {
-			if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
-				return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %w", cpuString, container, pod, err)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		for pod := range cp.CheckpointData.Entries {
+			tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(cp.CheckpointData.Entries[pod]))
+			for container, cpuString := range cp.CheckpointData.Entries[pod] {
+				if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
+					return fmt.Errorf("could not parse cpuset %q for container %q in pod %q: %w", cpuString, container, pod, err)
+				}
+				tmpAssignments[pod][container] = tmpContainerCPUSet
 			}
-			tmpAssignments[pod][container] = tmpContainerCPUSet
+		}
+	} else {
+		for pod := range cp.CheckpointData.Allocations {
+			tmpAllocations[pod] = make(map[string]ContainerCPUAllocation, len(cp.CheckpointData.Allocations[pod]))
+			for container, cpuAllocation := range cp.CheckpointData.Allocations[pod] {
+				if tmpContainerOriginalCPUSet, err = cpuset.Parse(cpuAllocation.Original); err != nil {
+					return fmt.Errorf("could not parse Original cpuset %q for container %q in pod %q: %w", cpuAllocation.Original, container, pod, err)
+				}
+				if tmpContainerResizedCPUSet, err = cpuset.Parse(cpuAllocation.Resized); err != nil {
+					return fmt.Errorf("could not parse Resized cpuset %q for container %q in pod %q: %w", cpuAllocation.Resized, container, pod, err)
+				}
+				tmpAllocations[pod][container] = ContainerCPUAllocation{Original: tmpContainerOriginalCPUSet, Resized: tmpContainerResizedCPUSet}
+			}
 		}
 	}
 
 	sc.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
-	sc.cache.SetCPUAssignments(tmpAssignments)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		sc.cache.SetCPUAssignments(tmpAssignments)
+	} else {
+		sc.cache.SetCPUAllocations(tmpAllocations)
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) {
 		sc.cache.SetPodCPUAssignments(cp.CheckpointData.PodEntries)
 	}
@@ -246,11 +268,21 @@ func (sc *stateCheckpoint) storeState() error {
 	checkpoint.CheckpointData.PolicyName = sc.policyName
 	checkpoint.CheckpointData.DefaultCPUSet = sc.cache.GetDefaultCPUSet().String()
 
-	assignments := sc.cache.GetCPUAssignments()
-	for pod := range assignments {
-		checkpoint.CheckpointData.Entries[pod] = make(map[string]string, len(assignments[pod]))
-		for container, cset := range assignments[pod] {
-			checkpoint.CheckpointData.Entries[pod][container] = cset.String()
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		assignments := sc.cache.GetCPUAssignments()
+		for pod := range assignments {
+			checkpoint.CheckpointData.Entries[pod] = make(map[string]string, len(assignments[pod]))
+			for container, cset := range assignments[pod] {
+				checkpoint.CheckpointData.Entries[pod][container] = cset.String()
+			}
+		}
+	} else {
+		allocations := sc.cache.GetCPUAllocations()
+		for pod := range allocations {
+			checkpoint.CheckpointData.Allocations[pod] = make(map[string]ContainerCPUs, len(allocations[pod]))
+			for container, cpuAllocation := range allocations[pod] {
+				checkpoint.CheckpointData.Allocations[pod][container] = ContainerCPUs{Original: cpuAllocation.Original.String(), Resized: cpuAllocation.Resized.String()}
+			}
 		}
 	}
 
@@ -398,6 +430,43 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	sc.cache.ClearState()
+	err := sc.storeState()
+	if err != nil {
+		sc.logger.Error(err, "Failed to store state to checkpoint")
+	}
+}
+
+// GetOriginalCPUSet returns current CPU set
+func (sc *stateCheckpoint) GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetOriginalCPUSet(podUID, containerName)
+}
+
+// GetResizedCPUSet returns current CPU set
+func (sc *stateCheckpoint) GetResizedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetResizedCPUSet(podUID, containerName)
+}
+
+// GetCPUAllocations returns current CPU to pod allocations
+// with InPlacePodVerticalScalingExclusiveCPUs
+func (sc *stateCheckpoint) GetCPUAllocations() ContainerCPUAllocations {
+	sc.mux.RLock()
+	defer sc.mux.RUnlock()
+
+	return sc.cache.GetCPUAllocations()
+}
+
+// SetCPUAllocations sets CPU to pod allocations
+// with InPlacePodVerticalScalingExclusiveCPUs
+func (sc *stateCheckpoint) SetCPUAllocations(a ContainerCPUAllocations) {
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	sc.cache.SetCPUAllocations(a)
 	err := sc.storeState()
 	if err != nil {
 		sc.logger.Error(err, "Failed to store state to checkpoint")
