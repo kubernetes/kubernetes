@@ -273,7 +273,7 @@ type cpuManagerKubeletArguments struct {
 	options                          map[string]string
 }
 
-func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments) *kubeletconfig.KubeletConfiguration {
+func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, kubeletArguments *cpuManagerKubeletArguments, isInPlacePodVerticalScalingAllocatedStatusEnabled bool, isInPlacePodVerticalScalingExclusiveCPUsEnabled bool) *kubeletconfig.KubeletConfiguration {
 	newCfg := oldCfg.DeepCopy()
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
@@ -283,6 +283,8 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
+	newCfg.FeatureGates["InPlacePodVerticalScalingExclusiveCPUs"] = isInPlacePodVerticalScalingExclusiveCPUsEnabled
+	newCfg.FeatureGates["InPlacePodVerticalScalingAllocatedStatus"] = isInPlacePodVerticalScalingAllocatedStatusEnabled
 
 	newCfg.CPUManagerPolicy = kubeletArguments.policyName
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
@@ -850,7 +852,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 			policyName:         string(cpumanager.PolicyStatic),
 			reservedSystemCPUs: cpuset.CPUSet{},
-		})
+		}, false, false)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
 		ginkgo.By("running a non-Gu pod")
@@ -908,7 +910,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
-			},
+			}, false, false,
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -926,7 +928,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				policyName:                       string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: true,
-			},
+			}, false, false,
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 		runCfsQuotaGuPods(ctx, f, true)
@@ -941,7 +943,7 @@ func runCPUManagerTests(f *framework.Framework) {
 				policyName:                       string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: false,
-			},
+			}, false, false,
 		)
 
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -960,7 +962,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 			policyName:         string(cpumanager.PolicyStatic),
 			reservedSystemCPUs: cpuset.CPUSet{},
-		})
+		}, false, false)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
 		ginkgo.By("running a Gu pod with a regular init container and a restartable init container")
