@@ -197,7 +197,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -273,7 +273,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -358,7 +358,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// Now recreate the first backend pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
 		ginkgo.By("Waiting for DaemonSet pods to become ready")
 		err = wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
@@ -445,7 +445,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 

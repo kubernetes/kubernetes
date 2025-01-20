@@ -34,7 +34,6 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -373,12 +372,7 @@ func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod)
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
-			err := e2epod.NewPodClient(f).Delete(ctx, pod.ObjectMeta.Name, *metav1.NewDeleteOptions(30))
-			if apierrors.IsNotFound(err) {
-				framework.Failf("Unexpected error trying to delete pod %s: %v", pod.Name, err)
-			}
-
-			framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.ObjectMeta.Name, f.Namespace.Name, 10*time.Minute))
+			e2epod.NewPodClient(f).DeleteSync(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		}()
 	}
 	wg.Wait()

@@ -251,7 +251,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 		ginkgo.AfterEach(func(ctx context.Context) {
 			for _, pod := range test.testPods {
 				ginkgo.By(fmt.Sprintf("Deleting Pod %v", pod.podName))
-				e2epod.NewPodClient(f).DeleteSync(ctx, pod.podName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+				e2epod.NewPodClient(f).DeleteSync(ctx, pod.podName, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			}
 
 			ginkgo.By("Making sure all containers get cleaned up")
