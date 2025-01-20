@@ -31,19 +31,22 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
 type testCase struct {
-	name                            string
-	pod                             v1.Pod
-	container                       v1.Container
-	assignments                     state.ContainerCPUAssignments
-	defaultCPUSet                   cpuset.CPUSet
-	expectedHints                   []topologymanager.TopologyHint
-	podLevelResourcesEnabled        bool
-	podLevelResourceManagersEnabled bool
+	name                                          string
+	pod                                           v1.Pod
+	container                                     v1.Container
+	assignments                                   state.ContainerCPUAssignments
+	allocations                                   state.ContainerCPUAllocations
+	defaultCPUSet                                 cpuset.CPUSet
+	expectedHints                                 []topologymanager.TopologyHint
+	podLevelResourcesEnabled                      bool
+	podLevelResourceManagersEnabled               bool
+	inPlacePodVerticalScalingExclusiveCPUsEnabled bool
 }
 
 func returnMachineInfo() cadvisorapi.MachineInfo {
@@ -270,7 +273,7 @@ func TestGetTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		hints := m.GetTopologyHints(logger, &tc.pod, &tc.container)[string(v1.ResourceCPU)]
+		hints := m.GetTopologyHints(logger, &tc.pod, &tc.container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue
 		}
@@ -326,7 +329,7 @@ func TestGetPodTopologyHints(t *testing.T) {
 			sourcesReady:      &sourcesReadyStub{},
 		}
 
-		podHints := m.GetPodTopologyHints(logger, &tc.pod)[string(v1.ResourceCPU)]
+		podHints := m.GetPodTopologyHints(logger, &tc.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(podHints) == 0 {
 			continue
 		}
@@ -509,7 +512,7 @@ func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
 				sourcesReady:      &sourcesReadyStub{},
 			}
 
-			podHints := m.GetPodTopologyHints(tCtx.Logger(), &testCase.pod)[string(v1.ResourceCPU)]
+			podHints := m.GetPodTopologyHints(tCtx.Logger(), &testCase.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})
@@ -634,7 +637,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 			}
 
 			// Test GetPodTopologyHints
-			podHints := m.GetPodTopologyHints(logger, &tc.pod)[string(v1.ResourceCPU)]
+			podHints := m.GetPodTopologyHints(logger, &tc.pod, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 			sort.SliceStable(podHints, func(i, j int) bool {
 				return podHints[i].LessThan(podHints[j])
 			})
@@ -646,7 +649,7 @@ func TestTopologyHintsPodLevelResources(t *testing.T) {
 			}
 
 			// Test GetTopologyHints
-			containerHints := m.GetTopologyHints(logger, &tc.pod, &tc.container)[string(v1.ResourceCPU)]
+			containerHints := m.GetTopologyHints(logger, &tc.pod, &tc.container, lifecycle.AddOperation)[string(v1.ResourceCPU)]
 			sort.SliceStable(containerHints, func(i, j int) bool {
 				return containerHints[i].LessThan(containerHints[j])
 			})
@@ -775,6 +778,7 @@ func returnTestCases() []testCase {
 					Preferred:        false,
 				},
 			},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: false,
 		},
 		{
 			name:      "Regenerate Single-Node NUMA Hints if already allocated 1/2",
@@ -796,6 +800,7 @@ func returnTestCases() []testCase {
 					Preferred:        false,
 				},
 			},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: false,
 		},
 		{
 			name:      "Regenerate Cross-NUMA Hints if already allocated",
@@ -813,6 +818,7 @@ func returnTestCases() []testCase {
 					Preferred:        true,
 				},
 			},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
 		},
 		{
 			name:      "Requested less than already allocated",
@@ -825,6 +831,7 @@ func returnTestCases() []testCase {
 			},
 			defaultCPUSet: cpuset.New(),
 			expectedHints: []topologymanager.TopologyHint{},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
 		},
 		{
 			name:      "Requested more than already allocated",
@@ -837,6 +844,7 @@ func returnTestCases() []testCase {
 			},
 			defaultCPUSet: cpuset.New(),
 			expectedHints: []topologymanager.TopologyHint{},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
 		},
 		{
 			name:                            "Pod has pod level resources but PodLevelResourceManagersEnabled is disabled, no hint generation",
@@ -873,6 +881,94 @@ func returnTestCases() []testCase {
 			expectedHints:                   nil,
 			podLevelResourcesEnabled:        true,
 			podLevelResourceManagersEnabled: true,
+		},
+		{
+			name:      "Regenerate Single-Node NUMA Hints if already allocated 1/2, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			pod:       *testPod1,
+			container: *testContainer1,
+			allocations: state.ContainerCPUAllocations{
+				string(testPod1.UID): map[string]state.ContainerCPUAllocation{
+					testContainer1.Name: {Original: cpuset.New(0, 6), Resized: cpuset.New()},
+				},
+			},
+			defaultCPUSet: cpuset.New(),
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: firstSocketMask,
+					Preferred:        true,
+				},
+				{
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
+				},
+			},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
+		},
+		{
+			name:      "Regenerate Single-Node NUMA Hints if already allocated 1/2, with InPlacePodVerticalScalingExclusiveCPUs enabled",
+			pod:       *testPod1,
+			container: *testContainer1,
+			allocations: state.ContainerCPUAllocations{
+				string(testPod1.UID): map[string]state.ContainerCPUAllocation{
+					testContainer1.Name: {Original: cpuset.New(3, 9), Resized: cpuset.New()},
+				},
+			},
+			defaultCPUSet: cpuset.New(),
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: secondSocketMask,
+					Preferred:        true,
+				},
+				{
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
+				},
+			},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
+		},
+		{
+			name:      "Regenerate Cross-NUMA Hints if already allocated, with InPlacePodVerticalScalingExclusiveCPUs",
+			pod:       *testPod4,
+			container: *testContainer4,
+			allocations: state.ContainerCPUAllocations{
+				string(testPod1.UID): map[string]state.ContainerCPUAllocation{
+					testContainer4.Name: {Original: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10), Resized: cpuset.New()},
+				},
+			},
+			defaultCPUSet: cpuset.New(),
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        true,
+				},
+			},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
+		},
+		{
+			name:      "Requested less than already allocated, with InPlacePodVerticalScalingExclusiveCPUs",
+			pod:       *testPod1,
+			container: *testContainer1,
+			allocations: state.ContainerCPUAllocations{
+				string(testPod1.UID): map[string]state.ContainerCPUAllocation{
+					testContainer1.Name: {Original: cpuset.New(0, 6, 3, 9), Resized: cpuset.New()},
+				},
+			},
+			defaultCPUSet: cpuset.New(),
+			expectedHints: []topologymanager.TopologyHint{},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
+		},
+		{
+			name:      "Requested more than already allocated, with InPlacePodVerticalScalingExclusiveCPUs",
+			pod:       *testPod4,
+			container: *testContainer4,
+			allocations: state.ContainerCPUAllocations{
+				string(testPod4.UID): map[string]state.ContainerCPUAllocation{
+					testContainer4.Name: {Original: cpuset.New(0, 6, 3, 9), Resized: cpuset.New()},
+				},
+			},
+			defaultCPUSet: cpuset.New(),
+			expectedHints: []topologymanager.TopologyHint{},
+			inPlacePodVerticalScalingExclusiveCPUsEnabled: true,
 		},
 	}
 }
