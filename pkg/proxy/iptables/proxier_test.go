@@ -135,7 +135,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		natRules:                 proxyutil.NewLineBuffer(),
 		nodeIP:                   netutils.ParseIPSloppy(testNodeIP),
 		localhostNodePorts:       true,
-		nodePortAddresses:        proxyutil.NewNodePortAddresses(ipfamily, nil),
+		nodeAddressHandler:       proxyutil.NewNodeAddressHandler(ipfamily, nil),
 		networkInterfacer:        networkInterfacer,
 		nfAcctCounters: map[string]bool{
 			metrics.IPTablesCTStateInvalidDroppedNFAcctCounter: true,
@@ -2352,7 +2352,7 @@ func TestNodePorts(t *testing.T) {
 			fp := NewFakeProxier(ipt)
 			fp.localhostNodePorts = tc.localhostNodePorts
 			if tc.nodePortAddresses != nil {
-				fp.nodePortAddresses = proxyutil.NewNodePortAddresses(tc.family, tc.nodePortAddresses)
+				fp.nodeAddressHandler = proxyutil.NewNodeAddressHandler(tc.family, tc.nodePortAddresses)
 			}
 
 			makeServiceMap(fp,
@@ -2500,7 +2500,7 @@ func TestNodePorts(t *testing.T) {
 func TestHealthCheckNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
-	fp.nodePortAddresses = proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	fp.nodeAddressHandler = proxyutil.NewNodeAddressHandler(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
 	svcIP := "172.30.0.42"
 	svcPort := 80

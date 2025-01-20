@@ -57,17 +57,17 @@ type proxyHealthChecker interface {
 	Health() ProxyHealth
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
+func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodeAddressHandler *proxyutil.NodeAddressHandler, healthzServer proxyHealthChecker) ServiceHealthServer {
 	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
 	// treats them all the same.
 	nodeIPs := []net.IP{net.IPv4zero}
 
-	if !nodePortAddresses.MatchAll() {
-		ips, err := nodePortAddresses.GetNodeIPs(proxyutil.RealNetwork{})
+	if !nodeAddressHandler.MatchAll() {
+		ips, err := nodeAddressHandler.GetNodeIPs(proxyutil.RealNetwork{})
 		if err == nil {
 			nodeIPs = ips
 		} else {
-			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
+			klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodeAddresses", nodeAddressHandler)
 		}
 	}
 
@@ -83,7 +83,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
+func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodeAddressHandler, healthzServer proxyHealthChecker) ServiceHealthServer {
 	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
 }
 

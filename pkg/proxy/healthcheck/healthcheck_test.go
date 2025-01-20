@@ -145,10 +145,10 @@ func (fake fakeProxyHealthChecker) Health() ProxyHealth {
 func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
+	nodeAddressHandler := proxyutil.NewNodeAddressHandler(v1.IPv4Protocol, []string{})
 	proxyChecker := &fakeProxyHealthChecker{true}
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodeAddressHandler, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -946,9 +946,9 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 
 	// limiting addresses to loop back. We don't want any cleverness here around getting IP for
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
-	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
+	nodeAddressHandler := proxyutil.NewNodeAddressHandler(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodeAddressHandler, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
