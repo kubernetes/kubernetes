@@ -18,6 +18,7 @@ package volumepathhandler
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -29,24 +30,19 @@ func pathWithSuffix(suffix string) string {
 }
 
 func createTestDevice(t *testing.T) string {
-	executor := utilexec.New()
-	backingFile := filepath.Join(t.TempDir(), "backingFile")
-
-	out, err := executor.Command("fallocate", "-l", "1M", backingFile).CombinedOutput()
+	tempDir, err := os.MkdirTemp("", "test-get-filetype-")
 	if err != nil {
-		t.Fatalf("failed to create backing file: %v, %v", err, string(out))
-	}
-	devicePath, err := makeLoopDevice(backingFile)
-	if err != nil {
-		t.Fatalf("failed to create loop device: %v", err)
+		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	t.Cleanup(func() {
-		err := removeLoopDevice(devicePath)
-		if err != nil {
-			t.Errorf("failed to remove loop device: %v", err)
-		}
+		os.RemoveAll(tempDir)
 	})
-	return devicePath
+	tempBlockFile := filepath.Join(tempDir, "test_blk_dev")
+	outputBytes, err := utilexec.New().Command("mknod", tempBlockFile, "b", "89", "1").CombinedOutput()
+	if err != nil {
+		t.Fatalf("failed to create block device: %v, %v", err, string(outputBytes))
+	}
+	return tempBlockFile
 }
 
 func TestCleanBackingFilePath(t *testing.T) {
