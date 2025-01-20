@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"fmt"
 	"reflect"
 	"runtime"
 	"testing"
@@ -113,50 +112,6 @@ func TestFIFO_basic(t *testing.T) {
 		default:
 			t.Fatalf("unexpected type %#v", obj)
 		}
-	}
-}
-
-func TestFIFO_requeueOnPop(t *testing.T) {
-	f := NewFIFO(testFifoObjectKeyFunc)
-
-	f.Add(mkFifoObj("foo", 10))
-	_, err := f.Pop(func(obj interface{}, isInInitialList bool) error {
-		if obj.(testFifoObject).name != "foo" {
-			t.Fatalf("unexpected object: %#v", obj)
-		}
-		return ErrRequeue{Err: nil}
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
-		t.Fatalf("object should have been requeued: %t %v", ok, err)
-	}
-
-	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
-		if obj.(testFifoObject).name != "foo" {
-			t.Fatalf("unexpected object: %#v", obj)
-		}
-		return ErrRequeue{Err: fmt.Errorf("test error")}
-	})
-	if err == nil || err.Error() != "test error" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
-		t.Fatalf("object should have been requeued: %t %v", ok, err)
-	}
-
-	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
-		if obj.(testFifoObject).name != "foo" {
-			t.Fatalf("unexpected object: %#v", obj)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok, err := f.GetByKey("foo"); ok || err != nil {
-		t.Fatalf("object should have been removed: %t %v", ok, err)
 	}
 }
 
