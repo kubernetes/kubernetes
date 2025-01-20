@@ -64,11 +64,6 @@ type Queue interface {
 	// Pop.
 	Pop(PopProcessFunc) (interface{}, error)
 
-	// AddIfNotPresent puts the given accumulator into the Queue (in
-	// association with the accumulator's key) if and only if that key
-	// is not already associated with a non-empty accumulator.
-	AddIfNotPresent(interface{}) error
-
 	// HasSynced returns true if the first batch of keys have all been
 	// popped.  The first batch of keys are those of the first Replace
 	// operation if that happened before any Add, AddIfNotPresent,
@@ -174,23 +169,6 @@ func (f *FIFO) Add(obj interface{}) error {
 	}
 	f.items[id] = obj
 	f.cond.Broadcast()
-	return nil
-}
-
-// AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
-// present in the set, it is neither enqueued nor added to the set.
-//
-// This is useful in a single producer/consumer scenario so that the consumer can
-// safely retry items without contending with the producer and potentially enqueueing
-// stale items.
-func (f *FIFO) AddIfNotPresent(obj interface{}) error {
-	id, err := f.keyFunc(obj)
-	if err != nil {
-		return KeyError{obj, err}
-	}
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.addIfNotPresent(id, obj)
 	return nil
 }
 

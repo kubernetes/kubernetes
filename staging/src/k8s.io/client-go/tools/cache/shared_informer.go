@@ -552,7 +552,6 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 			ObjectType:        s.objectType,
 			ObjectDescription: s.objectDescription,
 			FullResyncPeriod:  s.resyncCheckPeriod,
-			RetryOnError:      false,
 			ShouldResync:      s.processor.shouldResync,
 
 			Process:                      s.HandleDeltas,

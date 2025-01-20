@@ -62,7 +62,6 @@ func Example() {
 		ListerWatcher:    source,
 		ObjectType:       &v1.Pod{},
 		FullResyncPeriod: time.Millisecond * 100,
-		RetryOnError:     false,
 
 		// Let's implement a simple controller that just deletes
 		// everything that comes in.

@@ -369,30 +369,6 @@ func (f *DeltaFIFO) Delete(obj interface{}) error {
 	return f.queueActionLocked(Deleted, obj)
 }
 
-// AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
-// present in the set, it is neither enqueued nor added to the set.
-//
-// This is useful in a single producer/consumer scenario so that the consumer can
-// safely retry items without contending with the producer and potentially enqueueing
-// stale items.
-//
-// Important: obj must be a Deltas (the output of the Pop() function). Yes, this is
-// different from the Add/Update/Delete functions.
-func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
-	deltas, ok := obj.(Deltas)
-	if !ok {
-		return fmt.Errorf("object must be of type deltas, but got: %#v", obj)
-	}
-	id, err := f.KeyOf(deltas)
-	if err != nil {
-		return KeyError{obj, err}
-	}
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.addIfNotPresent(id, deltas)
-	return nil
-}
-
 // addIfNotPresent inserts deltas under id if it does not exist, and assumes the caller
 // already holds the fifo lock.
 func (f *DeltaFIFO) addIfNotPresent(id string, deltas Deltas) {

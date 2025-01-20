@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -878,39 +877,6 @@ func TestDeltaFIFO_detectLineJumpers(t *testing.T) {
 
 	if e, a := 14, testPop(f).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
-	}
-}
-
-func TestDeltaFIFO_addIfNotPresent(t *testing.T) {
-	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
-
-	emptyDeltas := Deltas{}
-	if err := f.AddIfNotPresent(emptyDeltas); err == nil || !errors.Is(err, ErrZeroLengthDeltasObject) {
-		t.Errorf("Expected error '%v', got %v", ErrZeroLengthDeltasObject, err)
-	}
-
-	f.Add(mkFifoObj("b", 3))
-	b3 := Pop(f)
-	f.Add(mkFifoObj("c", 4))
-	c4 := Pop(f)
-	if e, a := 0, len(f.items); e != a {
-		t.Fatalf("Expected %v, got %v items in queue", e, a)
-	}
-
-	f.Add(mkFifoObj("a", 1))
-	f.Add(mkFifoObj("b", 2))
-	f.AddIfNotPresent(b3)
-	f.AddIfNotPresent(c4)
-
-	if e, a := 3, len(f.items); a != e {
-		t.Fatalf("expected queue length %d, got %d", e, a)
-	}
-
-	expectedValues := []int{1, 2, 4}
-	for _, expected := range expectedValues {
-		if actual := testPop(f).val; actual != expected {
-			t.Fatalf("expected value %d, got %d", expected, actual)
-		}
 	}
 }
 
