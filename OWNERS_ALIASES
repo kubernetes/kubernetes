@@ -159,9 +159,10 @@ aliases:
   # - verult
   sig-scheduling-maintainers:
     - alculquicondor
-    - Huang-Wei
     - ahg-g
+    - Huang-Wei
     - kerthcet
+    - macsko
     - sanposhiho
   # emeritus:
   # - damemi
