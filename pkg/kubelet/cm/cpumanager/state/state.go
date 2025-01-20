@@ -110,7 +110,6 @@ func (a PodCPUAssignments) Clone() PodCPUAssignments {
 	return clone
 }
 
-// ContainerCPUAllocation tracks the current allocation state
 // ContainerCPUBaselines tracks the allocation state at admission time.
 // If in-place vertical scaling is enabled, the allocation state at admission
 // time is required to proper resource accounting; otherwise the field is

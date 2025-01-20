@@ -67,6 +67,7 @@ type staticPolicyTest struct {
 	options         map[string]string
 	containerName   string
 	stAssignments   state.ContainerCPUAssignments
+	stBaselines     state.ContainerCPUBaselines
 	stDefaultCPUSet cpuset.CPUSet
 	pod             *v1.Pod
 	topologyHint    *topologymanager.TopologyHint
@@ -86,6 +87,7 @@ func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
 		options:         spt.options, // accessed in read-only
 		containerName:   spt.containerName,
 		stAssignments:   spt.stAssignments.Clone(),
+		stBaselines:     spt.stBaselines.Clone(),
 		stDefaultCPUSet: spt.stDefaultCPUSet.Clone(),
 		pod:             spt.pod, // accessed in read-only
 		expErr:          spt.expErr,
@@ -2173,11 +2175,13 @@ type staticPolicyAllocatePodTest struct {
 	reservedCPUs                    cpuset.CPUSet
 	options                         map[string]string
 	stAssignments                   state.ContainerCPUAssignments
+	stBaselines                     state.ContainerCPUBaselines
 	stDefaultCPUSet                 cpuset.CPUSet
 	pod                             *v1.Pod
 	topologyHint                    topologymanager.TopologyHint
 	expErr                          error
 	expPodAssignments               state.ContainerCPUAssignments
+	expPodBaselines                 state.ContainerCPUBaselines
 	expDefaultCPUSet                cpuset.CPUSet
 	podLevelResourcesEnabled        bool
 	podLevelResourceManagersEnabled bool
@@ -3003,131 +3007,515 @@ func TestStaticPolicyLifecycleAllocatePod(t *testing.T) {
 	}
 }
 
-func TestStaticPolicyLifecycleGetTopologyHints(t *testing.T) {
+// The following lifecycle tests verify that InPlacePodVerticalScalingExclusiveCPUs
+// alongside static CPU manager policy processes resize operations as per KEP
+// All following tests require InPlacePodVerticalScalingExclusiveCPUs enabled
+type staticPolicyResizeTest struct {
+	description     string
+	topo            *topology.CPUTopology
+	numReservedCPUs int
+	reservedCPUs    *cpuset.CPUSet
+	podUID          string
+	options         map[string]string
+	containerName   string
+	stAssignments   state.ContainerCPUAssignments
+	stBaselines     state.ContainerCPUBaselines
+	stDefaultCPUSet cpuset.CPUSet
+	pod             *v1.Pod
+	qosClass        v1.PodQOSClass
+	podAllocated    string
+	resizeLimit     string
+	resizeRequest   string
+	topologyHint    *topologymanager.TopologyHint
+	expErr          error
+	expCPUAlloc     bool
+	expCSet         cpuset.CPUSet
+}
+
+// this is not a real Clone() - hence Pseudo- - because we don't clone some
+// objects which are accessed read-only
+func (spt staticPolicyResizeTest) PseudoClone() staticPolicyResizeTest {
+	return staticPolicyResizeTest{
+		description:     spt.description,
+		topo:            spt.topo, // accessed in read-only
+		numReservedCPUs: spt.numReservedCPUs,
+		podUID:          spt.podUID,
+		options:         spt.options, // accessed in read-only
+		containerName:   spt.containerName,
+		stAssignments:   spt.stAssignments.Clone(),
+		stBaselines:     spt.stBaselines.Clone(),
+		stDefaultCPUSet: spt.stDefaultCPUSet.Clone(),
+		pod:             spt.pod, // accessed in read-only
+		qosClass:        spt.qosClass,
+		podAllocated:    spt.podAllocated,
+		resizeLimit:     spt.resizeLimit,
+		resizeRequest:   spt.resizeRequest,
+		topologyHint:    spt.topologyHint, // accessed in read-only
+		expErr:          spt.expErr,
+		expCPUAlloc:     spt.expCPUAlloc,
+		expCSet:         spt.expCSet.Clone(),
+	}
+}
+
+func TestStaticPolicyStartAlognsideInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+	testCases := []staticPolicyResizeTest{
+		{
+			description: "non-corrupted state",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"0": cpuset.New(0),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePod": map[string]state.ContainerCPUBaseline{
+					"0": {Baseline: cpuset.New(0)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expCSet:         cpuset.New(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			description:     "empty cpuset",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stBaselines:     state.ContainerCPUBaselines{},
+			stDefaultCPUSet: cpuset.New(),
+			expCSet:         cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+		},
+		{
+			description:     "reserved cores 0 & 6 are not present in available cpuset",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 2,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stBaselines:     state.ContainerCPUBaselines{},
+			stDefaultCPUSet: cpuset.New(0, 1),
+			expErr:          fmt.Errorf("not all reserved cpus: \"0,6\" are present in defaultCpuSet: \"0-1\""),
+		},
+		{
+			description:     "some of reserved cores are present in available cpuset (StrictCPUReservationOption)",
+			topo:            topoDualSocketHT,
+			numReservedCPUs: 2,
+			options:         map[string]string{StrictCPUReservationOption: "true"},
+			stAssignments:   state.ContainerCPUAssignments{},
+			stBaselines:     state.ContainerCPUBaselines{},
+			stDefaultCPUSet: cpuset.New(0, 1),
+			expErr:          fmt.Errorf("some of strictly reserved cpus: \"0\" are present in defaultCpuSet: \"0-1\""),
+		},
+		{
+			description: "assigned core 2 is still present in available cpuset",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"0": cpuset.New(0, 1, 2),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePod": map[string]state.ContainerCPUBaseline{
+					"0": {Baseline: cpuset.New(0, 1, 2)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expErr:          fmt.Errorf("pod: fakePod, container: 0 cpuset: \"0-2\" overlaps with default cpuset \"2-11\""),
+		},
+		{
+			description: "assigned core 2 is still present in available cpuset (StrictCPUReservationOption)",
+			topo:        topoDualSocketHT,
+			options:     map[string]string{StrictCPUReservationOption: "true"},
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"0": cpuset.New(0, 1, 2),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePod": map[string]state.ContainerCPUBaseline{
+					"0": {Baseline: cpuset.New(0, 1, 2)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			expErr:          fmt.Errorf("pod: fakePod, container: 0 cpuset: \"0-2\" overlaps with default cpuset \"2-11\""),
+		},
+		{
+			description: "core 12 is not present in topology but is in state cpuset",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"0": cpuset.New(0, 1, 2),
+					"1": cpuset.New(3, 4),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePod": map[string]state.ContainerCPUBaseline{
+					"0": {Baseline: cpuset.New(0, 1, 2)},
+					"1": {Baseline: cpuset.New(3, 4)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(5, 6, 7, 8, 9, 10, 11, 12),
+			expErr:          fmt.Errorf("current set of available CPUs \"0-11\" doesn't match with CPUs in state \"0-12\""),
+		},
+		{
+			description: "core 11 is present in topology but is not in state cpuset",
+			topo:        topoDualSocketHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"0": cpuset.New(0, 1, 2),
+					"1": cpuset.New(3, 4),
+				},
+			},
+			stBaselines: state.ContainerCPUBaselines{
+				"fakePod": map[string]state.ContainerCPUBaseline{
+					"0": {Baseline: cpuset.New(0, 1, 2)},
+					"1": {Baseline: cpuset.New(3, 4)},
+				},
+			},
+			stDefaultCPUSet: cpuset.New(5, 6, 7, 8, 9, 10),
+			expErr:          fmt.Errorf("current set of available CPUs \"0-11\" doesn't match with CPUs in state \"0-10\""),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+			p, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), testCase.options)
+			if err != nil {
+				t.Fatalf("NewStaticPolicy() failed: %v", err)
+			}
+			policy := p.(*staticPolicy)
+			st := &mockState{
+				assignments:   testCase.stAssignments,
+				baselines:     testCase.stBaselines,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+			err = policy.Start(logger, st)
+			if !reflect.DeepEqual(err, testCase.expErr) {
+				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
+					testCase.description, testCase.expErr, err)
+			}
+			if err != nil {
+				return
+			}
+
+			if !testCase.stDefaultCPUSet.IsEmpty() {
+				for cpuid := 1; cpuid < policy.topology.NumCPUs; cpuid++ {
+					if !st.defaultCPUSet.Contains(cpuid) {
+						t.Errorf("StaticPolicy Start() error. expected cpuid %d to be present in defaultCPUSet", cpuid)
+					}
+				}
+			}
+			if !st.GetDefaultCPUSet().Equals(testCase.expCSet) {
+				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
+					testCase.expCSet)
+			}
+
+		})
+	}
+}
+
+func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 	testCases := []struct {
-		description string
-		operation   lifecycle.Operation
-		skipped     bool
+		staticPolicyResizeTest
+		expAllocErr            error
+		expCSetAfterAlloc      cpuset.CPUSet
+		expCSetAfterResize     cpuset.CPUSet
+		expCSetAfterResizeSize int
+		expCSetAfterRemove     cpuset.CPUSet
 	}{
 		{
-			description: "CPUManager static policy processes AddOperation",
-			operation:   lifecycle.AddOperation,
-			skipped:     false,
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in exclusively allocated pool, Increase allocated CPUs",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0, 4
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "2000m",
+				resizeLimit:     "4000m",
+				resizeRequest:   "4000m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:  cpuset.New(1, 2, 3, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(2, 3, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 		},
 		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
-			skipped:     true,
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in exclusively allocated pool, Keep same allocated CPUs",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0, 4
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "2000m",
+				resizeLimit:     "2000m",
+				resizeRequest:   "2000m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expAllocErr:        inconsistentCPUAllocationError{RequestedCPUs: "2", AllocatedCPUs: "2", Shared2Exclusive: false},
+			expCSetAfterAlloc:  cpuset.New(1, 2, 3, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(1, 2, 3, 5, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 		},
 		{
-			description: "CPUManager static policy skips empty operation",
-			operation:   "",
-			skipped:     true,
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in exclusively allocated pool, Decrease allocated CPUs",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "4000m", limit: "4000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "4000m",
+				resizeLimit:     "2000m",
+				resizeRequest:   "2000m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expAllocErr:            prohibitedCPUAllocationError{RequestedCPUs: "2", AllocatedCPUs: "4", BaselineCPUs: 4, GuaranteedCPUs: 2},
+			expCSetAfterAlloc:      cpuset.New(2, 3, 6, 7),
+			expCSetAfterResizeSize: 4,
+			expCSetAfterRemove:     cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in shared pool with more than one core, Attempt to move to exclusively allocated pool",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "2100m", limit: "2100m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "2100m",
+				resizeLimit:     "2000m",
+				resizeRequest:   "2000m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expAllocErr:        inconsistentCPUAllocationError{RequestedCPUs: "2", AllocatedCPUs: "2100m", Shared2Exclusive: true},
+			expCSetAfterAlloc:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in shared pool, Increase CPU and keep in shared pool",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "100m", limit: "100m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "100m",
+				resizeLimit:     "200m",
+				resizeRequest:   "200m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in shared pool, Increase CPU and keep in shared pool",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "1100m", limit: "1100m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "1100m",
+				resizeLimit:     "1200m",
+				resizeRequest:   "1200m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in shared pool with less than one core, Decrease CPU and keep in shared pool",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "200m", limit: "200m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "200m",
+				resizeLimit:     "100m",
+				resizeRequest:   "100m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in shared pool with more than one core, Decrease CPU and keep in shared pool",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "1200m", limit: "1200m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-7
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "1200m",
+				resizeLimit:     "1100m",
+				resizeRequest:   "1100m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expCSetAfterAlloc:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+		},
+		{
+			staticPolicyResizeTest: staticPolicyResizeTest{
+				description: "SingleSocketHT, PodResize, Container in exclusively allocated pool, Move to shared pool",
+				topo:        topoSingleSocketHT,
+				pod: makeMultiContainerPodWithOptions(
+					nil,
+					[]*containerOptions{
+						{request: "2000m", limit: "2000m", restartPolicy: v1.ContainerRestartPolicy("Never")}}, // 0-1, 4-5
+				),
+				qosClass:        v1.PodQOSGuaranteed,
+				podAllocated:    "2000m",
+				resizeLimit:     "1500m",
+				resizeRequest:   "1500m",
+				containerName:   "appContainer-0",
+				stAssignments:   state.ContainerCPUAssignments{},
+				stBaselines:     state.ContainerCPUBaselines{},
+				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			},
+			expAllocErr:        inconsistentCPUAllocationError{RequestedCPUs: "1500m", AllocatedCPUs: "2", Shared2Exclusive: false},
+			expCSetAfterAlloc:  cpuset.New(1, 2, 3, 5, 6, 7),
+			expCSetAfterResize: cpuset.New(1, 2, 3, 5, 6, 7),
+			expCSetAfterRemove: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 		},
 	}
 
 	for _, testCase := range testCases {
+		logger, _ := ktesting.NewTestContext(t)
 		t.Run(testCase.description, func(t *testing.T) {
-			ktesting.SetDefaultVerbosity(2)
-			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
-			logger := tCtx.Logger()
-
-			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScalingExclusiveCPUs, true)
+			policy, err := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
 			if err != nil {
 				t.Fatalf("NewStaticPolicy() failed: %v", err)
 			}
 
 			st := &mockState{
-				assignments:   state.ContainerCPUAssignments{},
-				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+				assignments:   testCase.stAssignments,
+				baselines:     testCase.stBaselines,
+				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
-			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
-			container := pod.Spec.Containers[0]
+			pod := testCase.pod
+			pod.Status.QOSClass = testCase.qosClass
 
-			hints := policy.GetTopologyHints(logger, st, pod, &container, testCase.operation)
-			if hints != nil {
-				t.Errorf("Unexpected hints: %v", hints)
+			// allocate
+			for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+				err := policy.Allocate(logger, st, pod, &container, lifecycle.AddOperation)
+				if err != nil {
+					t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
+						testCase.description, err)
+				}
+			}
+			if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
+				t.Errorf("StaticPolicy Allocate() error (%v) before pod resize. expected default cpuset %v but got %v",
+					testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)
 			}
 
-			underlier, ok := logger.GetSink().(ktesting.Underlier)
-			if !ok {
-				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
+			// resize
+			pod.Status.ContainerStatuses = []v1.ContainerStatus{
+				{
+					Name: testCase.containerName,
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse(testCase.podAllocated),
+					},
+				},
 			}
-			logs := underlier.GetBuffer().String()
-			expectedLog := "CPU Manager container-level hint generation skipped, operation not supported by the static CPU manager policy"
-			if testCase.skipped {
-				if !strings.Contains(logs, expectedLog) {
-					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
+			pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU): resource.MustParse(testCase.resizeLimit),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU): resource.MustParse(testCase.resizeRequest),
+				},
+			}
+			podResized := pod
+			for _, container := range append(podResized.Spec.InitContainers, podResized.Spec.Containers...) {
+				err := policy.Allocate(logger, st, podResized, &container, lifecycle.ResizeOperation)
+				if err != nil {
+					if !reflect.DeepEqual(err, testCase.expAllocErr) {
+						t.Errorf("StaticPolicy Allocate() error (%v), expected error: %v but got: %v",
+							testCase.description, testCase.expAllocErr, err)
+					}
+				}
+			}
+			if testCase.expCSetAfterResizeSize > 0 {
+				// expCSetAfterResizeSize is used when testing scale down because allocated CPUs are not deterministic,
+				// since size of defaultCPUSet is deterministic and also interesection  with expected allocation
+				// should not be nill. < ====== TODO esotsal
+				if !reflect.DeepEqual(st.defaultCPUSet.Size(), testCase.expCSetAfterResizeSize) {
+					t.Errorf("StaticPolicy Allocate() error (%v) after pod resize. expected default cpuset size equal to %v but got %v",
+						testCase.description, testCase.expCSetAfterResizeSize, st.defaultCPUSet.Size())
 				}
 			} else {
-				if strings.Contains(logs, expectedLog) {
-					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
+				if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterResize) {
+					t.Errorf("StaticPolicy Allocate() error (%v) after pod resize. expected default cpuset %v but got %v",
+						testCase.description, testCase.expCSetAfterResize, st.defaultCPUSet)
 				}
 			}
-		})
-	}
-}
 
-func TestStaticPolicyLifecycleGetPodTopologyHints(t *testing.T) {
-	testCases := []struct {
-		description string
-		operation   lifecycle.Operation
-		skipped     bool
-	}{
-		{
-			description: "CPUManager static policy processes AddOperation",
-			operation:   lifecycle.AddOperation,
-			skipped:     false,
-		},
-		{
-			description: "CPUManager static policy skips ResizeOperation",
-			operation:   lifecycle.ResizeOperation,
-			skipped:     true,
-		},
-		{
-			description: "CPUManager static policy skips empty operation",
-			operation:   "",
-			skipped:     true,
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.description, func(t *testing.T) {
-			ktesting.SetDefaultVerbosity(2)
-			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
-			logger := tCtx.Logger()
-
-			policy, err := NewStaticPolicy(logger, topoSingleSocketHT, 0, cpuset.New(), topologymanager.NewFakeManager(logger), nil)
+			// remove
+			err = policy.RemoveContainer(logger, st, string(pod.UID), testCase.containerName)
 			if err != nil {
-				t.Fatalf("NewStaticPolicy() failed: %v", err)
+				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected no error but got %v",
+					testCase.description, err)
 			}
 
-			st := &mockState{
-				assignments:   state.ContainerCPUAssignments{},
-				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
+			if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterRemove) {
+				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected default cpuset %v but got %v",
+					testCase.description, testCase.expCSetAfterRemove, st.defaultCPUSet)
 			}
-			pod := makeMultiContainerPod(nil, []struct{ request, limit string }{{"1", "2"}})
-
-			hints := policy.GetPodTopologyHints(logger, st, pod, testCase.operation)
-			if hints != nil {
-				t.Errorf("Unexpected hints: %v", hints)
-			}
-
-			underlier, ok := logger.GetSink().(ktesting.Underlier)
-			if !ok {
-				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
-			}
-			logs := underlier.GetBuffer().String()
-			expectedLog := "CPU Manager pod hint generation skipped, operation not supported by the static CPU manager policy"
-			if testCase.skipped {
-				if !strings.Contains(logs, expectedLog) {
-					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
-				}
-			} else {
-				if strings.Contains(logs, expectedLog) {
-					t.Errorf("Unexpected log '%s' found in logs: %s", expectedLog, logs)
-				}
+			if _, found := st.assignments[string(pod.UID)][testCase.containerName]; found {
+				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected (pod %v, container %v) not be in assignments %v",
+					testCase.description, testCase.podUID, testCase.containerName, st.assignments)
 			}
 		})
 	}
 }
+
