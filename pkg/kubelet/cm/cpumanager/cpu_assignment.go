@@ -298,13 +298,50 @@ type cpuAccumulator struct {
 	availableCPUSorter availableCPUSorter
 }
 
-func newCPUAccumulator(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy) *cpuAccumulator {
+func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForScaleDown *cpuset.CPUSet) *cpuAccumulator {
 	acc := &cpuAccumulator{
 		logger:        logger,
 		topo:          topo,
 		details:       topo.CPUDetails.KeepOnly(availableCPUs),
 		numCPUsNeeded: numCPUs,
 		result:        cpuset.New(),
+	}
+
+	if reusableCPUsForResize != nil {
+		if !reusableCPUsForResize.IsEmpty() {
+			// Increase of CPU resources ( scale up )
+			// Take existing from allocated
+			// CPUs
+			if numCPUs > reusableCPUsForResize.Size() {
+				// scale up ...
+				acc.take(reusableCPUsForResize.Clone())
+			}
+
+			// Decrease of CPU resources ( scale down )
+			// Take delta from allocated CPUs, if mustKeepCPUsForScaleDown
+			// is not nil, use explicetely those. If it is nil
+			// take delta starting from lowest CoreId of CPUs ( TODO esotsal, perhaps not needed).
+			if numCPUs < reusableCPUsForResize.Size() {
+				if mustKeepCPUsForScaleDown != nil {
+					// If explicetely CPUs to keep
+					// during scale down is given ( this requires
+					// addition in container[].resources ... which
+					// could be possible to patch ? Esotsal Note This means
+					// modifying API code
+					if !(mustKeepCPUsForScaleDown.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+						acc.take(mustKeepCPUsForScaleDown.Clone())
+					} else {
+						return acc
+					}
+				}
+			}
+
+			if numCPUs == reusableCPUsForResize.Size() {
+				// nothing to do return as is
+				acc.take(reusableCPUsForResize.Clone())
+				return acc
+			}
+		}
 	}
 
 	if topo.NumSockets >= topo.NumNUMANodes {
@@ -773,15 +810,23 @@ func (a *cpuAccumulator) iterateCombinations(n []int, k int, f func([]int) LoopC
 // the least amount of free CPUs to the one with the highest amount of free CPUs (i.e. in ascending
 // order of free CPUs). For any NUMA node, the cores are selected from the ones in the socket with
 // the least amount of free CPUs to the one with the highest amount of free CPUs.
-func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool) (cpuset.CPUSet, error) {
-	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy)
+func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuSortingStrategy CPUSortingStrategy, preferAlignByUncoreCache bool, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForScaleDown *cpuset.CPUSet) (cpuset.CPUSet, error) {
+
+	// If the number of CPUs requested to be retained is not a subset
+	// of reusableCPUs, then we fail early
+	if reusableCPUsForResize != nil && mustKeepCPUsForScaleDown != nil {
+		if (mustKeepCPUsForScaleDown.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForScaleDown.String(), reusableCPUsForResize.String())
+		}
+	}
+
+	acc := newCPUAccumulator(topo, availableCPUs, numCPUs, cpuSortingStrategy, reusableCPUsForResize, mustKeepCPUsForScaleDown)
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
 	if acc.isFailed() {
 		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
 	}
-
 	// Algorithm: topology-aware best-fit
 	// 1. Acquire whole NUMA nodes and sockets, if available and the container
 	//    requires at least a NUMA node or socket's-worth of CPUs. If NUMA
@@ -890,25 +935,32 @@ func takeByTopologyNUMAPacked(logger logr.Logger, topo *topology.CPUTopology, av
 // of size 'cpuGroupSize' according to the algorithm described above. This is
 // important, for example, to ensure that all CPUs (i.e. all hyperthreads) from
 // a single core are allocated together.
-func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy) (cpuset.CPUSet, error) {
+func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int, cpuGroupSize int, cpuSortingStrategy CPUSortingStrategy, reusableCPUsForResize *cpuset.CPUSet, mustKeepCPUsForScaleDown *cpuset.CPUSet) (cpuset.CPUSet, error) {
 	// If the number of CPUs requested cannot be handed out in chunks of
 	// 'cpuGroupSize', then we just call out the packing algorithm since we
 	// can't distribute CPUs in this chunk size.
 	// PreferAlignByUncoreCache feature not implemented here yet and set to false.
 	// Support for PreferAlignByUncoreCache to be done at beta release.
 	if (numCPUs % cpuGroupSize) != 0 {
-		return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false)
+		return takeByTopologyNUMAPacked(topo, availableCPUs, numCPUs, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForScaleDown)
+	}
+
+	// If the number of CPUs requested to be retained is not a subset
+	// of reusableCPUs, then we fail early
+	if reusableCPUsForResize != nil && mustKeepCPUsForScaleDown != nil {
+		if (mustKeepCPUsForScaleDown.Intersection(reusableCPUsForResize.Clone())).IsEmpty() {
+			return cpuset.New(), fmt.Errorf("requested CPUs to be retained %s are not a subset of reusable CPUs %s", mustKeepCPUsForScaleDown.String(), reusableCPUsForResize.String())
+		}
 	}
 
 	// Otherwise build an accumulator to start allocating CPUs from.
-	acc := newCPUAccumulator(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy)
+	acc := newCPUAccumulator(topo, availableCPUs, numCPUs, cpuSortingStrategy, reusableCPUsForResize, mustKeepCPUsForScaleDown)
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
 	if acc.isFailed() {
 		return cpuset.New(), fmt.Errorf("not enough cpus available to satisfy request: requested=%d, available=%d", numCPUs, availableCPUs.Size())
 	}
-
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
 	numas := acc.sortAvailableNUMANodes()
 
@@ -1080,7 +1132,7 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 		// size 'cpuGroupSize' from 'bestCombo'.
 		distribution := (numCPUs / len(bestCombo) / cpuGroupSize) * cpuGroupSize
 		for _, numa := range bestCombo {
-			cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false)
+			cpus, _ := takeByTopologyNUMAPacked(acc.topo, acc.details.CPUsInNUMANodes(numa), distribution, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForScaleDown)
 			acc.take(cpus)
 		}
 
@@ -1095,7 +1147,7 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 				if acc.details.CPUsInNUMANodes(numa).Size() < cpuGroupSize {
 					continue
 				}
-				cpus, _ := takeByTopologyNUMAPacked(logger, acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize, cpuSortingStrategy, false)
+				cpus, _ := takeByTopologyNUMAPacked(acc.topo, acc.details.CPUsInNUMANodes(numa), cpuGroupSize, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForScaleDown)
 				acc.take(cpus)
 				remainder -= cpuGroupSize
 			}
@@ -1119,5 +1171,5 @@ func takeByTopologyNUMADistributed(logger logr.Logger, topo *topology.CPUTopolog
 
 	// If we never found a combination of NUMA nodes that we could properly
 	// distribute CPUs across, fall back to the packing algorithm.
-	return takeByTopologyNUMAPacked(logger, topo, availableCPUs, numCPUs, cpuSortingStrategy, false)
+	return takeByTopologyNUMAPacked(topo, availableCPUs, numCPUs, cpuSortingStrategy, false, reusableCPUsForResize, mustKeepCPUsForScaleDown)
 }
