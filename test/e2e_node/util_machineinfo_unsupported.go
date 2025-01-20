@@ -57,3 +57,7 @@ func getNumaNodeCPUs() (map[int]cpuset.CPUSet, error) {
 func getCPUSocketID(cpuID int) (int, error) {
 	return -1, errors.New("not implemented")
 }
+
+func getSMTLevel() int {
+	return 1
+}

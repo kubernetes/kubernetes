@@ -511,3 +511,36 @@ func formatErrors(err error) error {
 	}
 	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
 }
+
+func ExpectPodResizePending(ctx context.Context, f *framework.Framework, resizePendingPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
+	ginkgo.GinkgoHelper()
+
+	// Verify Pod Containers Cgroup Values
+	var errs []error
+	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizePendingPod, expectedContainers); cgroupErrs != nil {
+		errs = append(errs, fmt.Errorf("container cgroup values don't match expected: %w", formatErrors(cgroupErrs)))
+	}
+	if resourceErrs := VerifyPodStatusResources(resizePendingPod, expectedContainers); resourceErrs != nil {
+		errs = append(errs, fmt.Errorf("container status resources don't match expected: %w", formatErrors(resourceErrs)))
+	}
+	if restartErrs := verifyPodRestarts(ctx, f, resizePendingPod, expectedContainers); restartErrs != nil {
+		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
+	}
+
+	// Verify PodResizePending condition are empty.
+	podResizePendingFound := false
+	for _, condition := range resizePendingPod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			podResizePendingFound = true
+		}
+	}
+	if !podResizePendingFound {
+		errs = append(errs, fmt.Errorf("resize condition type %s not found in pod status", v1.PodResizePending))
+	}
+
+	if len(errs) > 0 {
+		resizePendingPod.ManagedFields = nil // Suppress managed fields in error output.
+		framework.ExpectNoError(formatErrors(utilerrors.NewAggregate(errs)),
+			"Verifying pod resources resize state. Pod: %s", framework.PrettyPrintJSON(resizePendingPod))
+	}
+}
