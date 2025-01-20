@@ -55,7 +55,7 @@ var _ = SIGDescribe("Restart", framework.WithDisruptive(), func() {
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		// This test requires the ability to restart all nodes, so the provider
 		// check must be identical to that call.
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		var err error
 		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
 		framework.ExpectNoError(err)

@@ -78,7 +78,7 @@ var _ = common.SIGDescribe("DNS", func() {
 
 	// Added due to #8512. This is critical for GCE and GKE deployments.
 	ginkgo.It("should provide DNS for the cluster [Provider:GCE]", func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 
 		namesToResolve := []string{"google.com"}
 		// Windows containers do not have a route to the GCE metadata server by default.

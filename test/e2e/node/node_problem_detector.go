@@ -56,7 +56,7 @@ var _ = SIGDescribe("NodeProblemDetector", nodefeature.NodeProblemDetector, feat
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 		e2eskipper.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gce")
 		e2eskipper.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
 		e2enode.WaitForTotalHealthy(ctx, f.ClientSet, time.Minute)
 	})

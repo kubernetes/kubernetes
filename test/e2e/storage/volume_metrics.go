@@ -69,7 +69,7 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 		// The tests below make various assumptions about the cluster
 		// and the underlying storage driver and therefore don't pass
 		// with other kinds of clusters and drivers.
-		e2eskipper.SkipUnlessProviderIs("gce", "gke", "aws")
+		e2eskipper.SkipUnlessProviderIs("gce", "aws")
 		e2epv.SkipIfNoDefaultStorageClass(ctx, c)
 		defaultScName, err = e2epv.GetDefaultStorageClassName(ctx, c)
 		framework.ExpectNoError(err)
