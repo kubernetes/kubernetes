@@ -116,7 +116,7 @@ func NewDualStackProxier(
 	hostname string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
+	healthzServer *healthcheck.ProxyHealthServer,
 	nodePortAddresses []string,
 	initOnly bool,
 ) (proxy.Provider, error) {
@@ -181,7 +181,7 @@ type Proxier struct {
 	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
-	healthzServer       *healthcheck.ProxierHealthServer
+	healthzServer       *healthcheck.ProxyHealthServer
 
 	// nodePortAddresses selects the interfaces where nodePort works.
 	nodePortAddresses *proxyutil.NodePortAddresses
@@ -223,7 +223,7 @@ func NewProxier(ctx context.Context,
 	hostname string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
-	healthzServer *healthcheck.ProxierHealthServer,
+	healthzServer *healthcheck.ProxyHealthServer,
 	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
