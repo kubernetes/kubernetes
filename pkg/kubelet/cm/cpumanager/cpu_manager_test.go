@@ -1649,11 +1649,12 @@ func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
 	}
 }
 
-func TestCPUManagerAddResize(t *testing.T) {
+func TestCPUManagerAddWithInPlacePodVerticalScalingExclusiveCPUs(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
 	}
 
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingExclusiveCPUs, true)
 	logger, tCtx := ktesting.NewTestContext(t)
 
 	testPolicy, _ := NewStaticPolicy(
@@ -1673,90 +1674,31 @@ func TestCPUManagerAddResize(t *testing.T) {
 		cpuset.New(),
 		topologymanager.NewFakeManager(logger),
 		nil)
-
-	type testStep struct {
-		description      string
-		operation        lifecycle.Operation
-		expDefaultCPUSet cpuset.CPUSet
-		expAllocateErr   error
-		expContainerErr  error
-	}
-
 	testCases := []struct {
-		description string
-		updateErr   error
-		policy      Policy
-		testSteps   []testStep
+		description        string
+		updateErr          error
+		policy             Policy
+		expCPUSet          cpuset.CPUSet
+		expAllocateErr     error
+		expAddContainerErr error
 	}{
 		{
-			description: "CPU Manager first add then resize",
-			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "first add operation - no error",
-					operation:        lifecycle.AddOperation,
-					expDefaultCPUSet: cpuset.New(3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-				{
-					description:      "then resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
-					expDefaultCPUSet: cpuset.New(3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-			},
+			description:        "cpu manager add - no error",
+			updateErr:          nil,
+			policy:             testPolicy,
+			expCPUSet:          cpuset.New(3, 4),
+			expAllocateErr:     nil,
+			expAddContainerErr: nil,
 		},
 		{
-			description: "CPU Manager attempt to resize",
+			description: "cpu manager add - policy add container error",
 			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "no error - skip allocation",
-					operation:        lifecycle.ResizeOperation,
-					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
+			policy: &mockPolicy{
+				err: fmt.Errorf("fake reg error"),
 			},
-		},
-		{
-			description: "CPU Manager attempt to use empty operation",
-			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "no error - skip allocation",
-					operation:        "",
-					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-			},
-		},
-		{
-			description: "CPU Manager first resize then add",
-			updateErr:   nil,
-			policy:      testPolicy,
-			testSteps: []testStep{
-				{
-					description:      "first resize operation - no error - skip resize",
-					operation:        lifecycle.ResizeOperation,
-					expDefaultCPUSet: cpuset.New(1, 2, 3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-				{
-					description:      "then add operation - no error",
-					operation:        lifecycle.AddOperation,
-					expDefaultCPUSet: cpuset.New(3, 4),
-					expAllocateErr:   nil,
-					expContainerErr:  nil,
-				},
-			},
+			expCPUSet:          cpuset.New(1, 2, 3, 4),
+			expAllocateErr:     fmt.Errorf("fake reg error"),
+			expAddContainerErr: nil,
 		},
 	}
 
@@ -1765,6 +1707,7 @@ func TestCPUManagerAddResize(t *testing.T) {
 			policy: testCase.policy,
 			state: &mockState{
 				assignments:   state.ContainerCPUAssignments{},
+				baselines:     state.ContainerCPUBaselines{},
 				defaultCPUSet: cpuset.New(1, 2, 3, 4),
 			},
 			lastUpdateState: state.NewMemoryState(logger),
@@ -1780,23 +1723,22 @@ func TestCPUManagerAddResize(t *testing.T) {
 		container := &pod.Spec.Containers[0]
 		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
 
-		for _, testStep := range testCase.testSteps {
-			err := mgr.Allocate(tCtx, pod, container, testStep.operation)
-			if !reflect.DeepEqual(err, testStep.expAllocateErr) {
-				t.Errorf("CPU Manager Allocate(%v) error (%v). expected error: %v but got: %v",
-					testStep.operation, testStep.description, testStep.expAllocateErr, err)
-			}
+		err := mgr.Allocate(tCtx, pod, container, lifecycle.AddOperation)
+		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
+			t.Errorf("CPU Manager Allocate() error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expAllocateErr, err)
+		}
 
-			mgr.AddContainer(logger, pod, container, "fakeID")
-			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
-			if !reflect.DeepEqual(err, testStep.expContainerErr) {
-				t.Errorf("CPU Manager AddContainer(%v) error (%v). expected error: %v but got: %v",
-					testStep.operation, testStep.description, testStep.expContainerErr, err)
-			}
-			if !testStep.expDefaultCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
-				t.Errorf("CPU Manager AddContainer(%v) error (%v). expected default cpuset: %v but got: %v",
-					testStep.operation, testStep.description, testStep.expDefaultCPUSet, mgr.state.GetDefaultCPUSet())
-			}
+		mgr.AddContainer(logger, pod, container, "fakeID")
+		_, _, err = mgr.containerMap.GetContainerRef("fakeID")
+		if !reflect.DeepEqual(err, testCase.expAddContainerErr) {
+			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
+				testCase.description, testCase.expAddContainerErr, err)
+		}
+		if !testCase.expCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
+			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
+				testCase.description, testCase.expCPUSet, mgr.state.GetDefaultCPUSet())
 		}
 	}
 }
+
