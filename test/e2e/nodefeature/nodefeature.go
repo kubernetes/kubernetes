@@ -50,9 +50,6 @@ var (
 	Eviction = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("Eviction"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	FSGroup = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("FSGroup"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	GarbageCollect = framework.WithNodeFeature(framework.ValidNodeFeatures.Add("GarbageCollect"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
