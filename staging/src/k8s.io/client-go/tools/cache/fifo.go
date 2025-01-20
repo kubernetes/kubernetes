@@ -27,22 +27,8 @@ import (
 // It is supposed to process the accumulator popped from the queue.
 type PopProcessFunc func(obj interface{}, isInInitialList bool) error
 
-// ErrRequeue may be returned by a PopProcessFunc to safely requeue
-// the current item. The value of Err will be returned from Pop.
-type ErrRequeue struct {
-	// Err is returned by the Pop function
-	Err error
-}
-
 // ErrFIFOClosed used when FIFO is closed
 var ErrFIFOClosed = errors.New("DeltaFIFO: manipulating with closed queue")
-
-func (e ErrRequeue) Error() string {
-	if e.Err == nil {
-		return "the popped item should be requeued without returning an error"
-	}
-	return e.Err.Error()
-}
 
 // Queue extends ReflectorStore with a collection of Store keys to "process".
 // Every Add, Update, or Delete may put the object's key in that collection.
@@ -172,19 +158,6 @@ func (f *FIFO) Add(obj interface{}) error {
 	return nil
 }
 
-// addIfNotPresent assumes the fifo lock is already held and adds the provided
-// item to the queue under id if it does not already exist.
-func (f *FIFO) addIfNotPresent(id string, obj interface{}) {
-	f.populated = true
-	if _, exists := f.items[id]; exists {
-		return
-	}
-
-	f.queue = append(f.queue, id)
-	f.items[id] = obj
-	f.cond.Broadcast()
-}
-
 // Update is the same as Add in this implementation.
 func (f *FIFO) Update(obj interface{}) error {
 	return f.Add(obj)
@@ -245,10 +218,6 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		}
 		delete(f.items, id)
 		err := process(item, isInInitialList)
-		if e, ok := err.(ErrRequeue); ok {
-			f.addIfNotPresent(id, item)
-			err = e.Err
-		}
 		return item, err
 	}
 }
