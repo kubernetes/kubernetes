@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"time"
 
@@ -549,6 +550,9 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 }
 
 func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) bool {
+	if runtime.GOOS == "windows" {
+		return false
+	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return false
 	}
@@ -617,16 +621,17 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		return true
 	}
 
+	resizePolicy := make(map[v1.ResourceName]v1.ResourceResizeRestartPolicy)
+	for _, pol := range container.ResizePolicy {
+		resizePolicy[pol.ResourceName] = pol.RestartPolicy
+	}
 	determineContainerResize := func(rName v1.ResourceName, specValue, statusValue int64) (resize, restart bool) {
 		if specValue == statusValue {
 			return false, false
 		}
-		for _, policy := range container.ResizePolicy {
-			if policy.ResourceName == rName {
-				return true, policy.RestartPolicy == v1.RestartContainer
-			}
+		if resizePolicy[rName] == v1.RestartContainer {
+			return true, true
 		}
-		// If a resource policy isn't set, the implicit default is NotRequired.
 		return true, false
 	}
 	markContainerForUpdate := func(rName v1.ResourceName, specValue, statusValue int64) {
