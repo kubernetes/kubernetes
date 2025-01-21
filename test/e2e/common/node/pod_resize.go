@@ -1158,7 +1158,6 @@ func doPodResizeErrorTests() {
 	for idx := range tests {
 		tc := tests[idx]
 		f := framework.NewDefaultFramework("pod-resize-error-tests")
-		timeouts := f.Timeouts
 
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			podClient := e2epod.NewPodClient(f)
@@ -1197,7 +1196,7 @@ func doPodResizeErrorTests() {
 			framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPod, tc.expected))
 
 			ginkgo.By("deleting pod")
-			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, timeouts.PodDelete)
+			podClient.DeleteSync(ctx, newPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		})
 	}
 }

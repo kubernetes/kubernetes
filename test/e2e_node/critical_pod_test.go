@@ -136,10 +136,10 @@ var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisrupt
 		})
 		ginkgo.AfterEach(func(ctx context.Context) {
 			// Delete Pods
-			e2epod.NewPodClient(f).DeleteSync(ctx, guaranteedPodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
-			e2epod.NewPodClient(f).DeleteSync(ctx, burstablePodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
-			e2epod.NewPodClient(f).DeleteSync(ctx, bestEffortPodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
-			e2epod.PodClientNS(f, kubeapi.NamespaceSystem).DeleteSync(ctx, criticalPodName, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			e2epod.NewPodClient(f).DeleteSync(ctx, guaranteedPodName, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			e2epod.NewPodClient(f).DeleteSync(ctx, burstablePodName, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			e2epod.NewPodClient(f).DeleteSync(ctx, bestEffortPodName, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			e2epod.PodClientNS(f, kubeapi.NamespaceSystem).DeleteSync(ctx, criticalPodName, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			// Log Events
 			logPodEvents(ctx, f)
 			logNodeEvents(ctx, f)

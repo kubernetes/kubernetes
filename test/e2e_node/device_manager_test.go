@@ -256,12 +256,12 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 					"the pod succeeded to start, when it should fail with the admission error")
 
 			ginkgo.By("removing application pods")
-			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
 			ginkgo.By("Deleting the device plugin pod")
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 			ginkgo.By("Deleting the directory and file setup for controlling registration")
 			err := os.RemoveAll(triggerPathDir)
@@ -276,7 +276,7 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.Device
 				}
 
 				framework.Logf("Deleting pod: %s", p.Name)
-				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, 2*time.Minute)
+				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			}
 
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
