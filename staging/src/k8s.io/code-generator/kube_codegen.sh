@@ -27,6 +27,10 @@ set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
+# Callers which want a specific tag of the k8s.io/code-generator repo should set the KUBE_CODEGEN_TAG to the
+# tag name, e.g. KUBE_CODEGEN_TAG="release-1.32" before sourcing this file.
+CODEGEN_VERSION_SPEC="${KUBE_CODEGEN_TAG:+"@${KUBE_CODEGEN_TAG}"}"
+
 function kube::codegen::internal::findz() {
     # We use `find` rather than `git ls-files` because sometimes external
     # projects use this across repos.  This is an imperfect wrapper of find,
@@ -65,7 +69,6 @@ function kube::codegen::internal::grep() {
 function kube::codegen::gen_helpers() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
-    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
     local extra_peers=()
 
@@ -77,10 +80,6 @@ function kube::codegen::gen_helpers() {
                 ;;
             "--extra-peer-dir")
                 extra_peers+=("$2")
-                shift 2
-                ;;
-            "--version")
-                version="$2"
                 shift 2
                 ;;
             *)
@@ -108,9 +107,9 @@ function kube::codegen::gen_helpers() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            conversion-gen@${version}
-            deepcopy-gen@${version}
-            defaulter-gen@${version}
+            conversion-gen"${CODEGEN_VERSION_SPEC}"
+            deepcopy-gen"${CODEGEN_VERSION_SPEC}"
+            defaulter-gen"${CODEGEN_VERSION_SPEC}"
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
@@ -262,7 +261,6 @@ function kube::codegen::gen_openapi() {
     local report="/dev/null"
     local update_report=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
-    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
 
     while [ "$#" -gt 0 ]; do
@@ -289,10 +287,6 @@ function kube::codegen::gen_openapi() {
                 ;;
             "--boilerplate")
                 boilerplate="$2"
-                shift 2
-                ;;
-            "--version")
-                version="$2"
                 shift 2
                 ;;
             *)
@@ -334,7 +328,7 @@ function kube::codegen::gen_openapi() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            openapi-gen@${version}
+            openapi-gen"${CODEGEN_VERSION_SPEC}"
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/kube-openapi/cmd/%s " "${BINS[@]}")
@@ -443,6 +437,9 @@ function kube::codegen::gen_openapi() {
 #   --plural-exceptions <string = "">
 #     An optional list of comma separated plural exception definitions in Type:PluralizedType form.
 #
+#   --prefers-protobuf
+#     Enables generation of clientsets that use protobuf for API requests.
+#
 function kube::codegen::gen_client() {
     local in_dir=""
     local one_input_api=""
@@ -459,7 +456,6 @@ function kube::codegen::gen_client() {
     local informers_subdir="informers"
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local plural_exceptions=""
-    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
     local prefers_protobuf="false"
 
@@ -525,10 +521,6 @@ function kube::codegen::gen_client() {
                 prefers_protobuf="true"
                 shift
                 ;;
-            "--version")
-                version="$2"
-                shift 2
-                ;;
             *)
                 if [[ "$1" =~ ^-- ]]; then
                     echo "unknown argument: $1" >&2
@@ -563,10 +555,10 @@ function kube::codegen::gen_client() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            applyconfiguration-gen@${version}
-            client-gen@${version}
-            informer-gen@${version}
-            lister-gen@${version}
+            applyconfiguration-gen"${CODEGEN_VERSION_SPEC}"
+            client-gen"${CODEGEN_VERSION_SPEC}"
+            informer-gen"${CODEGEN_VERSION_SPEC}"
+            lister-gen"${CODEGEN_VERSION_SPEC}"
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
@@ -714,10 +706,6 @@ function kube::codegen::gen_register() {
                 boilerplate="$2"
                 shift 2
                 ;;
-            "--version")
-                version="$2"
-                shift 2
-                ;;
             *)
                 if [[ "$1" =~ ^-- ]]; then
                     echo "unknown argument: $1" >&2
@@ -743,7 +731,7 @@ function kube::codegen::gen_register() {
         # and then install with forced module mode on and fully qualified name.
         cd "${KUBE_CODEGEN_ROOT}"
         BINS=(
-            register-gen@${version}
+            register-gen"${CODEGEN_VERSION_SPEC}"
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
