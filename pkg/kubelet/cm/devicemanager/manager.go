@@ -351,7 +351,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	// Loads in allocatedDevices information from disk.
 	err := m.readCheckpoint()
 	if err != nil {
-		klog.InfoS("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date", "err", err)
+		klog.ErrorS(err, "Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date")
 	}
 
 	return m.server.Start()
@@ -503,7 +503,7 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
 		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
-		klog.InfoS("Failed to write checkpoint file", "err", err)
+		klog.ErrorS(err, "Failed to write checkpoint file")
 		return err2
 	}
 	return nil
@@ -516,7 +516,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 	if err != nil {
 		if err == errors.ErrCheckpointNotFound {
 			// no point in trying anything else
-			klog.InfoS("Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint, "err", err)
+			klog.ErrorS(err, "Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
 			return nil
 		}
 		return err
@@ -1167,7 +1167,7 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
 	cntID, err := m.containerMap.GetContainerID(podUID, cntName)
 	if err != nil {
-		klog.V(4).InfoS("container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName, "err", err)
+		klog.ErrorS(err, "container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
 		return false
 	}
 
