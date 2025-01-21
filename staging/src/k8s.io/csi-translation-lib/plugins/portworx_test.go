@@ -68,6 +68,35 @@ func TestTranslatePortworxInTreeStorageClassToCSI(t *testing.T) {
 			},
 			errorExp: false,
 		},
+		{
+			name: "with secret params",
+			inTreeSC: &storage.StorageClass{
+				Parameters: map[string]string{
+					"repl":                                 "1",
+					"openstorage.io/auth-secret-name":      "test-secret",
+					"openstorage.io/auth-secret-namespace": "test-namespace",
+				},
+			},
+			csiSC: &storage.StorageClass{
+				Parameters: map[string]string{
+					"repl": "1",
+					"csi.storage.k8s.io/provisioner-secret-name":             "test-secret",
+					"csi.storage.k8s.io/provisioner-secret-namespace":        "test-namespace",
+					"csi.storage.k8s.io/controller-publish-secret-name":      "test-secret",
+					"csi.storage.k8s.io/controller-publish-secret-namespace": "test-namespace",
+					"csi.storage.k8s.io/node-stage-secret-name":              "test-secret",
+					"csi.storage.k8s.io/node-stage-secret-namespace":         "test-namespace",
+					"csi.storage.k8s.io/node-publish-secret-name":            "test-secret",
+					"csi.storage.k8s.io/node-publish-secret-namespace":       "test-namespace",
+					"csi.storage.k8s.io/controller-expand-secret-name":       "test-secret",
+					"csi.storage.k8s.io/controller-expand-secret-namespace":  "test-namespace",
+					"csi.storage.k8s.io/node-expand-secret-name":             "test-secret",
+					"csi.storage.k8s.io/node-expand-secret-namespace":        "test-namespace",
+				},
+				Provisioner: PortworxDriverName,
+			},
+			errorExp: false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Logf("Testing %v", tc.name)
@@ -218,6 +247,81 @@ func TestTranslatePortworxInTreePVToCSI(t *testing.T) {
 							VolumeHandle:     "ID1111",
 							FSType:           "type",
 							VolumeAttributes: make(map[string]string),
+						},
+					},
+				},
+			},
+			errExpected: false,
+		},
+		{
+			name: "with secret annotations",
+			inTree: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pxd.portworx.com",
+					Annotations: map[string]string{
+						"openstorage.io/auth-secret-name":      "test-secret",
+						"openstorage.io/auth-secret-namespace": "test-namespace",
+					},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+					},
+					ClaimRef: &v1.ObjectReference{
+						Name:      "test-pvc",
+						Namespace: "default",
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						PortworxVolume: &v1.PortworxVolumeSource{
+							VolumeID: "ID1111",
+							FSType:   "type",
+							ReadOnly: false,
+						},
+					},
+				},
+			},
+			csi: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pxd.portworx.com",
+					Annotations: map[string]string{
+						"openstorage.io/auth-secret-name":      "test-secret",
+						"openstorage.io/auth-secret-namespace": "test-namespace",
+					},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{
+						v1.ReadWriteOnce,
+					},
+					ClaimRef: &v1.ObjectReference{
+						Name:      "test-pvc",
+						Namespace: "default",
+					},
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						CSI: &v1.CSIPersistentVolumeSource{
+							Driver:           PortworxDriverName,
+							VolumeHandle:     "ID1111",
+							FSType:           "type",
+							VolumeAttributes: make(map[string]string),
+							ControllerPublishSecretRef: &v1.SecretReference{
+								Name:      "test-secret",
+								Namespace: "test-namespace",
+							},
+							NodeStageSecretRef: &v1.SecretReference{
+								Name:      "test-secret",
+								Namespace: "test-namespace",
+							},
+							NodePublishSecretRef: &v1.SecretReference{
+								Name:      "test-secret",
+								Namespace: "test-namespace",
+							},
+							ControllerExpandSecretRef: &v1.SecretReference{
+								Name:      "test-secret",
+								Namespace: "test-namespace",
+							},
+							NodeExpandSecretRef: &v1.SecretReference{
+								Name:      "test-secret",
+								Namespace: "test-namespace",
+							},
 						},
 					},
 				},
