@@ -2242,11 +2242,11 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 	}
 	expectedList := []*framework.PodInfo{medPriorityPodInfo, unschedulablePodInfo}
 	podInfos := q.NominatedPodsForNode("node1")
-	if diff := cmp.Diff(expectedList, podInfos); diff != "" {
+	if diff := cmp.Diff(expectedList, podInfos, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 		t.Errorf("Unexpected list of nominated Pods for node: (-want, +got):\n%s", diff)
 	}
 	podInfos[0].Pod.Name = "not mpp"
-	if diff := cmp.Diff(podInfos, q.NominatedPodsForNode("node1")); diff == "" {
+	if diff := cmp.Diff(podInfos, q.NominatedPodsForNode("node1"), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff == "" {
 		t.Error("Expected list of nominated Pods for node2 is different from podInfos")
 	}
 	if len(q.NominatedPodsForNode("node2")) != 0 {
@@ -2548,7 +2548,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(newQueuedPodInfoForLookup(p))
 			}
-			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap); diff != "" {
+			if diff := cmp.Diff(test.expectedMapAfterAdd, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected map after adding pods(-want, +got):\n%s", diff)
 			}
 
@@ -2556,14 +2556,14 @@ func TestUnschedulablePodsMap(t *testing.T) {
 				for _, p := range test.podsToUpdate {
 					upm.addOrUpdate(newQueuedPodInfoForLookup(p))
 				}
-				if diff := cmp.Diff(test.expectedMapAfterUpdate, upm.podInfoMap); diff != "" {
+				if diff := cmp.Diff(test.expectedMapAfterUpdate, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 					t.Errorf("Unexpected map after updating pods (-want, +got):\n%s", diff)
 				}
 			}
 			for _, p := range test.podsToDelete {
 				upm.delete(p, false)
 			}
-			if diff := cmp.Diff(test.expectedMapAfterDelete, upm.podInfoMap); diff != "" {
+			if diff := cmp.Diff(test.expectedMapAfterDelete, upm.podInfoMap, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected map after deleting pods (-want, +got):\n%s", diff)
 			}
 			upm.clear()
@@ -2917,7 +2917,7 @@ func TestPriorityQueue_initPodMaxInUnschedulablePodsDuration(t *testing.T) {
 				}
 			}
 
-			if diff := cmp.Diff(test.expected, podInfoList); diff != "" {
+			if diff := cmp.Diff(test.expected, podInfoList, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodInfo list (-want, +got):\n%s", diff)
 			}
 		})
@@ -3094,7 +3094,7 @@ func TestPodTimestamp(t *testing.T) {
 				}
 			}
 
-			if diff := cmp.Diff(test.expected, podInfoList); diff != "" {
+			if diff := cmp.Diff(test.expected, podInfoList, cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected QueuedPodInfo list (-want, +got):\n%s", diff)
 			}
 		})
