@@ -19,6 +19,8 @@ package pod
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/onsi/gomega"
@@ -139,6 +142,43 @@ func ExecShellInPod(ctx context.Context, f *framework.Framework, podName string,
 // ExecShellInPodWithFullOutput executes the specified command on the Pod and returns stdout, stderr and error.
 func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd string) (string, string, error) {
 	return execCommandInPodWithFullOutput(ctx, f, podName, "/bin/sh", "-c", cmd)
+}
+
+// VerifyExecInPodSucceed verifies shell cmd in target pod succeed
+func VerifyExecInPodSucceed(ctx context.Context, f *framework.Framework, pod *v1.Pod, shExec string) error {
+	stdout, stderr, err := ExecShellInPodWithFullOutput(ctx, f, pod.Name, shExec)
+	if err != nil {
+		var exitError clientexec.CodeExitError
+		if errors.As(err, &exitError) {
+			exitCode := exitError.ExitStatus()
+			return fmt.Errorf("%q should succeed, but failed with exit code %d and error message %w\nstdout: %s\nstderr: %s",
+				shExec, exitCode, exitError, stdout, stderr)
+		} else {
+			return fmt.Errorf("%q should succeed, but failed with error message %w\nstdout: %s\nstderr: %s",
+				shExec, err, stdout, stderr)
+		}
+	}
+	return nil
+}
+
+// VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
+func VerifyExecInPodFail(ctx context.Context, f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) error {
+	stdout, stderr, err := ExecShellInPodWithFullOutput(ctx, f, pod.Name, shExec)
+	if err != nil {
+		var exitError clientexec.CodeExitError
+		if errors.As(err, &exitError) {
+			actualExitCode := exitError.ExitStatus()
+			if actualExitCode == exitCode {
+				return nil
+			}
+			return fmt.Errorf("%q should fail with exit code %d, but failed with exit code %d and error message %w\nstdout: %s\nstderr: %s",
+				shExec, exitCode, actualExitCode, exitError, stdout, stderr)
+		} else {
+			return fmt.Errorf("%q should fail with exit code %d, but failed with error message %w\nstdout: %s\nstderr: %s",
+				shExec, exitCode, err, stdout, stderr)
+		}
+	}
+	return fmt.Errorf("%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }
 
 func execute(ctx context.Context, method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
