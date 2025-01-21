@@ -177,14 +177,11 @@ func TestRequiredNamespaces(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	// モック用の動的クライアントを初期化
 	dynamicClient := dyfake.NewSimpleDynamicClient(runtime.NewScheme())
 
-	// モック用の TContext を初期化
 	tCtx := ktesting.Init(t)
 	tCtx = ktesting.WithClients(tCtx, nil, nil, nil, dynamicClient, nil)
 
-	// テストケース定義
 	testCases := []struct {
 		desc             string
 		templatePath     string
@@ -209,12 +206,11 @@ func TestCreate(t *testing.T) {
 			desc:         "restMappingFromUnstructuredObj fails",
 			templatePath: "hoge.yaml",
 			getSpecFunc: func(path string, env map[string]any, spec interface{}) error {
-				// spec をチェックして初期化
 				u, ok := spec.(*unstructured.Unstructured)
 				if !ok {
 					return fmt.Errorf("spec is not of type *unstructured.Unstructured")
 				}
-				*u = unstructured.Unstructured{} // 明示的に初期化
+				*u = unstructured.Unstructured{}
 				u.SetAPIVersion("v1")
 				u.SetKind("Pod")
 				u.SetName("test-pod")
@@ -405,7 +401,6 @@ func TestRestMappingFromUnstructuredObj(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tCtx = ktesting.WithClients(tCtx, nil, nil, clientset, nil, nil)
 
-	// テストケース定義
 	testCases := []struct {
 		name        string
 		obj         *unstructured.Unstructured
