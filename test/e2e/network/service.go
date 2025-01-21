@@ -59,7 +59,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -4591,7 +4590,7 @@ func validateEndpointsPortsOrFail(ctx context.Context, c clientset.Interface, na
 			// Retry the error
 			return false, nil
 		}
-		portsByUID := portsByPodUID(e2eendpoints.GetContainerPortsByPodUID(ep))
+		portsByUID := getContainerPortsByPodUID(ep)
 		if err := validatePorts(portsByUID, expectedPortsByPodUID); err != nil {
 			if i%5 == 0 {
 				framework.Logf("Unexpected endpoints: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
@@ -4675,7 +4674,7 @@ func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace,
 			// Retry the error
 			return false, nil
 		}
-		portsByUID := fullPortsByPodUID(e2eendpoints.GetFullContainerPortsByPodUID(ep))
+		portsByUID := getFullContainerPortsByPodUID(ep)
 		if err := validatePortsAndProtocols(portsByUID, expectedPortsByPodUID); err != nil {
 			if i%5 == 0 {
 				framework.Logf("Unexpected endpoints: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
