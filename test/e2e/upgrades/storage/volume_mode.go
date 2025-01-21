@@ -105,7 +105,8 @@ func (t *VolumeModeDowngradeTest) Setup(ctx context.Context, f *framework.Framew
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if PV exists as expected volume mode")
-	e2evolume.CheckVolumeModeOfPath(ctx, f, t.pod, block, devicePath)
+	err = e2evolume.CheckVolumeModeOfPath(ctx, f, t.pod, block, devicePath)
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if read/write to PV works properly")
 	storageutils.CheckReadWriteToPath(ctx, f, t.pod, block, devicePath)
@@ -118,7 +119,8 @@ func (t *VolumeModeDowngradeTest) Test(ctx context.Context, f *framework.Framewo
 	<-done
 
 	ginkgo.By("Verifying that nothing exists at the device path in the pod")
-	e2epod.VerifyExecInPodFail(ctx, f, t.pod, fmt.Sprintf("test -e %s", devicePath), 1)
+	err := e2epod.VerifyExecInPodFail(ctx, f, t.pod, fmt.Sprintf("test -e %s", devicePath), 1)
+	framework.ExpectNoError(err)
 }
 
 // Teardown cleans up any remaining resources.

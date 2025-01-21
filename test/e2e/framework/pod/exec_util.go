@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -144,40 +145,40 @@ func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, p
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
-func VerifyExecInPodSucceed(ctx context.Context, f *framework.Framework, pod *v1.Pod, shExec string) {
+func VerifyExecInPodSucceed(ctx context.Context, f *framework.Framework, pod *v1.Pod, shExec string) error {
 	stdout, stderr, err := ExecShellInPodWithFullOutput(ctx, f, pod.Name, shExec)
 	if err != nil {
 		var exitError clientexec.CodeExitError
 		if errors.As(err, &exitError) {
 			exitCode := exitError.ExitStatus()
-			framework.ExpectNoError(err,
-				"%q should succeed, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+			return fmt.Errorf("%q should succeed, but failed with exit code %d and error message %w\nstdout: %s\nstderr: %s",
 				shExec, exitCode, exitError, stdout, stderr)
 		} else {
-			framework.ExpectNoError(err,
-				"%q should succeed, but failed with error message %q\nstdout: %s\nstderr: %s",
+			return fmt.Errorf("%q should succeed, but failed with error message %w\nstdout: %s\nstderr: %s",
 				shExec, err, stdout, stderr)
 		}
 	}
+	return nil
 }
 
 // VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
-func VerifyExecInPodFail(ctx context.Context, f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
+func VerifyExecInPodFail(ctx context.Context, f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) error {
 	stdout, stderr, err := ExecShellInPodWithFullOutput(ctx, f, pod.Name, shExec)
 	if err != nil {
 		var exitError clientexec.CodeExitError
 		if errors.As(err, &exitError) {
 			actualExitCode := exitError.ExitStatus()
-			gomega.Expect(actualExitCode).To(gomega.Equal(exitCode),
-				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+			if actualExitCode == exitCode {
+				return nil
+			}
+			return fmt.Errorf("%q should fail with exit code %d, but failed with exit code %d and error message %w\nstdout: %s\nstderr: %s",
 				shExec, exitCode, actualExitCode, exitError, stdout, stderr)
 		} else {
-			framework.ExpectNoError(err,
-				"%q should fail with exit code %d, but failed with error message %q\nstdout: %s\nstderr: %s",
+			return fmt.Errorf("%q should fail with exit code %d, but failed with error message %w\nstdout: %s\nstderr: %s",
 				shExec, exitCode, err, stdout, stderr)
 		}
 	}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "%q should fail with exit code %d, but exit without error", shExec, exitCode)
+	return fmt.Errorf("%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }
 
 func execute(ctx context.Context, method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {

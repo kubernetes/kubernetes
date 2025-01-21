@@ -449,25 +449,34 @@ func isSudoPresent(ctx context.Context, nodeIP string, provider string) bool {
 func CheckReadWriteToPath(ctx context.Context, f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
 	if volMode == v1.PersistentVolumeBlock {
 		// random -> file1
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, "dd if=/dev/urandom of=/tmp/file1 bs=64 count=1")
+		err := e2epod.VerifyExecInPodSucceed(ctx, f, pod, "dd if=/dev/urandom of=/tmp/file1 bs=64 count=1")
+		framework.ExpectNoError(err, "Failed to write to file1")
 		// file1 -> dev (write to dev)
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=/tmp/file1 of=%s bs=64 count=1", path))
+		err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=/tmp/file1 of=%s bs=64 count=1", path))
+		framework.ExpectNoError(err, "Failed to write to block volume")
 		// dev -> file2 (read from dev)
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=%s of=/tmp/file2 bs=64 count=1", path))
+		err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=%s of=/tmp/file2 bs=64 count=1", path))
+		framework.ExpectNoError(err, "Failed to read from block volume")
 		// file1 == file2 (check contents)
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, "diff /tmp/file1 /tmp/file2")
+		err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, "diff /tmp/file1 /tmp/file2")
+		framework.ExpectNoError(err, "Failed to compare file1 and file2")
 		// Clean up temp files
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, "rm -f /tmp/file1 /tmp/file2")
+		err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, "rm -f /tmp/file1 /tmp/file2")
+		framework.ExpectNoError(err, "Failed to clean up temp files")
 
 		// Check that writing file to block volume fails
-		e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path), 1)
+		err = e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path), 1)
+		framework.ExpectNoError(err, "Expected write to block volume to fail")
 	} else {
 		// text -> file1 (write to file)
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
+		err := e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("echo 'Hello world.' > %s/file1.txt", path))
+		framework.ExpectNoError(err, "Failed to write to file1")
 		// grep file1 (read from file and check contents)
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, readFile("Hello word.", path))
+		err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, readFile("Hello word.", path))
+		framework.ExpectNoError(err, "Failed to read from file1")
 		// Check that writing to directory as block volume fails
-		e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
+		err = e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("dd if=/dev/urandom of=%s bs=64 count=1", path), 1)
+		framework.ExpectNoError(err, "Expected write to directory to fail")
 	}
 }
 
@@ -513,8 +522,10 @@ func CheckReadFromPath(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 
 	sum := sha256.Sum256(genBinDataFromSeed(len, seed))
 
-	e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
-	e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
+	err := e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
+	framework.ExpectNoError(err, "Failed to read from %s", pathForVolMode)
+	err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
+	framework.ExpectNoError(err, "Failed to read from %s", pathForVolMode)
 }
 
 // CheckWriteToPath that file can be properly written.
@@ -538,8 +549,10 @@ func CheckWriteToPath(ctx context.Context, f *framework.Framework, pod *v1.Pod, 
 
 	encoded := base64.StdEncoding.EncodeToString(genBinDataFromSeed(len, seed))
 
-	e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
-	e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
+	err := e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
+	framework.ExpectNoError(err, "Failed to generate sha256sum of encoded data")
+	err = e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
+	framework.ExpectNoError(err, "Failed to write to %s", pathForVolMode)
 }
 
 // GetSectorSize returns the sector size of the device.

@@ -510,7 +510,8 @@ func testVolumeContent(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
-			CheckVolumeModeOfPath(ctx, f, pod, test.Mode, deviceName)
+			err = CheckVolumeModeOfPath(ctx, f, pod, test.Mode, deviceName)
+			framework.ExpectNoError(err, "failed: getting the right privileges in the block device %v", deviceName)
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
@@ -520,7 +521,8 @@ func testVolumeContent(ctx context.Context, f *framework.Framework, pod *v1.Pod,
 
 			// Check that a directory has been mounted
 			dirName := filepath.Dir(fileName)
-			CheckVolumeModeOfPath(ctx, f, pod, test.Mode, dirName)
+			err = CheckVolumeModeOfPath(ctx, f, pod, test.Mode, dirName)
+			framework.ExpectNoError(err, "failed: getting the right privileges in the directory %v", dirName)
 
 			if !framework.NodeOSDistroIs("windows") {
 				// Filesystem: check fsgroup
@@ -663,18 +665,27 @@ func generateWriteFileCmd(content, fullPath string) []string {
 }
 
 // CheckVolumeModeOfPath check mode of volume
-func CheckVolumeModeOfPath(ctx context.Context, f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+func CheckVolumeModeOfPath(ctx context.Context, f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) error {
 	if volMode == v1.PersistentVolumeBlock {
 		// Check if block exists
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("test -b %s", path))
+		if err := e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("test -b %s", path)); err != nil {
+			return err
+		}
 
 		// Double check that it's not directory
-		e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("test -d %s", path), 1)
+		if err := e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("test -d %s", path), 1); err != nil {
+			return err
+		}
 	} else {
 		// Check if directory exists
-		e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("test -d %s", path))
+		if err := e2epod.VerifyExecInPodSucceed(ctx, f, pod, fmt.Sprintf("test -d %s", path)); err != nil {
+			return err
+		}
 
 		// Double check that it's not block
-		e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("test -b %s", path), 1)
+		if err := e2epod.VerifyExecInPodFail(ctx, f, pod, fmt.Sprintf("test -b %s", path), 1); err != nil {
+			return err
+		}
 	}
+	return nil
 }

@@ -499,7 +499,8 @@ func testAccessMultipleVolumes(ctx context.Context, f *framework.Framework, cs c
 		index := i + 1
 		path := fmt.Sprintf("/mnt/volume%d", index)
 		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, path)
+		err = e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, path)
+		framework.ExpectNoError(err)
 
 		if readSeedBase > 0 {
 			ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
@@ -607,7 +608,8 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 	for i, pod := range pods {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, path)
+		err := e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, path)
+		framework.ExpectNoError(err)
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")
@@ -643,7 +645,8 @@ func TestConcurrentAccessToSingleVolume(ctx context.Context, f *framework.Framew
 		index := i + 1
 		// index of pod and index of pvc match, because pods are created above way
 		ginkgo.By(fmt.Sprintf("Rechecking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
+		err := e2evolume.CheckVolumeModeOfPath(ctx, f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
+		framework.ExpectNoError(err)
 
 		if readOnly {
 			ginkgo.By("Skipping volume content checks, volume is read-only")
