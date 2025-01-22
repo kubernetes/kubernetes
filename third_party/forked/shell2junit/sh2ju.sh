@@ -20,7 +20,7 @@
 ###             -ierror="RegExp" : same as -error but case insensitive
 ###             -fail="RegExp"   : Any line from stderr which contains this pattern becomes part of
 ###                                the failure messsage, without the text matching that pattern.
-###                                Example: -fail="^ERROR: "
+###                                Example: -failure="^ERROR: "
 ###                                Default is to use the entire stderr as failure message.
 ###             -output="Path"   : path to output directory, defaults to "./results"
 ###     - Junit reports are left in the folder 'result' under the directory where the script is executed.
@@ -129,7 +129,6 @@ function juLog() {
       [[ -n "${H}" ]] && err=1
   fi
   [[ ${err} -ne 0 ]] && echo "+++ error: ${err}"         | tee -a ${outf}
-  outMsg=$(cat ${outf})
   rm -f ${outf}
 
   errMsg=$(cat ${errf})
@@ -164,7 +163,6 @@ ${failureMsg}
     <testcase assertions=\"1\" name=\"${name}\" time=\"${time}\" classname=\"${class}\">
     ${failure}
     <system-err><![CDATA[${errMsg}]]></system-err>
-    <system-out><![CDATA[${outMsg}]]></system-out>
     </testcase>
   "
   ## testsuite block
