@@ -75,6 +75,7 @@
       "google.golang.org/api": "cloud dependency",
       "google.golang.org/appengine": "cloud dependency",
       "google.golang.org/genproto": "refer to #113366",
+      "gopkg.in/square/go-jose.v2":"obsolete, use gopkg.in/go-jose/go-jose.v2",
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
       "gopkg.in/yaml.v2": "prefer sigs.k8s.io/yaml",
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",

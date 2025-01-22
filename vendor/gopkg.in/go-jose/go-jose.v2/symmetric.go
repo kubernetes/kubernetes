@@ -31,7 +31,7 @@ import (
 	"io"
 
 	"golang.org/x/crypto/pbkdf2"
-	"gopkg.in/square/go-jose.v2/cipher"
+	"gopkg.in/go-jose/go-jose.v2/cipher"
 )
 
 // Random reader (stubbed out in tests)
@@ -356,11 +356,11 @@ func (ctx *symmetricKeyCipher) decryptKey(headers rawHeader, recipient *recipien
 
 		iv, err := headers.getIV()
 		if err != nil {
-			return nil, fmt.Errorf("square/go-jose: invalid IV: %v", err)
+			return nil, fmt.Errorf("go-jose/go-jose: invalid IV: %v", err)
 		}
 		tag, err := headers.getTag()
 		if err != nil {
-			return nil, fmt.Errorf("square/go-jose: invalid tag: %v", err)
+			return nil, fmt.Errorf("go-jose/go-jose: invalid tag: %v", err)
 		}
 
 		parts := &aeadParts{
@@ -389,18 +389,23 @@ func (ctx *symmetricKeyCipher) decryptKey(headers rawHeader, recipient *recipien
 	case PBES2_HS256_A128KW, PBES2_HS384_A192KW, PBES2_HS512_A256KW:
 		p2s, err := headers.getP2S()
 		if err != nil {
-			return nil, fmt.Errorf("square/go-jose: invalid P2S: %v", err)
+			return nil, fmt.Errorf("go-jose/go-jose: invalid P2S: %v", err)
 		}
 		if p2s == nil || len(p2s.data) == 0 {
-			return nil, fmt.Errorf("square/go-jose: invalid P2S: must be present")
+			return nil, fmt.Errorf("go-jose/go-jose: invalid P2S: must be present")
 		}
 
 		p2c, err := headers.getP2C()
 		if err != nil {
-			return nil, fmt.Errorf("square/go-jose: invalid P2C: %v", err)
+			return nil, fmt.Errorf("go-jose/go-jose: invalid P2C: %v", err)
 		}
 		if p2c <= 0 {
-			return nil, fmt.Errorf("square/go-jose: invalid P2C: must be a positive integer")
+			return nil, fmt.Errorf("go-jose/go-jose: invalid P2C: must be a positive integer")
+		}
+		if p2c > 1000000 {
+			// An unauthenticated attacker can set a high P2C value. Set an upper limit to avoid
+			// DoS attacks.
+			return nil, fmt.Errorf("go-jose/go-jose: invalid P2C: too high")
 		}
 
 		// salt is UTF8(Alg) || 0x00 || Salt Input
@@ -431,7 +436,7 @@ func (ctx *symmetricKeyCipher) decryptKey(headers rawHeader, recipient *recipien
 func (ctx symmetricMac) signPayload(payload []byte, alg SignatureAlgorithm) (Signature, error) {
 	mac, err := ctx.hmac(payload, alg)
 	if err != nil {
-		return Signature{}, errors.New("square/go-jose: failed to compute hmac")
+		return Signature{}, errors.New("go-jose/go-jose: failed to compute hmac")
 	}
 
 	return Signature{
@@ -444,16 +449,16 @@ func (ctx symmetricMac) signPayload(payload []byte, alg SignatureAlgorithm) (Sig
 func (ctx symmetricMac) verifyPayload(payload []byte, mac []byte, alg SignatureAlgorithm) error {
 	expected, err := ctx.hmac(payload, alg)
 	if err != nil {
-		return errors.New("square/go-jose: failed to compute hmac")
+		return errors.New("go-jose/go-jose: failed to compute hmac")
 	}
 
 	if len(mac) != len(expected) {
-		return errors.New("square/go-jose: invalid hmac")
+		return errors.New("go-jose/go-jose: invalid hmac")
 	}
 
 	match := subtle.ConstantTimeCompare(mac, expected)
 	if match != 1 {
-		return errors.New("square/go-jose: invalid hmac")
+		return errors.New("go-jose/go-jose: invalid hmac")
 	}
 
 	return nil

@@ -28,7 +28,7 @@ var defaultIV = []byte{0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6, 0xA6}
 // KeyWrap implements NIST key wrapping; it wraps a content encryption key (cek) with the given block cipher.
 func KeyWrap(block cipher.Block, cek []byte) ([]byte, error) {
 	if len(cek)%8 != 0 {
-		return nil, errors.New("square/go-jose: key wrap input must be 8 byte blocks")
+		return nil, errors.New("go-jose/go-jose: key wrap input must be 8 byte blocks")
 	}
 
 	n := len(cek) / 8
@@ -68,7 +68,7 @@ func KeyWrap(block cipher.Block, cek []byte) ([]byte, error) {
 // KeyUnwrap implements NIST key unwrapping; it unwraps a content encryption key (cek) with the given block cipher.
 func KeyUnwrap(block cipher.Block, ciphertext []byte) ([]byte, error) {
 	if len(ciphertext)%8 != 0 {
-		return nil, errors.New("square/go-jose: key wrap input must be 8 byte blocks")
+		return nil, errors.New("go-jose/go-jose: key wrap input must be 8 byte blocks")
 	}
 
 	n := (len(ciphertext) / 8) - 1
@@ -97,7 +97,7 @@ func KeyUnwrap(block cipher.Block, ciphertext []byte) ([]byte, error) {
 	}
 
 	if subtle.ConstantTimeCompare(buffer[:8], defaultIV) == 0 {
-		return nil, errors.New("square/go-jose: failed to unwrap key")
+		return nil, errors.New("go-jose/go-jose: failed to unwrap key")
 	}
 
 	out := make([]byte, n*8)

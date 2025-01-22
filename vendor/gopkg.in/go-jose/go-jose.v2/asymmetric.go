@@ -29,8 +29,8 @@ import (
 	"math/big"
 
 	"golang.org/x/crypto/ed25519"
-	josecipher "gopkg.in/square/go-jose.v2/cipher"
-	"gopkg.in/square/go-jose.v2/json"
+	josecipher "gopkg.in/go-jose/go-jose.v2/cipher"
+	"gopkg.in/go-jose/go-jose.v2/json"
 )
 
 // A generic RSA-based encrypter/verifier
@@ -285,6 +285,9 @@ func (ctx rsaDecrypterSigner) signPayload(payload []byte, alg SignatureAlgorithm
 
 	switch alg {
 	case RS256, RS384, RS512:
+		// TODO(https://github.com/go-jose/go-jose/issues/40): As of go1.20, the
+		// random parameter is legacy and ignored, and it can be nil.
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.20:src/crypto/rsa/pkcs1v15.go;l=263;bpv=0;bpt=1
 		out, err = rsa.SignPKCS1v15(RandReader, ctx.privateKey, hash, hashed)
 	case PS256, PS384, PS512:
 		out, err = rsa.SignPSS(RandReader, ctx.privateKey, hash, hashed, &rsa.PSSOptions{
@@ -413,28 +416,28 @@ func (ctx ecKeyGenerator) genKey() ([]byte, rawHeader, error) {
 func (ctx ecDecrypterSigner) decryptKey(headers rawHeader, recipient *recipientInfo, generator keyGenerator) ([]byte, error) {
 	epk, err := headers.getEPK()
 	if err != nil {
-		return nil, errors.New("square/go-jose: invalid epk header")
+		return nil, errors.New("go-jose/go-jose: invalid epk header")
 	}
 	if epk == nil {
-		return nil, errors.New("square/go-jose: missing epk header")
+		return nil, errors.New("go-jose/go-jose: missing epk header")
 	}
 
 	publicKey, ok := epk.Key.(*ecdsa.PublicKey)
 	if publicKey == nil || !ok {
-		return nil, errors.New("square/go-jose: invalid epk header")
+		return nil, errors.New("go-jose/go-jose: invalid epk header")
 	}
 
 	if !ctx.privateKey.Curve.IsOnCurve(publicKey.X, publicKey.Y) {
-		return nil, errors.New("square/go-jose: invalid public key in epk header")
+		return nil, errors.New("go-jose/go-jose: invalid public key in epk header")
 	}
 
 	apuData, err := headers.getAPU()
 	if err != nil {
-		return nil, errors.New("square/go-jose: invalid apu header")
+		return nil, errors.New("go-jose/go-jose: invalid apu header")
 	}
 	apvData, err := headers.getAPV()
 	if err != nil {
-		return nil, errors.New("square/go-jose: invalid apv header")
+		return nil, errors.New("go-jose/go-jose: invalid apv header")
 	}
 
 	deriveKey := func(algID string, size int) []byte {
@@ -489,7 +492,7 @@ func (ctx edEncrypterVerifier) verifyPayload(payload []byte, signature []byte, a
 	}
 	ok := ed25519.Verify(ctx.publicKey, payload, signature)
 	if !ok {
-		return errors.New("square/go-jose: ed25519 signature failed to verify")
+		return errors.New("go-jose/go-jose: ed25519 signature failed to verify")
 	}
 	return nil
 }
@@ -513,7 +516,7 @@ func (ctx ecDecrypterSigner) signPayload(payload []byte, alg SignatureAlgorithm)
 
 	curveBits := ctx.privateKey.Curve.Params().BitSize
 	if expectedBitSize != curveBits {
-		return Signature{}, fmt.Errorf("square/go-jose: expected %d bit key, got %d bits instead", expectedBitSize, curveBits)
+		return Signature{}, fmt.Errorf("go-jose/go-jose: expected %d bit key, got %d bits instead", expectedBitSize, curveBits)
 	}
 
 	hasher := hash.New()
@@ -571,7 +574,7 @@ func (ctx ecEncrypterVerifier) verifyPayload(payload []byte, signature []byte, a
 	}
 
 	if len(signature) != 2*keySize {
-		return fmt.Errorf("square/go-jose: invalid signature size, have %d bytes, wanted %d", len(signature), 2*keySize)
+		return fmt.Errorf("go-jose/go-jose: invalid signature size, have %d bytes, wanted %d", len(signature), 2*keySize)
 	}
 
 	hasher := hash.New()
@@ -585,7 +588,7 @@ func (ctx ecEncrypterVerifier) verifyPayload(payload []byte, signature []byte, a
 
 	match := ecdsa.Verify(ctx.publicKey, hashed, r, s)
 	if !match {
-		return errors.New("square/go-jose: ecdsa signature failed to verify")
+		return errors.New("go-jose/go-jose: ecdsa signature failed to verify")
 	}
 
 	return nil

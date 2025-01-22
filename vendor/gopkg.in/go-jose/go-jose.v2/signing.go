@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
-	"gopkg.in/square/go-jose.v2/json"
+	"gopkg.in/go-jose/go-jose.v2/json"
 )
 
 // NonceSource represents a source of random nonces to go into JWS objects
@@ -227,7 +227,7 @@ func newJWKSigner(alg SignatureAlgorithm, signingKey JSONWebKey) (recipientSigIn
 
 		// This should be impossible, but let's check anyway.
 		if !recipient.publicKey().IsPublic() {
-			return recipientSigInfo{}, errors.New("square/go-jose: public key was unexpectedly not public")
+			return recipientSigInfo{}, errors.New("go-jose/go-jose: public key was unexpectedly not public")
 		}
 	}
 	return recipient, nil
@@ -251,7 +251,7 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 			// result of the JOSE spec. We've decided that this library will only include one or
 			// the other to avoid this confusion.
 			//
-			// See https://github.com/square/go-jose/issues/157 for more context.
+			// See https://github.com/go-jose/go-jose/issues/157 for more context.
 			if ctx.embedJWK {
 				protected[headerJWK] = recipient.publicKey()
 			} else {
@@ -265,7 +265,7 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 		if ctx.nonceSource != nil {
 			nonce, err := ctx.nonceSource.Nonce()
 			if err != nil {
-				return nil, fmt.Errorf("square/go-jose: Error generating nonce: %v", err)
+				return nil, fmt.Errorf("go-jose/go-jose: Error generating nonce: %v", err)
 			}
 			protected[headerNonce] = nonce
 		}
@@ -279,7 +279,7 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 
 		if b64, ok := protected[headerB64]; ok {
 			if needsBase64, ok = b64.(bool); !ok {
-				return nil, errors.New("square/go-jose: Invalid b64 header parameter")
+				return nil, errors.New("go-jose/go-jose: Invalid b64 header parameter")
 			}
 		}
 
@@ -303,7 +303,7 @@ func (ctx *genericSigner) Sign(payload []byte) (*JSONWebSignature, error) {
 		for k, v := range protected {
 			b, err := json.Marshal(v)
 			if err != nil {
-				return nil, fmt.Errorf("square/go-jose: Error marshalling item %#v: %v", k, err)
+				return nil, fmt.Errorf("go-jose/go-jose: Error marshalling item %#v: %v", k, err)
 			}
 			(*signatureInfo.protected)[k] = makeRawMessage(b)
 		}
@@ -354,7 +354,7 @@ func (obj JSONWebSignature) DetachedVerify(payload []byte, verificationKey inter
 	}
 
 	if len(obj.Signatures) > 1 {
-		return errors.New("square/go-jose: too many signatures in payload; expecting only one")
+		return errors.New("go-jose/go-jose: too many signatures in payload; expecting only one")
 	}
 
 	signature := obj.Signatures[0]

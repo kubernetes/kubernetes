@@ -101,14 +101,14 @@ func (ctx *cbcAEAD) Seal(dst, nonce, plaintext, data []byte) []byte {
 // Open decrypts and authenticates the ciphertext.
 func (ctx *cbcAEAD) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	if len(ciphertext) < ctx.authtagBytes {
-		return nil, errors.New("square/go-jose: invalid ciphertext (too short)")
+		return nil, errors.New("go-jose/go-jose: invalid ciphertext (too short)")
 	}
 
 	offset := len(ciphertext) - ctx.authtagBytes
 	expectedTag := ctx.computeAuthTag(data, nonce, ciphertext[:offset])
 	match := subtle.ConstantTimeCompare(expectedTag, ciphertext[offset:])
 	if match != 1 {
-		return nil, errors.New("square/go-jose: invalid ciphertext (auth tag mismatch)")
+		return nil, errors.New("go-jose/go-jose: invalid ciphertext (auth tag mismatch)")
 	}
 
 	cbc := cipher.NewCBCDecrypter(ctx.blockCipher, nonce)
@@ -117,7 +117,7 @@ func (ctx *cbcAEAD) Open(dst, nonce, ciphertext, data []byte) ([]byte, error) {
 	buffer := append([]byte{}, []byte(ciphertext[:offset])...)
 
 	if len(buffer)%ctx.blockCipher.BlockSize() > 0 {
-		return nil, errors.New("square/go-jose: invalid ciphertext (invalid length)")
+		return nil, errors.New("go-jose/go-jose: invalid ciphertext (invalid length)")
 	}
 
 	cbc.CryptBlocks(buffer, buffer)
@@ -177,19 +177,19 @@ func padBuffer(buffer []byte, blockSize int) []byte {
 // Remove padding
 func unpadBuffer(buffer []byte, blockSize int) ([]byte, error) {
 	if len(buffer)%blockSize != 0 {
-		return nil, errors.New("square/go-jose: invalid padding")
+		return nil, errors.New("go-jose/go-jose: invalid padding")
 	}
 
 	last := buffer[len(buffer)-1]
 	count := int(last)
 
 	if count == 0 || count > blockSize || count > len(buffer) {
-		return nil, errors.New("square/go-jose: invalid padding")
+		return nil, errors.New("go-jose/go-jose: invalid padding")
 	}
 
 	padding := bytes.Repeat([]byte{last}, count)
 	if !bytes.HasSuffix(buffer, padding) {
-		return nil, errors.New("square/go-jose: invalid padding")
+		return nil, errors.New("go-jose/go-jose: invalid padding")
 	}
 
 	return buffer[:len(buffer)-count], nil

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/square/go-jose.v2/json"
+	"gopkg.in/go-jose/go-jose.v2/json"
 )
 
 // rawJSONWebEncryption represents a raw JWE JSON object. Used for parsing/serializing.
@@ -146,7 +146,7 @@ func (parsed *rawJSONWebEncryption) sanitized() (*JSONWebEncryption, error) {
 	if parsed.Protected != nil && len(parsed.Protected.bytes()) > 0 {
 		err := json.Unmarshal(parsed.Protected.bytes(), &obj.protected)
 		if err != nil {
-			return nil, fmt.Errorf("square/go-jose: invalid protected header: %s, %s", err, parsed.Protected.base64())
+			return nil, fmt.Errorf("go-jose/go-jose: invalid protected header: %s, %s", err, parsed.Protected.base64())
 		}
 	}
 
@@ -156,7 +156,7 @@ func (parsed *rawJSONWebEncryption) sanitized() (*JSONWebEncryption, error) {
 	mergedHeaders := obj.mergedHeaders(nil)
 	obj.Header, err = mergedHeaders.sanitized()
 	if err != nil {
-		return nil, fmt.Errorf("square/go-jose: cannot sanitize merged headers: %v (%v)", err, mergedHeaders)
+		return nil, fmt.Errorf("go-jose/go-jose: cannot sanitize merged headers: %v (%v)", err, mergedHeaders)
 	}
 
 	if len(parsed.Recipients) == 0 {
@@ -187,7 +187,7 @@ func (parsed *rawJSONWebEncryption) sanitized() (*JSONWebEncryption, error) {
 	for _, recipient := range obj.recipients {
 		headers := obj.mergedHeaders(&recipient)
 		if headers.getAlgorithm() == "" || headers.getEncryption() == "" {
-			return nil, fmt.Errorf("square/go-jose: message is missing alg/enc headers")
+			return nil, fmt.Errorf("go-jose/go-jose: message is missing alg/enc headers")
 		}
 	}
 
@@ -203,7 +203,7 @@ func (parsed *rawJSONWebEncryption) sanitized() (*JSONWebEncryption, error) {
 func parseEncryptedCompact(input string) (*JSONWebEncryption, error) {
 	parts := strings.Split(input, ".")
 	if len(parts) != 5 {
-		return nil, fmt.Errorf("square/go-jose: compact JWE format must have five parts")
+		return nil, fmt.Errorf("go-jose/go-jose: compact JWE format must have five parts")
 	}
 
 	rawProtected, err := base64.RawURLEncoding.DecodeString(parts[0])

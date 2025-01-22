@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gopkg.in/square/go-jose.v2/json"
+	"gopkg.in/go-jose/go-jose.v2/json"
 )
 
 // KeyAlgorithm represents a key management algorithm.
@@ -45,32 +45,32 @@ var (
 	// ErrCryptoFailure represents an error in cryptographic primitive. This
 	// occurs when, for example, a message had an invalid authentication tag or
 	// could not be decrypted.
-	ErrCryptoFailure = errors.New("square/go-jose: error in cryptographic primitive")
+	ErrCryptoFailure = errors.New("go-jose/go-jose: error in cryptographic primitive")
 
 	// ErrUnsupportedAlgorithm indicates that a selected algorithm is not
 	// supported. This occurs when trying to instantiate an encrypter for an
 	// algorithm that is not yet implemented.
-	ErrUnsupportedAlgorithm = errors.New("square/go-jose: unknown/unsupported algorithm")
+	ErrUnsupportedAlgorithm = errors.New("go-jose/go-jose: unknown/unsupported algorithm")
 
 	// ErrUnsupportedKeyType indicates that the given key type/format is not
 	// supported. This occurs when trying to instantiate an encrypter and passing
 	// it a key of an unrecognized type or with unsupported parameters, such as
 	// an RSA private key with more than two primes.
-	ErrUnsupportedKeyType = errors.New("square/go-jose: unsupported key type/format")
+	ErrUnsupportedKeyType = errors.New("go-jose/go-jose: unsupported key type/format")
 
 	// ErrInvalidKeySize indicates that the given key is not the correct size
 	// for the selected algorithm. This can occur, for example, when trying to
 	// encrypt with AES-256 but passing only a 128-bit key as input.
-	ErrInvalidKeySize = errors.New("square/go-jose: invalid key size for algorithm")
+	ErrInvalidKeySize = errors.New("go-jose/go-jose: invalid key size for algorithm")
 
 	// ErrNotSupported serialization of object is not supported. This occurs when
 	// trying to compact-serialize an object which can't be represented in
 	// compact form.
-	ErrNotSupported = errors.New("square/go-jose: compact serialization not supported for object")
+	ErrNotSupported = errors.New("go-jose/go-jose: compact serialization not supported for object")
 
 	// ErrUnprotectedNonce indicates that while parsing a JWS or JWE object, a
 	// nonce header parameter was included in an unprotected header object.
-	ErrUnprotectedNonce = errors.New("square/go-jose: Nonce parameter included in unprotected header")
+	ErrUnprotectedNonce = errors.New("go-jose/go-jose: Nonce parameter included in unprotected header")
 )
 
 // Key management algorithms
@@ -194,7 +194,7 @@ type Header struct {
 // not be validated with the given verify options.
 func (h Header) Certificates(opts x509.VerifyOptions) ([][]*x509.Certificate, error) {
 	if len(h.certificates) == 0 {
-		return nil, errors.New("square/go-jose: no x5c header present in message")
+		return nil, errors.New("go-jose/go-jose: no x5c header present in message")
 	}
 
 	leaf := h.certificates[0]
@@ -496,7 +496,7 @@ func curveName(crv elliptic.Curve) (string, error) {
 	case elliptic.P521():
 		return "P-521", nil
 	default:
-		return "", fmt.Errorf("square/go-jose: unsupported/unknown elliptic curve")
+		return "", fmt.Errorf("go-jose/go-jose: unsupported/unknown elliptic curve")
 	}
 }
 
