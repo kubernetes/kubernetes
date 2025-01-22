@@ -10,7 +10,7 @@ godebug winsymlink=0
 
 require (
 	github.com/blang/semver/v4 v4.0.0
-	github.com/coreos/go-oidc v2.2.1+incompatible
+	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/fsnotify/fsnotify v1.7.0
@@ -122,7 +122,6 @@ require (
 	google.golang.org/genproto v0.0.0-20240123012728-ef4313101c80 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240826202546-f6391c0de4c7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 

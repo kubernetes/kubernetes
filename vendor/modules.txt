@@ -87,7 +87,7 @@ github.com/coredns/caddy/caddyfile
 ## explicit; go 1.14
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
-# github.com/coreos/go-oidc v2.2.1+incompatible
+# github.com/coreos/go-oidc v2.3.0+incompatible
 ## explicit
 github.com/coreos/go-oidc
 # github.com/coreos/go-semver v0.3.1
@@ -1004,11 +1004,6 @@ gopkg.in/inf.v0
 # gopkg.in/natefinch/lumberjack.v2 v2.2.1
 ## explicit; go 1.13
 gopkg.in/natefinch/lumberjack.v2
-# gopkg.in/square/go-jose.v2 v2.6.0
-## explicit
-gopkg.in/square/go-jose.v2
-gopkg.in/square/go-jose.v2/cipher
-gopkg.in/square/go-jose.v2/json
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3

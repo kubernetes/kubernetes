@@ -22,7 +22,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/container-storage-interface/spec v1.9.0
 	github.com/coredns/corefile-migration v1.0.25
-	github.com/coreos/go-oidc v2.2.1+incompatible
+	github.com/coreos/go-oidc v2.3.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.4
 	github.com/cyphar/filepath-securejoin v0.3.5
@@ -212,7 +212,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240826202546-f6391c0de4c7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.1 // indirect

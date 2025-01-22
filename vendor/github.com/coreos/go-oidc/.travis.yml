@@ -1,9 +1,11 @@
 language: go
 
 go:
-  - "1.12"
-  - "1.13"
-
+  - "1.14"
+  - "1.15"
+arch:
+  - AMD64
+  - ppc64le
 install:
  - go get -v -t github.com/coreos/go-oidc/...
  - go get golang.org/x/tools/cmd/cover
