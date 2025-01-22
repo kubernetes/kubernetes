@@ -65,7 +65,7 @@ func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *
 		}
 	}
 
-	return newDynamicClient(unstructuredScheme, defaultGvrToListMapping(unstructuredScheme), defaultPatchMetaInformation(scheme), objects...)
+	return newDynamicClient(unstructuredScheme, defaultGVRToListMapping(unstructuredScheme), defaultPatchMetaInformation(scheme), objects...)
 }
 
 func defaultPatchMetaInformation(scheme *runtime.Scheme) map[schema.GroupVersionKind]strategicpatch.LookupPatchMeta {
@@ -93,7 +93,7 @@ func defaultPatchMetaInformation(scheme *runtime.Scheme) map[schema.GroupVersion
 	return knownPatchMeta
 }
 
-func defaultGvrToListMapping(scheme *runtime.Scheme) map[schema.GroupVersionResource]string {
+func defaultGVRToListMapping(scheme *runtime.Scheme) map[schema.GroupVersionResource]string {
 	// first we attempt to invert known List types from the scheme to auto guess the resource with unsafe guesses
 	// this covers common usage of registering types in scheme and passing them
 	completeGVRToListKind := map[schema.GroupVersionResource]string{}
@@ -117,7 +117,7 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 	// cannot look up the actual hits), we need to know a mapping of GVR to listGVK here.  For GETs and other types of calls,
 	// there is no return value that contains a GVK, so it doesn't have to know the mapping in advance.
 
-	completeGVRToListKind := defaultGvrToListMapping(scheme)
+	completeGVRToListKind := defaultGVRToListMapping(scheme)
 
 	for gvr, listKind := range gvrToListKind {
 		if !strings.HasSuffix(listKind, "List") {

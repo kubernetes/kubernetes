@@ -78,7 +78,8 @@ type ObjectTracker interface {
 	// which will push added / modified / deleted object.
 	Watch(gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error)
 
-	// LookupPatchMeta returns the needed meta information to perform patches on any object the type represented in <obj>.
+	// LookupPatchMeta returns the needed meta information to perform patches (of type types.StrategicMergePatchType)
+	// on runtime.Object in <obj>.
 	LookupPatchMeta(obj runtime.Object) strategicpatch.LookupPatchMeta
 }
 
@@ -301,8 +302,11 @@ func (o objectTrackerReact) Patch(action PatchActionImpl) (runtime.Object, error
 	return obj, nil
 }
 
-type SchemeWithPatchMeta interface {
-	PatchMeta(kind schema.GroupVersionKind) strategicpatch.LookupPatchMeta
+// strategicMergePatchMetaResolver resolves meta information needed to perform a patch (of type types.StrategicMergePatchType).
+// It is intended to be used during fake patch calls within fake.FakeDynamicClient.
+type strategicMergePatchMetaResolver interface {
+	// resolveLookupPatchMeta returns meta information needed to perform patches on any object of schema.GroupVersionKind <kind>.
+	resolveLookupPatchMeta(kind schema.GroupVersionKind) strategicpatch.LookupPatchMeta
 }
 
 func NewSchemeWithPatchMeta(scheme *runtime.Scheme, patchMeta map[schema.GroupVersionKind]strategicpatch.LookupPatchMeta) *schemeWithPatchMeta {
@@ -314,7 +318,7 @@ type schemeWithPatchMeta struct {
 	patchMeta map[schema.GroupVersionKind]strategicpatch.LookupPatchMeta
 }
 
-func (s *schemeWithPatchMeta) PatchMeta(kind schema.GroupVersionKind) strategicpatch.LookupPatchMeta {
+func (s *schemeWithPatchMeta) resolveLookupPatchMeta(kind schema.GroupVersionKind) strategicpatch.LookupPatchMeta {
 	return s.patchMeta[kind]
 }
 
@@ -348,8 +352,8 @@ func (t *tracker) LookupPatchMeta(obj runtime.Object) strategicpatch.LookupPatch
 
 	kind := obj.GetObjectKind().GroupVersionKind()
 
-	if compatibleScheme, ok := t.scheme.(SchemeWithPatchMeta); ok {
-		return compatibleScheme.PatchMeta(kind)
+	if compatibleScheme, ok := t.scheme.(strategicMergePatchMetaResolver); ok {
+		return compatibleScheme.resolveLookupPatchMeta(kind)
 	}
 
 	return nil
