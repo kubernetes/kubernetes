@@ -653,7 +653,12 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 	}
 
+	pm.mutex.RUnlock()
+	pm.mutex.Lock()
 	pm.refreshProbedPlugins()
+	pm.mutex.Unlock()
+	pm.mutex.RLock()
+
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
 			match = plugin
@@ -681,7 +686,11 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 		match = v
 	}
 
+	pm.mutex.RUnlock()
+	pm.mutex.Lock()
 	pm.refreshProbedPlugins()
+	pm.mutex.Unlock()
+	pm.mutex.RLock()
 	if plugin, found := pm.probedPlugins[name]; found {
 		if match != nil {
 			return nil, fmt.Errorf("multiple volume plugins matched: %s and %s", match.GetPluginName(), plugin.GetPluginName())
