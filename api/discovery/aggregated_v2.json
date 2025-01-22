@@ -806,6 +806,29 @@
               ]
             },
             {
+              "resource": "ipaddresses",
+              "responseKind": {
+                "group": "",
+                "kind": "IPAddress",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "shortNames": [
+                "ip"
+              ],
+              "singularResource": "ipaddress",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "networkpolicies",
               "responseKind": {
                 "group": "",
@@ -817,6 +840,41 @@
                 "netpol"
               ],
               "singularResource": "networkpolicy",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
+              "resource": "servicecidrs",
+              "responseKind": {
+                "group": "",
+                "kind": "ServiceCIDR",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "servicecidr",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "ServiceCIDR",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
               "verbs": [
                 "create",
                 "delete",

@@ -392,6 +392,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: DisableCloudProviders
   versionedSpecs:
   - default: false
@@ -802,6 +806,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.33"
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false

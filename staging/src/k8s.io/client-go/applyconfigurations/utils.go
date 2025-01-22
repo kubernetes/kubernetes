@@ -1406,6 +1406,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.IngressStatusApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IngressTLS"):
 		return &applyconfigurationsnetworkingv1.IngressTLSApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("IPAddress"):
+		return &applyconfigurationsnetworkingv1.IPAddressApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("IPAddressSpec"):
+		return &applyconfigurationsnetworkingv1.IPAddressSpecApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IPBlock"):
 		return &applyconfigurationsnetworkingv1.IPBlockApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicy"):
@@ -1420,8 +1424,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.NetworkPolicyPortApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicySpec"):
 		return &applyconfigurationsnetworkingv1.NetworkPolicySpecApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("ParentReference"):
+		return &applyconfigurationsnetworkingv1.ParentReferenceApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("ServiceBackendPort"):
 		return &applyconfigurationsnetworkingv1.ServiceBackendPortApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("ServiceCIDR"):
+		return &applyconfigurationsnetworkingv1.ServiceCIDRApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("ServiceCIDRSpec"):
+		return &applyconfigurationsnetworkingv1.ServiceCIDRSpecApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("ServiceCIDRStatus"):
+		return &applyconfigurationsnetworkingv1.ServiceCIDRStatusApplyConfiguration{}
 
 		// Group=networking.k8s.io, Version=v1alpha1
 	case networkingv1alpha1.SchemeGroupVersion.WithKind("IPAddress"):

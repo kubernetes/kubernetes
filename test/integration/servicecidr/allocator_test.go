@@ -205,7 +205,7 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		_, err = client.NetworkingV1beta1().IPAddresses().Get(tCtx, svc.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = client.NetworkingV1().IPAddresses().Get(tCtx, svc.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			t.Error(err)
 		}
@@ -219,7 +219,7 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 		t.Errorf("unexpected error text: %v", err)
 	}
 
-	_, err = client.NetworkingV1beta1().IPAddresses().Get(context.TODO(), lastSvc.Spec.ClusterIP, metav1.GetOptions{})
+	_, err = client.NetworkingV1().IPAddresses().Get(context.TODO(), lastSvc.Spec.ClusterIP, metav1.GetOptions{})
 	if err != nil {
 		t.Error(err)
 	}
@@ -286,7 +286,7 @@ func TestMigrateService(t *testing.T) {
 
 	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 		// The repair loop must create the IP address associated
-		_, err = kubeclient.NetworkingV1beta1().IPAddresses().Get(context.TODO(), svc.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = kubeclient.NetworkingV1().IPAddresses().Get(context.TODO(), svc.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -339,7 +339,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		_, err = kubeclient1.NetworkingV1beta1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = kubeclient1.NetworkingV1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			t.Error(err)
 		}
@@ -369,7 +369,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 
 		err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
 			// The repair loop must create the IP address associated
-			_, err = kubeclient1.NetworkingV1beta1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
+			_, err = kubeclient1.NetworkingV1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -498,7 +498,7 @@ func TestSkewAllocatorsRollout(t *testing.T) {
 	// It takes some time for the repairip loop to create the corresponding IPAddress objects
 	// ClusterIPs are synchronized through the bitmap.
 	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(context.Context) (bool, error) {
-		ips, err := kubeclientNew.NetworkingV1beta1().IPAddresses().List(context.Background(), metav1.ListOptions{})
+		ips, err := kubeclientNew.NetworkingV1().IPAddresses().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -527,7 +527,7 @@ func TestSkewAllocatorsRollout(t *testing.T) {
 		ip := fmt.Sprintf("10.0.0.%d", i)
 		err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 10*time.Second, true, func(context.Context) (bool, error) {
 			// The repair loop must create the IP address associated
-			_, err = kubeclientNew.NetworkingV1beta1().IPAddresses().Get(context.Background(), ip, metav1.GetOptions{})
+			_, err = kubeclientNew.NetworkingV1().IPAddresses().Get(context.Background(), ip, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -577,7 +577,7 @@ func TestFlagsIPAllocator(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		_, err = kubeclient1.NetworkingV1beta1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
+		_, err = kubeclient1.NetworkingV1().IPAddresses().Get(context.TODO(), service.Spec.ClusterIP, metav1.GetOptions{})
 		if err != nil {
 			t.Error(err)
 		}
