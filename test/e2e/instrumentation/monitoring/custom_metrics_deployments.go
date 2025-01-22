@@ -236,20 +236,20 @@ func CreateAdapter(adapterDeploymentFile string) error {
 		return err
 	}
 	stat, err := e2ekubectl.RunKubectl("", "apply", "-f", adapterURL)
-	framework.Logf(stat)
+	framework.Logf("%s", stat)
 	return err
 }
 
 func createClusterAdminBinding() error {
 	stdout, stderr, err := framework.RunCmd("gcloud", "config", "get-value", "core/account")
 	if err != nil {
-		framework.Logf(stderr)
+		framework.Logf("%s", stderr)
 		return err
 	}
 	serviceAccount := strings.TrimSpace(stdout)
 	framework.Logf("current service account: %q", serviceAccount)
 	stat, err := e2ekubectl.RunKubectl("", "create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
-	framework.Logf(stat)
+	framework.Logf("%s", stat)
 	return err
 }
 
@@ -289,7 +289,7 @@ func CleanupDescriptors(service *gcm.Service, projectID string) {
 // CleanupAdapter deletes Custom Metrics - Stackdriver adapter deployments.
 func CleanupAdapter(adapterDeploymentFile string) {
 	stat, err := e2ekubectl.RunKubectl("", "delete", "-f", adapterDeploymentFile)
-	framework.Logf(stat)
+	framework.Logf("%s", stat)
 	if err != nil {
 		framework.Logf("Failed to delete adapter deployments: %s", err)
 	}
@@ -302,7 +302,7 @@ func CleanupAdapter(adapterDeploymentFile string) {
 
 func cleanupClusterAdminBinding() {
 	stat, err := e2ekubectl.RunKubectl("", "delete", "clusterrolebinding", ClusterAdminBinding)
-	framework.Logf(stat)
+	framework.Logf("%s", stat)
 	if err != nil {
 		framework.Logf("Failed to delete cluster admin binding: %s", err)
 	}

@@ -262,7 +262,7 @@ func gatherMetrics(ctx context.Context, f *framework.Framework) {
 			framework.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 		} else {
 			summary = (*e2emetrics.ComponentCollection)(&received)
-			framework.Logf(summary.PrintHumanReadable())
+			framework.Logf("%s", summary.PrintHumanReadable())
 		}
 	}
 }

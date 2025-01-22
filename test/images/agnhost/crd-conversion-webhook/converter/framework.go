@@ -126,7 +126,7 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	serializer := getInputSerializer(contentType)
 	if serializer == nil {
 		msg := fmt.Sprintf("invalid Content-Type header `%s`", contentType)
-		klog.Errorf(msg)
+		klog.Error(msg)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
@@ -146,7 +146,7 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		convertReview, ok := obj.(*v1beta1.ConversionReview)
 		if !ok {
 			msg := fmt.Sprintf("Expected v1beta1.ConversionReview but got: %T", obj)
-			klog.Errorf(msg)
+			klog.Error(msg)
 			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
@@ -161,7 +161,7 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		convertReview, ok := obj.(*v1.ConversionReview)
 		if !ok {
 			msg := fmt.Sprintf("Expected v1.ConversionReview but got: %T", obj)
-			klog.Errorf(msg)
+			klog.Error(msg)
 			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
@@ -183,7 +183,7 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 	outSerializer := getOutputSerializer(accept)
 	if outSerializer == nil {
 		msg := fmt.Sprintf("invalid accept header `%s`", accept)
-		klog.Errorf(msg)
+		klog.Error(msg)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
