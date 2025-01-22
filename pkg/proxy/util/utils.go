@@ -17,13 +17,10 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"time"
-
-	"golang.org/x/sys/unix"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -44,9 +41,6 @@ const (
 
 	// FullSyncPeriod is iptables and nftables proxier full sync period
 	FullSyncPeriod = 1 * time.Hour
-
-	// Arbitrary limit on max attempts at netlink calls if they are repeatedly interrupted.
-	MaxAttemptsEINTR = 5
 )
 
 // IsZeroCIDR checks whether the input CIDR string is either
@@ -228,14 +222,4 @@ func IsVIPMode(ing v1.LoadBalancerIngress) bool {
 		return true
 	}
 	return *ing.IPMode == v1.LoadBalancerIPModeVIP
-}
-
-func RetryOnIntr(f func() error) {
-	for attempt := 0; attempt < MaxAttemptsEINTR; attempt += 1 {
-		if err := f(); !errors.Is(err, unix.EINTR) {
-			return
-		}
-	}
-	klog.V(2).InfoS("netlink call interrupted", "attempts", MaxAttemptsEINTR)
-
 }
