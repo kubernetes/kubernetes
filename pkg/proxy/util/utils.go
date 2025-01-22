@@ -236,6 +236,6 @@ func RetryOnIntr(f func() error) {
 			return
 		}
 	}
-	klog.V(3).InfoS("netlink call interrupted", "attempts", MaxAttemptsEINTR)
+	klog.V(2).InfoS("netlink call interrupted", "attempts", MaxAttemptsEINTR)
 
 }
