@@ -19,7 +19,6 @@ package renewal
 import (
 	"crypto"
 	"crypto/x509"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -265,7 +264,7 @@ func TestPKICertificateReadWriterExists(t *testing.T) {
 		}
 	}()
 	filename := "testfile"
-	tmpfilepath := filepath.Join(tmpdir, fmt.Sprintf(filename+".crt"))
+	tmpfilepath := filepath.Join(tmpdir, filename+".crt")
 	err = os.WriteFile(tmpfilepath, nil, 0644)
 	if err != nil {
 		t.Fatalf("Couldn't write file: %v", err)

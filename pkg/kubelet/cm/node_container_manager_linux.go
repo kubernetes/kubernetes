@@ -20,6 +20,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -112,7 +113,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
-			return fmt.Errorf(message)
+			return errors.New(message)
 		}
 		cm.recorder.Eventf(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated limits on system reserved cgroup %v", nc.SystemReservedCgroupName)
 	}
@@ -121,7 +122,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
-			return fmt.Errorf(message)
+			return errors.New(message)
 		}
 		cm.recorder.Eventf(nodeRef, v1.EventTypeNormal, events.SuccessfulNodeAllocatableEnforcement, "Updated limits on kube reserved cgroup %v", nc.KubeReservedCgroupName)
 	}

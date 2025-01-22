@@ -18,6 +18,7 @@ package persistentvolume
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -1630,7 +1631,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 		strerr := fmt.Sprintf("plugin %q is not a CSI plugin. Only CSI plugin can provision a claim with a datasource", pluginName)
 		logger.V(2).Info(strerr)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
-		return pluginName, fmt.Errorf(strerr)
+		return pluginName, errors.New(strerr)
 
 	}
 	provisionerName := storageClass.Provisioner

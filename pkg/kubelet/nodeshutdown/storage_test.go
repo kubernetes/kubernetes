@@ -17,7 +17,6 @@ limitations under the License.
 package nodeshutdown
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -60,7 +59,7 @@ func TestLocalStorage(t *testing.T) {
 		return
 	}
 	nowStr := now.Format(time.RFC3339Nano)
-	wantRaw := fmt.Sprintf(`{"startTime":"` + nowStr + `","endTime":"` + nowStr + `"}`)
+	wantRaw := `{"startTime":"` + nowStr + `","endTime":"` + nowStr + `"}`
 	if string(raw) != wantRaw {
 		t.Errorf("got %s, want %s", string(raw), wantRaw)
 		return
