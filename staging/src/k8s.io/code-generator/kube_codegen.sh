@@ -27,8 +27,9 @@ set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-# Callers which want a specific tag of the k8s.io/code-generator repo should set the KUBE_CODEGEN_TAG to the
-# tag name, e.g. KUBE_CODEGEN_TAG="release-1.32" before sourcing this file.
+# Callers which want a specific tag of the k8s.io/code-generator repo should
+# set the KUBE_CODEGEN_TAG to the tag name, e.g. KUBE_CODEGEN_TAG="release-1.32"
+# before sourcing this file.
 CODEGEN_VERSION_SPEC="${KUBE_CODEGEN_TAG:+"@${KUBE_CODEGEN_TAG}"}"
 
 function kube::codegen::internal::findz() {
@@ -517,7 +518,7 @@ function kube::codegen::gen_client() {
                 plural_exceptions="$2"
                 shift 2
                 ;;
-              "--prefers-protobuf")
+            "--prefers-protobuf")
                 prefers_protobuf="true"
                 shift
                 ;;
@@ -697,7 +698,6 @@ function kube::codegen::gen_client() {
 function kube::codegen::gen_register() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
-    local version="latest"
     local v="${KUBE_VERBOSE:-0}"
 
     while [ "$#" -gt 0 ]; do
