@@ -243,7 +243,7 @@ func statusCausesToAggrError(scs []metav1.StatusCause) utilerrors.Aggregate {
 // commands.
 func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
-		klog.V(4).Infof(debugErr.DebugError())
+		klog.V(4).Info(debugErr.DebugError())
 	}
 	status, isStatus := err.(apierrors.APIStatus)
 	switch {

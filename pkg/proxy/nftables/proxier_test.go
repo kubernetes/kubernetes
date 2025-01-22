@@ -17,6 +17,7 @@ limitations under the License.
 package nftables
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -162,7 +163,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 				// Second call may succeed or fail
 				if tc.simulatedErr != "" {
 					cmdOutput = ""
-					simErr = fmt.Errorf(tc.simulatedErr)
+					simErr = errors.New(tc.simulatedErr)
 				}
 				fcmd.CombinedOutputScript = append(fcmd.CombinedOutputScript,
 					func() ([]byte, []byte, error) { return []byte(cmdOutput), nil, simErr },

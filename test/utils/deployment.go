@@ -18,6 +18,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -226,7 +227,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	})
 	if err == wait.ErrWaitTimeout {
 		LogReplicaSetsOfDeployment(deployment, nil, newRS, logf)
-		err = fmt.Errorf(reason)
+		err = errors.New(reason)
 	}
 	if newRS == nil {
 		return fmt.Errorf("deployment %q failed to create new replica set", deploymentName)

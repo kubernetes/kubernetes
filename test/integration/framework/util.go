@@ -158,7 +158,7 @@ func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionT
 							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
 					}
 					if !silent {
-						klog.Infof(msg)
+						klog.Info(msg)
 					}
 					return false
 				}

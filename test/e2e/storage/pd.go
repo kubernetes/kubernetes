@@ -555,7 +555,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	// escape if not a supported provider
 	if !(framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" ||
 		framework.TestContext.Provider == "aws") {
-		framework.Failf(fmt.Sprintf("func `testPDPod` only supports gce, gke, and aws providers, not %v", framework.TestContext.Provider))
+		framework.Fail(fmt.Sprintf("func `testPDPod` only supports gce, gke, and aws providers, not %v", framework.TestContext.Provider))
 	}
 
 	containers := make([]v1.Container, numContainers)
