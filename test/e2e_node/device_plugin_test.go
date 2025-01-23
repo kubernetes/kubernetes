@@ -933,7 +933,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 		// simulate node reboot scenario by removing pods using CRI before kubelet is started. In addition to that,
 		// intentionally a scenario is created where after node reboot, application pods requesting devices appear before the device plugin pod
 		// exposing those devices as resource has restarted. The expected behavior is that the application pod fails at admission time.
-		framework.It("Keeps device plugin assignments across node reboots (no pod restart, no device plugin re-registration)", framework.WithFlaky(), func(ctx context.Context) {
+		framework.It("Does not keep device plugin assignments across node reboots if fails admission (no pod restart, no device plugin re-registration)", framework.WithFlaky(), func(ctx context.Context) {
 			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
 			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(SampleDeviceResourceName, podRECMD))
 			deviceIDRE := "stub devices: (Dev-[0-9]+)"
@@ -984,9 +984,17 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 				return err
 			}, 30*time.Second, framework.Poll).ShouldNot(gomega.HaveOccurred(), "cannot fetch the compute resource assignment after kubelet restart")
 
-			err, _ = checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{devID1})
-			framework.ExpectNoError(err, "inconsistent device assignment after node reboot")
-
+			// if we got this far, podresources API will now report 2 entries:
+			// - sample device plugin pod, running and doing fine
+			// - our test pod, in failed state. Pods in terminal state will still be reported, see https://github.com/kubernetes/kubernetes/issues/119423
+			// so we care about our test pod, and it will be present in the returned list till 119423 is fixed, but since it failed admission it must not have
+			// any device allocated to it, hence we check for empty device set in the podresources response. So, we check that
+			// A. our test pod must be present in the list response *and*
+			// B. it has no devices assigned to it.
+			// anything else is unexpected and thus makes the test fail. Once 119423 is fixed, a better, simpler and more intuitive check will be for the
+			// test pod to not be present in the podresources list response, but till that time we're stuck with this approach.
+			_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, SampleDeviceResourceName, []string{})
+			gomega.Expect(found).To(gomega.BeTrueBecause("%s/%s/%s failed admission, should not have devices registered", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
 		})
 	})
 }
