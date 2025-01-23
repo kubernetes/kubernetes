@@ -134,9 +134,9 @@ export WINDOWS_CNI_DIR="${WINDOWS_K8S_DIR}\cni"
 # Directory where CNI config files will be stored on Windows nodes.
 export WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
 # CNI storage path for Windows nodes
-export WINDOWS_CNI_STORAGE_PATH="https://storage.googleapis.com/k8s-artifacts-cni/release"
+export WINDOWS_CNI_STORAGE_PATH="https://github.com/containernetworking/plugins/releases/download"
 # CNI version for Windows nodes
-export WINDOWS_CNI_VERSION="v1.6.0"
+export WINDOWS_CNI_VERSION="v1.6.2"
 # Pod manifests directory for Windows nodes on Windows nodes.
 export WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
 # Directory where cert/key files will be stores on Windows nodes.
