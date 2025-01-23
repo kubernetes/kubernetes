@@ -30,7 +30,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/prometheus/common/model"
@@ -47,7 +46,7 @@ const (
 	maxStatsAge = time.Minute
 )
 
-var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, feature.ResourceMetrics, func() {
+var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 	f := framework.NewDefaultFramework("resource-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {

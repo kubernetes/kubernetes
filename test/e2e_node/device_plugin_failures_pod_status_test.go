@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -41,7 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/testdeviceplugin"
 )
 
-var _ = SIGDescribe("Device Plugin Failures Pod Status", nodefeature.ResourceHealthStatus, feature.ResourceHealthStatus, func() {
+var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthStatus, func() {
 	f := framework.NewDefaultFramework("device-plugin-failures")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

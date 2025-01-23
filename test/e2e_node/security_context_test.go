@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -149,7 +148,7 @@ var _ = SIGDescribe("Security Context", func() {
 			nginxPid = strings.TrimSpace(output)
 		})
 
-		f.It("should show its pid in the host PID namespace", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
+		f.It("should show its pid in the host PID namespace", feature.HostAccess, func(ctx context.Context) {
 			busyboxPodName := "busybox-hostpid-" + string(uuid.NewUUID())
 			createAndWaitHostPidPod(ctx, busyboxPodName, true)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
@@ -169,7 +168,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("should not show its pid in the non-hostpid containers", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
+		f.It("should not show its pid in the non-hostpid containers", feature.HostAccess, func(ctx context.Context) {
 			busyboxPodName := "busybox-non-hostpid-" + string(uuid.NewUUID())
 			createAndWaitHostPidPod(ctx, busyboxPodName, false)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
@@ -225,7 +224,7 @@ var _ = SIGDescribe("Security Context", func() {
 			framework.Logf("Got host shared memory ID %q", hostSharedMemoryID)
 		})
 
-		f.It("should show the shared memory ID in the host IPC containers", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
+		f.It("should show the shared memory ID in the host IPC containers", feature.HostAccess, func(ctx context.Context) {
 			ipcutilsPodName := "ipcutils-hostipc-" + string(uuid.NewUUID())
 			createAndWaitHostIPCPod(ctx, ipcutilsPodName, true)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
@@ -240,7 +239,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("should not show the shared memory ID in the non-hostIPC containers", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
+		f.It("should not show the shared memory ID in the non-hostIPC containers", feature.HostAccess, func(ctx context.Context) {
 			ipcutilsPodName := "ipcutils-non-hostipc-" + string(uuid.NewUUID())
 			createAndWaitHostIPCPod(ctx, ipcutilsPodName, false)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, ipcutilsPodName, ipcutilsPodName)
@@ -308,7 +307,7 @@ var _ = SIGDescribe("Security Context", func() {
 			framework.Logf("Opened a new tcp port %q", listeningPort)
 		})
 
-		f.It("should listen on same port in the host network containers", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
+		f.It("should listen on same port in the host network containers", feature.HostAccess, func(ctx context.Context) {
 			busyboxPodName := "busybox-hostnetwork-" + string(uuid.NewUUID())
 			createAndWaitHostNetworkPod(ctx, busyboxPodName, true)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
@@ -322,7 +321,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("shouldn't show the same port in the non-hostnetwork containers", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
+		f.It("shouldn't show the same port in the non-hostnetwork containers", feature.HostAccess, func(ctx context.Context) {
 			busyboxPodName := "busybox-non-hostnetwork-" + string(uuid.NewUUID())
 			createAndWaitHostNetworkPod(ctx, busyboxPodName, false)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)

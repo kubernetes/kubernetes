@@ -38,7 +38,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo/v2"
@@ -52,7 +51,7 @@ const (
 )
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("Device Manager", framework.WithSerial(), nodefeature.DeviceManager, feature.DeviceManager, func() {
+var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceManager, func() {
 	f := framework.NewDefaultFramework("devicemanager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

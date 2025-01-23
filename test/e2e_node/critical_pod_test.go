@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -45,7 +44,7 @@ const (
 	bestEffortPodName = "best-effort"
 )
 
-var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisruptive(), nodefeature.CriticalPod, feature.CriticalPod, func() {
+var _ = SIGDescribe("CriticalPod", framework.WithSerial(), framework.WithDisruptive(), feature.CriticalPod, func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when we need to admit a critical pod", func() {

@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/mount-utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -101,7 +100,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 // pod that creates a file, deletes it, and writes data to it.  If
 // quotas are used to monitor, it will detect this deleted-but-in-use
 // file; if du is used to monitor, it will not detect this.
-var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolationQuota, nodefeature.LSCIQuotaMonitoring, feature.LSCIQuotaMonitoring, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationFSQuotaMonitoring", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolationQuota, feature.LSCIQuotaMonitoring, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("localstorage-quota-monitoring-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	runOneQuotaTest(f, true, true)
