@@ -98,14 +98,10 @@ var (
 `)
 )
 
-func boundObjectKindToAPIVersions() map[string]string {
-	kinds := map[string]string{
-		"Pod":    "v1",
-		"Secret": "v1",
-		"Node":   "v1",
-	}
-
-	return kinds
+var boundObjectKinds = map[string]string{
+	"Pod":    "v1",
+	"Secret": "v1",
+	"Node":   "v1",
 }
 
 func NewTokenOpts(ioStreams genericiooptions.IOStreams) *TokenOptions {
@@ -149,7 +145,7 @@ func NewCmdCreateToken(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) 
 	cmd.Flags().DurationVar(&o.Duration, "duration", o.Duration, "Requested lifetime of the issued token. If not set or if set to 0, the lifetime will be determined by the server automatically. The server may return a token with a longer or shorter lifetime.")
 
 	cmd.Flags().StringVar(&o.BoundObjectKind, "bound-object-kind", o.BoundObjectKind, "Kind of an object to bind the token to. "+
-		"Supported kinds are "+strings.Join(sets.List(sets.KeySet(boundObjectKindToAPIVersions())), ", ")+". "+
+		"Supported kinds are "+strings.Join(sets.List(sets.KeySet(boundObjectKinds)), ", ")+". "+
 		"If set, --bound-object-name must be provided.")
 	cmd.Flags().StringVar(&o.BoundObjectName, "bound-object-name", o.BoundObjectName, "Name of an object to bind the token to. "+
 		"The token will expire when the object is deleted. "+
@@ -226,8 +222,8 @@ func (o *TokenOptions) Validate() error {
 			return fmt.Errorf("--bound-object-uid can only be set if --bound-object-kind is provided")
 		}
 	} else {
-		if _, ok := boundObjectKindToAPIVersions()[o.BoundObjectKind]; !ok {
-			return fmt.Errorf("supported --bound-object-kind values are %s", strings.Join(sets.List(sets.KeySet(boundObjectKindToAPIVersions())), ", "))
+		if _, ok := boundObjectKinds[o.BoundObjectKind]; !ok {
+			return fmt.Errorf("supported --bound-object-kind values are %s", strings.Join(sets.List(sets.KeySet(boundObjectKinds)), ", "))
 		}
 		if len(o.BoundObjectName) == 0 {
 			return fmt.Errorf("--bound-object-name is required if --bound-object-kind is provided")
@@ -250,7 +246,7 @@ func (o *TokenOptions) Run() error {
 	if len(o.BoundObjectKind) > 0 {
 		request.Spec.BoundObjectRef = &authenticationv1.BoundObjectReference{
 			Kind:       o.BoundObjectKind,
-			APIVersion: boundObjectKindToAPIVersions()[o.BoundObjectKind],
+			APIVersion: boundObjectKinds[o.BoundObjectKind],
 			Name:       o.BoundObjectName,
 			UID:        types.UID(o.BoundObjectUID),
 		}
