@@ -57,7 +57,7 @@ func TestExplainInvalidArgs(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	flags := explain.NewExplainFlags(genericclioptions.NewTestIOStreamsDiscard())
+	flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
 
 	opts, err := flags.ToOptions(tf, "kubectl", []string{})
 	if err != nil {
@@ -84,7 +84,7 @@ func TestExplainNotExistResource(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
-	flags := explain.NewExplainFlags(genericclioptions.NewTestIOStreamsDiscard())
+	flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
 
 	opts, err := flags.ToOptions(tf, "kubectl", []string{"foo"})
 	if err != nil {
