@@ -4118,6 +4118,22 @@ var _ = common.SIGDescribe("Services", func() {
 			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
 			svc.Spec.HealthCheckNodePort = oldHealthCheckNodePort
 		})
+		if err != nil {
+			// We added a global static nodeport allocator to synchronize across tests and avoid other tests stealing the NodePort of this test and make it flake.
+			// Log the offending Service so we identify easily the problematic test.
+			// Dump all the IPs and look for the ones we want.
+			list, _ := cs.CoreV1().Services(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+			for _, svc := range list.Items {
+				if svc.Spec.HealthCheckNodePort == oldHealthCheckNodePort {
+					framework.Failf("Service %#v stole NodePort from current test, please ensure that test is using the Static NodePort Allocator https://github.com/kubernetes/kubernetes/pull/127153 : %v", svc, err)
+				}
+				for _, port := range svc.Spec.Ports {
+					if port.NodePort == oldHealthCheckNodePort {
+						framework.Failf("Service %#v stole NodePort from current test, please ensure that test is using the Static NodePort Allocator https://github.com/kubernetes/kubernetes/pull/127153 : %v", svc, err)
+					}
+				}
+			}
+		}
 		framework.ExpectNoError(err, "updating ExternalTrafficPolicy and HealthCheckNodePort")
 		deadline = time.Now().Add(e2eservice.KubeProxyEndpointLagTimeout)
 
