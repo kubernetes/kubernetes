@@ -626,9 +626,9 @@ func (s *ProxyServer) birthCry() {
 // dual-stack if the backend is capable of supporting both IP families, regardless of
 // whether the node is *actually* configured as dual-stack or not.)
 
-// (Note that on Linux, the node IPs are used only to determine whether a given
-// LoadBalancerSourceRanges value matches the node or not. In particular, they are *not*
-// used for NodePort handling.)
+// (Note that on Linux, the node IPs are used only (a) to determine whether a given
+// LoadBalancerSourceRanges value matches the node or not, and (b) as the IP(s) to
+// accept NodePort connections on when NodePortAddresses is set to 'primary'.)
 //
 // The order of precedence is:
 //  1. if bindAddress is not 0.0.0.0 or ::, then it is used as the primary IP.
