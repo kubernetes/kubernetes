@@ -147,6 +147,7 @@ issues:
 linters:
   disable-all: {{if .Base -}} true {{- else -}} false {{- end}}
   enable: # please keep this alphabetized
+    - depguard
     - forbidigo
     - ginkgolinter
     - gocritic
@@ -180,6 +181,16 @@ linters-settings: # please keep this alphabetized
       settings:
         config: |
           {{include "hack/logcheck.conf" | indent 10 | trim}}
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+          - "!$test"
+          - "!**/test/**"
+        deny:
+          - pkg: "github.com/google/go-cmp/cmp"
+            desc: "cmp is allowed only in test files"
   forbidigo:
     analyze-types: true
     forbid:

@@ -91,6 +91,7 @@ issues:
 linters:
   disable-all: false
   enable: # please keep this alphabetized
+    - depguard
     - forbidigo
     - ginkgolinter
     - gocritic
@@ -176,6 +177,16 @@ linters-settings: # please keep this alphabetized
           # this restriction. Whether we then do a global search/replace remains
           # to be decided.
           with-helpers .*
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+          - "!$test"
+          - "!**/test/**"
+        deny:
+          - pkg: "github.com/google/go-cmp/cmp"
+            desc: "cmp is allowed only in test files"
   forbidigo:
     analyze-types: true
     forbid:
