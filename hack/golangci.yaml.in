@@ -46,6 +46,12 @@ issues:
       text: should not be used because managedFields was removed
       path: _test.go$
 
+    # Adding unversioned feature gates is allowed in tests
+    - linters:
+        - forbidigo
+      text: should not use MutableFeatureGate.Add, use AddVersioned instead
+      path: _test.go$
+
     {{- if .Base}}
 
     # TODO(oscr) Remove these excluded directories and fix findings. Due to large amount of findings in different components
@@ -200,6 +206,10 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+    - p: \.Add$
+      pkg: ^k8s\.io/component-base/featuregate$
+      type: ^MutableFeatureGate$
+      msg: should not use MutableFeatureGate.Add, use AddVersioned instead
     {{- if .Hints}}
     - p: ^gomega\.BeTrue$
       pkg: ^github.com/onsi/gomega$
