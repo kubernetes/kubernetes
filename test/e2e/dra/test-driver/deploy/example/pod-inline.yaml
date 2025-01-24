@@ -1,14 +1,6 @@
 # One inline resource claim, one pod, two containers.
 # One container uses resource, one does not.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-inline-claim-parameters
-  namespace: default
-data:
-  a: b
----
-apiVersion: resource.k8s.io/v1alpha3
+apiVersion: resource.k8s.io/v1beta1
 kind: ResourceClaimTemplate
 metadata:
   name: test-inline-claim-template
@@ -18,10 +10,15 @@ spec:
     labels:
       app: inline-resource
   spec:
-    resourceClassName: example
-    parametersRef:
-      kind: ConfigMap
-      name: test-inline-claim-parameters
+    devices:
+      requests:
+      - name: my-device
+        deviceClassName: example
+      config:
+      - opaque:
+          driver: test-driver.cdi.k8s.io
+          parameters:
+            a: b
 ---
 apiVersion: v1
 kind: Pod

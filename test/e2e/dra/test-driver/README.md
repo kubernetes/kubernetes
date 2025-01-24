@@ -59,18 +59,14 @@ RUNTIME_CONFIG="resource.k8s.io/v1alpha3" FEATURE_GATES=DynamicResourceAllocatio
 ```
 
 In another:
-```console
-go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 controller
 ```
-
-In yet another:
-```console
 sudo mkdir -p /var/run/cdi && sudo chmod a+rwx /var/run/cdi /var/lib/kubelet/plugins_registry
-go run ./test/e2e/dra/test-driver --feature-gates ContextualLogging=true -v=5 kubelet-plugin --node-name=127.0.0.1
+KUBECONFIG=/var/run/kubernetes/admin.kubeconfig go run ./test/e2e/dra/test-driver -v=5 kubelet-plugin --node-name=127.0.0.1
 ```
 
 And finally:
 ```console
+$ export KUBECONFIG=/var/run/kubernetes/admin.kubeconfig
 $ kubectl create -f test/e2e/dra/test-driver/deploy/example/resourceclass.yaml
 resourceclass/example created
 $ kubectl create -f test/e2e/dra/test-driver/deploy/example/pod-inline.yaml
