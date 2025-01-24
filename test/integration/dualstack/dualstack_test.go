@@ -298,7 +298,7 @@ func TestCreateServiceSingleStackIPv6(t *testing.T) {
 					apiServerOptions,
 					[]string{
 						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=2001:db8:1::/112",
+						"--service-cluster-ip-range=2001:db8:1::/108",
 						"--advertise-address=2001:db8::10",
 						"--disable-admission-plugins=ServiceAccount",
 						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
@@ -529,7 +529,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 					apiServerOptions,
 					[]string{
 						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/112",
+						"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
 						"--advertise-address=10.0.0.1",
 						"--disable-admission-plugins=ServiceAccount",
 						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
@@ -808,7 +808,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 					apiServerOptions,
 					[]string{
 						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=2001:db8:1::/112,10.0.0.0/16",
+						"--service-cluster-ip-range=2001:db8:1::/108,10.0.0.0/16",
 						"--advertise-address=2001:db8::10",
 						"--disable-admission-plugins=ServiceAccount",
 						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
@@ -1038,7 +1038,7 @@ func TestUpgradeDowngrade(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/112",
+			"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
 			"--advertise-address=10.0.0.1",
 			"--disable-admission-plugins=ServiceAccount",
 		},
@@ -1149,7 +1149,7 @@ func TestConvertToFromExternalName(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/112",
+			"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
 			"--advertise-address=10.0.0.1",
 			"--disable-admission-plugins=ServiceAccount",
 		},
@@ -1238,7 +1238,7 @@ func TestPreferDualStack(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/112",
+			"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
 			"--advertise-address=10.0.0.1",
 			"--disable-admission-plugins=ServiceAccount",
 		},
@@ -1552,7 +1552,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	s = kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--service-cluster-ip-range=192.168.0.0/24,2001:db8:1::/112",
+			"--service-cluster-ip-range=192.168.0.0/24,2001:db8:1::/108",
 			"--disable-admission-plugins=ServiceAccount",
 		},
 		sharedEtcd)
@@ -1593,7 +1593,7 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--service-cluster-ip-range=192.168.0.0/24,2001:db8:1::/112",
+			"--service-cluster-ip-range=192.168.0.0/24,2001:db8:1::/108",
 			"--advertise-address=10.0.0.1",
 			"--disable-admission-plugins=ServiceAccount",
 		},

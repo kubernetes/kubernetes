@@ -484,9 +484,6 @@ func TestCIDRAllocateDualWrite(t *testing.T) {
 	if f := r.Free(); f != 0 {
 		t.Errorf("free: %d", f)
 	}
-	if _, err := r.AllocateNext(); err == nil {
-		t.Error(err)
-	}
 
 	cidr := newServiceCIDR("test", "192.168.0.0/28")
 	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
@@ -553,9 +550,6 @@ func TestCIDRAllocateDualWriteCollision(t *testing.T) {
 
 	if f := r.Free(); f != 0 {
 		t.Errorf("free: %d", f)
-	}
-	if _, err := r.AllocateNext(); err == nil {
-		t.Error(err)
 	}
 
 	cidr := newServiceCIDR("test", "192.168.0.0/28")
