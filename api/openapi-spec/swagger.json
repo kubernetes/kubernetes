@@ -2357,7 +2357,7 @@
       "description": "DeploymentStatus is the most recently observed status of the Deployment.",
       "properties": {
         "availableReplicas": {
-          "description": "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
+          "description": "Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.",
           "format": "int32",
           "type": "integer"
         },
@@ -2385,12 +2385,17 @@
           "type": "integer"
         },
         "readyReplicas": {
-          "description": "readyReplicas is the number of pods targeted by this Deployment with a Ready Condition.",
+          "description": "Total number of non-terminating pods targeted by this Deployment with a Ready Condition.",
           "format": "int32",
           "type": "integer"
         },
         "replicas": {
-          "description": "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
+          "description": "Total number of non-terminating pods targeted by this deployment (their labels match the selector).",
+          "format": "int32",
+          "type": "integer"
+        },
+        "terminatingReplicas": {
+          "description": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
           "format": "int32",
           "type": "integer"
         },
@@ -2400,7 +2405,7 @@
           "type": "integer"
         },
         "updatedReplicas": {
-          "description": "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+          "description": "Total number of non-terminating pods targeted by this deployment that have the desired template spec.",
           "format": "int32",
           "type": "integer"
         }
@@ -2492,7 +2497,7 @@
           "type": "string"
         },
         "items": {
-          "description": "List of ReplicaSets. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller",
+          "description": "List of ReplicaSets. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset",
           "items": {
             "$ref": "#/definitions/io.k8s.api.apps.v1.ReplicaSet"
           },
@@ -2528,7 +2533,7 @@
           "type": "integer"
         },
         "replicas": {
-          "description": "Replicas is the number of desired replicas. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+          "description": "Replicas is the number of desired pods. This is a pointer to distinguish between explicit zero and unspecified. Defaults to 1. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset",
           "format": "int32",
           "type": "integer"
         },
@@ -2538,7 +2543,7 @@
         },
         "template": {
           "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplateSpec",
-          "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template"
+          "description": "Template is the object that describes the pod that will be created if insufficient replicas are detected. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/#pod-template"
         }
       },
       "required": [
@@ -2550,7 +2555,7 @@
       "description": "ReplicaSetStatus represents the current status of a ReplicaSet.",
       "properties": {
         "availableReplicas": {
-          "description": "The number of available replicas (ready for at least minReadySeconds) for this replica set.",
+          "description": "The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.",
           "format": "int32",
           "type": "integer"
         },
@@ -2568,7 +2573,7 @@
           "x-kubernetes-patch-strategy": "merge"
         },
         "fullyLabeledReplicas": {
-          "description": "The number of pods that have labels matching the labels of the pod template of the replicaset.",
+          "description": "The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.",
           "format": "int32",
           "type": "integer"
         },
@@ -2578,12 +2583,17 @@
           "type": "integer"
         },
         "readyReplicas": {
-          "description": "readyReplicas is the number of pods targeted by this ReplicaSet with a Ready Condition.",
+          "description": "The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.",
           "format": "int32",
           "type": "integer"
         },
         "replicas": {
-          "description": "Replicas is the most recently observed number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller",
+          "description": "Replicas is the most recently observed number of non-terminating pods. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset",
+          "format": "int32",
+          "type": "integer"
+        },
+        "terminatingReplicas": {
+          "description": "The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
           "format": "int32",
           "type": "integer"
         }

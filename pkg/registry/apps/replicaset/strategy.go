@@ -37,10 +37,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	apistorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -231,6 +233,7 @@ func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 	oldRS := old.(*apps.ReplicaSet)
 	// update is not allowed to set spec
 	newRS.Spec = oldRS.Spec
+	dropDisabledStatusFields(&newRS.Status, &oldRS.Status)
 }
 
 func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -240,4 +243,12 @@ func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 // WarningsOnUpdate returns warnings for the given update.
 func (rsStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// dropDisabledStatusFields removes disabled fields from the replica set status.
+func dropDisabledStatusFields(rsStatus, oldRSStatus *apps.ReplicaSetStatus) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) &&
+		(oldRSStatus == nil || oldRSStatus.TerminatingReplicas == nil) {
+		rsStatus.TerminatingReplicas = nil
+	}
 }

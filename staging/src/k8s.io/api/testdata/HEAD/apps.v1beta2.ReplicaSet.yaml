@@ -1235,3 +1235,4 @@ status:
   observedGeneration: 3
   readyReplicas: 4
   replicas: 1
+  terminatingReplicas: 7

@@ -372,6 +372,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: DeploymentPodReplacementPolicy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.32"
 - name: DevicePluginCDIDevices
   versionedSpecs:
   - default: false
