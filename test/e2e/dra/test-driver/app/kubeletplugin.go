@@ -34,7 +34,6 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
@@ -97,8 +96,6 @@ type Device struct {
 	RequestName string
 	CDIDeviceID string
 }
-
-var _ drapb.DRAPluginServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *ExamplePlugin) getJSONFilePath(claimUID string, requestName string) string {
@@ -170,7 +167,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	// determine which one(s) really get served (by default, both).
 	// The options are a bit redundant now because a single instance cannot
 	// implement both, but that might be different in the future.
-	nodeServers := []any{
+	nodeServers := []kubeletplugin.DRADriverService{
 		ex, // Casting is done only for clarity here, it's not needed.
 	}
 	d, err := kubeletplugin.Start(ctx, nodeServers, opts...)
@@ -297,20 +294,13 @@ func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
-func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drapb.Claim) ([]Device, error) {
+func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourceapi.ResourceClaim) ([]Device, error) {
 	logger := klog.FromContext(ctx)
 
 	// The plugin must retrieve the claim itself to get it in the version
 	// that it understands.
-	claim, err := ex.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
-	}
 	if claim.Status.Allocation == nil {
-		return nil, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
-	}
-	if claim.UID != types.UID(claimReq.UID) {
-		return nil, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
+		return nil, fmt.Errorf("claim %s/%s not allocated", claim.Namespace, claim.Name)
 	}
 
 	ex.mutex.Lock()
@@ -318,7 +308,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 	ex.blockPrepareResourcesMutex.Lock()
 	defer ex.blockPrepareResourcesMutex.Unlock()
 
-	claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+	claimID := ClaimID{Name: claim.Name, UID: string(claim.UID)}
 	if result, ok := ex.prepared[claimID]; ok {
 		// Idempotent call, nothing to do.
 		return result, nil
@@ -348,7 +338,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 		claimReqName = regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(claimReqName, "_")
 		env[claimReqName] = "true"
 
-		deviceName := "claim-" + claimReq.UID + "-" + requestName
+		deviceName := "claim-" + string(claim.UID) + "-" + requestName
 		vendor := ex.driverName
 		class := "test"
 		cdiDeviceID := vendor + "/" + class + "=" + deviceName
@@ -383,7 +373,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 				},
 			},
 		}
-		filePath := ex.getJSONFilePath(claimReq.UID, requestName)
+		filePath := ex.getJSONFilePath(string(claim.UID), requestName)
 		buffer, err := json.Marshal(spec)
 		if err != nil {
 			return nil, fmt.Errorf("marshal spec: %w", err)
@@ -426,7 +416,7 @@ func extractParameters(parameters runtime.RawExtension, env *map[string]string, 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
+func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, claims []*resourceapi.ResourceClaim) (*drapb.NodePrepareResourcesResponse, error) {
 	resp := &drapb.NodePrepareResourcesResponse{
 		Claims: make(map[string]*drapb.NodePrepareResourceResponse),
 	}
@@ -436,14 +426,14 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapb.No
 		return resp, failure
 	}
 
-	for _, claimReq := range req.Claims {
-		if res, ok := allocatedClaims[claimReq.UID]; ok {
-			resp.Claims[claimReq.UID] = res
+	for _, claimReq := range claims {
+		if res, ok := allocatedClaims[string(claimReq.UID)]; ok {
+			resp.Claims[string(claimReq.UID)] = res
 			continue
 		}
 		devices, err := ex.nodePrepareResource(ctx, claimReq)
 		if err != nil {
-			resp.Claims[claimReq.UID] = &drapb.NodePrepareResourceResponse{
+			resp.Claims[string(claimReq.UID)] = &drapb.NodePrepareResourceResponse{
 				Error: err.Error(),
 			}
 		} else {
@@ -457,32 +447,21 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapb.No
 				}
 				r.Devices = append(r.Devices, pbDevice)
 			}
-			resp.Claims[claimReq.UID] = r
+			resp.Claims[string(claimReq.UID)] = r
 		}
 	}
 	return resp, nil
 }
 
-func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*drapb.Claim) (map[string]*drapb.NodePrepareResourceResponse, error) {
+func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*resourceapi.ResourceClaim) error {
 	allocatedClaims := make(map[string]*drapb.NodePrepareResourceResponse)
 	for _, claimReq := range claims {
-		claim, err := ex.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
-		}
-		if claim.Status.Allocation == nil {
-			return nil, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
-		}
-		if claim.UID != types.UID(claimReq.UID) {
-			return nil, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
-		}
-
 		ex.mutex.Lock()
 		defer ex.mutex.Unlock()
 		ex.blockPrepareResourcesMutex.Lock()
 		defer ex.blockPrepareResourcesMutex.Unlock()
 
-		claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+		claimID := ClaimID{Name: claimReq.Name, UID: string(claimReq.UID)}
 		if devices, ok := ex.prepared[claimID]; ok {
 			// Idempotent call, nothing to do.
 			r := &drapb.NodePrepareResourceResponse{}
@@ -495,22 +474,23 @@ func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*dr
 				}
 				r.Devices = append(r.Devices, pbDevice)
 			}
-			allocatedClaims[claimReq.UID] = r
+			allocatedClaims[string(claimReq.UID)] = r
 		}
 	}
-	return allocatedClaims, nil
+	ctx = context.WithValue(ctx, "allocatedClaims", allocatedClaims)
+	return nil
 }
 
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *drapb.Claim) error {
+func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *resourceapi.ResourceClaim) error {
 	ex.blockUnprepareResourcesMutex.Lock()
 	defer ex.blockUnprepareResourcesMutex.Unlock()
 
 	logger := klog.FromContext(ctx)
 
-	claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+	claimID := ClaimID{Name: claimReq.Name, UID: string(claimReq.UID)}
 	devices, ok := ex.prepared[claimID]
 	if !ok {
 		// Idempotent call, nothing to do.
@@ -518,7 +498,7 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *dr
 	}
 
 	for _, device := range devices {
-		filePath := ex.getJSONFilePath(claimReq.UID, device.RequestName)
+		filePath := ex.getJSONFilePath(string(claimReq.UID), device.RequestName)
 		if err := ex.fileOps.Remove(filePath); err != nil {
 			return fmt.Errorf("error removing CDI file: %w", err)
 		}
@@ -530,7 +510,7 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *dr
 	return nil
 }
 
-func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
+func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, claims []*resourceapi.ResourceClaim) (*drapb.NodeUnprepareResourcesResponse, error) {
 	resp := &drapb.NodeUnprepareResourcesResponse{
 		Claims: make(map[string]*drapb.NodeUnprepareResourceResponse),
 	}
@@ -539,14 +519,14 @@ func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapb.
 		return resp, failure
 	}
 
-	for _, claimReq := range req.Claims {
+	for _, claimReq := range claims {
 		err := ex.nodeUnprepareResource(ctx, claimReq)
 		if err != nil {
-			resp.Claims[claimReq.UID] = &drapb.NodeUnprepareResourceResponse{
+			resp.Claims[string(claimReq.UID)] = &drapb.NodeUnprepareResourceResponse{
 				Error: err.Error(),
 			}
 		} else {
-			resp.Claims[claimReq.UID] = &drapb.NodeUnprepareResourceResponse{}
+			resp.Claims[string(claimReq.UID)] = &drapb.NodeUnprepareResourceResponse{}
 		}
 	}
 	return resp, nil
