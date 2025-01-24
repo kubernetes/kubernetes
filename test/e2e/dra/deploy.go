@@ -195,8 +195,7 @@ func NewDriverInstance(f *framework.Framework) *Driver {
 		fail:       map[MethodInstance]bool{},
 		callCounts: map[MethodInstance]int64{},
 		// By default, test only with the latest gRPC API.
-		NodeV1alpha4: false,
-		NodeV1beta1:  true,
+		NodeV1beta1: true,
 	}
 	d.initName()
 	return d
@@ -233,8 +232,7 @@ type Driver struct {
 	// In addition, there is one entry for a fictional node.
 	Nodes map[string]KubeletPlugin
 
-	NodeV1alpha4 bool
-	NodeV1beta1  bool
+	NodeV1beta1 bool
 
 	mutex      sync.Mutex
 	fail       map[MethodInstance]bool
@@ -326,7 +324,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
-	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
+	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins_registry", d.Name+".sock")
 	numNodes := int32(len(nodes.NodeNames))
 	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
@@ -353,10 +351,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 					},
 				},
 			}
-			item.Spec.Template.Spec.Volumes[0].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins")
-			item.Spec.Template.Spec.Volumes[2].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
-			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
-			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
+			item.Spec.Template.Spec.Volumes[1].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
+			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+".sock")
 		}
 		return nil
 	}, manifests...)
@@ -427,10 +423,8 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			kubeletplugin.GRPCStreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				return d.streamInterceptor(nodename, srv, ss, info, handler)
 			}),
-			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
-			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
+			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001 /* same container name and port number as in test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml */)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
-			kubeletplugin.NodeV1alpha4(d.NodeV1alpha4),
 			kubeletplugin.NodeV1beta1(d.NodeV1beta1),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)

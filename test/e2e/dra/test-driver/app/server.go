@@ -178,9 +178,7 @@ func NewCommand() *cobra.Command {
 	}
 	kubeletPluginFlagSets := cliflag.NamedFlagSets{}
 	fs = kubeletPluginFlagSets.FlagSet("kubelet")
-	pluginRegistrationPath := fs.String("plugin-registration-path", "/var/lib/kubelet/plugins_registry", "The directory where kubelet looks for plugin registration sockets, in the filesystem of the driver.")
-	endpoint := fs.String("endpoint", "/var/lib/kubelet/plugins/test-driver/dra.sock", "The Unix domain socket where the driver will listen for kubelet requests, in the filesystem of the driver.")
-	draAddress := fs.String("dra-address", "/var/lib/kubelet/plugins/test-driver/dra.sock", "The Unix domain socket that kubelet will connect to for dynamic resource allocation requests, in the filesystem of kubelet.")
+	pluginRegistrationPath := fs.String("plugin-registration-path", "/var/lib/kubelet/plugins_registry", "The directory where kubelet looks for plugin registration sockets, in the filesystem of the driver *and* of the kubelet.")
 	fs = kubeletPluginFlagSets.FlagSet("CDI")
 	cdiDir := fs.String("cdi-dir", "/var/run/cdi", "directory for dynamically created CDI JSON files")
 	nodeName := fs.String("node-name", "", "name of the node that the kubelet plugin is responsible for")
@@ -192,11 +190,12 @@ func NewCommand() *cobra.Command {
 	kubeletPlugin.RunE = func(cmd *cobra.Command, args []string) error {
 		// Ensure that directories exist, creating them if necessary. We want
 		// to know early if there is a setup problem that would prevent
-		// creating those directories.
+		// creating or using those directories.
+		socketPath := path.Join(*pluginRegistrationPath, *driverName+".sock")
 		if err := os.MkdirAll(*cdiDir, os.FileMode(0750)); err != nil {
 			return fmt.Errorf("create CDI directory: %w", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(*endpoint), 0750); err != nil {
+		if err := os.MkdirAll(filepath.Dir(socketPath), 0750); err != nil {
 			return fmt.Errorf("create socket directory: %w", err)
 		}
 
@@ -205,9 +204,10 @@ func NewCommand() *cobra.Command {
 		}
 
 		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{NumDevices: *numDevices},
-			kubeletplugin.PluginSocketPath(*endpoint),
-			kubeletplugin.RegistrarSocketPath(path.Join(*pluginRegistrationPath, *driverName+"-reg.sock")),
-			kubeletplugin.KubeletPluginSocketPath(*draAddress),
+			// kubeletplugin supports different filesystem namespaces.
+			// We don't use that here.
+			kubeletplugin.PluginSocketPath(socketPath),
+			kubeletplugin.KubeletPluginSocketPath(socketPath),
 		)
 		if err != nil {
 			return fmt.Errorf("start example plugin: %w", err)

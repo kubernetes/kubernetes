@@ -19,6 +19,7 @@ package kubeletplugin
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -28,7 +29,7 @@ type registrationServer struct {
 	driverName        string
 	endpoint          string
 	supportedVersions []string
-	status            *registerapi.RegistrationStatus
+	status            atomic.Pointer[registerapi.RegistrationStatus]
 }
 
 var _ registerapi.RegistrationServer = &registrationServer{}
@@ -45,7 +46,7 @@ func (e *registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoR
 
 // NotifyRegistrationStatus is the RPC invoked by plugin watcher.
 func (e *registrationServer) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
-	e.status = status
+	e.status.Store(status)
 	if !status.PluginRegistered {
 		return nil, fmt.Errorf("failed registration process: %+v", status.Error)
 	}
