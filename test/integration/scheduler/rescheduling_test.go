@@ -235,7 +235,7 @@ func TestReScheduling(t *testing.T) {
 			}
 
 			if test.wantScheduled {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Didn't expect the pod to be unschedulable. error: %v", err)
 				}
 			} else if test.wantError {

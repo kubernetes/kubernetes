@@ -141,7 +141,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		}
 
 		// There are no schedulable nodes - the pod shouldn't be scheduled.
-		err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, myPod, 2*time.Second)
+		err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, myPod, 2*time.Second)
 		if err == nil {
 			t.Errorf("Test %d: Pod scheduled successfully on unschedulable nodes", i)
 		}
@@ -159,7 +159,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		mod.makeSchedulable(t, schedNode, nodeLister, testCtx.ClientSet)
 
 		// Wait until the pod is scheduled.
-		if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, myPod); err != nil {
+		if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, myPod); err != nil {
 			t.Errorf("Test %d: failed to schedule a pod: %v", i, err)
 		} else {
 			t.Logf("Test %d: Pod got scheduled on a schedulable node", i)
@@ -227,19 +227,19 @@ func TestMultipleSchedulers(t *testing.T) {
 	//		- testPod, testPodFitsDefault should be scheduled
 	//		- testPodFitsFoo should NOT be scheduled
 	t.Logf("wait for pods scheduled")
-	if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, testPod); err != nil {
+	if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, testPod); err != nil {
 		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPod.Name, err)
 	} else {
 		t.Logf("Test MultiScheduler: %s Pod scheduled", testPod.Name)
 	}
 
-	if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, testPodFitsDefault); err != nil {
+	if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, testPodFitsDefault); err != nil {
 		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPodFitsDefault.Name, err)
 	} else {
 		t.Logf("Test MultiScheduler: %s Pod scheduled", testPodFitsDefault.Name)
 	}
 
-	if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, testPodFitsFoo, time.Second*5); err == nil {
+	if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, testPodFitsFoo, time.Second*5); err == nil {
 		t.Errorf("Test MultiScheduler: %s Pod got scheduled, %v", testPodFitsFoo.Name, err)
 	} else {
 		t.Logf("Test MultiScheduler: %s Pod not scheduled", testPodFitsFoo.Name)
@@ -267,7 +267,7 @@ func TestMultipleSchedulers(t *testing.T) {
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled
-	err = testutils.WaitForPodToSchedule(testCtx.ClientSet, testPodFitsFoo)
+	err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, testPodFitsFoo)
 	if err != nil {
 		t.Errorf("Test MultiScheduler: %s Pod not scheduled, %v", testPodFitsFoo.Name, err)
 	} else {
@@ -371,7 +371,7 @@ func TestAllocatable(t *testing.T) {
 	}
 
 	// 4. Test: this test pod should be scheduled since api-server will use Capacity as Allocatable
-	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, testAllocPod, time.Second*5)
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, testAllocPod, time.Second*5)
 	if err != nil {
 		t.Errorf("Test allocatable unawareness: %s Pod not scheduled: %v", testAllocPod.Name, err)
 	} else {
@@ -408,7 +408,7 @@ func TestAllocatable(t *testing.T) {
 	}
 
 	// 7. Test: this test pod should not be scheduled since it request more than Allocatable
-	if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, testAllocPod2, time.Second*5); err == nil {
+	if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, testAllocPod2, time.Second*5); err == nil {
 		t.Errorf("Test allocatable awareness: %s Pod got scheduled unexpectedly, %v", testAllocPod2.Name, err)
 	} else {
 		t.Logf("Test allocatable awareness: %s Pod not scheduled as expected", testAllocPod2.Name)
@@ -575,7 +575,7 @@ func TestNodeEvents(t *testing.T) {
 	}
 
 	// 1.3 verify pod1 is scheduled
-	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod1, time.Second*5)
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod1, time.Second*5)
 	if err != nil {
 		t.Errorf("Pod %s didn't schedule: %v", pod1.Name, err)
 	}
@@ -615,7 +615,7 @@ func TestNodeEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create pod %v: %v", plugPod.Name, err)
 	}
-	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, plugPod, time.Second*5)
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, plugPod, time.Second*5)
 	if err != nil {
 		t.Errorf("Pod %s didn't schedule: %v", plugPod.Name, err)
 	}
@@ -632,7 +632,7 @@ func TestNodeEvents(t *testing.T) {
 		t.Fatalf("Failed to update %s: %v", node2.Name, err)
 	}
 
-	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod2, time.Second*5)
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod2, time.Second*5)
 	if err != nil {
 		t.Errorf("Pod %s didn't schedule: %v", pod2.Name, err)
 	}

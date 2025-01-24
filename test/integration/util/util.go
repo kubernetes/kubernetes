@@ -631,14 +631,14 @@ func InitTestSchedulerWithOptions(
 
 // WaitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
 // an error if it does not scheduled within the given timeout.
-func WaitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, timeout, false, PodScheduled(cs, pod.Namespace, pod.Name))
+func WaitForPodToScheduleWithTimeout(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, PodScheduled(cs, pod.Namespace, pod.Name))
 }
 
 // WaitForPodToSchedule waits for a pod to get scheduled and returns an error if
 // it does not get scheduled within the timeout duration (30 seconds).
-func WaitForPodToSchedule(cs clientset.Interface, pod *v1.Pod) error {
-	return WaitForPodToScheduleWithTimeout(cs, pod, 30*time.Second)
+func WaitForPodToSchedule(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error {
+	return WaitForPodToScheduleWithTimeout(ctx, cs, pod, 30*time.Second)
 }
 
 // PodScheduled checks if the pod has been scheduled
@@ -904,7 +904,7 @@ func RunPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pause pod: %v", err)
 	}
-	if err = WaitForPodToSchedule(cs, pod); err != nil {
+	if err = WaitForPodToSchedule(context.TODO(), cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
@@ -941,7 +941,7 @@ func RunPodWithContainers(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pod-with-containers: %v", err)
 	}
-	if err = WaitForPodToSchedule(cs, pod); err != nil {
+	if err = WaitForPodToSchedule(context.TODO(), cs, pod); err != nil {
 		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{}); err != nil {
