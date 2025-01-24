@@ -85,8 +85,8 @@ const filterPluginName = "filter-plugin"
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
 
-func waitForNominatedNodeNameWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, timeout, false, func(ctx context.Context) (bool, error) {
+func waitForNominatedNodeNameWithTimeout(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, func(ctx context.Context) (bool, error) {
 		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -101,8 +101,8 @@ func waitForNominatedNodeNameWithTimeout(cs clientset.Interface, pod *v1.Pod, ti
 	return nil
 }
 
-func waitForNominatedNodeName(cs clientset.Interface, pod *v1.Pod) error {
-	return waitForNominatedNodeNameWithTimeout(cs, pod, wait.ForeverTestTimeout)
+func waitForNominatedNodeName(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error {
+	return waitForNominatedNodeNameWithTimeout(ctx, cs, pod, wait.ForeverTestTimeout)
 }
 
 const tokenFilterName = "token-filter"
@@ -505,7 +505,7 @@ func TestPreemption(t *testing.T) {
 				}
 				// Also check that the preemptor pod gets the NominatedNodeName field set.
 				if len(test.preemptedPodIndexes) > 0 {
-					if err := waitForNominatedNodeName(cs, preemptor); err != nil {
+					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 					}
 				}
@@ -1078,7 +1078,7 @@ func TestNonPreemption(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Error while creating victim: %v", err)
 				}
-				if err := waitForPodToScheduleWithTimeout(cs, victimPod, 5*time.Second); err != nil {
+				if err := waitForPodToScheduleWithTimeout(testCtx.Ctx, cs, victimPod, 5*time.Second); err != nil {
 					t.Fatalf("victim %v should be become scheduled", victimPod.Name)
 				}
 
@@ -1087,7 +1087,7 @@ func TestNonPreemption(t *testing.T) {
 					t.Fatalf("Error while creating preemptor: %v", err)
 				}
 
-				err = waitForNominatedNodeNameWithTimeout(cs, preemptorPod, 5*time.Second)
+				err = waitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptorPod, 5*time.Second)
 				// test.PreemptionPolicy == nil means we expect the preemptor to be nominated.
 				expect := test.PreemptionPolicy == nil
 				// err == nil indicates the preemptor is indeed nominated.
@@ -1169,7 +1169,7 @@ func TestDisablePreemption(t *testing.T) {
 				}
 
 				// Ensure preemptor should not be nominated.
-				if err := waitForNominatedNodeNameWithTimeout(cs, preemptor, 5*time.Second); err == nil {
+				if err := waitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptor, 5*time.Second); err == nil {
 					t.Errorf("Preemptor %v should not be nominated", preemptor.Name)
 				}
 
@@ -1358,7 +1358,7 @@ func TestPreemptionStarvation(t *testing.T) {
 				}
 				// make sure that runningPods are all scheduled.
 				for _, p := range runningPods {
-					if err := testutils.WaitForPodToSchedule(cs, p); err != nil {
+					if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, p); err != nil {
 						t.Fatalf("Pod %v/%v didn't get scheduled: %v", p.Namespace, p.Name, err)
 					}
 				}
@@ -1382,11 +1382,11 @@ func TestPreemptionStarvation(t *testing.T) {
 					t.Errorf("Error while creating the preempting pod: %v", err)
 				}
 				// Check if .status.nominatedNodeName of the preemptor pod gets set.
-				if err := waitForNominatedNodeName(cs, preemptor); err != nil {
+				if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 					t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
 				}
 				// Make sure that preemptor is scheduled after preemptions.
-				if err := testutils.WaitForPodToScheduleWithTimeout(cs, preemptor, 60*time.Second); err != nil {
+				if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, preemptor, 60*time.Second); err != nil {
 					t.Errorf("Preemptor pod %v didn't get scheduled: %v", preemptor.Name, err)
 				}
 				// Cleanup
@@ -1463,7 +1463,7 @@ func TestPreemptionRaces(t *testing.T) {
 					}
 					// make sure that initial Pods are all scheduled.
 					for _, p := range initialPods {
-						if err := testutils.WaitForPodToSchedule(cs, p); err != nil {
+						if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, p); err != nil {
 							t.Fatalf("Pod %v/%v didn't get scheduled: %v", p.Namespace, p.Name, err)
 						}
 					}
@@ -1482,11 +1482,11 @@ func TestPreemptionRaces(t *testing.T) {
 						}
 					}
 					// Check that the preemptor pod gets nominated node name.
-					if err := waitForNominatedNodeName(cs, preemptor); err != nil {
+					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
 					}
 					// Make sure that preemptor is scheduled after preemptions.
-					if err := testutils.WaitForPodToScheduleWithTimeout(cs, preemptor, 60*time.Second); err != nil {
+					if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, preemptor, 60*time.Second); err != nil {
 						t.Errorf("Preemptor pod %v didn't get scheduled: %v", preemptor.Name, err)
 					}
 
@@ -1549,7 +1549,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		// A slice of pods to be created in batch.
 		podsToCreate [][]*v1.Pod
 		// Each postCheck function is run after each batch of pods' creation.
-		postChecks []func(cs clientset.Interface, pod *v1.Pod) error
+		postChecks []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error
 		// Delete the fake node or not. Optional.
 		deleteNode bool
 		// Pods to be deleted. Optional.
@@ -1576,7 +1576,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Obj(),
 				},
 			},
-			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				testutils.WaitForPodToSchedule,
 				waitForNominatedNodeName,
 				waitForNominatedNodeName,
@@ -1596,8 +1596,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					st.MakePod().Name("high").Priority(highPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 				},
 			},
-			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
-				testutils.WaitForPodToSchedule,
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				waitForNominatedNodeName,
 				testutils.WaitForPodToSchedule,
 			},
@@ -1614,7 +1613,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 				},
 			},
-			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				testutils.WaitForPodToSchedule,
 				waitForNominatedNodeName,
 			},
@@ -1633,7 +1632,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
 				},
 			},
-			postChecks: []func(cs clientset.Interface, pod *v1.Pod) error{
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				testutils.WaitForPodToSchedule,
 				waitForNominatedNodeName,
 			},
@@ -1683,7 +1682,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					// If necessary, run the post check function.
 					if len(tt.postChecks) > i && tt.postChecks[i] != nil {
 						for _, p := range pods {
-							if err := tt.postChecks[i](cs, p); err != nil {
+							if err := tt.postChecks[i](testCtx.Ctx, cs, p); err != nil {
 								t.Fatalf("Pod %v didn't pass the postChecks[%v]: %v", p.Name, i, err)
 							}
 						}
@@ -1991,7 +1990,7 @@ func TestPDBInPreemption(t *testing.T) {
 				}
 				// Also check if .status.nominatedNodeName of the preemptor pod gets set.
 				if len(test.preemptedPodIndexes) > 0 {
-					if err := waitForNominatedNodeName(cs, preemptor); err != nil {
+					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf("Test [%v]: .status.nominatedNodeName was not set for pod %v/%v: %v", test.name, preemptor.Namespace, preemptor.Name, err)
 					}
 				}
@@ -2484,7 +2483,7 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 				}
 				// Also check that the preemptor pod gets the NominatedNodeName field set.
 				if len(test.preemptedPodIndexes) > 0 {
-					if err := waitForNominatedNodeName(cs, preemptor); err != nil {
+					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 					}
 				}
