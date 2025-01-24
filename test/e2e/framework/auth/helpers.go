@@ -43,6 +43,29 @@ type bindingsGetter interface {
 	v1rbac.ClusterRolesGetter
 }
 
+// WaitForAuthzUpdate checks if the give user can perform named verb and action
+// on a resource or subresource.
+func WaitForAuthzUpdate(ctx context.Context, c v1authorization.SubjectAccessReviewsGetter, user string, ra *authorizationv1.ResourceAttributes, allowed bool) error {
+	review := &authorizationv1.SubjectAccessReview{
+		Spec: authorizationv1.SubjectAccessReviewSpec{
+			ResourceAttributes: ra,
+			User:               user,
+		},
+	}
+
+	err := wait.PollUntilContextTimeout(ctx, policyCachePollInterval, policyCachePollTimeout, false, func(ctx context.Context) (bool, error) {
+		response, err := c.SubjectAccessReviews().Create(ctx, review, metav1.CreateOptions{})
+		if err != nil {
+			return false, err
+		}
+		if response.Status.Allowed != allowed {
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
+}
+
 // WaitForAuthorizationUpdate checks if the given user can perform the named verb and action.
 // If policyCachePollTimeout is reached without the expected condition matching, an error is returned
 func WaitForAuthorizationUpdate(ctx context.Context, c v1authorization.SubjectAccessReviewsGetter, user, namespace, verb string, resource schema.GroupResource, allowed bool) error {
