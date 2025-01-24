@@ -57,7 +57,6 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
@@ -802,14 +801,7 @@ type gcePdDriver struct {
 	driverInfo storageframework.DriverInfo
 }
 
-type gcePdVolume struct {
-	volumeName string
-}
-
 var _ storageframework.TestDriver = &gcePdDriver{}
-var _ storageframework.PreprovisionedVolumeTestDriver = &gcePdDriver{}
-var _ storageframework.InlineVolumeTestDriver = &gcePdDriver{}
-var _ storageframework.PreprovisionedPVTestDriver = &gcePdDriver{}
 var _ storageframework.DynamicPVTestDriver = &gcePdDriver{}
 
 // InitGcePdDriver returns gcePdDriver that implements TestDriver interface
@@ -898,40 +890,6 @@ func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) 
 	}
 }
 
-func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) *v1.VolumeSource {
-	gv, ok := e2evolume.(*gcePdVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
-	}
-	volSource := v1.VolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   gv.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		volSource.GCEPersistentDisk.FSType = fsType
-	}
-	return &volSource
-}
-
-func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2evolume storageframework.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
-	gv, ok := e2evolume.(*gcePdVolume)
-	if !ok {
-		framework.Failf("Failed to cast test volume of type %T to the GCE PD test volume", e2evolume)
-	}
-	pvSource := v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:   gv.volumeName,
-			ReadOnly: readOnly,
-		},
-	}
-	if fsType != "" {
-		pvSource.GCEPersistentDisk.FSType = fsType
-	}
-	return &pvSource, nil
-}
-
 func (g *gcePdDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/gce-pd"
 	parameters := map[string]string{}
@@ -960,29 +918,6 @@ func (g *gcePdDriver) PrepareTest(ctx context.Context, f *framework.Framework) *
 	}
 	return config
 
-}
-
-func (g *gcePdDriver) CreateVolume(ctx context.Context, config *storageframework.PerTestConfig, volType storageframework.TestVolType) storageframework.TestVolume {
-	zone := getInlineVolumeZone(ctx, config.Framework)
-	if volType == storageframework.InlineVolume {
-		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
-		// so pods should be also scheduled there.
-		config.ClientNodeSelection = e2epod.NodeSelection{
-			Selector: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-		}
-	}
-	ginkgo.By("creating a test gce pd volume")
-	vname, err := e2epv.CreatePDWithRetryAndZone(ctx, zone)
-	framework.ExpectNoError(err)
-	return &gcePdVolume{
-		volumeName: vname,
-	}
-}
-
-func (v *gcePdVolume) DeleteVolume(ctx context.Context) {
-	_ = e2epv.DeletePDWithRetry(ctx, v.volumeName)
 }
 
 // vSphere
@@ -1435,24 +1370,6 @@ func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 // cleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
 func cleanUpVolumeServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
 	cleanUpVolumeServerWithSecret(ctx, f, serverPod, nil)
-}
-
-func getInlineVolumeZone(ctx context.Context, f *framework.Framework) string {
-	if framework.TestContext.CloudConfig.Zone != "" {
-		return framework.TestContext.CloudConfig.Zone
-	}
-	// if zone is not specified we will randomly pick a zone from schedulable nodes for inline tests
-	node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-	framework.ExpectNoError(err)
-	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
-	if ok {
-		return zone
-	}
-	topologyZone, ok := node.Labels[v1.LabelTopologyZone]
-	if ok {
-		return topologyZone
-	}
-	return ""
 }
 
 // cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
