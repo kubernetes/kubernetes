@@ -1096,14 +1096,12 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 
 	msg := truncateMessage(errMsg)
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
-	if err := updatePod(ctx, sched.client, pod, &v1.PodCondition{
+	updatePodParallel(ctx, sched.client, pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  reason,
 		Message: errMsg,
-	}, nominatingInfo); err != nil {
-		logger.Error(err, "Error updating pod", "pod", klog.KObj(pod))
-	}
+	}, nominatingInfo)
 }
 
 // truncateMessage truncates a message if it hits the NoteLengthLimit.
@@ -1116,7 +1114,7 @@ func truncateMessage(message string) string {
 	return message[:max-len(suffix)] + suffix
 }
 
-func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) error {
+func updatePodParallel(ctx context.Context, client clientset.Interface, pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *framework.NominatingInfo) {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Updating pod condition", "pod", klog.KObj(pod), "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	podStatusCopy := pod.Status.DeepCopy()
@@ -1124,10 +1122,13 @@ func updatePod(ctx context.Context, client clientset.Interface, pod *v1.Pod, con
 	// different from the existing one.
 	nnnNeedsUpdate := nominatingInfo.Mode() == framework.ModeOverride && pod.Status.NominatedNodeName != nominatingInfo.NominatedNodeName
 	if !podutil.UpdatePodCondition(podStatusCopy, condition) && !nnnNeedsUpdate {
-		return nil
+		return
 	}
 	if nnnNeedsUpdate {
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
-	return util.PatchPodStatus(ctx, client, pod, podStatusCopy)
+
+	go util.PatchPodStatusWithoutErrorReturn(ctx, client, pod, podStatusCopy)
+
+	return
 }

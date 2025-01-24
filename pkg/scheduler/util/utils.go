@@ -133,6 +133,42 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, old *v1.Pod, n
 	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
 }
 
+// PatchPodStatusWithoutErrorReturn calculates the delta bytes change from <old.Status> to <newStatus>,
+// and then submit a request to API server to patch the pod changes.
+// Compared to the PatchPodStatus function, this function does not return an error.
+func PatchPodStatusWithoutErrorReturn(ctx context.Context, cs kubernetes.Interface, old *v1.Pod, newStatus *v1.PodStatus) {
+	if newStatus == nil {
+		return
+	}
+
+	oldData, err := json.Marshal(v1.Pod{Status: old.Status})
+	if err != nil {
+		klog.Errorf("Error updating pod %s/%s: %v", old.Namespace, old.Name, err)
+		return
+	}
+
+	newData, err := json.Marshal(v1.Pod{Status: *newStatus})
+	if err != nil {
+		klog.Errorf("Error updating pod %s/%s: %v", old.Namespace, old.Name, err)
+		return
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Pod{})
+	if err != nil {
+		klog.Errorf("Error updating pod %s/%s: failed to create merge patch, %v", old.Namespace, old.Name, err)
+		return
+	}
+
+	if "{}" == string(patchBytes) {
+		return
+	}
+
+	_, err = cs.CoreV1().Pods(old.Namespace).Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	if err != nil {
+		klog.Errorf("Error updating pod %s/%s: %v", old.Namespace, old.Name, err)
+	}
+	return
+}
+
 // DeletePod deletes the given <pod> from API server
 func DeletePod(ctx context.Context, cs kubernetes.Interface, pod *v1.Pod) error {
 	return cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})

@@ -1487,9 +1487,8 @@ func TestUpdatePod(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			if err := updatePod(ctx, cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
-				t.Fatalf("Error calling update: %v", err)
-			}
+			updatePodParallel(ctx, cs, pod, test.newPodCondition, test.newNominatingInfo)
+			time.Sleep(time.Millisecond * 100)
 
 			if actualPatchRequests != test.expectedPatchRequests {
 				t.Fatalf("Actual patch requests (%d) does not equal expected patch requests (%d), actual patch data: %v", actualPatchRequests, test.expectedPatchRequests, actualPatchData)
