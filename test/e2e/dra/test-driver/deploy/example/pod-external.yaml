@@ -1,22 +1,19 @@
 # One external resource claim, one pod, two containers.
 # One container uses resource, one does not.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: external-claim-parameters
-  namespace: default
-data:
-  a: b
----
-apiVersion: resource.k8s.io/v1alpha3
+apiVersion: resource.k8s.io/v1beta1
 kind: ResourceClaim
 metadata:
   name: external-claim
 spec:
-  resourceClassName: example
-  parametersRef:
-    kind: ConfigMap
-    name: external-claim-parameters
+  devices:
+    requests:
+    - name: my-device
+      deviceClassName: example
+    config:
+    - opaque:
+        driver: test-driver.cdi.k8s.io
+        parameters:
+          a: b
 ---
 apiVersion: v1
 kind: Pod
@@ -30,7 +27,7 @@ spec:
     command: ["sh", "-c", "set && mount && ls -la /dev/"]
     resources:
       claims:
-      - resource
+      - name: resource
   - name: without-resource
     image: registry.k8s.io/e2e-test-images/busybox:1.29-2
     command: ["sh", "-c", "set && mount && ls -la /dev/"]
