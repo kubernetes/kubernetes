@@ -316,15 +316,19 @@ func (o *Options) completeServiceAccountOptions(ctx context.Context, completed *
 			if metadata.MaxTokenExpirationSeconds < validation.MinTokenAgeSec {
 				return fmt.Errorf("max token life supported by external-jwt-signer (%ds) is less than acceptable (min %ds)", metadata.MaxTokenExpirationSeconds, validation.MinTokenAgeSec)
 			}
-			if completed.Authentication.ServiceAccounts.MaxExpiration != 0 {
-				return fmt.Errorf("service-account-max-token-expiration and service-account-signing-endpoint are mutually exclusive and cannot be set at the same time")
+			maxExternalExpiration := time.Duration(metadata.MaxTokenExpirationSeconds) * time.Second
+			switch {
+			case completed.Authentication.ServiceAccounts.MaxExpiration == 0:
+				completed.Authentication.ServiceAccounts.MaxExpiration = maxExternalExpiration
+			case completed.Authentication.ServiceAccounts.MaxExpiration > maxExternalExpiration:
+				return fmt.Errorf("service-account-max-token-expiration cannot be set longer than the token expiration supported by service-account-signing-endpoint: %s > %s", completed.Authentication.ServiceAccounts.MaxExpiration, maxExternalExpiration)
 			}
 			transitionWarningFmt = "service-account-extend-token-expiration is true, in order to correctly trigger safe transition logic, token lifetime supported by external-jwt-signer must be longer than %d seconds (currently %s)"
 			expExtensionWarningFmt = "service-account-extend-token-expiration is true, tokens validity will be caped at the smaller of %d seconds and maximum token lifetime supported by external-jwt-signer (%s)"
 			completed.ServiceAccountIssuer = plugin
 			completed.Authentication.ServiceAccounts.ExternalPublicKeysGetter = cache
-			completed.Authentication.ServiceAccounts.MaxExpiration = time.Duration(metadata.MaxTokenExpirationSeconds) * time.Second
-			completed.Authentication.ServiceAccounts.IsTokenSignerExternal = true
+			// shorten ExtendedExpiration, if needed, to fit within the external signer's max expiration
+			completed.Authentication.ServiceAccounts.MaxExtendedExpiration = min(maxExternalExpiration, completed.Authentication.ServiceAccounts.MaxExtendedExpiration)
 		}
 	}
 

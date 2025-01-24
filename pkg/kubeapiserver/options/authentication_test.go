@@ -437,11 +437,12 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 			AllowedNames:    []string{"kube-aggregator"},
 		},
 		ServiceAccounts: &ServiceAccountAuthenticationOptions{
-			KeyFiles:         []string{"cert", "key"},
-			Lookup:           true,
-			Issuers:          []string{"http://foo.bar.com"},
-			JWKSURI:          "https://qux.com",
-			ExtendExpiration: true,
+			KeyFiles:              []string{"cert", "key"},
+			Lookup:                true,
+			Issuers:               []string{"http://foo.bar.com"},
+			JWKSURI:               "https://qux.com",
+			ExtendExpiration:      true,
+			MaxExtendedExpiration: serviceaccount.ExpirationExtensionSeconds * time.Second,
 		},
 		TokenFile: &TokenFileAuthenticationOptions{
 			TokenFile: "tokenfile",
