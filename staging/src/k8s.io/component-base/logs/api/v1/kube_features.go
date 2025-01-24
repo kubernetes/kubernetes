@@ -68,5 +68,5 @@ func featureGates() map[featuregate.Feature]featuregate.FeatureSpec {
 
 // AddFeatureGates adds all feature gates used by this package.
 func AddFeatureGates(mutableFeatureGate featuregate.MutableFeatureGate) error {
-	return mutableFeatureGate.Add(featureGates())
+	return mutableFeatureGate.Add(featureGates()) //nolint:forbidigo // The logging feature gates are by design unversioned (perpetual alpha/beta).
 }
