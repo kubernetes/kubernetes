@@ -302,8 +302,6 @@ func TestHammerController(t *testing.T) {
 	// At this point, all goroutines should have stopped, and
 	// leak checking is done by TestMain.
 	controllerWG.Wait()
-
-	t.Logf("got: %#v", outputSet)
 }
 
 func TestUpdate(t *testing.T) {
