@@ -109,7 +109,7 @@ var _ PluginManager = &pluginManager{}
 func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
-	if err := pm.desiredStateOfWorldPopulator.Start(stopCh); err != nil {
+	if err := pm.desiredStateOfWorldPopulator.Start(stopCh, pluginwatcher.DefaultMaxFailures); err != nil {
 		klog.ErrorS(err, "The desired_state_of_world populator (plugin watcher) starts failed!")
 		return
 	}

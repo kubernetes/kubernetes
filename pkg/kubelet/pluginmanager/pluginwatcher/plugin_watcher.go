@@ -36,6 +36,7 @@ type Watcher struct {
 	fsWatcher           *fsnotify.Watcher
 	desiredStateOfWorld cache.DesiredStateOfWorld
 	actualStateOfWorld  cache.ActualStateOfWorld
+	monitor             *pluginConnectionMonitor
 }
 
 // NewWatcher provides a new watcher for socket registration
@@ -45,11 +46,12 @@ func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld, a
 		fs:                  &utilfs.DefaultFs{},
 		desiredStateOfWorld: desiredStateOfWorld,
 		actualStateOfWorld:  actualStateOfWorld,
+		monitor:             newPluginConnectionMonitor(sockDir, desiredStateOfWorld, actualStateOfWorld),
 	}
 }
 
 // Start watches for the creation and deletion of plugin sockets at the path
-func (w *Watcher) Start(stopCh <-chan struct{}) error {
+func (w *Watcher) Start(stopCh <-chan struct{}, maxFailures uint) error {
 	klog.V(2).InfoS("Plugin Watcher Start", "path", w.path)
 
 	// Creating the directory to be watched if it doesn't exist yet,
@@ -68,6 +70,8 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 	if err := w.traversePluginDir(w.path); err != nil {
 		klog.ErrorS(err, "Failed to traverse plugin socket path", "path", w.path)
 	}
+
+	w.monitor.start()
 
 	go func(fsWatcher *fsnotify.Watcher) {
 		for {
@@ -90,6 +94,7 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 				continue
 			case <-stopCh:
 				w.fsWatcher.Close()
+				w.monitor.stop()
 				return
 			}
 		}

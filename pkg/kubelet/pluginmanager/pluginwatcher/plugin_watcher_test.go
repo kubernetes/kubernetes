@@ -79,7 +79,7 @@ func waitForUnregistration(
 	socketPath string,
 	dsw cache.DesiredStateOfWorld) {
 	err := retryWithExponentialBackOff(
-		time.Duration(500*time.Millisecond),
+		time.Duration(1000*time.Millisecond),
 		func() (bool, error) {
 			if !dsw.PluginExists(socketPath) {
 				return true, nil
@@ -258,9 +258,70 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	}
 }
 
+// TestPluginDisconnect tests the following scenarios of plugin disconnects:
+//  1. Plugin stops and removes the socket file.
+//     The Watcher reacts on the REMOVE fsnotify event and unregisters the plugin.
+//  2. Plugin stops but keeps the socket file around. This emulates plugin crash with
+//     a stale socket left on the file system.
+//     The PluginConnectionMonitor detects the disconnect and unregisters the plugin.
+func TestPluginDisconnect(t *testing.T) {
+	socketDir := t.TempDir()
+	for name, test := range map[string]struct {
+		unlinkSocket bool
+	}{
+		"unlink-socket": {
+			unlinkSocket: true,
+		},
+		"keep-socket": {
+			unlinkSocket: false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Create new watcher
+			dsw := cache.NewDesiredStateOfWorld()
+			asw := cache.NewActualStateOfWorld()
+			newWatcher(t, socketDir, dsw, asw, wait.NeverStop)
+
+			// Create a plugin
+			socketPath := filepath.Join(socketDir, name)
+			plugin := NewTestExamplePlugin("test-plugin-disconnect", registerapi.DevicePlugin, socketPath, supportedVersions...)
+
+			plugin.SetUnlinkSocket(test.unlinkSocket)
+
+			// Run and register it
+			require.NoError(t, plugin.Serve(supportedVersions...))
+			stopPlugin := sync.OnceFunc(func() {
+				require.NoError(t, plugin.Stop())
+			})
+			defer stopPlugin()
+
+			pluginInfo := GetPluginInfo(plugin)
+			require.Equal(t, socketPath, pluginInfo.SocketPath)
+			waitForRegistration(t, socketPath, dsw)
+
+			// Add plugin to asw to simulate a registered plugin
+			require.NoError(t, asw.AddPlugin(pluginInfo))
+
+			// Stop the plugin
+			stopPlugin()
+
+			if !test.unlinkSocket {
+				// Ensure that the stalled socket exists after stopping the plugin
+				require.FileExists(t, socketPath)
+			}
+
+			// Wait for the plugin to be deregistered due to disconnect
+			waitForUnregistration(t, socketPath, dsw)
+		})
+	}
+}
+
 func newWatcher(t *testing.T, socketDir string, desiredStateOfWorldCache cache.DesiredStateOfWorld, actualStateOfWorldCache cache.ActualStateOfWorld, stopCh <-chan struct{}) *Watcher {
 	w := NewWatcher(socketDir, desiredStateOfWorldCache, actualStateOfWorldCache)
-	require.NoError(t, w.Start(stopCh))
+	// Set reduced values to fit the test duration for TestPluginDisconnect and TestPluginStuckThenUnstuck
+	// tests into the pull-kubernetes-unit job timeout 3m
+	w.monitor.configure(2*time.Second, 3*time.Second, 3*time.Second, 3*time.Second, 1)
 
+	require.NoError(t, w.Start(stopCh, 1))
 	return w
 }
