@@ -1597,6 +1597,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				},
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
 				waitForNominatedNodeName,
 				testutils.WaitForPodToSchedule,
 			},
