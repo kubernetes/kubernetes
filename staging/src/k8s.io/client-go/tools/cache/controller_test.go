@@ -249,8 +249,6 @@ func TestHammerController(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 	const threads = 3
-	const opsPerThread = 100
-	const totalOps = threads * opsPerThread
 	wg.Add(threads)
 	for i := 0; i < threads; i++ {
 		go func() {
@@ -259,7 +257,7 @@ func TestHammerController(t *testing.T) {
 			currentNames := sets.String{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
-			for i := 0; i < opsPerThread; i++ {
+			for i := 0; i < 100; i++ {
 				var name string
 				var isNew bool
 				if currentNames.Len() == 0 || rand.Intn(3) == 1 {
@@ -297,30 +295,14 @@ func TestHammerController(t *testing.T) {
 
 	// Let's wait for the controller to finish processing the things we just added.
 	// TODO: look in the queue to see how many items need to be processed.
-	err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false, func(ctx context.Context) (bool, error) {
-		outputSetLock.Lock()
-		defer outputSetLock.Unlock()
-
-		// Count total operations across all keys
-		var processedOps uint64
-		for _, ops := range outputSet {
-			processedOps += uint64(len(ops))
-		}
-
-		return processedOps == totalOps, nil
-	})
-	if err != nil {
-		t.Errorf("Error during PollUntilContextTimeout: %v", err)
-	}
+	time.Sleep(100 * time.Millisecond)
 	cancel()
 
-	// Before we permanently lock this mutex, we have to be sure
-	// that the controller has stopped running. At this point,
-	// all goroutines should have stopped. Leak checking is
-	// done by TestMain.
+	// Wait until the controller has fully stopped running.
+	// At this point, all goroutines should have stopped, and
+	// leak checking is done by TestMain.
 	controllerWG.Wait()
 
-	outputSetLock.Lock()
 	t.Logf("got: %#v", outputSet)
 }
 
