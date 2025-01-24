@@ -42,46 +42,53 @@ import (
 func TestCreate_Token_WithExpiryCap(t *testing.T) {
 
 	testcases := []struct {
-		desc                 string
-		extendExpiration     bool
-		maxExpirationSeconds int
-		expectedTokenAgeSec  int
-		isExternal           bool
+		desc                         string
+		extendExpiration             bool
+		maxExpirationSeconds         int
+		maxExtendedExpirationSeconds int
+		expectedTokenAgeSec          int
 	}{
 		{
-			desc:                 "maxExpirationSeconds honoured",
-			extendExpiration:     true,
-			maxExpirationSeconds: 5 * 60 * 60, // 5h
-			expectedTokenAgeSec:  5 * 60 * 60, // 5h
-			isExternal:           true,
+			desc:                         "passed expiration respected if less than max",
+			extendExpiration:             false,
+			maxExpirationSeconds:         5 * 60 * 60,                               // 5h
+			maxExtendedExpirationSeconds: token.ExpirationExtensionSeconds,          // 1y
+			expectedTokenAgeSec:          token.WarnOnlyBoundTokenExpirationSeconds, // 1h 7s
 		},
 		{
-			desc:                 "ExpirationExtensionSeconds used for exp",
-			extendExpiration:     true,
-			maxExpirationSeconds: 2 * 365 * 24 * 60 * 60,           // 2 years
-			expectedTokenAgeSec:  token.ExpirationExtensionSeconds, // 1y
-			isExternal:           true,
+			desc:                         "maxExtendedExpirationSeconds honoured",
+			extendExpiration:             true,
+			maxExpirationSeconds:         2 * 60 * 60, // 2h
+			maxExtendedExpirationSeconds: 5 * 60 * 60, // 5h
+			expectedTokenAgeSec:          5 * 60 * 60, // 5h
 		},
 		{
-			desc:                 "ExpirationExtensionSeconds used for exp",
-			extendExpiration:     true,
-			maxExpirationSeconds: 5 * 60 * 60,                      // 5h
-			expectedTokenAgeSec:  token.ExpirationExtensionSeconds, // 1y
-			isExternal:           false,
+			desc:                         "ExpirationExtensionSeconds used for exp",
+			extendExpiration:             true,
+			maxExpirationSeconds:         2 * 365 * 24 * 60 * 60,           // 2y
+			maxExtendedExpirationSeconds: token.ExpirationExtensionSeconds, // 1y
+			expectedTokenAgeSec:          token.ExpirationExtensionSeconds, // 1y
 		},
 		{
-			desc:                 "requested time use with extension disabled",
-			extendExpiration:     false,
-			maxExpirationSeconds: 5 * 60 * 60, // 5h
-			expectedTokenAgeSec:  3607,        // 1h
-			isExternal:           true,
+			desc:                         "ExpirationSeconds used for exp",
+			extendExpiration:             true,
+			maxExpirationSeconds:         5 * 60 * 60,                      // 5h
+			maxExtendedExpirationSeconds: token.ExpirationExtensionSeconds, // 1y
+			expectedTokenAgeSec:          token.ExpirationExtensionSeconds, // 1y
 		},
 		{
-			desc:                 "maxExpirationSeconds honoured with extension disabled",
-			extendExpiration:     false,
-			maxExpirationSeconds: 30 * 60, // 30m
-			expectedTokenAgeSec:  30 * 60, // 30m
-			isExternal:           true,
+			desc:                         "requested time use with extension disabled",
+			extendExpiration:             false,
+			maxExpirationSeconds:         5 * 60 * 60, // 5h
+			expectedTokenAgeSec:          3607,        // 1h
+			maxExtendedExpirationSeconds: token.ExpirationExtensionSeconds,
+		},
+		{
+			desc:                         "maxExpirationSeconds honoured with extension disabled",
+			extendExpiration:             false,
+			maxExpirationSeconds:         30 * 60, // 30m
+			expectedTokenAgeSec:          30 * 60, // 30m
+			maxExtendedExpirationSeconds: token.ExpirationExtensionSeconds,
 		},
 	}
 
@@ -127,7 +134,7 @@ func TestCreate_Token_WithExpiryCap(t *testing.T) {
 			ctx = request.WithNamespace(ctx, serviceAccount.Namespace)
 			storage.Token.extendExpiration = tc.extendExpiration
 			storage.Token.maxExpirationSeconds = int64(tc.maxExpirationSeconds)
-			storage.Token.isTokenSignerExternal = tc.isExternal
+			storage.Token.maxExtendedExpirationSeconds = int64(tc.maxExtendedExpirationSeconds)
 
 			tokenReqTimeStamp := time.Now()
 			out, err := storage.Token.Create(ctx, serviceAccount.Name, &authenticationapi.TokenRequest{
@@ -161,13 +168,15 @@ func TestCreate_Token_WithExpiryCap(t *testing.T) {
 				t.Fatalf("Error unmarshalling Claims: %v", err)
 			}
 			structuredClaim.Expiry.Time()
-			upperBound := tokenReqTimeStamp.Add(time.Duration(tc.expectedTokenAgeSec+10) * time.Second)
-			lowerBound := tokenReqTimeStamp.Add(time.Duration(tc.expectedTokenAgeSec-10) * time.Second)
+			confidenceInterval := 10 // seconds
+			upperBound := tokenReqTimeStamp.Add(time.Duration(tc.expectedTokenAgeSec+confidenceInterval) * time.Second)
+			lowerBound := tokenReqTimeStamp.Add(time.Duration(tc.expectedTokenAgeSec-confidenceInterval) * time.Second)
 
 			// check for token expiration with a toleration of +/-10s after tokenReqTimeStamp to make for latencies.
 			if structuredClaim.Expiry.Time().After(upperBound) ||
 				structuredClaim.Expiry.Time().Before(lowerBound) {
-				t.Fatalf("expected token expiration to be between %v to %v\n was %v", upperBound, lowerBound, structuredClaim.Expiry.Time())
+				expiryDiff := structuredClaim.Expiry.Time().Sub(tokenReqTimeStamp)
+				t.Fatalf("expected token expiration to be %v (±%ds) in the future, was %v", time.Duration(tc.expectedTokenAgeSec)*time.Second, confidenceInterval, expiryDiff)
 			}
 
 		})
