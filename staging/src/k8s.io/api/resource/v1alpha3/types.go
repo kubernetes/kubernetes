@@ -213,6 +213,10 @@ type BasicDevice struct {
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// [ResourceSlicePatch] objects that match this device must also be
+	// consulted to determine the full set of attributes for this device.
+	//
 	// +optional
 	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,1,rep,name=attributes"`
 
@@ -220,6 +224,10 @@ type BasicDevice struct {
 	// The name of each capacity must be unique in that set.
 	//
 	// The maximum number of attributes and capacities combined is 32.
+	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// [ResourceSlicePatch] objects that match this device must also be
+	// consulted to determine the full capacity for this device.
 	//
 	// +optional
 	Capacity map[QualifiedName]resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
@@ -1083,4 +1091,43 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// ResourceSlicePatch objects define modifications to [ResourceSlice] objects.
+// [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker]
+// can be used to view fully resolved [ResourceSlice] objects which include
+// these modifications.
+type ResourceSlicePatch struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec contains modifications to ResourceSlices.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec ResourceSlicePatchSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+type ResourceSlicePatchSpec struct {
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+type ResourceSlicePatchList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource slice patches.
+	Items []ResourceSlicePatch `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

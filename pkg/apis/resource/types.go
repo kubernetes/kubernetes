@@ -209,6 +209,10 @@ type BasicDevice struct {
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// [ResourceSlicePatch] objects that match this device must also be
+	// consulted to determine the full set of attributes for this device.
+	//
 	// +optional
 	Attributes map[QualifiedName]DeviceAttribute
 
@@ -216,6 +220,10 @@ type BasicDevice struct {
 	// The name of each capacity must be unique in that set.
 	//
 	// The maximum number of attributes and capacities combined is 32.
+	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// [ResourceSlicePatch] objects that match this device must also be
+	// consulted to determine the full capacity for this device.
 	//
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity
@@ -1076,4 +1084,39 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	HardwareAddress string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSlicePatch objects define modifications to [ResourceSlice] objects.
+// [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker]
+// can be used to view fully resolved [ResourceSlice] objects which include
+// these modifications.
+type ResourceSlicePatch struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec contains modifications to a ResourceSlice.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec ResourceSlicePatchSpec
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+type ResourceSlicePatchSpec struct {
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+type ResourceSlicePatchList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of resource slice patches.
+	Items []ResourceSlicePatch
 }

@@ -212,6 +212,10 @@ type BasicDevice struct {
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// ResourceSlicePatch objects that match this device must also be
+	// consulted to determine the full set of attributes for this device.
+	//
 	// +optional
 	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,1,rep,name=attributes"`
 
@@ -219,6 +223,10 @@ type BasicDevice struct {
 	// The name of each capacity must be unique in that set.
 	//
 	// The maximum number of attributes and capacities combined is 32.
+	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// ResourceSlicePatch objects that match this device must also be
+	// consulted to determine the full capacity for this device.
 	//
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
