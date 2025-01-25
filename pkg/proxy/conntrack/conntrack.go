@@ -24,6 +24,7 @@ import (
 
 	"github.com/vishvananda/netlink"
 
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/util"
 )
@@ -59,7 +60,7 @@ func newConntracker(handler netlinkHandler) Interface {
 
 // ListEntries list all conntrack entries for connections of the given IP family.
 func (ct *conntracker) ListEntries(ipFamily uint8) (entries []*netlink.ConntrackFlow, err error) {
-	util.RetryOnIntr(func() error {
+	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
 		entries, err = ct.handler.ConntrackTableList(netlink.ConntrackTable, netlink.InetFamily(ipFamily))
 		return err
 	})
@@ -76,7 +77,7 @@ func (ct *conntracker) ClearEntries(ipFamily uint8, filters ...netlink.CustomCon
 
 	var n uint
 	var err error
-	util.RetryOnIntr(func() error {
+	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
 		n, err = ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, netlink.InetFamily(ipFamily), filters...)
 		return err
 	})

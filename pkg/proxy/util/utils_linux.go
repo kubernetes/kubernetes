@@ -24,19 +24,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"k8s.io/klog/v2"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-const (
-	// Arbitrary limit on max attempts at netlink calls if they are repeatedly interrupted.
-	MaxAttemptsEINTR = 5
-)
-
-func RetryOnIntr(f func() error) {
-	for attempt := 0; attempt < MaxAttemptsEINTR; attempt += 1 {
-		if err := f(); !errors.Is(err, unix.EINTR) {
-			return
-		}
-	}
-	klog.V(2).InfoS("netlink call interrupted", "attempts", MaxAttemptsEINTR)
-}
+var MaxAttemptsEINTR = wait.Backoff{Steps: 5}
+var ShouldRetryOnEINTR = func(err error) bool { return errors.Is(err, unix.EINTR) }
