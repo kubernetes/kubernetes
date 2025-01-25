@@ -58,6 +58,7 @@ API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,Int
 API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,StringValue
 API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,VersionValue
 API rule violation: names_match,k8s.io/api/resource/v1alpha3,NetworkDeviceData,IPs
+API rule violation: names_match,k8s.io/api/resource/v1alpha3,NullableDeviceAttribute,NullValue
 API rule violation: names_match,k8s.io/api/resource/v1beta1,DeviceAttribute,BoolValue
 API rule violation: names_match,k8s.io/api/resource/v1beta1,DeviceAttribute,IntValue
 API rule violation: names_match,k8s.io/api/resource/v1beta1,DeviceAttribute,StringValue

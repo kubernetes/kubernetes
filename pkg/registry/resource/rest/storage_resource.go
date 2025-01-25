@@ -29,6 +29,7 @@ import (
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
 	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
+	resourceslicepatchstore "k8s.io/kubernetes/pkg/registry/resource/resourceslicepatch/storage"
 )
 
 // The REST storage registers resource kinds also without the corresponding
@@ -91,6 +92,14 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 			return nil, err
 		}
 		storage[resource] = resourceSliceStorage
+	}
+
+	if resource := "resourceslicepatches"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
+		resourceSlicePatchStorage, err := resourceslicepatchstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceSlicePatchStorage
 	}
 
 	return storage, nil

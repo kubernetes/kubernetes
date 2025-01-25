@@ -583,19 +583,12 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 		numFields++
 	}
 	if attribute.StringValue != nil {
-		if len(*attribute.StringValue) > resource.DeviceAttributeMaxValueLength {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("string"), "" /*unused*/, resource.DeviceAttributeMaxValueLength))
-		}
 		numFields++
+		allErrs = append(allErrs, validateDeviceAttributeStringValue(attribute.StringValue, fldPath.Child("string"))...)
 	}
 	if attribute.VersionValue != nil {
 		numFields++
-		if !semverRe.MatchString(*attribute.VersionValue) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), *attribute.VersionValue, "must be a string compatible with semver.org spec 2.0.0"))
-		}
-		if len(*attribute.VersionValue) > resource.DeviceAttributeMaxValueLength {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("version"), "" /*unused*/, resource.DeviceAttributeMaxValueLength))
-		}
+		allErrs = append(allErrs, validateDeviceAttributeVersionValue(attribute.VersionValue, fldPath.Child("version"))...)
 	}
 
 	switch numFields {
@@ -605,6 +598,57 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 		// Okay.
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one value must be specified"))
+	}
+	return allErrs
+}
+
+func validateNullableDeviceAttribute(attribute resource.NullableDeviceAttribute, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	numFields := 0
+	if attribute.BoolValue != nil {
+		numFields++
+	}
+	if attribute.IntValue != nil {
+		numFields++
+	}
+	if attribute.StringValue != nil {
+		numFields++
+		allErrs = append(allErrs, validateDeviceAttributeStringValue(attribute.StringValue, fldPath.Child("string"))...)
+	}
+	if attribute.VersionValue != nil {
+		numFields++
+		allErrs = append(allErrs, validateDeviceAttributeVersionValue(attribute.VersionValue, fldPath.Child("version"))...)
+	}
+	if attribute.NullValue != nil {
+		numFields++
+	}
+
+	switch numFields {
+	case 0:
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one value must be specified"))
+	case 1:
+		// Okay.
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one value must be specified"))
+	}
+	return allErrs
+}
+
+func validateDeviceAttributeStringValue(value *string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(*value) > resource.DeviceAttributeMaxValueLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength))
+	}
+	return allErrs
+}
+
+func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if !semverRe.MatchString(*value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, "must be a string compatible with semver.org spec 2.0.0"))
+	}
+	if len(*value) > resource.DeviceAttributeMaxValueLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength))
 	}
 	return allErrs
 }
@@ -817,5 +861,85 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 			return address, ""
 		},
 		fldPath.Child("ips"))...)
+	return allErrs
+}
+
+// ValidateResourceSlicePatch tests if a ResourceSlicePatch object is valid.
+func ValidateResourceSlicePatch(resourceSlicePatch *resource.ResourceSlicePatch) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&resourceSlicePatch.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceSlicePatchSpec(&resourceSlicePatch.Spec, nil, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateResourceSlicePatch tests if a ResourceSlicePatch update is valid.
+func ValidateResourceSlicePatchUpdate(resourceSlicePatch, oldResourceSlicePatch *resource.ResourceSlicePatch) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceSlicePatch.ObjectMeta, &oldResourceSlicePatch.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceSlicePatchSpec(&resourceSlicePatch.Spec, &oldResourceSlicePatch.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateResourceSlicePatchSpec(spec, oldSpec *resource.ResourceSlicePatchSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	var oldDevices *resource.DevicePatch
+	if oldSpec != nil {
+		oldDevices = &oldSpec.Devices // +k8s:verify-mutation:reason=clone
+	}
+	allErrs = append(allErrs, validateDevicePatch(&spec.Devices, oldDevices, fldPath.Child("devices"))...)
+
+	return allErrs
+}
+
+func validateDevicePatch(patch, oldPatch *resource.DevicePatch, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	var oldFilter *resource.DevicePatchFilter
+	if oldPatch != nil {
+		oldFilter = oldPatch.Filter // +k8s:verify-mutation:reason=clone
+	}
+	allErrs = append(allErrs, validateDevicePatchFilter(patch.Filter, oldFilter, fldPath.Child("filter"))...)
+
+	maxKeyLen := resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength
+	allErrs = append(allErrs, validateMap(patch.Attributes, -1, maxKeyLen, validateFullyQualifiedName, validateNullableDeviceAttribute, fldPath.Child("attributes"))...)
+	allErrs = append(allErrs, validateMap(patch.Capacity, -1, maxKeyLen, validateFullyQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
+	if combinedLen, max := len(patch.Attributes)+len(patch.Capacity), resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice; combinedLen > max {
+		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
+	}
+
+	return allErrs
+}
+
+func validateDevicePatchFilter(filter, oldFilter *resource.DevicePatchFilter, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if filter == nil {
+		return allErrs
+	}
+	if filter.DeviceClassName != nil {
+		allErrs = append(allErrs, validateDeviceClassName(*filter.DeviceClassName, fldPath.Child("deviceClassName"))...)
+	}
+	if filter.Driver != nil {
+		allErrs = append(allErrs, validateDriverName(*filter.Driver, fldPath.Child("driver"))...)
+	}
+	if filter.Pool != nil {
+		allErrs = append(allErrs, validatePoolName(*filter.Pool, fldPath.Child("pool"))...)
+	}
+	if filter.Device != nil {
+		allErrs = append(allErrs, validateDeviceName(*filter.Device, fldPath.Child("device"))...)
+	}
+
+	// If the selectors are exactly as before, we treat the CEL expressions as "stored".
+	// Any change, including merely reordering selectors, triggers validation as new
+	// expressions.
+	stored := false
+	if oldFilter != nil {
+		stored = apiequality.Semantic.DeepEqual(filter.Selectors, oldFilter.Selectors)
+	}
+	allErrs = append(allErrs, validateSlice(filter.Selectors, resource.DeviceSelectorsMaxSize,
+		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
+			return validateSelector(selector, fldPath, stored)
+		},
+		fldPath.Child("selectors"))...)
+
 	return allErrs
 }
