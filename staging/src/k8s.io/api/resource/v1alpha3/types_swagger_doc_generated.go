@@ -360,6 +360,34 @@ func (ResourceSliceList) SwaggerDoc() map[string]string {
 	return map_ResourceSliceList
 }
 
+var map_ResourceSlicePatch = map[string]string{
+	"":         "ResourceSlicePatch augments ResourceSlices.",
+	"metadata": "Standard object metadata",
+	"spec":     "Spec contains modifications to ResourceSlices.\n\nChanging the spec automatically increments the metadata.generation number.",
+}
+
+func (ResourceSlicePatch) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatch
+}
+
+var map_ResourceSlicePatchList = map[string]string{
+	"":         "ResourceSlicePatchList is a collection of ResourceSlicePatches.",
+	"metadata": "Standard list metadata",
+	"items":    "Items is the list of resource slice patches.",
+}
+
+func (ResourceSlicePatchList) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatchList
+}
+
+var map_ResourceSlicePatchSpec = map[string]string{
+	"": "ResourceSlicePatchSpec contains modifications to ResourceSlices.",
+}
+
+func (ResourceSlicePatchSpec) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatchSpec
+}
+
 var map_ResourceSliceSpec = map[string]string{
 	"":             "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
 	"driver":       "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",

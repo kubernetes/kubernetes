@@ -1650,6 +1650,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourcePoolApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlice"):
 		return &resourcev1alpha3.ResourceSliceApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlicePatch"):
+		return &resourcev1alpha3.ResourceSlicePatchApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &resourcev1alpha3.ResourceSliceSpecApplyConfiguration{}
 

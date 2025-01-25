@@ -821,6 +821,32 @@ message ResourceSliceList {
   repeated ResourceSlice items = 2;
 }
 
+// ResourceSlicePatch augments ResourceSlices.
+message ResourceSlicePatch {
+  // Standard object metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec contains modifications to ResourceSlices.
+  //
+  // Changing the spec automatically increments the metadata.generation number.
+  optional ResourceSlicePatchSpec spec = 2;
+}
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+message ResourceSlicePatchList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of resource slice patches.
+  repeated ResourceSlicePatch items = 2;
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+message ResourceSlicePatchSpec {
+}
+
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
 message ResourceSliceSpec {
   // Driver identifies the DRA driver providing the capacity information.
