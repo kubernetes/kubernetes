@@ -361,6 +361,20 @@ func (c *MetaAllocator) Allocate(ip net.IP) error {
 }
 
 func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error) {
+	// If the cluster is still using the old allocators use them first to try to
+	// get an IP address to keep backwards compatibility.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+		ip, err := c.bitmapAllocator.AllocateNext()
+		if err == nil {
+			allocator, err := c.getAllocator(ip, true)
+			if err != nil {
+				return nil, err
+			}
+			return ip, allocator.AllocateService(service, ip)
+		} else {
+			klog.Infof("no IP address available on the old ClusterIP allocator, trying to get a new address using the new allocators")
+		}
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// TODO(aojea) add strategy to return a random allocator but
@@ -376,15 +390,6 @@ func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error
 		}
 		ip, err := item.allocator.AllocateNextService(service)
 		if err == nil {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-				cidr := c.bitmapAllocator.CIDR()
-				if cidr.Contains(ip) {
-					err := c.bitmapAllocator.Allocate(ip)
-					if err != nil {
-						continue
-					}
-				}
-			}
 			return ip, nil
 		}
 	}
