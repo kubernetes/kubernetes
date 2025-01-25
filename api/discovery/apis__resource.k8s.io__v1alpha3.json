@@ -66,6 +66,23 @@
       ]
     },
     {
+      "kind": "ResourceSlicePatch",
+      "name": "resourceslicepatches",
+      "namespaced": false,
+      "singularName": "resourceslicepatch",
+      "storageVersionHash": "jCBCmT68pNI=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
       "kind": "ResourceSlice",
       "name": "resourceslices",
       "namespaced": false,

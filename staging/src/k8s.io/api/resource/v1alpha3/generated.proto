@@ -101,6 +101,10 @@ message BasicDevice {
   //
   // The maximum number of attributes and capacities combined is 32.
   //
+  // When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+  // [ResourceSlicePatch] objects that match this device must also be
+  // consulted to determine the full set of attributes for this device.
+  //
   // +optional
   map<string, DeviceAttribute> attributes = 1;
 
@@ -108,6 +112,10 @@ message BasicDevice {
   // The name of each capacity must be unique in that set.
   //
   // The maximum number of attributes and capacities combined is 32.
+  //
+  // When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+  // [ResourceSlicePatch] objects that match this device must also be
+  // consulted to determine the full capacity for this device.
   //
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
@@ -820,6 +828,35 @@ message ResourceSliceList {
 
   // Items is the list of resource ResourceSlices.
   repeated ResourceSlice items = 2;
+}
+
+// ResourceSlicePatch objects define modifications to [ResourceSlice] objects.
+// [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker]
+// can be used to view fully resolved [ResourceSlice] objects which include
+// these modifications.
+message ResourceSlicePatch {
+  // Standard object metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec contains modifications to ResourceSlices.
+  //
+  // Changing the spec automatically increments the metadata.generation number.
+  optional ResourceSlicePatchSpec spec = 2;
+}
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+message ResourceSlicePatchList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of resource slice patches.
+  repeated ResourceSlicePatch items = 2;
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+message ResourceSlicePatchSpec {
 }
 
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.

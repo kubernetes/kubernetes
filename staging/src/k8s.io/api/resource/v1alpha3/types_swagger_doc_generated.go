@@ -53,8 +53,8 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 
 var map_BasicDevice = map[string]string{
 	"":           "BasicDevice defines one device instance.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, [ResourceSlicePatch] objects that match this device must also be consulted to determine the full set of attributes for this device.",
+	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, [ResourceSlicePatch] objects that match this device must also be consulted to determine the full capacity for this device.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {
@@ -358,6 +358,34 @@ var map_ResourceSliceList = map[string]string{
 
 func (ResourceSliceList) SwaggerDoc() map[string]string {
 	return map_ResourceSliceList
+}
+
+var map_ResourceSlicePatch = map[string]string{
+	"":         "ResourceSlicePatch objects define modifications to [ResourceSlice] objects. [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker] can be used to view fully resolved [ResourceSlice] objects which include these modifications.",
+	"metadata": "Standard object metadata",
+	"spec":     "Spec contains modifications to ResourceSlices.\n\nChanging the spec automatically increments the metadata.generation number.",
+}
+
+func (ResourceSlicePatch) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatch
+}
+
+var map_ResourceSlicePatchList = map[string]string{
+	"":         "ResourceSlicePatchList is a collection of ResourceSlicePatches.",
+	"metadata": "Standard list metadata",
+	"items":    "Items is the list of resource slice patches.",
+}
+
+func (ResourceSlicePatchList) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatchList
+}
+
+var map_ResourceSlicePatchSpec = map[string]string{
+	"": "ResourceSlicePatchSpec contains modifications to ResourceSlices.",
+}
+
+func (ResourceSlicePatchSpec) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatchSpec
 }
 
 var map_ResourceSliceSpec = map[string]string{
