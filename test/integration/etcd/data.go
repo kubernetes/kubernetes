@@ -569,7 +569,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			RemovedVersion:    "1.37",
 		},
 		gvr("resource.k8s.io", "v1alpha3", "resourceslicepatches"): {
-			Stub:              `{"metadata": {"name": "node1slicepatch"}, "spec": {}}`,
+			Stub:              `{"metadata": {"name": "node1slicepatch"}, "spec": {"devices": {"priority": 100}}}`,
 			ExpectedEtcdPath:  "/registry/resourceslicepatches/node1slicepatch",
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",

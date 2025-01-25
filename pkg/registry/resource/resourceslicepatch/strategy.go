@@ -23,9 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // resourceSlicePatchStrategy implements behavior for ResourceSlicePatch objects
@@ -43,6 +45,8 @@ func (resourceSlicePatchStrategy) NamespaceScoped() bool {
 func (resourceSlicePatchStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	patch := obj.(*resource.ResourceSlicePatch)
 	patch.Generation = 1
+
+	dropDisabledFields(patch, nil)
 }
 
 func (resourceSlicePatchStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -69,6 +73,8 @@ func (resourceSlicePatchStrategy) PrepareForUpdate(ctx context.Context, obj, old
 	if !apiequality.Semantic.DeepEqual(oldPatch.Spec, patch.Spec) {
 		patch.Generation = oldPatch.Generation + 1
 	}
+
+	dropDisabledFields(patch, oldPatch)
 }
 
 func (resourceSlicePatchStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -81,4 +87,33 @@ func (resourceSlicePatchStrategy) WarningsOnUpdate(ctx context.Context, obj, old
 
 func (resourceSlicePatchStrategy) AllowUnconditionalUpdate() bool {
 	return true
+}
+
+// dropDisabledFields removes fields which are covered by a feature gate.
+func dropDisabledFields(newPatch, oldPatch *resource.ResourceSlicePatch) {
+	dropDisabledDRAAdminControlledDeviceAttributesFields(newPatch, oldPatch)
+}
+
+func dropDisabledDRAAdminControlledDeviceAttributesFields(newPatch, oldPatch *resource.ResourceSlicePatch) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminControlledDeviceAttributes) {
+		// No need to drop anything.
+		return
+	}
+	if draAdminControlledDeviceAttributesFeatureInUse(oldPatch) {
+		// If anything was set in the past, then fields must not get
+		// dropped on potentially unrelated updates.
+		return
+	}
+
+	newPatch.Spec.Devices.Attributes = nil
+	newPatch.Spec.Devices.Capacity = nil
+}
+
+func draAdminControlledDeviceAttributesFeatureInUse(patch *resource.ResourceSlicePatch) bool {
+	if patch == nil {
+		return false
+	}
+
+	return patch.Spec.Devices.Attributes != nil ||
+		patch.Spec.Devices.Capacity != nil
 }
