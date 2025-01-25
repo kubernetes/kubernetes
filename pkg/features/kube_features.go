@@ -201,6 +201,13 @@ const (
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
 
+	// owner: @nojnhuh
+	// kep: http://kep.k8s.io/5027
+	//
+	// Enables support for modifying attributes and capacities of
+	// devices in ResourceSlices via ResourceSlicePatch objects.
+	DRAAdminControlledDeviceAttributes featuregate.Feature = "DRAAdminControlledDeviceAttributes"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
