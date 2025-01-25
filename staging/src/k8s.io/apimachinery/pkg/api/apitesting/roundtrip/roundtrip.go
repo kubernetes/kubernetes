@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 

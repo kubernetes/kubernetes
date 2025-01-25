@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/google/go-cmp/cmp"         //nolint:depguard
+	"github.com/google/go-cmp/cmp/cmpopts" //nolint:depguard
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"

@@ -30,7 +30,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"

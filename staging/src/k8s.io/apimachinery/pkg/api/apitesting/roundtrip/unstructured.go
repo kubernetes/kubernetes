@@ -37,7 +37,7 @@ import (
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 )
 
 // RoundtripToUnstructured verifies the roundtrip faithfulness of all external types in a scheme
