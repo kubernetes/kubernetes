@@ -150,9 +150,11 @@ func (r *runner) Get(name string) (*Counter, error) {
 func (r *runner) List() ([]*Counter, error) {
 	var err error
 	var msgs [][]byte
+
+	req := r.handler.newRequest(cmdGet, unix.NLM_F_REQUEST|unix.NLM_F_DUMP)
 	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
-		req := r.handler.newRequest(cmdGet, unix.NLM_F_REQUEST|unix.NLM_F_DUMP)
 		msgs, err = req.Execute(unix.NETLINK_NETFILTER, 0)
+
 		return err
 	})
 
