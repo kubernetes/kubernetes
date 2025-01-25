@@ -1083,3 +1083,39 @@ type NetworkDeviceData struct {
 	// +optional
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// ResourceSlicePatch augments ResourceSlices.
+type ResourceSlicePatch struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec contains modifications to ResourceSlices.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec ResourceSlicePatchSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+type ResourceSlicePatchSpec struct {
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+type ResourceSlicePatchList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource slice patches.
+	Items []ResourceSlicePatch `json:"items" protobuf:"bytes,2,rep,name=items"`
+}

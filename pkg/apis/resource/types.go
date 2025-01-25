@@ -1076,3 +1076,35 @@ type NetworkDeviceData struct {
 	// +optional
 	HardwareAddress string
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSlicePatch augments ResourceSlices.
+type ResourceSlicePatch struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec contains modifications to a ResourceSlice.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec ResourceSlicePatchSpec
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+type ResourceSlicePatchSpec struct {
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+type ResourceSlicePatchList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of resource slice patches.
+	Items []ResourceSlicePatch
+}

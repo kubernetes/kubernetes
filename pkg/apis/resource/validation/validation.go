@@ -817,3 +817,22 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 		fldPath.Child("ips"))...)
 	return allErrs
 }
+
+// ValidateResourceSlicePatch tests if a ResourceSlicePatch object is valid.
+func ValidateResourceSlicePatch(patch *resource.ResourceSlicePatch) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&patch.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceSlicePatchSpec(&patch.Spec, nil, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateResourceSlicePatch tests if a ResourceSlicePatch update is valid.
+func ValidateResourceSlicePatchUpdate(resourceSlicePatch, oldResourceSlicePatch *resource.ResourceSlicePatch) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceSlicePatch.ObjectMeta, &oldResourceSlicePatch.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateResourceSlicePatchSpec(&resourceSlicePatch.Spec, &oldResourceSlicePatch.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateResourceSlicePatchSpec(spec, oldSpec *resource.ResourceSlicePatchSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	return allErrs
+}
