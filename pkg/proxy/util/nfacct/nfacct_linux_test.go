@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
-	"k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // fakeHandler is a mock implementation of the handler interface, designed for testing.
@@ -479,12 +478,7 @@ func TestRunner_List(t *testing.T) {
 	rnr, err := newInternal(hndlr)
 	assert.NoError(t, err)
 
-	var counters []*Counter
-
-	util.RetryOnIntr(func() error {
-		counters, err = rnr.List()
-		return err
-	})
+	counters, err := rnr.List()
 
 	// validate request(NFNL_MSG_ACCT_GET)
 	assert.Len(t, hndlr.requests, 1)
