@@ -32,6 +32,7 @@ type ResourceV1alpha3Interface interface {
 	ResourceClaimsGetter
 	ResourceClaimTemplatesGetter
 	ResourceSlicesGetter
+	ResourceSlicePatchesGetter
 }
 
 // ResourceV1alpha3Client is used to interact with features provided by the resource.k8s.io group.
@@ -53,6 +54,10 @@ func (c *ResourceV1alpha3Client) ResourceClaimTemplates(namespace string) Resour
 
 func (c *ResourceV1alpha3Client) ResourceSlices() ResourceSliceInterface {
 	return newResourceSlices(c)
+}
+
+func (c *ResourceV1alpha3Client) ResourceSlicePatches() ResourceSlicePatchInterface {
+	return newResourceSlicePatches(c)
 }
 
 // NewForConfig creates a new ResourceV1alpha3Client for the given config.

@@ -32,6 +32,8 @@ type Interface interface {
 	ResourceClaimTemplates() ResourceClaimTemplateInformer
 	// ResourceSlices returns a ResourceSliceInformer.
 	ResourceSlices() ResourceSliceInformer
+	// ResourceSlicePatches returns a ResourceSlicePatchInformer.
+	ResourceSlicePatches() ResourceSlicePatchInformer
 }
 
 type version struct {
@@ -63,4 +65,9 @@ func (v *version) ResourceClaimTemplates() ResourceClaimTemplateInformer {
 // ResourceSlices returns a ResourceSliceInformer.
 func (v *version) ResourceSlices() ResourceSliceInformer {
 	return &resourceSliceInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceSlicePatches returns a ResourceSlicePatchInformer.
+func (v *version) ResourceSlicePatches() ResourceSlicePatchInformer {
+	return &resourceSlicePatchInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

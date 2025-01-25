@@ -1938,6 +1938,26 @@
               ]
             },
             {
+              "resource": "resourceslicepatches",
+              "responseKind": {
+                "group": "",
+                "kind": "ResourceSlicePatch",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "resourceslicepatch",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "resourceslices",
               "responseKind": {
                 "group": "",

@@ -103,6 +103,10 @@ message BasicDevice {
   //
   // The maximum number of attributes and capacities combined is 32.
   //
+  // When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+  // [ResourceSlicePatch] objects that match this device must also be
+  // consulted to determine the full set of attributes for this device.
+  //
   // +optional
   map<string, DeviceAttribute> attributes = 1;
 
@@ -110,6 +114,10 @@ message BasicDevice {
   // The name of each capacity must be unique in that set.
   //
   // The maximum number of attributes and capacities combined is 32.
+  //
+  // When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+  // [ResourceSlicePatch] objects that match this device must also be
+  // consulted to determine the full capacity for this device.
   //
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
@@ -256,6 +264,14 @@ message DeviceAttribute {
   optional string version = 5;
 }
 
+// DeviceCapacity describes a quantity associated with a device.
+message DeviceCapacity {
+  // Value defines how much of a certain device capacity is available.
+  //
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
+}
+
 // DeviceClaim defines how to request devices with a ResourceClaim.
 message DeviceClaim {
   // Requests represent individual requests for distinct devices which
@@ -390,6 +406,104 @@ message DeviceConstraint {
   // +optional
   // +oneOf=ConstraintType
   optional string matchAttribute = 2;
+}
+
+// DevicePatch selects one or more devices by class, driver, pool, device names
+// and/or CEL selectors. All of these criteria must be satisfied by a device, otherwise
+// it is ignored by the patch. A DevicePatch with no selection criteria is
+// valid and matches all devices.
+message DevicePatch {
+  // Filter defines which device(s) the patch is applied to.
+  //
+  // +optional
+  optional DevicePatchFilter filter = 1;
+
+  // If a ResourceSlice and a DevicePatch define the same attribute or
+  // capacity, the value of the DevicePatch is used. If multiple
+  // different DevicePatches match the same device, then the one with
+  // the highest priority wins. If priorities are equal, the older
+  // patch wins. This ensures that adding a new patch does not
+  // accidentally change the effect of some existing patch unless
+  // that is clearly intended according to the priority.
+  //
+  // +optional
+  optional int32 priority = 2;
+
+  // Attributes defines the set of attributes to patch for matching devices.
+  // The name of each attribute must be unique in that set and
+  // include the domain prefix.
+  //
+  // In contrast to attributes in a ResourceSlice, entries here are allowed to
+  // be marked as empty by setting their null field. Such entries remove the
+  // corresponding attribute in a ResourceSlice, if there is one, instead of
+  // overriding it. Because entries get removed and are not allowed in
+  // slices, CEL expressions do not need need to deal with null values.
+  //
+  // The maximum number of attributes and capacities in the DevicePatch combined is 32.
+  // This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes
+  // feature gate.
+  //
+  // +optional
+  // +featureGate:DRAAdminControlledDeviceAttributes
+  map<string, NullableDeviceAttribute> attributes = 3;
+
+  // Capacity defines the set of capacities to patch for matching devices.
+  // The name of each capacity must be unique in that set and
+  // include the domain prefix.
+  //
+  // Removing a capacity is not supported. It can be reduced to 0 instead.
+  //
+  // The maximum number of attributes and capacities in the DevicePatch combined is 32.
+  // This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes
+  // feature gate.
+  //
+  // +optional
+  // +featureGate:DRAAdminControlledDeviceAttributes
+  map<string, DeviceCapacity> capacity = 4;
+}
+
+// DevicePatchFilter defines which device(s) a [DevicePatch] applies to.
+message DevicePatchFilter {
+  // If DeviceClassName is set, the selectors defined there must be
+  // satisfied by a device to be patched. This field corresponds
+  // to class.metadata.name.
+  //
+  // +optional
+  optional string deviceClassName = 1;
+
+  // If driver is set, only devices from that driver are patched.
+  // This fields corresponds to slice.spec.driver.
+  //
+  // +optional
+  optional string driver = 2;
+
+  // If pool is set, only devices in that pool are patched.
+  //
+  // Also setting the driver name may be useful to avoid
+  // ambiguity when different drivers use the same pool name,
+  // but this is not required because selecting pools from
+  // different drivers may also be useful, for example when
+  // drivers with node-local devices use the node name as
+  // their pool name.
+  //
+  // +optional
+  optional string pool = 3;
+
+  // If device is set, only devices with that name are patched.
+  // This field corresponds to slice.spec.devices[].name.
+  //
+  // Setting also driver and pool may be required to avoid ambiguity,
+  // but is not required.
+  //
+  // +optional
+  optional string device = 4;
+
+  // Selectors define criteria which must be satisfied by a
+  // device to be patched. All selectors must be satisfied.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceSelector selectors = 5;
 }
 
 // DeviceRequest is a request for devices required for a claim.
@@ -564,6 +678,23 @@ message NetworkDeviceData {
   //
   // +optional
   optional string hardwareAddress = 3;
+}
+
+// NullValue denotes the value of an attribute to be removed by a [NullableDeviceAttribute].
+message NullValue {
+}
+
+// NullableDeviceAttribute must have exactly one field set.
+// It has the exact same fields as a DeviceAttribute plus `null` as
+// an additional alternative.
+message NullableDeviceAttribute {
+  optional DeviceAttribute deviceAttribute = 1;
+
+  // NullValue, if set, marks an intentionally empty attribute.
+  //
+  // +optional
+  // +oneOf=ValueType
+  optional NullValue null = 2;
 }
 
 // OpaqueDeviceConfiguration contains configuration parameters for a driver
@@ -824,6 +955,37 @@ message ResourceSliceList {
 
   // Items is the list of resource ResourceSlices.
   repeated ResourceSlice items = 2;
+}
+
+// ResourceSlicePatch objects define modifications to [ResourceSlice] objects.
+// [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker]
+// can be used to view fully resolved [ResourceSlice] objects which include
+// these modifications.
+message ResourceSlicePatch {
+  // Standard object metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec contains modifications to ResourceSlices.
+  //
+  // Changing the spec automatically increments the metadata.generation number.
+  optional ResourceSlicePatchSpec spec = 2;
+}
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+message ResourceSlicePatchList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of resource slice patches.
+  repeated ResourceSlicePatch items = 2;
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+message ResourceSlicePatchSpec {
+  // Devices defines how to patch device attributes and taints.
+  optional DevicePatch devices = 1;
 }
 
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.

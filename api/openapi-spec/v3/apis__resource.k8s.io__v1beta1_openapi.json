@@ -179,7 +179,7 @@
               ],
               "default": {}
             },
-            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full set of attributes for this device.",
             "type": "object"
           },
           "capacity": {
@@ -191,7 +191,7 @@
               ],
               "default": {}
             },
-            "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+            "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full capacity for this device.",
             "type": "object"
           }
         },

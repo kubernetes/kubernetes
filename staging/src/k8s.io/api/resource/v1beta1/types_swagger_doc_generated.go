@@ -53,8 +53,8 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 
 var map_BasicDevice = map[string]string{
 	"":           "BasicDevice defines one device instance.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full set of attributes for this device.",
+	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full capacity for this device.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {

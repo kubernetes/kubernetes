@@ -103,6 +103,10 @@ message BasicDevice {
   //
   // The maximum number of attributes and capacities combined is 32.
   //
+  // When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+  // ResourceSlicePatch objects that match this device must also be
+  // consulted to determine the full set of attributes for this device.
+  //
   // +optional
   map<string, DeviceAttribute> attributes = 1;
 
@@ -110,6 +114,10 @@ message BasicDevice {
   // The name of each capacity must be unique in that set.
   //
   // The maximum number of attributes and capacities combined is 32.
+  //
+  // When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+  // ResourceSlicePatch objects that match this device must also be
+  // consulted to determine the full capacity for this device.
   //
   // +optional
   map<string, DeviceCapacity> capacity = 2;
