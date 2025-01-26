@@ -576,6 +576,11 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Unschedulable, "plugin disabled")
 	}
+	// If a Pod doesn't have any resource claims attached to it, there is no need for further processing.
+	// Thus we provide a fast path for this case to avoid unnecessary computations.
+	if len(pod.Spec.ResourceClaims) == 0 {
+		return nil, framework.NewStatus(framework.Unschedulable)
+	}
 	logger := klog.FromContext(ctx)
 	state, err := getStateData(cs)
 	if err != nil {
