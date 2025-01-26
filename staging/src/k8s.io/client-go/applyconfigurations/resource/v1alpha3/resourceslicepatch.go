@@ -32,7 +32,7 @@ import (
 type ResourceSlicePatchApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *resourcev1alpha3.ResourceSlicePatchSpec `json:"spec,omitempty"`
+	Spec                             *ResourceSlicePatchSpecApplyConfiguration `json:"spec,omitempty"`
 }
 
 // ResourceSlicePatch constructs a declarative configuration of the ResourceSlicePatch type for use with
@@ -241,8 +241,8 @@ func (b *ResourceSlicePatchApplyConfiguration) ensureObjectMetaApplyConfiguratio
 // WithSpec sets the Spec field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Spec field is set to the value of the last call.
-func (b *ResourceSlicePatchApplyConfiguration) WithSpec(value resourcev1alpha3.ResourceSlicePatchSpec) *ResourceSlicePatchApplyConfiguration {
-	b.Spec = &value
+func (b *ResourceSlicePatchApplyConfiguration) WithSpec(value *ResourceSlicePatchSpecApplyConfiguration) *ResourceSlicePatchApplyConfiguration {
+	b.Spec = value
 	return b
 }
 

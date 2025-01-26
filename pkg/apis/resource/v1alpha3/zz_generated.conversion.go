@@ -122,6 +122,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceCapacity)(nil), (*resource.DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DeviceCapacity_To_resource_DeviceCapacity(a.(*resourcev1alpha3.DeviceCapacity), b.(*resource.DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceCapacity)(nil), (*resourcev1alpha3.DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceCapacity_To_v1alpha3_DeviceCapacity(a.(*resource.DeviceCapacity), b.(*resourcev1alpha3.DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceClaim)(nil), (*resource.DeviceClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha3_DeviceClaim_To_resource_DeviceClaim(a.(*resourcev1alpha3.DeviceClaim), b.(*resource.DeviceClaim), scope)
 	}); err != nil {
@@ -202,6 +212,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DevicePatch)(nil), (*resource.DevicePatch)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DevicePatch_To_resource_DevicePatch(a.(*resourcev1alpha3.DevicePatch), b.(*resource.DevicePatch), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DevicePatch)(nil), (*resourcev1alpha3.DevicePatch)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DevicePatch_To_v1alpha3_DevicePatch(a.(*resource.DevicePatch), b.(*resourcev1alpha3.DevicePatch), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DevicePatchFilter)(nil), (*resource.DevicePatchFilter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DevicePatchFilter_To_resource_DevicePatchFilter(a.(*resourcev1alpha3.DevicePatchFilter), b.(*resource.DevicePatchFilter), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DevicePatchFilter)(nil), (*resourcev1alpha3.DevicePatchFilter)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DevicePatchFilter_To_v1alpha3_DevicePatchFilter(a.(*resource.DevicePatchFilter), b.(*resourcev1alpha3.DevicePatchFilter), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceRequest)(nil), (*resource.DeviceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(a.(*resourcev1alpha3.DeviceRequest), b.(*resource.DeviceRequest), scope)
 	}); err != nil {
@@ -239,6 +269,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*resource.NetworkDeviceData)(nil), (*resourcev1alpha3.NetworkDeviceData)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_NetworkDeviceData_To_v1alpha3_NetworkDeviceData(a.(*resource.NetworkDeviceData), b.(*resourcev1alpha3.NetworkDeviceData), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.NullValue)(nil), (*resource.NullValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_NullValue_To_resource_NullValue(a.(*resourcev1alpha3.NullValue), b.(*resource.NullValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.NullValue)(nil), (*resourcev1alpha3.NullValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_NullValue_To_v1alpha3_NullValue(a.(*resource.NullValue), b.(*resourcev1alpha3.NullValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.NullableDeviceAttribute)(nil), (*resource.NullableDeviceAttribute)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_NullableDeviceAttribute_To_resource_NullableDeviceAttribute(a.(*resourcev1alpha3.NullableDeviceAttribute), b.(*resource.NullableDeviceAttribute), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.NullableDeviceAttribute)(nil), (*resourcev1alpha3.NullableDeviceAttribute)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_NullableDeviceAttribute_To_v1alpha3_NullableDeviceAttribute(a.(*resource.NullableDeviceAttribute), b.(*resourcev1alpha3.NullableDeviceAttribute), scope)
 	}); err != nil {
 		return err
 	}
@@ -651,6 +701,26 @@ func Convert_resource_DeviceAttribute_To_v1alpha3_DeviceAttribute(in *resource.D
 	return autoConvert_resource_DeviceAttribute_To_v1alpha3_DeviceAttribute(in, out, s)
 }
 
+func autoConvert_v1alpha3_DeviceCapacity_To_resource_DeviceCapacity(in *resourcev1alpha3.DeviceCapacity, out *resource.DeviceCapacity, s conversion.Scope) error {
+	out.Value = in.Value
+	return nil
+}
+
+// Convert_v1alpha3_DeviceCapacity_To_resource_DeviceCapacity is an autogenerated conversion function.
+func Convert_v1alpha3_DeviceCapacity_To_resource_DeviceCapacity(in *resourcev1alpha3.DeviceCapacity, out *resource.DeviceCapacity, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DeviceCapacity_To_resource_DeviceCapacity(in, out, s)
+}
+
+func autoConvert_resource_DeviceCapacity_To_v1alpha3_DeviceCapacity(in *resource.DeviceCapacity, out *resourcev1alpha3.DeviceCapacity, s conversion.Scope) error {
+	out.Value = in.Value
+	return nil
+}
+
+// Convert_resource_DeviceCapacity_To_v1alpha3_DeviceCapacity is an autogenerated conversion function.
+func Convert_resource_DeviceCapacity_To_v1alpha3_DeviceCapacity(in *resource.DeviceCapacity, out *resourcev1alpha3.DeviceCapacity, s conversion.Scope) error {
+	return autoConvert_resource_DeviceCapacity_To_v1alpha3_DeviceCapacity(in, out, s)
+}
+
 func autoConvert_v1alpha3_DeviceClaim_To_resource_DeviceClaim(in *resourcev1alpha3.DeviceClaim, out *resource.DeviceClaim, s conversion.Scope) error {
 	out.Requests = *(*[]resource.DeviceRequest)(unsafe.Pointer(&in.Requests))
 	out.Constraints = *(*[]resource.DeviceConstraint)(unsafe.Pointer(&in.Constraints))
@@ -837,6 +907,60 @@ func Convert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource
 	return autoConvert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in, out, s)
 }
 
+func autoConvert_v1alpha3_DevicePatch_To_resource_DevicePatch(in *resourcev1alpha3.DevicePatch, out *resource.DevicePatch, s conversion.Scope) error {
+	out.Filter = (*resource.DevicePatchFilter)(unsafe.Pointer(in.Filter))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
+	out.Attributes = *(*map[resource.FullyQualifiedName]resource.NullableDeviceAttribute)(unsafe.Pointer(&in.Attributes))
+	out.Capacity = *(*map[resource.FullyQualifiedName]resource.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	return nil
+}
+
+// Convert_v1alpha3_DevicePatch_To_resource_DevicePatch is an autogenerated conversion function.
+func Convert_v1alpha3_DevicePatch_To_resource_DevicePatch(in *resourcev1alpha3.DevicePatch, out *resource.DevicePatch, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DevicePatch_To_resource_DevicePatch(in, out, s)
+}
+
+func autoConvert_resource_DevicePatch_To_v1alpha3_DevicePatch(in *resource.DevicePatch, out *resourcev1alpha3.DevicePatch, s conversion.Scope) error {
+	out.Filter = (*resourcev1alpha3.DevicePatchFilter)(unsafe.Pointer(in.Filter))
+	out.Priority = (*int32)(unsafe.Pointer(in.Priority))
+	out.Attributes = *(*map[resourcev1alpha3.FullyQualifiedName]resourcev1alpha3.NullableDeviceAttribute)(unsafe.Pointer(&in.Attributes))
+	out.Capacity = *(*map[resourcev1alpha3.FullyQualifiedName]resourcev1alpha3.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	return nil
+}
+
+// Convert_resource_DevicePatch_To_v1alpha3_DevicePatch is an autogenerated conversion function.
+func Convert_resource_DevicePatch_To_v1alpha3_DevicePatch(in *resource.DevicePatch, out *resourcev1alpha3.DevicePatch, s conversion.Scope) error {
+	return autoConvert_resource_DevicePatch_To_v1alpha3_DevicePatch(in, out, s)
+}
+
+func autoConvert_v1alpha3_DevicePatchFilter_To_resource_DevicePatchFilter(in *resourcev1alpha3.DevicePatchFilter, out *resource.DevicePatchFilter, s conversion.Scope) error {
+	out.DeviceClassName = (*string)(unsafe.Pointer(in.DeviceClassName))
+	out.Driver = (*string)(unsafe.Pointer(in.Driver))
+	out.Pool = (*string)(unsafe.Pointer(in.Pool))
+	out.Device = (*string)(unsafe.Pointer(in.Device))
+	out.Selectors = *(*[]resource.DeviceSelector)(unsafe.Pointer(&in.Selectors))
+	return nil
+}
+
+// Convert_v1alpha3_DevicePatchFilter_To_resource_DevicePatchFilter is an autogenerated conversion function.
+func Convert_v1alpha3_DevicePatchFilter_To_resource_DevicePatchFilter(in *resourcev1alpha3.DevicePatchFilter, out *resource.DevicePatchFilter, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DevicePatchFilter_To_resource_DevicePatchFilter(in, out, s)
+}
+
+func autoConvert_resource_DevicePatchFilter_To_v1alpha3_DevicePatchFilter(in *resource.DevicePatchFilter, out *resourcev1alpha3.DevicePatchFilter, s conversion.Scope) error {
+	out.DeviceClassName = (*string)(unsafe.Pointer(in.DeviceClassName))
+	out.Driver = (*string)(unsafe.Pointer(in.Driver))
+	out.Pool = (*string)(unsafe.Pointer(in.Pool))
+	out.Device = (*string)(unsafe.Pointer(in.Device))
+	out.Selectors = *(*[]resourcev1alpha3.DeviceSelector)(unsafe.Pointer(&in.Selectors))
+	return nil
+}
+
+// Convert_resource_DevicePatchFilter_To_v1alpha3_DevicePatchFilter is an autogenerated conversion function.
+func Convert_resource_DevicePatchFilter_To_v1alpha3_DevicePatchFilter(in *resource.DevicePatchFilter, out *resourcev1alpha3.DevicePatchFilter, s conversion.Scope) error {
+	return autoConvert_resource_DevicePatchFilter_To_v1alpha3_DevicePatchFilter(in, out, s)
+}
+
 func autoConvert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *resourcev1alpha3.DeviceRequest, out *resource.DeviceRequest, s conversion.Scope) error {
 	out.Name = in.Name
 	out.DeviceClassName = in.DeviceClassName
@@ -937,6 +1061,50 @@ func autoConvert_resource_NetworkDeviceData_To_v1alpha3_NetworkDeviceData(in *re
 // Convert_resource_NetworkDeviceData_To_v1alpha3_NetworkDeviceData is an autogenerated conversion function.
 func Convert_resource_NetworkDeviceData_To_v1alpha3_NetworkDeviceData(in *resource.NetworkDeviceData, out *resourcev1alpha3.NetworkDeviceData, s conversion.Scope) error {
 	return autoConvert_resource_NetworkDeviceData_To_v1alpha3_NetworkDeviceData(in, out, s)
+}
+
+func autoConvert_v1alpha3_NullValue_To_resource_NullValue(in *resourcev1alpha3.NullValue, out *resource.NullValue, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_v1alpha3_NullValue_To_resource_NullValue is an autogenerated conversion function.
+func Convert_v1alpha3_NullValue_To_resource_NullValue(in *resourcev1alpha3.NullValue, out *resource.NullValue, s conversion.Scope) error {
+	return autoConvert_v1alpha3_NullValue_To_resource_NullValue(in, out, s)
+}
+
+func autoConvert_resource_NullValue_To_v1alpha3_NullValue(in *resource.NullValue, out *resourcev1alpha3.NullValue, s conversion.Scope) error {
+	return nil
+}
+
+// Convert_resource_NullValue_To_v1alpha3_NullValue is an autogenerated conversion function.
+func Convert_resource_NullValue_To_v1alpha3_NullValue(in *resource.NullValue, out *resourcev1alpha3.NullValue, s conversion.Scope) error {
+	return autoConvert_resource_NullValue_To_v1alpha3_NullValue(in, out, s)
+}
+
+func autoConvert_v1alpha3_NullableDeviceAttribute_To_resource_NullableDeviceAttribute(in *resourcev1alpha3.NullableDeviceAttribute, out *resource.NullableDeviceAttribute, s conversion.Scope) error {
+	if err := Convert_v1alpha3_DeviceAttribute_To_resource_DeviceAttribute(&in.DeviceAttribute, &out.DeviceAttribute, s); err != nil {
+		return err
+	}
+	out.NullValue = (*resource.NullValue)(unsafe.Pointer(in.NullValue))
+	return nil
+}
+
+// Convert_v1alpha3_NullableDeviceAttribute_To_resource_NullableDeviceAttribute is an autogenerated conversion function.
+func Convert_v1alpha3_NullableDeviceAttribute_To_resource_NullableDeviceAttribute(in *resourcev1alpha3.NullableDeviceAttribute, out *resource.NullableDeviceAttribute, s conversion.Scope) error {
+	return autoConvert_v1alpha3_NullableDeviceAttribute_To_resource_NullableDeviceAttribute(in, out, s)
+}
+
+func autoConvert_resource_NullableDeviceAttribute_To_v1alpha3_NullableDeviceAttribute(in *resource.NullableDeviceAttribute, out *resourcev1alpha3.NullableDeviceAttribute, s conversion.Scope) error {
+	if err := Convert_resource_DeviceAttribute_To_v1alpha3_DeviceAttribute(&in.DeviceAttribute, &out.DeviceAttribute, s); err != nil {
+		return err
+	}
+	out.NullValue = (*resourcev1alpha3.NullValue)(unsafe.Pointer(in.NullValue))
+	return nil
+}
+
+// Convert_resource_NullableDeviceAttribute_To_v1alpha3_NullableDeviceAttribute is an autogenerated conversion function.
+func Convert_resource_NullableDeviceAttribute_To_v1alpha3_NullableDeviceAttribute(in *resource.NullableDeviceAttribute, out *resourcev1alpha3.NullableDeviceAttribute, s conversion.Scope) error {
+	return autoConvert_resource_NullableDeviceAttribute_To_v1alpha3_NullableDeviceAttribute(in, out, s)
 }
 
 func autoConvert_v1alpha3_OpaqueDeviceConfiguration_To_resource_OpaqueDeviceConfiguration(in *resourcev1alpha3.OpaqueDeviceConfiguration, out *resource.OpaqueDeviceConfiguration, s conversion.Scope) error {
@@ -1304,6 +1472,9 @@ func Convert_resource_ResourceSlicePatchList_To_v1alpha3_ResourceSlicePatchList(
 }
 
 func autoConvert_v1alpha3_ResourceSlicePatchSpec_To_resource_ResourceSlicePatchSpec(in *resourcev1alpha3.ResourceSlicePatchSpec, out *resource.ResourceSlicePatchSpec, s conversion.Scope) error {
+	if err := Convert_v1alpha3_DevicePatch_To_resource_DevicePatch(&in.Devices, &out.Devices, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1313,6 +1484,9 @@ func Convert_v1alpha3_ResourceSlicePatchSpec_To_resource_ResourceSlicePatchSpec(
 }
 
 func autoConvert_resource_ResourceSlicePatchSpec_To_v1alpha3_ResourceSlicePatchSpec(in *resource.ResourceSlicePatchSpec, out *resourcev1alpha3.ResourceSlicePatchSpec, s conversion.Scope) error {
+	if err := Convert_resource_DevicePatch_To_v1alpha3_DevicePatch(&in.Devices, &out.Devices, s); err != nil {
+		return err
+	}
 	return nil
 }
 
