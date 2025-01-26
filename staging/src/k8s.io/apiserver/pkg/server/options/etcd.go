@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -106,19 +107,8 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, allowed values: %s. If not specified, it will default to 'etcd3'", strings.Join(storageTypes.List(), ", ")))
 	}
 
-	for _, override := range s.EtcdServersOverrides {
-		tokens := strings.Split(override, "#")
-		if len(tokens) != 2 {
-			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
-			continue
-		}
-
-		apiresource := strings.Split(tokens[0], "/")
-		if len(apiresource) != 2 {
-			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
-			continue
-		}
-
+	if _, err := ParseEtcdServersOverrides(s.EtcdServersOverrides); err != nil {
+		allErrors = append(allErrors, err)
 	}
 
 	if len(s.EncryptionProviderConfigFilepath) == 0 && s.EncryptionProviderConfigAutomaticReload {
@@ -363,7 +353,7 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 	if err != nil {
 		return err
 	}
-	c.AddHealthChecks(healthz.NamedCheck("etcd", func(r *http.Request) error {
+	c.AddHealthChecks(healthz.NamedGroupedCheck("etcd", "etcd", func(r *http.Request) error {
 		return healthCheck()
 	}))
 
@@ -371,50 +361,51 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 	if err != nil {
 		return err
 	}
-	c.AddReadyzChecks(healthz.NamedCheck("etcd-readiness", func(r *http.Request) error {
+	c.AddReadyzChecks(healthz.NamedGroupedCheck("etcd-readiness", "etcd-readiness", func(r *http.Request) error {
 		return readyCheck()
 	}))
 
 	if len(s.EtcdServersOverrides) != 0 {
-		if err := s.addOverrideEtcdHealthEndpoint(c); err != nil {
+		// multi overrides servers may in different order
+		// example: ["apps/deployments#s2.example.com;s1.example.com","apps/replicasets#s1.example.com;s2.example.com"]
+		overrides, err := ParseEtcdServersOverrides(s.EtcdServersOverrides)
+		if err != nil {
 			return err
 		}
-	}
+		// multi overrides may point to the same servers
+		// example: ["apps/deployments#s1.example.com;s2.example.com","apps/replicasets#s1.example.com;s2.example.com"]
+		serversSets := sets.NewString()
+		for _, override := range overrides {
+			sortedServers := make([]string, len(override.Servers))
+			// use a copied slice to avoid modifying the original slice for client in SetEtcdLocation
+			copy(sortedServers, override.Servers)
+			sort.Strings(sortedServers)
+			serversKeyStr := strings.Join(sortedServers, ";")
+			if serversSets.Has(serversKeyStr) {
+				continue
+			}
+			serversSets.Insert(serversKeyStr)
 
-	return nil
-}
+			sc := s.StorageConfig
+			sc.Transport.ServerList = override.Servers
 
-func (s *EtcdOptions) addOverrideEtcdHealthEndpoint(c *server.Config) error {
-	sc := s.StorageConfig
-	serverSet := sets.Set[string]{}
+			healthCheck, err := storagefactory.CreateHealthCheck(sc, c.DrainedNotify())
+			if err != nil {
+				return err
+			}
+			c.AddHealthChecks(healthz.NamedGroupedCheck(fmt.Sprintf("etcd-override-%d", len(serversSets)-1), "etcd", func(r *http.Request) error {
+				return healthCheck()
+			}))
 
-	for _, override := range s.EtcdServersOverrides {
-		tokens := strings.Split(override, "#")
-		servers := strings.Split(tokens[1], ";")
-		for _, server := range servers {
-			serverSet.Insert(server)
+			readyCheck, err := storagefactory.CreateReadyCheck(sc, c.DrainedNotify())
+			if err != nil {
+				return err
+			}
+			c.AddReadyzChecks(healthz.NamedGroupedCheck(fmt.Sprintf("etcd-override-readiness-%d", len(serversSets)-1), "etcd-readiness", func(r *http.Request) error {
+				return readyCheck()
+			}))
 		}
 	}
-	if serverSet.Len() != 0 {
-		sc.Transport.ServerList = serverSet.UnsortedList()
-	}
-
-	healthCheck, err := storagefactory.CreateHealthCheck(sc, c.DrainedNotify())
-	if err != nil {
-		return err
-	}
-	c.AddHealthChecks(healthz.NamedCheck("etcd-override", func(r *http.Request) error {
-		return healthCheck()
-	}))
-
-	readyCheck, err := storagefactory.CreateReadyCheck(sc, c.DrainedNotify())
-	if err != nil {
-		return err
-	}
-	c.AddReadyzChecks(healthz.NamedCheck("etcd-override-readiness", func(r *http.Request) error {
-		return readyCheck()
-	}))
-
 	return nil
 }
 
@@ -557,4 +548,36 @@ func (t *transformerStorageFactory) Configs() []storagebackend.Config {
 
 func (t *transformerStorageFactory) Backends() []serverstorage.Backend {
 	return t.delegate.Backends()
+}
+
+type EtcdServerOverride struct {
+	GroupResource schema.GroupResource
+	Servers       []string
+}
+
+var errOverridesInvalid = fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated")
+
+func ParseEtcdServersOverrides(etcdServersOverrides []string) ([]EtcdServerOverride, error) {
+	var overrides []EtcdServerOverride
+	for _, override := range etcdServersOverrides {
+		tokens := strings.Split(override, "#")
+		if len(tokens) != 2 {
+			return nil, errOverridesInvalid
+		}
+		apiresource := strings.Split(tokens[0], "/")
+		if len(apiresource) != 2 {
+			return nil, errOverridesInvalid
+		}
+		servers := strings.Split(tokens[1], ";")
+		for _, server := range servers {
+			if len(server) == 0 {
+				return nil, errOverridesInvalid
+			}
+		}
+		overrides = append(overrides, EtcdServerOverride{
+			GroupResource: schema.GroupResource{Group: apiresource[0], Resource: apiresource[1]},
+			Servers:       servers,
+		})
+	}
+	return overrides, nil
 }

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	kubernetes "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -32,9 +33,39 @@ func TestHealthHandler(t *testing.T) {
 	defer closeFn()
 
 	// Test /healthz
+	raw := readinessCheck(t, c, "/healthz", "")
+	// assert the raw contains `[+]etcd-override-0 ok`
+	if !strings.Contains(string(raw), "[+]etcd-override-0 ok") {
+		t.Errorf("Health check result should contain etcd-override-0 ok. Raw: %v", string(raw))
+	}
+
+	// Test /healthz?exclude=etcd group exclude
+	raw = readinessCheck(t, c, "/healthz", "etcd")
+	// assert the raw does not contain `[+]etcd-override-0 ok`
+	if strings.Contains(string(raw), "[+]etcd-override-0 ok") {
+		t.Errorf("Health check result should not contain etcd-override-0 ok. Raw: %v", string(raw))
+	}
+	if strings.Contains(string(raw), "[+]etcd ok") {
+		t.Errorf("Health check result should not contain etcd ok. Raw: %v", string(raw))
+	}
+
+	// Test /healthz?exclude=etcd-override-0 group exclude
+	raw = readinessCheck(t, c, "/healthz", "etcd-override-0")
+	if strings.Contains(string(raw), "[+]etcd-override-0 ok") {
+		t.Errorf("Health check result should not contain etcd-override-0 ok. Raw: %v", string(raw))
+	}
+	if !strings.Contains(string(raw), "[+]etcd ok") {
+		t.Errorf("Health check result should contain etcd ok. Raw: %v", string(raw))
+	}
+}
+
+func readinessCheck(t *testing.T, c kubernetes.Interface, path string, exclude string) []byte {
 	var statusCode int
-	req := c.CoreV1().RESTClient().Get().AbsPath("/healthz")
+	req := c.CoreV1().RESTClient().Get().AbsPath(path)
 	req.Param("verbose", "true")
+	if exclude != "" {
+		req.Param("exclude", exclude)
+	}
 	result := req.Do(context.TODO())
 	result.StatusCode(&statusCode)
 	if statusCode == 200 {
@@ -47,8 +78,6 @@ func TestHealthHandler(t *testing.T) {
 		t.Errorf("Failed to get health check result: %v", err)
 	}
 	t.Logf("Health check result: %v", string(raw))
-	// assert the raw contains `[+]etcd-override ok`
-	if !strings.Contains(string(raw), "[+]etcd-override ok") {
-		t.Errorf("Health check result does not contain etcd-override ok")
-	}
+
+	return raw
 }
