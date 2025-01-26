@@ -14922,6 +14922,19 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1alpha3.DeviceCapacity": {
+      "description": "DeviceCapacity describes a quantity associated with a device.",
+      "properties": {
+        "value": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
+          "description": "Value defines how much of a certain device capacity is available."
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.resource.v1alpha3.DeviceClaim": {
       "description": "DeviceClaim defines how to request devices with a ResourceClaim.",
       "properties": {
@@ -15087,6 +15100,65 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1alpha3.DevicePatch": {
+      "description": "DevicePatch selects one or more devices by class, driver, pool, device names and/or CEL selectors. All of these criteria must be satisfied by a device, otherwise it is ignored by the patch. A DevicePatch with no selection criteria is valid and matches all devices.",
+      "properties": {
+        "attributes": {
+          "additionalProperties": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NullableDeviceAttribute"
+          },
+          "description": "Attributes defines the set of attributes to patch for matching devices. The name of each attribute must be unique in that set and include the domain prefix.\n\nIn contrast to attributes in a ResourceSlice, entries here are allowed to be marked as empty by setting their null field. Such entries remove the corresponding attribute in a ResourceSlice, if there is one, instead of overriding it. Because entries get removed and are not allowed in slices, CEL expressions do not need need to deal with null values.\n\nThe maximum number of attributes and capacities in the DevicePatch combined is 32. This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes feature gate.",
+          "type": "object"
+        },
+        "capacity": {
+          "additionalProperties": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceCapacity"
+          },
+          "description": "Capacity defines the set of capacities to patch for matching devices. The name of each capacity must be unique in that set and include the domain prefix.\n\nRemoving a capacity is not supported. It can be reduced to 0 instead.\n\nThe maximum number of attributes and capacities in the DevicePatch combined is 32. This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes feature gate.",
+          "type": "object"
+        },
+        "filter": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DevicePatchFilter",
+          "description": "Filter defines which device(s) the patch is applied to."
+        },
+        "priority": {
+          "description": "If a ResourceSlice and a DevicePatch define the same attribute or capacity, the value of the DevicePatch is used. If multiple different DevicePatches match the same device, then the one with the highest priority wins. If the priorities are the same, it is non-deterministic which patch is used.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha3.DevicePatchFilter": {
+      "description": "DevicePatchFilter defines which device(s) a [DevicePatch] applies to.",
+      "properties": {
+        "device": {
+          "description": "If device is set, only devices with that name are patched. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
+          "type": "string"
+        },
+        "deviceClass": {
+          "description": "If DeviceClassName is set, the selectors defined there must be satisfied by a device to be patched. This field corresponds to class.metadata.name.",
+          "type": "string"
+        },
+        "driver": {
+          "description": "If driver is set, only devices from that driver are patched. This fields corresponds to slice.spec.driver.",
+          "type": "string"
+        },
+        "pool": {
+          "description": "If pool is set, only devices in that pool are patched.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
+          "type": "string"
+        },
+        "selectors": {
+          "description": "Selectors define criteria which must be satisfied by a device to be patched. All selectors must be satisfied.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceSelector"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.resource.v1alpha3.DeviceRequest": {
       "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
       "properties": {
@@ -15186,6 +15258,37 @@
           },
           "type": "array",
           "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha3.NullValue": {
+      "description": "NullValue denotes the value of an attribute to be removed by a [NullableDeviceAttribute].",
+      "type": "object"
+    },
+    "io.k8s.api.resource.v1alpha3.NullableDeviceAttribute": {
+      "description": "NullableDeviceAttribute must have exactly one field set. It has the exact same fields as a DeviceAttribute plus `null` as an additional alternative.",
+      "properties": {
+        "bool": {
+          "description": "BoolValue is a true/false value.",
+          "type": "boolean"
+        },
+        "int": {
+          "description": "IntValue is a number.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "null": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.NullValue",
+          "description": "NullValue, if set, marks an intentionally empty attribute."
+        },
+        "string": {
+          "description": "StringValue is a string. Must not be longer than 64 characters.",
+          "type": "string"
+        },
+        "version": {
+          "description": "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
+          "type": "string"
         }
       },
       "type": "object"
@@ -15597,6 +15700,15 @@
     },
     "io.k8s.api.resource.v1alpha3.ResourceSlicePatchSpec": {
       "description": "ResourceSlicePatchSpec contains modifications to ResourceSlices.",
+      "properties": {
+        "devices": {
+          "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DevicePatch",
+          "description": "Devices defines how to patch device attributes and taints."
+        }
+      },
+      "required": [
+        "devices"
+      ],
       "type": "object"
     },
     "io.k8s.api.resource.v1alpha3.ResourceSliceSpec": {

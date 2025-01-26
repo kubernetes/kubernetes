@@ -32,4 +32,24 @@ metadata:
   resourceVersion: resourceVersionValue
   selfLink: selfLinkValue
   uid: uidValue
-spec: {}
+spec:
+  devices:
+    attributes:
+      attributesKey:
+        bool: true
+        int: 2
+        "null": {}
+        string: stringValue
+        version: versionValue
+    capacity:
+      capacityKey:
+        value: "0"
+    filter:
+      device: deviceValue
+      deviceClass: deviceClassValue
+      driver: driverValue
+      pool: poolValue
+      selectors:
+      - cel:
+          expression: expressionValue
+    priority: 2

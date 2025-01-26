@@ -43,5 +43,36 @@
       }
     ]
   },
-  "spec": {}
+  "spec": {
+    "devices": {
+      "filter": {
+        "deviceClass": "deviceClassValue",
+        "driver": "driverValue",
+        "pool": "poolValue",
+        "device": "deviceValue",
+        "selectors": [
+          {
+            "cel": {
+              "expression": "expressionValue"
+            }
+          }
+        ]
+      },
+      "priority": 2,
+      "attributes": {
+        "attributesKey": {
+          "int": 2,
+          "bool": true,
+          "string": "stringValue",
+          "version": "versionValue",
+          "null": {}
+        }
+      },
+      "capacity": {
+        "capacityKey": {
+          "value": "0"
+        }
+      }
+    }
+  }
 }
