@@ -217,7 +217,6 @@ type priorityQueueOptions struct {
 	clock                             clock.WithTicker
 	podInitialBackoffDuration         time.Duration
 	podMaxBackoffDuration             time.Duration
-	podMaxInUnschedulablePodsDuration time.Duration
 	podLister                         listersv1.PodLister
 	metricsRecorder                   metrics.MetricAsyncRecorder
 	pluginMetricsSamplePercent        int
@@ -253,13 +252,6 @@ func WithPodMaxBackoffDuration(duration time.Duration) Option {
 func WithPodLister(pl listersv1.PodLister) Option {
 	return func(o *priorityQueueOptions) {
 		o.podLister = pl
-	}
-}
-
-// WithPodMaxInUnschedulablePodsDuration sets podMaxInUnschedulablePodsDuration for PriorityQueue.
-func WithPodMaxInUnschedulablePodsDuration(duration time.Duration) Option {
-	return func(o *priorityQueueOptions) {
-		o.podMaxInUnschedulablePodsDuration = duration
 	}
 }
 
@@ -301,7 +293,6 @@ var defaultPriorityQueueOptions = priorityQueueOptions{
 	clock:                             clock.RealClock{},
 	podInitialBackoffDuration:         DefaultPodInitialBackoffDuration,
 	podMaxBackoffDuration:             DefaultPodMaxBackoffDuration,
-	podMaxInUnschedulablePodsDuration: DefaultPodMaxInUnschedulablePodsDuration,
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
@@ -338,7 +329,7 @@ func NewPriorityQueue(
 	pq := &PriorityQueue{
 		clock:                             options.clock,
 		stop:                              make(chan struct{}),
-		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
+		podMaxInUnschedulablePodsDuration: DefaultPodMaxInUnschedulablePodsDuration,
 		backoffQ:                          backoffQ,
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,

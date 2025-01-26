@@ -126,7 +126,6 @@ type schedulerOptions struct {
 	percentageOfNodesToScore          int32
 	podInitialBackoffSeconds          int64
 	podMaxBackoffSeconds              int64
-	podMaxInUnschedulablePodsDuration time.Duration
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
@@ -217,13 +216,6 @@ func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
 	}
 }
 
-// WithPodMaxInUnschedulablePodsDuration sets podMaxInUnschedulablePodsDuration for PriorityQueue.
-func WithPodMaxInUnschedulablePodsDuration(duration time.Duration) Option {
-	return func(o *schedulerOptions) {
-		o.podMaxInUnschedulablePodsDuration = duration
-	}
-}
-
 // WithExtenders sets extenders for the Scheduler
 func WithExtenders(e ...schedulerapi.Extender) Option {
 	return func(o *schedulerOptions) {
@@ -253,7 +245,6 @@ var defaultSchedulerOptions = schedulerOptions{
 	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
 	podInitialBackoffSeconds:          int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
 	parallelism:                       int32(parallelize.DefaultParallelism),
 	// Ideally we would statically set the default profile here, but we can't because
 	// creating the default profile may require testing feature gates, which may get
@@ -380,7 +371,6 @@ func New(ctx context.Context,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(options.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(options.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodLister(podLister),
-		internalqueue.WithPodMaxInUnschedulablePodsDuration(options.podMaxInUnschedulablePodsDuration),
 		internalqueue.WithPreEnqueuePluginMap(preEnqueuePluginMap),
 		internalqueue.WithQueueingHintMapPerProfile(queueingHintsPerProfile),
 		internalqueue.WithPluginMetricsSamplePercent(pluginMetricsSamplePercent),
