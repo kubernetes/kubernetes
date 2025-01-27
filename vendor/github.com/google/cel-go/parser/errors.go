@@ -15,8 +15,6 @@
 package parser
 
 import (
-	"fmt"
-
 	"github.com/google/cel-go/common"
 )
 
@@ -31,11 +29,11 @@ func (e *parseErrors) errorCount() int {
 }
 
 func (e *parseErrors) internalError(message string) {
-	e.errs.ReportErrorAtID(0, common.NoLocation, message)
+	e.errs.ReportErrorAtID(0, common.NoLocation, "%s", message)
 }
 
 func (e *parseErrors) syntaxError(l common.Location, message string) {
-	e.errs.ReportErrorAtID(0, l, fmt.Sprintf("Syntax error: %s", message))
+	e.errs.ReportErrorAtID(0, l, "Syntax error: %s", message)
 }
 
 func (e *parseErrors) reportErrorAtID(id int64, l common.Location, message string, args ...any) {

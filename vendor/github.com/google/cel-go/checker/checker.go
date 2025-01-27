@@ -529,9 +529,15 @@ func (c *checker) checkComprehension(e ast.Expr) {
 		c.isAssignable(types.DynType, rangeType)
 		// Set the range iteration variable to type DYN as well.
 		varType = types.DynType
+		if comp.HasIterVar2() {
+			var2Type = types.DynType
+		}
 	default:
 		c.errors.notAComprehensionRange(comp.IterRange().ID(), c.location(comp.IterRange()), rangeType)
 		varType = types.ErrorType
+		if comp.HasIterVar2() {
+			var2Type = types.ErrorType
+		}
 	}
 
 	// Create a block scope for the loop.

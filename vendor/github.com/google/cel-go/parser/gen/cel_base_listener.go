@@ -1,4 +1,4 @@
-// Code generated from /usr/local/google/home/tswadell/go/src/github.com/google/cel-go/parser/gen/CEL.g4 by ANTLR 4.13.1. DO NOT EDIT.
+// Code generated from /usr/local/google/home/jdtatum/github/cel-go/parser/gen/CEL.g4 by ANTLR 4.13.1. DO NOT EDIT.
 
 package gen // CEL
 import "github.com/antlr4-go/antlr/v4"
@@ -98,11 +98,17 @@ func (s *BaseCELListener) EnterIndex(ctx *IndexContext) {}
 // ExitIndex is called when production Index is exited.
 func (s *BaseCELListener) ExitIndex(ctx *IndexContext) {}
 
-// EnterIdentOrGlobalCall is called when production IdentOrGlobalCall is entered.
-func (s *BaseCELListener) EnterIdentOrGlobalCall(ctx *IdentOrGlobalCallContext) {}
+// EnterIdent is called when production Ident is entered.
+func (s *BaseCELListener) EnterIdent(ctx *IdentContext) {}
 
-// ExitIdentOrGlobalCall is called when production IdentOrGlobalCall is exited.
-func (s *BaseCELListener) ExitIdentOrGlobalCall(ctx *IdentOrGlobalCallContext) {}
+// ExitIdent is called when production Ident is exited.
+func (s *BaseCELListener) ExitIdent(ctx *IdentContext) {}
+
+// EnterGlobalCall is called when production GlobalCall is entered.
+func (s *BaseCELListener) EnterGlobalCall(ctx *GlobalCallContext) {}
+
+// ExitGlobalCall is called when production GlobalCall is exited.
+func (s *BaseCELListener) ExitGlobalCall(ctx *GlobalCallContext) {}
 
 // EnterNested is called when production Nested is entered.
 func (s *BaseCELListener) EnterNested(ctx *NestedContext) {}
@@ -163,6 +169,18 @@ func (s *BaseCELListener) EnterMapInitializerList(ctx *MapInitializerListContext
 
 // ExitMapInitializerList is called when production mapInitializerList is exited.
 func (s *BaseCELListener) ExitMapInitializerList(ctx *MapInitializerListContext) {}
+
+// EnterSimpleIdentifier is called when production SimpleIdentifier is entered.
+func (s *BaseCELListener) EnterSimpleIdentifier(ctx *SimpleIdentifierContext) {}
+
+// ExitSimpleIdentifier is called when production SimpleIdentifier is exited.
+func (s *BaseCELListener) ExitSimpleIdentifier(ctx *SimpleIdentifierContext) {}
+
+// EnterEscapedIdentifier is called when production EscapedIdentifier is entered.
+func (s *BaseCELListener) EnterEscapedIdentifier(ctx *EscapedIdentifierContext) {}
+
+// ExitEscapedIdentifier is called when production EscapedIdentifier is exited.
+func (s *BaseCELListener) ExitEscapedIdentifier(ctx *EscapedIdentifierContext) {}
 
 // EnterOptExpr is called when production optExpr is entered.
 func (s *BaseCELListener) EnterOptExpr(ctx *OptExprContext) {}

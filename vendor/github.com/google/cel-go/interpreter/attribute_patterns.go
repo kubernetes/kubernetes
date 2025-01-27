@@ -358,7 +358,7 @@ func (m *attributeMatcher) AddQualifier(qual Qualifier) (Attribute, error) {
 func (m *attributeMatcher) Resolve(vars Activation) (any, error) {
 	id := m.NamespacedAttribute.ID()
 	// Bug in how partial activation is resolved, should search parents as well.
-	partial, isPartial := toPartialActivation(vars)
+	partial, isPartial := asPartialActivation(vars)
 	if isPartial {
 		unk, err := m.fac.matchesUnknownPatterns(
 			partial,
@@ -383,15 +383,4 @@ func (m *attributeMatcher) Qualify(vars Activation, obj any) (any, error) {
 // QualifyIfPresent is an implementation of the Qualifier interface method.
 func (m *attributeMatcher) QualifyIfPresent(vars Activation, obj any, presenceOnly bool) (any, bool, error) {
 	return attrQualifyIfPresent(m.fac, vars, obj, m, presenceOnly)
-}
-
-func toPartialActivation(vars Activation) (PartialActivation, bool) {
-	pv, ok := vars.(PartialActivation)
-	if ok {
-		return pv, true
-	}
-	if vars.Parent() != nil {
-		return toPartialActivation(vars.Parent())
-	}
-	return nil, false
 }
