@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -53,7 +54,7 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, in
 			allocatedDevices:    newAllocatedDevices(logger),
 			logger:              logger,
 		},
-		resourceSliceLister: &resourceSliceLister{sliceLister: informerFactory.Resource().V1beta1().ResourceSlices().Lister()},
+		resourceSliceLister: &resourceSliceLister{tracker: resourceslicetracker.NewTracker(informerFactory)},
 		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1beta1().DeviceClasses().Lister()},
 	}
 
@@ -79,11 +80,11 @@ func (s *DefaultDRAManager) DeviceClasses() framework.DeviceClassLister {
 var _ framework.ResourceSliceLister = &resourceSliceLister{}
 
 type resourceSliceLister struct {
-	sliceLister resourcelisters.ResourceSliceLister
+	tracker *resourceslicetracker.Tracker
 }
 
 func (l *resourceSliceLister) List() ([]*resourceapi.ResourceSlice, error) {
-	return l.sliceLister.List(labels.Everything())
+	return l.tracker.ListPatchedResourceSlices(context.TODO())
 }
 
 var _ framework.DeviceClassLister = &deviceClassLister{}
