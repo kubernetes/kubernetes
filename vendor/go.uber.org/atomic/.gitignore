@@ -1,0 +1,12 @@
+/bin
+.DS_Store
+/vendor
+cover.html
+cover.out
+lint.log
+
+# Binaries
+*.test
+
+# Profiling output
+*.prof
