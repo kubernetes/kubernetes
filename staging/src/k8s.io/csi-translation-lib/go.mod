@@ -10,8 +10,8 @@ godebug winsymlink=0
 
 require (
 	github.com/stretchr/testify v1.9.0
-	k8s.io/api v0.32.1
-	k8s.io/apimachinery v0.32.1
+	k8s.io/api v0.0.0
+	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.130.1
 )
 
