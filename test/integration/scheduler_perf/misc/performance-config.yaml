@@ -74,6 +74,14 @@
       initNodes: 5000
       initPods: 1000
       measurePods: 10000
+  - name: 5000Nodes_50000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
 
 # This test case simulates the scheduling of daemonset.
 # https://github.com/kubernetes/kubernetes/issues/124709
@@ -252,6 +260,73 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 5000
+
+# This test case simulates the scheduling of pods with service.
+# It benchmarks default PodTopologySpread constraints that calculate the label selector from services.
+- name: DefaultTopologySpreading
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["moon-1", "moon-2", "moon-3"]
+  - opcode: createAny
+    namespace: service-ns
+    templatePath: ../templates/service.yaml
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-default.yaml
+  - opcode: createPods
+    namespace: service-ns
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-with-label.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 1000
+      measurePods: 1000
+  - name: 5000Nodes_10000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 10000
+  - name: 5000Nodes_50000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
+  - name: 5000Nodes_50000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
 
 - name: PreemptionBasic
   workloadTemplate:
