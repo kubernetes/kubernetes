@@ -243,7 +243,7 @@ func (l *baseList) Equal(other ref.Val) ref.Val {
 func (l *baseList) Get(index ref.Val) ref.Val {
 	ind, err := IndexOrError(index)
 	if err != nil {
-		return ValOrErr(index, err.Error())
+		return ValOrErr(index, "%v", err)
 	}
 	if ind < 0 || ind >= l.size {
 		return NewErr("index '%d' out of range in list size '%d'", ind, l.Size())
@@ -427,7 +427,7 @@ func (l *concatList) Equal(other ref.Val) ref.Val {
 func (l *concatList) Get(index ref.Val) ref.Val {
 	ind, err := IndexOrError(index)
 	if err != nil {
-		return ValOrErr(index, err.Error())
+		return ValOrErr(index, "%v", err)
 	}
 	i := Int(ind)
 	if i < l.prevList.Size().(Int) {
