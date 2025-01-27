@@ -5644,6 +5644,11 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	var newContainers []core.Container
 	for ix, container := range originalCPUMemPodSpec.Containers {
 		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
+		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.Containers[ix]) {
+			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
+			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
+			allErrs = append(allErrs, errs)
+		}
 		newContainers = append(newContainers, container)
 	}
 	originalCPUMemPodSpec.Containers = newContainers
@@ -5676,8 +5681,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec, oldPod.Spec) {
 		// This likely means that the user has made changes to resources other than CPU and Memory.
-		specDiff := cmp.Diff(oldPod.Spec, originalCPUMemPodSpec)
-		errs := field.Forbidden(specPath, fmt.Sprintf("only cpu and memory resources are mutable\n%v", specDiff))
+		errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
 		allErrs = append(allErrs, errs)
 	}
 	return allErrs
