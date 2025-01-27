@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptrace"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/oauth2"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -68,19 +70,16 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 	return rt, nil
 }
 
-// DebugWrappers wraps a round tripper and logs based on the current log level.
+// DebugWrappers potentially wraps a round tripper with a wrapper that logs
+// based on the log level in the context of each individual request.
+//
+// At the moment, wrapping depends on the global log verbosity and is done
+// if that verbosity is >= 6. This may change in the future.
 func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
-	switch {
-	case bool(klog.V(9).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugCurlCommand, DebugURLTiming, DebugDetailedTiming, DebugResponseHeaders)
-	case bool(klog.V(8).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugJustURL, DebugRequestHeaders, DebugResponseStatus, DebugResponseHeaders)
-	case bool(klog.V(7).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugJustURL, DebugRequestHeaders, DebugResponseStatus)
-	case bool(klog.V(6).Enabled()):
-		rt = NewDebuggingRoundTripper(rt, DebugURLTiming)
+	//nolint:logcheck // The actual logging is done with a different logger, so only checking here is okay.
+	if klog.V(6).Enabled() {
+		rt = NewDebuggingRoundTripper(rt, DebugByContext)
 	}
-
 	return rt
 }
 
@@ -380,14 +379,17 @@ func (r *requestInfo) toCurl() string {
 		}
 	}
 
-	return fmt.Sprintf("curl -v -X%s %s '%s'", r.RequestVerb, headers, r.RequestURL)
+	// Newline at the end makes this look better in the text log output (the
+	// only usage of this method) because it becomes a multi-line string with
+	// no quoting.
+	return fmt.Sprintf("curl -v -X%s %s '%s'\n", r.RequestVerb, headers, r.RequestURL)
 }
 
 // debuggingRoundTripper will display information about the requests passing
 // through it based on what is configured
 type debuggingRoundTripper struct {
 	delegatedRoundTripper http.RoundTripper
-	levels                map[DebugLevel]bool
+	levels                int
 }
 
 var _ utilnet.RoundTripperWrapper = &debuggingRoundTripper{}
@@ -412,6 +414,26 @@ const (
 	DebugResponseHeaders
 	// DebugDetailedTiming will add to the debug output the duration of the HTTP requests events.
 	DebugDetailedTiming
+	// DebugByContext will add any of the above depending on the verbosity of the per-request logger obtained from the requests context.
+	//
+	// Can be combined in NewDebuggingRoundTripper with some of the other options, in which case the
+	// debug roundtripper will always log what is requested there plus the information that gets
+	// enabled by the context's log verbosity.
+	DebugByContext
+)
+
+// Different log levels include different sets of information.
+//
+// Not exported because the exact content of log messages is not part
+// of of the package API.
+const (
+	levelsV6 = (1 << DebugURLTiming)
+	// Logging *less* information for the response at level 7 compared to 6 replicates prior behavior:
+	//  https://github.com/kubernetes/kubernetes/blob/2b472fe4690c83a2b343995f88050b2a3e9ff0fa/staging/src/k8s.io/client-go/transport/round_trippers.go#L79
+	// Presumably that was done because verb and URL are already in the request log entry.
+	levelsV7 = (1 << DebugJustURL) | (1 << DebugRequestHeaders) | (1 << DebugResponseStatus)
+	levelsV8 = (1 << DebugJustURL) | (1 << DebugRequestHeaders) | (1 << DebugResponseStatus) | (1 << DebugResponseHeaders)
+	levelsV9 = (1 << DebugCurlCommand) | (1 << DebugURLTiming) | (1 << DebugDetailedTiming) | (1 << DebugResponseHeaders)
 )
 
 // NewDebuggingRoundTripper allows to display in the logs output debug information
@@ -419,10 +441,9 @@ const (
 func NewDebuggingRoundTripper(rt http.RoundTripper, levels ...DebugLevel) http.RoundTripper {
 	drt := &debuggingRoundTripper{
 		delegatedRoundTripper: rt,
-		levels:                make(map[DebugLevel]bool, len(levels)),
 	}
 	for _, v := range levels {
-		drt.levels[v] = true
+		drt.levels |= 1 << v
 	}
 	return drt
 }
@@ -464,27 +485,51 @@ func maskValue(key string, value string) string {
 }
 
 func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	logger := klog.FromContext(req.Context())
+	levels := rt.levels
+
+	// When logging depends on the context, it uses the verbosity of the per-context logger
+	// and a hard-coded mapping of verbosity to debug details. Otherwise all messages
+	// are logged as V(0).
+	if levels&(1<<DebugByContext) != 0 {
+		if loggerV := logger.V(9); loggerV.Enabled() {
+			logger = loggerV
+			// The curl command replaces logging of the URL.
+			levels |= levelsV9
+		} else if loggerV := logger.V(8); loggerV.Enabled() {
+			logger = loggerV
+			levels |= levelsV8
+		} else if loggerV := logger.V(7); loggerV.Enabled() {
+			logger = loggerV
+			levels |= levelsV7
+		} else if loggerV := logger.V(6); loggerV.Enabled() {
+			logger = loggerV
+			levels |= levelsV6
+		}
+	}
+
 	reqInfo := newRequestInfo(req)
 
-	if rt.levels[DebugJustURL] {
-		klog.Infof("%s %s", reqInfo.RequestVerb, reqInfo.RequestURL)
+	kvs := make([]any, 0, 8) // Exactly large enough for all appends below.
+	if levels&(1<<DebugJustURL) != 0 {
+		kvs = append(kvs,
+			"verb", reqInfo.RequestVerb,
+			"url", reqInfo.RequestURL,
+		)
 	}
-	if rt.levels[DebugCurlCommand] {
-		klog.Infof("%s", reqInfo.toCurl())
+	if levels&(1<<DebugCurlCommand) != 0 {
+		kvs = append(kvs, "curlCommand", reqInfo.toCurl())
 	}
-	if rt.levels[DebugRequestHeaders] {
-		klog.Info("Request Headers:")
-		for key, values := range reqInfo.RequestHeaders {
-			for _, value := range values {
-				value = maskValue(key, value)
-				klog.Infof("    %s: %s", key, value)
-			}
-		}
+	if levels&(1<<DebugRequestHeaders) != 0 {
+		kvs = append(kvs, "headers", newHeadersMap(reqInfo.RequestHeaders))
+	}
+	if len(kvs) > 0 {
+		logger.Info("Request", kvs...)
 	}
 
 	startTime := time.Now()
 
-	if rt.levels[DebugDetailedTiming] {
+	if levels&(1<<DebugDetailedTiming) != 0 {
 		var getConn, dnsStart, dialStart, tlsStart, serverStart time.Time
 		var host string
 		trace := &httptrace.ClientTrace{
@@ -499,7 +544,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
 				reqInfo.DNSLookup = time.Since(dnsStart)
-				klog.Infof("HTTP Trace: DNS Lookup for %s resolved to %v", host, info.Addrs)
+				logger.Info("HTTP Trace: DNS Lookup resolved", "host", host, "address", info.Addrs)
 			},
 			// Dial
 			ConnectStart: func(network, addr string) {
@@ -512,9 +557,9 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 				defer reqInfo.muTrace.Unlock()
 				reqInfo.Dialing = time.Since(dialStart)
 				if err != nil {
-					klog.Infof("HTTP Trace: Dial to %s:%s failed: %v", network, addr, err)
+					logger.Info("HTTP Trace: Dial failed", "network", network, "address", addr, "err", err)
 				} else {
-					klog.Infof("HTTP Trace: Dial to %s:%s succeed", network, addr)
+					logger.Info("HTTP Trace: Dial succeed", "network", network, "address", addr)
 				}
 			},
 			// TLS
@@ -556,40 +601,83 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 
 	reqInfo.complete(response, err)
 
-	if rt.levels[DebugURLTiming] {
-		klog.Infof("%s %s %s in %d milliseconds", reqInfo.RequestVerb, reqInfo.RequestURL, reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
+	kvs = make([]any, 0, 20) // Exactly large enough for all appends below.
+	if levels&(1<<DebugURLTiming) != 0 {
+		kvs = append(kvs, "verb", reqInfo.RequestVerb, "url", reqInfo.RequestURL)
 	}
-	if rt.levels[DebugDetailedTiming] {
-		stats := ""
+	if levels&(1<<DebugURLTiming|1<<DebugResponseStatus) != 0 {
+		kvs = append(kvs, "status", reqInfo.ResponseStatus)
+	}
+	if levels&(1<<DebugResponseHeaders) != 0 {
+		kvs = append(kvs, "headers", newHeadersMap(reqInfo.ResponseHeaders))
+	}
+	if levels&(1<<DebugURLTiming|1<<DebugDetailedTiming|1<<DebugResponseStatus) != 0 {
+		kvs = append(kvs, "milliseconds", reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
+	}
+	if levels&(1<<DebugDetailedTiming) != 0 {
 		if !reqInfo.ConnectionReused {
-			stats += fmt.Sprintf(`DNSLookup %d ms Dial %d ms TLSHandshake %d ms`,
-				reqInfo.DNSLookup.Nanoseconds()/int64(time.Millisecond),
-				reqInfo.Dialing.Nanoseconds()/int64(time.Millisecond),
-				reqInfo.TLSHandshake.Nanoseconds()/int64(time.Millisecond),
+			kvs = append(kvs,
+				"dnsLookupMilliseconds", reqInfo.DNSLookup.Nanoseconds()/int64(time.Millisecond),
+				"dialMilliseconds", reqInfo.Dialing.Nanoseconds()/int64(time.Millisecond),
+				"tlsHandshakeMilliseconds", reqInfo.TLSHandshake.Nanoseconds()/int64(time.Millisecond),
 			)
 		} else {
-			stats += fmt.Sprintf(`GetConnection %d ms`, reqInfo.GetConnection.Nanoseconds()/int64(time.Millisecond))
+			kvs = append(kvs, "getConnectionMilliseconds", reqInfo.GetConnection.Nanoseconds()/int64(time.Millisecond))
 		}
 		if reqInfo.ServerProcessing != 0 {
-			stats += fmt.Sprintf(` ServerProcessing %d ms`, reqInfo.ServerProcessing.Nanoseconds()/int64(time.Millisecond))
+			kvs = append(kvs, "serverProcessingMilliseconds", reqInfo.ServerProcessing.Nanoseconds()/int64(time.Millisecond))
 		}
-		stats += fmt.Sprintf(` Duration %d ms`, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
-		klog.Infof("HTTP Statistics: %s", stats)
 	}
-
-	if rt.levels[DebugResponseStatus] {
-		klog.Infof("Response Status: %s in %d milliseconds", reqInfo.ResponseStatus, reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
-	}
-	if rt.levels[DebugResponseHeaders] {
-		klog.Info("Response Headers:")
-		for key, values := range reqInfo.ResponseHeaders {
-			for _, value := range values {
-				klog.Infof("    %s: %s", key, value)
-			}
-		}
+	if len(kvs) > 0 {
+		logger.Info("Response", kvs...)
 	}
 
 	return response, err
+}
+
+// headerMap formats headers sorted and across multiple lines with no quoting
+// when using string output and as JSON when using zapr.
+type headersMap http.Header
+
+// newHeadersMap masks all sensitive values. This has to be done before
+// passing the map to a logger because while in practice all loggers
+// either use String or MarshalLog, that is not guaranteed.
+func newHeadersMap(header http.Header) headersMap {
+	h := make(headersMap, len(header))
+	for key, values := range header {
+		maskedValues := make([]string, 0, len(values))
+		for _, value := range values {
+			maskedValues = append(maskedValues, maskValue(key, value))
+		}
+		h[key] = maskedValues
+	}
+	return h
+}
+
+var _ fmt.Stringer = headersMap{}
+var _ logr.Marshaler = headersMap{}
+
+func (h headersMap) String() string {
+	// The fixed size typically avoids memory allocations when it is large enough.
+	keys := make([]string, 0, 20)
+	for key := range h {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var buffer strings.Builder
+	for _, key := range keys {
+		for _, value := range h[key] {
+			_, _ = buffer.WriteString(key)
+			_, _ = buffer.WriteString(": ")
+			_, _ = buffer.WriteString(value)
+			_, _ = buffer.WriteString("\n")
+		}
+	}
+	return buffer.String()
+}
+
+func (h headersMap) MarshalLog() any {
+	return map[string][]string(h)
 }
 
 func (rt *debuggingRoundTripper) WrappedRoundTripper() http.RoundTripper {

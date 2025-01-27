@@ -647,13 +647,13 @@ metadata:
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
 
-				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterURL)))
+				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf(`verb="POST" url="https://%s/api/v1/namespaces/configmap-namespace/configmaps`, inClusterURL)))
 
 				ginkgo.By("creating an object not containing a namespace with in-cluster config")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=6 2>&1")
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf("POST https://%s/api/v1/namespaces/%s/configmaps", inClusterURL, f.Namespace.Name)))
+				gomega.Expect(err).To(gomega.ContainSubstring(fmt.Sprintf(`verb="POST" url="https://%s/api/v1/namespaces/%s/configmaps`, inClusterURL, f.Namespace.Name)))
 
 				ginkgo.By("trying to use kubectl with invalid token")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
@@ -661,27 +661,27 @@ metadata:
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(err).To(gomega.ContainSubstring("Response Status: 401 Unauthorized"))
+				gomega.Expect(err).To(gomega.ContainSubstring(`"Response" status="401 Unauthorized"`))
 
 				ginkgo.By("trying to use kubectl with invalid server")
 				_, err = e2eoutput.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
 				framework.Logf("got err %v", err)
 				gomega.Expect(err).To(gomega.HaveOccurred())
 				gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
-				gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
+				gomega.Expect(err).To(gomega.ContainSubstring(`verb="GET" url="http://invalid/api`))
 
 				ginkgo.By("trying to use kubectl with invalid namespace")
 				execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --namespace=invalid --v=6 2>&1")
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("No resources found"))
 				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(execOutput).To(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf("GET http[s]?://[\\[]?%s[\\]]?:%s/api/v1/namespaces/invalid/pods", inClusterHost, inClusterPort)))
+				gomega.Expect(execOutput).To(gomega.MatchRegexp(fmt.Sprintf(`verb="GET" url="http[s]?://[\[]?%s[\]]?:%s/api/v1/namespaces/invalid/pods`, inClusterHost, inClusterPort)))
 
 				ginkgo.By("trying to use kubectl with kubeconfig")
 				execOutput = e2eoutput.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --kubeconfig=/tmp/"+overrideKubeconfigName+" --v=6 2>&1")
 				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster namespace"))
 				gomega.Expect(execOutput).ToNot(gomega.ContainSubstring("Using in-cluster configuration"))
-				gomega.Expect(execOutput).To(gomega.ContainSubstring("GET https://kubernetes.default.svc:443/api/v1/namespaces/default/pods"))
+				gomega.Expect(execOutput).To(gomega.ContainSubstring(`verb="GET" url="https://kubernetes.default.svc:443/api/v1/namespaces/default/pods`))
 			})
 		})
 
