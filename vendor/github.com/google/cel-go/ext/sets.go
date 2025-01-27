@@ -77,11 +77,28 @@ import (
 //	sets.intersects([1], []) // false
 //	sets.intersects([1], [1, 2]) // true
 //	sets.intersects([[1], [2, 3]], [[1, 2], [2, 3.0]]) // true
-func Sets() cel.EnvOption {
-	return cel.Lib(setsLib{})
+func Sets(options ...SetsOption) cel.EnvOption {
+	l := &setsLib{}
+	for _, o := range options {
+		l = o(l)
+	}
+	return cel.Lib(l)
 }
 
-type setsLib struct{}
+// SetsOption declares a functional operator for configuring set extensions.
+type SetsOption func(*setsLib) *setsLib
+
+// SetsVersion sets the library version for set extensions.
+func SetsVersion(version uint32) SetsOption {
+	return func(lib *setsLib) *setsLib {
+		lib.version = version
+		return lib
+	}
+}
+
+type setsLib struct {
+	version uint32
+}
 
 // LibraryName implements the SingletonLibrary interface method.
 func (setsLib) LibraryName() string {

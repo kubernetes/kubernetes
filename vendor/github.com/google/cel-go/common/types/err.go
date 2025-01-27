@@ -62,6 +62,12 @@ func NewErr(format string, args ...any) ref.Val {
 	return &Err{error: fmt.Errorf(format, args...)}
 }
 
+// NewErrFromString creates a new Err with the provided message.
+// TODO: Audit the use of this function and standardize the error messages and codes.
+func NewErrFromString(message string) ref.Val {
+	return &Err{error: errors.New(message)}
+}
+
 // NewErrWithNodeID creates a new Err described by the format string and args.
 // TODO: Audit the use of this function and standardize the error messages and codes.
 func NewErrWithNodeID(id int64, format string, args ...any) ref.Val {
