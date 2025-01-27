@@ -968,7 +968,6 @@ spec:
 	// wait for condition to go away
 	t.Log("Wait for condition to disappear")
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		var err error
 		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -1534,8 +1533,7 @@ properties:
 			if len(tst.expectedViolations) == 0 {
 				// wait for condition to not appear
 				var cond *apiextensionsv1.CustomResourceDefinitionCondition
-				err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-					var err error
+				err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 					obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, betaCRD.Name, metav1.GetOptions{})
 					if err != nil {
 						return false, err
