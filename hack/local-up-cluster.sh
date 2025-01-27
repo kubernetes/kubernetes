@@ -156,6 +156,9 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 # Audit policy
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
+# dmesg command PID for cleanup
+DMESG_PID=${DMESG_PID:-""}
+
 # Stop right away if the build fails
 set -e
 
@@ -410,6 +413,9 @@ cleanup()
   if [[ "${PRESERVE_ETCD}" == "false" ]]; then
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
+
+  # Cleanup dmesg running in the background
+  [[ -n "${DMESG_PID-}" ]] && kill "$DMESG_PID"
 
   exit 0
 }
@@ -812,6 +818,7 @@ function wait_coredns_available(){
     # loop through and grab all things in dmesg
     dmesg > "${LOG_DIR}/dmesg.log"
     dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+    DMESG_PID=$!
   fi
 }
 
