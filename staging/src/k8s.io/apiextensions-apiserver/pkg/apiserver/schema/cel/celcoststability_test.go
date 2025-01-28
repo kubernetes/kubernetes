@@ -2022,7 +2022,7 @@ func TestCelEstimatedCostStability(t *testing.T) {
 				"optional.of('a').hasValue()":                         2,
 				"optional.of('a').or(optional.of('a')).hasValue()":    4, // or() is short-circuited
 				"optional.none().or(optional.of('a')).hasValue()":     4,
-				"optional.of('a').optMap(v, v == 'value').hasValue()": 17,
+				"optional.of('a').optMap(v, v == 'value').hasValue()": 18,
 				"self.obj.?field == optional.of('a')":                 uint64(1844674407370955268),
 				"self.obj.?absentField == optional.none()":            uint64(1844674407370955268),
 				"self.obj.?field.orValue('v') == 'a'":                 5,
