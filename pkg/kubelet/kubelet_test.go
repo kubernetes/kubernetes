@@ -2711,7 +2711,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		expectedAllocatedLims v1.ResourceList
 		expectedResize        v1.PodResizeStatus
 		expectBackoffReset    bool
-		goos                  string
 		annotations           map[string]string
 	}{
 		{
@@ -2780,14 +2779,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:        "",
-		},
-		{
-			name:                  "windows node, expect Infeasible",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
-			expectedResize:        v1.PodResizeStatusInfeasible,
-			goos:                  "windows",
 		},
 		{
 			name:                  "static pod, expect Infeasible",
@@ -2882,11 +2873,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	for _, tt := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
 			t.Run(tt.name, func(t *testing.T) {
-				oldGOOS := goos
-				defer func() { goos = oldGOOS }()
-				if tt.goos != "" {
-					goos = tt.goos
-				}
 				kubelet.statusManager = status.NewFakeManager()
 
 				var originalPod *v1.Pod
