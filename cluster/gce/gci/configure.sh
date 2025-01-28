@@ -373,7 +373,7 @@ EOF
   fi
 
   echo "Downloading crictl"
-  local -r crictl_path="https://storage.googleapis.com/k8s-artifacts-cri-tools/release/${crictl_version}"
+  local -r crictl_path="https://github.com/kubernetes-sigs/cri-tools/releases/download/${crictl_version}"
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
