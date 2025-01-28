@@ -486,7 +486,7 @@ func addUsage(first, second *uint64) *uint64 {
 	return &total
 }
 
-func makePodStorageStats(logger klog.Logger, s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo, resourceAnalyzer stats.ResourceAnalyzer, hostStatsProvider HostStatsProvider, isCRIStatsProvider bool) {
+func makePodStorageStats(logger klog.Logger, s *statsapi.PodStats, terminatedContainerStats []statsapi.ContainerStats, rootFsInfo *cadvisorapiv2.FsInfo, resourceAnalyzer stats.ResourceAnalyzer, hostStatsProvider HostStatsProvider, isCRIStatsProvider bool) {
 	podNs := s.PodRef.Namespace
 	podName := s.PodRef.Name
 	podUID := types.UID(s.PodRef.UID)
@@ -509,7 +509,11 @@ func makePodStorageStats(logger klog.Logger, s *statsapi.PodStats, rootFsInfo *c
 	if err != nil {
 		logger.V(6).Error(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podNs, podName))
 	}
-	s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, etcHostsStats, isCRIStatsProvider)
+	containers := s.Containers
+	if terminatedContainerStats != nil {
+		containers = append(containers, terminatedContainerStats...)
+	}
+	s.EphemeralStorage = calcEphemeralStorage(containers, ephemeralStats, rootFsInfo, logStats, etcHostsStats, isCRIStatsProvider)
 }
 
 func cadvisorPSIToStatsPSI(psi *cadvisorapiv1.PSIStats) *statsapi.PSIStats {
