@@ -176,6 +176,10 @@ func TestRegistrationHandler(t *testing.T) {
 			// Simulate one existing plugin A.
 			err := handler.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				tCtx.Logf("Removing plugin %s", pluginA)
+				handler.DeRegisterPlugin(pluginA, endpointA)
+			})
 
 			err = handler.ValidatePlugin(test.pluginName, test.endpoint, test.supportedServices)
 			if test.shouldError {
@@ -206,9 +210,10 @@ func TestRegistrationHandler(t *testing.T) {
 					assert.NoError(t, err, "recreate slice")
 				}
 
-				handler.DeRegisterPlugin(test.pluginName)
+				tCtx.Logf("Removing plugin %s", test.pluginName)
+				handler.DeRegisterPlugin(test.pluginName, test.endpoint)
 				// Nop.
-				handler.DeRegisterPlugin(test.pluginName)
+				handler.DeRegisterPlugin(test.pluginName, test.endpoint)
 
 				requireNoSlices()
 			})
