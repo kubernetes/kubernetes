@@ -1164,7 +1164,7 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(pod *v1.Pod, pod
 					}
 				}
 
-				if IsInPlacePodVerticalScalingAllowed(pod) && !m.computePodResizeAction(pod, i, true, status, changes) {
+				if !m.computePodResizeAction(pod, i, true, status, changes) {
 					// computePodResizeAction updates 'changes' if resize policy requires restarting this container
 					break
 				}
