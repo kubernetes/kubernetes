@@ -16,9 +16,13 @@ limitations under the License.
 
 package oom
 
-import v1 "k8s.io/api/core/v1"
+import (
+	"context"
+
+	v1 "k8s.io/api/core/v1"
+)
 
 // Watcher defines the interface of OOM watchers.
 type Watcher interface {
-	Start(ref *v1.ObjectReference) error
+	Start(ctx context.Context, ref *v1.ObjectReference) error
 }
