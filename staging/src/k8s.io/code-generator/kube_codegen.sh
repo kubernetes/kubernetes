@@ -368,7 +368,10 @@ function kube::codegen::gen_openapi() {
             "${input_pkgs[@]}"
     fi
 
-    touch "${report}" # in case it doesn't exist yet
+    if [ ! -e "${report}" ]; then
+        touch "${report}" # in case it doesn't exist yet
+    fi
+
     if ! diff -u "${report}" "${new_report}"; then
         echo -e "ERROR:"
         echo -e "\tAPI rule check failed for ${report}: new reported violations"
