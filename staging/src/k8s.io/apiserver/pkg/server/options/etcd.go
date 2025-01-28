@@ -399,6 +399,10 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
 	}
 
+	if ret.StorageObjectCountTracker == nil {
+		ret.StorageObjectCountTracker = storageConfig.StorageObjectCountTracker
+	}
+
 	if f.Options.EnableWatchCache {
 		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
 		if err != nil {
