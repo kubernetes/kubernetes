@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/oauth/v1"
-	oauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	applyconfigurationsoauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
 	scheme "github.com/openshift/client-go/oauth/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type OAuthClientAuthorizationsGetter interface {
 
 // OAuthClientAuthorizationInterface has methods to work with OAuthClientAuthorization resources.
 type OAuthClientAuthorizationInterface interface {
-	Create(ctx context.Context, oAuthClientAuthorization *v1.OAuthClientAuthorization, opts metav1.CreateOptions) (*v1.OAuthClientAuthorization, error)
-	Update(ctx context.Context, oAuthClientAuthorization *v1.OAuthClientAuthorization, opts metav1.UpdateOptions) (*v1.OAuthClientAuthorization, error)
+	Create(ctx context.Context, oAuthClientAuthorization *oauthv1.OAuthClientAuthorization, opts metav1.CreateOptions) (*oauthv1.OAuthClientAuthorization, error)
+	Update(ctx context.Context, oAuthClientAuthorization *oauthv1.OAuthClientAuthorization, opts metav1.UpdateOptions) (*oauthv1.OAuthClientAuthorization, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.OAuthClientAuthorization, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.OAuthClientAuthorizationList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*oauthv1.OAuthClientAuthorization, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*oauthv1.OAuthClientAuthorizationList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OAuthClientAuthorization, err error)
-	Apply(ctx context.Context, oAuthClientAuthorization *oauthv1.OAuthClientAuthorizationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuthClientAuthorization, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *oauthv1.OAuthClientAuthorization, err error)
+	Apply(ctx context.Context, oAuthClientAuthorization *applyconfigurationsoauthv1.OAuthClientAuthorizationApplyConfiguration, opts metav1.ApplyOptions) (result *oauthv1.OAuthClientAuthorization, err error)
 	OAuthClientAuthorizationExpansion
 }
 
 // oAuthClientAuthorizations implements OAuthClientAuthorizationInterface
 type oAuthClientAuthorizations struct {
-	*gentype.ClientWithListAndApply[*v1.OAuthClientAuthorization, *v1.OAuthClientAuthorizationList, *oauthv1.OAuthClientAuthorizationApplyConfiguration]
+	*gentype.ClientWithListAndApply[*oauthv1.OAuthClientAuthorization, *oauthv1.OAuthClientAuthorizationList, *applyconfigurationsoauthv1.OAuthClientAuthorizationApplyConfiguration]
 }
 
 // newOAuthClientAuthorizations returns a OAuthClientAuthorizations
 func newOAuthClientAuthorizations(c *OauthV1Client) *oAuthClientAuthorizations {
 	return &oAuthClientAuthorizations{
-		gentype.NewClientWithListAndApply[*v1.OAuthClientAuthorization, *v1.OAuthClientAuthorizationList, *oauthv1.OAuthClientAuthorizationApplyConfiguration](
+		gentype.NewClientWithListAndApply[*oauthv1.OAuthClientAuthorization, *oauthv1.OAuthClientAuthorizationList, *applyconfigurationsoauthv1.OAuthClientAuthorizationApplyConfiguration](
 			"oauthclientauthorizations",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.OAuthClientAuthorization { return &v1.OAuthClientAuthorization{} },
-			func() *v1.OAuthClientAuthorizationList { return &v1.OAuthClientAuthorizationList{} }),
+			func() *oauthv1.OAuthClientAuthorization { return &oauthv1.OAuthClientAuthorization{} },
+			func() *oauthv1.OAuthClientAuthorizationList { return &oauthv1.OAuthClientAuthorizationList{} },
+		),
 	}
 }

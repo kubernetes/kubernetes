@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/security/v1"
-	securityv1 "github.com/openshift/client-go/security/applyconfigurations/security/v1"
+	securityv1 "github.com/openshift/api/security/v1"
+	applyconfigurationssecurityv1 "github.com/openshift/client-go/security/applyconfigurations/security/v1"
 	scheme "github.com/openshift/client-go/security/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type SecurityContextConstraintsGetter interface {
 
 // SecurityContextConstraintsInterface has methods to work with SecurityContextConstraints resources.
 type SecurityContextConstraintsInterface interface {
-	Create(ctx context.Context, securityContextConstraints *v1.SecurityContextConstraints, opts metav1.CreateOptions) (*v1.SecurityContextConstraints, error)
-	Update(ctx context.Context, securityContextConstraints *v1.SecurityContextConstraints, opts metav1.UpdateOptions) (*v1.SecurityContextConstraints, error)
+	Create(ctx context.Context, securityContextConstraints *securityv1.SecurityContextConstraints, opts metav1.CreateOptions) (*securityv1.SecurityContextConstraints, error)
+	Update(ctx context.Context, securityContextConstraints *securityv1.SecurityContextConstraints, opts metav1.UpdateOptions) (*securityv1.SecurityContextConstraints, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.SecurityContextConstraints, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.SecurityContextConstraintsList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*securityv1.SecurityContextConstraints, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*securityv1.SecurityContextConstraintsList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.SecurityContextConstraints, err error)
-	Apply(ctx context.Context, securityContextConstraints *securityv1.SecurityContextConstraintsApplyConfiguration, opts metav1.ApplyOptions) (result *v1.SecurityContextConstraints, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *securityv1.SecurityContextConstraints, err error)
+	Apply(ctx context.Context, securityContextConstraints *applyconfigurationssecurityv1.SecurityContextConstraintsApplyConfiguration, opts metav1.ApplyOptions) (result *securityv1.SecurityContextConstraints, err error)
 	SecurityContextConstraintsExpansion
 }
 
 // securityContextConstraints implements SecurityContextConstraintsInterface
 type securityContextConstraints struct {
-	*gentype.ClientWithListAndApply[*v1.SecurityContextConstraints, *v1.SecurityContextConstraintsList, *securityv1.SecurityContextConstraintsApplyConfiguration]
+	*gentype.ClientWithListAndApply[*securityv1.SecurityContextConstraints, *securityv1.SecurityContextConstraintsList, *applyconfigurationssecurityv1.SecurityContextConstraintsApplyConfiguration]
 }
 
 // newSecurityContextConstraints returns a SecurityContextConstraints
 func newSecurityContextConstraints(c *SecurityV1Client) *securityContextConstraints {
 	return &securityContextConstraints{
-		gentype.NewClientWithListAndApply[*v1.SecurityContextConstraints, *v1.SecurityContextConstraintsList, *securityv1.SecurityContextConstraintsApplyConfiguration](
+		gentype.NewClientWithListAndApply[*securityv1.SecurityContextConstraints, *securityv1.SecurityContextConstraintsList, *applyconfigurationssecurityv1.SecurityContextConstraintsApplyConfiguration](
 			"securitycontextconstraints",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.SecurityContextConstraints { return &v1.SecurityContextConstraints{} },
-			func() *v1.SecurityContextConstraintsList { return &v1.SecurityContextConstraintsList{} }),
+			func() *securityv1.SecurityContextConstraints { return &securityv1.SecurityContextConstraints{} },
+			func() *securityv1.SecurityContextConstraintsList { return &securityv1.SecurityContextConstraintsList{} },
+		),
 	}
 }

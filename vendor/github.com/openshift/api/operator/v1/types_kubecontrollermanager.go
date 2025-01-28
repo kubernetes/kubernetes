@@ -25,7 +25,6 @@ type KubeControllerManager struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	// spec is the specification of the desired behavior of the Kubernetes Controller Manager
-	// +kubebuilder:validation:Required
 	// +required
 	Spec KubeControllerManagerSpec `json:"spec"`
 
@@ -63,6 +62,6 @@ type KubeControllerManagerList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 
-	// Items contains the items
+	// items contains the items
 	Items []KubeControllerManager `json:"items"`
 }

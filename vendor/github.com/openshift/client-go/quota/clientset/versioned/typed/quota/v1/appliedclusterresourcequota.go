@@ -3,11 +3,11 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
 	quotav1 "github.com/openshift/api/quota/v1"
 	scheme "github.com/openshift/client-go/quota/clientset/versioned/scheme"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
@@ -19,8 +19,8 @@ type AppliedClusterResourceQuotasGetter interface {
 
 // AppliedClusterResourceQuotaInterface has methods to work with AppliedClusterResourceQuota resources.
 type AppliedClusterResourceQuotaInterface interface {
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*quotav1.AppliedClusterResourceQuota, error)
-	List(ctx context.Context, opts v1.ListOptions) (*quotav1.AppliedClusterResourceQuotaList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*quotav1.AppliedClusterResourceQuota, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*quotav1.AppliedClusterResourceQuotaList, error)
 	AppliedClusterResourceQuotaExpansion
 }
 
@@ -38,6 +38,7 @@ func newAppliedClusterResourceQuotas(c *QuotaV1Client, namespace string) *applie
 			scheme.ParameterCodec,
 			namespace,
 			func() *quotav1.AppliedClusterResourceQuota { return &quotav1.AppliedClusterResourceQuota{} },
-			func() *quotav1.AppliedClusterResourceQuotaList { return &quotav1.AppliedClusterResourceQuotaList{} }),
+			func() *quotav1.AppliedClusterResourceQuotaList { return &quotav1.AppliedClusterResourceQuotaList{} },
+		),
 	}
 }

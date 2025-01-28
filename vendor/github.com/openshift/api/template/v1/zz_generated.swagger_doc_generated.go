@@ -33,9 +33,9 @@ func (BrokerTemplateInstanceList) SwaggerDoc() map[string]string {
 
 var map_BrokerTemplateInstanceSpec = map[string]string{
 	"":                 "BrokerTemplateInstanceSpec describes the state of a BrokerTemplateInstance.",
-	"templateInstance": "templateinstance is a reference to a TemplateInstance object residing in a namespace.",
+	"templateInstance": "templateInstance is a reference to a TemplateInstance object residing in a namespace.",
 	"secret":           "secret is a reference to a Secret object residing in a namespace, containing the necessary template parameters.",
-	"bindingIDs":       "bindingids is a list of 'binding_id's provided during successive bind calls to the template service broker.",
+	"bindingIDs":       "bindingIDs is a list of 'binding_id's provided during successive bind calls to the template service broker.",
 }
 
 func (BrokerTemplateInstanceSpec) SwaggerDoc() map[string]string {
@@ -44,12 +44,12 @@ func (BrokerTemplateInstanceSpec) SwaggerDoc() map[string]string {
 
 var map_Parameter = map[string]string{
 	"":            "Parameter defines a name/value variable that is to be processed during the Template to Config transformation.",
-	"name":        "Name must be set and it can be referenced in Template Items using ${PARAMETER_NAME}. Required.",
+	"name":        "name must be set and it can be referenced in Template Items using ${PARAMETER_NAME}. Required.",
 	"displayName": "Optional: The name that will show in UI instead of parameter 'Name'",
-	"description": "Description of a parameter. Optional.",
-	"value":       "Value holds the Parameter data. If specified, the generator will be ignored. The value replaces all occurrences of the Parameter ${Name} expression during the Template to Config transformation. Optional.",
+	"description": "description of a parameter. Optional.",
+	"value":       "value holds the Parameter data. If specified, the generator will be ignored. The value replaces all occurrences of the Parameter ${Name} expression during the Template to Config transformation. Optional.",
 	"generate":    "generate specifies the generator to be used to generate random string from an input value specified by From field. The result string is stored into Value field. If empty, no generator is being used, leaving the result Value untouched. Optional.\n\nThe only supported generator is \"expression\", which accepts a \"from\" value in the form of a simple regular expression containing the range expression \"[a-zA-Z0-9]\", and the length expression \"a{length}\".\n\nExamples:\n\nfrom             | value",
-	"from":        "From is an input value for the generator. Optional.",
+	"from":        "from is an input value for the generator. Optional.",
 	"required":    "Optional: Indicates the parameter must have a value.  Defaults to false.",
 }
 
@@ -83,11 +83,11 @@ func (TemplateInstance) SwaggerDoc() map[string]string {
 
 var map_TemplateInstanceCondition = map[string]string{
 	"":                   "TemplateInstanceCondition contains condition information for a TemplateInstance.",
-	"type":               "Type of the condition, currently Ready or InstantiateFailure.",
-	"status":             "Status of the condition, one of True, False or Unknown.",
-	"lastTransitionTime": "LastTransitionTime is the last time a condition status transitioned from one state to another.",
-	"reason":             "Reason is a brief machine readable explanation for the condition's last transition.",
-	"message":            "Message is a human readable description of the details of the last transition, complementing reason.",
+	"type":               "type of the condition, currently Ready or InstantiateFailure.",
+	"status":             "status of the condition, one of True, False or Unknown.",
+	"lastTransitionTime": "lastTransitionTime is the last time a condition status transitioned from one state to another.",
+	"reason":             "reason is a brief machine readable explanation for the condition's last transition.",
+	"message":            "message is a human readable description of the details of the last transition, complementing reason.",
 }
 
 func (TemplateInstanceCondition) SwaggerDoc() map[string]string {
@@ -139,7 +139,7 @@ func (TemplateInstanceSpec) SwaggerDoc() map[string]string {
 var map_TemplateInstanceStatus = map[string]string{
 	"":           "TemplateInstanceStatus describes the current state of a TemplateInstance.",
 	"conditions": "conditions represent the latest available observations of a TemplateInstance's current state.",
-	"objects":    "Objects references the objects created by the TemplateInstance.",
+	"objects":    "objects references the objects created by the TemplateInstance.",
 }
 
 func (TemplateInstanceStatus) SwaggerDoc() map[string]string {
@@ -149,7 +149,7 @@ func (TemplateInstanceStatus) SwaggerDoc() map[string]string {
 var map_TemplateList = map[string]string{
 	"":         "TemplateList is a list of Template objects.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"items":    "Items is a list of templates",
+	"items":    "items is a list of templates",
 }
 
 func (TemplateList) SwaggerDoc() map[string]string {

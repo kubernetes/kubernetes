@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // ImageDigestMirrorSets.
 type ImageDigestMirrorSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ImageDigestMirrorSetLister
+	Lister() configv1.ImageDigestMirrorSetLister
 }
 
 type imageDigestMirrorSetInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredImageDigestMirrorSetInformer(client versioned.Interface, resyncP
 				return client.ConfigV1().ImageDigestMirrorSets().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.ImageDigestMirrorSet{},
+		&apiconfigv1.ImageDigestMirrorSet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *imageDigestMirrorSetInformer) defaultInformer(client versioned.Interfac
 }
 
 func (f *imageDigestMirrorSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.ImageDigestMirrorSet{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.ImageDigestMirrorSet{}, f.defaultInformer)
 }
 
-func (f *imageDigestMirrorSetInformer) Lister() v1.ImageDigestMirrorSetLister {
-	return v1.NewImageDigestMirrorSetLister(f.Informer().GetIndexer())
+func (f *imageDigestMirrorSetInformer) Lister() configv1.ImageDigestMirrorSetLister {
+	return configv1.NewImageDigestMirrorSetLister(f.Informer().GetIndexer())
 }

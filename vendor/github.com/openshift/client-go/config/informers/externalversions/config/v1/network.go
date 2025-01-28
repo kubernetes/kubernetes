@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Networks.
 type NetworkInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.NetworkLister
+	Lister() configv1.NetworkLister
 }
 
 type networkInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredNetworkInformer(client versioned.Interface, resyncPeriod time.Du
 				return client.ConfigV1().Networks().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.Network{},
+		&apiconfigv1.Network{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *networkInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *networkInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.Network{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.Network{}, f.defaultInformer)
 }
 
-func (f *networkInformer) Lister() v1.NetworkLister {
-	return v1.NewNetworkLister(f.Informer().GetIndexer())
+func (f *networkInformer) Lister() configv1.NetworkLister {
+	return configv1.NewNetworkLister(f.Informer().GetIndexer())
 }

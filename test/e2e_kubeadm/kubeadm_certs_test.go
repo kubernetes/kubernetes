@@ -69,7 +69,7 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 		gomega.Expect(s.OwnerReferences).To(gomega.HaveLen(1), "%s should have one owner reference", kubeadmCertsSecretName)
 		ownRef := s.OwnerReferences[0]
 		gomega.Expect(ownRef.Kind).To(gomega.Equal("Secret"), "%s should be owned by a secret", kubeadmCertsSecretName)
-		gomega.Expect(*ownRef.BlockOwnerDeletion).To(gomega.BeTrue(), "%s should be deleted on owner deletion", kubeadmCertsSecretName)
+		gomega.Expect(*ownRef.BlockOwnerDeletion).To(gomega.BeTrueBecause("%s should be deleted on owner deletion", kubeadmCertsSecretName))
 
 		o := GetSecret(f.ClientSet, kubeSystemNamespace, ownRef.Name)
 		gomega.Expect(o.Type).To(gomega.Equal(corev1.SecretTypeBootstrapToken), "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)

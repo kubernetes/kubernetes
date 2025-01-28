@@ -123,7 +123,7 @@ func TestParsePolicyWithNoVersionOrKind(t *testing.T) {
 	defer os.Remove(f)
 
 	_, err = LoadPolicyFromFile(f)
-	assert.Contains(t, err.Error(), "unknown group version field")
+	assert.ErrorContains(t, err, "unknown group version field")
 }
 
 func TestParsePolicyWithUnknownField(t *testing.T) {

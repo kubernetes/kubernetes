@@ -16,8 +16,11 @@ package swag
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strconv"
 
 	"github.com/mailru/easyjson/jlexer"
@@ -48,7 +51,7 @@ func BytesToYAMLDoc(data []byte) (interface{}, error) {
 		return nil, err
 	}
 	if document.Kind != yaml.DocumentNode || len(document.Content) != 1 || document.Content[0].Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("only YAML documents that are objects are supported")
+		return nil, errors.New("only YAML documents that are objects are supported")
 	}
 	return &document, nil
 }
@@ -147,7 +150,7 @@ func yamlScalar(node *yaml.Node) (interface{}, error) {
 	case yamlTimestamp:
 		return node.Value, nil
 	case yamlNull:
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	default:
 		return nil, fmt.Errorf("YAML tag %q is not supported", node.LongTag())
 	}
@@ -245,7 +248,27 @@ func (s JSONMapSlice) MarshalYAML() (interface{}, error) {
 	return yaml.Marshal(&n)
 }
 
+func isNil(input interface{}) bool {
+	if input == nil {
+		return true
+	}
+	kind := reflect.TypeOf(input).Kind()
+	switch kind { //nolint:exhaustive
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Chan:
+		return reflect.ValueOf(input).IsNil()
+	default:
+		return false
+	}
+}
+
 func json2yaml(item interface{}) (*yaml.Node, error) {
+	if isNil(item) {
+		return &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Value: "null",
+		}, nil
+	}
+
 	switch val := item.(type) {
 	case JSONMapSlice:
 		var n yaml.Node
@@ -265,7 +288,14 @@ func json2yaml(item interface{}) (*yaml.Node, error) {
 	case map[string]interface{}:
 		var n yaml.Node
 		n.Kind = yaml.MappingNode
-		for k, v := range val {
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			v := val[k]
 			childNode, err := json2yaml(v)
 			if err != nil {
 				return nil, err
@@ -318,8 +348,9 @@ func json2yaml(item interface{}) (*yaml.Node, error) {
 			Tag:   yamlBoolScalar,
 			Value: strconv.FormatBool(val),
 		}, nil
+	default:
+		return nil, fmt.Errorf("unhandled type: %T", val)
 	}
-	return nil, nil
 }
 
 // JSONMapItem represents the value of a key in a JSON object held by JSONMapSlice

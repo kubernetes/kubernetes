@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/image/v1"
-	imagev1 "github.com/openshift/client-go/image/applyconfigurations/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
+	applyconfigurationsimagev1 "github.com/openshift/client-go/image/applyconfigurations/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,46 +22,47 @@ type ImageStreamsGetter interface {
 
 // ImageStreamInterface has methods to work with ImageStream resources.
 type ImageStreamInterface interface {
-	Create(ctx context.Context, imageStream *v1.ImageStream, opts metav1.CreateOptions) (*v1.ImageStream, error)
-	Update(ctx context.Context, imageStream *v1.ImageStream, opts metav1.UpdateOptions) (*v1.ImageStream, error)
+	Create(ctx context.Context, imageStream *imagev1.ImageStream, opts metav1.CreateOptions) (*imagev1.ImageStream, error)
+	Update(ctx context.Context, imageStream *imagev1.ImageStream, opts metav1.UpdateOptions) (*imagev1.ImageStream, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, imageStream *v1.ImageStream, opts metav1.UpdateOptions) (*v1.ImageStream, error)
+	UpdateStatus(ctx context.Context, imageStream *imagev1.ImageStream, opts metav1.UpdateOptions) (*imagev1.ImageStream, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ImageStream, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageStreamList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*imagev1.ImageStream, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*imagev1.ImageStreamList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageStream, err error)
-	Apply(ctx context.Context, imageStream *imagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageStream, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *imagev1.ImageStream, err error)
+	Apply(ctx context.Context, imageStream *applyconfigurationsimagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *imagev1.ImageStream, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, imageStream *imagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageStream, err error)
-	Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*v1.SecretList, error)
-	Layers(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*v1.ImageStreamLayers, error)
+	ApplyStatus(ctx context.Context, imageStream *applyconfigurationsimagev1.ImageStreamApplyConfiguration, opts metav1.ApplyOptions) (result *imagev1.ImageStream, err error)
+	Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*imagev1.SecretList, error)
+	Layers(ctx context.Context, imageStreamName string, options metav1.GetOptions) (*imagev1.ImageStreamLayers, error)
 
 	ImageStreamExpansion
 }
 
 // imageStreams implements ImageStreamInterface
 type imageStreams struct {
-	*gentype.ClientWithListAndApply[*v1.ImageStream, *v1.ImageStreamList, *imagev1.ImageStreamApplyConfiguration]
+	*gentype.ClientWithListAndApply[*imagev1.ImageStream, *imagev1.ImageStreamList, *applyconfigurationsimagev1.ImageStreamApplyConfiguration]
 }
 
 // newImageStreams returns a ImageStreams
 func newImageStreams(c *ImageV1Client, namespace string) *imageStreams {
 	return &imageStreams{
-		gentype.NewClientWithListAndApply[*v1.ImageStream, *v1.ImageStreamList, *imagev1.ImageStreamApplyConfiguration](
+		gentype.NewClientWithListAndApply[*imagev1.ImageStream, *imagev1.ImageStreamList, *applyconfigurationsimagev1.ImageStreamApplyConfiguration](
 			"imagestreams",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.ImageStream { return &v1.ImageStream{} },
-			func() *v1.ImageStreamList { return &v1.ImageStreamList{} }),
+			func() *imagev1.ImageStream { return &imagev1.ImageStream{} },
+			func() *imagev1.ImageStreamList { return &imagev1.ImageStreamList{} },
+		),
 	}
 }
 
-// Secrets takes name of the imageStream, and returns the corresponding v1.SecretList object, and an error if there is any.
-func (c *imageStreams) Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (result *v1.SecretList, err error) {
-	result = &v1.SecretList{}
+// Secrets takes name of the imageStream, and returns the corresponding imagev1.SecretList object, and an error if there is any.
+func (c *imageStreams) Secrets(ctx context.Context, imageStreamName string, options metav1.GetOptions) (result *imagev1.SecretList, err error) {
+	result = &imagev1.SecretList{}
 	err = c.GetClient().Get().
 		Namespace(c.GetNamespace()).
 		Resource("imagestreams").
@@ -73,9 +74,9 @@ func (c *imageStreams) Secrets(ctx context.Context, imageStreamName string, opti
 	return
 }
 
-// Layers takes name of the imageStream, and returns the corresponding v1.ImageStreamLayers object, and an error if there is any.
-func (c *imageStreams) Layers(ctx context.Context, imageStreamName string, options metav1.GetOptions) (result *v1.ImageStreamLayers, err error) {
-	result = &v1.ImageStreamLayers{}
+// Layers takes name of the imageStream, and returns the corresponding imagev1.ImageStreamLayers object, and an error if there is any.
+func (c *imageStreams) Layers(ctx context.Context, imageStreamName string, options metav1.GetOptions) (result *imagev1.ImageStreamLayers, err error) {
+	result = &imagev1.ImageStreamLayers{}
 	err = c.GetClient().Get().
 		Namespace(c.GetNamespace()).
 		Resource("imagestreams").

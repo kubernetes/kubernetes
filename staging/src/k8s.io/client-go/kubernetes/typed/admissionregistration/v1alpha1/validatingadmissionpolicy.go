@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
+	applyconfigurationsadmissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,42 @@ type ValidatingAdmissionPoliciesGetter interface {
 
 // ValidatingAdmissionPolicyInterface has methods to work with ValidatingAdmissionPolicy resources.
 type ValidatingAdmissionPolicyInterface interface {
-	Create(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.CreateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
-	Update(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
+	Create(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, opts v1.CreateOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicy, error)
+	Update(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicy, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, validatingAdmissionPolicy *v1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
+	UpdateStatus(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, opts v1.UpdateOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicy, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ValidatingAdmissionPolicy, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ValidatingAdmissionPolicyList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicy, error)
+	List(ctx context.Context, opts v1.ListOptions) (*admissionregistrationv1alpha1.ValidatingAdmissionPolicyList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ValidatingAdmissionPolicy, err error)
-	Apply(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, err error)
+	Apply(ctx context.Context, validatingAdmissionPolicy *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, validatingAdmissionPolicy *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ValidatingAdmissionPolicy, err error)
+	ApplyStatus(ctx context.Context, validatingAdmissionPolicy *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration, opts v1.ApplyOptions) (result *admissionregistrationv1alpha1.ValidatingAdmissionPolicy, err error)
 	ValidatingAdmissionPolicyExpansion
 }
 
 // validatingAdmissionPolicies implements ValidatingAdmissionPolicyInterface
 type validatingAdmissionPolicies struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.ValidatingAdmissionPolicy, *v1alpha1.ValidatingAdmissionPolicyList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration]
+	*gentype.ClientWithListAndApply[*admissionregistrationv1alpha1.ValidatingAdmissionPolicy, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyList, *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration]
 }
 
 // newValidatingAdmissionPolicies returns a ValidatingAdmissionPolicies
 func newValidatingAdmissionPolicies(c *AdmissionregistrationV1alpha1Client) *validatingAdmissionPolicies {
 	return &validatingAdmissionPolicies{
-		gentype.NewClientWithListAndApply[*v1alpha1.ValidatingAdmissionPolicy, *v1alpha1.ValidatingAdmissionPolicyList, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration](
+		gentype.NewClientWithListAndApply[*admissionregistrationv1alpha1.ValidatingAdmissionPolicy, *admissionregistrationv1alpha1.ValidatingAdmissionPolicyList, *applyconfigurationsadmissionregistrationv1alpha1.ValidatingAdmissionPolicyApplyConfiguration](
 			"validatingadmissionpolicies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.ValidatingAdmissionPolicy { return &v1alpha1.ValidatingAdmissionPolicy{} },
-			func() *v1alpha1.ValidatingAdmissionPolicyList { return &v1alpha1.ValidatingAdmissionPolicyList{} }),
+			func() *admissionregistrationv1alpha1.ValidatingAdmissionPolicy {
+				return &admissionregistrationv1alpha1.ValidatingAdmissionPolicy{}
+			},
+			func() *admissionregistrationv1alpha1.ValidatingAdmissionPolicyList {
+				return &admissionregistrationv1alpha1.ValidatingAdmissionPolicyList{}
+			},
+			gentype.PrefersProtobuf[*admissionregistrationv1alpha1.ValidatingAdmissionPolicy](),
+		),
 	}
 }

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	quotav1 "github.com/openshift/api/quota/v1"
+	apiquotav1 "github.com/openshift/api/quota/v1"
 	versioned "github.com/openshift/client-go/quota/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/quota/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/quota/listers/quota/v1"
+	quotav1 "github.com/openshift/client-go/quota/listers/quota/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // ClusterResourceQuotas.
 type ClusterResourceQuotaInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ClusterResourceQuotaLister
+	Lister() quotav1.ClusterResourceQuotaLister
 }
 
 type clusterResourceQuotaInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredClusterResourceQuotaInformer(client versioned.Interface, resyncP
 				return client.QuotaV1().ClusterResourceQuotas().Watch(context.TODO(), options)
 			},
 		},
-		&quotav1.ClusterResourceQuota{},
+		&apiquotav1.ClusterResourceQuota{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *clusterResourceQuotaInformer) defaultInformer(client versioned.Interfac
 }
 
 func (f *clusterResourceQuotaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&quotav1.ClusterResourceQuota{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiquotav1.ClusterResourceQuota{}, f.defaultInformer)
 }
 
-func (f *clusterResourceQuotaInformer) Lister() v1.ClusterResourceQuotaLister {
-	return v1.NewClusterResourceQuotaLister(f.Informer().GetIndexer())
+func (f *clusterResourceQuotaInformer) Lister() quotav1.ClusterResourceQuotaLister {
+	return quotav1.NewClusterResourceQuotaLister(f.Informer().GetIndexer())
 }

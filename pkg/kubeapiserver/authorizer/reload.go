@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
-	"k8s.io/apiserver/pkg/authorization/cel"
+	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
@@ -64,6 +64,7 @@ type reloadableAuthorizerResolver struct {
 	rbacAuthorizer         *rbac.RBACAuthorizer
 	scopeLimitedAuthorizer authorizer.Authorizer
 	abacAuthorizer         abac.PolicyList
+	compiler               authorizationcel.Compiler // non-nil and shared across reloads.
 
 	lastLoadedLock   sync.Mutex
 	lastLoadedConfig *authzconfig.AuthorizationConfiguration
@@ -81,8 +82,8 @@ func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authoriz
 	return r.current.Load().authorizer.Authorize(ctx, a)
 }
 
-func (r *reloadableAuthorizerResolver) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
-	return r.current.Load().ruleResolver.RulesFor(user, namespace)
+func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	return r.current.Load().ruleResolver.RulesFor(ctx, user, namespace)
 }
 
 // newForConfig constructs
@@ -153,7 +154,8 @@ func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.Aut
 				decisionOnError,
 				configuredAuthorizer.Webhook.MatchConditions,
 				configuredAuthorizer.Name,
-				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: cel.NewMatcherMetrics()},
+				kubeapiserverWebhookMetrics{WebhookMetrics: webhookmetrics.NewWebhookMetrics(), MatcherMetrics: authorizationcel.NewMatcherMetrics()},
+				r.compiler,
 			)
 			if err != nil {
 				return nil, nil, err
@@ -187,7 +189,7 @@ type kubeapiserverWebhookMetrics struct {
 	// kube-apiserver does report webhook metrics
 	webhookmetrics.WebhookMetrics
 	// kube-apiserver does report matchCondition metrics
-	cel.MatcherMetrics
+	authorizationcel.MatcherMetrics
 }
 
 // runReload starts checking the config file for changes and reloads the authorizer when it changes.
@@ -226,7 +228,7 @@ func (r *reloadableAuthorizerResolver) checkFile(ctx context.Context) {
 	klog.InfoS("found new authorization config data")
 	r.lastReadData = data
 
-	config, err := LoadAndValidateData(data, r.requireNonWebhookTypes)
+	config, err := LoadAndValidateData(data, r.compiler, r.requireNonWebhookTypes)
 	if err != nil {
 		klog.ErrorS(err, "reloading authorization config")
 		metrics.RecordAuthorizationConfigAutomaticReloadFailure(r.apiServerID)

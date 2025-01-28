@@ -14,8 +14,8 @@ package v1
 var map_AppliedClusterResourceQuota = map[string]string{
 	"":         "AppliedClusterResourceQuota mirrors ClusterResourceQuota at a project scope, for projection into a project.  It allows a project-admin to know which ClusterResourceQuotas are applied to his project and their associated usage.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Spec defines the desired quota",
-	"status":   "Status defines the actual enforced quota and its current usage",
+	"spec":     "spec defines the desired quota",
+	"status":   "status defines the actual enforced quota and its current usage",
 }
 
 func (AppliedClusterResourceQuota) SwaggerDoc() map[string]string {
@@ -25,7 +25,7 @@ func (AppliedClusterResourceQuota) SwaggerDoc() map[string]string {
 var map_AppliedClusterResourceQuotaList = map[string]string{
 	"":         "AppliedClusterResourceQuotaList is a collection of AppliedClusterResourceQuotas\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"items":    "Items is a list of AppliedClusterResourceQuota",
+	"items":    "items is a list of AppliedClusterResourceQuota",
 }
 
 func (AppliedClusterResourceQuotaList) SwaggerDoc() map[string]string {
@@ -35,8 +35,8 @@ func (AppliedClusterResourceQuotaList) SwaggerDoc() map[string]string {
 var map_ClusterResourceQuota = map[string]string{
 	"":         "ClusterResourceQuota mirrors ResourceQuota at a cluster scope.  This object is easily convertible to synthetic ResourceQuota object to allow quota evaluation re-use.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Spec defines the desired quota",
-	"status":   "Status defines the actual enforced quota and its current usage",
+	"spec":     "spec defines the desired quota",
+	"status":   "status defines the actual enforced quota and its current usage",
 }
 
 func (ClusterResourceQuota) SwaggerDoc() map[string]string {
@@ -46,7 +46,7 @@ func (ClusterResourceQuota) SwaggerDoc() map[string]string {
 var map_ClusterResourceQuotaList = map[string]string{
 	"":         "ClusterResourceQuotaList is a collection of ClusterResourceQuotas\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"metadata": "metadata is the standard list's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"items":    "Items is a list of ClusterResourceQuotas",
+	"items":    "items is a list of ClusterResourceQuotas",
 }
 
 func (ClusterResourceQuotaList) SwaggerDoc() map[string]string {
@@ -65,8 +65,8 @@ func (ClusterResourceQuotaSelector) SwaggerDoc() map[string]string {
 
 var map_ClusterResourceQuotaSpec = map[string]string{
 	"":         "ClusterResourceQuotaSpec defines the desired quota restrictions",
-	"selector": "Selector is the selector used to match projects. It should only select active projects on the scale of dozens (though it can select many more less active projects).  These projects will contend on object creation through this resource.",
-	"quota":    "Quota defines the desired quota",
+	"selector": "selector is the selector used to match projects. It should only select active projects on the scale of dozens (though it can select many more less active projects).  These projects will contend on object creation through this resource.",
+	"quota":    "quota defines the desired quota",
 }
 
 func (ClusterResourceQuotaSpec) SwaggerDoc() map[string]string {
@@ -75,8 +75,8 @@ func (ClusterResourceQuotaSpec) SwaggerDoc() map[string]string {
 
 var map_ClusterResourceQuotaStatus = map[string]string{
 	"":           "ClusterResourceQuotaStatus defines the actual enforced quota and its current usage",
-	"total":      "Total defines the actual enforced quota and its current usage across all projects",
-	"namespaces": "Namespaces slices the usage by project.  This division allows for quick resolution of deletion reconciliation inside of a single project without requiring a recalculation across all projects.  This can be used to pull the deltas for a given project.",
+	"total":      "total defines the actual enforced quota and its current usage across all projects",
+	"namespaces": "namespaces slices the usage by project.  This division allows for quick resolution of deletion reconciliation inside of a single project without requiring a recalculation across all projects.  This can be used to pull the deltas for a given project.",
 }
 
 func (ClusterResourceQuotaStatus) SwaggerDoc() map[string]string {
@@ -85,8 +85,8 @@ func (ClusterResourceQuotaStatus) SwaggerDoc() map[string]string {
 
 var map_ResourceQuotaStatusByNamespace = map[string]string{
 	"":          "ResourceQuotaStatusByNamespace gives status for a particular project",
-	"namespace": "Namespace the project this status applies to",
-	"status":    "Status indicates how many resources have been consumed by this project",
+	"namespace": "namespace the project this status applies to",
+	"status":    "status indicates how many resources have been consumed by this project",
 }
 
 func (ResourceQuotaStatusByNamespace) SwaggerDoc() map[string]string {

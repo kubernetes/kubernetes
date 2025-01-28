@@ -19,7 +19,7 @@ type ImageList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of images
+	// items is a list of images
 	Items []Image `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -45,30 +45,30 @@ type Image struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// DockerImageReference is the string that can be used to pull this image.
+	// dockerImageReference is the string that can be used to pull this image.
 	DockerImageReference string `json:"dockerImageReference,omitempty" protobuf:"bytes,2,opt,name=dockerImageReference"`
-	// DockerImageMetadata contains metadata about this image
+	// dockerImageMetadata contains metadata about this image
 	// +patchStrategy=replace
 	// +kubebuilder:pruning:PreserveUnknownFields
 	DockerImageMetadata runtime.RawExtension `json:"dockerImageMetadata,omitempty" patchStrategy:"replace" protobuf:"bytes,3,opt,name=dockerImageMetadata"`
-	// DockerImageMetadataVersion conveys the version of the object, which if empty defaults to "1.0"
+	// dockerImageMetadataVersion conveys the version of the object, which if empty defaults to "1.0"
 	DockerImageMetadataVersion string `json:"dockerImageMetadataVersion,omitempty" protobuf:"bytes,4,opt,name=dockerImageMetadataVersion"`
-	// DockerImageManifest is the raw JSON of the manifest
+	// dockerImageManifest is the raw JSON of the manifest
 	DockerImageManifest string `json:"dockerImageManifest,omitempty" protobuf:"bytes,5,opt,name=dockerImageManifest"`
-	// DockerImageLayers represents the layers in the image. May not be set if the image does not define that data or if the image represents a manifest list.
+	// dockerImageLayers represents the layers in the image. May not be set if the image does not define that data or if the image represents a manifest list.
 	DockerImageLayers []ImageLayer `json:"dockerImageLayers,omitempty" protobuf:"bytes,6,rep,name=dockerImageLayers"`
-	// Signatures holds all signatures of the image.
+	// signatures holds all signatures of the image.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	Signatures []ImageSignature `json:"signatures,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=signatures"`
-	// DockerImageSignatures provides the signatures as opaque blobs. This is a part of manifest schema v1.
+	// dockerImageSignatures provides the signatures as opaque blobs. This is a part of manifest schema v1.
 	DockerImageSignatures [][]byte `json:"dockerImageSignatures,omitempty" protobuf:"bytes,8,rep,name=dockerImageSignatures"`
-	// DockerImageManifestMediaType specifies the mediaType of manifest. This is a part of manifest schema v2.
+	// dockerImageManifestMediaType specifies the mediaType of manifest. This is a part of manifest schema v2.
 	DockerImageManifestMediaType string `json:"dockerImageManifestMediaType,omitempty" protobuf:"bytes,9,opt,name=dockerImageManifestMediaType"`
-	// DockerImageConfig is a JSON blob that the runtime uses to set up the container. This is a part of manifest schema v2.
+	// dockerImageConfig is a JSON blob that the runtime uses to set up the container. This is a part of manifest schema v2.
 	// Will not be set when the image represents a manifest list.
 	DockerImageConfig string `json:"dockerImageConfig,omitempty" protobuf:"bytes,10,opt,name=dockerImageConfig"`
-	// DockerImageManifests holds information about sub-manifests when the image represents a manifest list.
+	// dockerImageManifests holds information about sub-manifests when the image represents a manifest list.
 	// When this field is present, no DockerImageLayers should be specified.
 	DockerImageManifests []ImageManifest `json:"dockerImageManifests,omitempty" protobuf:"bytes,11,rep,name=dockerImageManifests"`
 }
@@ -76,29 +76,29 @@ type Image struct {
 // ImageManifest represents sub-manifests of a manifest list. The Digest field points to a regular
 // Image object.
 type ImageManifest struct {
-	// Digest is the unique identifier for the manifest. It refers to an Image object.
+	// digest is the unique identifier for the manifest. It refers to an Image object.
 	Digest string `json:"digest" protobuf:"bytes,1,opt,name=digest"`
-	// MediaType defines the type of the manifest, possible values are application/vnd.oci.image.manifest.v1+json,
+	// mediaType defines the type of the manifest, possible values are application/vnd.oci.image.manifest.v1+json,
 	// application/vnd.docker.distribution.manifest.v2+json or application/vnd.docker.distribution.manifest.v1+json.
 	MediaType string `json:"mediaType" protobuf:"bytes,2,opt,name=mediaType"`
-	// ManifestSize represents the size of the raw object contents, in bytes.
+	// manifestSize represents the size of the raw object contents, in bytes.
 	ManifestSize int64 `json:"manifestSize" protobuf:"varint,3,opt,name=manifestSize"`
-	// Architecture specifies the supported CPU architecture, for example `amd64` or `ppc64le`.
+	// architecture specifies the supported CPU architecture, for example `amd64` or `ppc64le`.
 	Architecture string `json:"architecture" protobuf:"bytes,4,opt,name=architecture"`
-	// OS specifies the operating system, for example `linux`.
+	// os specifies the operating system, for example `linux`.
 	OS string `json:"os" protobuf:"bytes,5,opt,name=os"`
-	// Variant is an optional field repreenting a variant of the CPU, for example v6 to specify a particular CPU
+	// variant is an optional field repreenting a variant of the CPU, for example v6 to specify a particular CPU
 	// variant of the ARM CPU.
 	Variant string `json:"variant,omitempty" protobuf:"bytes,6,opt,name=variant"`
 }
 
 // ImageLayer represents a single layer of the image. Some images may have multiple layers. Some may have none.
 type ImageLayer struct {
-	// Name of the layer as defined by the underlying store.
+	// name of the layer as defined by the underlying store.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// Size of the layer in bytes as defined by the underlying store.
+	// size of the layer in bytes as defined by the underlying store.
 	LayerSize int64 `json:"size" protobuf:"varint,2,opt,name=size"`
-	// MediaType of the referenced object.
+	// mediaType of the referenced object.
 	MediaType string `json:"mediaType" protobuf:"bytes,3,opt,name=mediaType"`
 }
 
@@ -126,7 +126,7 @@ type ImageSignature struct {
 	Type string `json:"type" protobuf:"bytes,2,opt,name=type"`
 	// Required: An opaque binary string which is an image's signature.
 	Content []byte `json:"content" protobuf:"bytes,3,opt,name=content"`
-	// Conditions represent the latest available observations of a signature's current state.
+	// conditions represent the latest available observations of a signature's current state.
 	// +patchMergeKey=type
 	// +patchStrategy=merge
 	Conditions []SignatureCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
@@ -154,9 +154,9 @@ type SignatureConditionType string
 
 // SignatureCondition describes an image signature condition of particular kind at particular probe time.
 type SignatureCondition struct {
-	// Type of signature condition, Complete or Failed.
+	// type of signature condition, Complete or Failed.
 	Type SignatureConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=SignatureConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// Last time the condition was checked.
 	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
@@ -171,7 +171,7 @@ type SignatureCondition struct {
 // SignatureGenericEntity holds a generic information about a person or entity who is an issuer or a subject
 // of signing certificate or key.
 type SignatureGenericEntity struct {
-	// Organization name.
+	// organization name.
 	Organization string `json:"organization,omitempty" protobuf:"bytes,1,opt,name=organization"`
 	// Common name (e.g. openshift-signing-service).
 	CommonName string `json:"commonName,omitempty" protobuf:"bytes,2,opt,name=commonName"`
@@ -204,7 +204,7 @@ type ImageStreamList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of imageStreams
+	// items is a list of imageStreams
 	Items []ImageStream `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -237,10 +237,10 @@ type ImageStream struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec describes the desired state of this stream
+	// spec describes the desired state of this stream
 	// +optional
 	Spec ImageStreamSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
-	// Status describes the current state of this stream
+	// status describes the current state of this stream
 	// +optional
 	Status ImageStreamStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
@@ -272,7 +272,7 @@ type ImageLookupPolicy struct {
 
 // TagReference specifies optional annotations for images using this tag and an optional reference to an ImageStreamTag, ImageStreamImage, or DockerImage this tag should track.
 type TagReference struct {
-	// Name of the tag
+	// name of the tag
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Optional; if specified, annotations that are applied to images retrieved via ImageStreamTags.
 	// +optional
@@ -281,10 +281,10 @@ type TagReference struct {
 	// are ImageStreamTag, ImageStreamImage, and DockerImage.  ImageStreamTag references
 	// can only reference a tag within this same ImageStream.
 	From *corev1.ObjectReference `json:"from,omitempty" protobuf:"bytes,3,opt,name=from"`
-	// Reference states if the tag will be imported. Default value is false, which means the tag will
+	// reference states if the tag will be imported. Default value is false, which means the tag will
 	// be imported.
 	Reference bool `json:"reference,omitempty" protobuf:"varint,4,opt,name=reference"`
-	// Generation is a counter that tracks mutations to the spec tag (user intent). When a tag reference
+	// generation is a counter that tracks mutations to the spec tag (user intent). When a tag reference
 	// is changed the generation is set to match the current stream generation (which is incremented every
 	// time spec is changed). Other processes in the system like the image importer observe that the
 	// generation of spec tag is newer than the generation recorded in the status and use that as a trigger
@@ -293,19 +293,19 @@ type TagReference struct {
 	// nil which will be merged with the current tag generation.
 	// +optional
 	Generation *int64 `json:"generation" protobuf:"varint,5,opt,name=generation"`
-	// ImportPolicy is information that controls how images may be imported by the server.
+	// importPolicy is information that controls how images may be imported by the server.
 	ImportPolicy TagImportPolicy `json:"importPolicy,omitempty" protobuf:"bytes,6,opt,name=importPolicy"`
-	// ReferencePolicy defines how other components should consume the image.
+	// referencePolicy defines how other components should consume the image.
 	ReferencePolicy TagReferencePolicy `json:"referencePolicy,omitempty" protobuf:"bytes,7,opt,name=referencePolicy"`
 }
 
 // TagImportPolicy controls how images related to this tag will be imported.
 type TagImportPolicy struct {
-	// Insecure is true if the server may bypass certificate verification or connect directly over HTTP during image import.
+	// insecure is true if the server may bypass certificate verification or connect directly over HTTP during image import.
 	Insecure bool `json:"insecure,omitempty" protobuf:"varint,1,opt,name=insecure"`
-	// Scheduled indicates to the server that this tag should be periodically checked to ensure it is up to date, and imported
+	// scheduled indicates to the server that this tag should be periodically checked to ensure it is up to date, and imported
 	Scheduled bool `json:"scheduled,omitempty" protobuf:"varint,2,opt,name=scheduled"`
-	// ImportMode describes how to import an image manifest.
+	// importMode describes how to import an image manifest.
 	ImportMode ImportModeType `json:"importMode,omitempty" protobuf:"bytes,3,opt,name=importMode,casttype=ImportModeType"`
 }
 
@@ -342,7 +342,7 @@ const (
 // image change triggers in deployment configs or builds are resolved. This allows the image stream
 // author to control how images are accessed.
 type TagReferencePolicy struct {
-	// Type determines how the image pull spec should be transformed when the image stream tag is used in
+	// type determines how the image pull spec should be transformed when the image stream tag is used in
 	// deployment config triggers or new builds. The default value is `Source`, indicating the original
 	// location of the image should be used (if imported). The user may also specify `Local`, indicating
 	// that the pull spec should point to the integrated container image registry and leverage the registry's
@@ -355,14 +355,14 @@ type TagReferencePolicy struct {
 
 // ImageStreamStatus contains information about the state of this image stream.
 type ImageStreamStatus struct {
-	// DockerImageRepository represents the effective location this stream may be accessed at.
+	// dockerImageRepository represents the effective location this stream may be accessed at.
 	// May be empty until the server determines where the repository is located
 	DockerImageRepository string `json:"dockerImageRepository" protobuf:"bytes,1,opt,name=dockerImageRepository"`
-	// PublicDockerImageRepository represents the public location from where the image can
+	// publicDockerImageRepository represents the public location from where the image can
 	// be pulled outside the cluster. This field may be empty if the administrator
 	// has not exposed the integrated registry externally.
 	PublicDockerImageRepository string `json:"publicDockerImageRepository,omitempty" protobuf:"bytes,3,opt,name=publicDockerImageRepository"`
-	// Tags are a historical record of images associated with each tag. The first entry in the
+	// tags are a historical record of images associated with each tag. The first entry in the
 	// TagEvent array is the currently tagged image.
 	// +patchMergeKey=tag
 	// +patchStrategy=merge
@@ -371,23 +371,23 @@ type ImageStreamStatus struct {
 
 // NamedTagEventList relates a tag to its image history.
 type NamedTagEventList struct {
-	// Tag is the tag for which the history is recorded
+	// tag is the tag for which the history is recorded
 	Tag string `json:"tag" protobuf:"bytes,1,opt,name=tag"`
 	// Standard object's metadata.
 	Items []TagEvent `json:"items" protobuf:"bytes,2,rep,name=items"`
-	// Conditions is an array of conditions that apply to the tag event list.
+	// conditions is an array of conditions that apply to the tag event list.
 	Conditions []TagEventCondition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
 }
 
 // TagEvent is used by ImageStreamStatus to keep a historical record of images associated with a tag.
 type TagEvent struct {
-	// Created holds the time the TagEvent was created
+	// created holds the time the TagEvent was created
 	Created metav1.Time `json:"created" protobuf:"bytes,1,opt,name=created"`
-	// DockerImageReference is the string that can be used to pull this image
+	// dockerImageReference is the string that can be used to pull this image
 	DockerImageReference string `json:"dockerImageReference" protobuf:"bytes,2,opt,name=dockerImageReference"`
-	// Image is the image
+	// image is the image
 	Image string `json:"image" protobuf:"bytes,3,opt,name=image"`
-	// Generation is the spec tag generation that resulted in this tag being updated
+	// generation is the spec tag generation that resulted in this tag being updated
 	Generation int64 `json:"generation" protobuf:"varint,4,opt,name=generation"`
 }
 
@@ -401,17 +401,17 @@ const (
 
 // TagEventCondition contains condition information for a tag event.
 type TagEventCondition struct {
-	// Type of tag event condition, currently only ImportSuccess
+	// type of tag event condition, currently only ImportSuccess
 	Type TagEventConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=TagEventConditionType"`
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
-	// LastTransitionTIme is the time the condition transitioned from one status to another.
+	// lastTransitionTime is the time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
-	// Reason is a brief machine readable explanation for the condition's last transition.
+	// reason is a brief machine readable explanation for the condition's last transition.
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
-	// Message is a human readable description of the details about last transition, complementing reason.
+	// message is a human readable description of the details about last transition, complementing reason.
 	Message string `json:"message,omitempty" protobuf:"bytes,5,opt,name=message"`
-	// Generation is the spec tag generation that this status corresponds to
+	// generation is the spec tag generation that this status corresponds to
 	Generation int64 `json:"generation" protobuf:"varint,6,opt,name=generation"`
 }
 
@@ -438,9 +438,9 @@ type ImageStreamMapping struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Image is a container image.
+	// image is a container image.
 	Image Image `json:"image" protobuf:"bytes,2,opt,name=image"`
-	// Tag is a string value this image can be located with inside the stream.
+	// tag is a string value this image can be located with inside the stream.
 	Tag string `json:"tag" protobuf:"bytes,3,opt,name=tag"`
 }
 
@@ -500,7 +500,7 @@ type ImageStreamTagList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of image stream tags
+	// items is the list of image stream tags
 	Items []ImageStreamTag `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -555,7 +555,7 @@ type ImageTagList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of image stream tags
+	// items is the list of image stream tags
 	Items []ImageTag `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -585,7 +585,7 @@ type ImageStreamImage struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Image associated with the ImageStream and image name.
+	// image associated with the ImageStream and image name.
 	Image Image `json:"image" protobuf:"bytes,2,opt,name=image"`
 }
 
@@ -651,10 +651,10 @@ type ImageBlobReferences struct {
 
 // ImageLayerData contains metadata about an image layer.
 type ImageLayerData struct {
-	// Size of the layer in bytes as defined by the underlying store. This field is
+	// size of the layer in bytes as defined by the underlying store. This field is
 	// optional if the necessary information about size is not available.
 	LayerSize *int64 `json:"size" protobuf:"varint,1,opt,name=size"`
-	// MediaType of the referenced object.
+	// mediaType of the referenced object.
 	MediaType string `json:"mediaType" protobuf:"bytes,2,opt,name=mediaType"`
 }
 
@@ -680,82 +680,82 @@ type ImageStreamImport struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec is a description of the images that the user wishes to import
+	// spec is a description of the images that the user wishes to import
 	Spec ImageStreamImportSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
-	// Status is the result of importing the image
+	// status is the result of importing the image
 	Status ImageStreamImportStatus `json:"status" protobuf:"bytes,3,opt,name=status"`
 }
 
 // ImageStreamImportSpec defines what images should be imported.
 type ImageStreamImportSpec struct {
-	// Import indicates whether to perform an import - if so, the specified tags are set on the spec
+	// import indicates whether to perform an import - if so, the specified tags are set on the spec
 	// and status of the image stream defined by the type meta.
 	Import bool `json:"import" protobuf:"varint,1,opt,name=import"`
-	// Repository is an optional import of an entire container image repository. A maximum limit on the
+	// repository is an optional import of an entire container image repository. A maximum limit on the
 	// number of tags imported this way is imposed by the server.
 	Repository *RepositoryImportSpec `json:"repository,omitempty" protobuf:"bytes,2,opt,name=repository"`
-	// Images are a list of individual images to import.
+	// images are a list of individual images to import.
 	Images []ImageImportSpec `json:"images,omitempty" protobuf:"bytes,3,rep,name=images"`
 }
 
 // ImageStreamImportStatus contains information about the status of an image stream import.
 type ImageStreamImportStatus struct {
-	// Import is the image stream that was successfully updated or created when 'to' was set.
+	// import is the image stream that was successfully updated or created when 'to' was set.
 	Import *ImageStream `json:"import,omitempty" protobuf:"bytes,1,opt,name=import"`
-	// Repository is set if spec.repository was set to the outcome of the import
+	// repository is set if spec.repository was set to the outcome of the import
 	Repository *RepositoryImportStatus `json:"repository,omitempty" protobuf:"bytes,2,opt,name=repository"`
-	// Images is set with the result of importing spec.images
+	// images is set with the result of importing spec.images
 	Images []ImageImportStatus `json:"images,omitempty" protobuf:"bytes,3,rep,name=images"`
 }
 
 // RepositoryImportSpec describes a request to import images from a container image repository.
 type RepositoryImportSpec struct {
-	// From is the source for the image repository to import; only kind DockerImage and a name of a container image repository is allowed
+	// from is the source for the image repository to import; only kind DockerImage and a name of a container image repository is allowed
 	From corev1.ObjectReference `json:"from" protobuf:"bytes,1,opt,name=from"`
 
-	// ImportPolicy is the policy controlling how the image is imported
+	// importPolicy is the policy controlling how the image is imported
 	ImportPolicy TagImportPolicy `json:"importPolicy,omitempty" protobuf:"bytes,2,opt,name=importPolicy"`
-	// ReferencePolicy defines how other components should consume the image
+	// referencePolicy defines how other components should consume the image
 	ReferencePolicy TagReferencePolicy `json:"referencePolicy,omitempty" protobuf:"bytes,4,opt,name=referencePolicy"`
-	// IncludeManifest determines if the manifest for each image is returned in the response
+	// includeManifest determines if the manifest for each image is returned in the response
 	IncludeManifest bool `json:"includeManifest,omitempty" protobuf:"varint,3,opt,name=includeManifest"`
 }
 
 // RepositoryImportStatus describes the result of an image repository import
 type RepositoryImportStatus struct {
-	// Status reflects whether any failure occurred during import
+	// status reflects whether any failure occurred during import
 	Status metav1.Status `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
-	// Images is a list of images successfully retrieved by the import of the repository.
+	// images is a list of images successfully retrieved by the import of the repository.
 	Images []ImageImportStatus `json:"images,omitempty" protobuf:"bytes,2,rep,name=images"`
-	// AdditionalTags are tags that exist in the repository but were not imported because
+	// additionalTags are tags that exist in the repository but were not imported because
 	// a maximum limit of automatic imports was applied.
 	AdditionalTags []string `json:"additionalTags,omitempty" protobuf:"bytes,3,rep,name=additionalTags"`
 }
 
 // ImageImportSpec describes a request to import a specific image.
 type ImageImportSpec struct {
-	// From is the source of an image to import; only kind DockerImage is allowed
+	// from is the source of an image to import; only kind DockerImage is allowed
 	From corev1.ObjectReference `json:"from" protobuf:"bytes,1,opt,name=from"`
-	// To is a tag in the current image stream to assign the imported image to, if name is not specified the default tag from from.name will be used
+	// to is a tag in the current image stream to assign the imported image to, if name is not specified the default tag from from.name will be used
 	To *corev1.LocalObjectReference `json:"to,omitempty" protobuf:"bytes,2,opt,name=to"`
 
-	// ImportPolicy is the policy controlling how the image is imported
+	// importPolicy is the policy controlling how the image is imported
 	ImportPolicy TagImportPolicy `json:"importPolicy,omitempty" protobuf:"bytes,3,opt,name=importPolicy"`
-	// ReferencePolicy defines how other components should consume the image
+	// referencePolicy defines how other components should consume the image
 	ReferencePolicy TagReferencePolicy `json:"referencePolicy,omitempty" protobuf:"bytes,5,opt,name=referencePolicy"`
-	// IncludeManifest determines if the manifest for each image is returned in the response
+	// includeManifest determines if the manifest for each image is returned in the response
 	IncludeManifest bool `json:"includeManifest,omitempty" protobuf:"varint,4,opt,name=includeManifest"`
 }
 
 // ImageImportStatus describes the result of an image import.
 type ImageImportStatus struct {
-	// Status is the status of the image import, including errors encountered while retrieving the image
+	// status is the status of the image import, including errors encountered while retrieving the image
 	Status metav1.Status `json:"status" protobuf:"bytes,1,opt,name=status"`
-	// Image is the metadata of that image, if the image was located
+	// image is the metadata of that image, if the image was located
 	Image *Image `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
-	// Tag is the tag this image was located under, if any
+	// tag is the tag this image was located under, if any
 	Tag string `json:"tag,omitempty" protobuf:"bytes,3,opt,name=tag"`
-	// Manifests holds sub-manifests metadata when importing a manifest list
+	// manifests holds sub-manifests metadata when importing a manifest list
 	Manifests []Image `json:"manifests,omitempty" protobuf:"bytes,4,rep,name=manifests"`
 }
 

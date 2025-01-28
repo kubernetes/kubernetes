@@ -30,6 +30,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -89,7 +91,7 @@ func testPropagateStore(ctx context.Context, t *testing.T, store storage.Interfa
 	key := computePodKey(obj)
 
 	// Setup store with the specified key and grab the output for returning.
-	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil)
+	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
 	if err != nil && !storage.IsNotFound(err) {
 		t.Fatalf("Cleanup failed: %v", err)
 	}
@@ -169,6 +171,36 @@ func testCheckResultFunc(t *testing.T, w watch.Interface, check func(actualEvent
 	}
 }
 
+func testCheckResultWithIgnoreFunc(t *testing.T, w watch.Interface, expectedEvents []watch.Event, ignore func(watch.Event) bool) {
+	checkIndex := 0
+	for {
+		select {
+		case event := <-w.ResultChan():
+			obj := event.Object
+			if co, ok := obj.(runtime.CacheableObject); ok {
+				event.Object = co.GetObject()
+			}
+			if ignore != nil && ignore(event) {
+				continue
+			}
+			if checkIndex < len(expectedEvents) {
+				expectNoDiff(t, "incorrect event", expectedEvents[checkIndex], event)
+				checkIndex++
+			} else {
+				t.Fatalf("cannot receive correct event, expect no event, but get a event: %+v", event)
+			}
+		case <-time.After(100 * time.Millisecond):
+			// wait 100ms forcibly in order to receive watchEvents including bookmark event.
+			// we cannot guarantee that we will receive all bookmark events within 100ms,
+			// but too large timeout value will lead to exceed the timeout of package test.
+			if checkIndex < len(expectedEvents) {
+				t.Fatalf("cannot receive enough events within specific time, rest expected events: %+v", expectedEvents[checkIndex:])
+			}
+			return
+		}
+	}
+}
+
 func testCheckStop(t *testing.T, w watch.Interface) {
 	select {
 	case e, ok := <-w.ResultChan():
@@ -187,16 +219,18 @@ func testCheckStop(t *testing.T, w watch.Interface) {
 	}
 }
 
-func testCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
+func TestCheckResultsInStrictOrder(t *testing.T, w watch.Interface, expectedEvents []watch.Event) {
 	for _, expectedEvent := range expectedEvents {
 		testCheckResult(t, w, expectedEvent)
 	}
 }
 
-func testCheckNoMoreResults(t *testing.T, w watch.Interface) {
+func TestCheckNoMoreResultsWithIgnoreFunc(t *testing.T, w watch.Interface, ignore func(watch.Event) bool) {
 	select {
 	case e := <-w.ResultChan():
-		t.Errorf("Unexpected: %#v event received, expected no events", e)
+		if ignore == nil || !ignore(e) {
+			t.Errorf("Unexpected: %#v event received, expected no events", e)
+		}
 	// We consciously make the timeout short here to speed up tests.
 	case <-time.After(100 * time.Millisecond):
 		return
@@ -356,4 +390,43 @@ func (s sortablePodList) Less(i, j int) bool {
 
 func (s sortablePodList) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
+}
+
+func CreatePodPredicate(field fields.Selector, namespaceScoped bool, indexField []string) storage.SelectionPredicate {
+	return storage.SelectionPredicate{
+		Label:       labels.Everything(),
+		Field:       field,
+		GetAttrs:    determinePodGetAttrFunc(namespaceScoped, indexField),
+		IndexFields: indexField,
+	}
+}
+
+func determinePodGetAttrFunc(namespaceScoped bool, indexField []string) storage.AttrFunc {
+	if indexField != nil {
+		if namespaceScoped {
+			return namespacedScopedNodeNameAttrFunc
+		}
+		return clusterScopedNodeNameAttrFunc
+	}
+	if namespaceScoped {
+		return storage.DefaultNamespaceScopedAttr
+	}
+	return storage.DefaultClusterScopedAttr
+}
+
+func namespacedScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*example.Pod)
+	return nil, fields.Set{
+		"spec.nodeName":      pod.Spec.NodeName,
+		"metadata.name":      pod.ObjectMeta.Name,
+		"metadata.namespace": pod.ObjectMeta.Namespace,
+	}, nil
+}
+
+func clusterScopedNodeNameAttrFunc(obj runtime.Object) (labels.Set, fields.Set, error) {
+	pod := obj.(*example.Pod)
+	return nil, fields.Set{
+		"spec.nodeName": pod.Spec.NodeName,
+		"metadata.name": pod.ObjectMeta.Name,
+	}, nil
 }

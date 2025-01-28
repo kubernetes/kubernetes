@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type InfrastructuresGetter interface {
 
 // InfrastructureInterface has methods to work with Infrastructure resources.
 type InfrastructureInterface interface {
-	Create(ctx context.Context, infrastructure *v1.Infrastructure, opts metav1.CreateOptions) (*v1.Infrastructure, error)
-	Update(ctx context.Context, infrastructure *v1.Infrastructure, opts metav1.UpdateOptions) (*v1.Infrastructure, error)
+	Create(ctx context.Context, infrastructure *configv1.Infrastructure, opts metav1.CreateOptions) (*configv1.Infrastructure, error)
+	Update(ctx context.Context, infrastructure *configv1.Infrastructure, opts metav1.UpdateOptions) (*configv1.Infrastructure, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, infrastructure *v1.Infrastructure, opts metav1.UpdateOptions) (*v1.Infrastructure, error)
+	UpdateStatus(ctx context.Context, infrastructure *configv1.Infrastructure, opts metav1.UpdateOptions) (*configv1.Infrastructure, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Infrastructure, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.InfrastructureList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.Infrastructure, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.InfrastructureList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Infrastructure, err error)
-	Apply(ctx context.Context, infrastructure *configv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Infrastructure, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.Infrastructure, err error)
+	Apply(ctx context.Context, infrastructure *applyconfigurationsconfigv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Infrastructure, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, infrastructure *configv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Infrastructure, err error)
+	ApplyStatus(ctx context.Context, infrastructure *applyconfigurationsconfigv1.InfrastructureApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Infrastructure, err error)
 	InfrastructureExpansion
 }
 
 // infrastructures implements InfrastructureInterface
 type infrastructures struct {
-	*gentype.ClientWithListAndApply[*v1.Infrastructure, *v1.InfrastructureList, *configv1.InfrastructureApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.Infrastructure, *configv1.InfrastructureList, *applyconfigurationsconfigv1.InfrastructureApplyConfiguration]
 }
 
 // newInfrastructures returns a Infrastructures
 func newInfrastructures(c *ConfigV1Client) *infrastructures {
 	return &infrastructures{
-		gentype.NewClientWithListAndApply[*v1.Infrastructure, *v1.InfrastructureList, *configv1.InfrastructureApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.Infrastructure, *configv1.InfrastructureList, *applyconfigurationsconfigv1.InfrastructureApplyConfiguration](
 			"infrastructures",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Infrastructure { return &v1.Infrastructure{} },
-			func() *v1.InfrastructureList { return &v1.InfrastructureList{} }),
+			func() *configv1.Infrastructure { return &configv1.Infrastructure{} },
+			func() *configv1.InfrastructureList { return &configv1.InfrastructureList{} },
+		),
 	}
 }

@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/user/v1"
+	userv1 "github.com/openshift/api/user/v1"
 	scheme "github.com/openshift/client-go/user/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
@@ -19,26 +19,27 @@ type UserIdentityMappingsGetter interface {
 
 // UserIdentityMappingInterface has methods to work with UserIdentityMapping resources.
 type UserIdentityMappingInterface interface {
-	Create(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.CreateOptions) (*v1.UserIdentityMapping, error)
-	Update(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.UpdateOptions) (*v1.UserIdentityMapping, error)
+	Create(ctx context.Context, userIdentityMapping *userv1.UserIdentityMapping, opts metav1.CreateOptions) (*userv1.UserIdentityMapping, error)
+	Update(ctx context.Context, userIdentityMapping *userv1.UserIdentityMapping, opts metav1.UpdateOptions) (*userv1.UserIdentityMapping, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.UserIdentityMapping, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*userv1.UserIdentityMapping, error)
 	UserIdentityMappingExpansion
 }
 
 // userIdentityMappings implements UserIdentityMappingInterface
 type userIdentityMappings struct {
-	*gentype.Client[*v1.UserIdentityMapping]
+	*gentype.Client[*userv1.UserIdentityMapping]
 }
 
 // newUserIdentityMappings returns a UserIdentityMappings
 func newUserIdentityMappings(c *UserV1Client) *userIdentityMappings {
 	return &userIdentityMappings{
-		gentype.NewClient[*v1.UserIdentityMapping](
+		gentype.NewClient[*userv1.UserIdentityMapping](
 			"useridentitymappings",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.UserIdentityMapping { return &v1.UserIdentityMapping{} }),
+			func() *userv1.UserIdentityMapping { return &userv1.UserIdentityMapping{} },
+		),
 	}
 }

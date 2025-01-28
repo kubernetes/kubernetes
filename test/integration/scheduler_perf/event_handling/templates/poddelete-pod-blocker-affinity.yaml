@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-blocker-affinity-
+  labels:
+    color: green
+    type: blocker
+spec:
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause
+  terminationGracePeriodSeconds: 0

@@ -162,7 +162,7 @@ func (c *aggregatedAPIServiceAvailabilityCheck) checkForConnection(context gener
 		// if we timeout, always return ok so that we can start from a case where all kube-apiservers are down and the SDN isn't coming up
 		utilruntime.HandleError(fmt.Errorf("%s never reached apiserver", c.Name()))
 		return
-	case <-context.StopCh:
+	case <-context.Done():
 		utilruntime.HandleError(fmt.Errorf("%s interrupted", c.Name()))
 		return
 	case <-noAggregatedAPIServer:

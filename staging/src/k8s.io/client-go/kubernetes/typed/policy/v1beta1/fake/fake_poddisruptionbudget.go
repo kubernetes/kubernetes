@@ -19,179 +19,35 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1beta1 "k8s.io/api/policy/v1beta1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	policyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedpolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 )
 
-// FakePodDisruptionBudgets implements PodDisruptionBudgetInterface
-type FakePodDisruptionBudgets struct {
+// fakePodDisruptionBudgets implements PodDisruptionBudgetInterface
+type fakePodDisruptionBudgets struct {
+	*gentype.FakeClientWithListAndApply[*v1beta1.PodDisruptionBudget, *v1beta1.PodDisruptionBudgetList, *policyv1beta1.PodDisruptionBudgetApplyConfiguration]
 	Fake *FakePolicyV1beta1
-	ns   string
 }
 
-var poddisruptionbudgetsResource = v1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets")
-
-var poddisruptionbudgetsKind = v1beta1.SchemeGroupVersion.WithKind("PodDisruptionBudget")
-
-// Get takes name of the podDisruptionBudget, and returns the corresponding podDisruptionBudget object, and an error if there is any.
-func (c *FakePodDisruptionBudgets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	emptyResult := &v1beta1.PodDisruptionBudget{}
-	obj, err := c.Fake.
-		Invokes(testing.NewGetActionWithOptions(poddisruptionbudgetsResource, c.ns, name, options), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
+func newFakePodDisruptionBudgets(fake *FakePolicyV1beta1, namespace string) typedpolicyv1beta1.PodDisruptionBudgetInterface {
+	return &fakePodDisruptionBudgets{
+		gentype.NewFakeClientWithListAndApply[*v1beta1.PodDisruptionBudget, *v1beta1.PodDisruptionBudgetList, *policyv1beta1.PodDisruptionBudgetApplyConfiguration](
+			fake.Fake,
+			namespace,
+			v1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"),
+			v1beta1.SchemeGroupVersion.WithKind("PodDisruptionBudget"),
+			func() *v1beta1.PodDisruptionBudget { return &v1beta1.PodDisruptionBudget{} },
+			func() *v1beta1.PodDisruptionBudgetList { return &v1beta1.PodDisruptionBudgetList{} },
+			func(dst, src *v1beta1.PodDisruptionBudgetList) { dst.ListMeta = src.ListMeta },
+			func(list *v1beta1.PodDisruptionBudgetList) []*v1beta1.PodDisruptionBudget {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1beta1.PodDisruptionBudgetList, items []*v1beta1.PodDisruptionBudget) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
-}
-
-// List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *FakePodDisruptionBudgets) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
-	emptyResult := &v1beta1.PodDisruptionBudgetList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewListActionWithOptions(poddisruptionbudgetsResource, poddisruptionbudgetsKind, c.ns, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1beta1.PodDisruptionBudgetList{ListMeta: obj.(*v1beta1.PodDisruptionBudgetList).ListMeta}
-	for _, item := range obj.(*v1beta1.PodDisruptionBudgetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *FakePodDisruptionBudgets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchActionWithOptions(poddisruptionbudgetsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a podDisruptionBudget and creates it.  Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
-func (c *FakePodDisruptionBudgets) Create(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.CreateOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	emptyResult := &v1beta1.PodDisruptionBudget{}
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateActionWithOptions(poddisruptionbudgetsResource, c.ns, podDisruptionBudget, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
-}
-
-// Update takes the representation of a podDisruptionBudget and updates it. Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
-func (c *FakePodDisruptionBudgets) Update(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	emptyResult := &v1beta1.PodDisruptionBudget{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateActionWithOptions(poddisruptionbudgetsResource, c.ns, podDisruptionBudget, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePodDisruptionBudgets) UpdateStatus(ctx context.Context, podDisruptionBudget *v1beta1.PodDisruptionBudget, opts v1.UpdateOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	emptyResult := &v1beta1.PodDisruptionBudget{}
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceActionWithOptions(poddisruptionbudgetsResource, "status", c.ns, podDisruptionBudget, opts), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
-}
-
-// Delete takes name of the podDisruptionBudget and deletes it. Returns an error if one occurs.
-func (c *FakePodDisruptionBudgets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(poddisruptionbudgetsResource, c.ns, name, opts), &v1beta1.PodDisruptionBudget{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakePodDisruptionBudgets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionActionWithOptions(poddisruptionbudgetsResource, c.ns, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.PodDisruptionBudgetList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched podDisruptionBudget.
-func (c *FakePodDisruptionBudgets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.PodDisruptionBudget, err error) {
-	emptyResult := &v1beta1.PodDisruptionBudget{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(poddisruptionbudgetsResource, c.ns, name, pt, data, opts, subresources...), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied podDisruptionBudget.
-func (c *FakePodDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	if podDisruptionBudget == nil {
-		return nil, fmt.Errorf("podDisruptionBudget provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(podDisruptionBudget)
-	if err != nil {
-		return nil, err
-	}
-	name := podDisruptionBudget.Name
-	if name == nil {
-		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
-	}
-	emptyResult := &v1beta1.PodDisruptionBudget{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(poddisruptionbudgetsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakePodDisruptionBudgets) ApplyStatus(ctx context.Context, podDisruptionBudget *policyv1beta1.PodDisruptionBudgetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	if podDisruptionBudget == nil {
-		return nil, fmt.Errorf("podDisruptionBudget provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(podDisruptionBudget)
-	if err != nil {
-		return nil, err
-	}
-	name := podDisruptionBudget.Name
-	if name == nil {
-		return nil, fmt.Errorf("podDisruptionBudget.Name must be provided to Apply")
-	}
-	emptyResult := &v1beta1.PodDisruptionBudget{}
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceActionWithOptions(poddisruptionbudgetsResource, c.ns, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1beta1.PodDisruptionBudget), err
 }

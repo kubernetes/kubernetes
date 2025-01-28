@@ -144,7 +144,7 @@ func TestRun(t *testing.T) {
 	// Wait for the second callback to be issued.
 	<-callbackChan
 
-	require.Equal(t, callbackCount, 2)
+	require.Equal(t, 2, callbackCount)
 }
 
 func TestAllocate(t *testing.T) {

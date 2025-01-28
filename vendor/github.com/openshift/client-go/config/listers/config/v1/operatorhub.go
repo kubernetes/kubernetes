@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // OperatorHubLister helps list OperatorHubs.
@@ -14,19 +14,19 @@ import (
 type OperatorHubLister interface {
 	// List lists all OperatorHubs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.OperatorHub, err error)
+	List(selector labels.Selector) (ret []*configv1.OperatorHub, err error)
 	// Get retrieves the OperatorHub from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.OperatorHub, error)
+	Get(name string) (*configv1.OperatorHub, error)
 	OperatorHubListerExpansion
 }
 
 // operatorHubLister implements the OperatorHubLister interface.
 type operatorHubLister struct {
-	listers.ResourceIndexer[*v1.OperatorHub]
+	listers.ResourceIndexer[*configv1.OperatorHub]
 }
 
 // NewOperatorHubLister returns a new OperatorHubLister.
 func NewOperatorHubLister(indexer cache.Indexer) OperatorHubLister {
-	return &operatorHubLister{listers.New[*v1.OperatorHub](indexer, v1.Resource("operatorhub"))}
+	return &operatorHubLister{listers.New[*configv1.OperatorHub](indexer, configv1.Resource("operatorhub"))}
 }

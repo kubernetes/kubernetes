@@ -37,7 +37,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/nodefeature"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
@@ -45,7 +44,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
+func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, cgroupManager cm.CgroupManager) {
 	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
@@ -62,6 +61,11 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) 
 	initialConfig.CgroupsPerQOS = true
 	initialConfig.KubeReservedCgroup = kubeReservedCgroup
 	initialConfig.SystemReservedCgroup = systemReservedCgroup
+
+	if initialConfig.CgroupDriver == "systemd" {
+		initialConfig.KubeReservedCgroup = cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup).ToSystemd()
+		initialConfig.SystemReservedCgroup = cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup).ToSystemd()
+	}
 }
 
 var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
@@ -97,12 +101,9 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 					framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 
 					ginkgo.By("Restarting the kubelet")
-					restartKubelet(true)
+					restartKubelet(ctx, true)
 
-					// wait until the kubelet health check will succeed
-					gomega.Eventually(ctx, func(ctx context.Context) bool {
-						return kubeletHealthCheck(kubeletHealthCheckURL)
-					}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+					waitForKubeletToStart(ctx, f)
 					ginkgo.By("Started the kubelet")
 				}
 			})
@@ -117,12 +118,9 @@ var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 
 			ginkgo.By("Restarting the kubelet")
-			restartKubelet(true)
+			restartKubelet(ctx, true)
 
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}).WithTimeout(2 * time.Minute).WithPolling(5 * time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
+			waitForKubeletToStart(ctx, f)
 			ginkgo.By("Started the kubelet")
 
 			gomega.Consistently(ctx, func(ctx context.Context) bool {
@@ -174,8 +172,9 @@ func getAllocatableLimits(cpu, memory, pids string, capacity v1.ResourceList) (*
 }
 
 const (
-	kubeReservedCgroup   = "kube-reserved"
-	systemReservedCgroup = "system-reserved"
+	kubeReservedCgroup    = "kube-reserved"
+	systemReservedCgroup  = "system-reserved"
+	nodeAllocatableCgroup = "kubepods"
 )
 
 func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {
@@ -230,15 +229,6 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		return err
 	}
 
-	// Test needs to be updated to make it run properly on systemd.
-	// In its current state it will result in kubelet error since
-	// kubeReservedCgroup and systemReservedCgroup are not configured
-	// correctly for systemd.
-	// See: https://github.com/kubernetes/kubernetes/issues/102394
-	if oldCfg.CgroupDriver == "systemd" {
-		e2eskipper.Skipf("unable to run test when using systemd as cgroup driver")
-	}
-
 	// Create a cgroup manager object for manipulating cgroups.
 	cgroupManager := cm.NewCgroupManager(subsystems, oldCfg.CgroupDriver)
 
@@ -247,49 +237,57 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		if oldCfg != nil {
 			// Update the Kubelet configuration.
 			ginkgo.By("Stopping the kubelet")
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 
 			// wait until the kubelet health check will fail
 			gomega.Eventually(ctx, func() bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, time.Minute, time.Second).Should(gomega.BeFalse())
+			}, time.Minute, time.Second).Should(gomega.BeFalseBecause("expected kubelet health check to be failed"))
 
 			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(oldCfg))
 
-			ginkgo.By("Starting the kubelet")
-			startKubelet()
+			ginkgo.By("Restarting the kubelet")
+			restartKubelet(ctx)
 
 			// wait until the kubelet health check will succeed
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 		}
 	})
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
 		return err
 	}
+
 	newCfg := oldCfg.DeepCopy()
 	// Change existing kubelet configuration
-	setDesiredConfiguration(newCfg)
+	setDesiredConfiguration(newCfg, cgroupManager)
 	// Set the new kubelet configuration.
 	// Update the Kubelet configuration.
 	ginkgo.By("Stopping the kubelet")
-	startKubelet := stopKubelet()
+	restartKubelet := mustStopKubelet(ctx, f)
 
-	// wait until the kubelet health check will fail
-	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, time.Minute, time.Second).Should(gomega.BeFalse())
+	expectedNAPodCgroup := cm.NewCgroupName(cm.RootCgroupName, nodeAllocatableCgroup)
+
+	// Cleanup from the previous kubelet, to verify the new one creates it correctly
+	if err := cgroupManager.Destroy(&cm.CgroupConfig{
+		Name: cm.NewCgroupName(expectedNAPodCgroup),
+	}); err != nil {
+		return err
+	}
+	if cgroupManager.Exists(expectedNAPodCgroup) {
+		return fmt.Errorf("Expected Node Allocatable Cgroup %q not to exist", expectedNAPodCgroup)
+	}
 
 	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
 
 	ginkgo.By("Starting the kubelet")
-	startKubelet()
+	restartKubelet(ctx)
 
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
 		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
+	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	if err != nil {
 		return err
@@ -297,10 +295,8 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	// Set new config and current config.
 	currentConfig := newCfg
 
-	expectedNAPodCgroup := cm.ParseCgroupfsToCgroupName(currentConfig.CgroupRoot)
-	expectedNAPodCgroup = cm.NewCgroupName(expectedNAPodCgroup, "kubepods")
 	if !cgroupManager.Exists(expectedNAPodCgroup) {
-		return fmt.Errorf("Expected Node Allocatable Cgroup %q does not exist", expectedNAPodCgroup)
+		return fmt.Errorf("Expected Node Allocatable Cgroup %q to exist", expectedNAPodCgroup)
 	}
 
 	memoryLimitFile := "memory.limit_in_bytes"
@@ -318,9 +314,9 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 		if len(nodeList.Items) != 1 {
 			return fmt.Errorf("Unexpected number of node objects for node e2e. Expects only one node: %+v", nodeList)
 		}
-		cgroupName := "kubepods"
+		cgroupName := nodeAllocatableCgroup
 		if currentConfig.CgroupDriver == "systemd" {
-			cgroupName = "kubepods.slice"
+			cgroupName = nodeAllocatableCgroup + ".slice"
 		}
 
 		node := nodeList.Items[0]
@@ -369,7 +365,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 	cgroupPath := ""
 	if currentConfig.CgroupDriver == "systemd" {
-		cgroupPath = cm.ParseSystemdToCgroupName(kubeReservedCgroup).ToSystemd()
+		cgroupPath = cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup).ToSystemd()
 	} else {
 		cgroupPath = cgroupManager.Name(cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup))
 	}
@@ -397,7 +393,7 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 	}
 
 	if currentConfig.CgroupDriver == "systemd" {
-		cgroupPath = cm.ParseSystemdToCgroupName(systemReservedCgroup).ToSystemd()
+		cgroupPath = cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup).ToSystemd()
 	} else {
 		cgroupPath = cgroupManager.Name(cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup))
 	}

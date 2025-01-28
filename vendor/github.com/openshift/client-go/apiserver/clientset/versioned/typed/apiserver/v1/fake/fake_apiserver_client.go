@@ -13,7 +13,7 @@ type FakeApiserverV1 struct {
 }
 
 func (c *FakeApiserverV1) APIRequestCounts() v1.APIRequestCountInterface {
-	return &FakeAPIRequestCounts{c}
+	return newFakeAPIRequestCounts(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

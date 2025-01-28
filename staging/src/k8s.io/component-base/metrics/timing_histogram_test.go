@@ -23,6 +23,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	testclock "k8s.io/utils/clock/testing"
@@ -112,7 +113,7 @@ func TestTimingHistogram(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, metric := range ms {
 				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -137,13 +138,13 @@ func TestTimingHistogram(t *testing.T) {
 			expectedCount := uint64(dt1 + dt2 + dt3)
 			expectedSum := float64(dt1)*v0 + float64(dt2)*v1 + float64(dt3)*v2
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				t.Logf("Considering metric family %s", mf.GetName())
 				for _, m := range mf.GetMetric() {
 					assert.Equalf(t, expectedCount, m.GetHistogram().GetSampleCount(), "Got %v, want %v as the sample count of metric %s", m.GetHistogram().GetSampleCount(), expectedCount, m.String())
-					assert.Equalf(t, expectedSum, m.GetHistogram().GetSampleSum(), "Got %v, want %v as the sample sum of metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
+					assert.InDeltaf(t, expectedSum, m.GetHistogram().GetSampleSum(), 0.01, "Got %v, want %v as the sample sum of metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
 				}
 			}
 		})
@@ -243,7 +244,7 @@ func TestTimingHistogramVec(t *testing.T) {
 
 			ms, err := registry.Gather()
 			assert.Lenf(t, ms, test.expectedMetricCount, "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
 				if metric.GetHelp() != test.expectedHelp {
 					assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
@@ -260,7 +261,7 @@ func TestTimingHistogramVec(t *testing.T) {
 			c.WithLabelValues("1", "3").Add(5.0)
 			c.WithLabelValues("2", "3").Add(5.0)
 			ms, err = registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range ms {
 				t.Logf("Considering metric family %s", mf.String())
@@ -269,7 +270,7 @@ func TestTimingHistogramVec(t *testing.T) {
 					expectedCount := uint64(dt1)
 					expectedSum := float64(dt1) * v0
 					assert.Equalf(t, expectedCount, m.GetHistogram().GetSampleCount(), "Got %v, expected histogram sample count to equal %d for metric %s", m.GetHistogram().GetSampleCount(), expectedCount, m.String())
-					assert.Equalf(t, expectedSum, m.GetHistogram().GetSampleSum(), "Got %v, expected histogram sample sum to equal %v for metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
+					assert.InDeltaf(t, expectedSum, m.GetHistogram().GetSampleSum(), 0.01, "Got %v, expected histogram sample sum to equal %v for metric %s", m.GetHistogram().GetSampleSum(), expectedSum, m.String())
 				}
 			}
 		})
@@ -312,7 +313,8 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			SetLabelAllowListFromCLI(labelAllowValues)
+			labelValueAllowLists = map[string]*MetricLabelAllowList{}
+
 			registry := newKubeRegistry(apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
@@ -322,6 +324,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 			clk := testclock.NewFakePassiveClock(t0)
 			c := NewTestableTimingHistogramVec(clk.Now, opts, labels)
 			registry.MustRegister(c)
+			SetLabelAllowListFromCLI(labelAllowValues)
 			var v0 float64 = 13
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Set(v0)
@@ -335,7 +338,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 				c.WithLabelValues(lv...).Add(1.0)
 			}
 			mfs, err := registry.Gather()
-			assert.Nil(t, err, "Gather failed %v", err)
+			require.NoError(t, err, "Gather failed %v", err)
 
 			for _, mf := range mfs {
 				if *mf.Name != BuildFQName(opts.Namespace, opts.Subsystem, opts.Name) {
@@ -362,7 +365,7 @@ func TestTimingHistogramWithLabelValueAllowList(t *testing.T) {
 					actualCount := m.GetHistogram().GetSampleCount()
 					actualSum := m.GetHistogram().GetSampleSum()
 					assert.Equalf(t, expectedCount, actualCount, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualCount, expectedCount, aValue, bValue)
-					assert.Equalf(t, expectedSum, actualSum, "Got %v, wanted %v as the sum while setting label_a to %v and label b to %v", actualSum, expectedSum, aValue, bValue)
+					assert.InDeltaf(t, expectedSum, actualSum, 0.01, "Got %v, wanted %v as the sum while setting label_a to %v and label b to %v", actualSum, expectedSum, aValue, bValue)
 				}
 			}
 		})

@@ -2449,3 +2449,466 @@ var _ warning.Recorder = &warningRecorder{}
 func (w *warningRecorder) AddWarning(_, text string) {
 	w.warnings = append(w.warnings, text)
 }
+
+func TestPodResizePrepareForUpdate(t *testing.T) {
+	tests := []struct {
+		name     string
+		oldPod   *api.Pod
+		newPod   *api.Pod
+		expected *api.Pod
+	}{
+		{
+			name: "no resize",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						}),
+					),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						}),
+					),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						}),
+					),
+				)),
+			),
+		},
+		{
+			name: "update resizepolicy",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+					podtest.SetContainerResizePolicy(
+						api.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+						api.ContainerResizePolicy{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+					),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+					podtest.SetContainerResizePolicy(
+						api.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"},
+						api.ContainerResizePolicy{ResourceName: "memory", RestartPolicy: "RestartContainer"},
+					),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+		},
+		{
+			name: "add new container",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+		},
+		{
+			name: "add new container and update resources of existing container",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("2Gi"), // Updated resource
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(podtest.MakeContainer("container1",
+					podtest.SetContainerResources(api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("2Gi"), // Updated resource
+						},
+					}),
+				)),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
+					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
+						api.ResourceList{
+							api.ResourceCPU:    resource.MustParse("100m"),
+							api.ResourceMemory: resource.MustParse("1Gi"),
+						})),
+				)),
+			),
+		},
+		{
+			name: "change container order and update resources",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+						podtest.MakeContainerStatus("container2",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(
+					podtest.MakeContainer("container2", // Order changed
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("2Gi"),  // Updated resource
+							},
+						}),
+					),
+					podtest.MakeContainer("container1", // Order changed
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+						podtest.MakeContainerStatus("container2",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("2Gi"),  // Updated resource
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+						podtest.MakeContainerStatus("container2",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+		},
+		{
+			name: "change pod labels",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetLabels(map[string]string{"foo": "bar"}),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetLabels(map[string]string{"foo": "bar", "baz": "qux"}),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetLabels(map[string]string{"foo": "bar"}),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingAllocatedStatus, true)
+			ctx := context.Background()
+			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
+			if !cmp.Equal(tc.expected, tc.newPod) {
+				t.Errorf("ResizeStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
+			}
+		})
+	}
+}

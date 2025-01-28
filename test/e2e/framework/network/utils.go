@@ -255,7 +255,7 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
 		desc, _ := e2ekubectl.RunKubectl(
 			e.Namespace, "describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
-		framework.Logf(desc)
+		framework.Logf("%s", desc)
 	}
 }
 
@@ -554,12 +554,12 @@ func (config *NetworkingTestConfig) executeCurlCmd(ctx context.Context, cmd stri
 		stdout, err := e2epodoutput.RunHostCmd(config.Namespace, podName, cmd)
 		if err != nil {
 			msg = fmt.Sprintf("failed executing cmd %v in %v/%v: %v", cmd, config.Namespace, podName, err)
-			framework.Logf(msg)
+			framework.Logf("%s", msg)
 			return false, nil
 		}
 		if !strings.Contains(stdout, expected) {
 			msg = fmt.Sprintf("successfully executed %v in %v/%v, but output '%v' doesn't contain expected string '%v'", cmd, config.Namespace, podName, stdout, expected)
-			framework.Logf(msg)
+			framework.Logf("%s", msg)
 			return false, nil
 		}
 		return true, nil

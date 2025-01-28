@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type AuthenticationsGetter interface {
 
 // AuthenticationInterface has methods to work with Authentication resources.
 type AuthenticationInterface interface {
-	Create(ctx context.Context, authentication *v1.Authentication, opts metav1.CreateOptions) (*v1.Authentication, error)
-	Update(ctx context.Context, authentication *v1.Authentication, opts metav1.UpdateOptions) (*v1.Authentication, error)
+	Create(ctx context.Context, authentication *configv1.Authentication, opts metav1.CreateOptions) (*configv1.Authentication, error)
+	Update(ctx context.Context, authentication *configv1.Authentication, opts metav1.UpdateOptions) (*configv1.Authentication, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, authentication *v1.Authentication, opts metav1.UpdateOptions) (*v1.Authentication, error)
+	UpdateStatus(ctx context.Context, authentication *configv1.Authentication, opts metav1.UpdateOptions) (*configv1.Authentication, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Authentication, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.AuthenticationList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.Authentication, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.AuthenticationList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Authentication, err error)
-	Apply(ctx context.Context, authentication *configv1.AuthenticationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Authentication, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.Authentication, err error)
+	Apply(ctx context.Context, authentication *applyconfigurationsconfigv1.AuthenticationApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Authentication, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, authentication *configv1.AuthenticationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Authentication, err error)
+	ApplyStatus(ctx context.Context, authentication *applyconfigurationsconfigv1.AuthenticationApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Authentication, err error)
 	AuthenticationExpansion
 }
 
 // authentications implements AuthenticationInterface
 type authentications struct {
-	*gentype.ClientWithListAndApply[*v1.Authentication, *v1.AuthenticationList, *configv1.AuthenticationApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.Authentication, *configv1.AuthenticationList, *applyconfigurationsconfigv1.AuthenticationApplyConfiguration]
 }
 
 // newAuthentications returns a Authentications
 func newAuthentications(c *ConfigV1Client) *authentications {
 	return &authentications{
-		gentype.NewClientWithListAndApply[*v1.Authentication, *v1.AuthenticationList, *configv1.AuthenticationApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.Authentication, *configv1.AuthenticationList, *applyconfigurationsconfigv1.AuthenticationApplyConfiguration](
 			"authentications",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Authentication { return &v1.Authentication{} },
-			func() *v1.AuthenticationList { return &v1.AuthenticationList{} }),
+			func() *configv1.Authentication { return &configv1.Authentication{} },
+			func() *configv1.AuthenticationList { return &configv1.AuthenticationList{} },
+		),
 	}
 }

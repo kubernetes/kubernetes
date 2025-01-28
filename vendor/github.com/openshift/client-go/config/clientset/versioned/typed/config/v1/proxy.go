@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type ProxiesGetter interface {
 
 // ProxyInterface has methods to work with Proxy resources.
 type ProxyInterface interface {
-	Create(ctx context.Context, proxy *v1.Proxy, opts metav1.CreateOptions) (*v1.Proxy, error)
-	Update(ctx context.Context, proxy *v1.Proxy, opts metav1.UpdateOptions) (*v1.Proxy, error)
+	Create(ctx context.Context, proxy *configv1.Proxy, opts metav1.CreateOptions) (*configv1.Proxy, error)
+	Update(ctx context.Context, proxy *configv1.Proxy, opts metav1.UpdateOptions) (*configv1.Proxy, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, proxy *v1.Proxy, opts metav1.UpdateOptions) (*v1.Proxy, error)
+	UpdateStatus(ctx context.Context, proxy *configv1.Proxy, opts metav1.UpdateOptions) (*configv1.Proxy, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Proxy, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ProxyList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.Proxy, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.ProxyList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Proxy, err error)
-	Apply(ctx context.Context, proxy *configv1.ProxyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Proxy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.Proxy, err error)
+	Apply(ctx context.Context, proxy *applyconfigurationsconfigv1.ProxyApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Proxy, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, proxy *configv1.ProxyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Proxy, err error)
+	ApplyStatus(ctx context.Context, proxy *applyconfigurationsconfigv1.ProxyApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Proxy, err error)
 	ProxyExpansion
 }
 
 // proxies implements ProxyInterface
 type proxies struct {
-	*gentype.ClientWithListAndApply[*v1.Proxy, *v1.ProxyList, *configv1.ProxyApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.Proxy, *configv1.ProxyList, *applyconfigurationsconfigv1.ProxyApplyConfiguration]
 }
 
 // newProxies returns a Proxies
 func newProxies(c *ConfigV1Client) *proxies {
 	return &proxies{
-		gentype.NewClientWithListAndApply[*v1.Proxy, *v1.ProxyList, *configv1.ProxyApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.Proxy, *configv1.ProxyList, *applyconfigurationsconfigv1.ProxyApplyConfiguration](
 			"proxies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Proxy { return &v1.Proxy{} },
-			func() *v1.ProxyList { return &v1.ProxyList{} }),
+			func() *configv1.Proxy { return &configv1.Proxy{} },
+			func() *configv1.ProxyList { return &configv1.ProxyList{} },
+		),
 	}
 }

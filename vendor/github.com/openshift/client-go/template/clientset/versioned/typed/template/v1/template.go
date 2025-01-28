@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/template/v1"
-	templatev1 "github.com/openshift/client-go/template/applyconfigurations/template/v1"
+	templatev1 "github.com/openshift/api/template/v1"
+	applyconfigurationstemplatev1 "github.com/openshift/client-go/template/applyconfigurations/template/v1"
 	scheme "github.com/openshift/client-go/template/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type TemplatesGetter interface {
 
 // TemplateInterface has methods to work with Template resources.
 type TemplateInterface interface {
-	Create(ctx context.Context, template *v1.Template, opts metav1.CreateOptions) (*v1.Template, error)
-	Update(ctx context.Context, template *v1.Template, opts metav1.UpdateOptions) (*v1.Template, error)
+	Create(ctx context.Context, template *templatev1.Template, opts metav1.CreateOptions) (*templatev1.Template, error)
+	Update(ctx context.Context, template *templatev1.Template, opts metav1.UpdateOptions) (*templatev1.Template, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Template, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.TemplateList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*templatev1.Template, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*templatev1.TemplateList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Template, err error)
-	Apply(ctx context.Context, template *templatev1.TemplateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Template, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *templatev1.Template, err error)
+	Apply(ctx context.Context, template *applyconfigurationstemplatev1.TemplateApplyConfiguration, opts metav1.ApplyOptions) (result *templatev1.Template, err error)
 	TemplateExpansion
 }
 
 // templates implements TemplateInterface
 type templates struct {
-	*gentype.ClientWithListAndApply[*v1.Template, *v1.TemplateList, *templatev1.TemplateApplyConfiguration]
+	*gentype.ClientWithListAndApply[*templatev1.Template, *templatev1.TemplateList, *applyconfigurationstemplatev1.TemplateApplyConfiguration]
 }
 
 // newTemplates returns a Templates
 func newTemplates(c *TemplateV1Client, namespace string) *templates {
 	return &templates{
-		gentype.NewClientWithListAndApply[*v1.Template, *v1.TemplateList, *templatev1.TemplateApplyConfiguration](
+		gentype.NewClientWithListAndApply[*templatev1.Template, *templatev1.TemplateList, *applyconfigurationstemplatev1.TemplateApplyConfiguration](
 			"templates",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Template { return &v1.Template{} },
-			func() *v1.TemplateList { return &v1.TemplateList{} }),
+			func() *templatev1.Template { return &templatev1.Template{} },
+			func() *templatev1.TemplateList { return &templatev1.TemplateList{} },
+		),
 	}
 }

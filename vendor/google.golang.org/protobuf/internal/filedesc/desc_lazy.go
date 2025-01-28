@@ -504,6 +504,8 @@ func (fd *Field) unmarshalOptions(b []byte) {
 				fd.L1.EditionFeatures.IsPacked = protowire.DecodeBool(v)
 			case genid.FieldOptions_Weak_field_number:
 				fd.L1.IsWeak = protowire.DecodeBool(v)
+			case genid.FieldOptions_Lazy_field_number:
+				fd.L1.IsLazy = protowire.DecodeBool(v)
 			case FieldOptions_EnforceUTF8:
 				fd.L1.EditionFeatures.IsUTF8Validated = protowire.DecodeBool(v)
 			}

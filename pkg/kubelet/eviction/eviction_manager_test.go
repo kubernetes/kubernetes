@@ -66,7 +66,8 @@ func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride 
 
 // mockDiskInfoProvider is used to simulate testing.
 type mockDiskInfoProvider struct {
-	dedicatedImageFs *bool
+	dedicatedImageFs     *bool
+	dedicatedContainerFs *bool
 }
 
 // HasDedicatedImageFs returns the mocked value
@@ -74,14 +75,18 @@ func (m *mockDiskInfoProvider) HasDedicatedImageFs(_ context.Context) (bool, err
 	return ptr.Deref(m.dedicatedImageFs, false), nil
 }
 
+// HasDedicatedContainerFs returns the mocked value
+func (m *mockDiskInfoProvider) HasDedicatedContainerFs(_ context.Context) (bool, error) {
+	return ptr.Deref(m.dedicatedContainerFs, false), nil
+}
+
 // mockDiskGC is used to simulate invoking image and container garbage collection.
 type mockDiskGC struct {
-	err                  error
-	imageGCInvoked       bool
-	containerGCInvoked   bool
-	readAndWriteSeparate bool
-	fakeSummaryProvider  *fakeSummaryProvider
-	summaryAfterGC       *statsapi.Summary
+	err                 error
+	imageGCInvoked      bool
+	containerGCInvoked  bool
+	fakeSummaryProvider *fakeSummaryProvider
+	summaryAfterGC      *statsapi.Summary
 }
 
 // DeleteUnusedImages returns the mocked values.
@@ -100,10 +105,6 @@ func (m *mockDiskGC) DeleteAllUnusedContainers(_ context.Context) error {
 		m.fakeSummaryProvider.result = m.summaryAfterGC
 	}
 	return m.err
-}
-
-func (m *mockDiskGC) IsContainerFsSeparateFromImageFs(_ context.Context) bool {
-	return m.readAndWriteSeparate
 }
 
 func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
@@ -384,7 +385,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 
 		fakeClock := testingclock.NewFakeClock(time.Now())
 		podKiller := &mockPodKiller{}
-		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
+		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false), dedicatedContainerFs: ptr.To(false)}
 		diskGC := &mockDiskGC{err: nil}
 		nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
@@ -562,8 +563,8 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 
 		fakeClock := testingclock.NewFakeClock(time.Now())
 		podKiller := &mockPodKiller{}
-		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs}
-		diskGC := &mockDiskGC{err: nil, readAndWriteSeparate: tc.writeableSeparateFromReadOnly}
+		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
+		diskGC := &mockDiskGC{err: nil}
 		nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 		config := Config{
@@ -1307,8 +1308,8 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
-			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs}
-			diskGC := &mockDiskGC{err: nil, readAndWriteSeparate: tc.writeableSeparateFromReadOnly}
+			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
+			diskGC := &mockDiskGC{err: nil}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			config := Config{
@@ -1829,7 +1830,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
-			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs}
+			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			config := Config{
@@ -1846,7 +1847,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// This is a constant that we use to test that disk pressure is over. Don't change!
 			diskStatConst := diskStatStart
 			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStatStart)}
-			diskGC := &mockDiskGC{fakeSummaryProvider: summaryProvider, err: nil, readAndWriteSeparate: tc.writeableSeparateFromReadOnly}
+			diskGC := &mockDiskGC{fakeSummaryProvider: summaryProvider, err: nil}
 			manager := &managerImpl{
 				clock:                        fakeClock,
 				killPodFunc:                  podKiller.killPodNow,
@@ -2292,8 +2293,8 @@ func TestInodePressureFsInodes(t *testing.T) {
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
-			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs}
-			diskGC := &mockDiskGC{err: nil, readAndWriteSeparate: tc.writeableSeparateFromReadOnly}
+			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
+			diskGC := &mockDiskGC{err: nil}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			config := Config{

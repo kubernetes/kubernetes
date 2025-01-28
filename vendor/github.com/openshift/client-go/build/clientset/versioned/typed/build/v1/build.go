@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/build/v1"
-	buildv1 "github.com/openshift/client-go/build/applyconfigurations/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
+	applyconfigurationsbuildv1 "github.com/openshift/client-go/build/applyconfigurations/build/v1"
 	scheme "github.com/openshift/client-go/build/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,46 +22,47 @@ type BuildsGetter interface {
 
 // BuildInterface has methods to work with Build resources.
 type BuildInterface interface {
-	Create(ctx context.Context, build *v1.Build, opts metav1.CreateOptions) (*v1.Build, error)
-	Update(ctx context.Context, build *v1.Build, opts metav1.UpdateOptions) (*v1.Build, error)
+	Create(ctx context.Context, build *buildv1.Build, opts metav1.CreateOptions) (*buildv1.Build, error)
+	Update(ctx context.Context, build *buildv1.Build, opts metav1.UpdateOptions) (*buildv1.Build, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, build *v1.Build, opts metav1.UpdateOptions) (*v1.Build, error)
+	UpdateStatus(ctx context.Context, build *buildv1.Build, opts metav1.UpdateOptions) (*buildv1.Build, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Build, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.BuildList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*buildv1.Build, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*buildv1.BuildList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Build, err error)
-	Apply(ctx context.Context, build *buildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *buildv1.Build, err error)
+	Apply(ctx context.Context, build *applyconfigurationsbuildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *buildv1.Build, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, build *buildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Build, err error)
-	UpdateDetails(ctx context.Context, buildName string, build *v1.Build, opts metav1.UpdateOptions) (*v1.Build, error)
-	Clone(ctx context.Context, buildName string, buildRequest *v1.BuildRequest, opts metav1.CreateOptions) (*v1.Build, error)
+	ApplyStatus(ctx context.Context, build *applyconfigurationsbuildv1.BuildApplyConfiguration, opts metav1.ApplyOptions) (result *buildv1.Build, err error)
+	UpdateDetails(ctx context.Context, buildName string, build *buildv1.Build, opts metav1.UpdateOptions) (*buildv1.Build, error)
+	Clone(ctx context.Context, buildName string, buildRequest *buildv1.BuildRequest, opts metav1.CreateOptions) (*buildv1.Build, error)
 
 	BuildExpansion
 }
 
 // builds implements BuildInterface
 type builds struct {
-	*gentype.ClientWithListAndApply[*v1.Build, *v1.BuildList, *buildv1.BuildApplyConfiguration]
+	*gentype.ClientWithListAndApply[*buildv1.Build, *buildv1.BuildList, *applyconfigurationsbuildv1.BuildApplyConfiguration]
 }
 
 // newBuilds returns a Builds
 func newBuilds(c *BuildV1Client, namespace string) *builds {
 	return &builds{
-		gentype.NewClientWithListAndApply[*v1.Build, *v1.BuildList, *buildv1.BuildApplyConfiguration](
+		gentype.NewClientWithListAndApply[*buildv1.Build, *buildv1.BuildList, *applyconfigurationsbuildv1.BuildApplyConfiguration](
 			"builds",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Build { return &v1.Build{} },
-			func() *v1.BuildList { return &v1.BuildList{} }),
+			func() *buildv1.Build { return &buildv1.Build{} },
+			func() *buildv1.BuildList { return &buildv1.BuildList{} },
+		),
 	}
 }
 
 // UpdateDetails takes the top resource name and the representation of a build and updates it. Returns the server's representation of the build, and an error, if there is any.
-func (c *builds) UpdateDetails(ctx context.Context, buildName string, build *v1.Build, opts metav1.UpdateOptions) (result *v1.Build, err error) {
-	result = &v1.Build{}
+func (c *builds) UpdateDetails(ctx context.Context, buildName string, build *buildv1.Build, opts metav1.UpdateOptions) (result *buildv1.Build, err error) {
+	result = &buildv1.Build{}
 	err = c.GetClient().Put().
 		Namespace(c.GetNamespace()).
 		Resource("builds").
@@ -75,8 +76,8 @@ func (c *builds) UpdateDetails(ctx context.Context, buildName string, build *v1.
 }
 
 // Clone takes the representation of a buildRequest and creates it.  Returns the server's representation of the build, and an error, if there is any.
-func (c *builds) Clone(ctx context.Context, buildName string, buildRequest *v1.BuildRequest, opts metav1.CreateOptions) (result *v1.Build, err error) {
-	result = &v1.Build{}
+func (c *builds) Clone(ctx context.Context, buildName string, buildRequest *buildv1.BuildRequest, opts metav1.CreateOptions) (result *buildv1.Build, err error) {
+	result = &buildv1.Build{}
 	err = c.GetClient().Post().
 		Namespace(c.GetNamespace()).
 		Resource("builds").

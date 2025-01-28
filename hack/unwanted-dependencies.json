@@ -6,10 +6,13 @@
       "cloud.google.com/go/compute": "cloud dependency",
       "cloud.google.com/go/firestore": "db/datastore clients should not be required",
       "cloud.google.com/go/storage": "cloud dependency",
+      "dario.cat/mergo": "see https://github.com/kubernetes/kubernetes/issues/107499",
       "github.com/GoogleCloudPlatform/k8s-cloud-provider": "cloud dependency",
       "github.com/PuerkitoBio/urlesc": "unmaintained, archive mode",
       "github.com/armon/consul-api": "MPL license not in CNCF allowlist",
       "github.com/bketelsen/crypt": "unused, crypto",
+      "github.com/containerd/cgroups": "standardize on single cgroups library from runc, refer #128157",
+      "github.com/davecgh/go-spew": "refer to #103942",
       "github.com/form3tech-oss/jwt-go": "unmaintained, archive mode",
       "github.com/getsentry/raven-go": "unmaintained, archive mode",
       "github.com/go-bindata/go-bindata": "refer to #99829",
@@ -21,6 +24,7 @@
       "github.com/gogo/googleapis": "depends on unmaintained github.com/gogo/protobuf",
       "github.com/gogo/protobuf": "unmaintained",
       "github.com/golang/mock": "unmaintained, archive mode",
+      "github.com/golang/groupcache": "unmaintained",
       "github.com/google/gofuzz": "unmaintained, archive mode",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
@@ -46,6 +50,7 @@
       "github.com/hashicorp/logutils": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/memberlist": "MPL license not in CNCF allowlist",
       "github.com/hashicorp/serf": "MPL license not in CNCF allowlist",
+      "github.com/imdario/mergo": "see https://github.com/kubernetes/kubernetes/issues/107499",
       "github.com/influxdata/influxdb1-client": "db/datastore clients should not be required",
       "github.com/json-iterator/go": "refer to #105030",
       "github.com/mailru/easyjson": "unmaintained",
@@ -67,6 +72,7 @@
       "google.golang.org/appengine": "cloud dependency",
       "google.golang.org/genproto": "refer to #113366",
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
+      "gopkg.in/yaml.v2": "prefer sigs.k8s.io/yaml",
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",
       "rsc.io/quote": "refer to #102833",
       "rsc.io/sampler": "refer to #102833"
@@ -87,17 +93,48 @@
       "cloud.google.com/go/firestore": [
         "google.golang.org/genproto"
       ],
+      "github.com/davecgh/go-spew": [
+        "github.com/cyphar/filepath-securejoin",
+        "github.com/go-logr/zapr",
+        "github.com/go-openapi/jsonpointer",
+        "github.com/go-openapi/swag",
+        "github.com/go-task/slim-sprig/v3",
+        "github.com/google/cadvisor",
+        "github.com/json-iterator/go",
+        "github.com/prometheus/client_golang",
+        "github.com/prometheus/common",
+        "github.com/sirupsen/logrus",
+        "github.com/stretchr/objx",
+        "github.com/stretchr/testify",
+        "go.etcd.io/bbolt",
+        "go.etcd.io/etcd/client/pkg/v3",
+        "go.etcd.io/etcd/pkg/v3",
+        "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+        "go.opentelemetry.io/otel/metric",
+        "go.opentelemetry.io/otel/sdk",
+        "go.opentelemetry.io/otel/trace",
+        "go.uber.org/goleak",
+        "go.uber.org/multierr",
+        "go.uber.org/zap",
+        "k8s.io/apimachinery",
+        "k8s.io/kube-openapi",
+        "k8s.io/utils",
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v5",
+        "sigs.k8s.io/kustomize/kyaml"
+      ],
       "github.com/go-kit/kit": [
         "github.com/grpc-ecosystem/go-grpc-middleware"
       ],
-      "github.com/gogo/googleapis": [
-        "github.com/google/cadvisor"
-      ],
       "github.com/gogo/protobuf": [
-        "github.com/Microsoft/hcsshim",
-        "github.com/containerd/cgroups",
+        "github.com/containerd/containerd/api",
         "github.com/containerd/ttrpc",
-        "github.com/containerd/typeurl",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.etcd.io/etcd/api/v3",
@@ -111,11 +148,15 @@
         "k8s.io/client-go",
         "k8s.io/code-generator",
         "k8s.io/cri-api",
+        "k8s.io/externaljwt",
         "k8s.io/kms",
         "k8s.io/kube-aggregator",
         "k8s.io/kubelet",
         "k8s.io/kubernetes",
         "k8s.io/metrics"
+      ],
+      "github.com/golang/groupcache": [
+        "go.etcd.io/etcd/server/v3"
       ],
       "github.com/google/gofuzz": [
         "github.com/json-iterator/go",
@@ -156,6 +197,7 @@
         "sigs.k8s.io/structured-merge-diff/v4"
       ],
       "github.com/mailru/easyjson": [
+        "github.com/go-openapi/jsonpointer",
         "github.com/go-openapi/swag",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/kustomize/api",
@@ -163,41 +205,41 @@
         "sigs.k8s.io/kustomize/kyaml"
       ],
       "github.com/pkg/errors": [
-        "github.com/Microsoft/hcsshim",
-        "github.com/containerd/continuity",
-        "github.com/containerd/fifo",
-        "github.com/containerd/go-runc",
-        "github.com/containerd/typeurl",
+        "github.com/Microsoft/hnslib",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
-        "gotest.tools/v3",
         "k8s.io/kubectl",
         "k8s.io/kubernetes",
-        "k8s.io/system-validators",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
-      ],
-      "go.opencensus.io": [
-        "github.com/Microsoft/hcsshim"
       ],
       "golang.org/x/exp": [
         "github.com/antlr4-go/antlr/v4",
         "github.com/google/cel-go",
+        "github.com/opencontainers/runc",
         "k8s.io/mount-utils"
       ],
       "google.golang.org/appengine": [
         "github.com/prometheus/client_golang"
       ],
       "google.golang.org/genproto": [
-        "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
+        "go.etcd.io/etcd/api/v3",
+        "go.etcd.io/etcd/client/v3",
+        "go.etcd.io/etcd/server/v3"
+      ],
+      "gopkg.in/yaml.v2": [
+        "github.com/grpc-ecosystem/grpc-gateway",
+        "github.com/prometheus/client_golang",
+        "github.com/prometheus/common",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3"
       ]
     },
     "unwantedVendored": [
+      "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/google/gofuzz",
       "github.com/google/shlex",
@@ -207,7 +249,6 @@
       "github.com/json-iterator/go",
       "github.com/mailru/easyjson",
       "github.com/pkg/errors",
-      "go.opencensus.io",
       "golang.org/x/exp",
       "google.golang.org/genproto"
     ]

@@ -3,7 +3,7 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openshift/api/network/v1alpha1"
+	networkv1alpha1 "github.com/openshift/api/network/v1alpha1"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -11,7 +11,7 @@ import (
 // with apply.
 type DNSNameResolverResolvedNameApplyConfiguration struct {
 	Conditions         []v1.ConditionApplyConfiguration                   `json:"conditions,omitempty"`
-	DNSName            *v1alpha1.DNSName                                  `json:"dnsName,omitempty"`
+	DNSName            *networkv1alpha1.DNSName                           `json:"dnsName,omitempty"`
 	ResolvedAddresses  []DNSNameResolverResolvedAddressApplyConfiguration `json:"resolvedAddresses,omitempty"`
 	ResolutionFailures *int32                                             `json:"resolutionFailures,omitempty"`
 }
@@ -38,7 +38,7 @@ func (b *DNSNameResolverResolvedNameApplyConfiguration) WithConditions(values ..
 // WithDNSName sets the DNSName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DNSName field is set to the value of the last call.
-func (b *DNSNameResolverResolvedNameApplyConfiguration) WithDNSName(value v1alpha1.DNSName) *DNSNameResolverResolvedNameApplyConfiguration {
+func (b *DNSNameResolverResolvedNameApplyConfiguration) WithDNSName(value networkv1alpha1.DNSName) *DNSNameResolverResolvedNameApplyConfiguration {
 	b.DNSName = &value
 	return b
 }

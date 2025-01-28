@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 
-	v1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	storagev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
+	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type CSINodesGetter interface {
 
 // CSINodeInterface has methods to work with CSINode resources.
 type CSINodeInterface interface {
-	Create(ctx context.Context, cSINode *v1beta1.CSINode, opts v1.CreateOptions) (*v1beta1.CSINode, error)
-	Update(ctx context.Context, cSINode *v1beta1.CSINode, opts v1.UpdateOptions) (*v1beta1.CSINode, error)
+	Create(ctx context.Context, cSINode *storagev1beta1.CSINode, opts v1.CreateOptions) (*storagev1beta1.CSINode, error)
+	Update(ctx context.Context, cSINode *storagev1beta1.CSINode, opts v1.UpdateOptions) (*storagev1beta1.CSINode, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.CSINode, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.CSINodeList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*storagev1beta1.CSINode, error)
+	List(ctx context.Context, opts v1.ListOptions) (*storagev1beta1.CSINodeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSINode, err error)
-	Apply(ctx context.Context, cSINode *storagev1beta1.CSINodeApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.CSINode, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *storagev1beta1.CSINode, err error)
+	Apply(ctx context.Context, cSINode *applyconfigurationsstoragev1beta1.CSINodeApplyConfiguration, opts v1.ApplyOptions) (result *storagev1beta1.CSINode, err error)
 	CSINodeExpansion
 }
 
 // cSINodes implements CSINodeInterface
 type cSINodes struct {
-	*gentype.ClientWithListAndApply[*v1beta1.CSINode, *v1beta1.CSINodeList, *storagev1beta1.CSINodeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*storagev1beta1.CSINode, *storagev1beta1.CSINodeList, *applyconfigurationsstoragev1beta1.CSINodeApplyConfiguration]
 }
 
 // newCSINodes returns a CSINodes
 func newCSINodes(c *StorageV1beta1Client) *cSINodes {
 	return &cSINodes{
-		gentype.NewClientWithListAndApply[*v1beta1.CSINode, *v1beta1.CSINodeList, *storagev1beta1.CSINodeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*storagev1beta1.CSINode, *storagev1beta1.CSINodeList, *applyconfigurationsstoragev1beta1.CSINodeApplyConfiguration](
 			"csinodes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1beta1.CSINode { return &v1beta1.CSINode{} },
-			func() *v1beta1.CSINodeList { return &v1beta1.CSINodeList{} }),
+			func() *storagev1beta1.CSINode { return &storagev1beta1.CSINode{} },
+			func() *storagev1beta1.CSINodeList { return &storagev1beta1.CSINodeList{} },
+			gentype.PrefersProtobuf[*storagev1beta1.CSINode](),
+		),
 	}
 }

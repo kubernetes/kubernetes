@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	userv1 "github.com/openshift/api/user/v1"
+	apiuserv1 "github.com/openshift/api/user/v1"
 	versioned "github.com/openshift/client-go/user/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/user/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/user/listers/user/v1"
+	userv1 "github.com/openshift/client-go/user/listers/user/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Groups.
 type GroupInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.GroupLister
+	Lister() userv1.GroupLister
 }
 
 type groupInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredGroupInformer(client versioned.Interface, resyncPeriod time.Dura
 				return client.UserV1().Groups().Watch(context.TODO(), options)
 			},
 		},
-		&userv1.Group{},
+		&apiuserv1.Group{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *groupInformer) defaultInformer(client versioned.Interface, resyncPeriod
 }
 
 func (f *groupInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&userv1.Group{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiuserv1.Group{}, f.defaultInformer)
 }
 
-func (f *groupInformer) Lister() v1.GroupLister {
-	return v1.NewGroupLister(f.Informer().GetIndexer())
+func (f *groupInformer) Lister() userv1.GroupLister {
+	return userv1.NewGroupLister(f.Informer().GetIndexer())
 }

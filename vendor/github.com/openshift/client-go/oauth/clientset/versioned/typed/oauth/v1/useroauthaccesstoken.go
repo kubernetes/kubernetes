@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/oauth/v1"
-	oauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	applyconfigurationsoauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
 	scheme "github.com/openshift/client-go/oauth/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type UserOAuthAccessTokensGetter interface {
 
 // UserOAuthAccessTokenInterface has methods to work with UserOAuthAccessToken resources.
 type UserOAuthAccessTokenInterface interface {
-	Create(ctx context.Context, userOAuthAccessToken *v1.UserOAuthAccessToken, opts metav1.CreateOptions) (*v1.UserOAuthAccessToken, error)
-	Update(ctx context.Context, userOAuthAccessToken *v1.UserOAuthAccessToken, opts metav1.UpdateOptions) (*v1.UserOAuthAccessToken, error)
+	Create(ctx context.Context, userOAuthAccessToken *oauthv1.UserOAuthAccessToken, opts metav1.CreateOptions) (*oauthv1.UserOAuthAccessToken, error)
+	Update(ctx context.Context, userOAuthAccessToken *oauthv1.UserOAuthAccessToken, opts metav1.UpdateOptions) (*oauthv1.UserOAuthAccessToken, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.UserOAuthAccessToken, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.UserOAuthAccessTokenList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*oauthv1.UserOAuthAccessToken, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*oauthv1.UserOAuthAccessTokenList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.UserOAuthAccessToken, err error)
-	Apply(ctx context.Context, userOAuthAccessToken *oauthv1.UserOAuthAccessTokenApplyConfiguration, opts metav1.ApplyOptions) (result *v1.UserOAuthAccessToken, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *oauthv1.UserOAuthAccessToken, err error)
+	Apply(ctx context.Context, userOAuthAccessToken *applyconfigurationsoauthv1.UserOAuthAccessTokenApplyConfiguration, opts metav1.ApplyOptions) (result *oauthv1.UserOAuthAccessToken, err error)
 	UserOAuthAccessTokenExpansion
 }
 
 // userOAuthAccessTokens implements UserOAuthAccessTokenInterface
 type userOAuthAccessTokens struct {
-	*gentype.ClientWithListAndApply[*v1.UserOAuthAccessToken, *v1.UserOAuthAccessTokenList, *oauthv1.UserOAuthAccessTokenApplyConfiguration]
+	*gentype.ClientWithListAndApply[*oauthv1.UserOAuthAccessToken, *oauthv1.UserOAuthAccessTokenList, *applyconfigurationsoauthv1.UserOAuthAccessTokenApplyConfiguration]
 }
 
 // newUserOAuthAccessTokens returns a UserOAuthAccessTokens
 func newUserOAuthAccessTokens(c *OauthV1Client) *userOAuthAccessTokens {
 	return &userOAuthAccessTokens{
-		gentype.NewClientWithListAndApply[*v1.UserOAuthAccessToken, *v1.UserOAuthAccessTokenList, *oauthv1.UserOAuthAccessTokenApplyConfiguration](
+		gentype.NewClientWithListAndApply[*oauthv1.UserOAuthAccessToken, *oauthv1.UserOAuthAccessTokenList, *applyconfigurationsoauthv1.UserOAuthAccessTokenApplyConfiguration](
 			"useroauthaccesstokens",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.UserOAuthAccessToken { return &v1.UserOAuthAccessToken{} },
-			func() *v1.UserOAuthAccessTokenList { return &v1.UserOAuthAccessTokenList{} }),
+			func() *oauthv1.UserOAuthAccessToken { return &oauthv1.UserOAuthAccessToken{} },
+			func() *oauthv1.UserOAuthAccessTokenList { return &oauthv1.UserOAuthAccessTokenList{} },
+		),
 	}
 }

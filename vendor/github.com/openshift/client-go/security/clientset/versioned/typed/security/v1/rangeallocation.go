@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/security/v1"
-	securityv1 "github.com/openshift/client-go/security/applyconfigurations/security/v1"
+	securityv1 "github.com/openshift/api/security/v1"
+	applyconfigurationssecurityv1 "github.com/openshift/client-go/security/applyconfigurations/security/v1"
 	scheme "github.com/openshift/client-go/security/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type RangeAllocationsGetter interface {
 
 // RangeAllocationInterface has methods to work with RangeAllocation resources.
 type RangeAllocationInterface interface {
-	Create(ctx context.Context, rangeAllocation *v1.RangeAllocation, opts metav1.CreateOptions) (*v1.RangeAllocation, error)
-	Update(ctx context.Context, rangeAllocation *v1.RangeAllocation, opts metav1.UpdateOptions) (*v1.RangeAllocation, error)
+	Create(ctx context.Context, rangeAllocation *securityv1.RangeAllocation, opts metav1.CreateOptions) (*securityv1.RangeAllocation, error)
+	Update(ctx context.Context, rangeAllocation *securityv1.RangeAllocation, opts metav1.UpdateOptions) (*securityv1.RangeAllocation, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.RangeAllocation, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.RangeAllocationList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*securityv1.RangeAllocation, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*securityv1.RangeAllocationList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RangeAllocation, err error)
-	Apply(ctx context.Context, rangeAllocation *securityv1.RangeAllocationApplyConfiguration, opts metav1.ApplyOptions) (result *v1.RangeAllocation, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *securityv1.RangeAllocation, err error)
+	Apply(ctx context.Context, rangeAllocation *applyconfigurationssecurityv1.RangeAllocationApplyConfiguration, opts metav1.ApplyOptions) (result *securityv1.RangeAllocation, err error)
 	RangeAllocationExpansion
 }
 
 // rangeAllocations implements RangeAllocationInterface
 type rangeAllocations struct {
-	*gentype.ClientWithListAndApply[*v1.RangeAllocation, *v1.RangeAllocationList, *securityv1.RangeAllocationApplyConfiguration]
+	*gentype.ClientWithListAndApply[*securityv1.RangeAllocation, *securityv1.RangeAllocationList, *applyconfigurationssecurityv1.RangeAllocationApplyConfiguration]
 }
 
 // newRangeAllocations returns a RangeAllocations
 func newRangeAllocations(c *SecurityV1Client) *rangeAllocations {
 	return &rangeAllocations{
-		gentype.NewClientWithListAndApply[*v1.RangeAllocation, *v1.RangeAllocationList, *securityv1.RangeAllocationApplyConfiguration](
+		gentype.NewClientWithListAndApply[*securityv1.RangeAllocation, *securityv1.RangeAllocationList, *applyconfigurationssecurityv1.RangeAllocationApplyConfiguration](
 			"rangeallocations",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.RangeAllocation { return &v1.RangeAllocation{} },
-			func() *v1.RangeAllocationList { return &v1.RangeAllocationList{} }),
+			func() *securityv1.RangeAllocation { return &securityv1.RangeAllocation{} },
+			func() *securityv1.RangeAllocationList { return &securityv1.RangeAllocationList{} },
+		),
 	}
 }

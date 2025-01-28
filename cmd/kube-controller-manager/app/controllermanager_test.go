@@ -86,8 +86,10 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ClusterRoleAggregationController,
 		names.PersistentVolumeClaimProtectionController,
 		names.PersistentVolumeProtectionController,
+		names.VolumeAttributesClassProtectionController,
 		names.TTLAfterFinishedController,
 		names.RootCACertificatePublisherController,
+		names.KubeAPIServerClusterTrustBundlePublisherController,
 		names.ServiceCACertificatePublisherController,
 		names.EphemeralVolumeController,
 		names.StorageVersionGarbageCollectorController,
@@ -96,6 +98,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,
 		names.StorageVersionMigratorController,
+		names.SELinuxWarningController,
 	)
 
 	for _, name := range KnownControllers() {
@@ -226,10 +229,7 @@ func TestNoCloudProviderControllerStarted(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	controllerCtx := ControllerContext{
-		Cloud:    nil,
-		LoopMode: IncludeCloudLoops,
-	}
+	controllerCtx := ControllerContext{}
 	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
 	for _, controller := range NewControllerDescriptors() {
 		if !controller.IsCloudProviderController() {

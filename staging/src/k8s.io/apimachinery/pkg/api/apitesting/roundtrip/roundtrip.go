@@ -279,7 +279,7 @@ func roundTripOfExternalType(t *testing.T, scheme *runtime.Scheme, codecFactory 
 	typeAcc.SetKind(externalGVK.Kind)
 	typeAcc.SetAPIVersion(externalGVK.GroupVersion().String())
 
-	roundTrip(t, scheme, json.NewSerializer(json.DefaultMetaFactory, scheme, scheme, false), object)
+	roundTrip(t, scheme, json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, json.SerializerOptions{}), object)
 
 	// TODO remove this hack after we're past the intermediate steps
 	if !skipProtobuf {

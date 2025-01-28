@@ -40,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -1188,7 +1187,7 @@ func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fc.Options.PVName,
 			Annotations: map[string]string{
-				util.VolumeDynamicallyCreatedByKey: "fakeplugin-provisioner",
+				"kubernetes.io/createdby": "fakeplugin-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -1653,9 +1652,9 @@ func GetTestVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *FakeVolumeP
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
@@ -1664,9 +1663,9 @@ func GetTestKubeletVolumePluginMgr(t *testing.T) (*volume.VolumePluginMgr, *Fake
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
@@ -1675,9 +1674,9 @@ func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*volume
 	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
-		"",      /* rootDir */
-		nil,     /* kubeClient */
-		plugins, /* plugins */
+		t.TempDir(), /* rootDir */
+		nil,         /* kubeClient */
+		plugins,     /* plugins */
 	)
 	v.WithNode(node)
 

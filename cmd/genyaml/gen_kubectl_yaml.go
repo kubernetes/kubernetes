@@ -25,10 +25,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"gopkg.in/yaml.v2"
+
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 type cmdOption struct {

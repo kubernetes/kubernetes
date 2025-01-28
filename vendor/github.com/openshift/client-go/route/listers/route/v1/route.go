@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/route/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	routev1 "github.com/openshift/api/route/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // RouteLister helps list Routes.
@@ -14,7 +14,7 @@ import (
 type RouteLister interface {
 	// List lists all Routes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Route, err error)
+	List(selector labels.Selector) (ret []*routev1.Route, err error)
 	// Routes returns an object that can list and get Routes.
 	Routes(namespace string) RouteNamespaceLister
 	RouteListerExpansion
@@ -22,17 +22,17 @@ type RouteLister interface {
 
 // routeLister implements the RouteLister interface.
 type routeLister struct {
-	listers.ResourceIndexer[*v1.Route]
+	listers.ResourceIndexer[*routev1.Route]
 }
 
 // NewRouteLister returns a new RouteLister.
 func NewRouteLister(indexer cache.Indexer) RouteLister {
-	return &routeLister{listers.New[*v1.Route](indexer, v1.Resource("route"))}
+	return &routeLister{listers.New[*routev1.Route](indexer, routev1.Resource("route"))}
 }
 
 // Routes returns an object that can list and get Routes.
 func (s *routeLister) Routes(namespace string) RouteNamespaceLister {
-	return routeNamespaceLister{listers.NewNamespaced[*v1.Route](s.ResourceIndexer, namespace)}
+	return routeNamespaceLister{listers.NewNamespaced[*routev1.Route](s.ResourceIndexer, namespace)}
 }
 
 // RouteNamespaceLister helps list and get Routes.
@@ -40,15 +40,15 @@ func (s *routeLister) Routes(namespace string) RouteNamespaceLister {
 type RouteNamespaceLister interface {
 	// List lists all Routes in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Route, err error)
+	List(selector labels.Selector) (ret []*routev1.Route, err error)
 	// Get retrieves the Route from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Route, error)
+	Get(name string) (*routev1.Route, error)
 	RouteNamespaceListerExpansion
 }
 
 // routeNamespaceLister implements the RouteNamespaceLister
 // interface.
 type routeNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Route]
+	listers.ResourceIndexer[*routev1.Route]
 }

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type APIServersGetter interface {
 
 // APIServerInterface has methods to work with APIServer resources.
 type APIServerInterface interface {
-	Create(ctx context.Context, aPIServer *v1.APIServer, opts metav1.CreateOptions) (*v1.APIServer, error)
-	Update(ctx context.Context, aPIServer *v1.APIServer, opts metav1.UpdateOptions) (*v1.APIServer, error)
+	Create(ctx context.Context, aPIServer *configv1.APIServer, opts metav1.CreateOptions) (*configv1.APIServer, error)
+	Update(ctx context.Context, aPIServer *configv1.APIServer, opts metav1.UpdateOptions) (*configv1.APIServer, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, aPIServer *v1.APIServer, opts metav1.UpdateOptions) (*v1.APIServer, error)
+	UpdateStatus(ctx context.Context, aPIServer *configv1.APIServer, opts metav1.UpdateOptions) (*configv1.APIServer, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.APIServer, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.APIServerList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.APIServer, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.APIServerList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIServer, err error)
-	Apply(ctx context.Context, aPIServer *configv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIServer, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.APIServer, err error)
+	Apply(ctx context.Context, aPIServer *applyconfigurationsconfigv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.APIServer, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, aPIServer *configv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIServer, err error)
+	ApplyStatus(ctx context.Context, aPIServer *applyconfigurationsconfigv1.APIServerApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.APIServer, err error)
 	APIServerExpansion
 }
 
 // aPIServers implements APIServerInterface
 type aPIServers struct {
-	*gentype.ClientWithListAndApply[*v1.APIServer, *v1.APIServerList, *configv1.APIServerApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.APIServer, *configv1.APIServerList, *applyconfigurationsconfigv1.APIServerApplyConfiguration]
 }
 
 // newAPIServers returns a APIServers
 func newAPIServers(c *ConfigV1Client) *aPIServers {
 	return &aPIServers{
-		gentype.NewClientWithListAndApply[*v1.APIServer, *v1.APIServerList, *configv1.APIServerApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.APIServer, *configv1.APIServerList, *applyconfigurationsconfigv1.APIServerApplyConfiguration](
 			"apiservers",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.APIServer { return &v1.APIServer{} },
-			func() *v1.APIServerList { return &v1.APIServerList{} }),
+			func() *configv1.APIServer { return &configv1.APIServer{} },
+			func() *configv1.APIServerList { return &configv1.APIServerList{} },
+		),
 	}
 }

@@ -3,8 +3,8 @@
 package versioned
 
 import (
-	"fmt"
-	"net/http"
+	fmt "fmt"
+	http "net/http"
 
 	networkv1 "github.com/openshift/client-go/network/clientset/versioned/typed/network/v1"
 	networkv1alpha1 "github.com/openshift/client-go/network/clientset/versioned/typed/network/v1alpha1"

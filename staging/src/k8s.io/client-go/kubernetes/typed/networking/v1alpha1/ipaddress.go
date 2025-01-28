@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/networking/v1alpha1"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	networkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
+	applyconfigurationsnetworkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type IPAddressesGetter interface {
 
 // IPAddressInterface has methods to work with IPAddress resources.
 type IPAddressInterface interface {
-	Create(ctx context.Context, iPAddress *v1alpha1.IPAddress, opts v1.CreateOptions) (*v1alpha1.IPAddress, error)
-	Update(ctx context.Context, iPAddress *v1alpha1.IPAddress, opts v1.UpdateOptions) (*v1alpha1.IPAddress, error)
+	Create(ctx context.Context, iPAddress *networkingv1alpha1.IPAddress, opts v1.CreateOptions) (*networkingv1alpha1.IPAddress, error)
+	Update(ctx context.Context, iPAddress *networkingv1alpha1.IPAddress, opts v1.UpdateOptions) (*networkingv1alpha1.IPAddress, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.IPAddress, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.IPAddressList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*networkingv1alpha1.IPAddress, error)
+	List(ctx context.Context, opts v1.ListOptions) (*networkingv1alpha1.IPAddressList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.IPAddress, err error)
-	Apply(ctx context.Context, iPAddress *networkingv1alpha1.IPAddressApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.IPAddress, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *networkingv1alpha1.IPAddress, err error)
+	Apply(ctx context.Context, iPAddress *applyconfigurationsnetworkingv1alpha1.IPAddressApplyConfiguration, opts v1.ApplyOptions) (result *networkingv1alpha1.IPAddress, err error)
 	IPAddressExpansion
 }
 
 // iPAddresses implements IPAddressInterface
 type iPAddresses struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.IPAddress, *v1alpha1.IPAddressList, *networkingv1alpha1.IPAddressApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkingv1alpha1.IPAddress, *networkingv1alpha1.IPAddressList, *applyconfigurationsnetworkingv1alpha1.IPAddressApplyConfiguration]
 }
 
 // newIPAddresses returns a IPAddresses
 func newIPAddresses(c *NetworkingV1alpha1Client) *iPAddresses {
 	return &iPAddresses{
-		gentype.NewClientWithListAndApply[*v1alpha1.IPAddress, *v1alpha1.IPAddressList, *networkingv1alpha1.IPAddressApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkingv1alpha1.IPAddress, *networkingv1alpha1.IPAddressList, *applyconfigurationsnetworkingv1alpha1.IPAddressApplyConfiguration](
 			"ipaddresses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.IPAddress { return &v1alpha1.IPAddress{} },
-			func() *v1alpha1.IPAddressList { return &v1alpha1.IPAddressList{} }),
+			func() *networkingv1alpha1.IPAddress { return &networkingv1alpha1.IPAddress{} },
+			func() *networkingv1alpha1.IPAddressList { return &networkingv1alpha1.IPAddressList{} },
+			gentype.PrefersProtobuf[*networkingv1alpha1.IPAddress](),
+		),
 	}
 }

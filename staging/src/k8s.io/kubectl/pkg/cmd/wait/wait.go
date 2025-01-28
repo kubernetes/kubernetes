@@ -51,8 +51,8 @@ var (
 		The command takes multiple resources and waits until the specified condition
 		is seen in the Status field of every given resource.
 
-		Alternatively, the command can wait for the given set of resources to be deleted
-		by providing the "delete" keyword as the value to the --for flag.
+		Alternatively, the command can wait for the given set of resources to be created or
+		deleted by providing the "create" or "delete" keyword as the value to the --for flag.
 
 		A successful message will be printed to stdout indicating when the specified
         condition has been met. You can use -o option to change to output destination.`))
@@ -72,6 +72,10 @@ var (
 
 		# Wait for the service "loadbalancer" to have ingress
 		kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' service/loadbalancer
+
+		# Wait for the secret "busybox1" to be created, with a timeout of 30s
+		kubectl create secret generic busybox1
+		kubectl wait --for=create secret/busybox1 --timeout=30s
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
@@ -119,7 +123,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=create|--for=delete|--for condition=available|--for=jsonpath='{}'[=value]]",
 		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
@@ -143,8 +147,8 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.PrintFlags.AddFlags(cmd)
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
-	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true.  Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
+	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up. Zero means check once and don't wait, negative means wait for a week.")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [create|delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true. Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -356,7 +360,7 @@ func (o *WaitOptions) RunWait() error {
 			return nil
 		}
 		if err == nil {
-			return fmt.Errorf("%v unsatisified for unknown reason", finalObject)
+			return fmt.Errorf("%v unsatisfied for unknown reason", finalObject)
 		}
 		return err
 	}

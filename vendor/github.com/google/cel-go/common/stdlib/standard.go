@@ -23,15 +23,11 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 var (
 	stdFunctions []*decls.FunctionDecl
-	stdFnDecls   []*exprpb.Decl
 	stdTypes     []*decls.VariableDecl
-	stdTypeDecls []*exprpb.Decl
 )
 
 func init() {
@@ -53,15 +49,6 @@ func init() {
 		decls.TypeVariable(types.TimestampType),
 		decls.TypeVariable(types.TypeType),
 		decls.TypeVariable(types.UintType),
-	}
-
-	stdTypeDecls = make([]*exprpb.Decl, 0, len(stdTypes))
-	for _, stdType := range stdTypes {
-		typeVar, err := decls.VariableDeclToExprDecl(stdType)
-		if err != nil {
-			panic(err)
-		}
-		stdTypeDecls = append(stdTypeDecls, typeVar)
 	}
 
 	stdFunctions = []*decls.FunctionDecl{
@@ -576,18 +563,6 @@ func init() {
 			decls.MemberOverload(overloads.DurationToMilliseconds,
 				argTypes(types.DurationType), types.IntType)),
 	}
-
-	stdFnDecls = make([]*exprpb.Decl, 0, len(stdFunctions))
-	for _, fn := range stdFunctions {
-		if fn.IsDeclarationDisabled() {
-			continue
-		}
-		ed, err := decls.FunctionDeclToExprDecl(fn)
-		if err != nil {
-			panic(err)
-		}
-		stdFnDecls = append(stdFnDecls, ed)
-	}
 }
 
 // Functions returns the set of standard library function declarations and definitions for CEL.
@@ -595,25 +570,9 @@ func Functions() []*decls.FunctionDecl {
 	return stdFunctions
 }
 
-// FunctionExprDecls returns the legacy style protobuf-typed declarations for all functions and overloads
-// in the CEL standard environment.
-//
-// Deprecated: use Functions
-func FunctionExprDecls() []*exprpb.Decl {
-	return stdFnDecls
-}
-
 // Types returns the set of standard library types for CEL.
 func Types() []*decls.VariableDecl {
 	return stdTypes
-}
-
-// TypeExprDecls returns the legacy style protobuf-typed declarations for all types in the CEL
-// standard environment.
-//
-// Deprecated: use Types
-func TypeExprDecls() []*exprpb.Decl {
-	return stdTypeDecls
 }
 
 func notStrictlyFalse(value ref.Val) ref.Val {

@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // NetworkDiagnosticsTargetPlacementApplyConfiguration represents a declarative configuration of the NetworkDiagnosticsTargetPlacement type for use
 // with apply.
 type NetworkDiagnosticsTargetPlacementApplyConfiguration struct {
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-	Tolerations  []v1.Toleration   `json:"tolerations,omitempty"`
+	NodeSelector map[string]string   `json:"nodeSelector,omitempty"`
+	Tolerations  []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // NetworkDiagnosticsTargetPlacementApplyConfiguration constructs a declarative configuration of the NetworkDiagnosticsTargetPlacement type for use with
@@ -36,7 +36,7 @@ func (b *NetworkDiagnosticsTargetPlacementApplyConfiguration) WithNodeSelector(e
 // WithTolerations adds the given value to the Tolerations field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Tolerations field.
-func (b *NetworkDiagnosticsTargetPlacementApplyConfiguration) WithTolerations(values ...v1.Toleration) *NetworkDiagnosticsTargetPlacementApplyConfiguration {
+func (b *NetworkDiagnosticsTargetPlacementApplyConfiguration) WithTolerations(values ...corev1.Toleration) *NetworkDiagnosticsTargetPlacementApplyConfiguration {
 	for i := range values {
 		b.Tolerations = append(b.Tolerations, values[i])
 	}

@@ -2425,9 +2425,9 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 				"%s: Expected GVKs (%s), got (%s)", test.name, expectedGroupNames.List(), actualGroupNames.List())
 			// If the core V1 group is returned from /api, it should be the first group.
 			if expectedGroupNames.Has("") {
-				assert.True(t, len(apiGroups) > 0)
+				assert.NotEmpty(t, apiGroups)
 				actualFirstGroup := apiGroups[0]
-				assert.True(t, len(actualFirstGroup.Versions) > 0)
+				assert.NotEmpty(t, actualFirstGroup.Versions)
 				actualFirstGroupVersion := actualFirstGroup.Versions[0].GroupVersion
 				assert.Equal(t, "v1", actualFirstGroupVersion)
 			}

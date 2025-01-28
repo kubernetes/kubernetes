@@ -28,7 +28,6 @@ type Node struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec NodeSpec `json:"spec"`
 
@@ -38,14 +37,33 @@ type Node struct {
 }
 
 type NodeSpec struct {
-	// CgroupMode determines the cgroups version on the node
+	// cgroupMode determines the cgroups version on the node
 	// +optional
 	CgroupMode CgroupMode `json:"cgroupMode,omitempty"`
 
-	// WorkerLatencyProfile determins the how fast the kubelet is updating
+	// workerLatencyProfile determins the how fast the kubelet is updating
 	// the status and corresponding reaction of the cluster
 	// +optional
 	WorkerLatencyProfile WorkerLatencyProfileType `json:"workerLatencyProfile,omitempty"`
+
+	// minimumKubeletVersion is the lowest version of a kubelet that can join the cluster.
+	// Specifically, the apiserver will deny most authorization requests of kubelets that are older
+	// than the specified version, only allowing the kubelet to get and update its node object, and perform
+	// subjectaccessreviews.
+	// This means any kubelet that attempts to join the cluster will not be able to run any assigned workloads,
+	// and will eventually be marked as not ready.
+	// Its max length is 8, so maximum version allowed is either "9.999.99" or "99.99.99".
+	// Since the kubelet reports the version of the kubernetes release, not Openshift, this field references
+	// the underlying kubernetes version this version of Openshift is based off of.
+	// In other words: if an admin wishes to ensure no nodes run an older version than Openshift 4.17, then
+	// they should set the minimumKubeletVersion to 1.30.0.
+	// When comparing versions, the kubelet's version is stripped of any contents outside of major.minor.patch version.
+	// Thus, a kubelet with version "1.0.0-ec.0" will be compatible with minimumKubeletVersion "1.0.0" or earlier.
+	// +kubebuilder:validation:XValidation:rule="self == \"\" || self.matches('^[0-9]*.[0-9]*.[0-9]*$')",message="minmumKubeletVersion must be in a semver compatible format of x.y.z, or empty"
+	// +kubebuilder:validation:MaxLength:=8
+	// +openshift:enable:FeatureGate=MinimumKubeletVersion
+	// +optional
+	MinimumKubeletVersion string `json:"minimumKubeletVersion"`
 }
 
 type NodeStatus struct {

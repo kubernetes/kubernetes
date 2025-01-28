@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // ClusterVersionCapabilitiesStatusApplyConfiguration represents a declarative configuration of the ClusterVersionCapabilitiesStatus type for use
 // with apply.
 type ClusterVersionCapabilitiesStatusApplyConfiguration struct {
-	EnabledCapabilities []v1.ClusterVersionCapability `json:"enabledCapabilities,omitempty"`
-	KnownCapabilities   []v1.ClusterVersionCapability `json:"knownCapabilities,omitempty"`
+	EnabledCapabilities []configv1.ClusterVersionCapability `json:"enabledCapabilities,omitempty"`
+	KnownCapabilities   []configv1.ClusterVersionCapability `json:"knownCapabilities,omitempty"`
 }
 
 // ClusterVersionCapabilitiesStatusApplyConfiguration constructs a declarative configuration of the ClusterVersionCapabilitiesStatus type for use with
@@ -22,7 +22,7 @@ func ClusterVersionCapabilitiesStatus() *ClusterVersionCapabilitiesStatusApplyCo
 // WithEnabledCapabilities adds the given value to the EnabledCapabilities field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the EnabledCapabilities field.
-func (b *ClusterVersionCapabilitiesStatusApplyConfiguration) WithEnabledCapabilities(values ...v1.ClusterVersionCapability) *ClusterVersionCapabilitiesStatusApplyConfiguration {
+func (b *ClusterVersionCapabilitiesStatusApplyConfiguration) WithEnabledCapabilities(values ...configv1.ClusterVersionCapability) *ClusterVersionCapabilitiesStatusApplyConfiguration {
 	for i := range values {
 		b.EnabledCapabilities = append(b.EnabledCapabilities, values[i])
 	}
@@ -32,7 +32,7 @@ func (b *ClusterVersionCapabilitiesStatusApplyConfiguration) WithEnabledCapabili
 // WithKnownCapabilities adds the given value to the KnownCapabilities field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the KnownCapabilities field.
-func (b *ClusterVersionCapabilitiesStatusApplyConfiguration) WithKnownCapabilities(values ...v1.ClusterVersionCapability) *ClusterVersionCapabilitiesStatusApplyConfiguration {
+func (b *ClusterVersionCapabilitiesStatusApplyConfiguration) WithKnownCapabilities(values ...configv1.ClusterVersionCapability) *ClusterVersionCapabilitiesStatusApplyConfiguration {
 	for i := range values {
 		b.KnownCapabilities = append(b.KnownCapabilities, values[i])
 	}

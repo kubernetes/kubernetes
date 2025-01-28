@@ -28,6 +28,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -50,9 +50,120 @@ type NodeScore struct {
 	Score int64
 }
 
-// NodeToStatusMap contains the statuses of the Nodes where the incoming Pod was not schedulable.
-// A PostFilter plugin that uses this map should interpret absent Nodes as UnschedulableAndUnresolvable.
-type NodeToStatusMap map[string]*Status
+// NodeToStatusReader is a read-only interface of NodeToStatus passed to each PostFilter plugin.
+type NodeToStatusReader interface {
+	// Get returns the status for given nodeName.
+	// If the node is not in the map, the AbsentNodesStatus is returned.
+	Get(nodeName string) *Status
+	// NodesForStatusCode returns a list of NodeInfos for the nodes that have a given status code.
+	// It returns the NodeInfos for all matching nodes denoted by AbsentNodesStatus as well.
+	NodesForStatusCode(nodeLister NodeInfoLister, code Code) ([]*NodeInfo, error)
+}
+
+// NodeToStatusMap is an alias for NodeToStatusReader to keep partial backwards compatibility.
+// NodeToStatusReader should be used if possible.
+type NodeToStatusMap = NodeToStatusReader
+
+// NodeToStatus contains the statuses of the Nodes where the incoming Pod was not schedulable.
+type NodeToStatus struct {
+	// nodeToStatus contains specific statuses of the nodes.
+	nodeToStatus map[string]*Status
+	// absentNodesStatus defines a status for all nodes that are absent in nodeToStatus map.
+	// By default, all absent nodes are UnschedulableAndUnresolvable.
+	absentNodesStatus *Status
+}
+
+// NewDefaultNodeToStatus creates NodeToStatus without any node in the map.
+// The absentNodesStatus is set by default to UnschedulableAndUnresolvable.
+func NewDefaultNodeToStatus() *NodeToStatus {
+	return NewNodeToStatus(make(map[string]*Status), NewStatus(UnschedulableAndUnresolvable))
+}
+
+// NewNodeToStatus creates NodeToStatus initialized with given nodeToStatus and absentNodesStatus.
+func NewNodeToStatus(nodeToStatus map[string]*Status, absentNodesStatus *Status) *NodeToStatus {
+	return &NodeToStatus{
+		nodeToStatus:      nodeToStatus,
+		absentNodesStatus: absentNodesStatus,
+	}
+}
+
+// Get returns the status for given nodeName. If the node is not in the map, the absentNodesStatus is returned.
+func (m *NodeToStatus) Get(nodeName string) *Status {
+	if status, ok := m.nodeToStatus[nodeName]; ok {
+		return status
+	}
+	return m.absentNodesStatus
+}
+
+// Set sets status for given nodeName.
+func (m *NodeToStatus) Set(nodeName string, status *Status) {
+	m.nodeToStatus[nodeName] = status
+}
+
+// Len returns length of nodeToStatus map. It is not aware of number of absent nodes.
+func (m *NodeToStatus) Len() int {
+	return len(m.nodeToStatus)
+}
+
+// AbsentNodesStatus returns absentNodesStatus value.
+func (m *NodeToStatus) AbsentNodesStatus() *Status {
+	return m.absentNodesStatus
+}
+
+// SetAbsentNodesStatus sets absentNodesStatus value.
+func (m *NodeToStatus) SetAbsentNodesStatus(status *Status) {
+	m.absentNodesStatus = status
+}
+
+// ForEachExplicitNode runs fn for each node which status is explicitly set.
+// Imporatant note, it runs the fn only for nodes with a status explicitly registered,
+// and hence may not run the fn for all existing nodes.
+// For example, if PreFilter rejects all Nodes, the scheduler would NOT set a failure status to every Node,
+// but set a failure status as AbsentNodesStatus.
+// You're supposed to get a status from AbsentNodesStatus(), and consider all other nodes that are rejected by them.
+func (m *NodeToStatus) ForEachExplicitNode(fn func(nodeName string, status *Status)) {
+	for nodeName, status := range m.nodeToStatus {
+		fn(nodeName, status)
+	}
+}
+
+// NodesForStatusCode returns a list of NodeInfos for the nodes that matches a given status code.
+// If the absentNodesStatus matches the code, all existing nodes are fetched using nodeLister
+// and filtered using NodeToStatus.Get.
+// If the absentNodesStatus doesn't match the code, nodeToStatus map is used to create a list of nodes
+// and nodeLister.Get is used to obtain NodeInfo for each.
+func (m *NodeToStatus) NodesForStatusCode(nodeLister NodeInfoLister, code Code) ([]*NodeInfo, error) {
+	var resultNodes []*NodeInfo
+
+	if m.AbsentNodesStatus().Code() == code {
+		allNodes, err := nodeLister.List()
+		if err != nil {
+			return nil, err
+		}
+		if m.Len() == 0 {
+			// All nodes are absent and status code is matching, so can return all nodes.
+			return allNodes, nil
+		}
+		// Need to find all the nodes that are absent or have a matching code using the allNodes.
+		for _, node := range allNodes {
+			nodeName := node.Node().Name
+			if status := m.Get(nodeName); status.Code() == code {
+				resultNodes = append(resultNodes, node)
+			}
+		}
+		return resultNodes, nil
+	}
+
+	m.ForEachExplicitNode(func(nodeName string, status *Status) {
+		if status.Code() == code {
+			if nodeInfo, err := nodeLister.Get(nodeName); err == nil {
+				resultNodes = append(resultNodes, nodeInfo)
+			}
+		}
+	})
+
+	return resultNodes, nil
+}
 
 // NodePluginScores is a struct with node name and scores for that node.
 type NodePluginScores struct {
@@ -432,6 +543,9 @@ type FilterPlugin interface {
 	// All FilterPlugins should return "Success" to declare that
 	// the given node fits the pod. If Filter doesn't return "Success",
 	// it will return "Unschedulable", "UnschedulableAndUnresolvable" or "Error".
+	//
+	// "Error" aborts pod scheduling and puts the pod into the backoff queue.
+	//
 	// For the node being evaluated, Filter plugins should look at the passed
 	// nodeInfo reference for this particular node's information (e.g., pods
 	// considered to be running on the node) instead of looking it up in the
@@ -448,15 +562,11 @@ type PostFilterPlugin interface {
 	Plugin
 	// PostFilter is called by the scheduling framework
 	// when the scheduling cycle failed at PreFilter or Filter by Unschedulable or UnschedulableAndUnresolvable.
-	// NodeToStatusMap has statuses that each Node got in the Filter phase.
-	// If this scheduling cycle failed at PreFilter, all Nodes have the status from the rejector PreFilter plugin in NodeToStatusMap.
-	// Note that the scheduling framework runs PostFilter plugins even when PreFilter returned UnschedulableAndUnresolvable.
-	// In that case, NodeToStatusMap contains all Nodes with UnschedulableAndUnresolvable.
-	// If there is no entry in the NodeToStatus map, its implicit status is UnschedulableAndUnresolvable.
+	// NodeToStatusReader has statuses that each Node got in PreFilter or Filter phase.
 	//
-	// Also, ignoring Nodes with UnschedulableAndUnresolvable is the responsibility of each PostFilter plugin,
-	// meaning NodeToStatusMap obviously could have Nodes with UnschedulableAndUnresolvable
-	// and the scheduling framework does call PostFilter even when all Nodes in NodeToStatusMap are UnschedulableAndUnresolvable.
+	// If you're implementing a custom preemption with PostFilter, ignoring Nodes with UnschedulableAndUnresolvable is the responsibility of your plugin,
+	// meaning NodeToStatusReader could have Nodes with UnschedulableAndUnresolvable
+	// and the scheduling framework does call PostFilter plugins even when all Nodes in NodeToStatusReader are UnschedulableAndUnresolvable.
 	//
 	// A PostFilter plugin should return one of the following statuses:
 	// - Unschedulable: the plugin gets executed successfully but the pod cannot be made schedulable.
@@ -467,7 +577,7 @@ type PostFilterPlugin interface {
 	// Optionally, a non-nil PostFilterResult may be returned along with a Success status. For example,
 	// a preemption plugin may choose to return nominatedNodeName, so that framework can reuse that to update the
 	// preemptor pod's .spec.status.nominatedNodeName field.
-	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
+	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
 }
 
 // PreScorePlugin is an interface for "PreScore" plugin. PreScore is an
@@ -600,7 +710,7 @@ type Framework interface {
 	// PostFilter plugins can either be informational, in which case should be configured
 	// to execute first and return Unschedulable status, or ones that try to change the
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
-	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
+	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
@@ -660,6 +770,8 @@ type Framework interface {
 
 	// SetPodNominator sets the PodNominator
 	SetPodNominator(nominator PodNominator)
+	// SetPodActivator sets the PodActivator
+	SetPodActivator(activator PodActivator)
 
 	// Close calls Close method of each plugin.
 	Close() error
@@ -673,6 +785,8 @@ type Handle interface {
 	PodNominator
 	// PluginsRunner abstracts operations to run some plugins.
 	PluginsRunner
+	// PodActivator abstracts operations in the scheduling queue.
+	PodActivator
 	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Permit" point.
@@ -709,10 +823,9 @@ type Handle interface {
 
 	SharedInformerFactory() informers.SharedInformerFactory
 
-	// ResourceClaimCache returns an assume cache of ResourceClaim objects
-	// which gets populated by the shared informer factory and the dynamic resources
-	// plugin.
-	ResourceClaimCache() *assumecache.AssumeCache
+	// SharedDRAManager can be used to obtain DRA objects, and track modifications to them in-memory - mainly by the DRA plugin.
+	// A non-default implementation can be plugged into the framework to simulate the state of DRA objects.
+	SharedDRAManager() SharedDRAManager
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
 	RunFilterPluginsWithNominatedPods(ctx context.Context, state *CycleState, pod *v1.Pod, info *NodeInfo) *Status
@@ -785,6 +898,16 @@ func (ni *NominatingInfo) Mode() NominatingMode {
 		return ModeNoop
 	}
 	return ni.NominatingMode
+}
+
+// PodActivator abstracts operations in the scheduling queue.
+type PodActivator interface {
+	// Activate moves the given pods to activeQ.
+	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// the wildcard event is registered so that the pod will be requeued when it comes back.
+	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// Activate would ignore the pod.
+	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 }
 
 // PodNominator abstracts operations to maintain nominated Pods.

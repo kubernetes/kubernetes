@@ -23,14 +23,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/groupcache/lru"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/lru"
 )
 
 const (
@@ -77,6 +76,7 @@ func getSpamKey(event *v1.Event) string {
 		event.InvolvedObject.Name,
 		string(event.InvolvedObject.UID),
 		event.InvolvedObject.APIVersion,
+		event.Type,
 	},
 		"")
 }
@@ -90,8 +90,6 @@ type EventFilterFunc func(event *v1.Event) bool
 // EventSourceObjectSpamFilter is responsible for throttling
 // the amount of events a source and object can produce.
 type EventSourceObjectSpamFilter struct {
-	sync.RWMutex
-
 	// the cache that manages last synced state
 	cache *lru.Cache
 
@@ -133,8 +131,6 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 	eventKey := f.spamKeyFunc(event)
 
 	// do we have a record of similar events in our cache?
-	f.Lock()
-	defer f.Unlock()
 	value, found := f.cache.Get(eventKey)
 	if found {
 		record = value.(spamRecord)

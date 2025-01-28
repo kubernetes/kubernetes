@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -123,7 +124,7 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 	case "cluster-dns-ipv6":
 		cmd = append(cmd, "AAAA")
 	default:
-		panic(fmt.Errorf("invalid target: " + target))
+		panic(errors.New("invalid target: " + target))
 	}
 	cmd = append(cmd, dnsName)
 
@@ -352,7 +353,13 @@ func (t *dnsTestCommon) deleteDNSServerPod(ctx context.Context) {
 	}
 }
 
-func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, serviceName string) *v1.Pod {
+type dnsQuerier struct {
+	name  string             // container name
+	image imageutils.ImageID // container image
+	cmd   string             // a shell-script in a string
+}
+
+func createDNSPod(namespace string, probers []dnsQuerier, podHostName, serviceName string) *v1.Pod {
 	podName := "dns-test-" + string(uuid.NewUUID())
 	volumes := []v1.Volume{
 		{
@@ -369,21 +376,31 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 		},
 	}
 
+	// This is an "agnhost pod" but we use the 0th container as a webserver.
 	// TODO: Consider scraping logs instead of running a webserver.
 	dnsPod := e2epod.NewAgnhostPod(namespace, podName, volumes, mounts, nil, "test-webserver")
 	dnsPod.Spec.Containers[0].Name = "webserver"
 
-	querier := e2epod.NewAgnhostContainer("querier", mounts, nil, wheezyProbeCmd)
-	querier.Command = []string{"sh", "-c"}
-
-	jessieQuerier := v1.Container{
-		Name:         "jessie-querier",
-		Image:        imageutils.GetE2EImage(imageutils.JessieDnsutils),
-		Command:      []string{"sh", "-c", jessieProbeCmd},
-		VolumeMounts: mounts,
+	probeCtrs := []v1.Container{}
+	for _, probe := range probers {
+		name := probe.name + "-querier"
+		if probe.image == imageutils.Agnhost {
+			// agnhost is special cased, to keep all of its logic consistent.
+			ctr := e2epod.NewAgnhostContainer(name, mounts, nil)
+			ctr.Command = []string{"sh", "-c", probe.cmd}
+			probeCtrs = append(probeCtrs, ctr)
+		} else {
+			ctr := v1.Container{
+				Name:         name,
+				Image:        imageutils.GetE2EImage(probe.image),
+				Command:      []string{"sh", "-c", probe.cmd},
+				VolumeMounts: mounts,
+			}
+			probeCtrs = append(probeCtrs, ctr)
+		}
 	}
 
-	dnsPod.Spec.Containers = append(dnsPod.Spec.Containers, querier, jessieQuerier)
+	dnsPod.Spec.Containers = append(dnsPod.Spec.Containers, probeCtrs...)
 	dnsPod.Spec.Hostname = podHostName
 	dnsPod.Spec.Subdomain = serviceName
 
@@ -491,7 +508,9 @@ func assertFilesContain(ctx context.Context, fileNames []string, fileDir string,
 		// grab logs from all the containers
 		for _, container := range pod.Spec.Containers {
 			logs, err := e2epod.GetPodLogs(ctx, client, pod.Namespace, pod.Name, container.Name)
-			framework.ExpectNoError(err)
+			if err != nil {
+				return false, fmt.Errorf("unexpected error getting pod client logs for %s: %v", container.Name, err)
+			}
 			framework.Logf("Pod client logs for %s: %s", container.Name, logs)
 		}
 

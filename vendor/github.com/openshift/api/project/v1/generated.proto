@@ -32,10 +32,10 @@ message Project {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the behavior of the Namespace.
+  // spec defines the behavior of the Namespace.
   optional ProjectSpec spec = 2;
 
-  // Status describes the current status of a Namespace
+  // status describes the current status of a Namespace
   // +optional
   optional ProjectStatus status = 3;
 }
@@ -49,7 +49,7 @@ message ProjectList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of projects
+  // items is the list of projects
   repeated Project items = 2;
 }
 
@@ -62,22 +62,22 @@ message ProjectRequest {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // DisplayName is the display name to apply to a project
+  // displayName is the display name to apply to a project
   optional string displayName = 2;
 
-  // Description is the description to apply to a project
+  // description is the description to apply to a project
   optional string description = 3;
 }
 
 // ProjectSpec describes the attributes on a Project
 message ProjectSpec {
-  // Finalizers is an opaque list of values that must be empty to permanently remove object from storage
+  // finalizers is an opaque list of values that must be empty to permanently remove object from storage
   repeated string finalizers = 1;
 }
 
 // ProjectStatus is information about the current status of a Project
 message ProjectStatus {
-  // Phase is the current lifecycle phase of the project
+  // phase is the current lifecycle phase of the project
   // +optional
   optional string phase = 1;
 

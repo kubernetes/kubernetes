@@ -362,7 +362,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
-			assert.Contains(t, err.Error(), tc.expectedError.Error(), "the error message should have contained the expected error message")
+			assert.ErrorContains(t, err, tc.expectedError.Error(), "the error message should have contained the expected error message")
 			return
 		}
 		require.NoError(t, err, "there should not have been an error calculating the replica count")
@@ -412,7 +412,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 	if tc.expectedError != nil {
 		require.Error(t, err, "there should be an error calculating the replica count")
-		assert.Contains(t, err.Error(), tc.expectedError.Error(), "the error message should have contained the expected error message")
+		assert.ErrorContains(t, err, tc.expectedError.Error(), "the error message should have contained the expected error message")
 		return
 	}
 	require.NoError(t, err, "there should not have been an error calculating the replica count")

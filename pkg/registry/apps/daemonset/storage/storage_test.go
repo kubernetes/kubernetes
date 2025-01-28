@@ -19,12 +19,16 @@ package storage
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -179,6 +183,36 @@ func TestWatch(t *testing.T) {
 	)
 }
 
+func TestUpdateStatus(t *testing.T) {
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	dsStart := newValidDaemonSet()
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewDefaultContext(), dsStart.Namespace)
+	key, _ := storage.KeyFunc(ctx, dsStart.Name)
+	err := storage.Storage.Create(ctx, key, dsStart, nil, 0, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	ds := dsStart.DeepCopy()
+	ds.Status.ObservedGeneration = 1
+	_, _, err = statusStorage.Update(ctx, ds.Name, rest.DefaultUpdatedObjectInfo(ds), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	obj, err := storage.Get(ctx, ds.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	dsOut := obj.(*apps.DaemonSet)
+	// only compare relevant changes b/c of difference in metadata
+	if !apiequality.Semantic.DeepEqual(ds.Status, dsOut.Status) {
+		t.Errorf("unexpected object: %s", cmp.Diff(ds.Status, dsOut.Status))
+	}
+}
+
 func TestShortNames(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
@@ -186,5 +220,3 @@ func TestShortNames(t *testing.T) {
 	expected := []string{"ds"}
 	registrytest.AssertShortNames(t, storage, expected)
 }
-
-// TODO TestUpdateStatus

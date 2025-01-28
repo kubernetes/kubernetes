@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ImageChangeTriggerApplyConfiguration represents a declarative configuration of the ImageChangeTrigger type for use
 // with apply.
 type ImageChangeTriggerApplyConfiguration struct {
-	LastTriggeredImageID *string             `json:"lastTriggeredImageID,omitempty"`
-	From                 *v1.ObjectReference `json:"from,omitempty"`
-	Paused               *bool               `json:"paused,omitempty"`
+	LastTriggeredImageID *string                 `json:"lastTriggeredImageID,omitempty"`
+	From                 *corev1.ObjectReference `json:"from,omitempty"`
+	Paused               *bool                   `json:"paused,omitempty"`
 }
 
 // ImageChangeTriggerApplyConfiguration constructs a declarative configuration of the ImageChangeTrigger type for use with
@@ -31,7 +31,7 @@ func (b *ImageChangeTriggerApplyConfiguration) WithLastTriggeredImageID(value st
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *ImageChangeTriggerApplyConfiguration) WithFrom(value v1.ObjectReference) *ImageChangeTriggerApplyConfiguration {
+func (b *ImageChangeTriggerApplyConfiguration) WithFrom(value corev1.ObjectReference) *ImageChangeTriggerApplyConfiguration {
 	b.From = &value
 	return b
 }

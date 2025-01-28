@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/oauth/v1"
-	oauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	applyconfigurationsoauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
 	scheme "github.com/openshift/client-go/oauth/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type OAuthClientsGetter interface {
 
 // OAuthClientInterface has methods to work with OAuthClient resources.
 type OAuthClientInterface interface {
-	Create(ctx context.Context, oAuthClient *v1.OAuthClient, opts metav1.CreateOptions) (*v1.OAuthClient, error)
-	Update(ctx context.Context, oAuthClient *v1.OAuthClient, opts metav1.UpdateOptions) (*v1.OAuthClient, error)
+	Create(ctx context.Context, oAuthClient *oauthv1.OAuthClient, opts metav1.CreateOptions) (*oauthv1.OAuthClient, error)
+	Update(ctx context.Context, oAuthClient *oauthv1.OAuthClient, opts metav1.UpdateOptions) (*oauthv1.OAuthClient, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.OAuthClient, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.OAuthClientList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*oauthv1.OAuthClient, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*oauthv1.OAuthClientList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OAuthClient, err error)
-	Apply(ctx context.Context, oAuthClient *oauthv1.OAuthClientApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuthClient, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *oauthv1.OAuthClient, err error)
+	Apply(ctx context.Context, oAuthClient *applyconfigurationsoauthv1.OAuthClientApplyConfiguration, opts metav1.ApplyOptions) (result *oauthv1.OAuthClient, err error)
 	OAuthClientExpansion
 }
 
 // oAuthClients implements OAuthClientInterface
 type oAuthClients struct {
-	*gentype.ClientWithListAndApply[*v1.OAuthClient, *v1.OAuthClientList, *oauthv1.OAuthClientApplyConfiguration]
+	*gentype.ClientWithListAndApply[*oauthv1.OAuthClient, *oauthv1.OAuthClientList, *applyconfigurationsoauthv1.OAuthClientApplyConfiguration]
 }
 
 // newOAuthClients returns a OAuthClients
 func newOAuthClients(c *OauthV1Client) *oAuthClients {
 	return &oAuthClients{
-		gentype.NewClientWithListAndApply[*v1.OAuthClient, *v1.OAuthClientList, *oauthv1.OAuthClientApplyConfiguration](
+		gentype.NewClientWithListAndApply[*oauthv1.OAuthClient, *oauthv1.OAuthClientList, *applyconfigurationsoauthv1.OAuthClientApplyConfiguration](
 			"oauthclients",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.OAuthClient { return &v1.OAuthClient{} },
-			func() *v1.OAuthClientList { return &v1.OAuthClientList{} }),
+			func() *oauthv1.OAuthClient { return &oauthv1.OAuthClient{} },
+			func() *oauthv1.OAuthClientList { return &oauthv1.OAuthClientList{} },
+		),
 	}
 }

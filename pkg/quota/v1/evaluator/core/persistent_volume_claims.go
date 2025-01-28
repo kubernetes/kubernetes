@@ -90,14 +90,11 @@ func (p *pvcEvaluator) GroupResource() schema.GroupResource {
 
 // Handles returns true if the evaluator should handle the specified operation.
 func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
+	if a.GetSubresource() != "" {
+		return false
+	}
 	op := a.GetOperation()
-	if op == admission.Create {
-		return true
-	}
-	if op == admission.Update {
-		return true
-	}
-	return false
+	return admission.Create == op || admission.Update == op
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item

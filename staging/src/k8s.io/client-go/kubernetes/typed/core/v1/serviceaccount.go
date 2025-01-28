@@ -19,14 +19,14 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	corev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -39,15 +39,15 @@ type ServiceAccountsGetter interface {
 
 // ServiceAccountInterface has methods to work with ServiceAccount resources.
 type ServiceAccountInterface interface {
-	Create(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.CreateOptions) (*v1.ServiceAccount, error)
-	Update(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.UpdateOptions) (*v1.ServiceAccount, error)
+	Create(ctx context.Context, serviceAccount *corev1.ServiceAccount, opts metav1.CreateOptions) (*corev1.ServiceAccount, error)
+	Update(ctx context.Context, serviceAccount *corev1.ServiceAccount, opts metav1.UpdateOptions) (*corev1.ServiceAccount, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ServiceAccount, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ServiceAccountList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1.ServiceAccount, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*corev1.ServiceAccountList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ServiceAccount, err error)
-	Apply(ctx context.Context, serviceAccount *corev1.ServiceAccountApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ServiceAccount, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *corev1.ServiceAccount, err error)
+	Apply(ctx context.Context, serviceAccount *applyconfigurationscorev1.ServiceAccountApplyConfiguration, opts metav1.ApplyOptions) (result *corev1.ServiceAccount, err error)
 	CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (*authenticationv1.TokenRequest, error)
 
 	ServiceAccountExpansion
@@ -55,19 +55,21 @@ type ServiceAccountInterface interface {
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	*gentype.ClientWithListAndApply[*v1.ServiceAccount, *v1.ServiceAccountList, *corev1.ServiceAccountApplyConfiguration]
+	*gentype.ClientWithListAndApply[*corev1.ServiceAccount, *corev1.ServiceAccountList, *applyconfigurationscorev1.ServiceAccountApplyConfiguration]
 }
 
 // newServiceAccounts returns a ServiceAccounts
 func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
 	return &serviceAccounts{
-		gentype.NewClientWithListAndApply[*v1.ServiceAccount, *v1.ServiceAccountList, *corev1.ServiceAccountApplyConfiguration](
+		gentype.NewClientWithListAndApply[*corev1.ServiceAccount, *corev1.ServiceAccountList, *applyconfigurationscorev1.ServiceAccountApplyConfiguration](
 			"serviceaccounts",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.ServiceAccount { return &v1.ServiceAccount{} },
-			func() *v1.ServiceAccountList { return &v1.ServiceAccountList{} }),
+			func() *corev1.ServiceAccount { return &corev1.ServiceAccount{} },
+			func() *corev1.ServiceAccountList { return &corev1.ServiceAccountList{} },
+			gentype.PrefersProtobuf[*corev1.ServiceAccount](),
+		),
 	}
 }
 
@@ -75,6 +77,7 @@ func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
 func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (result *authenticationv1.TokenRequest, err error) {
 	result = &authenticationv1.TokenRequest{}
 	err = c.GetClient().Post().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("serviceaccounts").
 		Name(serviceAccountName).

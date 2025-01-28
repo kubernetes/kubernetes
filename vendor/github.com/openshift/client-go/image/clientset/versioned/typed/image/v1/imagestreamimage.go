@@ -3,11 +3,11 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
 	imagev1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
 )
 
@@ -19,7 +19,7 @@ type ImageStreamImagesGetter interface {
 
 // ImageStreamImageInterface has methods to work with ImageStreamImage resources.
 type ImageStreamImageInterface interface {
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*imagev1.ImageStreamImage, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*imagev1.ImageStreamImage, error)
 	ImageStreamImageExpansion
 }
 
@@ -36,6 +36,7 @@ func newImageStreamImages(c *ImageV1Client, namespace string) *imageStreamImages
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *imagev1.ImageStreamImage { return &imagev1.ImageStreamImage{} }),
+			func() *imagev1.ImageStreamImage { return &imagev1.ImageStreamImage{} },
+		),
 	}
 }

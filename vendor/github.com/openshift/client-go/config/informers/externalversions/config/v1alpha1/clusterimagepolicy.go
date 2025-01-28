@@ -3,13 +3,13 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
+	apiconfigv1alpha1 "github.com/openshift/api/config/v1alpha1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openshift/client-go/config/listers/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/client-go/config/listers/config/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // ClusterImagePolicies.
 type ClusterImagePolicyInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ClusterImagePolicyLister
+	Lister() configv1alpha1.ClusterImagePolicyLister
 }
 
 type clusterImagePolicyInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredClusterImagePolicyInformer(client versioned.Interface, resyncPer
 				return client.ConfigV1alpha1().ClusterImagePolicies().Watch(context.TODO(), options)
 			},
 		},
-		&configv1alpha1.ClusterImagePolicy{},
+		&apiconfigv1alpha1.ClusterImagePolicy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *clusterImagePolicyInformer) defaultInformer(client versioned.Interface,
 }
 
 func (f *clusterImagePolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1alpha1.ClusterImagePolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1alpha1.ClusterImagePolicy{}, f.defaultInformer)
 }
 
-func (f *clusterImagePolicyInformer) Lister() v1alpha1.ClusterImagePolicyLister {
-	return v1alpha1.NewClusterImagePolicyLister(f.Informer().GetIndexer())
+func (f *clusterImagePolicyInformer) Lister() configv1alpha1.ClusterImagePolicyLister {
+	return configv1alpha1.NewClusterImagePolicyLister(f.Informer().GetIndexer())
 }

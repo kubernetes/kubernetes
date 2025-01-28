@@ -28,7 +28,7 @@ import (
 // utils.go contains functions used across test suites.
 
 const (
-	cniVersion       = "v1.5.1"
+	cniVersion       = "v1.6.0"
 	cniDirectory     = "cni/bin" // The CNI tarball places binaries under directory under "cni/bin".
 	cniConfDirectory = "cni/net.d"
 
@@ -80,7 +80,7 @@ func getCNIURL() string {
 	if builder.IsTargetArchArm64() {
 		cniArch = "arm64"
 	}
-	cniURL := fmt.Sprintf("https://storage.googleapis.com/k8s-artifacts-cni/release/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
+	cniURL := fmt.Sprintf("https://github.com/containernetworking/plugins/releases/download/%s/cni-plugins-linux-%s-%s.tgz", cniVersion, cniArch, cniVersion)
 	return cniURL
 
 }

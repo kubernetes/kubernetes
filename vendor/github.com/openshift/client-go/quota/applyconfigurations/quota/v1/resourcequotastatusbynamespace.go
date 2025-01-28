@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ResourceQuotaStatusByNamespaceApplyConfiguration represents a declarative configuration of the ResourceQuotaStatusByNamespace type for use
 // with apply.
 type ResourceQuotaStatusByNamespaceApplyConfiguration struct {
-	Namespace *string                 `json:"namespace,omitempty"`
-	Status    *v1.ResourceQuotaStatus `json:"status,omitempty"`
+	Namespace *string                     `json:"namespace,omitempty"`
+	Status    *corev1.ResourceQuotaStatus `json:"status,omitempty"`
 }
 
 // ResourceQuotaStatusByNamespaceApplyConfiguration constructs a declarative configuration of the ResourceQuotaStatusByNamespace type for use with
@@ -30,7 +30,7 @@ func (b *ResourceQuotaStatusByNamespaceApplyConfiguration) WithNamespace(value s
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ResourceQuotaStatusByNamespaceApplyConfiguration) WithStatus(value v1.ResourceQuotaStatus) *ResourceQuotaStatusByNamespaceApplyConfiguration {
+func (b *ResourceQuotaStatusByNamespaceApplyConfiguration) WithStatus(value corev1.ResourceQuotaStatus) *ResourceQuotaStatusByNamespaceApplyConfiguration {
 	b.Status = &value
 	return b
 }

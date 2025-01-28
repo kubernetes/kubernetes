@@ -21,10 +21,15 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
@@ -263,6 +268,10 @@ func makeMultiContainerPodWithOptions(initCPUs, appCPUs []*containerOptions) *v1
 }
 
 func TestCPUManagerAdd(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	testPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{
 			NumCPUs:    4,
@@ -325,7 +334,7 @@ func TestCPUManagerAdd(t *testing.T) {
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
-		mgr.activePods = func() []*v1.Pod { return nil }
+		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
 
 		err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
@@ -347,6 +356,10 @@ func TestCPUManagerAdd(t *testing.T) {
 }
 
 func TestCPUManagerAddWithInitContainers(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	testCases := []struct {
 		description      string
 		topo             *topology.CPUTopology
@@ -598,6 +611,10 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 }
 
 func TestCPUManagerGenerate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	testCases := []struct {
 		description                string
 		cpuPolicyName              string
@@ -707,6 +724,10 @@ func TestCPUManagerGenerate(t *testing.T) {
 }
 
 func TestCPUManagerRemove(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	containerID := "fakeID"
 	containerMap := containermap.NewContainerMap()
 
@@ -750,6 +771,10 @@ func TestCPUManagerRemove(t *testing.T) {
 }
 
 func TestReconcileState(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	testPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{
 			NumCPUs:    8,
@@ -1273,6 +1298,10 @@ func TestReconcileState(t *testing.T) {
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 func TestCPUManagerAddWithResvList(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	testPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{
 			NumCPUs:    4,
@@ -1325,7 +1354,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
-		mgr.activePods = func() []*v1.Pod { return nil }
+		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
 
 		err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
@@ -1347,6 +1376,10 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 }
 
 func TestCPUManagerHandlePolicyOptions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	testCases := []struct {
 		description      string
 		cpuPolicyName    string
@@ -1413,6 +1446,10 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 }
 
 func TestCPUManagerGetAllocatableCPUs(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
+	}
+
 	nonePolicy, _ := NewNonePolicy(nil)
 	staticPolicy, _ := NewStaticPolicy(
 		&topology.CPUTopology{

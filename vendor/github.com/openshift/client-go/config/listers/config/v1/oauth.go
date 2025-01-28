@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // OAuthLister helps list OAuths.
@@ -14,19 +14,19 @@ import (
 type OAuthLister interface {
 	// List lists all OAuths in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.OAuth, err error)
+	List(selector labels.Selector) (ret []*configv1.OAuth, err error)
 	// Get retrieves the OAuth from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.OAuth, error)
+	Get(name string) (*configv1.OAuth, error)
 	OAuthListerExpansion
 }
 
 // oAuthLister implements the OAuthLister interface.
 type oAuthLister struct {
-	listers.ResourceIndexer[*v1.OAuth]
+	listers.ResourceIndexer[*configv1.OAuth]
 }
 
 // NewOAuthLister returns a new OAuthLister.
 func NewOAuthLister(indexer cache.Indexer) OAuthLister {
-	return &oAuthLister{listers.New[*v1.OAuth](indexer, v1.Resource("oauth"))}
+	return &oAuthLister{listers.New[*configv1.OAuth](indexer, configv1.Resource("oauth"))}
 }

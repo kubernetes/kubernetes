@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
 )
 
 // TagReferencePolicyApplyConfiguration represents a declarative configuration of the TagReferencePolicy type for use
 // with apply.
 type TagReferencePolicyApplyConfiguration struct {
-	Type *v1.TagReferencePolicyType `json:"type,omitempty"`
+	Type *imagev1.TagReferencePolicyType `json:"type,omitempty"`
 }
 
 // TagReferencePolicyApplyConfiguration constructs a declarative configuration of the TagReferencePolicy type for use with
@@ -21,7 +21,7 @@ func TagReferencePolicy() *TagReferencePolicyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *TagReferencePolicyApplyConfiguration) WithType(value v1.TagReferencePolicyType) *TagReferencePolicyApplyConfiguration {
+func (b *TagReferencePolicyApplyConfiguration) WithType(value imagev1.TagReferencePolicyType) *TagReferencePolicyApplyConfiguration {
 	b.Type = &value
 	return b
 }

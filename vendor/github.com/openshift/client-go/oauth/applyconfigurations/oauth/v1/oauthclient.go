@@ -5,25 +5,25 @@ package v1
 import (
 	oauthv1 "github.com/openshift/api/oauth/v1"
 	internal "github.com/openshift/client-go/oauth/applyconfigurations/internal"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // OAuthClientApplyConfiguration represents a declarative configuration of the OAuthClient type for use
 // with apply.
 type OAuthClientApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration       `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration    `json:"metadata,omitempty"`
-	Secret                              *string                              `json:"secret,omitempty"`
-	AdditionalSecrets                   []string                             `json:"additionalSecrets,omitempty"`
-	RespondWithChallenges               *bool                                `json:"respondWithChallenges,omitempty"`
-	RedirectURIs                        []string                             `json:"redirectURIs,omitempty"`
-	GrantMethod                         *oauthv1.GrantHandlerType            `json:"grantMethod,omitempty"`
-	ScopeRestrictions                   []ScopeRestrictionApplyConfiguration `json:"scopeRestrictions,omitempty"`
-	AccessTokenMaxAgeSeconds            *int32                               `json:"accessTokenMaxAgeSeconds,omitempty"`
-	AccessTokenInactivityTimeoutSeconds *int32                               `json:"accessTokenInactivityTimeoutSeconds,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Secret                               *string                              `json:"secret,omitempty"`
+	AdditionalSecrets                    []string                             `json:"additionalSecrets,omitempty"`
+	RespondWithChallenges                *bool                                `json:"respondWithChallenges,omitempty"`
+	RedirectURIs                         []string                             `json:"redirectURIs,omitempty"`
+	GrantMethod                          *oauthv1.GrantHandlerType            `json:"grantMethod,omitempty"`
+	ScopeRestrictions                    []ScopeRestrictionApplyConfiguration `json:"scopeRestrictions,omitempty"`
+	AccessTokenMaxAgeSeconds             *int32                               `json:"accessTokenMaxAgeSeconds,omitempty"`
+	AccessTokenInactivityTimeoutSeconds  *int32                               `json:"accessTokenInactivityTimeoutSeconds,omitempty"`
 }
 
 // OAuthClient constructs a declarative configuration of the OAuthClient type for use with
@@ -75,7 +75,7 @@ func extractOAuthClient(oAuthClient *oauthv1.OAuthClient, fieldManager string, s
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithKind(value string) *OAuthClientApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -83,7 +83,7 @@ func (b *OAuthClientApplyConfiguration) WithKind(value string) *OAuthClientApply
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithAPIVersion(value string) *OAuthClientApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -92,7 +92,7 @@ func (b *OAuthClientApplyConfiguration) WithAPIVersion(value string) *OAuthClien
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithName(value string) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -101,7 +101,7 @@ func (b *OAuthClientApplyConfiguration) WithName(value string) *OAuthClientApply
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithGenerateName(value string) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -110,7 +110,7 @@ func (b *OAuthClientApplyConfiguration) WithGenerateName(value string) *OAuthCli
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithNamespace(value string) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -119,7 +119,7 @@ func (b *OAuthClientApplyConfiguration) WithNamespace(value string) *OAuthClient
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithUID(value types.UID) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -128,7 +128,7 @@ func (b *OAuthClientApplyConfiguration) WithUID(value types.UID) *OAuthClientApp
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithResourceVersion(value string) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -137,25 +137,25 @@ func (b *OAuthClientApplyConfiguration) WithResourceVersion(value string) *OAuth
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithGeneration(value int64) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *OAuthClientApplyConfiguration) WithCreationTimestamp(value metav1.Time) *OAuthClientApplyConfiguration {
+func (b *OAuthClientApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *OAuthClientApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *OAuthClientApplyConfiguration {
+func (b *OAuthClientApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -164,7 +164,7 @@ func (b *OAuthClientApplyConfiguration) WithDeletionTimestamp(value metav1.Time)
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *OAuthClientApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -174,11 +174,11 @@ func (b *OAuthClientApplyConfiguration) WithDeletionGracePeriodSeconds(value int
 // overwriting an existing map entries in Labels field with the same key.
 func (b *OAuthClientApplyConfiguration) WithLabels(entries map[string]string) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -189,11 +189,11 @@ func (b *OAuthClientApplyConfiguration) WithLabels(entries map[string]string) *O
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *OAuthClientApplyConfiguration) WithAnnotations(entries map[string]string) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -201,13 +201,13 @@ func (b *OAuthClientApplyConfiguration) WithAnnotations(entries map[string]strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *OAuthClientApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *OAuthClientApplyConfiguration {
+func (b *OAuthClientApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -218,14 +218,14 @@ func (b *OAuthClientApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 func (b *OAuthClientApplyConfiguration) WithFinalizers(values ...string) *OAuthClientApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *OAuthClientApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -305,5 +305,5 @@ func (b *OAuthClientApplyConfiguration) WithAccessTokenInactivityTimeoutSeconds(
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *OAuthClientApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

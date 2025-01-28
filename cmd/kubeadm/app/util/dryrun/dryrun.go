@@ -76,7 +76,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		}
 
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
-		apiclient.PrintBytesWithLinePrefix(w, fileBytes, "\t")
+		fmt.Fprintf(w, "%s", fileBytes)
 	}
 	return errorsutil.NewAggregate(errs)
 }
@@ -90,7 +90,7 @@ func NewWaiter() apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration) error {
+func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiServerAddress string) error {
 	return nil
 }
 
@@ -103,12 +103,6 @@ func (w *Waiter) WaitForAPI() error {
 // WaitForPodsWithLabel just returns a dummy nil, to indicate that the program should just proceed
 func (w *Waiter) WaitForPodsWithLabel(kvLabel string) error {
 	fmt.Printf("[dryrun] Would wait for the Pods with the label %q in the %s namespace to become Running\n", kvLabel, metav1.NamespaceSystem)
-	return nil
-}
-
-// WaitForPodToDisappear just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForPodToDisappear(podName string) error {
-	fmt.Printf("[dryrun] Would wait for the %q Pod in the %s namespace to be deleted\n", podName, metav1.NamespaceSystem)
 	return nil
 }
 

@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ImageChangeCauseApplyConfiguration represents a declarative configuration of the ImageChangeCause type for use
 // with apply.
 type ImageChangeCauseApplyConfiguration struct {
-	ImageID *string             `json:"imageID,omitempty"`
-	FromRef *v1.ObjectReference `json:"fromRef,omitempty"`
+	ImageID *string                 `json:"imageID,omitempty"`
+	FromRef *corev1.ObjectReference `json:"fromRef,omitempty"`
 }
 
 // ImageChangeCauseApplyConfiguration constructs a declarative configuration of the ImageChangeCause type for use with
@@ -30,7 +30,7 @@ func (b *ImageChangeCauseApplyConfiguration) WithImageID(value string) *ImageCha
 // WithFromRef sets the FromRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FromRef field is set to the value of the last call.
-func (b *ImageChangeCauseApplyConfiguration) WithFromRef(value v1.ObjectReference) *ImageChangeCauseApplyConfiguration {
+func (b *ImageChangeCauseApplyConfiguration) WithFromRef(value corev1.ObjectReference) *ImageChangeCauseApplyConfiguration {
 	b.FromRef = &value
 	return b
 }

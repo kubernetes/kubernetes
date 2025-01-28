@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	securityv1 "github.com/openshift/api/security/v1"
+	apisecurityv1 "github.com/openshift/api/security/v1"
 	versioned "github.com/openshift/client-go/security/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/security/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/security/listers/security/v1"
+	securityv1 "github.com/openshift/client-go/security/listers/security/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // SecurityContextConstraints.
 type SecurityContextConstraintsInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.SecurityContextConstraintsLister
+	Lister() securityv1.SecurityContextConstraintsLister
 }
 
 type securityContextConstraintsInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredSecurityContextConstraintsInformer(client versioned.Interface, r
 				return client.SecurityV1().SecurityContextConstraints().Watch(context.TODO(), options)
 			},
 		},
-		&securityv1.SecurityContextConstraints{},
+		&apisecurityv1.SecurityContextConstraints{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *securityContextConstraintsInformer) defaultInformer(client versioned.In
 }
 
 func (f *securityContextConstraintsInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&securityv1.SecurityContextConstraints{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisecurityv1.SecurityContextConstraints{}, f.defaultInformer)
 }
 
-func (f *securityContextConstraintsInformer) Lister() v1.SecurityContextConstraintsLister {
-	return v1.NewSecurityContextConstraintsLister(f.Informer().GetIndexer())
+func (f *securityContextConstraintsInformer) Lister() securityv1.SecurityContextConstraintsLister {
+	return securityv1.NewSecurityContextConstraintsLister(f.Informer().GetIndexer())
 }

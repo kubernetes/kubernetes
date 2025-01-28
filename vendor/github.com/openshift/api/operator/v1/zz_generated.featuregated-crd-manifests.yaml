@@ -73,7 +73,7 @@ clustercsidrivers.operator.openshift.io:
   - VSphereDriverConfiguration
   FilenameOperatorName: csi-driver
   FilenameOperatorOrdering: "01"
-  FilenameRunLevel: "0000_90"
+  FilenameRunLevel: "0000_50"
   GroupName: operator.openshift.io
   HasStatus: true
   KindName: ClusterCSIDriver
@@ -344,6 +344,31 @@ networks.operator.openshift.io:
   Scope: Cluster
   ShortNames: null
   TopLevelFeatureGates: []
+  Version: v1
+
+olms.operator.openshift.io:
+  Annotations:
+    include.release.openshift.io/ibm-cloud-managed: "false"
+    include.release.openshift.io/self-managed-high-availability: "true"
+  ApprovedPRNumber: https://github.com/openshift/api/pull/1504
+  CRDName: olms.operator.openshift.io
+  Capability: OperatorLifecycleManagerV1
+  Category: ""
+  FeatureGates:
+  - NewOLM
+  FilenameOperatorName: operator-lifecycle-manager
+  FilenameOperatorOrdering: "01"
+  FilenameRunLevel: "0000_10"
+  GroupName: operator.openshift.io
+  HasStatus: true
+  KindName: OLM
+  Labels: {}
+  PluralName: olms
+  PrinterColumns: []
+  Scope: Cluster
+  ShortNames: null
+  TopLevelFeatureGates:
+  - NewOLM
   Version: v1
 
 openshiftapiservers.operator.openshift.io:

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // FeatureGateAttributesApplyConfiguration represents a declarative configuration of the FeatureGateAttributes type for use
 // with apply.
 type FeatureGateAttributesApplyConfiguration struct {
-	Name *v1.FeatureGateName `json:"name,omitempty"`
+	Name *configv1.FeatureGateName `json:"name,omitempty"`
 }
 
 // FeatureGateAttributesApplyConfiguration constructs a declarative configuration of the FeatureGateAttributes type for use with
@@ -21,7 +21,7 @@ func FeatureGateAttributes() *FeatureGateAttributesApplyConfiguration {
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *FeatureGateAttributesApplyConfiguration) WithName(value v1.FeatureGateName) *FeatureGateAttributesApplyConfiguration {
+func (b *FeatureGateAttributesApplyConfiguration) WithName(value configv1.FeatureGateName) *FeatureGateAttributesApplyConfiguration {
 	b.Name = &value
 	return b
 }

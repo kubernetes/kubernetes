@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // PlatformStatusApplyConfiguration represents a declarative configuration of the PlatformStatus type for use
 // with apply.
 type PlatformStatusApplyConfiguration struct {
-	Type         *v1.PlatformType                              `json:"type,omitempty"`
+	Type         *configv1.PlatformType                        `json:"type,omitempty"`
 	AWS          *AWSPlatformStatusApplyConfiguration          `json:"aws,omitempty"`
 	Azure        *AzurePlatformStatusApplyConfiguration        `json:"azure,omitempty"`
 	GCP          *GCPPlatformStatusApplyConfiguration          `json:"gcp,omitempty"`
@@ -35,7 +35,7 @@ func PlatformStatus() *PlatformStatusApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *PlatformStatusApplyConfiguration) WithType(value v1.PlatformType) *PlatformStatusApplyConfiguration {
+func (b *PlatformStatusApplyConfiguration) WithType(value configv1.PlatformType) *PlatformStatusApplyConfiguration {
 	b.Type = &value
 	return b
 }

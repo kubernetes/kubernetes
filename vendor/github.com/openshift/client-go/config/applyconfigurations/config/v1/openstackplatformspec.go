@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // OpenStackPlatformSpecApplyConfiguration represents a declarative configuration of the OpenStackPlatformSpec type for use
 // with apply.
 type OpenStackPlatformSpecApplyConfiguration struct {
-	APIServerInternalIPs []v1.IP   `json:"apiServerInternalIPs,omitempty"`
-	IngressIPs           []v1.IP   `json:"ingressIPs,omitempty"`
-	MachineNetworks      []v1.CIDR `json:"machineNetworks,omitempty"`
+	APIServerInternalIPs []configv1.IP   `json:"apiServerInternalIPs,omitempty"`
+	IngressIPs           []configv1.IP   `json:"ingressIPs,omitempty"`
+	MachineNetworks      []configv1.CIDR `json:"machineNetworks,omitempty"`
 }
 
 // OpenStackPlatformSpecApplyConfiguration constructs a declarative configuration of the OpenStackPlatformSpec type for use with
@@ -23,7 +23,7 @@ func OpenStackPlatformSpec() *OpenStackPlatformSpecApplyConfiguration {
 // WithAPIServerInternalIPs adds the given value to the APIServerInternalIPs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the APIServerInternalIPs field.
-func (b *OpenStackPlatformSpecApplyConfiguration) WithAPIServerInternalIPs(values ...v1.IP) *OpenStackPlatformSpecApplyConfiguration {
+func (b *OpenStackPlatformSpecApplyConfiguration) WithAPIServerInternalIPs(values ...configv1.IP) *OpenStackPlatformSpecApplyConfiguration {
 	for i := range values {
 		b.APIServerInternalIPs = append(b.APIServerInternalIPs, values[i])
 	}
@@ -33,7 +33,7 @@ func (b *OpenStackPlatformSpecApplyConfiguration) WithAPIServerInternalIPs(value
 // WithIngressIPs adds the given value to the IngressIPs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the IngressIPs field.
-func (b *OpenStackPlatformSpecApplyConfiguration) WithIngressIPs(values ...v1.IP) *OpenStackPlatformSpecApplyConfiguration {
+func (b *OpenStackPlatformSpecApplyConfiguration) WithIngressIPs(values ...configv1.IP) *OpenStackPlatformSpecApplyConfiguration {
 	for i := range values {
 		b.IngressIPs = append(b.IngressIPs, values[i])
 	}
@@ -43,7 +43,7 @@ func (b *OpenStackPlatformSpecApplyConfiguration) WithIngressIPs(values ...v1.IP
 // WithMachineNetworks adds the given value to the MachineNetworks field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the MachineNetworks field.
-func (b *OpenStackPlatformSpecApplyConfiguration) WithMachineNetworks(values ...v1.CIDR) *OpenStackPlatformSpecApplyConfiguration {
+func (b *OpenStackPlatformSpecApplyConfiguration) WithMachineNetworks(values ...configv1.CIDR) *OpenStackPlatformSpecApplyConfiguration {
 	for i := range values {
 		b.MachineNetworks = append(b.MachineNetworks, values[i])
 	}

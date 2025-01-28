@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/user/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	userv1 "github.com/openshift/api/user/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // UserLister helps list Users.
@@ -14,19 +14,19 @@ import (
 type UserLister interface {
 	// List lists all Users in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.User, err error)
+	List(selector labels.Selector) (ret []*userv1.User, err error)
 	// Get retrieves the User from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.User, error)
+	Get(name string) (*userv1.User, error)
 	UserListerExpansion
 }
 
 // userLister implements the UserLister interface.
 type userLister struct {
-	listers.ResourceIndexer[*v1.User]
+	listers.ResourceIndexer[*userv1.User]
 }
 
 // NewUserLister returns a new UserLister.
 func NewUserLister(indexer cache.Indexer) UserLister {
-	return &userLister{listers.New[*v1.User](indexer, v1.Resource("user"))}
+	return &userLister{listers.New[*userv1.User](indexer, userv1.Resource("user"))}
 }

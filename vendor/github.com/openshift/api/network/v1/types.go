@@ -32,39 +32,37 @@ type ClusterNetwork struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Network is a CIDR string specifying the global overlay network's L3 space
+	// network is a CIDR string specifying the global overlay network's L3 space
 	// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$`
 	Network string `json:"network,omitempty" protobuf:"bytes,2,opt,name=network"`
 
-	// HostSubnetLength is the number of bits of network to allocate to each node. eg, 8 would mean that each node would have a /24 slice of the overlay network for its pods
+	// hostsubnetlength is the number of bits of network to allocate to each node. eg, 8 would mean that each node would have a /24 slice of the overlay network for its pods
 	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=30
 	HostSubnetLength uint32 `json:"hostsubnetlength,omitempty" protobuf:"varint,3,opt,name=hostsubnetlength"`
 
-	// ServiceNetwork is the CIDR range that Service IP addresses are allocated from
+	// serviceNetwork is the CIDR range that Service IP addresses are allocated from
 	// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$`
 	ServiceNetwork string `json:"serviceNetwork" protobuf:"bytes,4,opt,name=serviceNetwork"`
 
-	// PluginName is the name of the network plugin being used
+	// pluginName is the name of the network plugin being used
 	PluginName string `json:"pluginName,omitempty" protobuf:"bytes,5,opt,name=pluginName"`
 
-	// ClusterNetworks is a list of ClusterNetwork objects that defines the global overlay network's L3 space by specifying a set of CIDR and netmasks that the SDN can allocate addresses from.
+	// clusterNetworks is a list of ClusterNetwork objects that defines the global overlay network's L3 space by specifying a set of CIDR and netmasks that the SDN can allocate addresses from.
 	ClusterNetworks []ClusterNetworkEntry `json:"clusterNetworks" protobuf:"bytes,6,rep,name=clusterNetworks"`
 
-	// VXLANPort sets the VXLAN destination port used by the cluster.
+	// vxlanPort sets the VXLAN destination port used by the cluster.
 	// It is set by the master configuration file on startup and cannot be edited manually.
 	// Valid values for VXLANPort are integers 1-65535 inclusive and if unset defaults to 4789.
 	// Changing VXLANPort allows users to resolve issues between openshift SDN and other software trying to use the same VXLAN destination port.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=65535
-	// +kubebuilder:validation:Optional
 	// +optional
 	VXLANPort *uint32 `json:"vxlanPort,omitempty" protobuf:"varint,7,opt,name=vxlanPort"`
 
-	// MTU is the MTU for the overlay network. This should be 50 less than the MTU of the network connecting the nodes. It is normally autodetected by the cluster network operator.
+	// mtu is the MTU for the overlay network. This should be 50 less than the MTU of the network connecting the nodes. It is normally autodetected by the cluster network operator.
 	// +kubebuilder:validation:Minimum=576
 	// +kubebuilder:validation:Maximum=65536
-	// +kubebuilder:validation:Optional
 	// +optional
 	MTU *uint32 `json:"mtu,omitempty" protobuf:"varint,8,opt,name=mtu"`
 }
@@ -75,7 +73,7 @@ type ClusterNetworkEntry struct {
 	// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$`
 	CIDR string `json:"CIDR" protobuf:"bytes,1,opt,name=cidr"`
 
-	// HostSubnetLength is the number of bits of the accompanying CIDR address to allocate to each node. eg, 8 would mean that each node would have a /24 slice of the overlay network for its pods.
+	// hostSubnetLength is the number of bits of the accompanying CIDR address to allocate to each node. eg, 8 would mean that each node would have a /24 slice of the overlay network for its pods.
 	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=30
 	HostSubnetLength uint32 `json:"hostSubnetLength" protobuf:"varint,2,opt,name=hostSubnetLength"`
@@ -94,7 +92,7 @@ type ClusterNetworkList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of cluster networks
+	// items is the list of cluster networks
 	Items []ClusterNetwork `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -134,25 +132,25 @@ type HostSubnet struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Host is the name of the node. (This is the same as the object's name, but both fields must be set.)
+	// host is the name of the node. (This is the same as the object's name, but both fields must be set.)
 	// +kubebuilder:validation:Pattern=`^[a-z0-9.-]+$`
 	Host string `json:"host" protobuf:"bytes,2,opt,name=host"`
 
-	// HostIP is the IP address to be used as a VTEP by other nodes in the overlay network
+	// hostIP is the IP address to be used as a VTEP by other nodes in the overlay network
 	// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])$`
 	HostIP string `json:"hostIP" protobuf:"bytes,3,opt,name=hostIP"`
 
-	// Subnet is the CIDR range of the overlay network assigned to the node for its pods
+	// subnet is the CIDR range of the overlay network assigned to the node for its pods
 	// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$`
 	Subnet string `json:"subnet" protobuf:"bytes,4,opt,name=subnet"`
 
-	// EgressIPs is the list of automatic egress IP addresses currently hosted by this node.
+	// egressIPs is the list of automatic egress IP addresses currently hosted by this node.
 	// If EgressCIDRs is empty, this can be set by hand; if EgressCIDRs is set then the
 	// master will overwrite the value here with its own allocation of egress IPs.
 	// +optional
 	EgressIPs []HostSubnetEgressIP `json:"egressIPs,omitempty" protobuf:"bytes,5,rep,name=egressIPs"`
 
-	// EgressCIDRs is the list of CIDR ranges available for automatically assigning
+	// egressCIDRs is the list of CIDR ranges available for automatically assigning
 	// egress IPs to this node from. If this field is set then EgressIPs should be
 	// treated as read-only.
 	// +optional
@@ -172,7 +170,7 @@ type HostSubnetList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of host subnets
+	// items is the list of host subnets
 	Items []HostSubnet `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -204,16 +202,16 @@ type NetNamespace struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// NetName is the name of the network namespace. (This is the same as the object's name, but both fields must be set.)
+	// netname is the name of the network namespace. (This is the same as the object's name, but both fields must be set.)
 	// +kubebuilder:validation:Pattern=`^[a-z0-9.-]+$`
 	NetName string `json:"netname" protobuf:"bytes,2,opt,name=netname"`
 
-	// NetID is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the "oc adm pod-network" commands.
+	// netid is the network identifier of the network namespace assigned to each overlay network packet. This can be manipulated with the "oc adm pod-network" commands.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=16777215
 	NetID uint32 `json:"netid" protobuf:"varint,3,opt,name=netid"`
 
-	// EgressIPs is a list of reserved IPs that will be used as the source for external traffic coming from pods in this namespace.
+	// egressIPs is a list of reserved IPs that will be used as the source for external traffic coming from pods in this namespace.
 	// (If empty, external traffic will be masqueraded to Node IPs.)
 	// +optional
 	EgressIPs []NetNamespaceEgressIP `json:"egressIPs,omitempty" protobuf:"bytes,4,rep,name=egressIPs"`
@@ -232,7 +230,7 @@ type NetNamespaceList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of net namespaces
+	// items is the list of net namespaces
 	Items []NetNamespace `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -247,13 +245,13 @@ const (
 
 // EgressNetworkPolicyPeer specifies a target to apply egress network policy to
 type EgressNetworkPolicyPeer struct {
-	// CIDRSelector is the CIDR range to allow/deny traffic to. If this is set, dnsName must be unset
+	// cidrSelector is the CIDR range to allow/deny traffic to. If this is set, dnsName must be unset
 	// Ideally we would have liked to use the cidr openapi format for this property.
 	// But openshift-sdn only supports v4 while specifying the cidr format allows both v4 and v6 cidrs
 	// We are therefore using a regex pattern to validate instead.
 	// +kubebuilder:validation:Pattern=`^(([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[0-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/([0-9]|[12][0-9]|3[0-2])$`
 	CIDRSelector string `json:"cidrSelector,omitempty" protobuf:"bytes,1,rep,name=cidrSelector"`
-	// DNSName is the domain name to allow/deny traffic to. If this is set, cidrSelector must be unset
+	// dnsName is the domain name to allow/deny traffic to. If this is set, cidrSelector must be unset
 	// +kubebuilder:validation:Pattern=`^([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?$`
 	DNSName string `json:"dnsName,omitempty" protobuf:"bytes,2,rep,name=dnsName"`
 }

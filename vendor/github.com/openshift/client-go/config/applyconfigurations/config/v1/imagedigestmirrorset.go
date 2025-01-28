@@ -3,21 +3,21 @@
 package v1
 
 import (
-	apiconfigv1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	internal "github.com/openshift/client-go/config/applyconfigurations/internal"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ImageDigestMirrorSetApplyConfiguration represents a declarative configuration of the ImageDigestMirrorSet type for use
 // with apply.
 type ImageDigestMirrorSetApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *ImageDigestMirrorSetSpecApplyConfiguration `json:"spec,omitempty"`
-	Status                           *apiconfigv1.ImageDigestMirrorSetStatus     `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *ImageDigestMirrorSetSpecApplyConfiguration `json:"spec,omitempty"`
+	Status                               *configv1.ImageDigestMirrorSetStatus        `json:"status,omitempty"`
 }
 
 // ImageDigestMirrorSet constructs a declarative configuration of the ImageDigestMirrorSet type for use with
@@ -41,18 +41,18 @@ func ImageDigestMirrorSet(name string) *ImageDigestMirrorSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractImageDigestMirrorSet(imageDigestMirrorSet *apiconfigv1.ImageDigestMirrorSet, fieldManager string) (*ImageDigestMirrorSetApplyConfiguration, error) {
+func ExtractImageDigestMirrorSet(imageDigestMirrorSet *configv1.ImageDigestMirrorSet, fieldManager string) (*ImageDigestMirrorSetApplyConfiguration, error) {
 	return extractImageDigestMirrorSet(imageDigestMirrorSet, fieldManager, "")
 }
 
 // ExtractImageDigestMirrorSetStatus is the same as ExtractImageDigestMirrorSet except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractImageDigestMirrorSetStatus(imageDigestMirrorSet *apiconfigv1.ImageDigestMirrorSet, fieldManager string) (*ImageDigestMirrorSetApplyConfiguration, error) {
+func ExtractImageDigestMirrorSetStatus(imageDigestMirrorSet *configv1.ImageDigestMirrorSet, fieldManager string) (*ImageDigestMirrorSetApplyConfiguration, error) {
 	return extractImageDigestMirrorSet(imageDigestMirrorSet, fieldManager, "status")
 }
 
-func extractImageDigestMirrorSet(imageDigestMirrorSet *apiconfigv1.ImageDigestMirrorSet, fieldManager string, subresource string) (*ImageDigestMirrorSetApplyConfiguration, error) {
+func extractImageDigestMirrorSet(imageDigestMirrorSet *configv1.ImageDigestMirrorSet, fieldManager string, subresource string) (*ImageDigestMirrorSetApplyConfiguration, error) {
 	b := &ImageDigestMirrorSetApplyConfiguration{}
 	err := managedfields.ExtractInto(imageDigestMirrorSet, internal.Parser().Type("com.github.openshift.api.config.v1.ImageDigestMirrorSet"), fieldManager, b, subresource)
 	if err != nil {
@@ -69,7 +69,7 @@ func extractImageDigestMirrorSet(imageDigestMirrorSet *apiconfigv1.ImageDigestMi
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithKind(value string) *ImageDigestMirrorSetApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -77,7 +77,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithKind(value string) *ImageDi
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithAPIVersion(value string) *ImageDigestMirrorSetApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -86,7 +86,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithAPIVersion(value string) *I
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithName(value string) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -95,7 +95,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithName(value string) *ImageDi
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithGenerateName(value string) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -104,7 +104,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithGenerateName(value string) 
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithNamespace(value string) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -113,7 +113,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithNamespace(value string) *Im
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithUID(value types.UID) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -122,7 +122,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithUID(value types.UID) *Image
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithResourceVersion(value string) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -131,25 +131,25 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithResourceVersion(value strin
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithGeneration(value int64) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *ImageDigestMirrorSetApplyConfiguration) WithCreationTimestamp(value metav1.Time) *ImageDigestMirrorSetApplyConfiguration {
+func (b *ImageDigestMirrorSetApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *ImageDigestMirrorSetApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *ImageDigestMirrorSetApplyConfiguration {
+func (b *ImageDigestMirrorSetApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -158,7 +158,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithDeletionTimestamp(value met
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -168,11 +168,11 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithDeletionGracePeriodSeconds(
 // overwriting an existing map entries in Labels field with the same key.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithLabels(entries map[string]string) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -183,11 +183,11 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithLabels(entries map[string]s
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *ImageDigestMirrorSetApplyConfiguration) WithAnnotations(entries map[string]string) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -195,13 +195,13 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithAnnotations(entries map[str
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *ImageDigestMirrorSetApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *ImageDigestMirrorSetApplyConfiguration {
+func (b *ImageDigestMirrorSetApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -212,14 +212,14 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithOwnerReferences(values ...*
 func (b *ImageDigestMirrorSetApplyConfiguration) WithFinalizers(values ...string) *ImageDigestMirrorSetApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *ImageDigestMirrorSetApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -234,7 +234,7 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithSpec(value *ImageDigestMirr
 // WithStatus sets the Status field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Status field is set to the value of the last call.
-func (b *ImageDigestMirrorSetApplyConfiguration) WithStatus(value apiconfigv1.ImageDigestMirrorSetStatus) *ImageDigestMirrorSetApplyConfiguration {
+func (b *ImageDigestMirrorSetApplyConfiguration) WithStatus(value configv1.ImageDigestMirrorSetStatus) *ImageDigestMirrorSetApplyConfiguration {
 	b.Status = &value
 	return b
 }
@@ -242,5 +242,5 @@ func (b *ImageDigestMirrorSetApplyConfiguration) WithStatus(value apiconfigv1.Im
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ImageDigestMirrorSetApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

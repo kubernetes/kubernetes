@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/security/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 )
 
 // SupplementalGroupsStrategyOptionsApplyConfiguration represents a declarative configuration of the SupplementalGroupsStrategyOptions type for use
 // with apply.
 type SupplementalGroupsStrategyOptionsApplyConfiguration struct {
-	Type   *v1.SupplementalGroupsStrategyType `json:"type,omitempty"`
-	Ranges []IDRangeApplyConfiguration        `json:"ranges,omitempty"`
+	Type   *securityv1.SupplementalGroupsStrategyType `json:"type,omitempty"`
+	Ranges []IDRangeApplyConfiguration                `json:"ranges,omitempty"`
 }
 
 // SupplementalGroupsStrategyOptionsApplyConfiguration constructs a declarative configuration of the SupplementalGroupsStrategyOptions type for use with
@@ -22,7 +22,7 @@ func SupplementalGroupsStrategyOptions() *SupplementalGroupsStrategyOptionsApply
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *SupplementalGroupsStrategyOptionsApplyConfiguration) WithType(value v1.SupplementalGroupsStrategyType) *SupplementalGroupsStrategyOptionsApplyConfiguration {
+func (b *SupplementalGroupsStrategyOptionsApplyConfiguration) WithType(value securityv1.SupplementalGroupsStrategyType) *SupplementalGroupsStrategyOptionsApplyConfiguration {
 	b.Type = &value
 	return b
 }

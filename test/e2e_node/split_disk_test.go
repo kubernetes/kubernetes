@@ -19,12 +19,13 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/pkg/features"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"k8s.io/kubernetes/pkg/features"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -217,7 +218,7 @@ func runImageFsPressureTest(f *framework.Framework, pressureTimeout time.Duratio
 				if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
 					// The disk eviction test may cause the pre-pulled images to be evicted,
 					// so pre-pull those images again to ensure this test does not affect subsequent tests.
-					err := PrePullAllImages()
+					err := PrePullAllImages(ctx)
 					framework.ExpectNoError(err)
 				}
 			}

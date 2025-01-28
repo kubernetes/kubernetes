@@ -32,6 +32,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
+	"k8s.io/client-go/features"
 	"k8s.io/client-go/pkg/version"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
@@ -113,6 +116,9 @@ type Config struct {
 
 	// QPS indicates the maximum QPS to the master from this client.
 	// If it's zero, the created RESTClient will use DefaultQPS: 5
+	//
+	// Setting this to a negative value will disable client-side ratelimiting
+	// unless `Ratelimiter` is also set.
 	QPS float32
 
 	// Maximum burst for throttle.
@@ -668,4 +674,20 @@ func CopyConfig(config *Config) *Config {
 		c.ExecProvider.Config = config.ExecProvider.Config.DeepCopyObject()
 	}
 	return c
+}
+
+// CodecFactoryForGeneratedClient returns the provided CodecFactory if there are no enabled client
+// feature gates affecting serialization. Otherwise, it constructs and returns a new CodecFactory
+// from the provided Scheme.
+//
+// This is supported ONLY for use by clients generated with client-gen. The caller is responsible
+// for ensuring that the CodecFactory argument was constructed using the Scheme argument.
+func CodecFactoryForGeneratedClient(scheme *runtime.Scheme, codecs serializer.CodecFactory) serializer.CodecFactory {
+	if !features.FeatureGates().Enabled(features.ClientsAllowCBOR) {
+		// NOTE: This assumes client-gen will not generate CBOR-enabled Codecs as long as
+		// the feature gate exists.
+		return codecs
+	}
+
+	return serializer.NewCodecFactory(scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
 }

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ImageLister helps list Images.
@@ -14,19 +14,19 @@ import (
 type ImageLister interface {
 	// List lists all Images in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Image, err error)
+	List(selector labels.Selector) (ret []*configv1.Image, err error)
 	// Get retrieves the Image from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Image, error)
+	Get(name string) (*configv1.Image, error)
 	ImageListerExpansion
 }
 
 // imageLister implements the ImageLister interface.
 type imageLister struct {
-	listers.ResourceIndexer[*v1.Image]
+	listers.ResourceIndexer[*configv1.Image]
 }
 
 // NewImageLister returns a new ImageLister.
 func NewImageLister(indexer cache.Indexer) ImageLister {
-	return &imageLister{listers.New[*v1.Image](indexer, v1.Resource("image"))}
+	return &imageLister{listers.New[*configv1.Image](indexer, configv1.Resource("image"))}
 }

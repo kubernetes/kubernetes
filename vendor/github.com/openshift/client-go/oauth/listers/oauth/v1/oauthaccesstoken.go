@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/oauth/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // OAuthAccessTokenLister helps list OAuthAccessTokens.
@@ -14,19 +14,19 @@ import (
 type OAuthAccessTokenLister interface {
 	// List lists all OAuthAccessTokens in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.OAuthAccessToken, err error)
+	List(selector labels.Selector) (ret []*oauthv1.OAuthAccessToken, err error)
 	// Get retrieves the OAuthAccessToken from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.OAuthAccessToken, error)
+	Get(name string) (*oauthv1.OAuthAccessToken, error)
 	OAuthAccessTokenListerExpansion
 }
 
 // oAuthAccessTokenLister implements the OAuthAccessTokenLister interface.
 type oAuthAccessTokenLister struct {
-	listers.ResourceIndexer[*v1.OAuthAccessToken]
+	listers.ResourceIndexer[*oauthv1.OAuthAccessToken]
 }
 
 // NewOAuthAccessTokenLister returns a new OAuthAccessTokenLister.
 func NewOAuthAccessTokenLister(indexer cache.Indexer) OAuthAccessTokenLister {
-	return &oAuthAccessTokenLister{listers.New[*v1.OAuthAccessToken](indexer, v1.Resource("oauthaccesstoken"))}
+	return &oAuthAccessTokenLister{listers.New[*oauthv1.OAuthAccessToken](indexer, oauthv1.Resource("oauthaccesstoken"))}
 }

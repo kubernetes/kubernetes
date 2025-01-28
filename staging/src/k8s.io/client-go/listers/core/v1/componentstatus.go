@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	corev1 "k8s.io/api/core/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ComponentStatusLister helps list ComponentStatuses.
@@ -30,19 +30,19 @@ import (
 type ComponentStatusLister interface {
 	// List lists all ComponentStatuses in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ComponentStatus, err error)
+	List(selector labels.Selector) (ret []*corev1.ComponentStatus, err error)
 	// Get retrieves the ComponentStatus from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ComponentStatus, error)
+	Get(name string) (*corev1.ComponentStatus, error)
 	ComponentStatusListerExpansion
 }
 
 // componentStatusLister implements the ComponentStatusLister interface.
 type componentStatusLister struct {
-	listers.ResourceIndexer[*v1.ComponentStatus]
+	listers.ResourceIndexer[*corev1.ComponentStatus]
 }
 
 // NewComponentStatusLister returns a new ComponentStatusLister.
 func NewComponentStatusLister(indexer cache.Indexer) ComponentStatusLister {
-	return &componentStatusLister{listers.New[*v1.ComponentStatus](indexer, v1.Resource("componentstatus"))}
+	return &componentStatusLister{listers.New[*corev1.ComponentStatus](indexer, corev1.Resource("componentstatus"))}
 }

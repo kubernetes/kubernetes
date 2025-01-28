@@ -19,29 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1 "k8s.io/api/authentication/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	authenticationv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 )
 
-// FakeTokenReviews implements TokenReviewInterface
-type FakeTokenReviews struct {
+// fakeTokenReviews implements TokenReviewInterface
+type fakeTokenReviews struct {
+	*gentype.FakeClient[*v1.TokenReview]
 	Fake *FakeAuthenticationV1
 }
 
-var tokenreviewsResource = v1.SchemeGroupVersion.WithResource("tokenreviews")
-
-var tokenreviewsKind = v1.SchemeGroupVersion.WithKind("TokenReview")
-
-// Create takes the representation of a tokenReview and creates it.  Returns the server's representation of the tokenReview, and an error, if there is any.
-func (c *FakeTokenReviews) Create(ctx context.Context, tokenReview *v1.TokenReview, opts metav1.CreateOptions) (result *v1.TokenReview, err error) {
-	emptyResult := &v1.TokenReview{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(tokenreviewsResource, tokenReview, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeTokenReviews(fake *FakeAuthenticationV1) authenticationv1.TokenReviewInterface {
+	return &fakeTokenReviews{
+		gentype.NewFakeClient[*v1.TokenReview](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("tokenreviews"),
+			v1.SchemeGroupVersion.WithKind("TokenReview"),
+			func() *v1.TokenReview { return &v1.TokenReview{} },
+		),
+		fake,
 	}
-	return obj.(*v1.TokenReview), err
 }

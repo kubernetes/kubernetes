@@ -3,16 +3,16 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/template/v1"
+	templatev1 "github.com/openshift/api/template/v1"
 )
 
 // TemplateInstanceRequesterApplyConfiguration represents a declarative configuration of the TemplateInstanceRequester type for use
 // with apply.
 type TemplateInstanceRequesterApplyConfiguration struct {
-	Username *string                  `json:"username,omitempty"`
-	UID      *string                  `json:"uid,omitempty"`
-	Groups   []string                 `json:"groups,omitempty"`
-	Extra    map[string]v1.ExtraValue `json:"extra,omitempty"`
+	Username *string                          `json:"username,omitempty"`
+	UID      *string                          `json:"uid,omitempty"`
+	Groups   []string                         `json:"groups,omitempty"`
+	Extra    map[string]templatev1.ExtraValue `json:"extra,omitempty"`
 }
 
 // TemplateInstanceRequesterApplyConfiguration constructs a declarative configuration of the TemplateInstanceRequester type for use with
@@ -51,9 +51,9 @@ func (b *TemplateInstanceRequesterApplyConfiguration) WithGroups(values ...strin
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, the entries provided by each call will be put on the Extra field,
 // overwriting an existing map entries in Extra field with the same key.
-func (b *TemplateInstanceRequesterApplyConfiguration) WithExtra(entries map[string]v1.ExtraValue) *TemplateInstanceRequesterApplyConfiguration {
+func (b *TemplateInstanceRequesterApplyConfiguration) WithExtra(entries map[string]templatev1.ExtraValue) *TemplateInstanceRequesterApplyConfiguration {
 	if b.Extra == nil && len(entries) > 0 {
-		b.Extra = make(map[string]v1.ExtraValue, len(entries))
+		b.Extra = make(map[string]templatev1.ExtraValue, len(entries))
 	}
 	for k, v := range entries {
 		b.Extra[k] = v

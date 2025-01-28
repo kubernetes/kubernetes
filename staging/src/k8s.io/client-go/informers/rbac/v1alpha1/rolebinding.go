@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
+	apirbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/rbac/v1alpha1"
+	rbacv1alpha1 "k8s.io/client-go/listers/rbac/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // RoleBindings.
 type RoleBindingInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.RoleBindingLister
+	Lister() rbacv1alpha1.RoleBindingLister
 }
 
 type roleBindingInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredRoleBindingInformer(client kubernetes.Interface, namespace strin
 				return client.RbacV1alpha1().RoleBindings(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&rbacv1alpha1.RoleBinding{},
+		&apirbacv1alpha1.RoleBinding{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *roleBindingInformer) defaultInformer(client kubernetes.Interface, resyn
 }
 
 func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbacv1alpha1.RoleBinding{}, f.defaultInformer)
+	return f.factory.InformerFor(&apirbacv1alpha1.RoleBinding{}, f.defaultInformer)
 }
 
-func (f *roleBindingInformer) Lister() v1alpha1.RoleBindingLister {
-	return v1alpha1.NewRoleBindingLister(f.Informer().GetIndexer())
+func (f *roleBindingInformer) Lister() rbacv1alpha1.RoleBindingLister {
+	return rbacv1alpha1.NewRoleBindingLister(f.Informer().GetIndexer())
 }

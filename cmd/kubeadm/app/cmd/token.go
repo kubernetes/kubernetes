@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -48,7 +49,9 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -77,14 +80,8 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			You can read more about bootstrap tokens here:
 			  https://kubernetes.io/docs/admin/bootstrap-tokens/
 		`),
-
-		// Without this callback, if a user runs just the "token"
-		// command without a subcommand, or with an invalid subcommand,
-		// cobra will print usage information, but still exit cleanly.
-		// We want to return an error code in these cases so that the
-		// user knows that their command was invalid.
-		Run: cmdutil.SubCmdRun(),
 	}
+	cmdutil.RequireSubcommand(tokenCmd)
 
 	options.AddKubeConfigFlag(tokenCmd.PersistentFlags(), &kubeConfigFile)
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
@@ -127,7 +124,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
+			client, err := getClientForTokenCommands(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -159,7 +156,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
+			client, err := getClientForTokenCommands(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -193,7 +190,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return errors.Errorf("missing argument; 'token delete' is missing token of form %q or %q", bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := cmdutil.GetClientSet(kubeConfigFile, dryRun)
+			client, err := getClientForTokenCommands(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -431,4 +428,18 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)
 	}
 	return nil
+}
+
+// getClientForTokenCommands returns a client to be used with token commands.
+// When dry-running it includes token specific reactors.
+func getClientForTokenCommands(file string, dryRun bool) (clientset.Interface, error) {
+	if dryRun {
+		dryRun := apiclient.NewDryRun().WithDefaultMarshalFunction().WithWriter(os.Stdout)
+		dryRun.AppendReactor(dryRun.DeleteBootstrapTokenReactor())
+		if err := dryRun.WithKubeConfigFile(file); err != nil {
+			return nil, err
+		}
+		return dryRun.FakeClient(), nil
+	}
+	return kubeconfigutil.ClientSetFromFile(file)
 }

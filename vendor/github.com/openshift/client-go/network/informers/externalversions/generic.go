@@ -3,7 +3,7 @@
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1 "github.com/openshift/api/network/v1"
 	v1alpha1 "github.com/openshift/api/network/v1alpha1"

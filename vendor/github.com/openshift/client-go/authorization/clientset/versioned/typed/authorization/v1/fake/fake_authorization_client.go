@@ -13,47 +13,47 @@ type FakeAuthorizationV1 struct {
 }
 
 func (c *FakeAuthorizationV1) ClusterRoles() v1.ClusterRoleInterface {
-	return &FakeClusterRoles{c}
+	return newFakeClusterRoles(c)
 }
 
 func (c *FakeAuthorizationV1) ClusterRoleBindings() v1.ClusterRoleBindingInterface {
-	return &FakeClusterRoleBindings{c}
+	return newFakeClusterRoleBindings(c)
 }
 
 func (c *FakeAuthorizationV1) LocalResourceAccessReviews(namespace string) v1.LocalResourceAccessReviewInterface {
-	return &FakeLocalResourceAccessReviews{c, namespace}
+	return newFakeLocalResourceAccessReviews(c, namespace)
 }
 
 func (c *FakeAuthorizationV1) LocalSubjectAccessReviews(namespace string) v1.LocalSubjectAccessReviewInterface {
-	return &FakeLocalSubjectAccessReviews{c, namespace}
+	return newFakeLocalSubjectAccessReviews(c, namespace)
 }
 
 func (c *FakeAuthorizationV1) ResourceAccessReviews() v1.ResourceAccessReviewInterface {
-	return &FakeResourceAccessReviews{c}
+	return newFakeResourceAccessReviews(c)
 }
 
 func (c *FakeAuthorizationV1) Roles(namespace string) v1.RoleInterface {
-	return &FakeRoles{c, namespace}
+	return newFakeRoles(c, namespace)
 }
 
 func (c *FakeAuthorizationV1) RoleBindings(namespace string) v1.RoleBindingInterface {
-	return &FakeRoleBindings{c, namespace}
+	return newFakeRoleBindings(c, namespace)
 }
 
 func (c *FakeAuthorizationV1) RoleBindingRestrictions(namespace string) v1.RoleBindingRestrictionInterface {
-	return &FakeRoleBindingRestrictions{c, namespace}
+	return newFakeRoleBindingRestrictions(c, namespace)
 }
 
 func (c *FakeAuthorizationV1) SelfSubjectRulesReviews(namespace string) v1.SelfSubjectRulesReviewInterface {
-	return &FakeSelfSubjectRulesReviews{c, namespace}
+	return newFakeSelfSubjectRulesReviews(c, namespace)
 }
 
 func (c *FakeAuthorizationV1) SubjectAccessReviews() v1.SubjectAccessReviewInterface {
-	return &FakeSubjectAccessReviews{c}
+	return newFakeSubjectAccessReviews(c)
 }
 
 func (c *FakeAuthorizationV1) SubjectRulesReviews(namespace string) v1.SubjectRulesReviewInterface {
-	return &FakeSubjectRulesReviews{c, namespace}
+	return newFakeSubjectRulesReviews(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

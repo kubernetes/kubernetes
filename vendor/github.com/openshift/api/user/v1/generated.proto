@@ -21,7 +21,7 @@ message Group {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Users is the list of users in this group.
+  // users is the list of users in this group.
   optional OptionalNames users = 2;
 }
 
@@ -34,7 +34,7 @@ message GroupList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of groups
+  // items is the list of groups
   repeated Group items = 2;
 }
 
@@ -51,17 +51,17 @@ message Identity {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // ProviderName is the source of identity information
+  // providerName is the source of identity information
   optional string providerName = 2;
 
-  // ProviderUserName uniquely represents this identity in the scope of the provider
+  // providerUserName uniquely represents this identity in the scope of the provider
   optional string providerUserName = 3;
 
-  // User is a reference to the user this identity is associated with
+  // user is a reference to the user this identity is associated with
   // Both Name and UID must be set
   optional .k8s.io.api.core.v1.ObjectReference user = 4;
 
-  // Extra holds extra information about this identity
+  // extra holds extra information about this identity
   map<string, string> extra = 5;
 }
 
@@ -74,7 +74,7 @@ message IdentityList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of identities
+  // items is the list of identities
   repeated Identity items = 2;
 }
 
@@ -100,14 +100,14 @@ message User {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // FullName is the full name of user
+  // fullName is the full name of user
   optional string fullName = 2;
 
-  // Identities are the identities associated with this user
+  // identities are the identities associated with this user
   // +optional
   repeated string identities = 3;
 
-  // Groups specifies group names this user is a member of.
+  // groups specifies group names this user is a member of.
   // This field is deprecated and will be removed in a future release.
   // Instead, create a Group object containing the name of this User.
   repeated string groups = 4;
@@ -122,10 +122,10 @@ message UserIdentityMapping {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Identity is a reference to an identity
+  // identity is a reference to an identity
   optional .k8s.io.api.core.v1.ObjectReference identity = 2;
 
-  // User is a reference to a user
+  // user is a reference to a user
   optional .k8s.io.api.core.v1.ObjectReference user = 3;
 }
 
@@ -138,7 +138,7 @@ message UserList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of users
+  // items is the list of users
   repeated User items = 2;
 }
 

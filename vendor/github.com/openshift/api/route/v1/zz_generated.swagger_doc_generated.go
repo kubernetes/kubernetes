@@ -72,9 +72,9 @@ func (RouteHTTPHeaders) SwaggerDoc() map[string]string {
 
 var map_RouteIngress = map[string]string{
 	"":                        "RouteIngress holds information about the places where a route is exposed.",
-	"host":                    "Host is the host string under which the route is exposed; this value is required",
+	"host":                    "host is the host string under which the route is exposed; this value is required",
 	"routerName":              "Name is a name chosen by the router to identify itself; this value is required",
-	"conditions":              "Conditions is the state of the route, may be empty.",
+	"conditions":              "conditions is the state of the route, may be empty.",
 	"wildcardPolicy":          "Wildcard policy is the wildcard policy that was allowed where this route is exposed.",
 	"routerCanonicalHostname": "CanonicalHostname is the external host name for the router that can be used as a CNAME for the host requested for this route. This value is optional and may not be set in all cases.",
 }
@@ -85,8 +85,8 @@ func (RouteIngress) SwaggerDoc() map[string]string {
 
 var map_RouteIngressCondition = map[string]string{
 	"":                   "RouteIngressCondition contains details for the current condition of this route on a particular router.",
-	"type":               "Type is the type of the condition. Currently only Admitted or UnservableInFutureVersions.",
-	"status":             "Status is the status of the condition. Can be True, False, Unknown.",
+	"type":               "type is the type of the condition. Currently only Admitted or UnservableInFutureVersions.",
+	"status":             "status is the status of the condition. Can be True, False, Unknown.",
 	"reason":             "(brief) reason for the condition's last transition, and is usually a machine and human readable constant",
 	"message":            "Human readable message indicating details about last transition.",
 	"lastTransitionTime": "RFC 3339 date and time when this condition last transitioned",

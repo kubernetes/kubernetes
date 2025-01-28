@@ -75,7 +75,7 @@ func TestMutateResolverConfig(t *testing.T) {
 				t.Fatalf("failed to mutate ResolverConfig for KubeletConfiguration, %v", err)
 			}
 			if !reflect.DeepEqual(test.cfg, test.expected) {
-				t.Errorf("Missmatch between expected and got:\nExpected:\n%+v\n---\nGot:\n%+v",
+				t.Errorf("Mismatch between expected and got:\nExpected:\n%+v\n---\nGot:\n%+v",
 					test.expected, test.cfg)
 			}
 		})

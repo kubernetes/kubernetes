@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/oauth/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // OAuthClientAuthorizationLister helps list OAuthClientAuthorizations.
@@ -14,19 +14,19 @@ import (
 type OAuthClientAuthorizationLister interface {
 	// List lists all OAuthClientAuthorizations in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.OAuthClientAuthorization, err error)
+	List(selector labels.Selector) (ret []*oauthv1.OAuthClientAuthorization, err error)
 	// Get retrieves the OAuthClientAuthorization from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.OAuthClientAuthorization, error)
+	Get(name string) (*oauthv1.OAuthClientAuthorization, error)
 	OAuthClientAuthorizationListerExpansion
 }
 
 // oAuthClientAuthorizationLister implements the OAuthClientAuthorizationLister interface.
 type oAuthClientAuthorizationLister struct {
-	listers.ResourceIndexer[*v1.OAuthClientAuthorization]
+	listers.ResourceIndexer[*oauthv1.OAuthClientAuthorization]
 }
 
 // NewOAuthClientAuthorizationLister returns a new OAuthClientAuthorizationLister.
 func NewOAuthClientAuthorizationLister(indexer cache.Indexer) OAuthClientAuthorizationLister {
-	return &oAuthClientAuthorizationLister{listers.New[*v1.OAuthClientAuthorization](indexer, v1.Resource("oauthclientauthorization"))}
+	return &oAuthClientAuthorizationLister{listers.New[*oauthv1.OAuthClientAuthorization](indexer, oauthv1.Resource("oauthclientauthorization"))}
 }

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // VSpherePlatformLoadBalancerApplyConfiguration represents a declarative configuration of the VSpherePlatformLoadBalancer type for use
 // with apply.
 type VSpherePlatformLoadBalancerApplyConfiguration struct {
-	Type *v1.PlatformLoadBalancerType `json:"type,omitempty"`
+	Type *configv1.PlatformLoadBalancerType `json:"type,omitempty"`
 }
 
 // VSpherePlatformLoadBalancerApplyConfiguration constructs a declarative configuration of the VSpherePlatformLoadBalancer type for use with
@@ -21,7 +21,7 @@ func VSpherePlatformLoadBalancer() *VSpherePlatformLoadBalancerApplyConfiguratio
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *VSpherePlatformLoadBalancerApplyConfiguration) WithType(value v1.PlatformLoadBalancerType) *VSpherePlatformLoadBalancerApplyConfiguration {
+func (b *VSpherePlatformLoadBalancerApplyConfiguration) WithType(value configv1.PlatformLoadBalancerType) *VSpherePlatformLoadBalancerApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	templatev1 "github.com/openshift/api/template/v1"
+	apitemplatev1 "github.com/openshift/api/template/v1"
 	versioned "github.com/openshift/client-go/template/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/template/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/template/listers/template/v1"
+	templatev1 "github.com/openshift/client-go/template/listers/template/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Templates.
 type TemplateInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.TemplateLister
+	Lister() templatev1.TemplateLister
 }
 
 type templateInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredTemplateInformer(client versioned.Interface, namespace string, r
 				return client.TemplateV1().Templates(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&templatev1.Template{},
+		&apitemplatev1.Template{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *templateInformer) defaultInformer(client versioned.Interface, resyncPer
 }
 
 func (f *templateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&templatev1.Template{}, f.defaultInformer)
+	return f.factory.InformerFor(&apitemplatev1.Template{}, f.defaultInformer)
 }
 
-func (f *templateInformer) Lister() v1.TemplateLister {
-	return v1.NewTemplateLister(f.Informer().GetIndexer())
+func (f *templateInformer) Lister() templatev1.TemplateLister {
+	return templatev1.NewTemplateLister(f.Informer().GetIndexer())
 }

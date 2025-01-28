@@ -11,17 +11,21 @@ var (
 		"[Disabled:Alpha]": {
 			`\[Feature:StorageVersionAPI\]`,
 			`\[Feature:InPlacePodVerticalScaling\]`,
-			`\[Feature:RecoverVolumeExpansionFailure\]`,
-			`\[Feature:WatchList\]`,
 			`\[Feature:ServiceCIDRs\]`,
 			`\[Feature:ClusterTrustBundle\]`,
 			`\[Feature:SELinuxMount\]`,
 			`\[FeatureGate:SELinuxMount\]`,
-			`\[Feature:RelaxedEnvironmentVariableValidation\]`,
 			`\[Feature:UserNamespacesPodSecurityStandards\]`,
 			`\[Feature:UserNamespacesSupport\]`, // disabled Beta
 			`\[Feature:DynamicResourceAllocation\]`,
 			`\[Feature:VolumeAttributesClass\]`, // disabled Beta
+			`\[sig-cli\] Kubectl client Kubectl prune with applyset should apply and prune objects`, // Alpha feature since k8s 1.27
+			// 4.19
+			`\[Feature:PodLevelResources\]`,
+			`\[Feature:SchedulerAsyncPreemption\]`,
+			`\[Feature:RelaxedDNSSearchValidation\]`,
+			`\[Feature:PodLogsQuerySplitStreams\]`,
+			`\[Feature:PodLifecycleSleepActionAllowZero\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -158,11 +162,32 @@ var (
 		"[Disabled:RebaseInProgress]": {
 			// https://issues.redhat.com/browse/OCPBUGS-7297
 			`DNS HostNetwork should resolve DNS of partial qualified names for services on hostNetwork pods with dnsPolicy`,
-			`\[sig-network\] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod`, // TODO(network): simple test in k8s 1.27, needs investigation
-			`\[sig-cli\] Kubectl client Kubectl prune with applyset should apply and prune objects`,                    // TODO(workloads): alpha feature in k8s 1.27. It's failing with `error: unknown flag: --applyset`. Needs investigation
+
+			// https://issues.redhat.com/browse/OCPBUGS-45275
+			`\[sig-network\] Connectivity Pod Lifecycle should be able to connect to other Pod from a terminating Pod`,
 
 			// https://issues.redhat.com/browse/OCPBUGS-17194
 			`\[sig-node\] ImageCredentialProvider \[Feature:KubeletCredentialProviders\] should be able to create pod with image credentials fetched from external credential provider`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-45214
+			// Even though this feature is not GA in k/k, it will be GA in OCP 4.19, so we should fix it and unskip this test
+			`\[Feature:volumegroupsnapshot\]`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-45273
+			`\[sig-network\] Services should implement NodePort and HealthCheckNodePort correctly when ExternalTrafficPolicy changes`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-45273
+			`\[sig-cli\] Kubectl Port forwarding Shutdown client connection while the remote stream is writing data to the port-forward connection port-forward should keep working after detect broken connection`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-45274
+			// https://github.com/kubernetes/kubernetes/issues/129056
+			`\[sig-node\] PodRejectionStatus Kubelet should reject pod when the node didn't have enough resource`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-45359
+			`\[Feature:RecoverVolumeExpansionFailure\]`,
+
+			// https://issues.redhat.com/browse/OCPBUGS-46477
+			`\[sig-storage\] In-tree Volumes \[Driver: azure-file\]`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

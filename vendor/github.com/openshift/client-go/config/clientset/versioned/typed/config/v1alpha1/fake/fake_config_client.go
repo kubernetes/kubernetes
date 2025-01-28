@@ -13,19 +13,23 @@ type FakeConfigV1alpha1 struct {
 }
 
 func (c *FakeConfigV1alpha1) Backups() v1alpha1.BackupInterface {
-	return &FakeBackups{c}
+	return newFakeBackups(c)
 }
 
 func (c *FakeConfigV1alpha1) ClusterImagePolicies() v1alpha1.ClusterImagePolicyInterface {
-	return &FakeClusterImagePolicies{c}
+	return newFakeClusterImagePolicies(c)
+}
+
+func (c *FakeConfigV1alpha1) ClusterMonitorings() v1alpha1.ClusterMonitoringInterface {
+	return newFakeClusterMonitorings(c)
 }
 
 func (c *FakeConfigV1alpha1) ImagePolicies(namespace string) v1alpha1.ImagePolicyInterface {
-	return &FakeImagePolicies{c, namespace}
+	return newFakeImagePolicies(c, namespace)
 }
 
 func (c *FakeConfigV1alpha1) InsightsDataGathers() v1alpha1.InsightsDataGatherInterface {
-	return &FakeInsightsDataGathers{c}
+	return newFakeInsightsDataGathers(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	corev1 "k8s.io/api/core/v1"
+	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ServiceAccounts.
 type ServiceAccountInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ServiceAccountLister
+	Lister() corev1.ServiceAccountLister
 }
 
 type serviceAccountInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredServiceAccountInformer(client kubernetes.Interface, namespace st
 				return client.CoreV1().ServiceAccounts(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&corev1.ServiceAccount{},
+		&apicorev1.ServiceAccount{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *serviceAccountInformer) defaultInformer(client kubernetes.Interface, re
 }
 
 func (f *serviceAccountInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&corev1.ServiceAccount{}, f.defaultInformer)
+	return f.factory.InformerFor(&apicorev1.ServiceAccount{}, f.defaultInformer)
 }
 
-func (f *serviceAccountInformer) Lister() v1.ServiceAccountLister {
-	return v1.NewServiceAccountLister(f.Informer().GetIndexer())
+func (f *serviceAccountInformer) Lister() corev1.ServiceAccountLister {
+	return corev1.NewServiceAccountLister(f.Informer().GetIndexer())
 }

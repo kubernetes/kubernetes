@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"path"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -48,15 +49,18 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
+	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/types"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilversion "k8s.io/apiserver/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -65,6 +69,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/pager"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -3351,4 +3357,137 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 
 func int32Ptr(i int32) *int32 {
 	return &i
+}
+
+// TestDefaultStorageEncoding verifies that the storage encoding for all built-in resources is
+// Protobuf.
+func TestDefaultStorageEncoding(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
+
+	protobufRecognizer := protobuf.NewSerializer(runtime.NewScheme(), runtime.NewScheme())
+	var recognizersByGroup map[string]recognizer.RecognizingDecoder
+	{
+		jsonRecognizer := jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, runtime.NewScheme(), runtime.NewScheme(), jsonserializer.SerializerOptions{})
+		recognizersByGroup = map[string]recognizer.RecognizingDecoder{
+			// No new exceptions should be added. Once these groups begin using Protobuf
+			// for storage, the exception list should be removed.
+			"apiextensions.k8s.io":   jsonRecognizer,
+			"apiregistration.k8s.io": jsonRecognizer,
+		}
+	}
+
+	storageConfig := framework.SharedEtcd()
+	etcdPrefix := string(uuid.NewUUID())
+	storageConfig.Prefix = path.Join(etcdPrefix, "registry")
+	server := kubeapiservertesting.StartTestServerOrDie(
+		t,
+		kubeapiservertesting.NewDefaultTestServerOptions(),
+		[]string{
+			"--runtime-config=api/all=true",
+			"--disable-admission-plugins=ServiceAccount",
+		},
+		storageConfig,
+	)
+	t.Cleanup(server.TearDownFn)
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	etcdClient, kvClient, err := integration.GetEtcdClients(storageConfig.Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := etcdClient.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+
+	const NamespaceName = "test-protobuf-default-storage-encoding"
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: NamespaceName}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	storageDataByResource := etcd.GetEtcdStorageDataForNamespace(NamespaceName)
+
+	_, lists, err := client.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, list := range lists {
+		for _, resource := range list.APIResources {
+			gv, err := schema.ParseGroupVersion(list.GroupVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resource.Group != "" {
+				gv.Group = resource.Group
+			}
+			if resource.Version != "" {
+				gv.Version = resource.Version
+			}
+
+			if strings.Contains(resource.Name, "/") {
+				continue
+			}
+
+			if !slices.Contains(resource.Verbs, "create") {
+				continue
+			}
+
+			gvr := gv.WithResource(resource.Name)
+
+			storageData := storageDataByResource[gvr]
+			if storageData.Stub == "" {
+				continue
+			}
+
+			name := fmt.Sprintf("%s.%s.%s", gvr.Resource, gvr.Version, gvr.Group)
+			if gvr.Group == "" {
+				name = fmt.Sprintf("%s.%s", gvr.Resource, gvr.Version)
+			}
+			t.Run(name, func(t *testing.T) {
+				var o unstructured.Unstructured
+				if err := utiljson.Unmarshal([]byte(storageData.Stub), &o.Object); err != nil {
+					t.Fatal(err)
+				}
+
+				resourceClient := dynamicClient.Resource(gvr).Namespace(NamespaceName)
+				if !resource.Namespaced {
+					resourceClient = dynamicClient.Resource(gvr)
+				}
+				if _, err := resourceClient.Create(context.TODO(), &o, metav1.CreateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+
+				response, err := kvClient.Get(context.TODO(), path.Join("/", etcdPrefix, storageData.ExpectedEtcdPath))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if n := len(response.Kvs); n != 1 {
+					t.Fatalf("expected 1 kv, got %d", n)
+				}
+				recognizer, ok := recognizersByGroup[gvr.Group]
+				if !ok {
+					recognizer = protobufRecognizer
+				}
+				recognized, _, err := recognizer.RecognizesData(response.Kvs[0].Value)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !recognized {
+					t.Fatal("stored object encoding not recognized as protobuf")
+				}
+			})
+		}
+	}
 }

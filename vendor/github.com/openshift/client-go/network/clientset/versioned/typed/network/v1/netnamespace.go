@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/network/v1"
-	networkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
+	networkv1 "github.com/openshift/api/network/v1"
+	applyconfigurationsnetworkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
 	scheme "github.com/openshift/client-go/network/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type NetNamespacesGetter interface {
 
 // NetNamespaceInterface has methods to work with NetNamespace resources.
 type NetNamespaceInterface interface {
-	Create(ctx context.Context, netNamespace *v1.NetNamespace, opts metav1.CreateOptions) (*v1.NetNamespace, error)
-	Update(ctx context.Context, netNamespace *v1.NetNamespace, opts metav1.UpdateOptions) (*v1.NetNamespace, error)
+	Create(ctx context.Context, netNamespace *networkv1.NetNamespace, opts metav1.CreateOptions) (*networkv1.NetNamespace, error)
+	Update(ctx context.Context, netNamespace *networkv1.NetNamespace, opts metav1.UpdateOptions) (*networkv1.NetNamespace, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.NetNamespace, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.NetNamespaceList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*networkv1.NetNamespace, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*networkv1.NetNamespaceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.NetNamespace, err error)
-	Apply(ctx context.Context, netNamespace *networkv1.NetNamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.NetNamespace, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *networkv1.NetNamespace, err error)
+	Apply(ctx context.Context, netNamespace *applyconfigurationsnetworkv1.NetNamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *networkv1.NetNamespace, err error)
 	NetNamespaceExpansion
 }
 
 // netNamespaces implements NetNamespaceInterface
 type netNamespaces struct {
-	*gentype.ClientWithListAndApply[*v1.NetNamespace, *v1.NetNamespaceList, *networkv1.NetNamespaceApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkv1.NetNamespace, *networkv1.NetNamespaceList, *applyconfigurationsnetworkv1.NetNamespaceApplyConfiguration]
 }
 
 // newNetNamespaces returns a NetNamespaces
 func newNetNamespaces(c *NetworkV1Client) *netNamespaces {
 	return &netNamespaces{
-		gentype.NewClientWithListAndApply[*v1.NetNamespace, *v1.NetNamespaceList, *networkv1.NetNamespaceApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkv1.NetNamespace, *networkv1.NetNamespaceList, *applyconfigurationsnetworkv1.NetNamespaceApplyConfiguration](
 			"netnamespaces",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.NetNamespace { return &v1.NetNamespace{} },
-			func() *v1.NetNamespaceList { return &v1.NetNamespaceList{} }),
+			func() *networkv1.NetNamespace { return &networkv1.NetNamespace{} },
+			func() *networkv1.NetNamespaceList { return &networkv1.NetNamespaceList{} },
+		),
 	}
 }

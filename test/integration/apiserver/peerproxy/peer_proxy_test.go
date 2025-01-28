@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,7 +52,9 @@ func TestPeerProxiedRequest(t *testing.T) {
 
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	t.Cleanup(cancel)
+	defer func() {
+		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
+	}()
 
 	// ensure to stop cert reloading after shutdown
 	transport.DialerStopCh = ctx.Done()
@@ -75,7 +78,7 @@ func TestPeerProxiedRequest(t *testing.T) {
 		EnableCertAuth: true,
 		ProxyCA:        &proxyCA},
 		[]string{}, etcd)
-	defer serverA.TearDownFn()
+	t.Cleanup(serverA.TearDownFn)
 
 	// start another test server with some api disabled
 	// override hostname to ensure unique ips
@@ -84,7 +87,7 @@ func TestPeerProxiedRequest(t *testing.T) {
 		EnableCertAuth: true,
 		ProxyCA:        &proxyCA},
 		[]string{fmt.Sprintf("--runtime-config=%s", "batch/v1=false")}, etcd)
-	defer serverB.TearDownFn()
+	t.Cleanup(serverB.TearDownFn)
 
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
@@ -112,7 +115,9 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	t.Cleanup(cancel)
+	defer func() {
+		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
+	}()
 
 	// ensure to stop cert reloading after shutdown
 	transport.DialerStopCh = ctx.Done()
@@ -132,18 +137,20 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// set lease duration to 1s for serverA to ensure that storageversions for serverA are updated
 	// once it is shutdown
 	controlplaneapiserver.IdentityLeaseDurationSeconds = 10
-	controlplaneapiserver.IdentityLeaseGCPeriod = time.Second
-	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = 10 * time.Second
+	controlplaneapiserver.IdentityLeaseGCPeriod = 2 * time.Second
+	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = time.Second
 
 	// start serverA with all APIs enabled
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-a")
+	t.Log("starting apiserver for ServerA")
 	serverA := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{}, etcd)
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
 	// ensure storageversion garbage collector ctlr is set up
 	informersA := informers.NewSharedInformerFactory(kubeClientSetA, time.Second)
-	setupStorageVersionGC(ctx, kubeClientSetA, informersA)
+	informersACtx, informersACancel := context.WithCancel(ctx)
+	setupStorageVersionGC(informersACtx, kubeClientSetA, informersA)
 	// reset lease duration to default value for serverB and serverC since we will not be
 	// shutting these down
 	controlplaneapiserver.IdentityLeaseDurationSeconds = 3600
@@ -151,9 +158,10 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// start serverB with some api disabled
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-b")
+	t.Log("starting apiserver for ServerB")
 	serverB := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{
 		fmt.Sprintf("--runtime-config=%v", "batch/v1=false")}, etcd)
-	defer serverB.TearDownFn()
+	t.Cleanup(serverB.TearDownFn)
 	kubeClientSetB, err := kubernetes.NewForConfig(serverB.ClientConfig)
 	require.NoError(t, err)
 	// ensure storageversion garbage collector ctlr is set up
@@ -163,8 +171,9 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// start serverC with all APIs enabled
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-c")
+	t.Log("starting apiserver for ServerC")
 	serverC := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{}, etcd)
-	defer serverC.TearDownFn()
+	t.Cleanup(serverC.TearDownFn)
 
 	// create jobs resource using serverA
 	job := createJobResource()
@@ -173,18 +182,29 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	klog.Infof("\nServerA has created jobs\n")
 
 	// shutdown serverA
+	informersACancel()
 	serverA.TearDownFn()
 
 	var jobsB *v1.JobList
 	// list jobs using ServerB which it should proxy to ServerC and get back valid response
-	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		default:
+		}
+
+		t.Log("retrieving jobs from ServerB")
 		jobsB, err = kubeClientSetB.BatchV1().Jobs("default").List(context.Background(), metav1.ListOptions{})
 		if err != nil {
+			t.Logf("error trying to list jobs from ServerB: %v", err)
 			return false, nil
 		}
+
 		if jobsB != nil {
 			return true, nil
 		}
+		t.Log("retrieved nil jobs from ServerB")
 		return false, nil
 	})
 	klog.Infof("\nServerB has retrieved jobs list of length %v \n\n", len(jobsB.Items))

@@ -7,5 +7,4 @@ approvers:
   - jpbetz
   - serathius
 labels:
-  - sig/api-machinery
   - sig/etcd

@@ -25,7 +25,6 @@ type CSISnapshotController struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec CSISnapshotControllerSpec `json:"spec"`
 

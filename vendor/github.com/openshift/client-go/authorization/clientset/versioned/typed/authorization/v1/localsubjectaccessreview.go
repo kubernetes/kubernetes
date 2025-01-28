@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/authorization/v1"
+	authorizationv1 "github.com/openshift/api/authorization/v1"
 	scheme "github.com/openshift/client-go/authorization/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
@@ -19,31 +19,32 @@ type LocalSubjectAccessReviewsGetter interface {
 
 // LocalSubjectAccessReviewInterface has methods to work with LocalSubjectAccessReview resources.
 type LocalSubjectAccessReviewInterface interface {
-	Create(ctx context.Context, localSubjectAccessReview *v1.LocalSubjectAccessReview, opts metav1.CreateOptions) (*v1.SubjectAccessReviewResponse, error)
+	Create(ctx context.Context, localSubjectAccessReview *authorizationv1.LocalSubjectAccessReview, opts metav1.CreateOptions) (*authorizationv1.SubjectAccessReviewResponse, error)
 
 	LocalSubjectAccessReviewExpansion
 }
 
 // localSubjectAccessReviews implements LocalSubjectAccessReviewInterface
 type localSubjectAccessReviews struct {
-	*gentype.Client[*v1.LocalSubjectAccessReview]
+	*gentype.Client[*authorizationv1.LocalSubjectAccessReview]
 }
 
 // newLocalSubjectAccessReviews returns a LocalSubjectAccessReviews
 func newLocalSubjectAccessReviews(c *AuthorizationV1Client, namespace string) *localSubjectAccessReviews {
 	return &localSubjectAccessReviews{
-		gentype.NewClient[*v1.LocalSubjectAccessReview](
+		gentype.NewClient[*authorizationv1.LocalSubjectAccessReview](
 			"localsubjectaccessreviews",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.LocalSubjectAccessReview { return &v1.LocalSubjectAccessReview{} }),
+			func() *authorizationv1.LocalSubjectAccessReview { return &authorizationv1.LocalSubjectAccessReview{} },
+		),
 	}
 }
 
 // Create takes the representation of a localSubjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReviewResponse, and an error, if there is any.
-func (c *localSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *v1.LocalSubjectAccessReview, opts metav1.CreateOptions) (result *v1.SubjectAccessReviewResponse, err error) {
-	result = &v1.SubjectAccessReviewResponse{}
+func (c *localSubjectAccessReviews) Create(ctx context.Context, localSubjectAccessReview *authorizationv1.LocalSubjectAccessReview, opts metav1.CreateOptions) (result *authorizationv1.SubjectAccessReviewResponse, err error) {
+	result = &authorizationv1.SubjectAccessReviewResponse{}
 	err = c.GetClient().Post().
 		Namespace(c.GetNamespace()).
 		Resource("localsubjectaccessreviews").

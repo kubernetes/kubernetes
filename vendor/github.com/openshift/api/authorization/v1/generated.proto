@@ -16,10 +16,10 @@ option go_package = "github.com/openshift/api/authorization/v1";
 
 // Action describes a request to the API server
 message Action {
-  // Namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces
+  // namespace is the namespace of the action being requested.  Currently, there is no distinction between no namespace and all namespaces
   optional string namespace = 1;
 
-  // Verb is one of: get, list, watch, create, update, delete
+  // verb is one of: get, list, watch, create, update, delete
   optional string verb = 2;
 
   // Group is the API group of the resource
@@ -30,19 +30,19 @@ message Action {
   // Serialized as resourceAPIVersion to avoid confusion with TypeMeta.apiVersion and ObjectMeta.resourceVersion when inlined
   optional string resourceAPIVersion = 4;
 
-  // Resource is one of the existing resource types
+  // resource is one of the existing resource types
   optional string resource = 5;
 
-  // ResourceName is the name of the resource being requested for a "get" or deleted for a "delete"
+  // resourceName is the name of the resource being requested for a "get" or deleted for a "delete"
   optional string resourceName = 6;
 
-  // Path is the path of a non resource URL
+  // path is the path of a non resource URL
   optional string path = 8;
 
-  // IsNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hierarchy)
+  // isNonResourceURL is true if this is a request for a non-resource URL (outside of the resource hierarchy)
   optional bool isNonResourceURL = 9;
 
-  // Content is the actual content of the request for create and update
+  // content is the actual content of the request for create and update
   // +kubebuilder:pruning:PreserveUnknownFields
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension content = 7;
 }
@@ -56,10 +56,10 @@ message ClusterRole {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Rules holds all the PolicyRules for this ClusterRole
+  // rules holds all the PolicyRules for this ClusterRole
   repeated PolicyRule rules = 2;
 
-  // AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
+  // aggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
   // If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
   // stomped by the controller.
   optional .k8s.io.api.rbac.v1.AggregationRule aggregationRule = 3;
@@ -76,28 +76,28 @@ message ClusterRoleBinding {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // UserNames holds all the usernames directly bound to the role.
+  // userNames holds all the usernames directly bound to the role.
   // This field should only be specified when supporting legacy clients and servers.
   // See Subjects for further details.
   // +k8s:conversion-gen=false
   // +optional
   optional OptionalNames userNames = 2;
 
-  // GroupNames holds all the groups directly bound to the role.
+  // groupNames holds all the groups directly bound to the role.
   // This field should only be specified when supporting legacy clients and servers.
   // See Subjects for further details.
   // +k8s:conversion-gen=false
   // +optional
   optional OptionalNames groupNames = 3;
 
-  // Subjects hold object references to authorize with this rule.
+  // subjects hold object references to authorize with this rule.
   // This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers.
   // Thus newer clients that do not need to support backwards compatibility should send
   // only fully qualified Subjects and should omit the UserNames and GroupNames fields.
   // Clients that need to support backwards compatibility can use this field to build the UserNames and GroupNames.
   repeated .k8s.io.api.core.v1.ObjectReference subjects = 4;
 
-  // RoleRef can only reference the current namespace and the global namespace.
+  // roleRef can only reference the current namespace and the global namespace.
   // If the ClusterRoleRef cannot be resolved, the Authorizer must return an error.
   // Since Policy is a singleton, this is sufficient knowledge to locate a role.
   optional .k8s.io.api.core.v1.ObjectReference roleRef = 5;
@@ -112,7 +112,7 @@ message ClusterRoleBindingList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of ClusterRoleBindings
+  // items is a list of ClusterRoleBindings
   repeated ClusterRoleBinding items = 2;
 }
 
@@ -125,14 +125,14 @@ message ClusterRoleList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of ClusterRoles
+  // items is a list of ClusterRoles
   repeated ClusterRole items = 2;
 }
 
 // GroupRestriction matches a group either by a string match on the group name
 // or a label selector applied to group labels.
 message GroupRestriction {
-  // Groups is a list of groups used to match against an individual user's
+  // groups is a list of groups used to match against an individual user's
   // groups. If the user is a member of one of the whitelisted groups, the user
   // is allowed to be bound to a role.
   // +nullable
@@ -175,14 +175,14 @@ message LocalSubjectAccessReview {
   // Action describes the action being tested.  The Namespace element is FORCED to the current namespace.
   optional Action Action = 1;
 
-  // User is optional.  If both User and Groups are empty, the current authenticated user is used.
+  // user is optional.  If both User and Groups are empty, the current authenticated user is used.
   optional string user = 2;
 
-  // Groups is optional.  Groups is the list of groups to which the User belongs.
+  // groups is optional.  Groups is the list of groups to which the User belongs.
   // +k8s:conversion-gen=false
   repeated string groups = 3;
 
-  // Scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
+  // scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
   // Nil for a self-SAR, means "use the scopes on this request".
   // Nil for a regular SAR, means the same as empty.
   // +k8s:conversion-gen=false
@@ -191,37 +191,37 @@ message LocalSubjectAccessReview {
 
 // NamedClusterRole relates a name with a cluster role
 message NamedClusterRole {
-  // Name is the name of the cluster role
+  // name is the name of the cluster role
   optional string name = 1;
 
-  // Role is the cluster role being named
+  // role is the cluster role being named
   optional ClusterRole role = 2;
 }
 
 // NamedClusterRoleBinding relates a name with a cluster role binding
 message NamedClusterRoleBinding {
-  // Name is the name of the cluster role binding
+  // name is the name of the cluster role binding
   optional string name = 1;
 
-  // RoleBinding is the cluster role binding being named
+  // roleBinding is the cluster role binding being named
   optional ClusterRoleBinding roleBinding = 2;
 }
 
 // NamedRole relates a Role with a name
 message NamedRole {
-  // Name is the name of the role
+  // name is the name of the role
   optional string name = 1;
 
-  // Role is the role being named
+  // role is the role being named
   optional Role role = 2;
 }
 
 // NamedRoleBinding relates a role binding with a name
 message NamedRoleBinding {
-  // Name is the name of the role binding
+  // name is the name of the role binding
   optional string name = 1;
 
-  // RoleBinding is the role binding being named
+  // roleBinding is the role binding being named
   optional RoleBinding roleBinding = 2;
 }
 
@@ -246,25 +246,25 @@ message OptionalScopes {
 // PolicyRule holds information that describes a policy rule, but does not contain information
 // about who the rule applies to or which namespace the rule applies to.
 message PolicyRule {
-  // Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
+  // verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
   repeated string verbs = 1;
 
-  // AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
+  // attributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
   // If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
   // +kubebuilder:pruning:PreserveUnknownFields
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension attributeRestrictions = 2;
 
-  // APIGroups is the name of the APIGroup that contains the resources.  If this field is empty, then both kubernetes and origin API groups are assumed.
+  // apiGroups is the name of the APIGroup that contains the resources.  If this field is empty, then both kubernetes and origin API groups are assumed.
   // That means that if an action is requested against one of the enumerated resources in either the kubernetes or the origin API group, the request
   // will be allowed
   // +optional
   // +nullable
   repeated string apiGroups = 3;
 
-  // Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
+  // resources is a list of resources this rule applies to.  ResourceAll represents all resources.
   repeated string resources = 4;
 
-  // ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
+  // resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
   repeated string resourceNames = 5;
 
   // NonResourceURLsSlice is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
@@ -291,7 +291,7 @@ message ResourceAccessReview {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message ResourceAccessReviewResponse {
-  // Namespace is the namespace used for the access review
+  // namespace is the namespace used for the access review
   optional string namespace = 1;
 
   // UsersSlice is the list of users who can perform the action
@@ -317,7 +317,7 @@ message Role {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Rules holds all the PolicyRules for this Role
+  // rules holds all the PolicyRules for this Role
   repeated PolicyRule rules = 2;
 }
 
@@ -332,28 +332,28 @@ message RoleBinding {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // UserNames holds all the usernames directly bound to the role.
+  // userNames holds all the usernames directly bound to the role.
   // This field should only be specified when supporting legacy clients and servers.
   // See Subjects for further details.
   // +k8s:conversion-gen=false
   // +optional
   optional OptionalNames userNames = 2;
 
-  // GroupNames holds all the groups directly bound to the role.
+  // groupNames holds all the groups directly bound to the role.
   // This field should only be specified when supporting legacy clients and servers.
   // See Subjects for further details.
   // +k8s:conversion-gen=false
   // +optional
   optional OptionalNames groupNames = 3;
 
-  // Subjects hold object references to authorize with this rule.
+  // subjects hold object references to authorize with this rule.
   // This field is ignored if UserNames or GroupNames are specified to support legacy clients and servers.
   // Thus newer clients that do not need to support backwards compatibility should send
   // only fully qualified Subjects and should omit the UserNames and GroupNames fields.
   // Clients that need to support backwards compatibility can use this field to build the UserNames and GroupNames.
   repeated .k8s.io.api.core.v1.ObjectReference subjects = 4;
 
-  // RoleRef can only reference the current namespace and the global namespace.
+  // roleRef can only reference the current namespace and the global namespace.
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
   // Since Policy is a singleton, this is sufficient knowledge to locate a role.
   optional .k8s.io.api.core.v1.ObjectReference roleRef = 5;
@@ -368,7 +368,7 @@ message RoleBindingList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of RoleBindings
+  // items is a list of RoleBindings
   repeated RoleBinding items = 2;
 }
 
@@ -390,7 +390,7 @@ message RoleBindingRestriction {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the matcher.
+  // spec defines the matcher.
   optional RoleBindingRestrictionSpec spec = 2;
 }
 
@@ -403,22 +403,22 @@ message RoleBindingRestrictionList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of RoleBindingRestriction objects.
+  // items is a list of RoleBindingRestriction objects.
   repeated RoleBindingRestriction items = 2;
 }
 
 // RoleBindingRestrictionSpec defines a rolebinding restriction.  Exactly one
 // field must be non-nil.
 message RoleBindingRestrictionSpec {
-  // UserRestriction matches against user subjects.
+  // userrestriction matches against user subjects.
   // +nullable
   optional UserRestriction userrestriction = 1;
 
-  // GroupRestriction matches against group subjects.
+  // grouprestriction matches against group subjects.
   // +nullable
   optional GroupRestriction grouprestriction = 2;
 
-  // ServiceAccountRestriction matches against service-account subjects.
+  // serviceaccountrestriction matches against service-account subjects.
   // +nullable
   optional ServiceAccountRestriction serviceaccountrestriction = 3;
 }
@@ -432,7 +432,7 @@ message RoleList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of Roles
+  // items is a list of Roles
   repeated Role items = 2;
 }
 
@@ -445,16 +445,16 @@ message SelfSubjectRulesReview {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 3;
 
-  // Spec adds information about how to conduct the check
+  // spec adds information about how to conduct the check
   optional SelfSubjectRulesReviewSpec spec = 1;
 
-  // Status is completed by the server to tell which permissions you have
+  // status is completed by the server to tell which permissions you have
   optional SubjectRulesReviewStatus status = 2;
 }
 
 // SelfSubjectRulesReviewSpec adds information about how to conduct the check
 message SelfSubjectRulesReviewSpec {
-  // Scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
+  // scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
   // Nil means "use the scopes on this request".
   // +k8s:conversion-gen=false
   optional OptionalScopes scopes = 1;
@@ -463,10 +463,10 @@ message SelfSubjectRulesReviewSpec {
 // ServiceAccountReference specifies a service account and namespace by their
 // names.
 message ServiceAccountReference {
-  // Name is the name of the service account.
+  // name is the name of the service account.
   optional string name = 1;
 
-  // Namespace is the namespace of the service account.  Service accounts from
+  // namespace is the namespace of the service account.  Service accounts from
   // inside the whitelisted namespaces are allowed to be bound to roles.  If
   // Namespace is empty, then the namespace of the RoleBindingRestriction in
   // which the ServiceAccountReference is embedded is used.
@@ -477,10 +477,10 @@ message ServiceAccountReference {
 // either the service-account name or the name of the service account's
 // namespace.
 message ServiceAccountRestriction {
-  // ServiceAccounts specifies a list of literal service-account names.
+  // serviceaccounts specifies a list of literal service-account names.
   repeated ServiceAccountReference serviceaccounts = 1;
 
-  // Namespaces specifies a list of literal namespace names.
+  // namespaces specifies a list of literal namespace names.
   repeated string namespaces = 2;
 }
 
@@ -496,14 +496,14 @@ message SubjectAccessReview {
   // Action describes the action being tested.
   optional Action Action = 1;
 
-  // User is optional. If both User and Groups are empty, the current authenticated user is used.
+  // user is optional. If both User and Groups are empty, the current authenticated user is used.
   optional string user = 2;
 
   // GroupsSlice is optional. Groups is the list of groups to which the User belongs.
   // +k8s:conversion-gen=false
   repeated string groups = 3;
 
-  // Scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
+  // scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
   // Nil for a self-SAR, means "use the scopes on this request".
   // Nil for a regular SAR, means the same as empty.
   // +k8s:conversion-gen=false
@@ -515,16 +515,16 @@ message SubjectAccessReview {
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
 message SubjectAccessReviewResponse {
-  // Namespace is the namespace used for the access review
+  // namespace is the namespace used for the access review
   optional string namespace = 1;
 
-  // Allowed is required.  True if the action would be allowed, false otherwise.
+  // allowed is required.  True if the action would be allowed, false otherwise.
   optional bool allowed = 2;
 
-  // Reason is optional.  It indicates why a request was allowed or denied.
+  // reason is optional.  It indicates why a request was allowed or denied.
   optional string reason = 3;
 
-  // EvaluationError is an indication that some error occurred during the authorization check.
+  // evaluationError is an indication that some error occurred during the authorization check.
   // It is entirely possible to get an error and be able to continue determine authorization status in spite of it.  This is
   // most common when a bound role is missing, but enough roles are still present and bound to reason about the request.
   optional string evaluationError = 4;
@@ -539,31 +539,31 @@ message SubjectRulesReview {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 3;
 
-  // Spec adds information about how to conduct the check
+  // spec adds information about how to conduct the check
   optional SubjectRulesReviewSpec spec = 1;
 
-  // Status is completed by the server to tell which permissions you have
+  // status is completed by the server to tell which permissions you have
   optional SubjectRulesReviewStatus status = 2;
 }
 
 // SubjectRulesReviewSpec adds information about how to conduct the check
 message SubjectRulesReviewSpec {
-  // User is optional.  At least one of User and Groups must be specified.
+  // user is optional.  At least one of User and Groups must be specified.
   optional string user = 1;
 
-  // Groups is optional.  Groups is the list of groups to which the User belongs.  At least one of User and Groups must be specified.
+  // groups is optional.  Groups is the list of groups to which the User belongs.  At least one of User and Groups must be specified.
   repeated string groups = 2;
 
-  // Scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
+  // scopes to use for the evaluation.  Empty means "use the unscoped (full) permissions of the user/groups".
   optional OptionalScopes scopes = 3;
 }
 
 // SubjectRulesReviewStatus is contains the result of a rules check
 message SubjectRulesReviewStatus {
-  // Rules is the list of rules (no particular sort) that are allowed for the subject
+  // rules is the list of rules (no particular sort) that are allowed for the subject
   repeated PolicyRule rules = 1;
 
-  // EvaluationError can appear in combination with Rules.  It means some error happened during evaluation
+  // evaluationError can appear in combination with Rules.  It means some error happened during evaluation
   // that may have prevented additional rules from being populated.
   optional string evaluationError = 2;
 }
@@ -572,10 +572,10 @@ message SubjectRulesReviewStatus {
 // a string match on the name of a group to which the user belongs, or a label
 // selector applied to the user labels.
 message UserRestriction {
-  // Users specifies a list of literal user names.
+  // users specifies a list of literal user names.
   repeated string users = 1;
 
-  // Groups specifies a list of literal group names.
+  // groups specifies a list of literal group names.
   // +nullable
   repeated string groups = 2;
 

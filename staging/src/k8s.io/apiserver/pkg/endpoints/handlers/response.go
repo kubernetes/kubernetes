@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,8 +39,9 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
-
-	klog "k8s.io/klog/v2"
+	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/util/apihelpers"
+	"k8s.io/klog/v2"
 )
 
 // watchEmbeddedEncoder performs encoding of the embedded object.
@@ -147,6 +149,8 @@ type watchEncoder struct {
 	encoder         runtime.Encoder
 	framer          io.Writer
 
+	watchListTransformerFn watchListTransformerFunction
+
 	buffer      runtime.Splice
 	eventBuffer runtime.Splice
 
@@ -154,15 +158,16 @@ type watchEncoder struct {
 	identifiers               map[watch.EventType]runtime.Identifier
 }
 
-func newWatchEncoder(ctx context.Context, kind schema.GroupVersionKind, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer) *watchEncoder {
+func newWatchEncoder(ctx context.Context, kind schema.GroupVersionKind, embeddedEncoder runtime.Encoder, encoder runtime.Encoder, framer io.Writer, watchListTransformerFn watchListTransformerFunction) *watchEncoder {
 	return &watchEncoder{
-		ctx:             ctx,
-		kind:            kind,
-		embeddedEncoder: embeddedEncoder,
-		encoder:         encoder,
-		framer:          framer,
-		buffer:          runtime.NewSpliceBuffer(),
-		eventBuffer:     runtime.NewSpliceBuffer(),
+		ctx:                    ctx,
+		kind:                   kind,
+		embeddedEncoder:        embeddedEncoder,
+		encoder:                encoder,
+		framer:                 framer,
+		watchListTransformerFn: watchListTransformerFn,
+		buffer:                 runtime.NewSpliceBuffer(),
+		eventBuffer:            runtime.NewSpliceBuffer(),
 	}
 }
 
@@ -173,6 +178,12 @@ func newWatchEncoder(ctx context.Context, kind schema.GroupVersionKind, embedded
 func (e *watchEncoder) Encode(event watch.Event) error {
 	encodeFunc := func(obj runtime.Object, w io.Writer) error {
 		return e.doEncode(obj, event, w)
+	}
+	if event.Type == watch.Bookmark {
+		// Bookmark objects are small, and we don't yet support serialization for them.
+		// Additionally, we need to additionally transform them to support watch-list feature
+		event = e.watchListTransformerFn(event)
+		return encodeFunc(event.Object, e.framer)
 	}
 	if co, ok := event.Object.(runtime.CacheableObject); ok {
 		return co.CacheEncode(e.identifier(event.Type), encodeFunc, e.framer)
@@ -270,7 +281,7 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 		return asTable(ctx, obj, options, scope, target.GroupVersion())
 
 	default:
-		accepted, _ := negotiation.MediaTypesForSerializer(metainternalversionscheme.Codecs)
+		accepted, _ := negotiation.MediaTypesForSerializer(apihelpers.GetMetaInternalVersionCodecs())
 		err := negotiation.NewNotAcceptableError(accepted)
 		return nil, err
 	}
@@ -304,7 +315,7 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 	case target == nil:
 	case (target.Kind == "PartialObjectMetadata" || target.Kind == "PartialObjectMetadataList" || target.Kind == "Table") &&
 		(target.GroupVersion() == metav1beta1.SchemeGroupVersion || target.GroupVersion() == metav1.SchemeGroupVersion):
-		return *target, metainternalversionscheme.Codecs, true
+		return *target, apihelpers.GetMetaInternalVersionCodecs(), true
 	}
 	return scope.Kind, scope.Serializer, false
 }
@@ -477,5 +488,96 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 
 	default:
 		return nil, newNotAcceptableError(fmt.Sprintf("no PartialObjectMetadataList exists in group version %s", groupVersion))
+	}
+}
+
+// watchListTransformerFunction an optional function
+// applied to watchlist bookmark events that transforms
+// the embedded object before sending it to a client.
+type watchListTransformerFunction func(watch.Event) watch.Event
+
+// watchListTransformer performs transformation of
+// a special watchList bookmark event.
+//
+// The bookmark is annotated with InitialEventsListBlueprintAnnotationKey
+// and contains an empty, versioned list that we must encode in the requested format
+// (e.g., protobuf, JSON, CBOR) and then store as a base64-encoded string.
+type watchListTransformer struct {
+	initialEventsListBlueprint runtime.Object
+	targetGVK                  *schema.GroupVersionKind
+	negotiatedEncoder          runtime.Encoder
+	buffer                     runtime.Splice
+}
+
+// createWatchListTransformerIfRequested returns a transformer function for watchlist bookmark event.
+func newWatchListTransformer(initialEventsListBlueprint runtime.Object, targetGVK *schema.GroupVersionKind, negotiatedEncoder runtime.Encoder) *watchListTransformer {
+	return &watchListTransformer{
+		initialEventsListBlueprint: initialEventsListBlueprint,
+		targetGVK:                  targetGVK,
+		negotiatedEncoder:          negotiatedEncoder,
+		buffer:                     runtime.NewSpliceBuffer(),
+	}
+}
+
+func (e *watchListTransformer) transform(event watch.Event) watch.Event {
+	if e.initialEventsListBlueprint == nil {
+		return event
+	}
+	hasAnnotation, err := storage.HasInitialEventsEndBookmarkAnnotation(event.Object)
+	if err != nil {
+		return newWatchEventErrorFor(err)
+	}
+	if !hasAnnotation {
+		return event
+	}
+
+	if err = e.encodeInitialEventsListBlueprint(event.Object); err != nil {
+		return newWatchEventErrorFor(err)
+	}
+
+	return event
+}
+
+func (e *watchListTransformer) encodeInitialEventsListBlueprint(object runtime.Object) error {
+	initialEventsListBlueprint, err := e.transformInitialEventsListBlueprint()
+	if err != nil {
+		return err
+	}
+
+	defer e.buffer.Reset()
+	if err = e.negotiatedEncoder.Encode(initialEventsListBlueprint, e.buffer); err != nil {
+		return err
+	}
+	encodedInitialEventsListBlueprint := e.buffer.Bytes()
+
+	// the storage layer creates a deep copy of the obj before modifying it.
+	// since the object has the annotation, we can modify it directly.
+	objectMeta, err := meta.Accessor(object)
+	if err != nil {
+		return err
+	}
+	annotations := objectMeta.GetAnnotations()
+	annotations[metav1.InitialEventsListBlueprintAnnotationKey] = base64.StdEncoding.EncodeToString(encodedInitialEventsListBlueprint)
+	objectMeta.SetAnnotations(annotations)
+
+	return nil
+}
+
+func (e *watchListTransformer) transformInitialEventsListBlueprint() (runtime.Object, error) {
+	if e.targetGVK != nil && e.targetGVK.Kind == "PartialObjectMetadata" {
+		return asPartialObjectMetadataList(e.initialEventsListBlueprint, e.targetGVK.GroupVersion())
+	}
+	return e.initialEventsListBlueprint, nil
+}
+
+func newWatchEventErrorFor(err error) watch.Event {
+	return watch.Event{
+		Type: watch.Error,
+		Object: &metav1.Status{
+			Status:  metav1.StatusFailure,
+			Message: err.Error(),
+			Reason:  metav1.StatusReasonInternalError,
+			Code:    http.StatusInternalServerError,
+		},
 	}
 }

@@ -3,7 +3,7 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // IBMCloudPlatformStatusApplyConfiguration represents a declarative configuration of the IBMCloudPlatformStatus type for use
@@ -11,7 +11,7 @@ import (
 type IBMCloudPlatformStatusApplyConfiguration struct {
 	Location          *string                                     `json:"location,omitempty"`
 	ResourceGroupName *string                                     `json:"resourceGroupName,omitempty"`
-	ProviderType      *v1.IBMCloudProviderType                    `json:"providerType,omitempty"`
+	ProviderType      *configv1.IBMCloudProviderType              `json:"providerType,omitempty"`
 	CISInstanceCRN    *string                                     `json:"cisInstanceCRN,omitempty"`
 	DNSInstanceCRN    *string                                     `json:"dnsInstanceCRN,omitempty"`
 	ServiceEndpoints  []IBMCloudServiceEndpointApplyConfiguration `json:"serviceEndpoints,omitempty"`
@@ -42,7 +42,7 @@ func (b *IBMCloudPlatformStatusApplyConfiguration) WithResourceGroupName(value s
 // WithProviderType sets the ProviderType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ProviderType field is set to the value of the last call.
-func (b *IBMCloudPlatformStatusApplyConfiguration) WithProviderType(value v1.IBMCloudProviderType) *IBMCloudPlatformStatusApplyConfiguration {
+func (b *IBMCloudPlatformStatusApplyConfiguration) WithProviderType(value configv1.IBMCloudProviderType) *IBMCloudPlatformStatusApplyConfiguration {
 	b.ProviderType = &value
 	return b
 }

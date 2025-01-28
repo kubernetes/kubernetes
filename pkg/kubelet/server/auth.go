@@ -24,26 +24,30 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/server/healthz"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/configz"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // KubeletAuth implements AuthInterface
 type KubeletAuth struct {
 	// authenticator identifies the user for requests to the Kubelet API
 	authenticator.Request
-	// authorizerAttributeGetter builds authorization.Attributes for a request to the Kubelet API
-	authorizer.RequestAttributesGetter
+	// KubeletRequestAttributesGetter builds authorization.Attributes for a request to the Kubelet API
+	NodeRequestAttributesGetter
 	// authorizer determines whether a given authorization.Attributes is allowed
 	authorizer.Authorizer
 }
 
 // NewKubeletAuth returns a kubelet.AuthInterface composed of the given authenticator, attribute getter, and authorizer
-func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter authorizer.RequestAttributesGetter, authorizer authorizer.Authorizer) AuthInterface {
+func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter NodeRequestAttributesGetter, authorizer authorizer.Authorizer) AuthInterface {
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
 }
 
 // NewNodeAuthorizerAttributesGetter creates a new authorizer.RequestAttributesGetter for the node.
-func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) authorizer.RequestAttributesGetter {
+func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) NodeRequestAttributesGetter {
 	return nodeAuthorizerAttributesGetter{nodeName: nodeName}
 }
 
@@ -60,10 +64,15 @@ func isSubpath(subpath, path string) bool {
 // Default attributes are: {apiVersion=v1,verb=<http verb from request>,resource=nodes,name=<node name>,subresource=proxy}
 // More specific verb/resource is set for the following request patterns:
 //
-//	/stats/*   => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=stats
-//	/metrics/* => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=metrics
-//	/logs/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=log
-func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) authorizer.Attributes {
+//	/stats/*		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=stats
+//	/metrics/*		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=metrics
+//	/logs/*			=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=log
+//	/checkpoint/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=checkpoint
+//	/pods/*			=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=pods,proxy
+//	/runningPods/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=pods,proxy
+//	/healthz/* 		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=healthz,proxy
+//	/configz 		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=configz,proxy
+func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) []authorizer.Attributes {
 
 	apiVerb := ""
 	switch r.Method {
@@ -81,35 +90,54 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 
 	requestPath := r.URL.Path
 
-	// Default attributes mirror the API attributes that would allow this access to the kubelet API
-	attrs := authorizer.AttributesRecord{
-		User:            u,
-		Verb:            apiVerb,
-		Namespace:       "",
-		APIGroup:        "",
-		APIVersion:      "v1",
-		Resource:        "nodes",
-		Subresource:     "proxy",
-		Name:            string(n.nodeName),
-		ResourceRequest: true,
-		Path:            requestPath,
+	var subresources []string
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletFineGrainedAuthz) {
+		switch {
+		case isSubpath(requestPath, podsPath):
+			subresources = append(subresources, "pods")
+		case isSubpath(requestPath, healthz.DefaultHealthzPath):
+			subresources = append(subresources, "healthz")
+		case isSubpath(requestPath, configz.DefaultConfigzPath):
+			subresources = append(subresources, "configz")
+		// We put runningpods last since it will allocate a new string on every
+		// check since the handler path has a trailing slash.
+		case isSubpath(requestPath, runningPodsPath):
+			subresources = append(subresources, "pods")
+		}
 	}
 
-	// Override subresource for specific paths
-	// This allows subdividing access to the kubelet API
 	switch {
 	case isSubpath(requestPath, statsPath):
-		attrs.Subresource = "stats"
+		subresources = append(subresources, "stats")
 	case isSubpath(requestPath, metricsPath):
-		attrs.Subresource = "metrics"
+		subresources = append(subresources, "metrics")
 	case isSubpath(requestPath, logsPath):
 		// "log" to match other log subresources (pods/log, etc)
-		attrs.Subresource = "log"
+		subresources = append(subresources, "log")
 	case isSubpath(requestPath, checkpointPath):
-		attrs.Subresource = "checkpoint"
+		subresources = append(subresources, "checkpoint")
+	default:
+		subresources = append(subresources, "proxy")
 	}
 
-	klog.V(5).InfoS("Node request attributes", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
+	var attrs []authorizer.Attributes
+	for _, subresource := range subresources {
+		attr := authorizer.AttributesRecord{
+			User:            u,
+			Verb:            apiVerb,
+			Namespace:       "",
+			APIGroup:        "",
+			APIVersion:      "v1",
+			Resource:        "nodes",
+			Subresource:     subresource,
+			Name:            string(n.nodeName),
+			ResourceRequest: true,
+			Path:            requestPath,
+		}
+		attrs = append(attrs, attr)
+	}
+
+	klog.V(5).InfoS("Node request attributes", "user", attrs[0].GetUser().GetName(), "verb", attrs[0].GetVerb(), "resource", attrs[0].GetResource(), "subresource(s)", subresources)
 
 	return attrs
 }

@@ -25,173 +25,28 @@ import (
 
 	"github.com/pkg/errors"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
-	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
-// PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
-// Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
-	var errs []error
-
-	// Upload currently used configuration to the cluster
-	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
-	// depend on centralized information from this source in the future
-	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create the new, version-branched kubelet ComponentConfig ConfigMap
-	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
-		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
-	}
-
-	// Write the new kubelet config down to disk and the env file if needed
-	if err := WriteKubeletConfigFiles(cfg, patchesDir, dryRun, out); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
-	// --cri-socket.
-	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
-	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		errs = append(errs, errors.Wrap(err, "error uploading crisocket"))
-	}
-
-	// Create RBAC rules that makes the bootstrap tokens able to get nodes
-	if err := nodebootstraptoken.AllowBoostrapTokensToGetNodes(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create/update RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// TODO: Is this needed to do here? I think that updating cluster info should probably be separate from a normal upgrade
-	// Create the cluster-info ConfigMap with the associated RBAC rules
-	// if err := clusterinfo.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
-	// 	return err
-	//}
-	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
-	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := PerformAddonsUpgrade(client, cfg, patchesDir, out); err != nil {
-		errs = append(errs, err)
-	}
-
-	if features.Enabled(cfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		if err := UpdateKubeletLocalMode(cfg, dryRun); err != nil {
-			return errors.Wrap(err, "failed to update kubelet local mode")
-		}
-	}
-
-	return errorsutil.NewAggregate(errs)
-}
-
-// PerformAddonsUpgrade performs the upgrade of the coredns and kube-proxy addons.
-func PerformAddonsUpgrade(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, out io.Writer) error {
-	unupgradedControlPlanes, err := unupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
-	if err != nil {
-		return errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
-	}
-	if len(unupgradedControlPlanes) > 0 {
-		fmt.Fprintf(out, "[upgrade/addons] skip upgrade addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)
-		return nil
-	}
-
-	var errs []error
-
-	// If the coredns ConfigMap is missing, show a warning and assume that the
-	// DNS addon was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
-	//
-	// TODO: remove this once "kubeadm upgrade apply" phases are supported:
-	//   https://github.com/kubernetes/kubeadm/issues/1318
-	var missingCoreDNSConfigMap bool
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
-		context.TODO(),
-		kubeadmconstants.CoreDNSConfigMap,
-		metav1.GetOptions{},
-	); err != nil && apierrors.IsNotFound(err) {
-		missingCoreDNSConfigMap = true
-	}
-	if missingCoreDNSConfigMap {
-		klog.Warningf("the ConfigMaps %q in the namespace %q were not found. "+
-			"Assuming that a DNS server was not deployed for this cluster. "+
-			"Note that once 'kubeadm upgrade apply' supports phases you "+
-			"will have to skip the DNS upgrade manually",
-			kubeadmconstants.CoreDNSConfigMap,
-			metav1.NamespaceSystem)
-	} else {
-		// Upgrade CoreDNS
-		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, false); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	// If the kube-proxy ConfigMap is missing, show a warning and assume that kube-proxy
-	// was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
-	//
-	// TODO: remove this once "kubeadm upgrade apply" phases are supported:
-	//   https://github.com/kubernetes/kubeadm/issues/1318
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
-		context.TODO(),
-		kubeadmconstants.KubeProxyConfigMap,
-		metav1.GetOptions{},
-	); err != nil && apierrors.IsNotFound(err) {
-		klog.Warningf("the ConfigMap %q in the namespace %q was not found. "+
-			"Assuming that kube-proxy was not deployed for this cluster. "+
-			"Note that once 'kubeadm upgrade apply' supports phases you "+
-			"will have to skip the kube-proxy upgrade manually",
-			kubeadmconstants.KubeProxyConfigMap,
-			metav1.NamespaceSystem)
-	} else {
-		// Upgrade kube-proxy
-		if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, false); err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	return errorsutil.NewAggregate(errs)
-}
-
-// unupgradedControlPlaneInstances returns a list of control palne instances that have not yet been upgraded.
+// UnupgradedControlPlaneInstances returns a list of control plane instances that have not yet been upgraded.
 //
 // NB. This function can only be called after the current control plane instance has been upgraded already.
 // Because it determines whether the other control plane instances have been upgraded by checking whether
 // the kube-apiserver image of other control plane instance is the same as that of this instance.
-func unupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
+func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		"component": kubeadmconstants.KubeAPIServer,
 	}))
@@ -241,19 +96,27 @@ func unupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 }
 
 // WriteKubeletConfigFiles writes the kubelet config file to disk, but first creates a backup of any existing one.
-func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
-	// Set up the kubelet directory to use. If dry-running, this will return a fake directory
-	kubeletDir, err := GetKubeletDir(dryRun)
+func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir string, patchesDir string, dryRun bool, out io.Writer) error {
+	var (
+		err        error
+		kubeletDir = kubeadmconstants.KubeletRunDirectory
+	)
+	// If dry-running, this will return a directory under /etc/kubernetes/tmp or kubeletConfigDir.
+	if dryRun {
+		kubeletDir, err = kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-upgrade-dryrun")
+	}
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
 		return err
 	}
-
-	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp/ folder.
-	backupDir, err := kubeadmconstants.CreateTempDirForKubeadm(kubeadmconstants.KubernetesDir, "kubeadm-kubelet-config")
+	// Create a copy of the kubelet config file in the /etc/kubernetes/tmp or kubeletConfigDir.
+	backupDir, err := kubeadmconstants.CreateTempDir(kubeletConfigDir, "kubeadm-kubelet-config")
 	if err != nil {
 		return err
 	}
+	klog.Warningf("Using temporary directory %s for kubelet config. To override it set the environment variable %s",
+		backupDir, kubeadmconstants.EnvVarUpgradeDryRunDir)
+
 	src := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletConfigurationFileName)
 
@@ -267,27 +130,57 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, patchesDir strin
 		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
 	}
 
-	errs := []error{}
+	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
+		// If instance-config.yaml exist on disk, we don't need to create it.
+		_, err := os.Stat(filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName))
+		if os.IsNotExist(err) {
+			var containerRuntimeEndpoint string
+			dynamicFlags, err := kubeletphase.ReadKubeletDynamicEnvFile(filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName))
+			if err == nil {
+				args := kubeadmutil.ArgumentsFromCommand(dynamicFlags)
+				for _, arg := range args {
+					if arg.Name == "container-runtime-endpoint" {
+						containerRuntimeEndpoint = arg.Value
+						break
+					}
+				}
+			} else if dryRun {
+				fmt.Fprintf(os.Stdout, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
+					"Using default socket %q instead", kubeadmconstants.KubeletEnvFileName, kubeadmconstants.DefaultCRISocket)
+				containerRuntimeEndpoint = kubeadmconstants.DefaultCRISocket
+			} else {
+				return errors.Wrap(err, "error reading kubeadm flags file")
+			}
+
+			kubeletConfig := &kubeletconfig.KubeletConfiguration{
+				ContainerRuntimeEndpoint: containerRuntimeEndpoint,
+			}
+
+			if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, kubeletDir); err != nil {
+				return errors.Wrap(err, "error writing kubelet instance configuration")
+			}
+
+			if dryRun { // Print what contents would be written
+				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
+				if err != nil {
+					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
+				}
+			}
+		}
+	}
+
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
-		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
+		return errors.Wrap(err, "error writing kubelet configuration to file")
 	}
 
 	if dryRun { // Print what contents would be written
 		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
 		if err != nil {
-			errs = append(errs, errors.Wrap(err, "error printing files on dryrun"))
+			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
 		}
 	}
-	return errorsutil.NewAggregate(errs)
-}
-
-// GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
-func GetKubeletDir(dryRun bool) (string, error) {
-	if dryRun {
-		return kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
-	}
-	return kubeadmconstants.KubeletRunDirectory, nil
+	return nil
 }
 
 // UpdateKubeletLocalMode changes the Server URL in the kubelets kubeconfig to the local API endpoint if it is currently
@@ -325,7 +218,7 @@ func UpdateKubeletLocalMode(cfg *kubeadmapi.InitConfiguration, dryRun bool) erro
 		return err
 	}
 
-	// Skip changing kubeconfig file if Server does not match the ControlPlaneEndoint.
+	// Skip changing kubeconfig file if Server does not match the ControlPlaneEndpoint.
 	if config.Clusters[configContext.Cluster].Server != controlPlaneAPIEndpoint || controlPlaneAPIEndpoint == localAPIEndpoint {
 		klog.V(2).Infof("Skipping update of the Server URL in %s, because it's already not equal to %q or already matches the localAPIEndpoint", kubeletKubeConfigFilePath, cfg.ControlPlaneEndpoint)
 		return nil

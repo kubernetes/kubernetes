@@ -372,7 +372,7 @@ func (enc *jsonEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 			final.AppendString(ent.Level.String())
 		}
 	}
-	if final.TimeKey != "" {
+	if final.TimeKey != "" && !ent.Time.IsZero() {
 		final.AddTime(final.TimeKey, ent.Time)
 	}
 	if ent.LoggerName != "" && final.NameKey != "" {

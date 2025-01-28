@@ -19,6 +19,7 @@ package options
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	apiextensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -77,13 +78,6 @@ func validateNodeSelectorAuthorizationFeature() []error {
 	return nil
 }
 
-func validateDRAControlPlaneControllerFeature() []error {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAControlPlaneController) && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		return []error{fmt.Errorf("DRAControlPlaneController feature requires DynamicResourceAllocation feature to be enabled")}
-	}
-	return nil
-}
-
 func validateUnknownVersionInteroperabilityProxyFeature() []error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.UnknownVersionInteroperabilityProxy) {
 		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
@@ -110,6 +104,29 @@ func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error 
 	return err
 }
 
+var pathOrSocket = regexp.MustCompile(`(^(/[^/ ]*)+/?$)|(^@([a-zA-Z0-9_-]+\.)*[a-zA-Z0-9_-]+$)`)
+
+func validateServiceAccountTokenSigningConfig(options *Options) []error {
+	if len(options.ServiceAccountSigningEndpoint) == 0 {
+		return nil
+	}
+
+	errors := []error{}
+
+	if len(options.ServiceAccountSigningKeyFile) != 0 || len(options.Authentication.ServiceAccounts.KeyFiles) != 0 {
+		errors = append(errors, fmt.Errorf("can't set `--service-account-signing-key-file` and/or `--service-account-key-file` with `--service-account-signing-endpoint` (They are mutually exclusive)"))
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalServiceAccountTokenSigner) {
+		errors = append(errors, fmt.Errorf("setting `--service-account-signing-endpoint` requires enabling ExternalServiceAccountTokenSigner feature gate"))
+	}
+	// Check if ServiceAccountSigningEndpoint is a linux file path or an abstract socket name.
+	if !pathOrSocket.MatchString(options.ServiceAccountSigningEndpoint) {
+		errors = append(errors, fmt.Errorf("invalid value %q passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace", options.ServiceAccountSigningEndpoint))
+	}
+
+	return errors
+}
+
 // Validate checks Options and return a slice of found errs.
 func (s *Options) Validate() []error {
 	var errs []error
@@ -128,7 +145,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFeature()...)
 	errs = append(errs, validateUnknownVersionInteroperabilityProxyFlags(s)...)
 	errs = append(errs, validateNodeSelectorAuthorizationFeature()...)
-	errs = append(errs, validateDRAControlPlaneControllerFeature()...)
+	errs = append(errs, validateServiceAccountTokenSigningConfig(s)...)
 
 	return errs
 }

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	authorizationv1 "github.com/openshift/api/authorization/v1"
+	apiauthorizationv1 "github.com/openshift/api/authorization/v1"
 	versioned "github.com/openshift/client-go/authorization/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/authorization/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/authorization/listers/authorization/v1"
+	authorizationv1 "github.com/openshift/client-go/authorization/listers/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // RoleBindingRestrictions.
 type RoleBindingRestrictionInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.RoleBindingRestrictionLister
+	Lister() authorizationv1.RoleBindingRestrictionLister
 }
 
 type roleBindingRestrictionInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredRoleBindingRestrictionInformer(client versioned.Interface, names
 				return client.AuthorizationV1().RoleBindingRestrictions(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&authorizationv1.RoleBindingRestriction{},
+		&apiauthorizationv1.RoleBindingRestriction{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *roleBindingRestrictionInformer) defaultInformer(client versioned.Interf
 }
 
 func (f *roleBindingRestrictionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&authorizationv1.RoleBindingRestriction{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiauthorizationv1.RoleBindingRestriction{}, f.defaultInformer)
 }
 
-func (f *roleBindingRestrictionInformer) Lister() v1.RoleBindingRestrictionLister {
-	return v1.NewRoleBindingRestrictionLister(f.Informer().GetIndexer())
+func (f *roleBindingRestrictionInformer) Lister() authorizationv1.RoleBindingRestrictionLister {
+	return authorizationv1.NewRoleBindingRestrictionLister(f.Informer().GetIndexer())
 }

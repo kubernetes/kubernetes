@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // AuditApplyConfiguration represents a declarative configuration of the Audit type for use
 // with apply.
 type AuditApplyConfiguration struct {
-	Profile     *v1.AuditProfileType                `json:"profile,omitempty"`
+	Profile     *configv1.AuditProfileType          `json:"profile,omitempty"`
 	CustomRules []AuditCustomRuleApplyConfiguration `json:"customRules,omitempty"`
 }
 
@@ -22,7 +22,7 @@ func Audit() *AuditApplyConfiguration {
 // WithProfile sets the Profile field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Profile field is set to the value of the last call.
-func (b *AuditApplyConfiguration) WithProfile(value v1.AuditProfileType) *AuditApplyConfiguration {
+func (b *AuditApplyConfiguration) WithProfile(value configv1.AuditProfileType) *AuditApplyConfiguration {
 	b.Profile = &value
 	return b
 }

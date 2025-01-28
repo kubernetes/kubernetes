@@ -10,6 +10,10 @@ type BackupListerExpansion interface{}
 // ClusterImagePolicyLister.
 type ClusterImagePolicyListerExpansion interface{}
 
+// ClusterMonitoringListerExpansion allows custom methods to be added to
+// ClusterMonitoringLister.
+type ClusterMonitoringListerExpansion interface{}
+
 // ImagePolicyListerExpansion allows custom methods to be added to
 // ImagePolicyLister.
 type ImagePolicyListerExpansion interface{}

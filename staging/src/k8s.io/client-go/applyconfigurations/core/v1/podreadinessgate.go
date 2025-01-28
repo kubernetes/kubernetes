@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // PodReadinessGateApplyConfiguration represents a declarative configuration of the PodReadinessGate type for use
 // with apply.
 type PodReadinessGateApplyConfiguration struct {
-	ConditionType *v1.PodConditionType `json:"conditionType,omitempty"`
+	ConditionType *corev1.PodConditionType `json:"conditionType,omitempty"`
 }
 
 // PodReadinessGateApplyConfiguration constructs a declarative configuration of the PodReadinessGate type for use with
@@ -37,7 +37,7 @@ func PodReadinessGate() *PodReadinessGateApplyConfiguration {
 // WithConditionType sets the ConditionType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ConditionType field is set to the value of the last call.
-func (b *PodReadinessGateApplyConfiguration) WithConditionType(value v1.PodConditionType) *PodReadinessGateApplyConfiguration {
+func (b *PodReadinessGateApplyConfiguration) WithConditionType(value corev1.PodConditionType) *PodReadinessGateApplyConfiguration {
 	b.ConditionType = &value
 	return b
 }

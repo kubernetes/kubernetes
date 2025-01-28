@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ImageTagMirrorSetLister helps list ImageTagMirrorSets.
@@ -14,19 +14,19 @@ import (
 type ImageTagMirrorSetLister interface {
 	// List lists all ImageTagMirrorSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ImageTagMirrorSet, err error)
+	List(selector labels.Selector) (ret []*configv1.ImageTagMirrorSet, err error)
 	// Get retrieves the ImageTagMirrorSet from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ImageTagMirrorSet, error)
+	Get(name string) (*configv1.ImageTagMirrorSet, error)
 	ImageTagMirrorSetListerExpansion
 }
 
 // imageTagMirrorSetLister implements the ImageTagMirrorSetLister interface.
 type imageTagMirrorSetLister struct {
-	listers.ResourceIndexer[*v1.ImageTagMirrorSet]
+	listers.ResourceIndexer[*configv1.ImageTagMirrorSet]
 }
 
 // NewImageTagMirrorSetLister returns a new ImageTagMirrorSetLister.
 func NewImageTagMirrorSetLister(indexer cache.Indexer) ImageTagMirrorSetLister {
-	return &imageTagMirrorSetLister{listers.New[*v1.ImageTagMirrorSet](indexer, v1.Resource("imagetagmirrorset"))}
+	return &imageTagMirrorSetLister{listers.New[*configv1.ImageTagMirrorSet](indexer, configv1.Resource("imagetagmirrorset"))}
 }

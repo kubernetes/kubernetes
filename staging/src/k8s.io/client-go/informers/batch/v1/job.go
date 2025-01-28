@@ -19,16 +19,16 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	batchv1 "k8s.io/api/batch/v1"
+	apibatchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/listers/batch/v1"
+	batchv1 "k8s.io/client-go/listers/batch/v1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // Jobs.
 type JobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.JobLister
+	Lister() batchv1.JobLister
 }
 
 type jobInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredJobInformer(client kubernetes.Interface, namespace string, resyn
 				return client.BatchV1().Jobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&batchv1.Job{},
+		&apibatchv1.Job{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *jobInformer) defaultInformer(client kubernetes.Interface, resyncPeriod 
 }
 
 func (f *jobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&batchv1.Job{}, f.defaultInformer)
+	return f.factory.InformerFor(&apibatchv1.Job{}, f.defaultInformer)
 }
 
-func (f *jobInformer) Lister() v1.JobLister {
-	return v1.NewJobLister(f.Informer().GetIndexer())
+func (f *jobInformer) Lister() batchv1.JobLister {
+	return batchv1.NewJobLister(f.Informer().GetIndexer())
 }

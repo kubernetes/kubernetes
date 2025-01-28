@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 type invariantFunc func(set *apps.StatefulSet, om *fakeObjectManager) error
@@ -100,13 +102,14 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 		subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 	}
 	t.Run(subtestName, func(t *testing.T) {
+		// TODO: this will be removed in 1.35
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.31"))
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, false)
 		testFn(t, &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
 			WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
 		})
 	})
-
 	for _, policy := range []*apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		{
 			WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
@@ -132,7 +135,6 @@ func runTestOverPVCRetentionPolicies(t *testing.T, testName string, testFn func(
 			subtestName = fmt.Sprintf("%s/%s", testName, subtestName)
 		}
 		t.Run(subtestName, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)
 			testFn(t, policy)
 		})
 	}
@@ -165,7 +167,8 @@ func TestStatefulSetControl(t *testing.T) {
 		fn  func(*testing.T, *apps.StatefulSet, invariantFunc)
 		obj func() *apps.StatefulSet
 	}{
-		{CreatesPods, simpleSetFn},
+		{CreatesPodsWithPodIndexLabelFeature, simpleSetFn},
+		{CreatesPodsWithoutPodIndexLabelFeature, simpleSetFn},
 		{ScalesUp, simpleSetFn},
 		{ScalesDown, simpleSetFn},
 		{ReplacesPods, largeSetFn},
@@ -208,7 +211,20 @@ func TestStatefulSetControl(t *testing.T) {
 	}
 }
 
-func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+func CreatesPodsWithPodIndexLabelFeature(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	createPods(t, set, invariants, true)
+}
+
+func CreatesPodsWithoutPodIndexLabelFeature(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	createPods(t, set, invariants, false)
+}
+
+func createPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc, isPodIndexLabelEnabled bool) {
+	if !isPodIndexLabelEnabled {
+		// TODO: this will be removed in 1.35
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, utilversion.MustParse("1.31"))
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodIndexLabel, isPodIndexLabelEnabled)
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
@@ -229,20 +245,21 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 	if set.Status.UpdatedReplicas != 3 {
 		t.Error("Failed to set UpdatedReplicas correctly")
 	}
+
 	// Check all pods have correct pod index label.
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
-		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-		if err != nil {
-			t.Error(err)
-		}
-		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
-		if err != nil {
-			t.Error(err)
-		}
-		if len(pods) != 3 {
-			t.Errorf("Expected 3 pods, got %d", len(pods))
-		}
-		for _, pod := range pods {
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(pods) != 3 {
+		t.Errorf("Expected 3 pods, got %d", len(pods))
+	}
+	for _, pod := range pods {
+		if isPodIndexLabelEnabled {
 			podIndexFromLabel, exists := pod.Labels[apps.PodIndexLabel]
 			if !exists {
 				t.Errorf("Missing pod index label: %s", apps.PodIndexLabel)
@@ -251,6 +268,12 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 			podIndexFromName := strconv.Itoa(getOrdinal(pod))
 			if podIndexFromLabel != podIndexFromName {
 				t.Errorf("Pod index label value (%s) does not match pod index in pod name (%s)", podIndexFromLabel, podIndexFromName)
+			}
+		} else {
+			_, exists := pod.Labels[apps.PodIndexLabel]
+			if exists {
+				t.Errorf("Pod index label should not exist when feature gate is disabled: %s", apps.PodIndexLabel)
+				continue
 			}
 		}
 	}
@@ -2009,6 +2032,13 @@ func TestStatefulSetControlLimitsHistory(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
+
+			if *set.Spec.RevisionHistoryLimit < 0 {
+				// If the revisionHistoryLimit is negative value, we don't truncate
+				// the revision history and it is incremental.
+				continue
+			}
+
 			if len(revisions) > int(*set.Spec.RevisionHistoryLimit)+2 {
 				t.Fatalf("%s: %d greater than limit %d", test.name, len(revisions), *set.Spec.RevisionHistoryLimit)
 			}
@@ -2028,6 +2058,33 @@ func TestStatefulSetControlLimitsHistory(t *testing.T) {
 			invariants: assertBurstInvariants,
 			initial: func() *apps.StatefulSet {
 				return burst(newStatefulSet(3))
+			},
+		},
+		{
+			name:       "zero revisionHistoryLimit",
+			invariants: assertMonotonicInvariants,
+			initial: func() *apps.StatefulSet {
+				sts := newStatefulSet(3)
+				sts.Spec.RevisionHistoryLimit = ptr.To(int32(0))
+				return sts
+			},
+		},
+		{
+			name:       "negative revisionHistoryLimit",
+			invariants: assertMonotonicInvariants,
+			initial: func() *apps.StatefulSet {
+				sts := newStatefulSet(3)
+				sts.Spec.RevisionHistoryLimit = ptr.To(int32(-2))
+				return sts
+			},
+		},
+		{
+			name:       "positive revisionHistoryLimit",
+			invariants: assertMonotonicInvariants,
+			initial: func() *apps.StatefulSet {
+				sts := newStatefulSet(3)
+				sts.Spec.RevisionHistoryLimit = ptr.To(int32(5))
+				return sts
 			},
 		},
 	}

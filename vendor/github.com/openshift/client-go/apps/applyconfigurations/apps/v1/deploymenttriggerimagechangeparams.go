@@ -3,16 +3,16 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // DeploymentTriggerImageChangeParamsApplyConfiguration represents a declarative configuration of the DeploymentTriggerImageChangeParams type for use
 // with apply.
 type DeploymentTriggerImageChangeParamsApplyConfiguration struct {
-	Automatic          *bool               `json:"automatic,omitempty"`
-	ContainerNames     []string            `json:"containerNames,omitempty"`
-	From               *v1.ObjectReference `json:"from,omitempty"`
-	LastTriggeredImage *string             `json:"lastTriggeredImage,omitempty"`
+	Automatic          *bool                   `json:"automatic,omitempty"`
+	ContainerNames     []string                `json:"containerNames,omitempty"`
+	From               *corev1.ObjectReference `json:"from,omitempty"`
+	LastTriggeredImage *string                 `json:"lastTriggeredImage,omitempty"`
 }
 
 // DeploymentTriggerImageChangeParamsApplyConfiguration constructs a declarative configuration of the DeploymentTriggerImageChangeParams type for use with
@@ -42,7 +42,7 @@ func (b *DeploymentTriggerImageChangeParamsApplyConfiguration) WithContainerName
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *DeploymentTriggerImageChangeParamsApplyConfiguration) WithFrom(value v1.ObjectReference) *DeploymentTriggerImageChangeParamsApplyConfiguration {
+func (b *DeploymentTriggerImageChangeParamsApplyConfiguration) WithFrom(value corev1.ObjectReference) *DeploymentTriggerImageChangeParamsApplyConfiguration {
 	b.From = &value
 	return b
 }

@@ -52,10 +52,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/editor/crlf"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
-	"k8s.io/kubectl/pkg/util/slice"
 )
-
-var SupportedSubresources = []string{"status"}
 
 // EditOptions contains all the options for running edit cli command.
 type EditOptions struct {
@@ -230,9 +227,6 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 
 // Validate checks the EditOptions to see if there is sufficient information to run the command.
 func (o *EditOptions) Validate() error {
-	if len(o.Subresource) > 0 && !slice.ContainsString(SupportedSubresources, o.Subresource, nil) {
-		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, SupportedSubresources)
-	}
 	return nil
 }
 

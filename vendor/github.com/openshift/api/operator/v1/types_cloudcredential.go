@@ -25,7 +25,6 @@ type CloudCredential struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// +kubebuilder:validation:Required
 	// +required
 	Spec CloudCredentialSpec `json:"spec"`
 	// +optional
@@ -60,7 +59,7 @@ const (
 // CloudCredentialSpec is the specification of the desired behavior of the cloud-credential-operator.
 type CloudCredentialSpec struct {
 	OperatorSpec `json:",inline"`
-	// CredentialsMode allows informing CCO that it should not attempt to dynamically
+	// credentialsMode allows informing CCO that it should not attempt to dynamically
 	// determine the root cloud credentials capabilities, and it should just run in
 	// the specified mode.
 	// It also allows putting the operator into "manual" mode if desired.

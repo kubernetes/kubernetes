@@ -18,7 +18,7 @@ func BitbucketWebHookCause() *BitbucketWebHookCauseApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Revision field is set to the value of the last call.
 func (b *BitbucketWebHookCauseApplyConfiguration) WithRevision(value *SourceRevisionApplyConfiguration) *BitbucketWebHookCauseApplyConfiguration {
-	b.Revision = value
+	b.CommonWebHookCauseApplyConfiguration.Revision = value
 	return b
 }
 
@@ -26,6 +26,6 @@ func (b *BitbucketWebHookCauseApplyConfiguration) WithRevision(value *SourceRevi
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Secret field is set to the value of the last call.
 func (b *BitbucketWebHookCauseApplyConfiguration) WithSecret(value string) *BitbucketWebHookCauseApplyConfiguration {
-	b.Secret = &value
+	b.CommonWebHookCauseApplyConfiguration.Secret = &value
 	return b
 }

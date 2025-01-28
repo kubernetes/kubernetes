@@ -3,17 +3,17 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // BuildVolumeSourceApplyConfiguration represents a declarative configuration of the BuildVolumeSource type for use
 // with apply.
 type BuildVolumeSourceApplyConfiguration struct {
-	Type      *v1.BuildVolumeSourceType     `json:"type,omitempty"`
-	Secret    *corev1.SecretVolumeSource    `json:"secret,omitempty"`
-	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
-	CSI       *corev1.CSIVolumeSource       `json:"csi,omitempty"`
+	Type      *buildv1.BuildVolumeSourceType `json:"type,omitempty"`
+	Secret    *corev1.SecretVolumeSource     `json:"secret,omitempty"`
+	ConfigMap *corev1.ConfigMapVolumeSource  `json:"configMap,omitempty"`
+	CSI       *corev1.CSIVolumeSource        `json:"csi,omitempty"`
 }
 
 // BuildVolumeSourceApplyConfiguration constructs a declarative configuration of the BuildVolumeSource type for use with
@@ -25,7 +25,7 @@ func BuildVolumeSource() *BuildVolumeSourceApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *BuildVolumeSourceApplyConfiguration) WithType(value v1.BuildVolumeSourceType) *BuildVolumeSourceApplyConfiguration {
+func (b *BuildVolumeSourceApplyConfiguration) WithType(value buildv1.BuildVolumeSourceType) *BuildVolumeSourceApplyConfiguration {
 	b.Type = &value
 	return b
 }

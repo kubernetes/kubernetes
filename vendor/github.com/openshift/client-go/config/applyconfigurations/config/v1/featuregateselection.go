@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // FeatureGateSelectionApplyConfiguration represents a declarative configuration of the FeatureGateSelection type for use
 // with apply.
 type FeatureGateSelectionApplyConfiguration struct {
-	FeatureSet      *v1.FeatureSet                        `json:"featureSet,omitempty"`
+	FeatureSet      *configv1.FeatureSet                  `json:"featureSet,omitempty"`
 	CustomNoUpgrade *CustomFeatureGatesApplyConfiguration `json:"customNoUpgrade,omitempty"`
 }
 
@@ -22,7 +22,7 @@ func FeatureGateSelection() *FeatureGateSelectionApplyConfiguration {
 // WithFeatureSet sets the FeatureSet field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FeatureSet field is set to the value of the last call.
-func (b *FeatureGateSelectionApplyConfiguration) WithFeatureSet(value v1.FeatureSet) *FeatureGateSelectionApplyConfiguration {
+func (b *FeatureGateSelectionApplyConfiguration) WithFeatureSet(value configv1.FeatureSet) *FeatureGateSelectionApplyConfiguration {
 	b.FeatureSet = &value
 	return b
 }

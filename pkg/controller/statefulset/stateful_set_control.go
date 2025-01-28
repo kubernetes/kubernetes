@@ -194,7 +194,7 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	}
 	historyLen := len(history)
 	historyLimit := int(*set.Spec.RevisionHistoryLimit)
-	if historyLen <= historyLimit {
+	if historyLimit < 0 || historyLen <= historyLimit {
 		return nil
 	}
 	// delete any non-live history to maintain the revision limit.
@@ -566,8 +566,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	// for any empty indices in the sequence [0,set.Spec.Replicas) create a new Pod at the correct revision
-	for ord := getStartOrdinal(set); ord <= getEndOrdinal(set); ord++ {
-		replicaIdx := ord - getStartOrdinal(set)
+	start, end := getStartOrdinal(set), getEndOrdinal(set)
+	for ord := start; ord <= end; ord++ {
+		replicaIdx := ord - start
 		if replicas[replicaIdx] == nil {
 			replicas[replicaIdx] = newVersionedStatefulSetPod(
 				currentSet,

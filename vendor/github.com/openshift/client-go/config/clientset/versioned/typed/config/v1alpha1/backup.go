@@ -3,10 +3,10 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/openshift/api/config/v1alpha1"
-	configv1alpha1 "github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
+	applyconfigurationsconfigv1alpha1 "github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type BackupsGetter interface {
 
 // BackupInterface has methods to work with Backup resources.
 type BackupInterface interface {
-	Create(ctx context.Context, backup *v1alpha1.Backup, opts v1.CreateOptions) (*v1alpha1.Backup, error)
-	Update(ctx context.Context, backup *v1alpha1.Backup, opts v1.UpdateOptions) (*v1alpha1.Backup, error)
+	Create(ctx context.Context, backup *configv1alpha1.Backup, opts v1.CreateOptions) (*configv1alpha1.Backup, error)
+	Update(ctx context.Context, backup *configv1alpha1.Backup, opts v1.UpdateOptions) (*configv1alpha1.Backup, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, backup *v1alpha1.Backup, opts v1.UpdateOptions) (*v1alpha1.Backup, error)
+	UpdateStatus(ctx context.Context, backup *configv1alpha1.Backup, opts v1.UpdateOptions) (*configv1alpha1.Backup, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Backup, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.BackupList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*configv1alpha1.Backup, error)
+	List(ctx context.Context, opts v1.ListOptions) (*configv1alpha1.BackupList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Backup, err error)
-	Apply(ctx context.Context, backup *configv1alpha1.BackupApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Backup, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1alpha1.Backup, err error)
+	Apply(ctx context.Context, backup *applyconfigurationsconfigv1alpha1.BackupApplyConfiguration, opts v1.ApplyOptions) (result *configv1alpha1.Backup, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, backup *configv1alpha1.BackupApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.Backup, err error)
+	ApplyStatus(ctx context.Context, backup *applyconfigurationsconfigv1alpha1.BackupApplyConfiguration, opts v1.ApplyOptions) (result *configv1alpha1.Backup, err error)
 	BackupExpansion
 }
 
 // backups implements BackupInterface
 type backups struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.Backup, *v1alpha1.BackupList, *configv1alpha1.BackupApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1alpha1.Backup, *configv1alpha1.BackupList, *applyconfigurationsconfigv1alpha1.BackupApplyConfiguration]
 }
 
 // newBackups returns a Backups
 func newBackups(c *ConfigV1alpha1Client) *backups {
 	return &backups{
-		gentype.NewClientWithListAndApply[*v1alpha1.Backup, *v1alpha1.BackupList, *configv1alpha1.BackupApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1alpha1.Backup, *configv1alpha1.BackupList, *applyconfigurationsconfigv1alpha1.BackupApplyConfiguration](
 			"backups",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.Backup { return &v1alpha1.Backup{} },
-			func() *v1alpha1.BackupList { return &v1alpha1.BackupList{} }),
+			func() *configv1alpha1.Backup { return &configv1alpha1.Backup{} },
+			func() *configv1alpha1.BackupList { return &configv1alpha1.BackupList{} },
+		),
 	}
 }

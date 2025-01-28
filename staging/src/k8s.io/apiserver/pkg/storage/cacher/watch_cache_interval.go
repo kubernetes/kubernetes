@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
 // watchCacheInterval serves as an abstraction over a source
@@ -102,6 +101,9 @@ type watchCacheInterval struct {
 	// Given that indexer and indexValidator only read state, if
 	// possible, Locker obtained through RLocker() is provided.
 	lock sync.Locker
+
+	// initialEventsEndBookmark will be sent after sending all events in cacheInterval
+	initialEventsEndBookmark *watchCacheEvent
 }
 
 type attrFunc func(runtime.Object) (labels.Set, fields.Set, error)
@@ -138,7 +140,7 @@ func (s sortableWatchCacheEvents) Swap(i, j int) {
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getAttrsFunc attrFunc, key string, matchesSingle bool) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, store storeIndexer, getAttrsFunc attrFunc, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
 

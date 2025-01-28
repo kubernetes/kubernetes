@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // GroupRestrictionApplyConfiguration represents a declarative configuration of the GroupRestriction type for use
 // with apply.
 type GroupRestrictionApplyConfiguration struct {
-	Groups    []string                             `json:"groups,omitempty"`
-	Selectors []v1.LabelSelectorApplyConfiguration `json:"labels,omitempty"`
+	Groups    []string                                 `json:"groups,omitempty"`
+	Selectors []metav1.LabelSelectorApplyConfiguration `json:"labels,omitempty"`
 }
 
 // GroupRestrictionApplyConfiguration constructs a declarative configuration of the GroupRestriction type for use with
@@ -32,7 +32,7 @@ func (b *GroupRestrictionApplyConfiguration) WithGroups(values ...string) *Group
 // WithSelectors adds the given value to the Selectors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Selectors field.
-func (b *GroupRestrictionApplyConfiguration) WithSelectors(values ...*v1.LabelSelectorApplyConfiguration) *GroupRestrictionApplyConfiguration {
+func (b *GroupRestrictionApplyConfiguration) WithSelectors(values ...*metav1.LabelSelectorApplyConfiguration) *GroupRestrictionApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithSelectors")

@@ -281,6 +281,10 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostIPC"), sc.HostIPC(), "Host IPC is not allowed to be used"))
 	}
 
+	if s.scc.UserNamespaceLevel == securityv1.NamespaceLevelRequirePod && (sc.HostUsers() == nil || *sc.HostUsers()) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostUsers"), sc.HostUsers(), "Host Users must be set to false"))
+	}
+
 	allErrs = append(allErrs, s.sysctlsStrategy.Validate(pod)...)
 
 	if len(pod.Spec.Volumes) > 0 && !sccutil.SCCAllowsAllVolumes(s.scc) {

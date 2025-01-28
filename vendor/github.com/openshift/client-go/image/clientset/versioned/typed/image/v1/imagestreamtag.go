@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
@@ -19,28 +19,29 @@ type ImageStreamTagsGetter interface {
 
 // ImageStreamTagInterface has methods to work with ImageStreamTag resources.
 type ImageStreamTagInterface interface {
-	Create(ctx context.Context, imageStreamTag *v1.ImageStreamTag, opts metav1.CreateOptions) (*v1.ImageStreamTag, error)
-	Update(ctx context.Context, imageStreamTag *v1.ImageStreamTag, opts metav1.UpdateOptions) (*v1.ImageStreamTag, error)
+	Create(ctx context.Context, imageStreamTag *imagev1.ImageStreamTag, opts metav1.CreateOptions) (*imagev1.ImageStreamTag, error)
+	Update(ctx context.Context, imageStreamTag *imagev1.ImageStreamTag, opts metav1.UpdateOptions) (*imagev1.ImageStreamTag, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ImageStreamTag, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageStreamTagList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*imagev1.ImageStreamTag, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*imagev1.ImageStreamTagList, error)
 	ImageStreamTagExpansion
 }
 
 // imageStreamTags implements ImageStreamTagInterface
 type imageStreamTags struct {
-	*gentype.ClientWithList[*v1.ImageStreamTag, *v1.ImageStreamTagList]
+	*gentype.ClientWithList[*imagev1.ImageStreamTag, *imagev1.ImageStreamTagList]
 }
 
 // newImageStreamTags returns a ImageStreamTags
 func newImageStreamTags(c *ImageV1Client, namespace string) *imageStreamTags {
 	return &imageStreamTags{
-		gentype.NewClientWithList[*v1.ImageStreamTag, *v1.ImageStreamTagList](
+		gentype.NewClientWithList[*imagev1.ImageStreamTag, *imagev1.ImageStreamTagList](
 			"imagestreamtags",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.ImageStreamTag { return &v1.ImageStreamTag{} },
-			func() *v1.ImageStreamTagList { return &v1.ImageStreamTagList{} }),
+			func() *imagev1.ImageStreamTag { return &imagev1.ImageStreamTag{} },
+			func() *imagev1.ImageStreamTagList { return &imagev1.ImageStreamTagList{} },
+		),
 	}
 }

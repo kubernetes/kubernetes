@@ -38,7 +38,7 @@ type KubeAPIServerConfig struct {
 	// DEPRECATED: consolePublicURL has been deprecated and setting it has no effect.
 	ConsolePublicURL string `json:"consolePublicURL"`
 
-	// UserAgentMatchingConfig controls how API calls from *voluntarily* identifying clients will be handled.  THIS DOES NOT DEFEND AGAINST MALICIOUS CLIENTS!
+	// userAgentMatchingConfig controls how API calls from *voluntarily* identifying clients will be handled.  THIS DOES NOT DEFEND AGAINST MALICIOUS CLIENTS!
 	// TODO I think we should just drop this feature.
 	UserAgentMatchingConfig UserAgentMatchingConfig `json:"userAgentMatchingConfig"`
 
@@ -62,6 +62,25 @@ type KubeAPIServerConfig struct {
 
 	// TODO this needs to be removed.
 	APIServerArguments map[string]Arguments `json:"apiServerArguments"`
+
+	// minimumKubeletVersion is the lowest version of a kubelet that can join the cluster.
+	// Specifically, the apiserver will deny most authorization requests of kubelets that are older
+	// than the specified version, only allowing the kubelet to get and update its node object, and perform
+	// subjectaccessreviews.
+	// This means any kubelet that attempts to join the cluster will not be able to run any assigned workloads,
+	// and will eventually be marked as not ready.
+	// Its max length is 8, so maximum version allowed is either "9.999.99" or "99.99.99".
+	// Since the kubelet reports the version of the kubernetes release, not Openshift, this field references
+	// the underlying kubernetes version this version of Openshift is based off of.
+	// In other words: if an admin wishes to ensure no nodes run an older version than Openshift 4.17, then
+	// they should set the minimumKubeletVersion to 1.30.0.
+	// When comparing versions, the kubelet's version is stripped of any contents outside of major.minor.patch version.
+	// Thus, a kubelet with version "1.0.0-ec.0" will be compatible with minimumKubeletVersion "1.0.0" or earlier.
+	// +kubebuilder:validation:XValidation:rule="self == \"\" || self.matches('^[0-9]*.[0-9]*.[0-9]*$')",message="minmumKubeletVersion must be in a semver compatible format of x.y.z, or empty"
+	// +kubebuilder:validation:MaxLength:=8
+	// +openshift:enable:FeatureGate=MinimumKubeletVersion
+	// +optional
+	MinimumKubeletVersion string `json:"minimumKubeletVersion"`
 }
 
 // Arguments masks the value so protobuf can generate
@@ -134,7 +153,7 @@ type UserAgentMatchRule struct {
 type UserAgentDenyRule struct {
 	UserAgentMatchRule `json:",inline"`
 
-	// RejectionMessage is the message shown when rejecting a client.  If it is not a set, the default message is used.
+	// rejectionMessage is the message shown when rejecting a client.  If it is not a set, the default message is used.
 	RejectionMessage string `json:"rejectionMessage"`
 }
 
@@ -212,6 +231,6 @@ type KubeControllerManagerProjectConfig struct {
 // ServiceServingCert holds configuration for service serving cert signer which creates cert/key pairs for
 // pods fulfilling a service to serve with.
 type ServiceServingCert struct {
-	// CertFile is a file containing a PEM-encoded certificate
+	// certFile is a file containing a PEM-encoded certificate
 	CertFile string `json:"certFile"`
 }

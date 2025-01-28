@@ -13,19 +13,19 @@ type FakeUserV1 struct {
 }
 
 func (c *FakeUserV1) Groups() v1.GroupInterface {
-	return &FakeGroups{c}
+	return newFakeGroups(c)
 }
 
 func (c *FakeUserV1) Identities() v1.IdentityInterface {
-	return &FakeIdentities{c}
+	return newFakeIdentities(c)
 }
 
 func (c *FakeUserV1) Users() v1.UserInterface {
-	return &FakeUsers{c}
+	return newFakeUsers(c)
 }
 
 func (c *FakeUserV1) UserIdentityMappings() v1.UserIdentityMappingInterface {
-	return &FakeUserIdentityMappings{c}
+	return newFakeUserIdentityMappings(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

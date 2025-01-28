@@ -17,14 +17,11 @@ limitations under the License.
 package garbagecollector
 
 import (
-	"sync"
-
-	"github.com/golang/groupcache/lru"
+	"k8s.io/utils/lru"
 )
 
 // ReferenceCache is an LRU cache for uid.
 type ReferenceCache struct {
-	mutex sync.Mutex
 	cache *lru.Cache
 }
 
@@ -37,15 +34,11 @@ func NewReferenceCache(maxCacheEntries int) *ReferenceCache {
 
 // Add adds a uid to the cache.
 func (c *ReferenceCache) Add(reference objectReference) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	c.cache.Add(reference, nil)
 }
 
 // Has returns if a uid is in the cache.
 func (c *ReferenceCache) Has(reference objectReference) bool {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	_, found := c.cache.Get(reference)
 	return found
 }

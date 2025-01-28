@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type NodesGetter interface {
 
 // NodeInterface has methods to work with Node resources.
 type NodeInterface interface {
-	Create(ctx context.Context, node *v1.Node, opts metav1.CreateOptions) (*v1.Node, error)
-	Update(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (*v1.Node, error)
+	Create(ctx context.Context, node *configv1.Node, opts metav1.CreateOptions) (*configv1.Node, error)
+	Update(ctx context.Context, node *configv1.Node, opts metav1.UpdateOptions) (*configv1.Node, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (*v1.Node, error)
+	UpdateStatus(ctx context.Context, node *configv1.Node, opts metav1.UpdateOptions) (*configv1.Node, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Node, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.NodeList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.Node, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.NodeList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Node, err error)
-	Apply(ctx context.Context, node *configv1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Node, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.Node, err error)
+	Apply(ctx context.Context, node *applyconfigurationsconfigv1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Node, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, node *configv1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Node, err error)
+	ApplyStatus(ctx context.Context, node *applyconfigurationsconfigv1.NodeApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Node, err error)
 	NodeExpansion
 }
 
 // nodes implements NodeInterface
 type nodes struct {
-	*gentype.ClientWithListAndApply[*v1.Node, *v1.NodeList, *configv1.NodeApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.Node, *configv1.NodeList, *applyconfigurationsconfigv1.NodeApplyConfiguration]
 }
 
 // newNodes returns a Nodes
 func newNodes(c *ConfigV1Client) *nodes {
 	return &nodes{
-		gentype.NewClientWithListAndApply[*v1.Node, *v1.NodeList, *configv1.NodeApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.Node, *configv1.NodeList, *applyconfigurationsconfigv1.NodeApplyConfiguration](
 			"nodes",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Node { return &v1.Node{} },
-			func() *v1.NodeList { return &v1.NodeList{} }),
+			func() *configv1.Node { return &configv1.Node{} },
+			func() *configv1.NodeList { return &configv1.NodeList{} },
+		),
 	}
 }

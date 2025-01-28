@@ -3,16 +3,16 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // TLSSecurityProfileApplyConfiguration represents a declarative configuration of the TLSSecurityProfile type for use
 // with apply.
 type TLSSecurityProfileApplyConfiguration struct {
-	Type         *v1.TLSProfileType                  `json:"type,omitempty"`
-	Old          *v1.OldTLSProfile                   `json:"old,omitempty"`
-	Intermediate *v1.IntermediateTLSProfile          `json:"intermediate,omitempty"`
-	Modern       *v1.ModernTLSProfile                `json:"modern,omitempty"`
+	Type         *configv1.TLSProfileType            `json:"type,omitempty"`
+	Old          *configv1.OldTLSProfile             `json:"old,omitempty"`
+	Intermediate *configv1.IntermediateTLSProfile    `json:"intermediate,omitempty"`
+	Modern       *configv1.ModernTLSProfile          `json:"modern,omitempty"`
 	Custom       *CustomTLSProfileApplyConfiguration `json:"custom,omitempty"`
 }
 
@@ -25,7 +25,7 @@ func TLSSecurityProfile() *TLSSecurityProfileApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *TLSSecurityProfileApplyConfiguration) WithType(value v1.TLSProfileType) *TLSSecurityProfileApplyConfiguration {
+func (b *TLSSecurityProfileApplyConfiguration) WithType(value configv1.TLSProfileType) *TLSSecurityProfileApplyConfiguration {
 	b.Type = &value
 	return b
 }
@@ -33,7 +33,7 @@ func (b *TLSSecurityProfileApplyConfiguration) WithType(value v1.TLSProfileType)
 // WithOld sets the Old field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Old field is set to the value of the last call.
-func (b *TLSSecurityProfileApplyConfiguration) WithOld(value v1.OldTLSProfile) *TLSSecurityProfileApplyConfiguration {
+func (b *TLSSecurityProfileApplyConfiguration) WithOld(value configv1.OldTLSProfile) *TLSSecurityProfileApplyConfiguration {
 	b.Old = &value
 	return b
 }
@@ -41,7 +41,7 @@ func (b *TLSSecurityProfileApplyConfiguration) WithOld(value v1.OldTLSProfile) *
 // WithIntermediate sets the Intermediate field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Intermediate field is set to the value of the last call.
-func (b *TLSSecurityProfileApplyConfiguration) WithIntermediate(value v1.IntermediateTLSProfile) *TLSSecurityProfileApplyConfiguration {
+func (b *TLSSecurityProfileApplyConfiguration) WithIntermediate(value configv1.IntermediateTLSProfile) *TLSSecurityProfileApplyConfiguration {
 	b.Intermediate = &value
 	return b
 }
@@ -49,7 +49,7 @@ func (b *TLSSecurityProfileApplyConfiguration) WithIntermediate(value v1.Interme
 // WithModern sets the Modern field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Modern field is set to the value of the last call.
-func (b *TLSSecurityProfileApplyConfiguration) WithModern(value v1.ModernTLSProfile) *TLSSecurityProfileApplyConfiguration {
+func (b *TLSSecurityProfileApplyConfiguration) WithModern(value configv1.ModernTLSProfile) *TLSSecurityProfileApplyConfiguration {
 	b.Modern = &value
 	return b
 }

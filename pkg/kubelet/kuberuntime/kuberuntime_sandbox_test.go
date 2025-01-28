@@ -34,7 +34,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const testPodLogsDirectory = "/var/log/pods"
@@ -91,7 +91,7 @@ func TestCreatePodSandbox(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, sandboxes, 1)
 	assert.Equal(t, sandboxes[0].Id, fmt.Sprintf("%s_%s_%s_1", pod.Name, pod.Namespace, pod.UID))
-	assert.Equal(t, sandboxes[0].State, runtimeapi.PodSandboxState_SANDBOX_READY)
+	assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandboxes[0].State)
 }
 
 func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
@@ -153,8 +153,8 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 		expectError     bool
 	}{
 		"unspecified RuntimeClass": {rcn: nil, expectedHandler: ""},
-		"valid RuntimeClass":       {rcn: pointer.String(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
-		"missing RuntimeClass":     {rcn: pointer.String("phantom"), expectError: true},
+		"valid RuntimeClass":       {rcn: ptr.To(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler},
+		"missing RuntimeClass":     {rcn: ptr.To("phantom"), expectError: true},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -467,7 +467,7 @@ func TestGeneratePodSandboxWindowsConfig_HostNetwork(t *testing.T) {
 			wc, err := m.generatePodSandboxWindowsConfig(pod)
 
 			assert.Equal(t, testCase.expectedWindowsConfig, wc)
-			assert.Equal(t, nil, err)
+			assert.NoError(t, err)
 		})
 	}
 }

@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
@@ -19,28 +19,29 @@ type ImageTagsGetter interface {
 
 // ImageTagInterface has methods to work with ImageTag resources.
 type ImageTagInterface interface {
-	Create(ctx context.Context, imageTag *v1.ImageTag, opts metav1.CreateOptions) (*v1.ImageTag, error)
-	Update(ctx context.Context, imageTag *v1.ImageTag, opts metav1.UpdateOptions) (*v1.ImageTag, error)
+	Create(ctx context.Context, imageTag *imagev1.ImageTag, opts metav1.CreateOptions) (*imagev1.ImageTag, error)
+	Update(ctx context.Context, imageTag *imagev1.ImageTag, opts metav1.UpdateOptions) (*imagev1.ImageTag, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ImageTag, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageTagList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*imagev1.ImageTag, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*imagev1.ImageTagList, error)
 	ImageTagExpansion
 }
 
 // imageTags implements ImageTagInterface
 type imageTags struct {
-	*gentype.ClientWithList[*v1.ImageTag, *v1.ImageTagList]
+	*gentype.ClientWithList[*imagev1.ImageTag, *imagev1.ImageTagList]
 }
 
 // newImageTags returns a ImageTags
 func newImageTags(c *ImageV1Client, namespace string) *imageTags {
 	return &imageTags{
-		gentype.NewClientWithList[*v1.ImageTag, *v1.ImageTagList](
+		gentype.NewClientWithList[*imagev1.ImageTag, *imagev1.ImageTagList](
 			"imagetags",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.ImageTag { return &v1.ImageTag{} },
-			func() *v1.ImageTagList { return &v1.ImageTagList{} }),
+			func() *imagev1.ImageTag { return &imagev1.ImageTag{} },
+			func() *imagev1.ImageTagList { return &imagev1.ImageTagList{} },
+		),
 	}
 }

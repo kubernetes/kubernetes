@@ -54,7 +54,7 @@ type NetworkList struct {
 
 // NetworkSpec is the top-level network configuration object.
 // +kubebuilder:validation:XValidation:rule="!has(self.defaultNetwork) || !has(self.defaultNetwork.ovnKubernetesConfig) || !has(self.defaultNetwork.ovnKubernetesConfig.gatewayConfig) || !has(self.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding) || self.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding == oldSelf.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding || self.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding == 'Restricted' || self.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding == 'Global'",message="invalid value for IPForwarding, valid values are 'Restricted' or 'Global'"
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=AdditionalRoutingCapabilities,rule="(has(self.additionalRoutingCapabilities) && ('FRR' in self.additionalRoutingCapabilities.providers)) || !has(self.defaultNetwork) || !has(self.defaultNetwork.ovnKubernetesConfig) || !has(self.defaultNetwork.ovnKubernetesConfig.routeAdvertisements) || self.defaultNetwork.ovnKubernetesConfig.routeAdvertisements != 'Enabled'",message="Route advertisements cannot be Enabled if 'FRR' routing capability provider is not available"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=RouteAdvertisements,rule="(has(self.additionalRoutingCapabilities) && ('FRR' in self.additionalRoutingCapabilities.providers)) || !has(self.defaultNetwork) || !has(self.defaultNetwork.ovnKubernetesConfig) || !has(self.defaultNetwork.ovnKubernetesConfig.routeAdvertisements) || self.defaultNetwork.ovnKubernetesConfig.routeAdvertisements != 'Enabled'",message="Route advertisements cannot be Enabled if 'FRR' routing capability provider is not available"
 type NetworkSpec struct {
 	OperatorSpec `json:",inline"`
 
@@ -250,7 +250,7 @@ type DefaultNetworkDefinition struct {
 	// All NetworkTypes are supported except for NetworkTypeRaw
 	Type NetworkType `json:"type"`
 
-	// openShiftSDNConfig was previously used to configure the openshift-sdn plugin.
+	// openshiftSDNConfig was previously used to configure the openshift-sdn plugin.
 	// DEPRECATED: OpenShift SDN is no longer supported.
 	// +optional
 	OpenShiftSDNConfig *OpenShiftSDNConfig `json:"openshiftSDNConfig,omitempty"`
@@ -267,7 +267,7 @@ type SimpleMacvlanConfig struct {
 	// +optional
 	Master string `json:"master,omitempty"`
 
-	// IPAMConfig configures IPAM module will be used for IP Address Management (IPAM).
+	// ipamConfig configures IPAM module will be used for IP Address Management (IPAM).
 	// +optional
 	IPAMConfig *IPAMConfig `json:"ipamConfig,omitempty"`
 
@@ -284,19 +284,19 @@ type SimpleMacvlanConfig struct {
 
 // StaticIPAMAddresses provides IP address and Gateway for static IPAM addresses
 type StaticIPAMAddresses struct {
-	// Address is the IP address in CIDR format
+	// address is the IP address in CIDR format
 	// +optional
 	Address string `json:"address"`
-	// Gateway is IP inside of subnet to designate as the gateway
+	// gateway is IP inside of subnet to designate as the gateway
 	// +optional
 	Gateway string `json:"gateway,omitempty"`
 }
 
 // StaticIPAMRoutes provides Destination/Gateway pairs for static IPAM routes
 type StaticIPAMRoutes struct {
-	// Destination points the IP route destination
+	// destination points the IP route destination
 	Destination string `json:"destination"`
-	// Gateway is the route's next-hop IP address
+	// gateway is the route's next-hop IP address
 	// If unset, a default gateway is assumed (as determined by the CNI plugin).
 	// +optional
 	Gateway string `json:"gateway,omitempty"`
@@ -304,14 +304,14 @@ type StaticIPAMRoutes struct {
 
 // StaticIPAMDNS provides DNS related information for static IPAM
 type StaticIPAMDNS struct {
-	// Nameservers points DNS servers for IP lookup
+	// nameservers points DNS servers for IP lookup
 	// +optional
 	// +listType=atomic
 	Nameservers []string `json:"nameservers,omitempty"`
-	// Domain configures the domainname the local domain used for short hostname lookups
+	// domain configures the domainname the local domain used for short hostname lookups
 	// +optional
 	Domain string `json:"domain,omitempty"`
-	// Search configures priority ordered search domains for short hostname lookups
+	// search configures priority ordered search domains for short hostname lookups
 	// +optional
 	// +listType=atomic
 	Search []string `json:"search,omitempty"`
@@ -319,26 +319,26 @@ type StaticIPAMDNS struct {
 
 // StaticIPAMConfig contains configurations for static IPAM (IP Address Management)
 type StaticIPAMConfig struct {
-	// Addresses configures IP address for the interface
+	// addresses configures IP address for the interface
 	// +optional
 	// +listType=atomic
 	Addresses []StaticIPAMAddresses `json:"addresses,omitempty"`
-	// Routes configures IP routes for the interface
+	// routes configures IP routes for the interface
 	// +optional
 	// +listType=atomic
 	Routes []StaticIPAMRoutes `json:"routes,omitempty"`
-	// DNS configures DNS for the interface
+	// dns configures DNS for the interface
 	// +optional
 	DNS *StaticIPAMDNS `json:"dns,omitempty"`
 }
 
 // IPAMConfig contains configurations for IPAM (IP Address Management)
 type IPAMConfig struct {
-	// Type is the type of IPAM module will be used for IP Address Management(IPAM).
+	// type is the type of IPAM module will be used for IP Address Management(IPAM).
 	// The supported values are IPAMTypeDHCP, IPAMTypeStatic
 	Type IPAMType `json:"type"`
 
-	// StaticIPAMConfig configures the static IP address in case of type:IPAMTypeStatic
+	// staticIPAMConfig configures the static IP address in case of type:IPAMTypeStatic
 	// +optional
 	StaticIPAMConfig *StaticIPAMConfig `json:"staticIPAMConfig,omitempty"`
 }
@@ -353,7 +353,7 @@ type AdditionalNetworkDefinition struct {
 
 	// name is the name of the network. This will be populated in the resulting CRD
 	// This must be unique.
-	// +kubebuilder:validation:Required
+	// +required
 	Name string `json:"name"`
 
 	// namespace is the namespace of the network. This will be populated in the resulting CRD
@@ -364,7 +364,7 @@ type AdditionalNetworkDefinition struct {
 	// NetworkAttachmentDefinition CRD
 	RawCNIConfig string `json:"rawCNIConfig,omitempty"`
 
-	// SimpleMacvlanConfig configures the macvlan interface in case of type:NetworkTypeSimpleMacvlan
+	// simpleMacvlanConfig configures the macvlan interface in case of type:NetworkTypeSimpleMacvlan
 	// +optional
 	SimpleMacvlanConfig *SimpleMacvlanConfig `json:"simpleMacvlanConfig,omitempty"`
 }
@@ -410,7 +410,7 @@ type OVNKubernetesConfig struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	GenevePort *uint32 `json:"genevePort,omitempty"`
-	// HybridOverlayConfig configures an additional overlay network for peers that are
+	// hybridOverlayConfig configures an additional overlay network for peers that are
 	// not using OVN.
 	// +optional
 	HybridOverlayConfig *HybridOverlayConfig `json:"hybridOverlayConfig,omitempty"`
@@ -540,16 +540,18 @@ type IPv6OVNKubernetesConfig struct {
 }
 
 type HybridOverlayConfig struct {
-	// HybridClusterNetwork defines a network space given to nodes on an additional overlay network.
+	// hybridClusterNetwork defines a network space given to nodes on an additional overlay network.
 	// +listType=atomic
 	HybridClusterNetwork []ClusterNetworkEntry `json:"hybridClusterNetwork"`
-	// HybridOverlayVXLANPort defines the VXLAN port number to be used by the additional overlay network.
+	// hybridOverlayVXLANPort defines the VXLAN port number to be used by the additional overlay network.
 	// Default is 4789
 	// +optional
 	HybridOverlayVXLANPort *uint32 `json:"hybridOverlayVXLANPort,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="self == oldSelf || has(self.mode)",message="ipsecConfig.mode is required"
+// +kubebuilder:validation:XValidation:rule="has(self.mode) && self.mode == 'Full' ?  true : !has(self.full)",message="full is forbidden when mode is not Full"
+// +union
 type IPsecConfig struct {
 	// mode defines the behaviour of the ipsec configuration within the platform.
 	// Valid values are `Disabled`, `External` and `Full`.
@@ -561,7 +563,43 @@ type IPsecConfig struct {
 	// this is left to the user to configure.
 	// +kubebuilder:validation:Enum=Disabled;External;Full
 	// +optional
+	// +unionDiscriminator
 	Mode IPsecMode `json:"mode,omitempty"`
+
+	// full defines configuration parameters for the IPsec `Full` mode.
+	// This is permitted only when mode is configured with `Full`,
+	// and forbidden otherwise.
+	// +unionMember,optional
+	// +optional
+	Full *IPsecFullModeConfig `json:"full,omitempty"`
+}
+
+type Encapsulation string
+
+const (
+	// EncapsulationAlways always enable UDP encapsulation regardless of whether NAT is detected.
+	EncapsulationAlways = "Always"
+	// EncapsulationNever never enable UDP encapsulation even if NAT is present.
+	EncapsulationNever = "Never"
+	// EncapsulationAuto enable UDP encapsulation based on the detection of NAT.
+	EncapsulationAuto = "Auto"
+)
+
+// IPsecFullModeConfig defines configuration parameters for the IPsec `Full` mode.
+// +kubebuilder:validation:MinProperties:=1
+type IPsecFullModeConfig struct {
+	// encapsulation option to configure libreswan on how inter-pod traffic across nodes
+	// are encapsulated to handle NAT traversal. When configured it uses UDP port 4500
+	// for the encapsulation.
+	// Valid values are Always, Never, Auto and omitted.
+	// Always means enable UDP encapsulation regardless of whether NAT is detected.
+	// Disable means never enable UDP encapsulation even if NAT is present.
+	// Auto means enable UDP encapsulation based on the detection of NAT.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable
+	// default, which is subject to change over time. The current default is Auto.
+	// +kubebuilder:validation:Enum:=Always;Never;Auto
+	// +optional
+	Encapsulation Encapsulation `json:"encapsulation,omitempty"`
 }
 
 type IPForwardingMode string
@@ -577,14 +615,14 @@ const (
 
 // GatewayConfig holds node gateway-related parsed config file parameters and command-line overrides
 type GatewayConfig struct {
-	// RoutingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port
+	// routingViaHost allows pod egress traffic to exit via the ovn-k8s-mp0 management port
 	// into the host before sending it out. If this is not set, traffic will always egress directly
 	// from OVN to outside without touching the host stack. Setting this to true means hardware
 	// offload will not be supported. Default is false if GatewayConfig is specified.
 	// +kubebuilder:default:=false
 	// +optional
 	RoutingViaHost bool `json:"routingViaHost,omitempty"`
-	// IPForwarding controls IP forwarding for all traffic on OVN-Kubernetes managed interfaces (such as br-ex).
+	// ipForwarding controls IP forwarding for all traffic on OVN-Kubernetes managed interfaces (such as br-ex).
 	// By default this is set to Restricted, and Kubernetes related traffic is still forwarded appropriately, but other
 	// IP traffic will not be routed by the OCP node. If there is a desire to allow the host to forward traffic across
 	// OVN-Kubernetes managed interfaces, then set this field to "Global".
@@ -862,7 +900,7 @@ type AdditionalRoutingCapabilities struct {
 	// is currrently "FRR" which provides FRR routing capabilities through the
 	// deployment of FRR.
 	// +listType=atomic
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=1
 	// +kubebuilder:validation:XValidation:rule="self.all(x, self.exists_one(y, x == y))"

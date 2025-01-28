@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/authorization/v1"
-	authorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
+	authorizationv1 "github.com/openshift/api/authorization/v1"
+	applyconfigurationsauthorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
 	scheme "github.com/openshift/client-go/authorization/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type ClusterRoleBindingsGetter interface {
 
 // ClusterRoleBindingInterface has methods to work with ClusterRoleBinding resources.
 type ClusterRoleBindingInterface interface {
-	Create(ctx context.Context, clusterRoleBinding *v1.ClusterRoleBinding, opts metav1.CreateOptions) (*v1.ClusterRoleBinding, error)
-	Update(ctx context.Context, clusterRoleBinding *v1.ClusterRoleBinding, opts metav1.UpdateOptions) (*v1.ClusterRoleBinding, error)
+	Create(ctx context.Context, clusterRoleBinding *authorizationv1.ClusterRoleBinding, opts metav1.CreateOptions) (*authorizationv1.ClusterRoleBinding, error)
+	Update(ctx context.Context, clusterRoleBinding *authorizationv1.ClusterRoleBinding, opts metav1.UpdateOptions) (*authorizationv1.ClusterRoleBinding, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterRoleBinding, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*authorizationv1.ClusterRoleBinding, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*authorizationv1.ClusterRoleBindingList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRoleBinding, err error)
-	Apply(ctx context.Context, clusterRoleBinding *authorizationv1.ClusterRoleBindingApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterRoleBinding, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *authorizationv1.ClusterRoleBinding, err error)
+	Apply(ctx context.Context, clusterRoleBinding *applyconfigurationsauthorizationv1.ClusterRoleBindingApplyConfiguration, opts metav1.ApplyOptions) (result *authorizationv1.ClusterRoleBinding, err error)
 	ClusterRoleBindingExpansion
 }
 
 // clusterRoleBindings implements ClusterRoleBindingInterface
 type clusterRoleBindings struct {
-	*gentype.ClientWithListAndApply[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList, *authorizationv1.ClusterRoleBindingApplyConfiguration]
+	*gentype.ClientWithListAndApply[*authorizationv1.ClusterRoleBinding, *authorizationv1.ClusterRoleBindingList, *applyconfigurationsauthorizationv1.ClusterRoleBindingApplyConfiguration]
 }
 
 // newClusterRoleBindings returns a ClusterRoleBindings
 func newClusterRoleBindings(c *AuthorizationV1Client) *clusterRoleBindings {
 	return &clusterRoleBindings{
-		gentype.NewClientWithListAndApply[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList, *authorizationv1.ClusterRoleBindingApplyConfiguration](
+		gentype.NewClientWithListAndApply[*authorizationv1.ClusterRoleBinding, *authorizationv1.ClusterRoleBindingList, *applyconfigurationsauthorizationv1.ClusterRoleBindingApplyConfiguration](
 			"clusterrolebindings",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterRoleBinding { return &v1.ClusterRoleBinding{} },
-			func() *v1.ClusterRoleBindingList { return &v1.ClusterRoleBindingList{} }),
+			func() *authorizationv1.ClusterRoleBinding { return &authorizationv1.ClusterRoleBinding{} },
+			func() *authorizationv1.ClusterRoleBindingList { return &authorizationv1.ClusterRoleBindingList{} },
+		),
 	}
 }

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/authorization/v1"
-	authorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
+	authorizationv1 "github.com/openshift/api/authorization/v1"
+	applyconfigurationsauthorizationv1 "github.com/openshift/client-go/authorization/applyconfigurations/authorization/v1"
 	scheme "github.com/openshift/client-go/authorization/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type ClusterRolesGetter interface {
 
 // ClusterRoleInterface has methods to work with ClusterRole resources.
 type ClusterRoleInterface interface {
-	Create(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.CreateOptions) (*v1.ClusterRole, error)
-	Update(ctx context.Context, clusterRole *v1.ClusterRole, opts metav1.UpdateOptions) (*v1.ClusterRole, error)
+	Create(ctx context.Context, clusterRole *authorizationv1.ClusterRole, opts metav1.CreateOptions) (*authorizationv1.ClusterRole, error)
+	Update(ctx context.Context, clusterRole *authorizationv1.ClusterRole, opts metav1.UpdateOptions) (*authorizationv1.ClusterRole, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterRole, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterRoleList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*authorizationv1.ClusterRole, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*authorizationv1.ClusterRoleList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterRole, err error)
-	Apply(ctx context.Context, clusterRole *authorizationv1.ClusterRoleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterRole, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *authorizationv1.ClusterRole, err error)
+	Apply(ctx context.Context, clusterRole *applyconfigurationsauthorizationv1.ClusterRoleApplyConfiguration, opts metav1.ApplyOptions) (result *authorizationv1.ClusterRole, err error)
 	ClusterRoleExpansion
 }
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	*gentype.ClientWithListAndApply[*v1.ClusterRole, *v1.ClusterRoleList, *authorizationv1.ClusterRoleApplyConfiguration]
+	*gentype.ClientWithListAndApply[*authorizationv1.ClusterRole, *authorizationv1.ClusterRoleList, *applyconfigurationsauthorizationv1.ClusterRoleApplyConfiguration]
 }
 
 // newClusterRoles returns a ClusterRoles
 func newClusterRoles(c *AuthorizationV1Client) *clusterRoles {
 	return &clusterRoles{
-		gentype.NewClientWithListAndApply[*v1.ClusterRole, *v1.ClusterRoleList, *authorizationv1.ClusterRoleApplyConfiguration](
+		gentype.NewClientWithListAndApply[*authorizationv1.ClusterRole, *authorizationv1.ClusterRoleList, *applyconfigurationsauthorizationv1.ClusterRoleApplyConfiguration](
 			"clusterroles",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterRole { return &v1.ClusterRole{} },
-			func() *v1.ClusterRoleList { return &v1.ClusterRoleList{} }),
+			func() *authorizationv1.ClusterRole { return &authorizationv1.ClusterRole{} },
+			func() *authorizationv1.ClusterRoleList { return &authorizationv1.ClusterRoleList{} },
+		),
 	}
 }

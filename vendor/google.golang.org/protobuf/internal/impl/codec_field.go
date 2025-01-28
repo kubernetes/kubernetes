@@ -65,6 +65,9 @@ func (mi *MessageInfo) initOneofFieldCoders(od protoreflect.OneofDescriptor, si 
 			if err != nil {
 				return out, err
 			}
+			if cf.funcs.isInit == nil {
+				out.initialized = true
+			}
 			vi.Set(vw)
 			return out, nil
 		}

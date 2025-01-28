@@ -22,7 +22,7 @@ func FeatureGateSpec() *FeatureGateSpecApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FeatureSet field is set to the value of the last call.
 func (b *FeatureGateSpecApplyConfiguration) WithFeatureSet(value configv1.FeatureSet) *FeatureGateSpecApplyConfiguration {
-	b.FeatureSet = &value
+	b.FeatureGateSelectionApplyConfiguration.FeatureSet = &value
 	return b
 }
 
@@ -30,6 +30,6 @@ func (b *FeatureGateSpecApplyConfiguration) WithFeatureSet(value configv1.Featur
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CustomNoUpgrade field is set to the value of the last call.
 func (b *FeatureGateSpecApplyConfiguration) WithCustomNoUpgrade(value *CustomFeatureGatesApplyConfiguration) *FeatureGateSpecApplyConfiguration {
-	b.CustomNoUpgrade = value
+	b.FeatureGateSelectionApplyConfiguration.CustomNoUpgrade = value
 	return b
 }

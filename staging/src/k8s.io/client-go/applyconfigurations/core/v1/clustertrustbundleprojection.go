@@ -19,17 +19,17 @@ limitations under the License.
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // ClusterTrustBundleProjectionApplyConfiguration represents a declarative configuration of the ClusterTrustBundleProjection type for use
 // with apply.
 type ClusterTrustBundleProjectionApplyConfiguration struct {
-	Name          *string                             `json:"name,omitempty"`
-	SignerName    *string                             `json:"signerName,omitempty"`
-	LabelSelector *v1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
-	Optional      *bool                               `json:"optional,omitempty"`
-	Path          *string                             `json:"path,omitempty"`
+	Name          *string                                 `json:"name,omitempty"`
+	SignerName    *string                                 `json:"signerName,omitempty"`
+	LabelSelector *metav1.LabelSelectorApplyConfiguration `json:"labelSelector,omitempty"`
+	Optional      *bool                                   `json:"optional,omitempty"`
+	Path          *string                                 `json:"path,omitempty"`
 }
 
 // ClusterTrustBundleProjectionApplyConfiguration constructs a declarative configuration of the ClusterTrustBundleProjection type for use with
@@ -57,7 +57,7 @@ func (b *ClusterTrustBundleProjectionApplyConfiguration) WithSignerName(value st
 // WithLabelSelector sets the LabelSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LabelSelector field is set to the value of the last call.
-func (b *ClusterTrustBundleProjectionApplyConfiguration) WithLabelSelector(value *v1.LabelSelectorApplyConfiguration) *ClusterTrustBundleProjectionApplyConfiguration {
+func (b *ClusterTrustBundleProjectionApplyConfiguration) WithLabelSelector(value *metav1.LabelSelectorApplyConfiguration) *ClusterTrustBundleProjectionApplyConfiguration {
 	b.LabelSelector = value
 	return b
 }

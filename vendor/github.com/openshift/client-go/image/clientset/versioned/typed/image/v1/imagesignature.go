@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
@@ -19,24 +19,25 @@ type ImageSignaturesGetter interface {
 
 // ImageSignatureInterface has methods to work with ImageSignature resources.
 type ImageSignatureInterface interface {
-	Create(ctx context.Context, imageSignature *v1.ImageSignature, opts metav1.CreateOptions) (*v1.ImageSignature, error)
+	Create(ctx context.Context, imageSignature *imagev1.ImageSignature, opts metav1.CreateOptions) (*imagev1.ImageSignature, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	ImageSignatureExpansion
 }
 
 // imageSignatures implements ImageSignatureInterface
 type imageSignatures struct {
-	*gentype.Client[*v1.ImageSignature]
+	*gentype.Client[*imagev1.ImageSignature]
 }
 
 // newImageSignatures returns a ImageSignatures
 func newImageSignatures(c *ImageV1Client) *imageSignatures {
 	return &imageSignatures{
-		gentype.NewClient[*v1.ImageSignature](
+		gentype.NewClient[*imagev1.ImageSignature](
 			"imagesignatures",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ImageSignature { return &v1.ImageSignature{} }),
+			func() *imagev1.ImageSignature { return &imagev1.ImageSignature{} },
+		),
 	}
 }

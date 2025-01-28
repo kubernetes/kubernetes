@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -275,7 +274,7 @@ func main() {
 		}
 	}
 
-	vendorModulesTxt, err := ioutil.ReadFile("vendor/modules.txt")
+	vendorModulesTxt, err := os.ReadFile("vendor/modules.txt")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // SourceBuildStrategyApplyConfiguration represents a declarative configuration of the SourceBuildStrategy type for use
 // with apply.
 type SourceBuildStrategyApplyConfiguration struct {
-	From        *v1.ObjectReference             `json:"from,omitempty"`
-	PullSecret  *v1.LocalObjectReference        `json:"pullSecret,omitempty"`
-	Env         []v1.EnvVar                     `json:"env,omitempty"`
+	From        *corev1.ObjectReference         `json:"from,omitempty"`
+	PullSecret  *corev1.LocalObjectReference    `json:"pullSecret,omitempty"`
+	Env         []corev1.EnvVar                 `json:"env,omitempty"`
 	Scripts     *string                         `json:"scripts,omitempty"`
 	Incremental *bool                           `json:"incremental,omitempty"`
 	ForcePull   *bool                           `json:"forcePull,omitempty"`
@@ -27,7 +27,7 @@ func SourceBuildStrategy() *SourceBuildStrategyApplyConfiguration {
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *SourceBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReference) *SourceBuildStrategyApplyConfiguration {
+func (b *SourceBuildStrategyApplyConfiguration) WithFrom(value corev1.ObjectReference) *SourceBuildStrategyApplyConfiguration {
 	b.From = &value
 	return b
 }
@@ -35,7 +35,7 @@ func (b *SourceBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReferenc
 // WithPullSecret sets the PullSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullSecret field is set to the value of the last call.
-func (b *SourceBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObjectReference) *SourceBuildStrategyApplyConfiguration {
+func (b *SourceBuildStrategyApplyConfiguration) WithPullSecret(value corev1.LocalObjectReference) *SourceBuildStrategyApplyConfiguration {
 	b.PullSecret = &value
 	return b
 }
@@ -43,7 +43,7 @@ func (b *SourceBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObj
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *SourceBuildStrategyApplyConfiguration) WithEnv(values ...v1.EnvVar) *SourceBuildStrategyApplyConfiguration {
+func (b *SourceBuildStrategyApplyConfiguration) WithEnv(values ...corev1.EnvVar) *SourceBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.Env = append(b.Env, values[i])
 	}

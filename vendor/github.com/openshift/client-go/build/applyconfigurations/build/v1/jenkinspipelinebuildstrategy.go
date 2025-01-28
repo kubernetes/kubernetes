@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // JenkinsPipelineBuildStrategyApplyConfiguration represents a declarative configuration of the JenkinsPipelineBuildStrategy type for use
 // with apply.
 type JenkinsPipelineBuildStrategyApplyConfiguration struct {
-	JenkinsfilePath *string     `json:"jenkinsfilePath,omitempty"`
-	Jenkinsfile     *string     `json:"jenkinsfile,omitempty"`
-	Env             []v1.EnvVar `json:"env,omitempty"`
+	JenkinsfilePath *string         `json:"jenkinsfilePath,omitempty"`
+	Jenkinsfile     *string         `json:"jenkinsfile,omitempty"`
+	Env             []corev1.EnvVar `json:"env,omitempty"`
 }
 
 // JenkinsPipelineBuildStrategyApplyConfiguration constructs a declarative configuration of the JenkinsPipelineBuildStrategy type for use with
@@ -39,7 +39,7 @@ func (b *JenkinsPipelineBuildStrategyApplyConfiguration) WithJenkinsfile(value s
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *JenkinsPipelineBuildStrategyApplyConfiguration) WithEnv(values ...v1.EnvVar) *JenkinsPipelineBuildStrategyApplyConfiguration {
+func (b *JenkinsPipelineBuildStrategyApplyConfiguration) WithEnv(values ...corev1.EnvVar) *JenkinsPipelineBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.Env = append(b.Env, values[i])
 	}

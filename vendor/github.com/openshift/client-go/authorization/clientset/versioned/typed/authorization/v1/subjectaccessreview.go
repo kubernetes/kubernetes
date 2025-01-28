@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/authorization/v1"
+	authorizationv1 "github.com/openshift/api/authorization/v1"
 	scheme "github.com/openshift/client-go/authorization/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
@@ -19,31 +19,32 @@ type SubjectAccessReviewsGetter interface {
 
 // SubjectAccessReviewInterface has methods to work with SubjectAccessReview resources.
 type SubjectAccessReviewInterface interface {
-	Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (*v1.SubjectAccessReviewResponse, error)
+	Create(ctx context.Context, subjectAccessReview *authorizationv1.SubjectAccessReview, opts metav1.CreateOptions) (*authorizationv1.SubjectAccessReviewResponse, error)
 
 	SubjectAccessReviewExpansion
 }
 
 // subjectAccessReviews implements SubjectAccessReviewInterface
 type subjectAccessReviews struct {
-	*gentype.Client[*v1.SubjectAccessReview]
+	*gentype.Client[*authorizationv1.SubjectAccessReview]
 }
 
 // newSubjectAccessReviews returns a SubjectAccessReviews
 func newSubjectAccessReviews(c *AuthorizationV1Client) *subjectAccessReviews {
 	return &subjectAccessReviews{
-		gentype.NewClient[*v1.SubjectAccessReview](
+		gentype.NewClient[*authorizationv1.SubjectAccessReview](
 			"subjectaccessreviews",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.SubjectAccessReview { return &v1.SubjectAccessReview{} }),
+			func() *authorizationv1.SubjectAccessReview { return &authorizationv1.SubjectAccessReview{} },
+		),
 	}
 }
 
 // Create takes the representation of a subjectAccessReview and creates it.  Returns the server's representation of the subjectAccessReviewResponse, and an error, if there is any.
-func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (result *v1.SubjectAccessReviewResponse, err error) {
-	result = &v1.SubjectAccessReviewResponse{}
+func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *authorizationv1.SubjectAccessReview, opts metav1.CreateOptions) (result *authorizationv1.SubjectAccessReviewResponse, err error) {
+	result = &authorizationv1.SubjectAccessReviewResponse{}
 	err = c.GetClient().Post().
 		Resource("subjectaccessreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).

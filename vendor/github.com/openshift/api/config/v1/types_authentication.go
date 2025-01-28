@@ -26,7 +26,6 @@ type Authentication struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec AuthenticationSpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.
@@ -81,7 +80,7 @@ type AuthenticationSpec struct {
 	// +optional
 	ServiceAccountIssuer string `json:"serviceAccountIssuer"`
 
-	// OIDCProviders are OIDC identity providers that can issue tokens
+	// oidcProviders are OIDC identity providers that can issue tokens
 	// for this cluster
 	// Can only be set if "Type" is set to "OIDC".
 	//
@@ -110,7 +109,7 @@ type AuthenticationStatus struct {
 	// The namespace for this config map is openshift-config-managed.
 	IntegratedOAuthMetadata ConfigMapNameReference `json:"integratedOAuthMetadata"`
 
-	// OIDCClients is where participating operators place the current OIDC client status
+	// oidcClients is where participating operators place the current OIDC client status
 	// for OIDC clients that can be customized by the cluster-admin.
 	//
 	// +listType=map
@@ -181,7 +180,6 @@ type WebhookTokenAuthenticator struct {
 	// The key "kubeConfig" is used to locate the data.
 	// If the secret or expected key is not found, the webhook is not honored.
 	// If the specified kube config data is not valid, the webhook is not honored.
-	// +kubebuilder:validation:Required
 	// +required
 	KubeConfig SecretNameReference `json:"kubeConfig"`
 }
@@ -195,19 +193,17 @@ const (
 )
 
 type OIDCProvider struct {
-	// Name of the OIDC provider
+	// name of the OIDC provider
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
-	// Issuer describes atributes of the OIDC token issuer
+	// issuer describes atributes of the OIDC token issuer
 	//
-	// +kubebuilder:validation:Required
 	// +required
 	Issuer TokenIssuer `json:"issuer"`
 
-	// OIDCClients contains configuration for the platform's clients that
+	// oidcClients contains configuration for the platform's clients that
 	// need to request tokens from the issuer
 	//
 	// +listType=map
@@ -216,11 +212,11 @@ type OIDCProvider struct {
 	// +kubebuilder:validation:MaxItems=20
 	OIDCClients []OIDCClientConfig `json:"oidcClients"`
 
-	// ClaimMappings describes rules on how to transform information from an
+	// claimMappings describes rules on how to transform information from an
 	// ID token into a cluster identity
 	ClaimMappings TokenClaimMappings `json:"claimMappings"`
 
-	// ClaimValidationRules are rules that are applied to validate token claims to authenticate users.
+	// claimValidationRules are rules that are applied to validate token claims to authenticate users.
 	//
 	// +listType=atomic
 	ClaimValidationRules []TokenClaimValidationRule `json:"claimValidationRules,omitempty"`
@@ -234,17 +230,15 @@ type TokenIssuer struct {
 	// Must use the https:// scheme.
 	//
 	// +kubebuilder:validation:Pattern=`^https:\/\/[^\s]`
-	// +kubebuilder:validation:Required
 	// +required
 	URL string `json:"issuerURL"`
 
-	// Audiences is an array of audiences that the token was issued for.
+	// audiences is an array of audiences that the token was issued for.
 	// Valid tokens must include at least one of these values in their
 	// "aud" claim.
 	// Must be set to exactly one value.
 	//
 	// +listType=set
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=10
 	// +required
@@ -258,94 +252,88 @@ type TokenIssuer struct {
 }
 
 type TokenClaimMappings struct {
-	// Username is a name of the claim that should be used to construct
+	// username is a name of the claim that should be used to construct
 	// usernames for the cluster identity.
 	//
 	// Default value: "sub"
 	Username UsernameClaimMapping `json:"username,omitempty"`
 
-	// Groups is a name of the claim that should be used to construct
+	// groups is a name of the claim that should be used to construct
 	// groups for the cluster identity.
 	// The referenced claim must use array of strings values.
 	Groups PrefixedClaimMapping `json:"groups,omitempty"`
 }
 
 type TokenClaimMapping struct {
-	// Claim is a JWT token claim to be used in the mapping
+	// claim is a JWT token claim to be used in the mapping
 	//
-	// +kubebuilder:validation:Required
 	// +required
 	Claim string `json:"claim"`
 }
 
 type OIDCClientConfig struct {
-	// ComponentName is the name of the component that is supposed to consume this
+	// componentName is the name of the component that is supposed to consume this
 	// client configuration
 	//
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
-	// +kubebuilder:validation:Required
 	// +required
 	ComponentName string `json:"componentName"`
 
-	// ComponentNamespace is the namespace of the component that is supposed to consume this
+	// componentNamespace is the namespace of the component that is supposed to consume this
 	// client configuration
 	//
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Required
 	// +required
 	ComponentNamespace string `json:"componentNamespace"`
 
-	// ClientID is the identifier of the OIDC client from the OIDC provider
+	// clientID is the identifier of the OIDC client from the OIDC provider
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
 	// +required
 	ClientID string `json:"clientID"`
 
-	// ClientSecret refers to a secret in the `openshift-config` namespace that
+	// clientSecret refers to a secret in the `openshift-config` namespace that
 	// contains the client secret in the `clientSecret` key of the `.data` field
 	ClientSecret SecretNameReference `json:"clientSecret"`
 
-	// ExtraScopes is an optional set of scopes to request tokens with.
+	// extraScopes is an optional set of scopes to request tokens with.
 	//
 	// +listType=set
 	ExtraScopes []string `json:"extraScopes"`
 }
 
 type OIDCClientStatus struct {
-	// ComponentName is the name of the component that will consume a client configuration.
+	// componentName is the name of the component that will consume a client configuration.
 	//
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
-	// +kubebuilder:validation:Required
 	// +required
 	ComponentName string `json:"componentName"`
 
-	// ComponentNamespace is the namespace of the component that will consume a client configuration.
+	// componentNamespace is the namespace of the component that will consume a client configuration.
 	//
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Required
 	// +required
 	ComponentNamespace string `json:"componentNamespace"`
 
-	// CurrentOIDCClients is a list of clients that the component is currently using.
+	// currentOIDCClients is a list of clients that the component is currently using.
 	//
 	// +listType=map
 	// +listMapKey=issuerURL
 	// +listMapKey=clientID
 	CurrentOIDCClients []OIDCClientReference `json:"currentOIDCClients"`
 
-	// ConsumingUsers is a slice of ServiceAccounts that need to have read
+	// consumingUsers is a slice of ServiceAccounts that need to have read
 	// permission on the `clientSecret` secret.
 	//
 	// +kubebuilder:validation:MaxItems=5
 	// +listType=set
 	ConsumingUsers []ConsumingUser `json:"consumingUsers"`
 
-	// Conditions are used to communicate the state of the `oidcClients` entry.
+	// conditions are used to communicate the state of the `oidcClients` entry.
 	//
 	// Supported conditions include Available, Degraded and Progressing.
 	//
@@ -362,7 +350,6 @@ type OIDCClientReference struct {
 	// OIDCName refers to the `name` of the provider from `oidcProviders`
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
 	// +required
 	OIDCProviderName string `json:"oidcProviderName"`
 
@@ -370,14 +357,12 @@ type OIDCClientReference struct {
 	// Must use the https:// scheme.
 	//
 	// +kubebuilder:validation:Pattern=`^https:\/\/[^\s]`
-	// +kubebuilder:validation:Required
 	// +required
 	IssuerURL string `json:"issuerURL"`
 
-	// ClientID is the identifier of the OIDC client from the OIDC provider
+	// clientID is the identifier of the OIDC client from the OIDC provider
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
 	// +required
 	ClientID string `json:"clientID"`
 }
@@ -386,7 +371,7 @@ type OIDCClientReference struct {
 type UsernameClaimMapping struct {
 	TokenClaimMapping `json:",inline"`
 
-	// PrefixPolicy specifies how a prefix should apply.
+	// prefixPolicy specifies how a prefix should apply.
 	//
 	// By default, claims other than `email` will be prefixed with the issuer URL to
 	// prevent naming clashes with other plugins.
@@ -427,7 +412,6 @@ var (
 )
 
 type UsernamePrefix struct {
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	// +required
 	PrefixString string `json:"prefixString"`
@@ -436,7 +420,7 @@ type UsernamePrefix struct {
 type PrefixedClaimMapping struct {
 	TokenClaimMapping `json:",inline"`
 
-	// Prefix is a string to prefix the value from the token in the result of the
+	// prefix is a string to prefix the value from the token in the result of the
 	// claim mapping.
 	//
 	// By default, no prefixing occurs.
@@ -454,30 +438,28 @@ const (
 )
 
 type TokenClaimValidationRule struct {
-	// Type sets the type of the validation rule
+	// type sets the type of the validation rule
 	//
 	// +kubebuilder:validation:Enum={"RequiredClaim"}
 	// +kubebuilder:default="RequiredClaim"
 	Type TokenValidationRuleType `json:"type"`
 
-	// RequiredClaim allows configuring a required claim name and its expected
+	// requiredClaim allows configuring a required claim name and its expected
 	// value
 	RequiredClaim *TokenRequiredClaim `json:"requiredClaim"`
 }
 
 type TokenRequiredClaim struct {
-	// Claim is a name of a required claim. Only claims with string values are
+	// claim is a name of a required claim. Only claims with string values are
 	// supported.
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
 	// +required
 	Claim string `json:"claim"`
 
-	// RequiredValue is the required value for the claim.
+	// requiredValue is the required value for the claim.
 	//
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
 	// +required
 	RequiredValue string `json:"requiredValue"`
 }

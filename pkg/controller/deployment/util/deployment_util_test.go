@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1020,6 +1021,87 @@ func TestMaxUnavailable(t *testing.T) {
 	}
 }
 
+func TestGetNonNegativeInt32FromAnnotation(t *testing.T) {
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		expectedValue int32
+		expectedValid bool
+		expectedErr   string
+	}{
+		{
+			name: "invalid empty",
+		},
+		{
+			name:        "invalid",
+			annotations: map[string]string{"test": "invalid", "foo": "2"},
+			expectedErr: "invalid syntax",
+		},
+		{
+			name:        "invalid negative ",
+			annotations: map[string]string{"test": "-1", "foo": "2"},
+			expectedErr: "invalid syntax",
+		},
+		{
+			name:          "valid zero",
+			annotations:   map[string]string{"test": "0", "foo": "2"},
+			expectedValue: 0,
+			expectedValid: true,
+		},
+		{
+			name:          "valid",
+			annotations:   map[string]string{"test": "13", "foo": "2"},
+			expectedValue: 13,
+			expectedValid: true,
+		},
+		{
+			name:          "valid max",
+			annotations:   map[string]string{"test": fmt.Sprintf("%d", math.MaxInt32), "foo": "2"},
+			expectedValue: math.MaxInt32,
+			expectedValid: true,
+		},
+		{
+			name:        "invalid max out of range",
+			annotations: map[string]string{"test": fmt.Sprintf("%d", uint32(math.MaxInt32)+1), "foo": "2"},
+			expectedErr: "out of range",
+		},
+		{
+			name:        "invalid max out of range 2",
+			annotations: map[string]string{"test": fmt.Sprintf("%d", uint64(math.MaxUint32)+1), "foo": "2"},
+			expectedErr: "out of range",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tDeployment := generateDeployment("nginx")
+			tRS := generateRS(tDeployment)
+			tRS.Annotations = test.annotations
+			value, valid, err := getNonNegativeInt32FromAnnotation(&tRS, "test")
+			if test.expectedValue != value {
+				t.Fatalf("expected value:%v, got:%v", test.expectedValue, value)
+			}
+			if test.expectedValid != valid {
+				t.Fatalf("expected valid:%v, got:%v", test.expectedValid, valid)
+			}
+			if err != nil && !strings.Contains(err.Error(), test.expectedErr) {
+				t.Fatalf("unexpected error, expected: %s, got %v", test.expectedErr, err)
+			}
+			if err == nil && len(test.expectedErr) != 0 {
+				t.Fatalf("didn't return error expected %s", test.expectedErr)
+			}
+			logger, _ := ktesting.NewTestContext(t)
+			value, valid = getNonNegativeInt32FromAnnotationVerbose(logger, &tRS, "test")
+			if test.expectedValue != value {
+				t.Fatalf("expected value:%v, got:%v", test.expectedValue, value)
+			}
+			if test.expectedValid != valid {
+				t.Fatalf("expected valid:%v, got:%v", test.expectedValid, valid)
+			}
+		})
+	}
+}
+
 // Set of simple tests for annotation related util functions
 func TestAnnotationUtils(t *testing.T) {
 
@@ -1315,6 +1397,124 @@ func TestMinAvailable(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MinAvailable(tt.deployment); got != tt.expected {
 				t.Errorf("MinAvailable() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetReplicaSetFraction(t *testing.T) {
+	tests := []struct {
+		name                                 string
+		enableDeploymentPodReplacementPolicy bool
+		deploymentReplicas                   int32
+		deploymentStatusReplicas             int32
+		deploymentMaxSurge                   int32
+		rsReplicas                           int32
+		rsAnnotations                        map[string]string
+		expectedFraction                     int32
+	}{
+		{
+			name:               "empty deployment always scales to 0",
+			deploymentReplicas: 0,
+			rsReplicas:         10,
+			expectedFraction:   -10,
+		},
+		{
+			name:               "unsynced deployment does not scale when max-replicas annotation is missing (removed by a 3rd party)",
+			deploymentReplicas: 10,
+			rsReplicas:         5,
+			expectedFraction:   0,
+		},
+		{
+			name:               "unsynced deployment does not scale when max-replicas annotation is incorrectly set to 0 (by a 3rd party)",
+			deploymentReplicas: 10,
+			rsReplicas:         5,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "0",
+			},
+			expectedFraction: 0,
+		},
+		{
+			name:                     "scale up by 1/5 should increase RS replicas by 1/5 when max-replicas annotation is missing (removed by a 3rd party)",
+			deploymentReplicas:       120,
+			deploymentStatusReplicas: 100,
+			rsReplicas:               50,
+			expectedFraction:         10,
+		},
+		{
+			name:                     "scale up by 1/5 should increase RS replicas by 1/5 when max-replicas annotation is incorrectly set to 0 (by a 3rd party)",
+			deploymentReplicas:       120,
+			deploymentStatusReplicas: 100,
+			rsReplicas:               50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "0",
+			},
+			expectedFraction: 10,
+		},
+		{
+			name:               "scale up by 1/5 should increase RS replicas by 1/5",
+			deploymentReplicas: 120,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "100",
+			},
+			expectedFraction: 10,
+		},
+		{
+			name:               "scale up with maxSurge by 1/5 should increase RS replicas approximately by 1/5",
+			deploymentReplicas: 120,
+			deploymentMaxSurge: 10,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "110",
+			},
+			// expectedFraction is not the whole 1/5 (10) since maxSurge pods have to be taken into account
+			// and replica sets with these surge pods should proportionally scale as well during a rollout
+			expectedFraction: 9,
+		},
+		{
+			name:               "scale down by 1/6 should decrease RS replicas by 1/6",
+			deploymentReplicas: 10,
+			rsReplicas:         6,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "12",
+			},
+			expectedFraction: -1,
+		},
+		{
+			name:               "scale down with maxSurge by 1/6 should decrease RS replicas approximately by 1/6",
+			deploymentReplicas: 100,
+			deploymentMaxSurge: 10,
+			rsReplicas:         50,
+			rsAnnotations: map[string]string{
+				MaxReplicasAnnotation: "130",
+			},
+			expectedFraction: -8,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
+			tDeployment := generateDeployment("nginx")
+			tDeployment.Status.Replicas = test.deploymentStatusReplicas
+			tDeployment.Spec.Replicas = ptr.To(test.deploymentReplicas)
+			tDeployment.Spec.Strategy = apps.DeploymentStrategy{
+				Type: apps.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &apps.RollingUpdateDeployment{
+					MaxSurge:       ptr.To(intstr.FromInt32(test.deploymentMaxSurge)),
+					MaxUnavailable: ptr.To(intstr.FromInt32(1)),
+				},
+			}
+
+			tRS := generateRS(tDeployment)
+			tRS.Annotations = test.rsAnnotations
+			tRS.Spec.Replicas = ptr.To(test.rsReplicas)
+
+			fraction := getReplicaSetFraction(logger, tRS, tDeployment)
+			if test.expectedFraction != fraction {
+				t.Fatalf("expected fraction: %v, got:%v", test.expectedFraction, fraction)
 			}
 		})
 	}

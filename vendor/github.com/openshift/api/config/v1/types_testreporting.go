@@ -15,7 +15,6 @@ type TestReporting struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// +kubebuilder:validation:Required
 	// +required
 	Spec TestReportingSpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.
@@ -24,20 +23,20 @@ type TestReporting struct {
 }
 
 type TestReportingSpec struct {
-	// TestsForFeatureGates is a list, indexed by FeatureGate and includes information about testing.
+	// testsForFeatureGates is a list, indexed by FeatureGate and includes information about testing.
 	TestsForFeatureGates []FeatureGateTests `json:"testsForFeatureGates"`
 }
 
 type FeatureGateTests struct {
-	// FeatureGate is the name of the FeatureGate as it appears in The FeatureGate CR instance.
+	// featureGate is the name of the FeatureGate as it appears in The FeatureGate CR instance.
 	FeatureGate string `json:"featureGate"`
 
-	// Tests contains an item for every TestName
+	// tests contains an item for every TestName
 	Tests []TestDetails `json:"tests"`
 }
 
 type TestDetails struct {
-	// TestName is the name of the test as it appears in junit XMLs.
+	// testName is the name of the test as it appears in junit XMLs.
 	// It does not include the suite name since the same test can be executed in many suites.
 	TestName string `json:"testName"`
 }

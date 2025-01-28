@@ -23,10 +23,10 @@ message AppliedClusterResourceQuota {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired quota
+  // spec defines the desired quota
   optional ClusterResourceQuotaSpec spec = 2;
 
-  // Status defines the actual enforced quota and its current usage
+  // status defines the actual enforced quota and its current usage
   optional ClusterResourceQuotaStatus status = 3;
 }
 
@@ -39,7 +39,7 @@ message AppliedClusterResourceQuotaList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of AppliedClusterResourceQuota
+  // items is a list of AppliedClusterResourceQuota
   repeated AppliedClusterResourceQuota items = 2;
 }
 
@@ -59,10 +59,10 @@ message ClusterResourceQuota {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the desired quota
+  // spec defines the desired quota
   optional ClusterResourceQuotaSpec spec = 2;
 
-  // Status defines the actual enforced quota and its current usage
+  // status defines the actual enforced quota and its current usage
   optional ClusterResourceQuotaStatus status = 3;
 }
 
@@ -75,7 +75,7 @@ message ClusterResourceQuotaList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of ClusterResourceQuotas
+  // items is a list of ClusterResourceQuotas
   repeated ClusterResourceQuota items = 2;
 }
 
@@ -96,22 +96,22 @@ message ClusterResourceQuotaSelector {
 
 // ClusterResourceQuotaSpec defines the desired quota restrictions
 message ClusterResourceQuotaSpec {
-  // Selector is the selector used to match projects.
+  // selector is the selector used to match projects.
   // It should only select active projects on the scale of dozens (though it can select
   // many more less active projects).  These projects will contend on object creation through
   // this resource.
   optional ClusterResourceQuotaSelector selector = 1;
 
-  // Quota defines the desired quota
+  // quota defines the desired quota
   optional .k8s.io.api.core.v1.ResourceQuotaSpec quota = 2;
 }
 
 // ClusterResourceQuotaStatus defines the actual enforced quota and its current usage
 message ClusterResourceQuotaStatus {
-  // Total defines the actual enforced quota and its current usage across all projects
+  // total defines the actual enforced quota and its current usage across all projects
   optional .k8s.io.api.core.v1.ResourceQuotaStatus total = 1;
 
-  // Namespaces slices the usage by project.  This division allows for quick resolution of
+  // namespaces slices the usage by project.  This division allows for quick resolution of
   // deletion reconciliation inside of a single project without requiring a recalculation
   // across all projects.  This can be used to pull the deltas for a given project.
   // +optional
@@ -121,10 +121,10 @@ message ClusterResourceQuotaStatus {
 
 // ResourceQuotaStatusByNamespace gives status for a particular project
 message ResourceQuotaStatusByNamespace {
-  // Namespace the project this status applies to
+  // namespace the project this status applies to
   optional string namespace = 1;
 
-  // Status indicates how many resources have been consumed by this project
+  // status indicates how many resources have been consumed by this project
   optional .k8s.io.api.core.v1.ResourceQuotaStatus status = 2;
 }
 

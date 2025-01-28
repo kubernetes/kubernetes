@@ -37,8 +37,6 @@ const (
 	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
 	DefaultKubernetesVersion = "stable-1"
-	// DefaultAPIBindPort defines default API port
-	DefaultAPIBindPort = 6443
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
@@ -177,7 +175,7 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 // layer, but set to a random value later at runtime if not set before.
 func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 
-	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
+	if len(obj.BootstrapTokens) == 0 {
 		obj.BootstrapTokens = []bootstraptokenv1.BootstrapToken{{}}
 	}
 
@@ -189,7 +187,7 @@ func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 // SetDefaults_APIEndpoint sets the defaults for the API server instance deployed on a node.
 func SetDefaults_APIEndpoint(obj *APIEndpoint) {
 	if obj.BindPort == 0 {
-		obj.BindPort = DefaultAPIBindPort
+		obj.BindPort = constants.KubeAPIServerPort
 	}
 }
 

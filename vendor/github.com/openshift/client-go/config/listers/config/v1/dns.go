@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // DNSLister helps list DNSes.
@@ -14,19 +14,19 @@ import (
 type DNSLister interface {
 	// List lists all DNSes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.DNS, err error)
+	List(selector labels.Selector) (ret []*configv1.DNS, err error)
 	// Get retrieves the DNS from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.DNS, error)
+	Get(name string) (*configv1.DNS, error)
 	DNSListerExpansion
 }
 
 // dNSLister implements the DNSLister interface.
 type dNSLister struct {
-	listers.ResourceIndexer[*v1.DNS]
+	listers.ResourceIndexer[*configv1.DNS]
 }
 
 // NewDNSLister returns a new DNSLister.
 func NewDNSLister(indexer cache.Indexer) DNSLister {
-	return &dNSLister{listers.New[*v1.DNS](indexer, v1.Resource("dns"))}
+	return &dNSLister{listers.New[*configv1.DNS](indexer, configv1.Resource("dns"))}
 }

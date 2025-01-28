@@ -31,7 +31,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,7 +39,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
 
 type ExamplePlugin struct {
@@ -97,7 +98,7 @@ type Device struct {
 	CDIDeviceID string
 }
 
-var _ drapb.NodeServer = &ExamplePlugin{}
+var _ drapb.DRAPluginServer = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
 func (ex *ExamplePlugin) getJSONFilePath(claimUID string, requestName string) string {
@@ -165,7 +166,15 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ctx, ex, opts...)
+	// Both APIs get provided, the legacy one via wrapping. The options
+	// determine which one(s) really get served (by default, both).
+	// The options are a bit redundant now because a single instance cannot
+	// implement both, but that might be different in the future.
+	nodeServers := []any{
+		drapb.DRAPluginServer(ex), // Casting is done only for clarity here, it's not needed.
+		drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: ex},
+	}
+	d, err := kubeletplugin.Start(ctx, nodeServers, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
@@ -182,7 +191,9 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		resources := kubeletplugin.Resources{
 			Devices: devices,
 		}
-		ex.d.PublishResources(ctx, resources)
+		if err := ex.d.PublishResources(ctx, resources); err != nil {
+			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
+		}
 	} else if len(ex.fileOps.Devices) > 0 {
 		devices := make([]resourceapi.Device, len(ex.fileOps.Devices))
 		for i, deviceName := range sets.List(ex.deviceNames) {
@@ -194,13 +205,15 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		resources := kubeletplugin.Resources{
 			Devices: devices,
 		}
-		ex.d.PublishResources(ctx, resources)
+		if err := ex.d.PublishResources(ctx, resources); err != nil {
+			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
+		}
 	}
 
 	return ex, nil
 }
 
-// stop ensures that all servers are stopped and resources freed.
+// Stop ensures that all servers are stopped and resources freed.
 func (ex *ExamplePlugin) Stop() {
 	ex.d.Stop()
 }
@@ -278,7 +291,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 
 	// The plugin must retrieve the claim itself to get it in the version
 	// that it understands.
-	claim, err := ex.kubeClient.ResourceV1alpha3().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
+	claim, err := ex.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
 	}
@@ -555,4 +568,8 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 		}
 	}
 	return count
+}
+
+func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
+	return ex.kubeClient.ResourceV1beta1().ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
 }

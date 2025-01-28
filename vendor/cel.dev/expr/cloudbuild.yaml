@@ -1,0 +1,9 @@
+steps:
+- name: 'gcr.io/cloud-builders/bazel:7.0.1'
+  entrypoint: bazel
+  args: ['build', '...']
+  id: bazel-build
+  waitFor: ['-']
+timeout: 15m
+options:
+  machineType: 'N1_HIGHCPU_32'

@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
-	v1beta1 "k8s.io/api/storage/v1beta1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // VolumeAttachmentLister helps list VolumeAttachments.
@@ -30,19 +30,19 @@ import (
 type VolumeAttachmentLister interface {
 	// List lists all VolumeAttachments in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1beta1.VolumeAttachment, err error)
+	List(selector labels.Selector) (ret []*storagev1beta1.VolumeAttachment, err error)
 	// Get retrieves the VolumeAttachment from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1beta1.VolumeAttachment, error)
+	Get(name string) (*storagev1beta1.VolumeAttachment, error)
 	VolumeAttachmentListerExpansion
 }
 
 // volumeAttachmentLister implements the VolumeAttachmentLister interface.
 type volumeAttachmentLister struct {
-	listers.ResourceIndexer[*v1beta1.VolumeAttachment]
+	listers.ResourceIndexer[*storagev1beta1.VolumeAttachment]
 }
 
 // NewVolumeAttachmentLister returns a new VolumeAttachmentLister.
 func NewVolumeAttachmentLister(indexer cache.Indexer) VolumeAttachmentLister {
-	return &volumeAttachmentLister{listers.New[*v1beta1.VolumeAttachment](indexer, v1beta1.Resource("volumeattachment"))}
+	return &volumeAttachmentLister{listers.New[*storagev1beta1.VolumeAttachment](indexer, storagev1beta1.Resource("volumeattachment"))}
 }

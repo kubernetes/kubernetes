@@ -61,6 +61,10 @@ const (
 	// compressing the logic graph to a single call when multiple like-operator
 	// expressions occur: e.g. a && b && c && d -> call(_&&_, [a, b, c, d])
 	featureVariadicLogicalASTs
+
+	// Enable error generation when a presence test or optional field selection is
+	// performed on a primitive type.
+	featureEnableErrorOnBadPresenceTest
 )
 
 // EnvOption is a functional interface for configuring the environment.
@@ -243,6 +247,13 @@ func Abbrevs(qualifiedNames ...string) EnvOption {
 	}
 }
 
+// customTypeRegistry is an internal-only interface containing the minimum methods required to support
+// custom types. It is a subset of methods from ref.TypeRegistry.
+type customTypeRegistry interface {
+	RegisterDescriptor(protoreflect.FileDescriptor) error
+	RegisterType(...ref.Type) error
+}
+
 // Types adds one or more type declarations to the environment, allowing for construction of
 // type-literals whose definitions are included in the common expression built-in set.
 //
@@ -255,12 +266,7 @@ func Abbrevs(qualifiedNames ...string) EnvOption {
 // Note: This option must be specified after the CustomTypeProvider option when used together.
 func Types(addTypes ...any) EnvOption {
 	return func(e *Env) (*Env, error) {
-		var reg ref.TypeRegistry
-		var isReg bool
-		reg, isReg = e.provider.(*types.Registry)
-		if !isReg {
-			reg, isReg = e.provider.(ref.TypeRegistry)
-		}
+		reg, isReg := e.provider.(customTypeRegistry)
 		if !isReg {
 			return nil, fmt.Errorf("custom types not supported by provider: %T", e.provider)
 		}
@@ -297,7 +303,7 @@ func Types(addTypes ...any) EnvOption {
 // extension or by re-using the same EnvOption with another NewEnv() call.
 func TypeDescs(descs ...any) EnvOption {
 	return func(e *Env) (*Env, error) {
-		reg, isReg := e.provider.(ref.TypeRegistry)
+		reg, isReg := e.provider.(customTypeRegistry)
 		if !isReg {
 			return nil, fmt.Errorf("custom types not supported by provider: %T", e.provider)
 		}
@@ -345,7 +351,7 @@ func TypeDescs(descs ...any) EnvOption {
 	}
 }
 
-func registerFileSet(reg ref.TypeRegistry, fileSet *descpb.FileDescriptorSet) error {
+func registerFileSet(reg customTypeRegistry, fileSet *descpb.FileDescriptorSet) error {
 	files, err := protodesc.NewFiles(fileSet)
 	if err != nil {
 		return fmt.Errorf("protodesc.NewFiles(%v) failed: %v", fileSet, err)
@@ -353,7 +359,7 @@ func registerFileSet(reg ref.TypeRegistry, fileSet *descpb.FileDescriptorSet) er
 	return registerFiles(reg, files)
 }
 
-func registerFiles(reg ref.TypeRegistry, files *protoregistry.Files) error {
+func registerFiles(reg customTypeRegistry, files *protoregistry.Files) error {
 	var err error
 	files.RangeFiles(func(fd protoreflect.FileDescriptor) bool {
 		err = reg.RegisterDescriptor(fd)

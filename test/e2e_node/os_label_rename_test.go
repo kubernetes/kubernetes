@@ -49,7 +49,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation", framework.WithSerial(), framewo
 
 			ginkgo.By("killing and restarting kubelet")
 			// Let's kill the kubelet
-			startKubelet := stopKubelet()
+			restartKubelet := mustStopKubelet(ctx, f)
 			// Update labels
 			newNode := node.DeepCopy()
 			newNode.Labels[v1.LabelOSStable] = "dummyOS"
@@ -57,7 +57,7 @@ var _ = SIGDescribe("OSArchLabelReconciliation", framework.WithSerial(), framewo
 			_, _, err := nodeutil.PatchNodeStatus(f.ClientSet.CoreV1(), types.NodeName(node.Name), node, newNode)
 			framework.ExpectNoError(err)
 			// Restart kubelet
-			startKubelet()
+			restartKubelet(ctx)
 			framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, framework.RestartNodeReadyAgainTimeout))
 			// If this happens right, node should have all the labels reset properly
 			err = waitForNodeLabels(ctx, f.ClientSet.CoreV1(), node.Name, 5*time.Minute)

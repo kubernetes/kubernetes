@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	apiresourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/client-go/listers/resource/v1alpha3"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // ResourceClaims.
 type ResourceClaimInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha3.ResourceClaimLister
+	Lister() resourcev1alpha3.ResourceClaimLister
 }
 
 type resourceClaimInformer struct {
@@ -71,7 +71,7 @@ func NewFilteredResourceClaimInformer(client kubernetes.Interface, namespace str
 				return client.ResourceV1alpha3().ResourceClaims(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&resourcev1alpha3.ResourceClaim{},
+		&apiresourcev1alpha3.ResourceClaim{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *resourceClaimInformer) defaultInformer(client kubernetes.Interface, res
 }
 
 func (f *resourceClaimInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&resourcev1alpha3.ResourceClaim{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiresourcev1alpha3.ResourceClaim{}, f.defaultInformer)
 }
 
-func (f *resourceClaimInformer) Lister() v1alpha3.ResourceClaimLister {
-	return v1alpha3.NewResourceClaimLister(f.Informer().GetIndexer())
+func (f *resourceClaimInformer) Lister() resourcev1alpha3.ResourceClaimLister {
+	return resourcev1alpha3.NewResourceClaimLister(f.Informer().GetIndexer())
 }

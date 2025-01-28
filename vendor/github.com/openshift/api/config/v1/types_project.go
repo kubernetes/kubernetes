@@ -24,7 +24,6 @@ type Project struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec ProjectSpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.

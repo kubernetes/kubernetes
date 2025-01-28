@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/oauth/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // OAuthClientLister helps list OAuthClients.
@@ -14,19 +14,19 @@ import (
 type OAuthClientLister interface {
 	// List lists all OAuthClients in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.OAuthClient, err error)
+	List(selector labels.Selector) (ret []*oauthv1.OAuthClient, err error)
 	// Get retrieves the OAuthClient from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.OAuthClient, error)
+	Get(name string) (*oauthv1.OAuthClient, error)
 	OAuthClientListerExpansion
 }
 
 // oAuthClientLister implements the OAuthClientLister interface.
 type oAuthClientLister struct {
-	listers.ResourceIndexer[*v1.OAuthClient]
+	listers.ResourceIndexer[*oauthv1.OAuthClient]
 }
 
 // NewOAuthClientLister returns a new OAuthClientLister.
 func NewOAuthClientLister(indexer cache.Indexer) OAuthClientLister {
-	return &oAuthClientLister{listers.New[*v1.OAuthClient](indexer, v1.Resource("oauthclient"))}
+	return &oAuthClientLister{listers.New[*oauthv1.OAuthClient](indexer, oauthv1.Resource("oauthclient"))}
 }

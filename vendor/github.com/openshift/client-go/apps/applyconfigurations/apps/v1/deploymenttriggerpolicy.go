@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/apps/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
 )
 
 // DeploymentTriggerPolicyApplyConfiguration represents a declarative configuration of the DeploymentTriggerPolicy type for use
 // with apply.
 type DeploymentTriggerPolicyApplyConfiguration struct {
-	Type              *v1.DeploymentTriggerType                             `json:"type,omitempty"`
+	Type              *appsv1.DeploymentTriggerType                         `json:"type,omitempty"`
 	ImageChangeParams *DeploymentTriggerImageChangeParamsApplyConfiguration `json:"imageChangeParams,omitempty"`
 }
 
@@ -22,7 +22,7 @@ func DeploymentTriggerPolicy() *DeploymentTriggerPolicyApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *DeploymentTriggerPolicyApplyConfiguration) WithType(value v1.DeploymentTriggerType) *DeploymentTriggerPolicyApplyConfiguration {
+func (b *DeploymentTriggerPolicyApplyConfiguration) WithType(value appsv1.DeploymentTriggerType) *DeploymentTriggerPolicyApplyConfiguration {
 	b.Type = &value
 	return b
 }

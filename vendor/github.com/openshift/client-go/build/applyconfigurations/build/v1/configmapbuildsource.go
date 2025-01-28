@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ConfigMapBuildSourceApplyConfiguration represents a declarative configuration of the ConfigMapBuildSource type for use
 // with apply.
 type ConfigMapBuildSourceApplyConfiguration struct {
-	ConfigMap      *v1.LocalObjectReference `json:"configMap,omitempty"`
-	DestinationDir *string                  `json:"destinationDir,omitempty"`
+	ConfigMap      *corev1.LocalObjectReference `json:"configMap,omitempty"`
+	DestinationDir *string                      `json:"destinationDir,omitempty"`
 }
 
 // ConfigMapBuildSourceApplyConfiguration constructs a declarative configuration of the ConfigMapBuildSource type for use with
@@ -22,7 +22,7 @@ func ConfigMapBuildSource() *ConfigMapBuildSourceApplyConfiguration {
 // WithConfigMap sets the ConfigMap field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ConfigMap field is set to the value of the last call.
-func (b *ConfigMapBuildSourceApplyConfiguration) WithConfigMap(value v1.LocalObjectReference) *ConfigMapBuildSourceApplyConfiguration {
+func (b *ConfigMapBuildSourceApplyConfiguration) WithConfigMap(value corev1.LocalObjectReference) *ConfigMapBuildSourceApplyConfiguration {
 	b.ConfigMap = &value
 	return b
 }

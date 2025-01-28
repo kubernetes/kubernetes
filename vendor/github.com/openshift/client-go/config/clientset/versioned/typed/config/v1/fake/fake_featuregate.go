@@ -3,168 +3,31 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedconfigv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeFeatureGates implements FeatureGateInterface
-type FakeFeatureGates struct {
+// fakeFeatureGates implements FeatureGateInterface
+type fakeFeatureGates struct {
+	*gentype.FakeClientWithListAndApply[*v1.FeatureGate, *v1.FeatureGateList, *configv1.FeatureGateApplyConfiguration]
 	Fake *FakeConfigV1
 }
 
-var featuregatesResource = v1.SchemeGroupVersion.WithResource("featuregates")
-
-var featuregatesKind = v1.SchemeGroupVersion.WithKind("FeatureGate")
-
-// Get takes name of the featureGate, and returns the corresponding featureGate object, and an error if there is any.
-func (c *FakeFeatureGates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.FeatureGate, err error) {
-	emptyResult := &v1.FeatureGate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(featuregatesResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeFeatureGates(fake *FakeConfigV1) typedconfigv1.FeatureGateInterface {
+	return &fakeFeatureGates{
+		gentype.NewFakeClientWithListAndApply[*v1.FeatureGate, *v1.FeatureGateList, *configv1.FeatureGateApplyConfiguration](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("featuregates"),
+			v1.SchemeGroupVersion.WithKind("FeatureGate"),
+			func() *v1.FeatureGate { return &v1.FeatureGate{} },
+			func() *v1.FeatureGateList { return &v1.FeatureGateList{} },
+			func(dst, src *v1.FeatureGateList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.FeatureGateList) []*v1.FeatureGate { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1.FeatureGateList, items []*v1.FeatureGate) { list.Items = gentype.FromPointerSlice(items) },
+		),
+		fake,
 	}
-	return obj.(*v1.FeatureGate), err
-}
-
-// List takes label and field selectors, and returns the list of FeatureGates that match those selectors.
-func (c *FakeFeatureGates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.FeatureGateList, err error) {
-	emptyResult := &v1.FeatureGateList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(featuregatesResource, featuregatesKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.FeatureGateList{ListMeta: obj.(*v1.FeatureGateList).ListMeta}
-	for _, item := range obj.(*v1.FeatureGateList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested featureGates.
-func (c *FakeFeatureGates) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(featuregatesResource, opts))
-}
-
-// Create takes the representation of a featureGate and creates it.  Returns the server's representation of the featureGate, and an error, if there is any.
-func (c *FakeFeatureGates) Create(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.CreateOptions) (result *v1.FeatureGate, err error) {
-	emptyResult := &v1.FeatureGate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(featuregatesResource, featureGate, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.FeatureGate), err
-}
-
-// Update takes the representation of a featureGate and updates it. Returns the server's representation of the featureGate, and an error, if there is any.
-func (c *FakeFeatureGates) Update(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.UpdateOptions) (result *v1.FeatureGate, err error) {
-	emptyResult := &v1.FeatureGate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(featuregatesResource, featureGate, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.FeatureGate), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeFeatureGates) UpdateStatus(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.UpdateOptions) (result *v1.FeatureGate, err error) {
-	emptyResult := &v1.FeatureGate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(featuregatesResource, "status", featureGate, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.FeatureGate), err
-}
-
-// Delete takes name of the featureGate and deletes it. Returns an error if one occurs.
-func (c *FakeFeatureGates) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(featuregatesResource, name, opts), &v1.FeatureGate{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeFeatureGates) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(featuregatesResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.FeatureGateList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched featureGate.
-func (c *FakeFeatureGates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.FeatureGate, err error) {
-	emptyResult := &v1.FeatureGate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(featuregatesResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.FeatureGate), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied featureGate.
-func (c *FakeFeatureGates) Apply(ctx context.Context, featureGate *configv1.FeatureGateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.FeatureGate, err error) {
-	if featureGate == nil {
-		return nil, fmt.Errorf("featureGate provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(featureGate)
-	if err != nil {
-		return nil, err
-	}
-	name := featureGate.Name
-	if name == nil {
-		return nil, fmt.Errorf("featureGate.Name must be provided to Apply")
-	}
-	emptyResult := &v1.FeatureGate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(featuregatesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.FeatureGate), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeFeatureGates) ApplyStatus(ctx context.Context, featureGate *configv1.FeatureGateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.FeatureGate, err error) {
-	if featureGate == nil {
-		return nil, fmt.Errorf("featureGate provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(featureGate)
-	if err != nil {
-		return nil, err
-	}
-	name := featureGate.Name
-	if name == nil {
-		return nil, fmt.Errorf("featureGate.Name must be provided to Apply")
-	}
-	emptyResult := &v1.FeatureGate{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(featuregatesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.FeatureGate), err
 }

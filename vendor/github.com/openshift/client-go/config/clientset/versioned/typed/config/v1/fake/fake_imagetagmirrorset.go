@@ -3,168 +3,35 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1 "github.com/openshift/api/config/v1"
 	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedconfigv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeImageTagMirrorSets implements ImageTagMirrorSetInterface
-type FakeImageTagMirrorSets struct {
+// fakeImageTagMirrorSets implements ImageTagMirrorSetInterface
+type fakeImageTagMirrorSets struct {
+	*gentype.FakeClientWithListAndApply[*v1.ImageTagMirrorSet, *v1.ImageTagMirrorSetList, *configv1.ImageTagMirrorSetApplyConfiguration]
 	Fake *FakeConfigV1
 }
 
-var imagetagmirrorsetsResource = v1.SchemeGroupVersion.WithResource("imagetagmirrorsets")
-
-var imagetagmirrorsetsKind = v1.SchemeGroupVersion.WithKind("ImageTagMirrorSet")
-
-// Get takes name of the imageTagMirrorSet, and returns the corresponding imageTagMirrorSet object, and an error if there is any.
-func (c *FakeImageTagMirrorSets) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ImageTagMirrorSet, err error) {
-	emptyResult := &v1.ImageTagMirrorSet{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(imagetagmirrorsetsResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeImageTagMirrorSets(fake *FakeConfigV1) typedconfigv1.ImageTagMirrorSetInterface {
+	return &fakeImageTagMirrorSets{
+		gentype.NewFakeClientWithListAndApply[*v1.ImageTagMirrorSet, *v1.ImageTagMirrorSetList, *configv1.ImageTagMirrorSetApplyConfiguration](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("imagetagmirrorsets"),
+			v1.SchemeGroupVersion.WithKind("ImageTagMirrorSet"),
+			func() *v1.ImageTagMirrorSet { return &v1.ImageTagMirrorSet{} },
+			func() *v1.ImageTagMirrorSetList { return &v1.ImageTagMirrorSetList{} },
+			func(dst, src *v1.ImageTagMirrorSetList) { dst.ListMeta = src.ListMeta },
+			func(list *v1.ImageTagMirrorSetList) []*v1.ImageTagMirrorSet {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1.ImageTagMirrorSetList, items []*v1.ImageTagMirrorSet) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1.ImageTagMirrorSet), err
-}
-
-// List takes label and field selectors, and returns the list of ImageTagMirrorSets that match those selectors.
-func (c *FakeImageTagMirrorSets) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ImageTagMirrorSetList, err error) {
-	emptyResult := &v1.ImageTagMirrorSetList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(imagetagmirrorsetsResource, imagetagmirrorsetsKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1.ImageTagMirrorSetList{ListMeta: obj.(*v1.ImageTagMirrorSetList).ListMeta}
-	for _, item := range obj.(*v1.ImageTagMirrorSetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested imageTagMirrorSets.
-func (c *FakeImageTagMirrorSets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(imagetagmirrorsetsResource, opts))
-}
-
-// Create takes the representation of a imageTagMirrorSet and creates it.  Returns the server's representation of the imageTagMirrorSet, and an error, if there is any.
-func (c *FakeImageTagMirrorSets) Create(ctx context.Context, imageTagMirrorSet *v1.ImageTagMirrorSet, opts metav1.CreateOptions) (result *v1.ImageTagMirrorSet, err error) {
-	emptyResult := &v1.ImageTagMirrorSet{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(imagetagmirrorsetsResource, imageTagMirrorSet, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ImageTagMirrorSet), err
-}
-
-// Update takes the representation of a imageTagMirrorSet and updates it. Returns the server's representation of the imageTagMirrorSet, and an error, if there is any.
-func (c *FakeImageTagMirrorSets) Update(ctx context.Context, imageTagMirrorSet *v1.ImageTagMirrorSet, opts metav1.UpdateOptions) (result *v1.ImageTagMirrorSet, err error) {
-	emptyResult := &v1.ImageTagMirrorSet{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(imagetagmirrorsetsResource, imageTagMirrorSet, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ImageTagMirrorSet), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeImageTagMirrorSets) UpdateStatus(ctx context.Context, imageTagMirrorSet *v1.ImageTagMirrorSet, opts metav1.UpdateOptions) (result *v1.ImageTagMirrorSet, err error) {
-	emptyResult := &v1.ImageTagMirrorSet{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(imagetagmirrorsetsResource, "status", imageTagMirrorSet, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ImageTagMirrorSet), err
-}
-
-// Delete takes name of the imageTagMirrorSet and deletes it. Returns an error if one occurs.
-func (c *FakeImageTagMirrorSets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(imagetagmirrorsetsResource, name, opts), &v1.ImageTagMirrorSet{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeImageTagMirrorSets) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(imagetagmirrorsetsResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1.ImageTagMirrorSetList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched imageTagMirrorSet.
-func (c *FakeImageTagMirrorSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageTagMirrorSet, err error) {
-	emptyResult := &v1.ImageTagMirrorSet{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagetagmirrorsetsResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ImageTagMirrorSet), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied imageTagMirrorSet.
-func (c *FakeImageTagMirrorSets) Apply(ctx context.Context, imageTagMirrorSet *configv1.ImageTagMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageTagMirrorSet, err error) {
-	if imageTagMirrorSet == nil {
-		return nil, fmt.Errorf("imageTagMirrorSet provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(imageTagMirrorSet)
-	if err != nil {
-		return nil, err
-	}
-	name := imageTagMirrorSet.Name
-	if name == nil {
-		return nil, fmt.Errorf("imageTagMirrorSet.Name must be provided to Apply")
-	}
-	emptyResult := &v1.ImageTagMirrorSet{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagetagmirrorsetsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ImageTagMirrorSet), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeImageTagMirrorSets) ApplyStatus(ctx context.Context, imageTagMirrorSet *configv1.ImageTagMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageTagMirrorSet, err error) {
-	if imageTagMirrorSet == nil {
-		return nil, fmt.Errorf("imageTagMirrorSet provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(imageTagMirrorSet)
-	if err != nil {
-		return nil, err
-	}
-	name := imageTagMirrorSet.Name
-	if name == nil {
-		return nil, fmt.Errorf("imageTagMirrorSet.Name must be provided to Apply")
-	}
-	emptyResult := &v1.ImageTagMirrorSet{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(imagetagmirrorsetsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.ImageTagMirrorSet), err
 }

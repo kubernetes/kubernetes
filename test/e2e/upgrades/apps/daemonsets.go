@@ -94,6 +94,8 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(ctx context.Context, f *
 
 	// DaemonSet resource itself should be good
 	ginkgo.By("confirming the DaemonSet resource is in a good state")
+
 	err = e2edaemonset.CheckDaemonStatus(ctx, f, t.daemonSet.Name)
 	framework.ExpectNoError(err)
+
 }

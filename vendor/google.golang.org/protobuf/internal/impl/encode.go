@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"google.golang.org/protobuf/internal/flags"
-	proto "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	piface "google.golang.org/protobuf/runtime/protoiface"
 )
 

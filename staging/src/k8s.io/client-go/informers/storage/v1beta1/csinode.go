@@ -19,16 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	apistoragev1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1beta1 "k8s.io/client-go/listers/storage/v1beta1"
+	storagev1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // CSINodes.
 type CSINodeInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1beta1.CSINodeLister
+	Lister() storagev1beta1.CSINodeLister
 }
 
 type cSINodeInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredCSINodeInformer(client kubernetes.Interface, resyncPeriod time.D
 				return client.StorageV1beta1().CSINodes().Watch(context.TODO(), options)
 			},
 		},
-		&storagev1beta1.CSINode{},
+		&apistoragev1beta1.CSINode{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *cSINodeInformer) defaultInformer(client kubernetes.Interface, resyncPer
 }
 
 func (f *cSINodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&storagev1beta1.CSINode{}, f.defaultInformer)
+	return f.factory.InformerFor(&apistoragev1beta1.CSINode{}, f.defaultInformer)
 }
 
-func (f *cSINodeInformer) Lister() v1beta1.CSINodeLister {
-	return v1beta1.NewCSINodeLister(f.Informer().GetIndexer())
+func (f *cSINodeInformer) Lister() storagev1beta1.CSINodeLister {
+	return storagev1beta1.NewCSINodeLister(f.Informer().GetIndexer())
 }

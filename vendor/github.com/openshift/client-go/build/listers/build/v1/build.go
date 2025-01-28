@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/build/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	buildv1 "github.com/openshift/api/build/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // BuildLister helps list Builds.
@@ -14,7 +14,7 @@ import (
 type BuildLister interface {
 	// List lists all Builds in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Build, err error)
+	List(selector labels.Selector) (ret []*buildv1.Build, err error)
 	// Builds returns an object that can list and get Builds.
 	Builds(namespace string) BuildNamespaceLister
 	BuildListerExpansion
@@ -22,17 +22,17 @@ type BuildLister interface {
 
 // buildLister implements the BuildLister interface.
 type buildLister struct {
-	listers.ResourceIndexer[*v1.Build]
+	listers.ResourceIndexer[*buildv1.Build]
 }
 
 // NewBuildLister returns a new BuildLister.
 func NewBuildLister(indexer cache.Indexer) BuildLister {
-	return &buildLister{listers.New[*v1.Build](indexer, v1.Resource("build"))}
+	return &buildLister{listers.New[*buildv1.Build](indexer, buildv1.Resource("build"))}
 }
 
 // Builds returns an object that can list and get Builds.
 func (s *buildLister) Builds(namespace string) BuildNamespaceLister {
-	return buildNamespaceLister{listers.NewNamespaced[*v1.Build](s.ResourceIndexer, namespace)}
+	return buildNamespaceLister{listers.NewNamespaced[*buildv1.Build](s.ResourceIndexer, namespace)}
 }
 
 // BuildNamespaceLister helps list and get Builds.
@@ -40,15 +40,15 @@ func (s *buildLister) Builds(namespace string) BuildNamespaceLister {
 type BuildNamespaceLister interface {
 	// List lists all Builds in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Build, err error)
+	List(selector labels.Selector) (ret []*buildv1.Build, err error)
 	// Get retrieves the Build from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Build, error)
+	Get(name string) (*buildv1.Build, error)
 	BuildNamespaceListerExpansion
 }
 
 // buildNamespaceLister implements the BuildNamespaceLister
 // interface.
 type buildNamespaceLister struct {
-	listers.ResourceIndexer[*v1.Build]
+	listers.ResourceIndexer[*buildv1.Build]
 }

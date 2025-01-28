@@ -1,6 +1,7 @@
 package bbolt
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -185,6 +186,10 @@ func (tx *Tx) Commit() error {
 
 	// If the high water mark has moved up then attempt to grow the database.
 	if tx.meta.pgid > opgid {
+		_ = errors.New("")
+		// gofail: var lackOfDiskSpace string
+		// tx.rollback()
+		// return errors.New(lackOfDiskSpace)
 		if err := tx.db.grow(int(tx.meta.pgid+1) * tx.db.pageSize); err != nil {
 			tx.rollback()
 			return err
@@ -470,6 +475,7 @@ func (tx *Tx) write() error {
 
 	// Ignore file sync if flag is set on DB.
 	if !tx.db.NoSync || IgnoreNoSync {
+		// gofail: var beforeSyncDataPages struct{}
 		if err := fdatasync(tx.db); err != nil {
 			return err
 		}
@@ -507,6 +513,7 @@ func (tx *Tx) writeMeta() error {
 		return err
 	}
 	if !tx.db.NoSync || IgnoreNoSync {
+		// gofail: var beforeSyncMetaPage struct{}
 		if err := fdatasync(tx.db); err != nil {
 			return err
 		}

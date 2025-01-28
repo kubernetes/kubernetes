@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/security/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 )
 
 // FSGroupStrategyOptionsApplyConfiguration represents a declarative configuration of the FSGroupStrategyOptions type for use
 // with apply.
 type FSGroupStrategyOptionsApplyConfiguration struct {
-	Type   *v1.FSGroupStrategyType     `json:"type,omitempty"`
-	Ranges []IDRangeApplyConfiguration `json:"ranges,omitempty"`
+	Type   *securityv1.FSGroupStrategyType `json:"type,omitempty"`
+	Ranges []IDRangeApplyConfiguration     `json:"ranges,omitempty"`
 }
 
 // FSGroupStrategyOptionsApplyConfiguration constructs a declarative configuration of the FSGroupStrategyOptions type for use with
@@ -22,7 +22,7 @@ func FSGroupStrategyOptions() *FSGroupStrategyOptionsApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *FSGroupStrategyOptionsApplyConfiguration) WithType(value v1.FSGroupStrategyType) *FSGroupStrategyOptionsApplyConfiguration {
+func (b *FSGroupStrategyOptionsApplyConfiguration) WithType(value securityv1.FSGroupStrategyType) *FSGroupStrategyOptionsApplyConfiguration {
 	b.Type = &value
 	return b
 }

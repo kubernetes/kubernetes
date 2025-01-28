@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type ImagesGetter interface {
 
 // ImageInterface has methods to work with Image resources.
 type ImageInterface interface {
-	Create(ctx context.Context, image *v1.Image, opts metav1.CreateOptions) (*v1.Image, error)
-	Update(ctx context.Context, image *v1.Image, opts metav1.UpdateOptions) (*v1.Image, error)
+	Create(ctx context.Context, image *configv1.Image, opts metav1.CreateOptions) (*configv1.Image, error)
+	Update(ctx context.Context, image *configv1.Image, opts metav1.UpdateOptions) (*configv1.Image, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, image *v1.Image, opts metav1.UpdateOptions) (*v1.Image, error)
+	UpdateStatus(ctx context.Context, image *configv1.Image, opts metav1.UpdateOptions) (*configv1.Image, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Image, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.Image, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.ImageList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Image, err error)
-	Apply(ctx context.Context, image *configv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Image, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.Image, err error)
+	Apply(ctx context.Context, image *applyconfigurationsconfigv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Image, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, image *configv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Image, err error)
+	ApplyStatus(ctx context.Context, image *applyconfigurationsconfigv1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Image, err error)
 	ImageExpansion
 }
 
 // images implements ImageInterface
 type images struct {
-	*gentype.ClientWithListAndApply[*v1.Image, *v1.ImageList, *configv1.ImageApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.Image, *configv1.ImageList, *applyconfigurationsconfigv1.ImageApplyConfiguration]
 }
 
 // newImages returns a Images
 func newImages(c *ConfigV1Client) *images {
 	return &images{
-		gentype.NewClientWithListAndApply[*v1.Image, *v1.ImageList, *configv1.ImageApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.Image, *configv1.ImageList, *applyconfigurationsconfigv1.ImageApplyConfiguration](
 			"images",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Image { return &v1.Image{} },
-			func() *v1.ImageList { return &v1.ImageList{} }),
+			func() *configv1.Image { return &configv1.Image{} },
+			func() *configv1.ImageList { return &configv1.ImageList{} },
+		),
 	}
 }

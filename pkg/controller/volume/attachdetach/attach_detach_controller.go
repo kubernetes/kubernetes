@@ -437,7 +437,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld(logger klog.Logge
 			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
 			// with the correct ones found on pods. The present in the ASW with no corresponding
 			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpec(logger, podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpecWithNodeMigration(logger, podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 			if err != nil {
 				logger.Error(
 					err,
@@ -711,7 +711,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
 				plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 				// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace
-				volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
+				volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(logger, volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
 				if err != nil {
 					logger.Error(err, "Failed to translate intree volumeSpec to CSI volumeSpec for volume", "node", klog.KRef("", string(nodeName)), "inTreePluginName", inTreePluginName, "vaName", va.Name, "PV", klog.KRef("", *pvName))
 					continue

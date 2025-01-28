@@ -302,11 +302,10 @@ type NodeConfig struct {
 // NewNodeConfig creates a new NodeConfig.
 func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration) *NodeConfig {
 	result := &NodeConfig{
-		listerSynced: nodeInformer.Informer().HasSynced,
-		logger:       klog.FromContext(ctx),
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddNode,
 			UpdateFunc: result.handleUpdateNode,
@@ -314,6 +313,8 @@ func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, r
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
 
 	return result
 }
@@ -405,12 +406,11 @@ type ServiceCIDRConfig struct {
 // NewServiceCIDRConfig creates a new ServiceCIDRConfig.
 func NewServiceCIDRConfig(ctx context.Context, serviceCIDRInformer networkingv1beta1informers.ServiceCIDRInformer, resyncPeriod time.Duration) *ServiceCIDRConfig {
 	result := &ServiceCIDRConfig{
-		listerSynced: serviceCIDRInformer.Informer().HasSynced,
-		cidrs:        sets.New[string](),
-		logger:       klog.FromContext(ctx),
+		cidrs:  sets.New[string](),
+		logger: klog.FromContext(ctx),
 	}
 
-	_, _ = serviceCIDRInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handlerRegistration, _ := serviceCIDRInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				result.handleServiceCIDREvent(nil, obj)
@@ -424,6 +424,9 @@ func NewServiceCIDRConfig(ctx context.Context, serviceCIDRInformer networkingv1b
 		},
 		resyncPeriod,
 	)
+
+	result.listerSynced = handlerRegistration.HasSynced
+
 	return result
 }
 

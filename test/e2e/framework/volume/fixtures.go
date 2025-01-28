@@ -176,6 +176,24 @@ func NewNFSServerWithNodeName(ctx context.Context, cs clientset.Interface, names
 	return config, pod, host
 }
 
+// Restart the passed-in nfs-server by issuing a `rpc.nfsd 1` command in the
+// pod's (only) container. This command changes the number of nfs server threads from
+// (presumably) zero back to 1, and therefore allows nfs to open connections again.
+func RestartNFSServer(f *framework.Framework, serverPod *v1.Pod) {
+	const startcmd = "rpc.nfsd 1"
+	_, _, err := PodExec(f, serverPod, startcmd)
+	framework.ExpectNoError(err)
+}
+
+// Stop the passed-in nfs-server by issuing a `rpc.nfsd 0` command in the
+// pod's (only) container. This command changes the number of nfs server threads to 0,
+// thus closing all open nfs connections.
+func StopNFSServer(f *framework.Framework, serverPod *v1.Pod) {
+	const stopcmd = "rpc.nfsd 0 && for i in $(seq 200); do rpcinfo -p | grep -q nfs || break; sleep 1; done"
+	_, _, err := PodExec(f, serverPod, stopcmd)
+	framework.ExpectNoError(err)
+}
+
 // CreateStorageServer is a wrapper for startVolumeServer(). A storage server config is passed in, and a pod pointer
 // and ip address string are returned.
 // Note: Expect() is called so no error is returned.

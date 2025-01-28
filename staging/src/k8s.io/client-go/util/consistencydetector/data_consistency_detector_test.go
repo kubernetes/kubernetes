@@ -221,8 +221,8 @@ func TestDataConsistencyChecker(t *testing.T) {
 				CheckDataConsistency(ctx, "", scenario.lastSyncedResourceVersion, fakeLister.List, scenario.requestOptions, retrievedItemsFunc)
 			}
 
-			require.Equal(t, fakeLister.counter, scenario.expectedListRequests)
-			require.Equal(t, fakeLister.requestOptions, scenario.expectedRequestOptions)
+			require.Equal(t, scenario.expectedListRequests, fakeLister.counter)
+			require.Equal(t, scenario.expectedRequestOptions, fakeLister.requestOptions)
 		})
 	}
 }

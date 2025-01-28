@@ -18,9 +18,9 @@ package features
 
 import (
 	"errors"
+	"sync/atomic"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"sync/atomic"
 )
 
 // NOTE: types Feature, FeatureSpec, prerelease (and its values)

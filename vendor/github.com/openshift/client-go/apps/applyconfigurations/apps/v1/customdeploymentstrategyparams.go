@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // CustomDeploymentStrategyParamsApplyConfiguration represents a declarative configuration of the CustomDeploymentStrategyParams type for use
 // with apply.
 type CustomDeploymentStrategyParamsApplyConfiguration struct {
-	Image       *string     `json:"image,omitempty"`
-	Environment []v1.EnvVar `json:"environment,omitempty"`
-	Command     []string    `json:"command,omitempty"`
+	Image       *string         `json:"image,omitempty"`
+	Environment []corev1.EnvVar `json:"environment,omitempty"`
+	Command     []string        `json:"command,omitempty"`
 }
 
 // CustomDeploymentStrategyParamsApplyConfiguration constructs a declarative configuration of the CustomDeploymentStrategyParams type for use with
@@ -31,7 +31,7 @@ func (b *CustomDeploymentStrategyParamsApplyConfiguration) WithImage(value strin
 // WithEnvironment adds the given value to the Environment field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Environment field.
-func (b *CustomDeploymentStrategyParamsApplyConfiguration) WithEnvironment(values ...v1.EnvVar) *CustomDeploymentStrategyParamsApplyConfiguration {
+func (b *CustomDeploymentStrategyParamsApplyConfiguration) WithEnvironment(values ...corev1.EnvVar) *CustomDeploymentStrategyParamsApplyConfiguration {
 	for i := range values {
 		b.Environment = append(b.Environment, values[i])
 	}

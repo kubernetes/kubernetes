@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,7 +117,7 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
+	if e.kubeAPIServer, err = startTestServerLocked(
 		tb, nil,
 		e.getEncryptionOptions(reload), e.storageConfig); err != nil {
 		e.cleanUp()
@@ -145,6 +146,15 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 	}
 
 	return &e, nil
+}
+
+var startTestServerLock sync.Mutex
+
+// startTestServerLocked prevents parallel calls to kubeapiservertesting.StartTestServer because it messes with global state.
+func startTestServerLocked(t ktesting.TB, instanceOptions *kubeapiservertesting.TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result kubeapiservertesting.TestServer, err error) {
+	startTestServerLock.Lock()
+	defer startTestServerLock.Unlock()
+	return kubeapiservertesting.StartTestServer(t, instanceOptions, customFlags, storageConfig)
 }
 
 func (e *transformTest) cleanUp() {
@@ -280,7 +290,8 @@ func (e *transformTest) getEncryptionOptions(reload bool) []string {
 		return []string{
 			"--encryption-provider-config", filepath.Join(e.configDir, encryptionConfigFileName),
 			fmt.Sprintf("--encryption-provider-config-automatic-reload=%v", reload),
-			"--disable-admission-plugins", "ServiceAccount"}
+			"--disable-admission-plugins", "ServiceAccount",
+			"--authorization-mode=RBAC"}
 	}
 
 	return nil

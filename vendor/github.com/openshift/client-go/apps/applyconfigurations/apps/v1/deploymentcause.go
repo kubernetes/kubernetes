@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/apps/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
 )
 
 // DeploymentCauseApplyConfiguration represents a declarative configuration of the DeploymentCause type for use
 // with apply.
 type DeploymentCauseApplyConfiguration struct {
-	Type         *v1.DeploymentTriggerType                      `json:"type,omitempty"`
+	Type         *appsv1.DeploymentTriggerType                  `json:"type,omitempty"`
 	ImageTrigger *DeploymentCauseImageTriggerApplyConfiguration `json:"imageTrigger,omitempty"`
 }
 
@@ -22,7 +22,7 @@ func DeploymentCause() *DeploymentCauseApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *DeploymentCauseApplyConfiguration) WithType(value v1.DeploymentTriggerType) *DeploymentCauseApplyConfiguration {
+func (b *DeploymentCauseApplyConfiguration) WithType(value appsv1.DeploymentTriggerType) *DeploymentCauseApplyConfiguration {
 	b.Type = &value
 	return b
 }

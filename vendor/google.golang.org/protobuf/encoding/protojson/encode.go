@@ -216,9 +216,7 @@ func (m unpopulatedFieldRanger) Range(f func(protoreflect.FieldDescriptor, proto
 		}
 
 		v := m.Get(fd)
-		isProto2Scalar := fd.Syntax() == protoreflect.Proto2 && fd.Default().IsValid()
-		isSingularMessage := fd.Cardinality() != protoreflect.Repeated && fd.Message() != nil
-		if isProto2Scalar || isSingularMessage {
+		if fd.HasPresence() {
 			if m.skipNull {
 				continue
 			}

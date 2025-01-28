@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/apps/v1"
-	appsv1 "github.com/openshift/client-go/apps/applyconfigurations/apps/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
+	applyconfigurationsappsv1 "github.com/openshift/client-go/apps/applyconfigurations/apps/v1"
 	scheme "github.com/openshift/client-go/apps/clientset/versioned/scheme"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,21 +23,21 @@ type DeploymentConfigsGetter interface {
 
 // DeploymentConfigInterface has methods to work with DeploymentConfig resources.
 type DeploymentConfigInterface interface {
-	Create(ctx context.Context, deploymentConfig *v1.DeploymentConfig, opts metav1.CreateOptions) (*v1.DeploymentConfig, error)
-	Update(ctx context.Context, deploymentConfig *v1.DeploymentConfig, opts metav1.UpdateOptions) (*v1.DeploymentConfig, error)
+	Create(ctx context.Context, deploymentConfig *appsv1.DeploymentConfig, opts metav1.CreateOptions) (*appsv1.DeploymentConfig, error)
+	Update(ctx context.Context, deploymentConfig *appsv1.DeploymentConfig, opts metav1.UpdateOptions) (*appsv1.DeploymentConfig, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, deploymentConfig *v1.DeploymentConfig, opts metav1.UpdateOptions) (*v1.DeploymentConfig, error)
+	UpdateStatus(ctx context.Context, deploymentConfig *appsv1.DeploymentConfig, opts metav1.UpdateOptions) (*appsv1.DeploymentConfig, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.DeploymentConfig, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.DeploymentConfigList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*appsv1.DeploymentConfig, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*appsv1.DeploymentConfigList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DeploymentConfig, err error)
-	Apply(ctx context.Context, deploymentConfig *appsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeploymentConfig, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *appsv1.DeploymentConfig, err error)
+	Apply(ctx context.Context, deploymentConfig *applyconfigurationsappsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.DeploymentConfig, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, deploymentConfig *appsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DeploymentConfig, err error)
-	Instantiate(ctx context.Context, deploymentConfigName string, deploymentRequest *v1.DeploymentRequest, opts metav1.CreateOptions) (*v1.DeploymentConfig, error)
-	Rollback(ctx context.Context, deploymentConfigName string, deploymentConfigRollback *v1.DeploymentConfigRollback, opts metav1.CreateOptions) (*v1.DeploymentConfig, error)
+	ApplyStatus(ctx context.Context, deploymentConfig *applyconfigurationsappsv1.DeploymentConfigApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.DeploymentConfig, err error)
+	Instantiate(ctx context.Context, deploymentConfigName string, deploymentRequest *appsv1.DeploymentRequest, opts metav1.CreateOptions) (*appsv1.DeploymentConfig, error)
+	Rollback(ctx context.Context, deploymentConfigName string, deploymentConfigRollback *appsv1.DeploymentConfigRollback, opts metav1.CreateOptions) (*appsv1.DeploymentConfig, error)
 	GetScale(ctx context.Context, deploymentConfigName string, options metav1.GetOptions) (*v1beta1.Scale, error)
 	UpdateScale(ctx context.Context, deploymentConfigName string, scale *v1beta1.Scale, opts metav1.UpdateOptions) (*v1beta1.Scale, error)
 
@@ -46,25 +46,26 @@ type DeploymentConfigInterface interface {
 
 // deploymentConfigs implements DeploymentConfigInterface
 type deploymentConfigs struct {
-	*gentype.ClientWithListAndApply[*v1.DeploymentConfig, *v1.DeploymentConfigList, *appsv1.DeploymentConfigApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1.DeploymentConfig, *appsv1.DeploymentConfigList, *applyconfigurationsappsv1.DeploymentConfigApplyConfiguration]
 }
 
 // newDeploymentConfigs returns a DeploymentConfigs
 func newDeploymentConfigs(c *AppsV1Client, namespace string) *deploymentConfigs {
 	return &deploymentConfigs{
-		gentype.NewClientWithListAndApply[*v1.DeploymentConfig, *v1.DeploymentConfigList, *appsv1.DeploymentConfigApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1.DeploymentConfig, *appsv1.DeploymentConfigList, *applyconfigurationsappsv1.DeploymentConfigApplyConfiguration](
 			"deploymentconfigs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.DeploymentConfig { return &v1.DeploymentConfig{} },
-			func() *v1.DeploymentConfigList { return &v1.DeploymentConfigList{} }),
+			func() *appsv1.DeploymentConfig { return &appsv1.DeploymentConfig{} },
+			func() *appsv1.DeploymentConfigList { return &appsv1.DeploymentConfigList{} },
+		),
 	}
 }
 
 // Instantiate takes the representation of a deploymentRequest and creates it.  Returns the server's representation of the deploymentConfig, and an error, if there is any.
-func (c *deploymentConfigs) Instantiate(ctx context.Context, deploymentConfigName string, deploymentRequest *v1.DeploymentRequest, opts metav1.CreateOptions) (result *v1.DeploymentConfig, err error) {
-	result = &v1.DeploymentConfig{}
+func (c *deploymentConfigs) Instantiate(ctx context.Context, deploymentConfigName string, deploymentRequest *appsv1.DeploymentRequest, opts metav1.CreateOptions) (result *appsv1.DeploymentConfig, err error) {
+	result = &appsv1.DeploymentConfig{}
 	err = c.GetClient().Post().
 		Namespace(c.GetNamespace()).
 		Resource("deploymentconfigs").
@@ -78,8 +79,8 @@ func (c *deploymentConfigs) Instantiate(ctx context.Context, deploymentConfigNam
 }
 
 // Rollback takes the representation of a deploymentConfigRollback and creates it.  Returns the server's representation of the deploymentConfig, and an error, if there is any.
-func (c *deploymentConfigs) Rollback(ctx context.Context, deploymentConfigName string, deploymentConfigRollback *v1.DeploymentConfigRollback, opts metav1.CreateOptions) (result *v1.DeploymentConfig, err error) {
-	result = &v1.DeploymentConfig{}
+func (c *deploymentConfigs) Rollback(ctx context.Context, deploymentConfigName string, deploymentConfigRollback *appsv1.DeploymentConfigRollback, opts metav1.CreateOptions) (result *appsv1.DeploymentConfig, err error) {
+	result = &appsv1.DeploymentConfig{}
 	err = c.GetClient().Post().
 		Namespace(c.GetNamespace()).
 		Resource("deploymentconfigs").

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type SchedulersGetter interface {
 
 // SchedulerInterface has methods to work with Scheduler resources.
 type SchedulerInterface interface {
-	Create(ctx context.Context, scheduler *v1.Scheduler, opts metav1.CreateOptions) (*v1.Scheduler, error)
-	Update(ctx context.Context, scheduler *v1.Scheduler, opts metav1.UpdateOptions) (*v1.Scheduler, error)
+	Create(ctx context.Context, scheduler *configv1.Scheduler, opts metav1.CreateOptions) (*configv1.Scheduler, error)
+	Update(ctx context.Context, scheduler *configv1.Scheduler, opts metav1.UpdateOptions) (*configv1.Scheduler, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, scheduler *v1.Scheduler, opts metav1.UpdateOptions) (*v1.Scheduler, error)
+	UpdateStatus(ctx context.Context, scheduler *configv1.Scheduler, opts metav1.UpdateOptions) (*configv1.Scheduler, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Scheduler, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.SchedulerList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.Scheduler, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.SchedulerList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Scheduler, err error)
-	Apply(ctx context.Context, scheduler *configv1.SchedulerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Scheduler, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.Scheduler, err error)
+	Apply(ctx context.Context, scheduler *applyconfigurationsconfigv1.SchedulerApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Scheduler, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, scheduler *configv1.SchedulerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Scheduler, err error)
+	ApplyStatus(ctx context.Context, scheduler *applyconfigurationsconfigv1.SchedulerApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Scheduler, err error)
 	SchedulerExpansion
 }
 
 // schedulers implements SchedulerInterface
 type schedulers struct {
-	*gentype.ClientWithListAndApply[*v1.Scheduler, *v1.SchedulerList, *configv1.SchedulerApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.Scheduler, *configv1.SchedulerList, *applyconfigurationsconfigv1.SchedulerApplyConfiguration]
 }
 
 // newSchedulers returns a Schedulers
 func newSchedulers(c *ConfigV1Client) *schedulers {
 	return &schedulers{
-		gentype.NewClientWithListAndApply[*v1.Scheduler, *v1.SchedulerList, *configv1.SchedulerApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.Scheduler, *configv1.SchedulerList, *applyconfigurationsconfigv1.SchedulerApplyConfiguration](
 			"schedulers",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Scheduler { return &v1.Scheduler{} },
-			func() *v1.SchedulerList { return &v1.SchedulerList{} }),
+			func() *configv1.Scheduler { return &configv1.Scheduler{} },
+			func() *configv1.SchedulerList { return &configv1.SchedulerList{} },
+		),
 	}
 }

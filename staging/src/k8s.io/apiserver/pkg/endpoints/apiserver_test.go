@@ -237,7 +237,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
-		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
@@ -2818,7 +2817,7 @@ func TestDeleteWithOptions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		t.Logf(string(s))
+		t.Log(string(s))
 	}
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
@@ -2858,7 +2857,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		t.Logf(string(s))
+		t.Log(string(s))
 	}
 	if simpleStorage.deleted != ID {
 		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
@@ -2901,7 +2900,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		t.Logf(string(s))
+		t.Log(string(s))
 	}
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
@@ -3311,7 +3310,6 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Namer:           namer,
-		RootScopedKinds: sets.NewString("SimpleRoot"),
 
 		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 

@@ -73,24 +73,16 @@ func VerifyFSGroupInPod(f *framework.Framework, filePath, expectedFSGroup string
 	gomega.Expect(expectedFSGroup).To(gomega.Equal(fsGroupResult), "Expected fsGroup of %s, got %s", expectedFSGroup, fsGroupResult)
 }
 
-// getKubeletMainPid return the Main PID of the Kubelet Process
-func getKubeletMainPid(ctx context.Context, nodeIP string, sudoPresent bool, systemctlPresent bool) string {
-	command := ""
-	if systemctlPresent {
-		command = "systemctl status kubelet | grep 'Main PID'"
-	} else {
-		command = "service kubelet status | grep 'Main PID'"
-	}
-	if sudoPresent {
-		command = fmt.Sprintf("sudo %s", command)
-	}
+// getKubeletRunning return if the kubelet is running or not
+func getKubeletRunning(ctx context.Context, nodeIP string) bool {
+	command := "systemctl show kubelet --property ActiveState --value"
 	framework.Logf("Attempting `%s`", command)
 	sshResult, err := e2essh.SSH(ctx, command, nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", nodeIP))
 	e2essh.LogResult(sshResult)
-	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to get kubelet PID")
-	gomega.Expect(sshResult.Stdout).NotTo(gomega.BeEmpty(), "Kubelet Main PID should not be Empty")
-	return sshResult.Stdout
+	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to get kubelet status")
+	gomega.Expect(sshResult.Stdout).NotTo(gomega.BeEmpty(), "Kubelet status should not be Empty")
+	return strings.TrimSpace(sshResult.Stdout) == "active"
 }
 
 // TestKubeletRestartsAndRestoresMount tests that a volume mounted to a pod remains mounted after a kubelet restarts
@@ -103,6 +95,9 @@ func TestKubeletRestartsAndRestoresMount(ctx context.Context, c clientset.Interf
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(ctx, KRestart, c, clientPod)
+
+	ginkgo.By("Wait 20s for the volume to become stable")
+	time.Sleep(20 * time.Second)
 
 	ginkgo.By("Testing that written file is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeFilesystem, false, volumePath, byteLen, seed)
@@ -120,6 +115,9 @@ func TestKubeletRestartsAndRestoresMap(ctx context.Context, c clientset.Interfac
 
 	ginkgo.By("Restarting kubelet")
 	KubeletCommand(ctx, KRestart, c, clientPod)
+
+	ginkgo.By("Wait 20s for the volume to become stable")
+	time.Sleep(20 * time.Second)
 
 	ginkgo.By("Testing that written pv is accessible.")
 	CheckReadFromPath(f, clientPod, v1.PersistentVolumeBlock, false, volumePath, byteLen, seed)

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	oauthv1 "github.com/openshift/api/oauth/v1"
+	apioauthv1 "github.com/openshift/api/oauth/v1"
 	versioned "github.com/openshift/client-go/oauth/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/oauth/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/oauth/listers/oauth/v1"
+	oauthv1 "github.com/openshift/client-go/oauth/listers/oauth/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // OAuthClientAuthorizations.
 type OAuthClientAuthorizationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.OAuthClientAuthorizationLister
+	Lister() oauthv1.OAuthClientAuthorizationLister
 }
 
 type oAuthClientAuthorizationInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredOAuthClientAuthorizationInformer(client versioned.Interface, res
 				return client.OauthV1().OAuthClientAuthorizations().Watch(context.TODO(), options)
 			},
 		},
-		&oauthv1.OAuthClientAuthorization{},
+		&apioauthv1.OAuthClientAuthorization{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *oAuthClientAuthorizationInformer) defaultInformer(client versioned.Inte
 }
 
 func (f *oAuthClientAuthorizationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&oauthv1.OAuthClientAuthorization{}, f.defaultInformer)
+	return f.factory.InformerFor(&apioauthv1.OAuthClientAuthorization{}, f.defaultInformer)
 }
 
-func (f *oAuthClientAuthorizationInformer) Lister() v1.OAuthClientAuthorizationLister {
-	return v1.NewOAuthClientAuthorizationLister(f.Informer().GetIndexer())
+func (f *oAuthClientAuthorizationInformer) Lister() oauthv1.OAuthClientAuthorizationLister {
+	return oauthv1.NewOAuthClientAuthorizationLister(f.Informer().GetIndexer())
 }

@@ -29,15 +29,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/cgroups"
 	cadvisorv1 "github.com/google/cadvisor/info/v1"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -45,6 +46,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/utils/ptr"
 )
 
 var defaultPageSize = int64(os.Getpagesize())
@@ -93,6 +95,34 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	return lc, nil
 }
 
+// getCPULimit returns the memory limit for the container to be used to calculate
+// Linux Container Resources.
+func getCPULimit(pod *v1.Pod, container *v1.Container) *resource.Quantity {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// When container-level CPU limit is not set, the pod-level
+		// limit is used in the calculation for components relying on linux resource limits
+		// to be set.
+		if container.Resources.Limits.Cpu().IsZero() {
+			return pod.Spec.Resources.Limits.Cpu()
+		}
+	}
+	return container.Resources.Limits.Cpu()
+}
+
+// getMemoryLimit returns the memory limit for the container to be used to calculate
+// Linux Container Resources.
+func getMemoryLimit(pod *v1.Pod, container *v1.Container) *resource.Quantity {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		// When container-level memory limit is not set, the pod-level
+		// limit is used in the calculation for components relying on linux resource limits
+		// to be set.
+		if container.Resources.Limits.Memory().IsZero() {
+			return pod.Spec.Resources.Limits.Memory()
+		}
+	}
+	return container.Resources.Limits.Memory()
+}
+
 // generateLinuxContainerResources generates linux container resources config for runtime
 func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod, container *v1.Container, enforceMemoryQoS bool) *runtimeapi.LinuxContainerResources {
 	// set linux container resources
@@ -100,7 +130,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	if _, cpuRequestExists := container.Resources.Requests[v1.ResourceCPU]; cpuRequestExists {
 		cpuRequest = container.Resources.Requests.Cpu()
 	}
-	lcr := m.calculateLinuxResources(cpuRequest, container.Resources.Limits.Cpu(), container.Resources.Limits.Memory())
+
+	memoryLimit := getMemoryLimit(pod, container)
+	cpuLimit := getCPULimit(pod, container)
+	lcr := m.calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit)
 
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
@@ -247,7 +280,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	}
 
 	// runc requires cgroupv2 for unified mode
-	if isCgroup2UnifiedMode() {
+	if isCgroup2UnifiedMode() && !ptr.Deref(m.singleProcessOOMKill, true) {
 		resources.Unified = map[string]string{
 			// Ask the kernel to kill all processes in the container cgroup in case of OOM.
 			// See memory.oom.group in https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html for
@@ -337,38 +370,35 @@ var isCgroup2UnifiedMode = func() bool {
 	return libcontainercgroups.IsCgroup2UnifiedMode()
 }
 
-var (
-	swapControllerAvailability     bool
-	swapControllerAvailabilityOnce sync.Once
-)
-
 // Note: this function variable is being added here so it would be possible to mock
 // the swap controller availability for unit tests by assigning a new function to it. Without it,
 // the swap controller availability would solely depend on the environment running the test.
-var swapControllerAvailable = func() bool {
+var swapControllerAvailable = sync.OnceValue(func() bool {
 	// See https://github.com/containerd/containerd/pull/7838/
-	swapControllerAvailabilityOnce.Do(func() {
-		const warn = "Failed to detect the availability of the swap controller, assuming not available"
-		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
-		if isCgroup2UnifiedMode() {
-			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
-			if err != nil {
-				klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
-				return
-			}
-			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+	const warn = "Failed to detect the availability of the swap controller, assuming not available"
+	p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+	if isCgroup2UnifiedMode() {
+		// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
+		cm, err := libcontainercgroups.ParseCgroupFile("/proc/self/cgroup")
+		if err != nil {
+			klog.V(5).ErrorS(fmt.Errorf("failed to parse /proc/self/cgroup: %w", err), warn)
+			return false
 		}
-		if _, err := os.Stat(p); err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				klog.V(5).ErrorS(err, warn)
-			}
-			return
+		// Fr cgroup v2 unified hierarchy, there are no per-controller
+		// cgroup paths, so the cm map returned by ParseCgroupFile above
+		// has a single element where the key is empty string ("") and
+		// the value is the cgroup path the <pid> is in.
+		p = filepath.Join("/sys/fs/cgroup", cm[""], "memory.swap.max")
+	}
+	if _, err := os.Stat(p); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			klog.V(5).ErrorS(err, warn)
 		}
-		swapControllerAvailability = true
-	})
-	return swapControllerAvailability
-}
+		return false
+	}
+
+	return true
+})
 
 type swapConfigurationHelper struct {
 	machineInfo cadvisorv1.MachineInfo
@@ -390,7 +420,6 @@ func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxConta
 
 	containerMemoryRequest := container.Resources.Requests.Memory()
 	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
-
 	if err != nil {
 		klog.ErrorS(err, "cannot calculate swap allocation amount; disallowing swap")
 		m.ConfigureNoSwap(lcr)

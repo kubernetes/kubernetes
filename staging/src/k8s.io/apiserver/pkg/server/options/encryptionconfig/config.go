@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver/validation"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig/metrics"
@@ -106,24 +107,35 @@ const (
 
 var codecs serializer.CodecFactory
 
-// this atomic bool allows us to swap enablement of the KMSv2KDF feature in tests
+// this map allows us to swap enablement of the KMSv2KDF feature in tests
 // as the feature gate is now locked to true starting with v1.29
 // Note: it cannot be set by an end user
-var kdfDisabled atomic.Bool
+// KDF enablement is tracked per KMS provider to allow tests to run in parallel.
+var kdfEnabledPerKMS sync.Map // map[string]bool, KMS name -> KDF enabled
 
 // this function should only be called in tests to swap enablement of the KMSv2KDF feature
-func SetKDFForTests(b bool) func() {
-	kdfDisabled.Store(!b)
-	return func() {
-		kdfDisabled.Store(false)
+// Caller must guarantee that all KMS providers have distinct names across all tests.
+func SetKDFForTests(kmsName string, b bool) func() {
+	if len(kmsName) == 0 { // guarantee that GetKDF("") returns the default value
+		panic("empty KMS name used in test")
 	}
+	if _, loaded := kdfEnabledPerKMS.LoadOrStore(kmsName, b); loaded {
+		panic("duplicate KMS name used in test")
+	}
+	return func() { kdfEnabledPerKMS.Delete(kmsName) }
 }
 
 // this function should be used to determine enablement of the KMSv2KDF feature
 // instead of getting it from DefaultFeatureGate as the feature gate is now locked
 // to true starting with v1.29
-func GetKDF() bool {
-	return !kdfDisabled.Load()
+// to allow integration tests to run in parallel, this "feature flag" can be set
+// per KMS provider as long as all providers use distinct names.
+func GetKDF(kmsName string) bool {
+	kdfEnabled, ok := kdfEnabledPerKMS.Load(kmsName)
+	if !ok {
+		return true // explicit config is missing, but KDF is enabled by default
+	}
+	return kdfEnabled.(bool) // this will panic if a non-bool ever gets stored, which should never happen
 }
 
 func init() {
@@ -389,7 +401,7 @@ func (h *kmsv2PluginProbe) rotateDEKOnKeyIDChange(ctx context.Context, statusKey
 	// this gate can only change during tests, but the check is cheap enough to always make
 	// this allows us to easily exercise both modes without restarting the API server
 	// TODO integration test that this dynamically takes effect
-	useSeed := GetKDF()
+	useSeed := GetKDF(h.name)
 	stateUseSeed := state.EncryptedObject.EncryptedDEKSourceType == kmstypes.EncryptedDEKSourceType_HKDF_SHA256_XNONCE_AES_GCM_SEED
 
 	// state is valid and status keyID is unchanged from when we generated this DEK/seed so there is no need to rotate it
@@ -760,10 +772,6 @@ func kmsPrefixTransformer(ctx context.Context, config *apiserver.KMSConfiguratio
 		}, nil
 
 	case kmsAPIVersionV2:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.KMSv2) {
-			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2 plugin %q, KMSv2 feature is not enabled", kmsName)
-		}
-
 		envelopeService, err := EnvelopeKMSv2ServiceFactory(ctx, config.Endpoint, config.Name, config.Timeout.Duration)
 		if err != nil {
 			return storagevalue.PrefixTransformer{}, nil, nil, fmt.Errorf("could not configure KMSv2-Plugin's probe %q, error: %w", kmsName, err)
@@ -1013,7 +1021,9 @@ var anyGroupAnyResource = schema.GroupResource{
 	Resource: "*",
 }
 
-func transformerFromOverrides(transformerOverrides map[schema.GroupResource]storagevalue.Transformer, resource schema.GroupResource) storagevalue.Transformer {
+func transformerFromOverrides(transformerOverrides map[schema.GroupResource]storagevalue.Transformer, resource schema.GroupResource) (out storagevalue.Transformer) {
+	defer func() { out = newRequestInfoTransformer(resource, out) }()
+
 	if transformer := transformerOverrides[resource]; transformer != nil {
 		return transformer
 	}
@@ -1038,4 +1048,42 @@ func grYAMLString(gr schema.GroupResource) string {
 	}
 
 	return gr.String()
+}
+
+var _ storagevalue.Transformer = &requestInfoTransformer{}
+
+type requestInfoTransformer struct {
+	baseValueCtx context.Context
+	delegate     storagevalue.Transformer
+}
+
+func newRequestInfoTransformer(resource schema.GroupResource, delegate storagevalue.Transformer) *requestInfoTransformer {
+	return &requestInfoTransformer{
+		baseValueCtx: request.WithRequestInfo(context.Background(), &request.RequestInfo{IsResourceRequest: true, APIGroup: resource.Group, Resource: resource.Resource}),
+		delegate:     delegate,
+	}
+}
+
+func (l *requestInfoTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, bool, error) {
+	return l.delegate.TransformFromStorage(l.withBaseValueCtx(ctx), data, dataCtx)
+}
+
+func (l *requestInfoTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx storagevalue.Context) ([]byte, error) {
+	return l.delegate.TransformToStorage(l.withBaseValueCtx(ctx), data, dataCtx)
+}
+
+func (l *requestInfoTransformer) withBaseValueCtx(ctx context.Context) context.Context {
+	return &joinValueContext{Context: ctx, baseValueCtx: l.baseValueCtx}
+}
+
+type joinValueContext struct {
+	context.Context
+	baseValueCtx context.Context
+}
+
+func (j *joinValueContext) Value(key any) any {
+	if val := j.Context.Value(key); val != nil {
+		return val
+	}
+	return j.baseValueCtx.Value(key)
 }

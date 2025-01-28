@@ -3,21 +3,21 @@
 package v1
 
 import (
-	apiconfigv1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	internal "github.com/openshift/client-go/config/applyconfigurations/internal"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // FeatureGateApplyConfiguration represents a declarative configuration of the FeatureGate type for use
 // with apply.
 type FeatureGateApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
-	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	Spec                             *FeatureGateSpecApplyConfiguration   `json:"spec,omitempty"`
-	Status                           *FeatureGateStatusApplyConfiguration `json:"status,omitempty"`
+	metav1.TypeMetaApplyConfiguration    `json:",inline"`
+	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
+	Spec                                 *FeatureGateSpecApplyConfiguration   `json:"spec,omitempty"`
+	Status                               *FeatureGateStatusApplyConfiguration `json:"status,omitempty"`
 }
 
 // FeatureGate constructs a declarative configuration of the FeatureGate type for use with
@@ -41,18 +41,18 @@ func FeatureGate(name string) *FeatureGateApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractFeatureGate(featureGate *apiconfigv1.FeatureGate, fieldManager string) (*FeatureGateApplyConfiguration, error) {
+func ExtractFeatureGate(featureGate *configv1.FeatureGate, fieldManager string) (*FeatureGateApplyConfiguration, error) {
 	return extractFeatureGate(featureGate, fieldManager, "")
 }
 
 // ExtractFeatureGateStatus is the same as ExtractFeatureGate except
 // that it extracts the status subresource applied configuration.
 // Experimental!
-func ExtractFeatureGateStatus(featureGate *apiconfigv1.FeatureGate, fieldManager string) (*FeatureGateApplyConfiguration, error) {
+func ExtractFeatureGateStatus(featureGate *configv1.FeatureGate, fieldManager string) (*FeatureGateApplyConfiguration, error) {
 	return extractFeatureGate(featureGate, fieldManager, "status")
 }
 
-func extractFeatureGate(featureGate *apiconfigv1.FeatureGate, fieldManager string, subresource string) (*FeatureGateApplyConfiguration, error) {
+func extractFeatureGate(featureGate *configv1.FeatureGate, fieldManager string, subresource string) (*FeatureGateApplyConfiguration, error) {
 	b := &FeatureGateApplyConfiguration{}
 	err := managedfields.ExtractInto(featureGate, internal.Parser().Type("com.github.openshift.api.config.v1.FeatureGate"), fieldManager, b, subresource)
 	if err != nil {
@@ -69,7 +69,7 @@ func extractFeatureGate(featureGate *apiconfigv1.FeatureGate, fieldManager strin
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Kind field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithKind(value string) *FeatureGateApplyConfiguration {
-	b.Kind = &value
+	b.TypeMetaApplyConfiguration.Kind = &value
 	return b
 }
 
@@ -77,7 +77,7 @@ func (b *FeatureGateApplyConfiguration) WithKind(value string) *FeatureGateApply
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the APIVersion field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithAPIVersion(value string) *FeatureGateApplyConfiguration {
-	b.APIVersion = &value
+	b.TypeMetaApplyConfiguration.APIVersion = &value
 	return b
 }
 
@@ -86,7 +86,7 @@ func (b *FeatureGateApplyConfiguration) WithAPIVersion(value string) *FeatureGat
 // If called multiple times, the Name field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithName(value string) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Name = &value
+	b.ObjectMetaApplyConfiguration.Name = &value
 	return b
 }
 
@@ -95,7 +95,7 @@ func (b *FeatureGateApplyConfiguration) WithName(value string) *FeatureGateApply
 // If called multiple times, the GenerateName field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithGenerateName(value string) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.GenerateName = &value
+	b.ObjectMetaApplyConfiguration.GenerateName = &value
 	return b
 }
 
@@ -104,7 +104,7 @@ func (b *FeatureGateApplyConfiguration) WithGenerateName(value string) *FeatureG
 // If called multiple times, the Namespace field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithNamespace(value string) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Namespace = &value
+	b.ObjectMetaApplyConfiguration.Namespace = &value
 	return b
 }
 
@@ -113,7 +113,7 @@ func (b *FeatureGateApplyConfiguration) WithNamespace(value string) *FeatureGate
 // If called multiple times, the UID field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithUID(value types.UID) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.UID = &value
+	b.ObjectMetaApplyConfiguration.UID = &value
 	return b
 }
 
@@ -122,7 +122,7 @@ func (b *FeatureGateApplyConfiguration) WithUID(value types.UID) *FeatureGateApp
 // If called multiple times, the ResourceVersion field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithResourceVersion(value string) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.ResourceVersion = &value
+	b.ObjectMetaApplyConfiguration.ResourceVersion = &value
 	return b
 }
 
@@ -131,25 +131,25 @@ func (b *FeatureGateApplyConfiguration) WithResourceVersion(value string) *Featu
 // If called multiple times, the Generation field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithGeneration(value int64) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.Generation = &value
+	b.ObjectMetaApplyConfiguration.Generation = &value
 	return b
 }
 
 // WithCreationTimestamp sets the CreationTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CreationTimestamp field is set to the value of the last call.
-func (b *FeatureGateApplyConfiguration) WithCreationTimestamp(value metav1.Time) *FeatureGateApplyConfiguration {
+func (b *FeatureGateApplyConfiguration) WithCreationTimestamp(value apismetav1.Time) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.CreationTimestamp = &value
+	b.ObjectMetaApplyConfiguration.CreationTimestamp = &value
 	return b
 }
 
 // WithDeletionTimestamp sets the DeletionTimestamp field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DeletionTimestamp field is set to the value of the last call.
-func (b *FeatureGateApplyConfiguration) WithDeletionTimestamp(value metav1.Time) *FeatureGateApplyConfiguration {
+func (b *FeatureGateApplyConfiguration) WithDeletionTimestamp(value apismetav1.Time) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionTimestamp = &value
+	b.ObjectMetaApplyConfiguration.DeletionTimestamp = &value
 	return b
 }
 
@@ -158,7 +158,7 @@ func (b *FeatureGateApplyConfiguration) WithDeletionTimestamp(value metav1.Time)
 // If called multiple times, the DeletionGracePeriodSeconds field is set to the value of the last call.
 func (b *FeatureGateApplyConfiguration) WithDeletionGracePeriodSeconds(value int64) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	b.DeletionGracePeriodSeconds = &value
+	b.ObjectMetaApplyConfiguration.DeletionGracePeriodSeconds = &value
 	return b
 }
 
@@ -168,11 +168,11 @@ func (b *FeatureGateApplyConfiguration) WithDeletionGracePeriodSeconds(value int
 // overwriting an existing map entries in Labels field with the same key.
 func (b *FeatureGateApplyConfiguration) WithLabels(entries map[string]string) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Labels == nil && len(entries) > 0 {
-		b.Labels = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Labels == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Labels = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Labels[k] = v
+		b.ObjectMetaApplyConfiguration.Labels[k] = v
 	}
 	return b
 }
@@ -183,11 +183,11 @@ func (b *FeatureGateApplyConfiguration) WithLabels(entries map[string]string) *F
 // overwriting an existing map entries in Annotations field with the same key.
 func (b *FeatureGateApplyConfiguration) WithAnnotations(entries map[string]string) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
-	if b.Annotations == nil && len(entries) > 0 {
-		b.Annotations = make(map[string]string, len(entries))
+	if b.ObjectMetaApplyConfiguration.Annotations == nil && len(entries) > 0 {
+		b.ObjectMetaApplyConfiguration.Annotations = make(map[string]string, len(entries))
 	}
 	for k, v := range entries {
-		b.Annotations[k] = v
+		b.ObjectMetaApplyConfiguration.Annotations[k] = v
 	}
 	return b
 }
@@ -195,13 +195,13 @@ func (b *FeatureGateApplyConfiguration) WithAnnotations(entries map[string]strin
 // WithOwnerReferences adds the given value to the OwnerReferences field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the OwnerReferences field.
-func (b *FeatureGateApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerReferenceApplyConfiguration) *FeatureGateApplyConfiguration {
+func (b *FeatureGateApplyConfiguration) WithOwnerReferences(values ...*metav1.OwnerReferenceApplyConfiguration) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithOwnerReferences")
 		}
-		b.OwnerReferences = append(b.OwnerReferences, *values[i])
+		b.ObjectMetaApplyConfiguration.OwnerReferences = append(b.ObjectMetaApplyConfiguration.OwnerReferences, *values[i])
 	}
 	return b
 }
@@ -212,14 +212,14 @@ func (b *FeatureGateApplyConfiguration) WithOwnerReferences(values ...*v1.OwnerR
 func (b *FeatureGateApplyConfiguration) WithFinalizers(values ...string) *FeatureGateApplyConfiguration {
 	b.ensureObjectMetaApplyConfigurationExists()
 	for i := range values {
-		b.Finalizers = append(b.Finalizers, values[i])
+		b.ObjectMetaApplyConfiguration.Finalizers = append(b.ObjectMetaApplyConfiguration.Finalizers, values[i])
 	}
 	return b
 }
 
 func (b *FeatureGateApplyConfiguration) ensureObjectMetaApplyConfigurationExists() {
 	if b.ObjectMetaApplyConfiguration == nil {
-		b.ObjectMetaApplyConfiguration = &v1.ObjectMetaApplyConfiguration{}
+		b.ObjectMetaApplyConfiguration = &metav1.ObjectMetaApplyConfiguration{}
 	}
 }
 
@@ -242,5 +242,5 @@ func (b *FeatureGateApplyConfiguration) WithStatus(value *FeatureGateStatusApply
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *FeatureGateApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
-	return b.Name
+	return b.ObjectMetaApplyConfiguration.Name
 }

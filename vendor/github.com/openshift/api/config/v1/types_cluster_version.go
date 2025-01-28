@@ -34,7 +34,6 @@ type ClusterVersion struct {
 
 	// spec is the desired state of the cluster version - the operator will work
 	// to ensure that the desired version is applied to the cluster.
-	// +kubebuilder:validation:Required
 	// +required
 	Spec ClusterVersionSpec `json:"spec"`
 	// status contains information about the available updates and any in-progress
@@ -51,7 +50,6 @@ type ClusterVersionSpec struct {
 	// clusterID uniquely identifies this cluster. This is expected to be
 	// an RFC4122 UUID value (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx in
 	// hexadecimal values). This is a required field.
-	// +kubebuilder:validation:Required
 	// +required
 	ClusterID ClusterID `json:"clusterID"`
 
@@ -138,7 +136,6 @@ type ClusterVersionStatus struct {
 	// desired is the version that the cluster is reconciling towards.
 	// If the cluster is not yet fully initialized desired will be set
 	// with the information available, which may be an image or a tag.
-	// +kubebuilder:validation:Required
 	// +required
 	Desired Release `json:"desired"`
 
@@ -156,14 +153,12 @@ type ClusterVersionStatus struct {
 	// observedGeneration reports which version of the spec is being synced.
 	// If this value is not equal to metadata.generation, then the desired
 	// and conditions fields may represent a previous version.
-	// +kubebuilder:validation:Required
 	// +required
 	ObservedGeneration int64 `json:"observedGeneration"`
 
 	// versionHash is a fingerprint of the content that the cluster will be
 	// updated with. It is used by the operator to avoid unnecessary work
 	// and is for internal use only.
-	// +kubebuilder:validation:Required
 	// +required
 	VersionHash string `json:"versionHash"`
 
@@ -190,7 +185,6 @@ type ClusterVersionStatus struct {
 	// may be empty if no updates are recommended, if the update service
 	// is unavailable, or if an invalid channel has been specified.
 	// +nullable
-	// +kubebuilder:validation:Required
 	// +listType=atomic
 	// +required
 	AvailableUpdates []Release `json:"availableUpdates"`
@@ -226,12 +220,10 @@ type UpdateHistory struct {
 	// indicates the update is not fully applied, while the Completed state
 	// indicates the update was successfully rolled out at least once (all
 	// parts of the update successfully applied).
-	// +kubebuilder:validation:Required
 	// +required
 	State UpdateState `json:"state"`
 
 	// startedTime is the time at which the update was started.
-	// +kubebuilder:validation:Required
 	// +required
 	StartedTime metav1.Time `json:"startedTime"`
 
@@ -239,7 +231,6 @@ type UpdateHistory struct {
 	// that is currently being applied will have a null completion time.
 	// Completion time will always be set for entries that are not the current
 	// update (usually to the started time of the next update).
-	// +kubebuilder:validation:Required
 	// +required
 	// +nullable
 	CompletionTime *metav1.Time `json:"completionTime"`
@@ -253,7 +244,6 @@ type UpdateHistory struct {
 
 	// image is a container image location that contains the update. This value
 	// is always populated.
-	// +kubebuilder:validation:Required
 	// +required
 	Image string `json:"image"`
 
@@ -261,7 +251,6 @@ type UpdateHistory struct {
 	// before it was installed. If this is false the cluster may not be trusted.
 	// Verified does not cover upgradeable checks that depend on the cluster
 	// state at the time when the update target was accepted.
-	// +kubebuilder:validation:Required
 	// +required
 	Verified bool `json:"verified"`
 
@@ -288,7 +277,7 @@ const (
 )
 
 // ClusterVersionCapability enumerates optional, core cluster components.
-// +kubebuilder:validation:Enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential;Ingress;CloudControllerManager
+// +kubebuilder:validation:Enum=openshift-samples;baremetal;marketplace;Console;Insights;Storage;CSISnapshot;NodeTuning;MachineAPI;Build;DeploymentConfig;ImageRegistry;OperatorLifecycleManager;CloudCredential;Ingress;CloudControllerManager;OperatorLifecycleManagerV1
 type ClusterVersionCapability string
 
 const (
@@ -379,9 +368,13 @@ const (
 	// allows to distribute Docker images
 	ClusterVersionCapabilityImageRegistry ClusterVersionCapability = "ImageRegistry"
 
-	// ClusterVersionCapabilityOperatorLifecycleManager manages the Operator Lifecycle Manager
+	// ClusterVersionCapabilityOperatorLifecycleManager manages the Operator Lifecycle Manager (legacy)
 	// which itself manages the lifecycle of operators
 	ClusterVersionCapabilityOperatorLifecycleManager ClusterVersionCapability = "OperatorLifecycleManager"
+
+	// ClusterVersionCapabilityOperatorLifecycleManagerV1 manages the Operator Lifecycle Manager (v1)
+	// which itself manages the lifecycle of operators
+	ClusterVersionCapabilityOperatorLifecycleManagerV1 ClusterVersionCapability = "OperatorLifecycleManagerV1"
 
 	// ClusterVersionCapabilityCloudCredential manages credentials for cloud providers
 	// in openshift cluster
@@ -422,6 +415,7 @@ var KnownClusterVersionCapabilities = []ClusterVersionCapability{
 	ClusterVersionCapabilityDeploymentConfig,
 	ClusterVersionCapabilityImageRegistry,
 	ClusterVersionCapabilityOperatorLifecycleManager,
+	ClusterVersionCapabilityOperatorLifecycleManagerV1,
 	ClusterVersionCapabilityCloudCredential,
 	ClusterVersionCapabilityIngress,
 	ClusterVersionCapabilityCloudControllerManager,
@@ -600,6 +594,7 @@ var ClusterVersionCapabilitySets = map[ClusterVersionCapabilitySet][]ClusterVers
 		ClusterVersionCapabilityDeploymentConfig,
 		ClusterVersionCapabilityImageRegistry,
 		ClusterVersionCapabilityOperatorLifecycleManager,
+		ClusterVersionCapabilityOperatorLifecycleManagerV1,
 		ClusterVersionCapabilityCloudCredential,
 		ClusterVersionCapabilityIngress,
 		ClusterVersionCapabilityCloudControllerManager,
@@ -618,6 +613,7 @@ var ClusterVersionCapabilitySets = map[ClusterVersionCapabilitySet][]ClusterVers
 		ClusterVersionCapabilityDeploymentConfig,
 		ClusterVersionCapabilityImageRegistry,
 		ClusterVersionCapabilityOperatorLifecycleManager,
+		ClusterVersionCapabilityOperatorLifecycleManagerV1,
 		ClusterVersionCapabilityCloudCredential,
 		ClusterVersionCapabilityIngress,
 		ClusterVersionCapabilityCloudControllerManager,
@@ -664,28 +660,23 @@ type ClusterVersionCapabilitiesStatus struct {
 // +k8s:deepcopy-gen=true
 type ComponentOverride struct {
 	// kind indentifies which object to override.
-	// +kubebuilder:validation:Required
 	// +required
 	Kind string `json:"kind"`
 	// group identifies the API group that the kind is in.
-	// +kubebuilder:validation:Required
 	// +required
 	Group string `json:"group"`
 
 	// namespace is the component's namespace. If the resource is cluster
 	// scoped, the namespace should be empty.
-	// +kubebuilder:validation:Required
 	// +required
 	Namespace string `json:"namespace"`
 	// name is the component's name.
-	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
 
 	// unmanaged controls if cluster version operator should stop managing the
 	// resources in this cluster.
 	// Default: false
-	// +kubebuilder:validation:Required
 	// +required
 	Unmanaged bool `json:"unmanaged"`
 }
@@ -694,8 +685,8 @@ type ComponentOverride struct {
 type URL string
 
 // Update represents an administrator update request.
-// +kubebuilder:validation:XValidation:rule="has(self.architecture) && has(self.image) ? (self.architecture == '' || self.image == '') : true",message="cannot set both Architecture and Image"
-// +kubebuilder:validation:XValidation:rule="has(self.architecture) && self.architecture != '' ? self.version != '' : true",message="Version must be set if Architecture is set"
+// +kubebuilder:validation:XValidation:rule="has(self.architecture) && has(self.image) ? (self.architecture == \"\" || self.image == \"\") : true",message="cannot set both Architecture and Image"
+// +kubebuilder:validation:XValidation:rule="has(self.architecture) && self.architecture != \"\" ? self.version != \"\" : true",message="Version must be set if Architecture is set"
 // +k8s:deepcopy-gen=true
 type Update struct {
 	// architecture is an optional field that indicates the desired
@@ -739,6 +730,16 @@ type Update struct {
 // Release represents an OpenShift release image and associated metadata.
 // +k8s:deepcopy-gen=true
 type Release struct {
+	// architecture is an optional field that indicates the
+	// value of the cluster architecture. In this context cluster
+	// architecture means either a single architecture or a multi
+	// architecture.
+	// Valid values are 'Multi' and empty.
+	//
+	// +openshift:enable:FeatureGate=ImageStreamImportMode
+	// +optional
+	Architecture ClusterVersionArchitecture `json:"architecture,omitempty"`
+
 	// version is a semantic version identifying the update version. When this
 	// field is part of spec, version is optional if image is specified.
 	// +required
@@ -776,7 +777,6 @@ const RetrievedUpdates ClusterStatusConditionType = "RetrievedUpdates"
 // may not be recommended for the current cluster.
 type ConditionalUpdate struct {
 	// release is the target of the update.
-	// +kubebuilder:validation:Required
 	// +required
 	Release Release `json:"release"`
 
@@ -785,7 +785,6 @@ type ConditionalUpdate struct {
 	// operator will evaluate all entries, and only recommend the
 	// update if there is at least one entry and all entries
 	// recommend the update.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +patchMergeKey=name
 	// +patchStrategy=merge
@@ -809,7 +808,6 @@ type ConditionalUpdate struct {
 // +k8s:deepcopy-gen=true
 type ConditionalUpdateRisk struct {
 	// url contains information about this risk.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Format=uri
 	// +kubebuilder:validation:MinLength=1
 	// +required
@@ -818,7 +816,6 @@ type ConditionalUpdateRisk struct {
 	// name is the CamelCase reason for not recommending a
 	// conditional update, in the event that matchingRules match the
 	// cluster state.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	// +required
 	Name string `json:"name"`
@@ -828,7 +825,6 @@ type ConditionalUpdateRisk struct {
 	// state. This is only to be consumed by humans. It may
 	// contain Line Feed characters (U+000A), which should be
 	// rendered as new lines.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
 	// +required
 	Message string `json:"message"`
@@ -839,7 +835,6 @@ type ConditionalUpdateRisk struct {
 	// operator will walk the slice in order, and stop after the
 	// first it can successfully evaluate. If no condition can be
 	// successfully evaluated, the update will not be recommended.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// +listType=atomic
 	// +required
@@ -854,24 +849,22 @@ type ConditionalUpdateRisk struct {
 type ClusterCondition struct {
 	// type represents the cluster-condition type. This defines
 	// the members and semantics of any additional properties.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum={"Always","PromQL"}
 	// +required
 	Type string `json:"type"`
 
-	// promQL represents a cluster condition based on PromQL.
+	// promql represents a cluster condition based on PromQL.
 	// +optional
 	PromQL *PromQLClusterCondition `json:"promql,omitempty"`
 }
 
 // PromQLClusterCondition represents a cluster condition based on PromQL.
 type PromQLClusterCondition struct {
-	// PromQL is a PromQL query classifying clusters. This query
+	// promql is a PromQL query classifying clusters. This query
 	// query should return a 1 in the match case and a 0 in the
 	// does-not-match case. Queries which return no time
 	// series, or which return values besides 0 or 1, are
 	// evaluation failures.
-	// +kubebuilder:validation:Required
 	// +required
 	PromQL string `json:"promql"`
 }
@@ -900,7 +893,7 @@ type SignatureStore struct {
 	//
 	// +kubebuilder:validation:Type=string
 	// +kubebuilder:validation:XValidation:rule="isURL(self)",message="url must be a valid absolute URL"
-	// +kubebuilder:validation:Required
+	// +required
 	URL string `json:"url"`
 
 	// ca is an optional reference to a config map by name containing the PEM-encoded CA bundle.

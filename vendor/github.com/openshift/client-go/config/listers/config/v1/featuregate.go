@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // FeatureGateLister helps list FeatureGates.
@@ -14,19 +14,19 @@ import (
 type FeatureGateLister interface {
 	// List lists all FeatureGates in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.FeatureGate, err error)
+	List(selector labels.Selector) (ret []*configv1.FeatureGate, err error)
 	// Get retrieves the FeatureGate from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.FeatureGate, error)
+	Get(name string) (*configv1.FeatureGate, error)
 	FeatureGateListerExpansion
 }
 
 // featureGateLister implements the FeatureGateLister interface.
 type featureGateLister struct {
-	listers.ResourceIndexer[*v1.FeatureGate]
+	listers.ResourceIndexer[*configv1.FeatureGate]
 }
 
 // NewFeatureGateLister returns a new FeatureGateLister.
 func NewFeatureGateLister(indexer cache.Indexer) FeatureGateLister {
-	return &featureGateLister{listers.New[*v1.FeatureGate](indexer, v1.Resource("featuregate"))}
+	return &featureGateLister{listers.New[*configv1.FeatureGate](indexer, configv1.Resource("featuregate"))}
 }

@@ -19,16 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	apinodev1alpha1 "k8s.io/api/node/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
-	v1alpha1 "k8s.io/client-go/listers/node/v1alpha1"
+	nodev1alpha1 "k8s.io/client-go/listers/node/v1alpha1"
 	cache "k8s.io/client-go/tools/cache"
 )
 
@@ -36,7 +36,7 @@ import (
 // RuntimeClasses.
 type RuntimeClassInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.RuntimeClassLister
+	Lister() nodev1alpha1.RuntimeClassLister
 }
 
 type runtimeClassInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredRuntimeClassInformer(client kubernetes.Interface, resyncPeriod t
 				return client.NodeV1alpha1().RuntimeClasses().Watch(context.TODO(), options)
 			},
 		},
-		&nodev1alpha1.RuntimeClass{},
+		&apinodev1alpha1.RuntimeClass{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *runtimeClassInformer) defaultInformer(client kubernetes.Interface, resy
 }
 
 func (f *runtimeClassInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&nodev1alpha1.RuntimeClass{}, f.defaultInformer)
+	return f.factory.InformerFor(&apinodev1alpha1.RuntimeClass{}, f.defaultInformer)
 }
 
-func (f *runtimeClassInformer) Lister() v1alpha1.RuntimeClassLister {
-	return v1alpha1.NewRuntimeClassLister(f.Informer().GetIndexer())
+func (f *runtimeClassInformer) Lister() nodev1alpha1.RuntimeClassLister {
+	return nodev1alpha1.NewRuntimeClassLister(f.Informer().GetIndexer())
 }

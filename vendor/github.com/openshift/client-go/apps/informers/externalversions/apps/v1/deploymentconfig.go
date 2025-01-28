@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1 "github.com/openshift/api/apps/v1"
+	apiappsv1 "github.com/openshift/api/apps/v1"
 	versioned "github.com/openshift/client-go/apps/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/apps/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/apps/listers/apps/v1"
+	appsv1 "github.com/openshift/client-go/apps/listers/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // DeploymentConfigs.
 type DeploymentConfigInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.DeploymentConfigLister
+	Lister() appsv1.DeploymentConfigLister
 }
 
 type deploymentConfigInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredDeploymentConfigInformer(client versioned.Interface, namespace s
 				return client.AppsV1().DeploymentConfigs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1.DeploymentConfig{},
+		&apiappsv1.DeploymentConfig{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *deploymentConfigInformer) defaultInformer(client versioned.Interface, r
 }
 
 func (f *deploymentConfigInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1.DeploymentConfig{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiappsv1.DeploymentConfig{}, f.defaultInformer)
 }
 
-func (f *deploymentConfigInformer) Lister() v1.DeploymentConfigLister {
-	return v1.NewDeploymentConfigLister(f.Informer().GetIndexer())
+func (f *deploymentConfigInformer) Lister() appsv1.DeploymentConfigLister {
+	return appsv1.NewDeploymentConfigLister(f.Informer().GetIndexer())
 }

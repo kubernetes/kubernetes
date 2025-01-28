@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	goruntime "runtime"
 	"sort"
@@ -33,12 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/managed"
@@ -95,7 +98,16 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return true
 	}
 
-	if !apierrors.IsAlreadyExists(err) {
+	switch {
+	case apierrors.IsAlreadyExists(err):
+		// Node already exists, proceed to reconcile node.
+	case apierrors.IsForbidden(err):
+		// Creating nodes is forbidden, but node may still exist, attempt to get the node.
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletRegistrationGetOnExistsOnly) {
+			klog.ErrorS(err, "Unable to register node with API server, reason is forbidden", "node", klog.KObj(node))
+			return false
+		}
+	default:
 		klog.ErrorS(err, "Unable to register node with API server", "node", klog.KObj(node))
 		return false
 	}
@@ -105,6 +117,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		klog.ErrorS(err, "Unable to register node with API server, error getting existing node", "node", klog.KObj(node))
 		return false
 	}
+
 	if existingNode == nil {
 		klog.InfoS("Unable to register node with API server, no node instance returned", "node", klog.KObj(node))
 		return false
@@ -616,18 +629,40 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	}
 
 	node, changed := kl.updateNode(ctx, originalNode)
-	shouldPatchNodeStatus := changed || kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency
-
-	if !shouldPatchNodeStatus {
+	// no need to update the status yet
+	if !changed && !kl.isUpdateStatusPeriodExperid() {
 		kl.markVolumesFromNode(node)
 		return nil
 	}
 
+	// We need to update the node status, if this is caused by a node change we want to calculate a new
+	// random delay so we avoid all the nodes to reach the apiserver at the same time. If the update is not related
+	// to a node change, because we run over the period, we reset the random delay so the node keeps updating
+	// its status at the same cadence
+	if changed {
+		kl.delayAfterNodeStatusChange = kl.calculateDelay()
+	} else {
+		kl.delayAfterNodeStatusChange = 0
+	}
 	updatedNode, err := kl.patchNodeStatus(originalNode, node)
 	if err == nil {
 		kl.markVolumesFromNode(updatedNode)
 	}
 	return err
+}
+
+func (kl *Kubelet) isUpdateStatusPeriodExperid() bool {
+	if kl.lastStatusReportTime.IsZero() {
+		return false
+	}
+	if kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency+kl.delayAfterNodeStatusChange {
+		return true
+	}
+	return false
+}
+
+func (kl *Kubelet) calculateDelay() time.Duration {
+	return time.Duration(float64(kl.nodeStatusReportFrequency) * (-0.5 + rand.Float64()))
 }
 
 // updateNode creates a copy of originalNode and runs update logic on it.

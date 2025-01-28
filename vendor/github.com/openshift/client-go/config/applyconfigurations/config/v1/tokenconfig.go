@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TokenConfigApplyConfiguration represents a declarative configuration of the TokenConfig type for use
 // with apply.
 type TokenConfigApplyConfiguration struct {
-	AccessTokenMaxAgeSeconds            *int32       `json:"accessTokenMaxAgeSeconds,omitempty"`
-	AccessTokenInactivityTimeoutSeconds *int32       `json:"accessTokenInactivityTimeoutSeconds,omitempty"`
-	AccessTokenInactivityTimeout        *v1.Duration `json:"accessTokenInactivityTimeout,omitempty"`
+	AccessTokenMaxAgeSeconds            *int32           `json:"accessTokenMaxAgeSeconds,omitempty"`
+	AccessTokenInactivityTimeoutSeconds *int32           `json:"accessTokenInactivityTimeoutSeconds,omitempty"`
+	AccessTokenInactivityTimeout        *metav1.Duration `json:"accessTokenInactivityTimeout,omitempty"`
 }
 
 // TokenConfigApplyConfiguration constructs a declarative configuration of the TokenConfig type for use with
@@ -39,7 +39,7 @@ func (b *TokenConfigApplyConfiguration) WithAccessTokenInactivityTimeoutSeconds(
 // WithAccessTokenInactivityTimeout sets the AccessTokenInactivityTimeout field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the AccessTokenInactivityTimeout field is set to the value of the last call.
-func (b *TokenConfigApplyConfiguration) WithAccessTokenInactivityTimeout(value v1.Duration) *TokenConfigApplyConfiguration {
+func (b *TokenConfigApplyConfiguration) WithAccessTokenInactivityTimeout(value metav1.Duration) *TokenConfigApplyConfiguration {
 	b.AccessTokenInactivityTimeout = &value
 	return b
 }

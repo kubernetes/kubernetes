@@ -315,7 +315,7 @@ func TestLoadConfigFailures(t *testing.T) {
 			_, err := options.loadConfig([]byte(config))
 
 			require.Error(t, err, tc.name)
-			require.Contains(t, err.Error(), tc.expErr)
+			require.ErrorContains(t, err, tc.expErr)
 
 			if tc.checkFn != nil {
 				require.True(t, tc.checkFn(err), tc.name)
@@ -524,6 +524,22 @@ kind: KubeProxyConfiguration
 	}{
 		"empty": {
 			expected: expected,
+		},
+		"conntrack": {
+			flags: []string{
+				"--conntrack-max-per-core=0",
+				"--conntrack-min=0",
+				"--conntrack-tcp-timeout-established=0",
+				"--conntrack-tcp-timeout-close-wait=0",
+			},
+			expected: func() *kubeproxyconfig.KubeProxyConfiguration {
+				c := expected.DeepCopy()
+				c.Linux.Conntrack.MaxPerCore = ptr.To(int32(0))
+				c.Linux.Conntrack.Min = ptr.To(int32(0))
+				c.Linux.Conntrack.TCPEstablishedTimeout = ptr.To(metav1.Duration{})
+				c.Linux.Conntrack.TCPCloseWaitTimeout = ptr.To(metav1.Duration{})
+				return c
+			}(),
 		},
 		"empty-config": {
 			config:   header,

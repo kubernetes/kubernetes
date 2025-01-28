@@ -62,7 +62,7 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	// ADMISSION
 	clusterQuotaMappingController := newClusterQuotaMappingController(kubeInformers.Core().V1().Namespaces(), openshiftInformers.OpenshiftQuotaInformers.Quota().V1().ClusterResourceQuotas())
 	genericConfig.AddPostStartHookOrDie("quota.openshift.io-clusterquotamapping", func(context genericapiserver.PostStartHookContext) error {
-		go clusterQuotaMappingController.Run(5, context.StopCh)
+		go clusterQuotaMappingController.Run(5, context.Done())
 		return nil
 	})
 
@@ -95,7 +95,7 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	}
 	apiRequestCountController := apirequestcount.NewController(apiserverClient.APIRequestCounts(), nodeFor())
 	genericConfig.AddPostStartHook("openshift.io-api-request-count-filter", func(context genericapiserver.PostStartHookContext) error {
-		go apiRequestCountController.Start(context.StopCh)
+		go apiRequestCountController.Start(context.Done())
 		return nil
 	})
 	genericConfig.BuildHandlerChainFunc, err = BuildHandlerChain(
@@ -113,7 +113,7 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	genericConfig.ReadyzChecks = append(genericConfig.ReadyzChecks, openshiftAPIServiceReachabilityCheck, oauthAPIServiceReachabilityCheck)
 
 	genericConfig.AddPostStartHookOrDie("openshift.io-startkubeinformers", func(context genericapiserver.PostStartHookContext) error {
-		go openshiftInformers.Start(context.StopCh)
+		go openshiftInformers.Start(context.Done())
 		return nil
 	})
 	genericConfig.AddPostStartHookOrDie("openshift.io-openshift-apiserver-reachable", func(context genericapiserver.PostStartHookContext) error {

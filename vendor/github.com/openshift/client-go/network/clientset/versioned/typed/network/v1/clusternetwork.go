@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/network/v1"
-	networkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
+	networkv1 "github.com/openshift/api/network/v1"
+	applyconfigurationsnetworkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
 	scheme "github.com/openshift/client-go/network/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type ClusterNetworksGetter interface {
 
 // ClusterNetworkInterface has methods to work with ClusterNetwork resources.
 type ClusterNetworkInterface interface {
-	Create(ctx context.Context, clusterNetwork *v1.ClusterNetwork, opts metav1.CreateOptions) (*v1.ClusterNetwork, error)
-	Update(ctx context.Context, clusterNetwork *v1.ClusterNetwork, opts metav1.UpdateOptions) (*v1.ClusterNetwork, error)
+	Create(ctx context.Context, clusterNetwork *networkv1.ClusterNetwork, opts metav1.CreateOptions) (*networkv1.ClusterNetwork, error)
+	Update(ctx context.Context, clusterNetwork *networkv1.ClusterNetwork, opts metav1.UpdateOptions) (*networkv1.ClusterNetwork, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterNetwork, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterNetworkList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*networkv1.ClusterNetwork, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*networkv1.ClusterNetworkList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterNetwork, err error)
-	Apply(ctx context.Context, clusterNetwork *networkv1.ClusterNetworkApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterNetwork, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *networkv1.ClusterNetwork, err error)
+	Apply(ctx context.Context, clusterNetwork *applyconfigurationsnetworkv1.ClusterNetworkApplyConfiguration, opts metav1.ApplyOptions) (result *networkv1.ClusterNetwork, err error)
 	ClusterNetworkExpansion
 }
 
 // clusterNetworks implements ClusterNetworkInterface
 type clusterNetworks struct {
-	*gentype.ClientWithListAndApply[*v1.ClusterNetwork, *v1.ClusterNetworkList, *networkv1.ClusterNetworkApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkv1.ClusterNetwork, *networkv1.ClusterNetworkList, *applyconfigurationsnetworkv1.ClusterNetworkApplyConfiguration]
 }
 
 // newClusterNetworks returns a ClusterNetworks
 func newClusterNetworks(c *NetworkV1Client) *clusterNetworks {
 	return &clusterNetworks{
-		gentype.NewClientWithListAndApply[*v1.ClusterNetwork, *v1.ClusterNetworkList, *networkv1.ClusterNetworkApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkv1.ClusterNetwork, *networkv1.ClusterNetworkList, *applyconfigurationsnetworkv1.ClusterNetworkApplyConfiguration](
 			"clusternetworks",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterNetwork { return &v1.ClusterNetwork{} },
-			func() *v1.ClusterNetworkList { return &v1.ClusterNetworkList{} }),
+			func() *networkv1.ClusterNetwork { return &networkv1.ClusterNetwork{} },
+			func() *networkv1.ClusterNetworkList { return &networkv1.ClusterNetworkList{} },
+		),
 	}
 }

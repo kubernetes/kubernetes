@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/apps/v1"
+	appsv1 "github.com/openshift/api/apps/v1"
 )
 
 // LifecycleHookApplyConfiguration represents a declarative configuration of the LifecycleHook type for use
 // with apply.
 type LifecycleHookApplyConfiguration struct {
-	FailurePolicy *v1.LifecycleHookFailurePolicy    `json:"failurePolicy,omitempty"`
-	ExecNewPod    *ExecNewPodHookApplyConfiguration `json:"execNewPod,omitempty"`
-	TagImages     []TagImageHookApplyConfiguration  `json:"tagImages,omitempty"`
+	FailurePolicy *appsv1.LifecycleHookFailurePolicy `json:"failurePolicy,omitempty"`
+	ExecNewPod    *ExecNewPodHookApplyConfiguration  `json:"execNewPod,omitempty"`
+	TagImages     []TagImageHookApplyConfiguration   `json:"tagImages,omitempty"`
 }
 
 // LifecycleHookApplyConfiguration constructs a declarative configuration of the LifecycleHook type for use with
@@ -23,7 +23,7 @@ func LifecycleHook() *LifecycleHookApplyConfiguration {
 // WithFailurePolicy sets the FailurePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the FailurePolicy field is set to the value of the last call.
-func (b *LifecycleHookApplyConfiguration) WithFailurePolicy(value v1.LifecycleHookFailurePolicy) *LifecycleHookApplyConfiguration {
+func (b *LifecycleHookApplyConfiguration) WithFailurePolicy(value appsv1.LifecycleHookFailurePolicy) *LifecycleHookApplyConfiguration {
 	b.FailurePolicy = &value
 	return b
 }

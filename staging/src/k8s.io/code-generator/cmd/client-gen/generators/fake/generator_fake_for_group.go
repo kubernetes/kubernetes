@@ -34,7 +34,6 @@ type genFakeForGroup struct {
 	generator.GoGenerator
 	outputPackage     string // must be a Go import-path
 	realClientPackage string // must be a Go import-path
-	group             string
 	version           string
 	groupGoName       string
 	// types in this group
@@ -78,6 +77,8 @@ func (g *genFakeForGroup) GenerateType(c *generator.Context, t *types.Type, w io
 		"Fake":                c.Universe.Type(types.Name{Package: "k8s.io/client-go/testing", Name: "Fake"}),
 		"RESTClientInterface": c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"RESTClient":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClient"}),
+		"FakeClient":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/gentype", Name: "FakeClient"}),
+		"NewFakeClient":       c.Universe.Function(types.Name{Package: "k8s.io/client-go/gentype", Name: "NewFakeClient"}),
 	}
 
 	sw.Do(groupClientTemplate, m)
@@ -110,13 +111,13 @@ type Fake$.GroupGoName$$.Version$ struct {
 
 var getterImplNamespaced = `
 func (c *Fake$.GroupGoName$$.Version$) $.type|publicPlural$(namespace string) $.realClientPackage$.$.type|public$Interface {
-	return &Fake$.type|publicPlural${c, namespace}
+	return newFake$.type|publicPlural$(c, namespace)
 }
 `
 
 var getterImplNonNamespaced = `
 func (c *Fake$.GroupGoName$$.Version$) $.type|publicPlural$() $.realClientPackage$.$.type|public$Interface {
-	return &Fake$.type|publicPlural${c}
+	return newFake$.type|publicPlural$(c)
 }
 `
 

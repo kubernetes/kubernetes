@@ -19,17 +19,16 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"net/http"
+	http "net/http"
 
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
-	"k8s.io/client-go/kubernetes/scheme"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
+	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
 type ResourceV1alpha3Interface interface {
 	RESTClient() rest.Interface
 	DeviceClassesGetter
-	PodSchedulingContextsGetter
 	ResourceClaimsGetter
 	ResourceClaimTemplatesGetter
 	ResourceSlicesGetter
@@ -42,10 +41,6 @@ type ResourceV1alpha3Client struct {
 
 func (c *ResourceV1alpha3Client) DeviceClasses() DeviceClassInterface {
 	return newDeviceClasses(c)
-}
-
-func (c *ResourceV1alpha3Client) PodSchedulingContexts(namespace string) PodSchedulingContextInterface {
-	return newPodSchedulingContexts(c, namespace)
 }
 
 func (c *ResourceV1alpha3Client) ResourceClaims(namespace string) ResourceClaimInterface {
@@ -105,10 +100,10 @@ func New(c rest.Interface) *ResourceV1alpha3Client {
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := v1alpha3.SchemeGroupVersion
+	gv := resourcev1alpha3.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

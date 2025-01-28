@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/authorization/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	authorizationv1 "github.com/openshift/api/authorization/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterRoleLister helps list ClusterRoles.
@@ -14,19 +14,19 @@ import (
 type ClusterRoleLister interface {
 	// List lists all ClusterRoles in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ClusterRole, err error)
+	List(selector labels.Selector) (ret []*authorizationv1.ClusterRole, err error)
 	// Get retrieves the ClusterRole from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ClusterRole, error)
+	Get(name string) (*authorizationv1.ClusterRole, error)
 	ClusterRoleListerExpansion
 }
 
 // clusterRoleLister implements the ClusterRoleLister interface.
 type clusterRoleLister struct {
-	listers.ResourceIndexer[*v1.ClusterRole]
+	listers.ResourceIndexer[*authorizationv1.ClusterRole]
 }
 
 // NewClusterRoleLister returns a new ClusterRoleLister.
 func NewClusterRoleLister(indexer cache.Indexer) ClusterRoleLister {
-	return &clusterRoleLister{listers.New[*v1.ClusterRole](indexer, v1.Resource("clusterrole"))}
+	return &clusterRoleLister{listers.New[*authorizationv1.ClusterRole](indexer, authorizationv1.Resource("clusterrole"))}
 }

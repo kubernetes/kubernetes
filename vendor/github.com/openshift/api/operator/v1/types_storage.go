@@ -25,7 +25,6 @@ type Storage struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec StorageSpec `json:"spec"`
 
@@ -47,7 +46,7 @@ const (
 type StorageSpec struct {
 	OperatorSpec `json:",inline"`
 
-	// VSphereStorageDriver indicates the storage driver to use on VSphere clusters.
+	// vsphereStorageDriver indicates the storage driver to use on VSphere clusters.
 	// Once this field is set to CSIWithMigrationDriver, it can not be changed.
 	// If this is empty, the platform will choose a good default,
 	// which may change over time without notice.

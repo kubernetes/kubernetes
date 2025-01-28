@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
-	gofeaturespb "google.golang.org/protobuf/types/gofeaturespb"
+	"google.golang.org/protobuf/types/gofeaturespb"
 )
 
 var defaults = &descriptorpb.FeatureSetDefaults{}

@@ -158,7 +158,7 @@ type EntryExpr interface {
 // IDGenerator produces unique ids suitable for tagging expression nodes
 type IDGenerator func(originalID int64) int64
 
-// CallExpr defines an interface for inspecting a function call and its arugments.
+// CallExpr defines an interface for inspecting a function call and its arguments.
 type CallExpr interface {
 	// FunctionName returns the name of the function.
 	FunctionName() string
@@ -269,7 +269,21 @@ type ComprehensionExpr interface {
 	IterRange() Expr
 
 	// IterVar returns the iteration variable name.
+	//
+	// For one-variable comprehensions, the iter var refers to the element value
+	// when iterating over a list, or the map key when iterating over a map.
+	//
+	// For two-variable comprehneions, the iter var refers to the list index or the
+	// map key.
 	IterVar() string
+
+	// IterVar2 returns the second iteration variable name.
+	//
+	// When the value is non-empty, the comprehension is a two-variable comprehension.
+	IterVar2() string
+
+	// HasIterVar2 returns true if the second iteration variable is non-empty.
+	HasIterVar2() bool
 
 	// AccuVar returns the accumulation variable name.
 	AccuVar() string
@@ -397,6 +411,7 @@ func (e *expr) SetKindCase(other Expr) {
 		e.exprKindCase = &baseComprehensionExpr{
 			iterRange: c.IterRange(),
 			iterVar:   c.IterVar(),
+			iterVar2:  c.IterVar2(),
 			accuVar:   c.AccuVar(),
 			accuInit:  c.AccuInit(),
 			loopCond:  c.LoopCondition(),
@@ -505,6 +520,7 @@ var _ ComprehensionExpr = &baseComprehensionExpr{}
 type baseComprehensionExpr struct {
 	iterRange Expr
 	iterVar   string
+	iterVar2  string
 	accuVar   string
 	accuInit  Expr
 	loopCond  Expr
@@ -525,6 +541,14 @@ func (e *baseComprehensionExpr) IterRange() Expr {
 
 func (e *baseComprehensionExpr) IterVar() string {
 	return e.iterVar
+}
+
+func (e *baseComprehensionExpr) IterVar2() string {
+	return e.iterVar2
+}
+
+func (e *baseComprehensionExpr) HasIterVar2() bool {
+	return e.iterVar2 != ""
 }
 
 func (e *baseComprehensionExpr) AccuVar() string {

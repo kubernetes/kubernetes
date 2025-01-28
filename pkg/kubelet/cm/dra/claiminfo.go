@@ -22,7 +22,7 @@ import (
 	"slices"
 	"sync"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -115,12 +115,12 @@ func (info *ClaimInfo) isPrepared() bool {
 func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error) {
 	checkpointer, err := state.NewCheckpointer(stateDir, checkpointName)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove dra state file, err: %+v", err)
+		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove dra state file, err: %w", err)
 	}
 
 	checkpoint, err := checkpointer.GetOrCreate()
 	if err != nil {
-		return nil, fmt.Errorf("error calling GetOrCreate() on checkpoint state: %v", err)
+		return nil, fmt.Errorf("error calling GetOrCreate() on checkpoint state: %w", err)
 	}
 
 	cache := &claimInfoCache{
@@ -182,9 +182,9 @@ func (cache *claimInfoCache) delete(claimName, namespace string) {
 // that is referenced by the pod with the given UID
 // This function is used indirectly by the status manager
 // to check if pod can enter termination status
-func (cache *claimInfoCache) hasPodReference(UID types.UID) bool {
+func (cache *claimInfoCache) hasPodReference(uid types.UID) bool {
 	for _, claimInfo := range cache.claimInfo {
-		if claimInfo.hasPodReference(UID) {
+		if claimInfo.hasPodReference(uid) {
 			return true
 		}
 	}

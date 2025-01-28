@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	templatev1 "github.com/openshift/api/template/v1"
+	apitemplatev1 "github.com/openshift/api/template/v1"
 	versioned "github.com/openshift/client-go/template/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/template/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/template/listers/template/v1"
+	templatev1 "github.com/openshift/client-go/template/listers/template/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // BrokerTemplateInstances.
 type BrokerTemplateInstanceInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.BrokerTemplateInstanceLister
+	Lister() templatev1.BrokerTemplateInstanceLister
 }
 
 type brokerTemplateInstanceInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredBrokerTemplateInstanceInformer(client versioned.Interface, resyn
 				return client.TemplateV1().BrokerTemplateInstances().Watch(context.TODO(), options)
 			},
 		},
-		&templatev1.BrokerTemplateInstance{},
+		&apitemplatev1.BrokerTemplateInstance{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *brokerTemplateInstanceInformer) defaultInformer(client versioned.Interf
 }
 
 func (f *brokerTemplateInstanceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&templatev1.BrokerTemplateInstance{}, f.defaultInformer)
+	return f.factory.InformerFor(&apitemplatev1.BrokerTemplateInstance{}, f.defaultInformer)
 }
 
-func (f *brokerTemplateInstanceInformer) Lister() v1.BrokerTemplateInstanceLister {
-	return v1.NewBrokerTemplateInstanceLister(f.Informer().GetIndexer())
+func (f *brokerTemplateInstanceInformer) Lister() templatev1.BrokerTemplateInstanceLister {
+	return templatev1.NewBrokerTemplateInstanceLister(f.Informer().GetIndexer())
 }

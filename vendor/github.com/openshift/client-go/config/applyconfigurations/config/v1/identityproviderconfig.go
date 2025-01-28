@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // IdentityProviderConfigApplyConfiguration represents a declarative configuration of the IdentityProviderConfig type for use
 // with apply.
 type IdentityProviderConfigApplyConfiguration struct {
-	Type          *v1.IdentityProviderType                         `json:"type,omitempty"`
+	Type          *configv1.IdentityProviderType                   `json:"type,omitempty"`
 	BasicAuth     *BasicAuthIdentityProviderApplyConfiguration     `json:"basicAuth,omitempty"`
 	GitHub        *GitHubIdentityProviderApplyConfiguration        `json:"github,omitempty"`
 	GitLab        *GitLabIdentityProviderApplyConfiguration        `json:"gitlab,omitempty"`
@@ -30,7 +30,7 @@ func IdentityProviderConfig() *IdentityProviderConfigApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *IdentityProviderConfigApplyConfiguration) WithType(value v1.IdentityProviderType) *IdentityProviderConfigApplyConfiguration {
+func (b *IdentityProviderConfigApplyConfiguration) WithType(value configv1.IdentityProviderType) *IdentityProviderConfigApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -26,6 +26,11 @@ Usage: $0 [-r <revision>] [directory ...]"
                   Default is the current working tree instead of a revision.
    -r <revision>: Report change in code added since this revision. Default is
                   the common base of origin/master and HEAD.
+   -b <directory> Build all packages in that directory after replacing
+                  Kubernetes dependencies with the current content of the
+                  staging repo. May be given more than once. Must be an
+                  absolute path.
+                  WARNING: this will modify the go.mod in that directory.
    [directory]:   Check one or more specific directory instead of everything.
 EOF
   exit 1
@@ -40,7 +45,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 base=
 target=
-while getopts "r:t:" o; do
+builds=()
+while getopts "r:t:b:" o; do
     case "${o}" in
         r)
             base="${OPTARG}"
@@ -57,6 +63,14 @@ while getopts "r:t:" o; do
                 echo >&2
                 usage
             fi
+            ;;
+       b)
+            if [ ! "${OPTARG}" ]; then
+                echo "ERROR: -${o} needs a non-empty parameter" >&2
+                echo >&2
+                usage
+            fi
+            builds+=("${OPTARG}")
             ;;
         *)
             usage
@@ -136,6 +150,8 @@ output_name () {
 
 # run invokes apidiff once per target and stores the output
 # file(s) in the given directory.
+#
+# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
 run () {
     out="$1"
     mkdir -p "$out"
@@ -144,31 +160,44 @@ run () {
     done
 }
 
-# runWorktree checks out a specific revision, then invokes run there.
-runWorktree () {
-    local out="$1"
-    local worktree="$2"
-    local rev="$3"
+# inWorktree checks out a specific revision, then invokes the given
+# command there.
+#
+# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
+inWorktree () {
+    local worktree="$1"
+    shift
+    local rev="$1"
+    shift
 
     # Create a copy of the repo with the specific revision checked out.
-    git worktree add -f -d "${worktree}" "${rev}"
-    # Clean up the copy on exit.
-    kube::util::trap_add "git worktree remove -f ${worktree}" EXIT
+    # Might already have been done before.
+    if ! [ -d "${worktree}" ]; then
+        git worktree add -f -d "${worktree}" "${rev}"
+        # Clean up the copy on exit.
+        kube::util::trap_add "git worktree remove -f ${worktree}" EXIT
+    fi
 
     # Ready for apidiff.
     (
         cd "${worktree}"
-        run "${out}"
+        "$@"
     )
 }
 
+# inTarget runs the given command in the target revision of Kubernetes,
+# checking it out in a work tree if necessary.
+inTarget () {
+    if [ -z "${target}" ]; then
+        "$@"
+    else
+        inWorktree "${KUBE_TEMP}/target" "${target}" "$@"
+    fi
+}
+
 # Dump old and new api state.
-if [ -z "${target}" ]; then
-    run "${KUBE_TEMP}/after"
-else
-    runWorktree "${KUBE_TEMP}/after" "${KUBE_TEMP}/target" "${target}"
-fi
-runWorktree "${KUBE_TEMP}/before" "${KUBE_TEMP}/base" "${base}"
+inTarget run "${KUBE_TEMP}/after"
+inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
 
 # Now produce a report. All changes get reported because exporting some API
 # unnecessarily might also be good to know, but the final exit code will only
@@ -198,5 +227,94 @@ compare () {
 for d in "${targets[@]}"; do
     compare "${d}" "${KUBE_TEMP}/before/$(output_name "${d}")" "${KUBE_TEMP}/after/$(output_name "${d}")"
 done
+
+# tryBuild checks whether some other project builds with the staging repos
+# of the current Kubernetes directory.
+#
+# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
+tryBuild () {
+    local build="$1"
+
+    # Replace all staging repos, whether the project uses them or not (playing it safe...).
+    local repo
+    for repo in $(cd staging/src; find k8s.io -name go.mod); do
+        local path
+        repo=$(dirname "${repo}")
+        path="$(pwd)/staging/src/${repo}"
+        (
+            cd "$build"
+            go mod edit -replace "${repo}"="${path}"
+        )
+    done
+
+    # We only care about building. Breaking compilation of unit tests is also
+    # annoying, but does not affect downstream consumers.
+    (
+        cd "$build"
+        rm -rf vendor
+        go mod tidy
+        go build ./...
+    )
+}
+
+if [ $res -ne 0 ]; then
+    cat <<EOF
+
+Some notes about API differences:
+
+Changes in internal packages are usually okay.
+However, remember that custom schedulers
+and scheduler plugins depend on pkg/scheduler/framework.
+
+API changes in staging repos are more critical.
+Try to avoid them as much as possible.
+But sometimes changing an API is the lesser evil
+and/or the impact on downstream consumers is low.
+Use common sense and code searches.
+EOF
+
+    if [ ${#builds[@]} -gt 0 ]; then
+
+cat <<EOF
+
+To help with assessing the real-world impact of an
+API change, $0 will now try to build code in
+${builds[@]}.
+EOF
+
+        if [[ "${builds[*]}" =~ controller-runtime ]]; then
+cat <<EOF
+
+controller-runtime is used because
+- It tends to use advanced client-go functionality.
+- Breaking it has additional impact on controller
+  built on top of it.
+
+This doesn't mean that an API change isn't allowed
+if it breaks controller runtime, it just needs additional
+scrutiny.
+
+https://github.com/kubernetes-sigs/controller-runtime?tab=readme-ov-file#compatibility
+explicitly states that a controller-runtime
+release cannot be expected to work with a newer
+release of the Kubernetes Go packages.
+EOF
+        fi
+
+        for build in "${builds[@]}"; do
+            echo
+            echo "vvvvvvvvvvvvvvvv ${build} vvvvvvvvvvvvvvvvvv"
+            if inTarget tryBuild "${build}"; then
+                echo "${build} builds without errors."
+            else
+                cat <<EOF
+
+WARNING: Building ${build} failed. This may or may not be because of the API changes!
+EOF
+            fi
+            echo "^^^^^^^^^^^^^^^^ ${build} ^^^^^^^^^^^^^^^^^^"
+        done
+    fi
+fi
 
 exit "$res"

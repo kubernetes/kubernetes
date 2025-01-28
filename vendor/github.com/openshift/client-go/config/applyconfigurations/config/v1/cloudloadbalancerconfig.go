@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // CloudLoadBalancerConfigApplyConfiguration represents a declarative configuration of the CloudLoadBalancerConfig type for use
 // with apply.
 type CloudLoadBalancerConfigApplyConfiguration struct {
-	DNSType       *v1.DNSType                             `json:"dnsType,omitempty"`
+	DNSType       *configv1.DNSType                       `json:"dnsType,omitempty"`
 	ClusterHosted *CloudLoadBalancerIPsApplyConfiguration `json:"clusterHosted,omitempty"`
 }
 
@@ -22,7 +22,7 @@ func CloudLoadBalancerConfig() *CloudLoadBalancerConfigApplyConfiguration {
 // WithDNSType sets the DNSType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DNSType field is set to the value of the last call.
-func (b *CloudLoadBalancerConfigApplyConfiguration) WithDNSType(value v1.DNSType) *CloudLoadBalancerConfigApplyConfiguration {
+func (b *CloudLoadBalancerConfigApplyConfiguration) WithDNSType(value configv1.DNSType) *CloudLoadBalancerConfigApplyConfiguration {
 	b.DNSType = &value
 	return b
 }

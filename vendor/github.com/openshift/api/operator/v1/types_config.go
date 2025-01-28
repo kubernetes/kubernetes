@@ -26,7 +26,6 @@ type Config struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	// spec is the specification of the desired behavior of the Config Operator.
-	// +kubebuilder:validation:Required
 	// +required
 	Spec ConfigSpec `json:"spec"`
 
@@ -56,6 +55,6 @@ type ConfigList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 
-	// Items contains the items
+	// items contains the items
 	Items []Config `json:"items"`
 }

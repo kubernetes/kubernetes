@@ -3,8 +3,8 @@
 package versioned
 
 import (
-	"fmt"
-	"net/http"
+	fmt "fmt"
+	http "net/http"
 
 	buildv1 "github.com/openshift/client-go/build/clientset/versioned/typed/build/v1"
 	discovery "k8s.io/client-go/discovery"

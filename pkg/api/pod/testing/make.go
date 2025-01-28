@@ -27,6 +27,7 @@ import (
 // Tweak is a function that modifies a Pod.
 type Tweak func(*api.Pod)
 type TweakContainer func(*api.Container)
+type TweakPodStatus func(*api.PodStatus)
 
 // MakePod helps construct Pod objects (which pass API validation) more
 // legibly and tersely than a Go struct definition.  By default this produces
@@ -68,6 +69,12 @@ func SetNamespace(ns string) Tweak {
 func SetResourceVersion(rv string) Tweak {
 	return func(pod *api.Pod) {
 		pod.ResourceVersion = rv
+	}
+}
+
+func SetPodResources(resources *api.ResourceRequirements) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.Resources = resources
 	}
 }
 
@@ -162,6 +169,12 @@ func SetOverhead(overhead api.ResourceList) Tweak {
 func SetDNSPolicy(policy api.DNSPolicy) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.DNSPolicy = policy
+	}
+}
+
+func SetDNSConfig(config *api.PodDNSConfig) Tweak {
+	return func(pod *api.Pod) {
+		pod.Spec.DNSConfig = config
 	}
 }
 
@@ -289,5 +302,36 @@ func SetContainerSecurityContext(ctx api.SecurityContext) TweakContainer {
 func SetContainerRestartPolicy(policy api.ContainerRestartPolicy) TweakContainer {
 	return func(cnr *api.Container) {
 		cnr.RestartPolicy = &policy
+	}
+}
+
+func MakePodStatus(tweaks ...TweakPodStatus) api.PodStatus {
+	ps := api.PodStatus{}
+
+	for _, tweak := range tweaks {
+		tweak(&ps)
+	}
+
+	return ps
+}
+
+func SetContainerStatuses(containerStatuses ...api.ContainerStatus) TweakPodStatus {
+	return func(podstatus *api.PodStatus) {
+		podstatus.ContainerStatuses = containerStatuses
+	}
+}
+
+func MakeContainerStatus(name string, allocatedResources api.ResourceList) api.ContainerStatus {
+	cs := api.ContainerStatus{
+		Name:               name,
+		AllocatedResources: allocatedResources,
+	}
+
+	return cs
+}
+
+func SetResizeStatus(resizeStatus api.PodResizeStatus) TweakPodStatus {
+	return func(podstatus *api.PodStatus) {
+		podstatus.Resize = resizeStatus
 	}
 }

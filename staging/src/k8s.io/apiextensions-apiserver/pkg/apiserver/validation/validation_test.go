@@ -594,7 +594,7 @@ func TestValidateCustomResource(t *testing.T) {
 			},
 			failingObjects: []failingObject{
 				{object: map[string]interface{}{"fieldX": "abc"}, expectErrs: []string{
-					`fieldX: Too long: may not be longer than 2`,
+					`fieldX: Too long: may not be more than 2 bytes`,
 				}},
 			},
 		},
@@ -620,7 +620,7 @@ func TestValidateCustomResource(t *testing.T) {
 				}
 				errs, _ := celValidator.Validate(context.TODO(), nil, structural, obj, oldObject, celconfig.RuntimeCELCostBudget)
 				if len(errs) > 0 {
-					t.Errorf(errs.ToAggregate().Error())
+					t.Error(errs.ToAggregate().Error())
 				}
 			}
 			for i, failingObject := range tt.failingObjects {

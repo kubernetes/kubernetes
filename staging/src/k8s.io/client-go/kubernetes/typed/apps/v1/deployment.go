@@ -19,19 +19,19 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
+	context "context"
+	fmt "fmt"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
+	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
 	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
+	apply "k8s.io/client-go/util/apply"
 )
 
 // DeploymentsGetter has a method to return a DeploymentInterface.
@@ -42,19 +42,19 @@ type DeploymentsGetter interface {
 
 // DeploymentInterface has methods to work with Deployment resources.
 type DeploymentInterface interface {
-	Create(ctx context.Context, deployment *v1.Deployment, opts metav1.CreateOptions) (*v1.Deployment, error)
-	Update(ctx context.Context, deployment *v1.Deployment, opts metav1.UpdateOptions) (*v1.Deployment, error)
+	Create(ctx context.Context, deployment *appsv1.Deployment, opts metav1.CreateOptions) (*appsv1.Deployment, error)
+	Update(ctx context.Context, deployment *appsv1.Deployment, opts metav1.UpdateOptions) (*appsv1.Deployment, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, deployment *v1.Deployment, opts metav1.UpdateOptions) (*v1.Deployment, error)
+	UpdateStatus(ctx context.Context, deployment *appsv1.Deployment, opts metav1.UpdateOptions) (*appsv1.Deployment, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Deployment, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.DeploymentList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*appsv1.Deployment, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*appsv1.DeploymentList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Deployment, err error)
-	Apply(ctx context.Context, deployment *appsv1.DeploymentApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Deployment, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *appsv1.Deployment, err error)
+	Apply(ctx context.Context, deployment *applyconfigurationsappsv1.DeploymentApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.Deployment, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, deployment *appsv1.DeploymentApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Deployment, err error)
+	ApplyStatus(ctx context.Context, deployment *applyconfigurationsappsv1.DeploymentApplyConfiguration, opts metav1.ApplyOptions) (result *appsv1.Deployment, err error)
 	GetScale(ctx context.Context, deploymentName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, deploymentName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (*autoscalingv1.Scale, error)
 	ApplyScale(ctx context.Context, deploymentName string, scale *applyconfigurationsautoscalingv1.ScaleApplyConfiguration, opts metav1.ApplyOptions) (*autoscalingv1.Scale, error)
@@ -64,19 +64,21 @@ type DeploymentInterface interface {
 
 // deployments implements DeploymentInterface
 type deployments struct {
-	*gentype.ClientWithListAndApply[*v1.Deployment, *v1.DeploymentList, *appsv1.DeploymentApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1.Deployment, *appsv1.DeploymentList, *applyconfigurationsappsv1.DeploymentApplyConfiguration]
 }
 
 // newDeployments returns a Deployments
 func newDeployments(c *AppsV1Client, namespace string) *deployments {
 	return &deployments{
-		gentype.NewClientWithListAndApply[*v1.Deployment, *v1.DeploymentList, *appsv1.DeploymentApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1.Deployment, *appsv1.DeploymentList, *applyconfigurationsappsv1.DeploymentApplyConfiguration](
 			"deployments",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.Deployment { return &v1.Deployment{} },
-			func() *v1.DeploymentList { return &v1.DeploymentList{} }),
+			func() *appsv1.Deployment { return &appsv1.Deployment{} },
+			func() *appsv1.DeploymentList { return &appsv1.DeploymentList{} },
+			gentype.PrefersProtobuf[*appsv1.Deployment](),
+		),
 	}
 }
 
@@ -84,6 +86,7 @@ func newDeployments(c *AppsV1Client, namespace string) *deployments {
 func (c *deployments) GetScale(ctx context.Context, deploymentName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.GetClient().Get().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
@@ -98,6 +101,7 @@ func (c *deployments) GetScale(ctx context.Context, deploymentName string, optio
 func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.GetClient().Put().
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
@@ -116,19 +120,19 @@ func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, sca
 		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
 	}
 	patchOpts := opts.ToPatchOptions()
-	data, err := json.Marshal(scale)
+	request, err := apply.NewRequest(c.GetClient(), scale)
 	if err != nil {
 		return nil, err
 	}
 
 	result = &autoscalingv1.Scale{}
-	err = c.GetClient().Patch(types.ApplyPatchType).
+	err = request.
+		UseProtobufAsDefault().
 		Namespace(c.GetNamespace()).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
-		Body(data).
 		Do(ctx).
 		Into(result)
 	return

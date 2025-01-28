@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/template/v1"
-	templatev1 "github.com/openshift/client-go/template/applyconfigurations/template/v1"
+	templatev1 "github.com/openshift/api/template/v1"
+	applyconfigurationstemplatev1 "github.com/openshift/client-go/template/applyconfigurations/template/v1"
 	scheme "github.com/openshift/client-go/template/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type TemplateInstancesGetter interface {
 
 // TemplateInstanceInterface has methods to work with TemplateInstance resources.
 type TemplateInstanceInterface interface {
-	Create(ctx context.Context, templateInstance *v1.TemplateInstance, opts metav1.CreateOptions) (*v1.TemplateInstance, error)
-	Update(ctx context.Context, templateInstance *v1.TemplateInstance, opts metav1.UpdateOptions) (*v1.TemplateInstance, error)
+	Create(ctx context.Context, templateInstance *templatev1.TemplateInstance, opts metav1.CreateOptions) (*templatev1.TemplateInstance, error)
+	Update(ctx context.Context, templateInstance *templatev1.TemplateInstance, opts metav1.UpdateOptions) (*templatev1.TemplateInstance, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, templateInstance *v1.TemplateInstance, opts metav1.UpdateOptions) (*v1.TemplateInstance, error)
+	UpdateStatus(ctx context.Context, templateInstance *templatev1.TemplateInstance, opts metav1.UpdateOptions) (*templatev1.TemplateInstance, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.TemplateInstance, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.TemplateInstanceList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*templatev1.TemplateInstance, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*templatev1.TemplateInstanceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.TemplateInstance, err error)
-	Apply(ctx context.Context, templateInstance *templatev1.TemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TemplateInstance, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *templatev1.TemplateInstance, err error)
+	Apply(ctx context.Context, templateInstance *applyconfigurationstemplatev1.TemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *templatev1.TemplateInstance, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, templateInstance *templatev1.TemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.TemplateInstance, err error)
+	ApplyStatus(ctx context.Context, templateInstance *applyconfigurationstemplatev1.TemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *templatev1.TemplateInstance, err error)
 	TemplateInstanceExpansion
 }
 
 // templateInstances implements TemplateInstanceInterface
 type templateInstances struct {
-	*gentype.ClientWithListAndApply[*v1.TemplateInstance, *v1.TemplateInstanceList, *templatev1.TemplateInstanceApplyConfiguration]
+	*gentype.ClientWithListAndApply[*templatev1.TemplateInstance, *templatev1.TemplateInstanceList, *applyconfigurationstemplatev1.TemplateInstanceApplyConfiguration]
 }
 
 // newTemplateInstances returns a TemplateInstances
 func newTemplateInstances(c *TemplateV1Client, namespace string) *templateInstances {
 	return &templateInstances{
-		gentype.NewClientWithListAndApply[*v1.TemplateInstance, *v1.TemplateInstanceList, *templatev1.TemplateInstanceApplyConfiguration](
+		gentype.NewClientWithListAndApply[*templatev1.TemplateInstance, *templatev1.TemplateInstanceList, *applyconfigurationstemplatev1.TemplateInstanceApplyConfiguration](
 			"templateinstances",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.TemplateInstance { return &v1.TemplateInstance{} },
-			func() *v1.TemplateInstanceList { return &v1.TemplateInstanceList{} }),
+			func() *templatev1.TemplateInstance { return &templatev1.TemplateInstance{} },
+			func() *templatev1.TemplateInstanceList { return &templatev1.TemplateInstanceList{} },
+		),
 	}
 }

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/apiserver/v1"
-	apiserverv1 "github.com/openshift/client-go/apiserver/applyconfigurations/apiserver/v1"
+	apiserverv1 "github.com/openshift/api/apiserver/v1"
+	applyconfigurationsapiserverv1 "github.com/openshift/client-go/apiserver/applyconfigurations/apiserver/v1"
 	scheme "github.com/openshift/client-go/apiserver/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type APIRequestCountsGetter interface {
 
 // APIRequestCountInterface has methods to work with APIRequestCount resources.
 type APIRequestCountInterface interface {
-	Create(ctx context.Context, aPIRequestCount *v1.APIRequestCount, opts metav1.CreateOptions) (*v1.APIRequestCount, error)
-	Update(ctx context.Context, aPIRequestCount *v1.APIRequestCount, opts metav1.UpdateOptions) (*v1.APIRequestCount, error)
+	Create(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCount, opts metav1.CreateOptions) (*apiserverv1.APIRequestCount, error)
+	Update(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCount, opts metav1.UpdateOptions) (*apiserverv1.APIRequestCount, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, aPIRequestCount *v1.APIRequestCount, opts metav1.UpdateOptions) (*v1.APIRequestCount, error)
+	UpdateStatus(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCount, opts metav1.UpdateOptions) (*apiserverv1.APIRequestCount, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.APIRequestCount, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.APIRequestCountList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiserverv1.APIRequestCount, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*apiserverv1.APIRequestCountList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.APIRequestCount, err error)
-	Apply(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCountApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIRequestCount, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apiserverv1.APIRequestCount, err error)
+	Apply(ctx context.Context, aPIRequestCount *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration, opts metav1.ApplyOptions) (result *apiserverv1.APIRequestCount, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, aPIRequestCount *apiserverv1.APIRequestCountApplyConfiguration, opts metav1.ApplyOptions) (result *v1.APIRequestCount, err error)
+	ApplyStatus(ctx context.Context, aPIRequestCount *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration, opts metav1.ApplyOptions) (result *apiserverv1.APIRequestCount, err error)
 	APIRequestCountExpansion
 }
 
 // aPIRequestCounts implements APIRequestCountInterface
 type aPIRequestCounts struct {
-	*gentype.ClientWithListAndApply[*v1.APIRequestCount, *v1.APIRequestCountList, *apiserverv1.APIRequestCountApplyConfiguration]
+	*gentype.ClientWithListAndApply[*apiserverv1.APIRequestCount, *apiserverv1.APIRequestCountList, *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration]
 }
 
 // newAPIRequestCounts returns a APIRequestCounts
 func newAPIRequestCounts(c *ApiserverV1Client) *aPIRequestCounts {
 	return &aPIRequestCounts{
-		gentype.NewClientWithListAndApply[*v1.APIRequestCount, *v1.APIRequestCountList, *apiserverv1.APIRequestCountApplyConfiguration](
+		gentype.NewClientWithListAndApply[*apiserverv1.APIRequestCount, *apiserverv1.APIRequestCountList, *applyconfigurationsapiserverv1.APIRequestCountApplyConfiguration](
 			"apirequestcounts",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.APIRequestCount { return &v1.APIRequestCount{} },
-			func() *v1.APIRequestCountList { return &v1.APIRequestCountList{} }),
+			func() *apiserverv1.APIRequestCount { return &apiserverv1.APIRequestCount{} },
+			func() *apiserverv1.APIRequestCountList { return &apiserverv1.APIRequestCountList{} },
+		),
 	}
 }

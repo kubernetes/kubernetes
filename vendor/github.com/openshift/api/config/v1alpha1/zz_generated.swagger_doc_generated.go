@@ -41,10 +41,10 @@ func (BackupSpec) SwaggerDoc() map[string]string {
 
 var map_EtcdBackupSpec = map[string]string{
 	"":                "EtcdBackupSpec provides configuration for automated etcd backups to the cluster-etcd-operator",
-	"schedule":        "Schedule defines the recurring backup schedule in Cron format every 2 hours: 0 */2 * * * every day at 3am: 0 3 * * * Empty string means no opinion and the platform is left to choose a reasonable default which is subject to change without notice. The current default is \"no backups\", but will change in the future.",
+	"schedule":        "schedule defines the recurring backup schedule in Cron format every 2 hours: 0 */2 * * * every day at 3am: 0 3 * * * Empty string means no opinion and the platform is left to choose a reasonable default which is subject to change without notice. The current default is \"no backups\", but will change in the future.",
 	"timeZone":        "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. See https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
-	"retentionPolicy": "RetentionPolicy defines the retention policy for retaining and deleting existing backups.",
-	"pvcName":         "PVCName specifies the name of the PersistentVolumeClaim (PVC) which binds a PersistentVolume where the etcd backup files would be saved The PVC itself must always be created in the \"openshift-etcd\" namespace If the PVC is left unspecified \"\" then the platform will choose a reasonable default location to save the backup. In the future this would be backups saved across the control-plane master nodes.",
+	"retentionPolicy": "retentionPolicy defines the retention policy for retaining and deleting existing backups.",
+	"pvcName":         "pvcName specifies the name of the PersistentVolumeClaim (PVC) which binds a PersistentVolume where the etcd backup files would be saved The PVC itself must always be created in the \"openshift-etcd\" namespace If the PVC is left unspecified \"\" then the platform will choose a reasonable default location to save the backup. In the future this would be backups saved across the control-plane master nodes.",
 }
 
 func (EtcdBackupSpec) SwaggerDoc() map[string]string {
@@ -53,7 +53,7 @@ func (EtcdBackupSpec) SwaggerDoc() map[string]string {
 
 var map_RetentionNumberConfig = map[string]string{
 	"":                   "RetentionNumberConfig specifies the configuration of the retention policy on the number of backups",
-	"maxNumberOfBackups": "MaxNumberOfBackups defines the maximum number of backups to retain. If the existing number of backups saved is equal to MaxNumberOfBackups then the oldest backup will be removed before a new backup is initiated.",
+	"maxNumberOfBackups": "maxNumberOfBackups defines the maximum number of backups to retain. If the existing number of backups saved is equal to MaxNumberOfBackups then the oldest backup will be removed before a new backup is initiated.",
 }
 
 func (RetentionNumberConfig) SwaggerDoc() map[string]string {
@@ -62,9 +62,9 @@ func (RetentionNumberConfig) SwaggerDoc() map[string]string {
 
 var map_RetentionPolicy = map[string]string{
 	"":                "RetentionPolicy defines the retention policy for retaining and deleting existing backups. This struct is a discriminated union that allows users to select the type of retention policy from the supported types.",
-	"retentionType":   "RetentionType sets the type of retention policy. Currently, the only valid policies are retention by number of backups (RetentionNumber), by the size of backups (RetentionSize). More policies or types may be added in the future. Empty string means no opinion and the platform is left to choose a reasonable default which is subject to change without notice. The current default is RetentionNumber with 15 backups kept.",
-	"retentionNumber": "RetentionNumber configures the retention policy based on the number of backups",
-	"retentionSize":   "RetentionSize configures the retention policy based on the size of backups",
+	"retentionType":   "retentionType sets the type of retention policy. Currently, the only valid policies are retention by number of backups (RetentionNumber), by the size of backups (RetentionSize). More policies or types may be added in the future. Empty string means no opinion and the platform is left to choose a reasonable default which is subject to change without notice. The current default is RetentionNumber with 15 backups kept.",
+	"retentionNumber": "retentionNumber configures the retention policy based on the number of backups",
+	"retentionSize":   "retentionSize configures the retention policy based on the size of backups",
 }
 
 func (RetentionPolicy) SwaggerDoc() map[string]string {
@@ -73,7 +73,7 @@ func (RetentionPolicy) SwaggerDoc() map[string]string {
 
 var map_RetentionSizeConfig = map[string]string{
 	"":                   "RetentionSizeConfig specifies the configuration of the retention policy on the total size of backups",
-	"maxSizeOfBackupsGb": "MaxSizeOfBackupsGb defines the total size in GB of backups to retain. If the current total size backups exceeds MaxSizeOfBackupsGb then the oldest backup will be removed before a new backup is initiated.",
+	"maxSizeOfBackupsGb": "maxSizeOfBackupsGb defines the total size in GB of backups to retain. If the current total size backups exceeds MaxSizeOfBackupsGb then the oldest backup will be removed before a new backup is initiated.",
 }
 
 func (RetentionSizeConfig) SwaggerDoc() map[string]string {
@@ -102,7 +102,7 @@ func (ClusterImagePolicyList) SwaggerDoc() map[string]string {
 
 var map_ClusterImagePolicySpec = map[string]string{
 	"":       "CLusterImagePolicySpec is the specification of the ClusterImagePolicy custom resource.",
-	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored. In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
+	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored. In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation. If a scope is configured in both the ClusterImagePolicy and the ImagePolicy, or if the scope in ImagePolicy is nested under one of the scopes from the ClusterImagePolicy, only the policy from the ClusterImagePolicy will be applied. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
 	"policy": "policy contains configuration to allow scopes to be verified, and defines how images not matching the verification policy will be treated.",
 }
 
@@ -116,6 +116,53 @@ var map_ClusterImagePolicyStatus = map[string]string{
 
 func (ClusterImagePolicyStatus) SwaggerDoc() map[string]string {
 	return map_ClusterImagePolicyStatus
+}
+
+var map_ClusterMonitoring = map[string]string{
+	"":         "ClusterMonitoring is the Custom Resource object which holds the current status of Cluster Monitoring Operator. CMO is a central component of the monitoring stack.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support. ClusterMonitoring is the Schema for the Cluster Monitoring Operators API",
+	"metadata": "metadata is the standard object metadata.",
+	"spec":     "spec holds user configuration for the Cluster Monitoring Operator",
+	"status":   "status holds observed values from the cluster. They may not be overridden.",
+}
+
+func (ClusterMonitoring) SwaggerDoc() map[string]string {
+	return map_ClusterMonitoring
+}
+
+var map_ClusterMonitoringList = map[string]string{
+	"":         "Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
+	"metadata": "metadata is the standard list metadata.",
+	"items":    "items is a list of ClusterMonitoring",
+}
+
+func (ClusterMonitoringList) SwaggerDoc() map[string]string {
+	return map_ClusterMonitoringList
+}
+
+var map_ClusterMonitoringSpec = map[string]string{
+	"":            "ClusterMonitoringSpec defines the desired state of Cluster Monitoring Operator",
+	"userDefined": "userDefined set the deployment mode for user-defined monitoring in addition to the default platform monitoring.",
+}
+
+func (ClusterMonitoringSpec) SwaggerDoc() map[string]string {
+	return map_ClusterMonitoringSpec
+}
+
+var map_ClusterMonitoringStatus = map[string]string{
+	"": "MonitoringOperatorStatus defines the observed state of MonitoringOperator",
+}
+
+func (ClusterMonitoringStatus) SwaggerDoc() map[string]string {
+	return map_ClusterMonitoringStatus
+}
+
+var map_UserDefinedMonitoring = map[string]string{
+	"":     "UserDefinedMonitoring config for user-defined projects.",
+	"mode": "mode defines the different configurations of UserDefinedMonitoring Valid values are Disabled and NamespaceIsolated Disabled disables monitoring for user-defined projects. This restricts the default monitoring stack, installed in the openshift-monitoring project, to monitor only platform namespaces, which prevents any custom monitoring configurations or resources from being applied to user-defined namespaces. NamespaceIsolated enables monitoring for user-defined projects with namespace-scoped tenancy. This ensures that metrics, alerts, and monitoring data are isolated at the namespace level.",
+}
+
+func (UserDefinedMonitoring) SwaggerDoc() map[string]string {
+	return map_UserDefinedMonitoring
 }
 
 var map_FulcioCAWithRekor = map[string]string{
@@ -151,7 +198,7 @@ func (ImagePolicyList) SwaggerDoc() map[string]string {
 
 var map_ImagePolicySpec = map[string]string{
 	"":       "ImagePolicySpec is the specification of the ImagePolicy CRD.",
-	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored. In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
+	"scopes": "scopes defines the list of image identities assigned to a policy. Each item refers to a scope in a registry implementing the \"Docker Registry HTTP API V2\". Scopes matching individual images are named Docker references in the fully expanded form, either using a tag or digest. For example, docker.io/library/busybox:latest (not busybox:latest). More general scopes are prefixes of individual-image scopes, and specify a repository (by omitting the tag or digest), a repository namespace, or a registry host (by only specifying the host name and possibly a port number) or a wildcard expression starting with `*.`, for matching all subdomains (not including a port number). Wildcards are only supported for subdomain matching, and may not be used in the middle of the host, i.e.  *.example.com is a valid case, but example*.*.com is not. If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored. In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation. If a scope is configured in both the ClusterImagePolicy and the ImagePolicy, or if the scope in ImagePolicy is nested under one of the scopes from the ClusterImagePolicy, only the policy from the ClusterImagePolicy will be applied. For additional details about the format, please refer to the document explaining the docker transport field, which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker",
 	"policy": "policy contains configuration to allow scopes to be verified, and defines how images not matching the verification policy will be treated.",
 }
 

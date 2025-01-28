@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	routev1 "github.com/openshift/api/route/v1"
+	apiroutev1 "github.com/openshift/api/route/v1"
 	versioned "github.com/openshift/client-go/route/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/route/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/route/listers/route/v1"
+	routev1 "github.com/openshift/client-go/route/listers/route/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Routes.
 type RouteInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.RouteLister
+	Lister() routev1.RouteLister
 }
 
 type routeInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredRouteInformer(client versioned.Interface, namespace string, resy
 				return client.RouteV1().Routes(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&routev1.Route{},
+		&apiroutev1.Route{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *routeInformer) defaultInformer(client versioned.Interface, resyncPeriod
 }
 
 func (f *routeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&routev1.Route{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiroutev1.Route{}, f.defaultInformer)
 }
 
-func (f *routeInformer) Lister() v1.RouteLister {
-	return v1.NewRouteLister(f.Informer().GetIndexer())
+func (f *routeInformer) Lister() routev1.RouteLister {
+	return routev1.NewRouteLister(f.Informer().GetIndexer())
 }

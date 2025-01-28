@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // SchedulerLister helps list Schedulers.
@@ -14,19 +14,19 @@ import (
 type SchedulerLister interface {
 	// List lists all Schedulers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Scheduler, err error)
+	List(selector labels.Selector) (ret []*configv1.Scheduler, err error)
 	// Get retrieves the Scheduler from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Scheduler, error)
+	Get(name string) (*configv1.Scheduler, error)
 	SchedulerListerExpansion
 }
 
 // schedulerLister implements the SchedulerLister interface.
 type schedulerLister struct {
-	listers.ResourceIndexer[*v1.Scheduler]
+	listers.ResourceIndexer[*configv1.Scheduler]
 }
 
 // NewSchedulerLister returns a new SchedulerLister.
 func NewSchedulerLister(indexer cache.Indexer) SchedulerLister {
-	return &schedulerLister{listers.New[*v1.Scheduler](indexer, v1.Resource("scheduler"))}
+	return &schedulerLister{listers.New[*configv1.Scheduler](indexer, configv1.Resource("scheduler"))}
 }

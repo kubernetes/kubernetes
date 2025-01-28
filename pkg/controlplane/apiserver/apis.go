@@ -52,6 +52,7 @@ func (c *CompletedConfig) NewCoreGenericConfig() *corerest.GenericConfig {
 		LoopbackClientConfig:        c.Generic.LoopbackClientConfig,
 		ServiceAccountIssuer:        c.Extra.ServiceAccountIssuer,
 		ExtendExpiration:            c.Extra.ExtendExpiration,
+		IsTokenSignerExternal:       c.Extra.IsTokenSignerExternal,
 		ServiceAccountMaxExpiration: c.Extra.ServiceAccountMaxExpiration,
 		APIAudiences:                c.Generic.Authentication.APIAudiences,
 		Informers:                   c.Extra.VersionedInformers,

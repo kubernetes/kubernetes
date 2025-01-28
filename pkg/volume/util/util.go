@@ -32,12 +32,10 @@ import (
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -512,19 +510,18 @@ func IsLocalEphemeralVolume(volume v1.Volume) bool {
 }
 
 // GetPodVolumeNames returns names of volumes that are used in a pod,
-// either as filesystem mount or raw block device, together with list
-// of all SELinux contexts of all containers that use the volumes.
-func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
+// either as filesystem mount or raw block device.
+// To save another sweep through containers, SELinux options are optionally collected too.
+func GetPodVolumeNames(pod *v1.Pod, collectSELinuxOptions bool) (mounts sets.Set[string], devices sets.Set[string], seLinuxContainerContexts map[string][]*v1.SELinuxOptions) {
 	mounts = sets.New[string]()
 	devices = sets.New[string]()
 	seLinuxContainerContexts = make(map[string][]*v1.SELinuxOptions)
 
 	podutil.VisitContainers(&pod.Spec, podutil.AllFeatureEnabledContainers(), func(container *v1.Container, containerType podutil.ContainerType) bool {
 		var seLinuxOptions *v1.SELinuxOptions
-		if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		if collectSELinuxOptions {
 			effectiveContainerSecurity := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 			if effectiveContainerSecurity != nil {
-				// No DeepCopy, SELinuxOptions is already a copy of Pod's or container's SELinuxOptions
 				seLinuxOptions = effectiveContainerSecurity.SELinuxOptions
 			}
 		}
@@ -532,7 +529,7 @@ func GetPodVolumeNames(pod *v1.Pod) (mounts sets.Set[string], devices sets.Set[s
 		if container.VolumeMounts != nil {
 			for _, mount := range container.VolumeMounts {
 				mounts.Insert(mount.Name)
-				if seLinuxOptions != nil {
+				if seLinuxOptions != nil && collectSELinuxOptions {
 					seLinuxContainerContexts[mount.Name] = append(seLinuxContainerContexts[mount.Name], seLinuxOptions.DeepCopy())
 				}
 			}

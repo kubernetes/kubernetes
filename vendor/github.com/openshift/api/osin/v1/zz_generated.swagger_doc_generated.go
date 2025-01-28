@@ -248,8 +248,8 @@ func (SessionConfig) SwaggerDoc() map[string]string {
 
 var map_SessionSecret = map[string]string{
 	"":               "SessionSecret is a secret used to authenticate/decrypt cookie-based sessions",
-	"authentication": "Authentication is used to authenticate sessions using HMAC. Recommended to use a secret with 32 or 64 bytes.",
-	"encryption":     "Encryption is used to encrypt sessions. Must be 16, 24, or 32 characters long, to select AES-128, AES-",
+	"authentication": "authentication is used to authenticate sessions using HMAC. Recommended to use a secret with 32 or 64 bytes.",
+	"encryption":     "encryption is used to encrypt sessions. Must be 16, 24, or 32 characters long, to select AES-128, AES-",
 }
 
 func (SessionSecret) SwaggerDoc() map[string]string {
@@ -258,7 +258,7 @@ func (SessionSecret) SwaggerDoc() map[string]string {
 
 var map_SessionSecrets = map[string]string{
 	"":        "SessionSecrets list the secrets to use to sign/encrypt and authenticate/decrypt created sessions.\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
-	"secrets": "Secrets is a list of secrets New sessions are signed and encrypted using the first secret. Existing sessions are decrypted/authenticated by each secret until one succeeds. This allows rotating secrets.",
+	"secrets": "secrets is a list of secrets New sessions are signed and encrypted using the first secret. Existing sessions are decrypted/authenticated by each secret until one succeeds. This allows rotating secrets.",
 }
 
 func (SessionSecrets) SwaggerDoc() map[string]string {

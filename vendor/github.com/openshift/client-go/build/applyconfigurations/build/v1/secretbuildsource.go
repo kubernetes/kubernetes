@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // SecretBuildSourceApplyConfiguration represents a declarative configuration of the SecretBuildSource type for use
 // with apply.
 type SecretBuildSourceApplyConfiguration struct {
-	Secret         *v1.LocalObjectReference `json:"secret,omitempty"`
-	DestinationDir *string                  `json:"destinationDir,omitempty"`
+	Secret         *corev1.LocalObjectReference `json:"secret,omitempty"`
+	DestinationDir *string                      `json:"destinationDir,omitempty"`
 }
 
 // SecretBuildSourceApplyConfiguration constructs a declarative configuration of the SecretBuildSource type for use with
@@ -22,7 +22,7 @@ func SecretBuildSource() *SecretBuildSourceApplyConfiguration {
 // WithSecret sets the Secret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Secret field is set to the value of the last call.
-func (b *SecretBuildSourceApplyConfiguration) WithSecret(value v1.LocalObjectReference) *SecretBuildSourceApplyConfiguration {
+func (b *SecretBuildSourceApplyConfiguration) WithSecret(value corev1.LocalObjectReference) *SecretBuildSourceApplyConfiguration {
 	b.Secret = &value
 	return b
 }

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ImageDigestMirrorSetLister helps list ImageDigestMirrorSets.
@@ -14,19 +14,19 @@ import (
 type ImageDigestMirrorSetLister interface {
 	// List lists all ImageDigestMirrorSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ImageDigestMirrorSet, err error)
+	List(selector labels.Selector) (ret []*configv1.ImageDigestMirrorSet, err error)
 	// Get retrieves the ImageDigestMirrorSet from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ImageDigestMirrorSet, error)
+	Get(name string) (*configv1.ImageDigestMirrorSet, error)
 	ImageDigestMirrorSetListerExpansion
 }
 
 // imageDigestMirrorSetLister implements the ImageDigestMirrorSetLister interface.
 type imageDigestMirrorSetLister struct {
-	listers.ResourceIndexer[*v1.ImageDigestMirrorSet]
+	listers.ResourceIndexer[*configv1.ImageDigestMirrorSet]
 }
 
 // NewImageDigestMirrorSetLister returns a new ImageDigestMirrorSetLister.
 func NewImageDigestMirrorSetLister(indexer cache.Indexer) ImageDigestMirrorSetLister {
-	return &imageDigestMirrorSetLister{listers.New[*v1.ImageDigestMirrorSet](indexer, v1.Resource("imagedigestmirrorset"))}
+	return &imageDigestMirrorSetLister{listers.New[*configv1.ImageDigestMirrorSet](indexer, configv1.Resource("imagedigestmirrorset"))}
 }

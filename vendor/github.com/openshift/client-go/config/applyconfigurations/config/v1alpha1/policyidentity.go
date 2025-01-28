@@ -3,13 +3,13 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openshift/api/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
 // PolicyIdentityApplyConfiguration represents a declarative configuration of the PolicyIdentity type for use
 // with apply.
 type PolicyIdentityApplyConfiguration struct {
-	MatchPolicy                *v1alpha1.IdentityMatchPolicy                 `json:"matchPolicy,omitempty"`
+	MatchPolicy                *configv1alpha1.IdentityMatchPolicy           `json:"matchPolicy,omitempty"`
 	PolicyMatchExactRepository *PolicyMatchExactRepositoryApplyConfiguration `json:"exactRepository,omitempty"`
 	PolicyMatchRemapIdentity   *PolicyMatchRemapIdentityApplyConfiguration   `json:"remapIdentity,omitempty"`
 }
@@ -23,7 +23,7 @@ func PolicyIdentity() *PolicyIdentityApplyConfiguration {
 // WithMatchPolicy sets the MatchPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MatchPolicy field is set to the value of the last call.
-func (b *PolicyIdentityApplyConfiguration) WithMatchPolicy(value v1alpha1.IdentityMatchPolicy) *PolicyIdentityApplyConfiguration {
+func (b *PolicyIdentityApplyConfiguration) WithMatchPolicy(value configv1alpha1.IdentityMatchPolicy) *PolicyIdentityApplyConfiguration {
 	b.MatchPolicy = &value
 	return b
 }

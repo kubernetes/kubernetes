@@ -20,19 +20,19 @@ package v1beta1
 
 import (
 	v1 "k8s.io/api/core/v1"
-	v1beta1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DeploymentConditionApplyConfiguration represents a declarative configuration of the DeploymentCondition type for use
 // with apply.
 type DeploymentConditionApplyConfiguration struct {
-	Type               *v1beta1.DeploymentConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus              `json:"status,omitempty"`
-	LastUpdateTime     *metav1.Time                     `json:"lastUpdateTime,omitempty"`
-	LastTransitionTime *metav1.Time                     `json:"lastTransitionTime,omitempty"`
-	Reason             *string                          `json:"reason,omitempty"`
-	Message            *string                          `json:"message,omitempty"`
+	Type               *extensionsv1beta1.DeploymentConditionType `json:"type,omitempty"`
+	Status             *v1.ConditionStatus                        `json:"status,omitempty"`
+	LastUpdateTime     *metav1.Time                               `json:"lastUpdateTime,omitempty"`
+	LastTransitionTime *metav1.Time                               `json:"lastTransitionTime,omitempty"`
+	Reason             *string                                    `json:"reason,omitempty"`
+	Message            *string                                    `json:"message,omitempty"`
 }
 
 // DeploymentConditionApplyConfiguration constructs a declarative configuration of the DeploymentCondition type for use with
@@ -44,7 +44,7 @@ func DeploymentCondition() *DeploymentConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *DeploymentConditionApplyConfiguration) WithType(value v1beta1.DeploymentConditionType) *DeploymentConditionApplyConfiguration {
+func (b *DeploymentConditionApplyConfiguration) WithType(value extensionsv1beta1.DeploymentConditionType) *DeploymentConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

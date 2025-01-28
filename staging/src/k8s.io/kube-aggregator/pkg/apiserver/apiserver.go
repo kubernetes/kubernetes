@@ -403,7 +403,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 			klog.Infof("still waiting on handling APIServices: %v", strings.Join(notYetHandledAPIServices.List(), ","))
 
 			return false, nil
-		}, context.StopCh)
+		}, context.Done())
 		return err
 	})
 

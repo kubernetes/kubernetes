@@ -3,7 +3,7 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -12,9 +12,9 @@ import (
 type ComponentRouteStatusApplyConfiguration struct {
 	Namespace        *string                              `json:"namespace,omitempty"`
 	Name             *string                              `json:"name,omitempty"`
-	DefaultHostname  *v1.Hostname                         `json:"defaultHostname,omitempty"`
-	ConsumingUsers   []v1.ConsumingUser                   `json:"consumingUsers,omitempty"`
-	CurrentHostnames []v1.Hostname                        `json:"currentHostnames,omitempty"`
+	DefaultHostname  *configv1.Hostname                   `json:"defaultHostname,omitempty"`
+	ConsumingUsers   []configv1.ConsumingUser             `json:"consumingUsers,omitempty"`
+	CurrentHostnames []configv1.Hostname                  `json:"currentHostnames,omitempty"`
 	Conditions       []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	RelatedObjects   []ObjectReferenceApplyConfiguration  `json:"relatedObjects,omitempty"`
 }
@@ -44,7 +44,7 @@ func (b *ComponentRouteStatusApplyConfiguration) WithName(value string) *Compone
 // WithDefaultHostname sets the DefaultHostname field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DefaultHostname field is set to the value of the last call.
-func (b *ComponentRouteStatusApplyConfiguration) WithDefaultHostname(value v1.Hostname) *ComponentRouteStatusApplyConfiguration {
+func (b *ComponentRouteStatusApplyConfiguration) WithDefaultHostname(value configv1.Hostname) *ComponentRouteStatusApplyConfiguration {
 	b.DefaultHostname = &value
 	return b
 }
@@ -52,7 +52,7 @@ func (b *ComponentRouteStatusApplyConfiguration) WithDefaultHostname(value v1.Ho
 // WithConsumingUsers adds the given value to the ConsumingUsers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the ConsumingUsers field.
-func (b *ComponentRouteStatusApplyConfiguration) WithConsumingUsers(values ...v1.ConsumingUser) *ComponentRouteStatusApplyConfiguration {
+func (b *ComponentRouteStatusApplyConfiguration) WithConsumingUsers(values ...configv1.ConsumingUser) *ComponentRouteStatusApplyConfiguration {
 	for i := range values {
 		b.ConsumingUsers = append(b.ConsumingUsers, values[i])
 	}
@@ -62,7 +62,7 @@ func (b *ComponentRouteStatusApplyConfiguration) WithConsumingUsers(values ...v1
 // WithCurrentHostnames adds the given value to the CurrentHostnames field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the CurrentHostnames field.
-func (b *ComponentRouteStatusApplyConfiguration) WithCurrentHostnames(values ...v1.Hostname) *ComponentRouteStatusApplyConfiguration {
+func (b *ComponentRouteStatusApplyConfiguration) WithCurrentHostnames(values ...configv1.Hostname) *ComponentRouteStatusApplyConfiguration {
 	for i := range values {
 		b.CurrentHostnames = append(b.CurrentHostnames, values[i])
 	}

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // ImageTagMirrorSets.
 type ImageTagMirrorSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ImageTagMirrorSetLister
+	Lister() configv1.ImageTagMirrorSetLister
 }
 
 type imageTagMirrorSetInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredImageTagMirrorSetInformer(client versioned.Interface, resyncPeri
 				return client.ConfigV1().ImageTagMirrorSets().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.ImageTagMirrorSet{},
+		&apiconfigv1.ImageTagMirrorSet{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *imageTagMirrorSetInformer) defaultInformer(client versioned.Interface, 
 }
 
 func (f *imageTagMirrorSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.ImageTagMirrorSet{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.ImageTagMirrorSet{}, f.defaultInformer)
 }
 
-func (f *imageTagMirrorSetInformer) Lister() v1.ImageTagMirrorSetLister {
-	return v1.NewImageTagMirrorSetLister(f.Informer().GetIndexer())
+func (f *imageTagMirrorSetInformer) Lister() configv1.ImageTagMirrorSetLister {
+	return configv1.NewImageTagMirrorSetLister(f.Informer().GetIndexer())
 }

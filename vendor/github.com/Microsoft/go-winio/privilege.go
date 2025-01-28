@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"syscall"
 	"unicode/utf16"
 
 	"golang.org/x/sys/windows"
@@ -18,8 +17,8 @@ import (
 //sys adjustTokenPrivileges(token windows.Token, releaseAll bool, input *byte, outputSize uint32, output *byte, requiredSize *uint32) (success bool, err error) [true] = advapi32.AdjustTokenPrivileges
 //sys impersonateSelf(level uint32) (err error) = advapi32.ImpersonateSelf
 //sys revertToSelf() (err error) = advapi32.RevertToSelf
-//sys openThreadToken(thread syscall.Handle, accessMask uint32, openAsSelf bool, token *windows.Token) (err error) = advapi32.OpenThreadToken
-//sys getCurrentThread() (h syscall.Handle) = GetCurrentThread
+//sys openThreadToken(thread windows.Handle, accessMask uint32, openAsSelf bool, token *windows.Token) (err error) = advapi32.OpenThreadToken
+//sys getCurrentThread() (h windows.Handle) = GetCurrentThread
 //sys lookupPrivilegeValue(systemName string, name string, luid *uint64) (err error) = advapi32.LookupPrivilegeValueW
 //sys lookupPrivilegeName(systemName string, luid *uint64, buffer *uint16, size *uint32) (err error) = advapi32.LookupPrivilegeNameW
 //sys lookupPrivilegeDisplayName(systemName string, name *uint16, buffer *uint16, size *uint32, languageId *uint32) (err error) = advapi32.LookupPrivilegeDisplayNameW
@@ -29,7 +28,7 @@ const (
 	SE_PRIVILEGE_ENABLED = windows.SE_PRIVILEGE_ENABLED
 
 	//revive:disable-next-line:var-naming ALL_CAPS
-	ERROR_NOT_ALL_ASSIGNED syscall.Errno = windows.ERROR_NOT_ALL_ASSIGNED
+	ERROR_NOT_ALL_ASSIGNED windows.Errno = windows.ERROR_NOT_ALL_ASSIGNED
 
 	SeBackupPrivilege   = "SeBackupPrivilege"
 	SeRestorePrivilege  = "SeRestorePrivilege"
@@ -177,7 +176,7 @@ func newThreadToken() (windows.Token, error) {
 	}
 
 	var token windows.Token
-	err = openThreadToken(getCurrentThread(), syscall.TOKEN_ADJUST_PRIVILEGES|syscall.TOKEN_QUERY, false, &token)
+	err = openThreadToken(getCurrentThread(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, false, &token)
 	if err != nil {
 		rerr := revertToSelf()
 		if rerr != nil {

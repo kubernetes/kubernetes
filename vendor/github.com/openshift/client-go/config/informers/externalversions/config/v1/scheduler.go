@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Schedulers.
 type SchedulerInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.SchedulerLister
+	Lister() configv1.SchedulerLister
 }
 
 type schedulerInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredSchedulerInformer(client versioned.Interface, resyncPeriod time.
 				return client.ConfigV1().Schedulers().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.Scheduler{},
+		&apiconfigv1.Scheduler{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *schedulerInformer) defaultInformer(client versioned.Interface, resyncPe
 }
 
 func (f *schedulerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.Scheduler{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.Scheduler{}, f.defaultInformer)
 }
 
-func (f *schedulerInformer) Lister() v1.SchedulerLister {
-	return v1.NewSchedulerLister(f.Informer().GetIndexer())
+func (f *schedulerInformer) Lister() configv1.SchedulerLister {
+	return configv1.NewSchedulerLister(f.Informer().GetIndexer())
 }

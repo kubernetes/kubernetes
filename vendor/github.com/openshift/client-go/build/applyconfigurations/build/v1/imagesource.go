@@ -3,16 +3,16 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ImageSourceApplyConfiguration represents a declarative configuration of the ImageSource type for use
 // with apply.
 type ImageSourceApplyConfiguration struct {
-	From       *v1.ObjectReference                 `json:"from,omitempty"`
+	From       *corev1.ObjectReference             `json:"from,omitempty"`
 	As         []string                            `json:"as,omitempty"`
 	Paths      []ImageSourcePathApplyConfiguration `json:"paths,omitempty"`
-	PullSecret *v1.LocalObjectReference            `json:"pullSecret,omitempty"`
+	PullSecret *corev1.LocalObjectReference        `json:"pullSecret,omitempty"`
 }
 
 // ImageSourceApplyConfiguration constructs a declarative configuration of the ImageSource type for use with
@@ -24,7 +24,7 @@ func ImageSource() *ImageSourceApplyConfiguration {
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *ImageSourceApplyConfiguration) WithFrom(value v1.ObjectReference) *ImageSourceApplyConfiguration {
+func (b *ImageSourceApplyConfiguration) WithFrom(value corev1.ObjectReference) *ImageSourceApplyConfiguration {
 	b.From = &value
 	return b
 }
@@ -55,7 +55,7 @@ func (b *ImageSourceApplyConfiguration) WithPaths(values ...*ImageSourcePathAppl
 // WithPullSecret sets the PullSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullSecret field is set to the value of the last call.
-func (b *ImageSourceApplyConfiguration) WithPullSecret(value v1.LocalObjectReference) *ImageSourceApplyConfiguration {
+func (b *ImageSourceApplyConfiguration) WithPullSecret(value corev1.LocalObjectReference) *ImageSourceApplyConfiguration {
 	b.PullSecret = &value
 	return b
 }

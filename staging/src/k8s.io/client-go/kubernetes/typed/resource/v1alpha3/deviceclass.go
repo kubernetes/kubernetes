@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha3
 
 import (
-	"context"
+	context "context"
 
-	v1alpha3 "k8s.io/api/resource/v1alpha3"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	resourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
+	applyconfigurationsresourcev1alpha3 "k8s.io/client-go/applyconfigurations/resource/v1alpha3"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type DeviceClassesGetter interface {
 
 // DeviceClassInterface has methods to work with DeviceClass resources.
 type DeviceClassInterface interface {
-	Create(ctx context.Context, deviceClass *v1alpha3.DeviceClass, opts v1.CreateOptions) (*v1alpha3.DeviceClass, error)
-	Update(ctx context.Context, deviceClass *v1alpha3.DeviceClass, opts v1.UpdateOptions) (*v1alpha3.DeviceClass, error)
+	Create(ctx context.Context, deviceClass *resourcev1alpha3.DeviceClass, opts v1.CreateOptions) (*resourcev1alpha3.DeviceClass, error)
+	Update(ctx context.Context, deviceClass *resourcev1alpha3.DeviceClass, opts v1.UpdateOptions) (*resourcev1alpha3.DeviceClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha3.DeviceClass, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha3.DeviceClassList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*resourcev1alpha3.DeviceClass, error)
+	List(ctx context.Context, opts v1.ListOptions) (*resourcev1alpha3.DeviceClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha3.DeviceClass, err error)
-	Apply(ctx context.Context, deviceClass *resourcev1alpha3.DeviceClassApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha3.DeviceClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *resourcev1alpha3.DeviceClass, err error)
+	Apply(ctx context.Context, deviceClass *applyconfigurationsresourcev1alpha3.DeviceClassApplyConfiguration, opts v1.ApplyOptions) (result *resourcev1alpha3.DeviceClass, err error)
 	DeviceClassExpansion
 }
 
 // deviceClasses implements DeviceClassInterface
 type deviceClasses struct {
-	*gentype.ClientWithListAndApply[*v1alpha3.DeviceClass, *v1alpha3.DeviceClassList, *resourcev1alpha3.DeviceClassApplyConfiguration]
+	*gentype.ClientWithListAndApply[*resourcev1alpha3.DeviceClass, *resourcev1alpha3.DeviceClassList, *applyconfigurationsresourcev1alpha3.DeviceClassApplyConfiguration]
 }
 
 // newDeviceClasses returns a DeviceClasses
 func newDeviceClasses(c *ResourceV1alpha3Client) *deviceClasses {
 	return &deviceClasses{
-		gentype.NewClientWithListAndApply[*v1alpha3.DeviceClass, *v1alpha3.DeviceClassList, *resourcev1alpha3.DeviceClassApplyConfiguration](
+		gentype.NewClientWithListAndApply[*resourcev1alpha3.DeviceClass, *resourcev1alpha3.DeviceClassList, *applyconfigurationsresourcev1alpha3.DeviceClassApplyConfiguration](
 			"deviceclasses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha3.DeviceClass { return &v1alpha3.DeviceClass{} },
-			func() *v1alpha3.DeviceClassList { return &v1alpha3.DeviceClassList{} }),
+			func() *resourcev1alpha3.DeviceClass { return &resourcev1alpha3.DeviceClass{} },
+			func() *resourcev1alpha3.DeviceClassList { return &resourcev1alpha3.DeviceClassList{} },
+			gentype.PrefersProtobuf[*resourcev1alpha3.DeviceClass](),
+		),
 	}
 }

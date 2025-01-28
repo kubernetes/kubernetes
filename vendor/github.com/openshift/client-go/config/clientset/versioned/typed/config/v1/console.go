@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type ConsolesGetter interface {
 
 // ConsoleInterface has methods to work with Console resources.
 type ConsoleInterface interface {
-	Create(ctx context.Context, console *v1.Console, opts metav1.CreateOptions) (*v1.Console, error)
-	Update(ctx context.Context, console *v1.Console, opts metav1.UpdateOptions) (*v1.Console, error)
+	Create(ctx context.Context, console *configv1.Console, opts metav1.CreateOptions) (*configv1.Console, error)
+	Update(ctx context.Context, console *configv1.Console, opts metav1.UpdateOptions) (*configv1.Console, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, console *v1.Console, opts metav1.UpdateOptions) (*v1.Console, error)
+	UpdateStatus(ctx context.Context, console *configv1.Console, opts metav1.UpdateOptions) (*configv1.Console, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Console, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ConsoleList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.Console, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.ConsoleList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Console, err error)
-	Apply(ctx context.Context, console *configv1.ConsoleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Console, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.Console, err error)
+	Apply(ctx context.Context, console *applyconfigurationsconfigv1.ConsoleApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Console, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, console *configv1.ConsoleApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Console, err error)
+	ApplyStatus(ctx context.Context, console *applyconfigurationsconfigv1.ConsoleApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.Console, err error)
 	ConsoleExpansion
 }
 
 // consoles implements ConsoleInterface
 type consoles struct {
-	*gentype.ClientWithListAndApply[*v1.Console, *v1.ConsoleList, *configv1.ConsoleApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.Console, *configv1.ConsoleList, *applyconfigurationsconfigv1.ConsoleApplyConfiguration]
 }
 
 // newConsoles returns a Consoles
 func newConsoles(c *ConfigV1Client) *consoles {
 	return &consoles{
-		gentype.NewClientWithListAndApply[*v1.Console, *v1.ConsoleList, *configv1.ConsoleApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.Console, *configv1.ConsoleList, *applyconfigurationsconfigv1.ConsoleApplyConfiguration](
 			"consoles",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Console { return &v1.Console{} },
-			func() *v1.ConsoleList { return &v1.ConsoleList{} }),
+			func() *configv1.Console { return &configv1.Console{} },
+			func() *configv1.ConsoleList { return &configv1.ConsoleList{} },
+		),
 	}
 }

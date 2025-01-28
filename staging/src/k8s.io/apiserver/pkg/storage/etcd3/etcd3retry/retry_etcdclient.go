@@ -43,9 +43,9 @@ func (c *retryClient) Create(ctx context.Context, key string, obj, out runtime.O
 
 // Delete removes the specified key and returns the value that existed at that spot.
 // If key didn't exist, it will return NotFound storage error.
-func (c *retryClient) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object) error {
+func (c *retryClient) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	return OnError(ctx, DefaultRetry, IsRetriableEtcdError, func() error {
-		return c.Interface.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject)
+		return c.Interface.Delete(ctx, key, out, preconditions, validateDeletion, cachedExistingObject, opts)
 	})
 }
 

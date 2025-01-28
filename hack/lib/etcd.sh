@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.5.15}
+ETCD_VERSION=${ETCD_VERSION:-3.5.16}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
@@ -159,7 +159,7 @@ kube::etcd::install() {
 
     cd "${KUBE_ROOT}/third_party" || return 1
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
-      V=3 kube::log::info "etcd v${ETCD_VERSION} is already installed"
+      V=4 kube::log::info "etcd v${ETCD_VERSION} is already installed"
       return 0 # already installed
     fi
 

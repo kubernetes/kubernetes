@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/network/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	networkv1 "github.com/openshift/api/network/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // HostSubnetLister helps list HostSubnets.
@@ -14,19 +14,19 @@ import (
 type HostSubnetLister interface {
 	// List lists all HostSubnets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.HostSubnet, err error)
+	List(selector labels.Selector) (ret []*networkv1.HostSubnet, err error)
 	// Get retrieves the HostSubnet from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.HostSubnet, error)
+	Get(name string) (*networkv1.HostSubnet, error)
 	HostSubnetListerExpansion
 }
 
 // hostSubnetLister implements the HostSubnetLister interface.
 type hostSubnetLister struct {
-	listers.ResourceIndexer[*v1.HostSubnet]
+	listers.ResourceIndexer[*networkv1.HostSubnet]
 }
 
 // NewHostSubnetLister returns a new HostSubnetLister.
 func NewHostSubnetLister(indexer cache.Indexer) HostSubnetLister {
-	return &hostSubnetLister{listers.New[*v1.HostSubnet](indexer, v1.Resource("hostsubnet"))}
+	return &hostSubnetLister{listers.New[*networkv1.HostSubnet](indexer, networkv1.Resource("hostsubnet"))}
 }

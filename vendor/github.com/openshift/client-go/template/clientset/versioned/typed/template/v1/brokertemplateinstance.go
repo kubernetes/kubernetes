@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/template/v1"
-	templatev1 "github.com/openshift/client-go/template/applyconfigurations/template/v1"
+	templatev1 "github.com/openshift/api/template/v1"
+	applyconfigurationstemplatev1 "github.com/openshift/client-go/template/applyconfigurations/template/v1"
 	scheme "github.com/openshift/client-go/template/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type BrokerTemplateInstancesGetter interface {
 
 // BrokerTemplateInstanceInterface has methods to work with BrokerTemplateInstance resources.
 type BrokerTemplateInstanceInterface interface {
-	Create(ctx context.Context, brokerTemplateInstance *v1.BrokerTemplateInstance, opts metav1.CreateOptions) (*v1.BrokerTemplateInstance, error)
-	Update(ctx context.Context, brokerTemplateInstance *v1.BrokerTemplateInstance, opts metav1.UpdateOptions) (*v1.BrokerTemplateInstance, error)
+	Create(ctx context.Context, brokerTemplateInstance *templatev1.BrokerTemplateInstance, opts metav1.CreateOptions) (*templatev1.BrokerTemplateInstance, error)
+	Update(ctx context.Context, brokerTemplateInstance *templatev1.BrokerTemplateInstance, opts metav1.UpdateOptions) (*templatev1.BrokerTemplateInstance, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.BrokerTemplateInstance, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.BrokerTemplateInstanceList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*templatev1.BrokerTemplateInstance, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*templatev1.BrokerTemplateInstanceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.BrokerTemplateInstance, err error)
-	Apply(ctx context.Context, brokerTemplateInstance *templatev1.BrokerTemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.BrokerTemplateInstance, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *templatev1.BrokerTemplateInstance, err error)
+	Apply(ctx context.Context, brokerTemplateInstance *applyconfigurationstemplatev1.BrokerTemplateInstanceApplyConfiguration, opts metav1.ApplyOptions) (result *templatev1.BrokerTemplateInstance, err error)
 	BrokerTemplateInstanceExpansion
 }
 
 // brokerTemplateInstances implements BrokerTemplateInstanceInterface
 type brokerTemplateInstances struct {
-	*gentype.ClientWithListAndApply[*v1.BrokerTemplateInstance, *v1.BrokerTemplateInstanceList, *templatev1.BrokerTemplateInstanceApplyConfiguration]
+	*gentype.ClientWithListAndApply[*templatev1.BrokerTemplateInstance, *templatev1.BrokerTemplateInstanceList, *applyconfigurationstemplatev1.BrokerTemplateInstanceApplyConfiguration]
 }
 
 // newBrokerTemplateInstances returns a BrokerTemplateInstances
 func newBrokerTemplateInstances(c *TemplateV1Client) *brokerTemplateInstances {
 	return &brokerTemplateInstances{
-		gentype.NewClientWithListAndApply[*v1.BrokerTemplateInstance, *v1.BrokerTemplateInstanceList, *templatev1.BrokerTemplateInstanceApplyConfiguration](
+		gentype.NewClientWithListAndApply[*templatev1.BrokerTemplateInstance, *templatev1.BrokerTemplateInstanceList, *applyconfigurationstemplatev1.BrokerTemplateInstanceApplyConfiguration](
 			"brokertemplateinstances",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.BrokerTemplateInstance { return &v1.BrokerTemplateInstance{} },
-			func() *v1.BrokerTemplateInstanceList { return &v1.BrokerTemplateInstanceList{} }),
+			func() *templatev1.BrokerTemplateInstance { return &templatev1.BrokerTemplateInstance{} },
+			func() *templatev1.BrokerTemplateInstanceList { return &templatev1.BrokerTemplateInstanceList{} },
+		),
 	}
 }

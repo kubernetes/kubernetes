@@ -25,7 +25,6 @@ type ServiceCA struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	//spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec ServiceCASpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.
@@ -54,6 +53,6 @@ type ServiceCAList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 
-	// Items contains the items
+	// items contains the items
 	Items []ServiceCA `json:"items"`
 }

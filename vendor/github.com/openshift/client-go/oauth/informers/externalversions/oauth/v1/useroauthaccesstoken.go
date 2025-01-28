@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	oauthv1 "github.com/openshift/api/oauth/v1"
+	apioauthv1 "github.com/openshift/api/oauth/v1"
 	versioned "github.com/openshift/client-go/oauth/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/oauth/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/oauth/listers/oauth/v1"
+	oauthv1 "github.com/openshift/client-go/oauth/listers/oauth/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // UserOAuthAccessTokens.
 type UserOAuthAccessTokenInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.UserOAuthAccessTokenLister
+	Lister() oauthv1.UserOAuthAccessTokenLister
 }
 
 type userOAuthAccessTokenInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredUserOAuthAccessTokenInformer(client versioned.Interface, resyncP
 				return client.OauthV1().UserOAuthAccessTokens().Watch(context.TODO(), options)
 			},
 		},
-		&oauthv1.UserOAuthAccessToken{},
+		&apioauthv1.UserOAuthAccessToken{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *userOAuthAccessTokenInformer) defaultInformer(client versioned.Interfac
 }
 
 func (f *userOAuthAccessTokenInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&oauthv1.UserOAuthAccessToken{}, f.defaultInformer)
+	return f.factory.InformerFor(&apioauthv1.UserOAuthAccessToken{}, f.defaultInformer)
 }
 
-func (f *userOAuthAccessTokenInformer) Lister() v1.UserOAuthAccessTokenLister {
-	return v1.NewUserOAuthAccessTokenLister(f.Informer().GetIndexer())
+func (f *userOAuthAccessTokenInformer) Lister() oauthv1.UserOAuthAccessTokenLister {
+	return oauthv1.NewUserOAuthAccessTokenLister(f.Informer().GetIndexer())
 }

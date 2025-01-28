@@ -4,19 +4,19 @@ package v1
 
 import (
 	buildv1 "github.com/openshift/api/build/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // DockerBuildStrategyApplyConfiguration represents a declarative configuration of the DockerBuildStrategy type for use
 // with apply.
 type DockerBuildStrategyApplyConfiguration struct {
-	From                    *v1.ObjectReference              `json:"from,omitempty"`
-	PullSecret              *v1.LocalObjectReference         `json:"pullSecret,omitempty"`
+	From                    *corev1.ObjectReference          `json:"from,omitempty"`
+	PullSecret              *corev1.LocalObjectReference     `json:"pullSecret,omitempty"`
 	NoCache                 *bool                            `json:"noCache,omitempty"`
-	Env                     []v1.EnvVar                      `json:"env,omitempty"`
+	Env                     []corev1.EnvVar                  `json:"env,omitempty"`
 	ForcePull               *bool                            `json:"forcePull,omitempty"`
 	DockerfilePath          *string                          `json:"dockerfilePath,omitempty"`
-	BuildArgs               []v1.EnvVar                      `json:"buildArgs,omitempty"`
+	BuildArgs               []corev1.EnvVar                  `json:"buildArgs,omitempty"`
 	ImageOptimizationPolicy *buildv1.ImageOptimizationPolicy `json:"imageOptimizationPolicy,omitempty"`
 	Volumes                 []BuildVolumeApplyConfiguration  `json:"volumes,omitempty"`
 }
@@ -30,7 +30,7 @@ func DockerBuildStrategy() *DockerBuildStrategyApplyConfiguration {
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *DockerBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReference) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithFrom(value corev1.ObjectReference) *DockerBuildStrategyApplyConfiguration {
 	b.From = &value
 	return b
 }
@@ -38,7 +38,7 @@ func (b *DockerBuildStrategyApplyConfiguration) WithFrom(value v1.ObjectReferenc
 // WithPullSecret sets the PullSecret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PullSecret field is set to the value of the last call.
-func (b *DockerBuildStrategyApplyConfiguration) WithPullSecret(value v1.LocalObjectReference) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithPullSecret(value corev1.LocalObjectReference) *DockerBuildStrategyApplyConfiguration {
 	b.PullSecret = &value
 	return b
 }
@@ -54,7 +54,7 @@ func (b *DockerBuildStrategyApplyConfiguration) WithNoCache(value bool) *DockerB
 // WithEnv adds the given value to the Env field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Env field.
-func (b *DockerBuildStrategyApplyConfiguration) WithEnv(values ...v1.EnvVar) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithEnv(values ...corev1.EnvVar) *DockerBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.Env = append(b.Env, values[i])
 	}
@@ -80,7 +80,7 @@ func (b *DockerBuildStrategyApplyConfiguration) WithDockerfilePath(value string)
 // WithBuildArgs adds the given value to the BuildArgs field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the BuildArgs field.
-func (b *DockerBuildStrategyApplyConfiguration) WithBuildArgs(values ...v1.EnvVar) *DockerBuildStrategyApplyConfiguration {
+func (b *DockerBuildStrategyApplyConfiguration) WithBuildArgs(values ...corev1.EnvVar) *DockerBuildStrategyApplyConfiguration {
 	for i := range values {
 		b.BuildArgs = append(b.BuildArgs, values[i])
 	}

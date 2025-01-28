@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockery
 package cm
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -27,6 +29,7 @@ import (
 
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -45,17 +48,25 @@ import (
 
 const (
 	// Warning message for the users still using cgroup v1
-	CgroupV1MaintenanceModeWarning = "Cgroup v1 support is in maintenance mode, please migrate to Cgroup v2."
+	CgroupV1MaintenanceModeWarning = "cgroup v1 support is in maintenance mode, please migrate to cgroup v2"
+
+	// Warning message for the users using cgroup v2 on kernel doesn't support root `cpu.stat`.
+	// `cpu.stat` was added to root cgroup in kernel 5.8.
+	// (ref: https://github.com/torvalds/linux/commit/936f2a70f2077f64fab1dcb3eca71879e82ecd3f)
+	CgroupV2KernelWarning = "cgroup v2 is being used on a kernel, which doesn't support root `cpu.stat`." +
+		"Kubelet will continue, but may experience instability or wrong behavior"
 )
 
 type ActivePodsFunc func() []*v1.Pod
+
+type GetNodeFunc func() (*v1.Node, error)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
+	Start(context.Context, *v1.Node, ActivePodsFunc, GetNodeFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -94,7 +105,7 @@ type ContainerManager interface {
 
 	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
 	// extended resources required by container.
-	GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
+	GetResources(ctx context.Context, pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
 
 	// UpdatePluginResources calls Allocate of device plugin handler for potential
 	// requests for device plugin resources, and returns an error if fails.
@@ -108,10 +119,14 @@ type ContainerManager interface {
 	// GetPodCgroupRoot returns the cgroup which contains all pods.
 	GetPodCgroupRoot() string
 
-	// GetPluginRegistrationHandler returns a plugin registration handler
+	// GetPluginRegistrationHandlers returns a set of plugin registration handlers
 	// The pluginwatcher's Handlers allow to have a single module for handling
 	// registration.
-	GetPluginRegistrationHandler() cache.PluginHandler
+	GetPluginRegistrationHandlers() map[string]cache.PluginHandler
+
+	// GetHealthCheckers returns a set of health checkers for all plugins.
+	// These checkers are integrated into the systemd watchdog to monitor the service's health.
+	GetHealthCheckers() []healthz.HealthChecker
 
 	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
 	// due to node recreation.
@@ -124,10 +139,10 @@ type ContainerManager interface {
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
 	// PrepareDynamicResource prepares dynamic pod resources
-	PrepareDynamicResources(*v1.Pod) error
+	PrepareDynamicResources(context.Context, *v1.Pod) error
 
 	// UnprepareDynamicResources unprepares dynamic pod resources
-	UnprepareDynamicResources(*v1.Pod) error
+	UnprepareDynamicResources(context.Context, *v1.Pod) error
 
 	// PodMightNeedToUnprepareResources returns true if the pod with the given UID
 	// might need to unprepare resources.
@@ -187,6 +202,14 @@ type NodeAllocatableConfig struct {
 type Status struct {
 	// Any soft requirements that were unsatisfied.
 	SoftRequirements error
+}
+
+func int64Slice(in []int) []int64 {
+	out := make([]int64, len(in))
+	for i := range in {
+		out[i] = int64(in[i])
+	}
+	return out
 }
 
 // parsePercentage parses the percentage string to numeric value.

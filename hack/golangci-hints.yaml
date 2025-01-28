@@ -77,6 +77,17 @@ issues:
       text: comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|comment on exported (method|function|type|const)|should have( a package)? comment|comment should be of the form|exported (.+) should have comment( \(or a comment on this block\))? or be unexported|package comment should be of the form "(.+)...|comment on exported (.+) should be of the form "(.+)...|should have a package comment
       path-except: cmd/kubeadm
 
+    # The unused linter that comes from staticcheck currently does not handle types which implement
+    # a generic interface. The linter incorrectly reports the implementations of unexported
+    # interface methods as unused. See https://github.com/dominikh/go-tools/issues/1294.
+    # Rather than exporting the interface methods, which makes the error go away but changes the
+    # semantics of the code, we ignore this error for affected files.
+    # This can be removed when the staticcheck implementation of this rule is fixed, which may
+    # depend on https://github.com/golang/go/issues/63982.
+    - linters:
+        - unused
+      path: staging/src/k8s.io/client-go/util/workqueue/metrics.go
+
 linters:
   disable-all: false
   enable: # please keep this alphabetized
@@ -92,6 +103,7 @@ linters:
     - stylecheck
     - testifylint
     - unused
+    - usestdlibvars
 
 linters-settings: # please keep this alphabetized
   custom:
@@ -136,6 +148,7 @@ linters-settings: # please keep this alphabetized
           contextual k8s.io/component-helpers/.*
           contextual k8s.io/cri-api/.*
           contextual k8s.io/cri-client/.*
+          contextual k8s.io/csi-translation-lib/.*
           contextual k8s.io/dynamic-resource-allocation/.*
           contextual k8s.io/endpointslice/.*
           contextual k8s.io/kms/.*
@@ -150,6 +163,11 @@ linters-settings: # please keep this alphabetized
           contextual k8s.io/kubernetes/pkg/controller/.*
           contextual k8s.io/kubernetes/pkg/scheduler/.*
           contextual k8s.io/kubernetes/test/e2e/dra/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/cm/dra/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/pleg/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/token/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
           
           # As long as contextual logging is alpha or beta, all WithName, WithValues,
           # NewContext calls have to go through klog. Once it is GA, we can lift

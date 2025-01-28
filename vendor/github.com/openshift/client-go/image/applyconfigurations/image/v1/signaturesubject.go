@@ -19,7 +19,7 @@ func SignatureSubject() *SignatureSubjectApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Organization field is set to the value of the last call.
 func (b *SignatureSubjectApplyConfiguration) WithOrganization(value string) *SignatureSubjectApplyConfiguration {
-	b.Organization = &value
+	b.SignatureGenericEntityApplyConfiguration.Organization = &value
 	return b
 }
 
@@ -27,7 +27,7 @@ func (b *SignatureSubjectApplyConfiguration) WithOrganization(value string) *Sig
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CommonName field is set to the value of the last call.
 func (b *SignatureSubjectApplyConfiguration) WithCommonName(value string) *SignatureSubjectApplyConfiguration {
-	b.CommonName = &value
+	b.SignatureGenericEntityApplyConfiguration.CommonName = &value
 	return b
 }
 

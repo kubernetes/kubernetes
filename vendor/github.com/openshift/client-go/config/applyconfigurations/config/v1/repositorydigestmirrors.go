@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // RepositoryDigestMirrorsApplyConfiguration represents a declarative configuration of the RepositoryDigestMirrors type for use
 // with apply.
 type RepositoryDigestMirrorsApplyConfiguration struct {
-	Source            *string     `json:"source,omitempty"`
-	AllowMirrorByTags *bool       `json:"allowMirrorByTags,omitempty"`
-	Mirrors           []v1.Mirror `json:"mirrors,omitempty"`
+	Source            *string           `json:"source,omitempty"`
+	AllowMirrorByTags *bool             `json:"allowMirrorByTags,omitempty"`
+	Mirrors           []configv1.Mirror `json:"mirrors,omitempty"`
 }
 
 // RepositoryDigestMirrorsApplyConfiguration constructs a declarative configuration of the RepositoryDigestMirrors type for use with
@@ -39,7 +39,7 @@ func (b *RepositoryDigestMirrorsApplyConfiguration) WithAllowMirrorByTags(value 
 // WithMirrors adds the given value to the Mirrors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Mirrors field.
-func (b *RepositoryDigestMirrorsApplyConfiguration) WithMirrors(values ...v1.Mirror) *RepositoryDigestMirrorsApplyConfiguration {
+func (b *RepositoryDigestMirrorsApplyConfiguration) WithMirrors(values ...configv1.Mirror) *RepositoryDigestMirrorsApplyConfiguration {
 	for i := range values {
 		b.Mirrors = append(b.Mirrors, values[i])
 	}

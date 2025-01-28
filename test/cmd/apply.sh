@@ -413,6 +413,10 @@ run_kubectl_server_side_apply_tests() {
   kubectl apply --server-side --field-manager=my-field-manager --force-conflicts -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
   output_message=$(kubectl get -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'my-field-manager'
+  # can add pod condition
+  kubectl apply --server-side --subresource=status --field-manager=my-field-manager -f hack/testdata/pod-apply-status.yaml "${kube_flags[@]:?}"
+  output_message=$(kubectl get -f hack/testdata/pod.yaml -o=jsonpath='{.status.conditions[*].type}' "${kube_flags[@]:?}" 2>&1)
+  kube::test::if_has_string "${output_message}" 'example.io/Foo'
   # Clean up
   kubectl delete pods test-pod "${kube_flags[@]:?}"
 

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/build/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	buildv1 "github.com/openshift/api/build/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // BuildConfigLister helps list BuildConfigs.
@@ -14,7 +14,7 @@ import (
 type BuildConfigLister interface {
 	// List lists all BuildConfigs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.BuildConfig, err error)
+	List(selector labels.Selector) (ret []*buildv1.BuildConfig, err error)
 	// BuildConfigs returns an object that can list and get BuildConfigs.
 	BuildConfigs(namespace string) BuildConfigNamespaceLister
 	BuildConfigListerExpansion
@@ -22,17 +22,17 @@ type BuildConfigLister interface {
 
 // buildConfigLister implements the BuildConfigLister interface.
 type buildConfigLister struct {
-	listers.ResourceIndexer[*v1.BuildConfig]
+	listers.ResourceIndexer[*buildv1.BuildConfig]
 }
 
 // NewBuildConfigLister returns a new BuildConfigLister.
 func NewBuildConfigLister(indexer cache.Indexer) BuildConfigLister {
-	return &buildConfigLister{listers.New[*v1.BuildConfig](indexer, v1.Resource("buildconfig"))}
+	return &buildConfigLister{listers.New[*buildv1.BuildConfig](indexer, buildv1.Resource("buildconfig"))}
 }
 
 // BuildConfigs returns an object that can list and get BuildConfigs.
 func (s *buildConfigLister) BuildConfigs(namespace string) BuildConfigNamespaceLister {
-	return buildConfigNamespaceLister{listers.NewNamespaced[*v1.BuildConfig](s.ResourceIndexer, namespace)}
+	return buildConfigNamespaceLister{listers.NewNamespaced[*buildv1.BuildConfig](s.ResourceIndexer, namespace)}
 }
 
 // BuildConfigNamespaceLister helps list and get BuildConfigs.
@@ -40,15 +40,15 @@ func (s *buildConfigLister) BuildConfigs(namespace string) BuildConfigNamespaceL
 type BuildConfigNamespaceLister interface {
 	// List lists all BuildConfigs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.BuildConfig, err error)
+	List(selector labels.Selector) (ret []*buildv1.BuildConfig, err error)
 	// Get retrieves the BuildConfig from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.BuildConfig, error)
+	Get(name string) (*buildv1.BuildConfig, error)
 	BuildConfigNamespaceListerExpansion
 }
 
 // buildConfigNamespaceLister implements the BuildConfigNamespaceLister
 // interface.
 type buildConfigNamespaceLister struct {
-	listers.ResourceIndexer[*v1.BuildConfig]
+	listers.ResourceIndexer[*buildv1.BuildConfig]
 }

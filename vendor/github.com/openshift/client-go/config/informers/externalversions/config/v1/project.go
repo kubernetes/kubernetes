@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Projects.
 type ProjectInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ProjectLister
+	Lister() configv1.ProjectLister
 }
 
 type projectInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredProjectInformer(client versioned.Interface, resyncPeriod time.Du
 				return client.ConfigV1().Projects().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.Project{},
+		&apiconfigv1.Project{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *projectInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *projectInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.Project{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.Project{}, f.defaultInformer)
 }
 
-func (f *projectInformer) Lister() v1.ProjectLister {
-	return v1.NewProjectLister(f.Informer().GetIndexer())
+func (f *projectInformer) Lister() configv1.ProjectLister {
+	return configv1.NewProjectLister(f.Informer().GetIndexer())
 }

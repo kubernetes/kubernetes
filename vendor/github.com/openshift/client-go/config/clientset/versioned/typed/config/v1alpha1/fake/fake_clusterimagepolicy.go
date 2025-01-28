@@ -3,168 +3,35 @@
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1alpha1 "github.com/openshift/api/config/v1alpha1"
 	configv1alpha1 "github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	typedconfigv1alpha1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeClusterImagePolicies implements ClusterImagePolicyInterface
-type FakeClusterImagePolicies struct {
+// fakeClusterImagePolicies implements ClusterImagePolicyInterface
+type fakeClusterImagePolicies struct {
+	*gentype.FakeClientWithListAndApply[*v1alpha1.ClusterImagePolicy, *v1alpha1.ClusterImagePolicyList, *configv1alpha1.ClusterImagePolicyApplyConfiguration]
 	Fake *FakeConfigV1alpha1
 }
 
-var clusterimagepoliciesResource = v1alpha1.SchemeGroupVersion.WithResource("clusterimagepolicies")
-
-var clusterimagepoliciesKind = v1alpha1.SchemeGroupVersion.WithKind("ClusterImagePolicy")
-
-// Get takes name of the clusterImagePolicy, and returns the corresponding clusterImagePolicy object, and an error if there is any.
-func (c *FakeClusterImagePolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ClusterImagePolicy, err error) {
-	emptyResult := &v1alpha1.ClusterImagePolicy{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(clusterimagepoliciesResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeClusterImagePolicies(fake *FakeConfigV1alpha1) typedconfigv1alpha1.ClusterImagePolicyInterface {
+	return &fakeClusterImagePolicies{
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.ClusterImagePolicy, *v1alpha1.ClusterImagePolicyList, *configv1alpha1.ClusterImagePolicyApplyConfiguration](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("clusterimagepolicies"),
+			v1alpha1.SchemeGroupVersion.WithKind("ClusterImagePolicy"),
+			func() *v1alpha1.ClusterImagePolicy { return &v1alpha1.ClusterImagePolicy{} },
+			func() *v1alpha1.ClusterImagePolicyList { return &v1alpha1.ClusterImagePolicyList{} },
+			func(dst, src *v1alpha1.ClusterImagePolicyList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.ClusterImagePolicyList) []*v1alpha1.ClusterImagePolicy {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.ClusterImagePolicyList, items []*v1alpha1.ClusterImagePolicy) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.ClusterImagePolicy), err
-}
-
-// List takes label and field selectors, and returns the list of ClusterImagePolicies that match those selectors.
-func (c *FakeClusterImagePolicies) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ClusterImagePolicyList, err error) {
-	emptyResult := &v1alpha1.ClusterImagePolicyList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(clusterimagepoliciesResource, clusterimagepoliciesKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.ClusterImagePolicyList{ListMeta: obj.(*v1alpha1.ClusterImagePolicyList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ClusterImagePolicyList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested clusterImagePolicies.
-func (c *FakeClusterImagePolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(clusterimagepoliciesResource, opts))
-}
-
-// Create takes the representation of a clusterImagePolicy and creates it.  Returns the server's representation of the clusterImagePolicy, and an error, if there is any.
-func (c *FakeClusterImagePolicies) Create(ctx context.Context, clusterImagePolicy *v1alpha1.ClusterImagePolicy, opts v1.CreateOptions) (result *v1alpha1.ClusterImagePolicy, err error) {
-	emptyResult := &v1alpha1.ClusterImagePolicy{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(clusterimagepoliciesResource, clusterImagePolicy, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterImagePolicy), err
-}
-
-// Update takes the representation of a clusterImagePolicy and updates it. Returns the server's representation of the clusterImagePolicy, and an error, if there is any.
-func (c *FakeClusterImagePolicies) Update(ctx context.Context, clusterImagePolicy *v1alpha1.ClusterImagePolicy, opts v1.UpdateOptions) (result *v1alpha1.ClusterImagePolicy, err error) {
-	emptyResult := &v1alpha1.ClusterImagePolicy{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(clusterimagepoliciesResource, clusterImagePolicy, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterImagePolicy), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeClusterImagePolicies) UpdateStatus(ctx context.Context, clusterImagePolicy *v1alpha1.ClusterImagePolicy, opts v1.UpdateOptions) (result *v1alpha1.ClusterImagePolicy, err error) {
-	emptyResult := &v1alpha1.ClusterImagePolicy{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(clusterimagepoliciesResource, "status", clusterImagePolicy, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterImagePolicy), err
-}
-
-// Delete takes name of the clusterImagePolicy and deletes it. Returns an error if one occurs.
-func (c *FakeClusterImagePolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(clusterimagepoliciesResource, name, opts), &v1alpha1.ClusterImagePolicy{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeClusterImagePolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(clusterimagepoliciesResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.ClusterImagePolicyList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched clusterImagePolicy.
-func (c *FakeClusterImagePolicies) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterImagePolicy, err error) {
-	emptyResult := &v1alpha1.ClusterImagePolicy{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clusterimagepoliciesResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterImagePolicy), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied clusterImagePolicy.
-func (c *FakeClusterImagePolicies) Apply(ctx context.Context, clusterImagePolicy *configv1alpha1.ClusterImagePolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterImagePolicy, err error) {
-	if clusterImagePolicy == nil {
-		return nil, fmt.Errorf("clusterImagePolicy provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(clusterImagePolicy)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterImagePolicy.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterImagePolicy.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.ClusterImagePolicy{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clusterimagepoliciesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterImagePolicy), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeClusterImagePolicies) ApplyStatus(ctx context.Context, clusterImagePolicy *configv1alpha1.ClusterImagePolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterImagePolicy, err error) {
-	if clusterImagePolicy == nil {
-		return nil, fmt.Errorf("clusterImagePolicy provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(clusterImagePolicy)
-	if err != nil {
-		return nil, err
-	}
-	name := clusterImagePolicy.Name
-	if name == nil {
-		return nil, fmt.Errorf("clusterImagePolicy.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.ClusterImagePolicy{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(clusterimagepoliciesResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.ClusterImagePolicy), err
 }

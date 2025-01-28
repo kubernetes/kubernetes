@@ -97,6 +97,7 @@ type Extra struct {
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
 	ExtendExpiration            bool
+	IsTokenSignerExternal       bool
 
 	// ServiceAccountIssuerDiscovery
 	ServiceAccountIssuerURL        string
@@ -123,6 +124,7 @@ func BuildGenericConfig(
 	lastErr error,
 ) {
 	genericConfig = genericapiserver.NewConfig(legacyscheme.Codecs)
+	genericConfig.Flagz = s.Flagz
 	genericConfig.MergedResourceConfig = resourceConfig
 
 	if lastErr = s.GenericServerRunOptions.ApplyTo(genericConfig); lastErr != nil {
@@ -314,6 +316,7 @@ func CreateConfig(
 			ServiceAccountIssuer:        opts.ServiceAccountIssuer,
 			ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
 			ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
+			IsTokenSignerExternal:       opts.Authentication.ServiceAccounts.IsTokenSignerExternal,
 
 			VersionedInformers: versionedInformers,
 		},
@@ -351,6 +354,7 @@ func CreateConfig(
 		config.ClusterAuthenticationInfo.RequestHeaderExtraHeaderPrefixes = requestHeaderConfig.ExtraHeaderPrefixes
 		config.ClusterAuthenticationInfo.RequestHeaderGroupHeaders = requestHeaderConfig.GroupHeaders
 		config.ClusterAuthenticationInfo.RequestHeaderUsernameHeaders = requestHeaderConfig.UsernameHeaders
+		config.ClusterAuthenticationInfo.RequestHeaderUIDHeaders = requestHeaderConfig.UIDHeaders
 	}
 
 	// setup admission

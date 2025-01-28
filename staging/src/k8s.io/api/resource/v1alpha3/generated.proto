@@ -30,6 +30,56 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/resource/v1alpha3";
 
+// AllocatedDeviceStatus contains the status of an allocated device, if the
+// driver chooses to report it. This may include driver-specific information.
+message AllocatedDeviceStatus {
+  // Driver specifies the name of the DRA driver whose kubelet
+  // plugin should be invoked to process the allocation once the claim is
+  // needed on a node.
+  //
+  // Must be a DNS subdomain and should end with a DNS domain owned by the
+  // vendor of the driver.
+  //
+  // +required
+  optional string driver = 1;
+
+  // This name together with the driver name and the device name field
+  // identify which device was allocated (`<driver name>/<pool name>/<device name>`).
+  //
+  // Must not be longer than 253 characters and may contain one or more
+  // DNS sub-domains separated by slashes.
+  //
+  // +required
+  optional string pool = 2;
+
+  // Device references one device instance via its name in the driver's
+  // resource pool. It must be a DNS label.
+  //
+  // +required
+  optional string device = 3;
+
+  // Conditions contains the latest observation of the device's state.
+  // If the device has been configured according to the class and claim
+  // config references, the `Ready` condition should be True.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=type
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 4;
+
+  // Data contains arbitrary driver-specific data.
+  //
+  // The length of the raw data must be smaller or equal to 10 Ki.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.runtime.RawExtension data = 5;
+
+  // NetworkData contains network-related information specific to the device.
+  //
+  // +optional
+  optional NetworkDeviceData networkData = 6;
+}
+
 // AllocationResult contains attributes of an allocated resource.
 message AllocationResult {
   // Devices is the result of allocating devices.
@@ -42,22 +92,6 @@ message AllocationResult {
   //
   // +optional
   optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 3;
-
-  // Controller is the name of the DRA driver which handled the
-  // allocation. That driver is also responsible for deallocating the
-  // claim. It is empty when the claim can be deallocated without
-  // involving a driver.
-  //
-  // A driver may allocate devices provided by other drivers, so this
-  // driver name here can be different from the driver names listed for
-  // the results.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
-  //
-  // +optional
-  // +featureGate=DRAControlPlaneController
-  optional string controller = 4;
 }
 
 // BasicDevice defines one device instance.
@@ -127,6 +161,10 @@ message CELDeviceSelector {
   // same domain. For example:
   //
   //     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
+  //
+  // The length of the expression must be smaller or equal to 10 Ki. The
+  // cost of evaluating it is also limited based on the estimated number
+  // of logical steps.
   //
   // +required
   optional string expression = 1;
@@ -309,22 +347,6 @@ message DeviceClassSpec {
   // +optional
   // +listType=atomic
   repeated DeviceClassConfiguration config = 2;
-
-  // Only nodes matching the selector will be considered by the scheduler
-  // when trying to find a Node that fits a Pod when that Pod uses
-  // a claim that has not been allocated yet *and* that claim
-  // gets allocated through a control plane controller. It is ignored
-  // when the claim does not use a control plane controller
-  // for allocation.
-  //
-  // Setting this field is optional. If unset, all Nodes are candidates.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
-  //
-  // +optional
-  // +featureGate=DRAControlPlaneController
-  optional .k8s.io.api.core.v1.NodeSelector suitableNodes = 3;
 }
 
 // DeviceConfiguration must have exactly one field set. It gets embedded
@@ -443,8 +465,12 @@ message DeviceRequest {
   // all ordinary claims to the device with respect to access modes and
   // any resource allocations.
   //
+  // This is an alpha field and requires enabling the DRAAdminAccess
+  // feature gate. Admin access is disabled if this field is unset or
+  // set to false, otherwise it is enabled.
+  //
   // +optional
-  // +default=false
+  // +featureGate=DRAAdminAccess
   optional bool adminAccess = 6;
 }
 
@@ -481,6 +507,18 @@ message DeviceRequestAllocationResult {
   //
   // +required
   optional string device = 4;
+
+  // AdminAccess indicates that this device was allocated for
+  // administrative access. See the corresponding request field
+  // for a definition of mode.
+  //
+  // This is an alpha field and requires enabling the DRAAdminAccess
+  // feature gate. Admin access is disabled if this field is unset or
+  // set to false, otherwise it is enabled.
+  //
+  // +optional
+  // +featureGate=DRAAdminAccess
+  optional bool adminAccess = 5;
 }
 
 // DeviceSelector must have exactly one field set.
@@ -490,6 +528,37 @@ message DeviceSelector {
   // +optional
   // +oneOf=SelectorType
   optional CELDeviceSelector cel = 1;
+}
+
+// NetworkDeviceData provides network-related details for the allocated device.
+// This information may be filled by drivers or other components to configure
+// or identify the device within a network context.
+message NetworkDeviceData {
+  // InterfaceName specifies the name of the network interface associated with
+  // the allocated device. This might be the name of a physical or virtual
+  // network interface being configured in the pod.
+  //
+  // Must not be longer than 256 characters.
+  //
+  // +optional
+  optional string interfaceName = 1;
+
+  // IPs lists the network addresses assigned to the device's network interface.
+  // This can include both IPv4 and IPv6 addresses.
+  // The IPs are in the CIDR notation, which includes both the address and the
+  // associated subnet mask.
+  // e.g.: "192.0.2.5/24" for IPv4 and "2001:db8::5/64" for IPv6.
+  //
+  // +optional
+  // +listType=atomic
+  repeated string ips = 2;
+
+  // HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
+  //
+  // Must not be longer than 128 characters.
+  //
+  // +optional
+  optional string hardwareAddress = 3;
 }
 
 // OpaqueDeviceConfiguration contains configuration parameters for a driver
@@ -512,71 +581,10 @@ message OpaqueDeviceConfiguration {
   // includes self-identification and a version ("kind" + "apiVersion" for
   // Kubernetes types), with conversion between different versions.
   //
+  // The length of the raw data must be smaller or equal to 10 Ki.
+  //
   // +required
   optional .k8s.io.apimachinery.pkg.runtime.RawExtension parameters = 2;
-}
-
-// PodSchedulingContext objects hold information that is needed to schedule
-// a Pod with ResourceClaims that use "WaitForFirstConsumer" allocation
-// mode.
-//
-// This is an alpha type and requires enabling the DRAControlPlaneController
-// feature gate.
-message PodSchedulingContext {
-  // Standard object metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // Spec describes where resources for the Pod are needed.
-  optional PodSchedulingContextSpec spec = 2;
-
-  // Status describes where resources for the Pod can be allocated.
-  //
-  // +optional
-  optional PodSchedulingContextStatus status = 3;
-}
-
-// PodSchedulingContextList is a collection of Pod scheduling objects.
-message PodSchedulingContextList {
-  // Standard list metadata
-  // +optional
-  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of PodSchedulingContext objects.
-  repeated PodSchedulingContext items = 2;
-}
-
-// PodSchedulingContextSpec describes where resources for the Pod are needed.
-message PodSchedulingContextSpec {
-  // SelectedNode is the node for which allocation of ResourceClaims that
-  // are referenced by the Pod and that use "WaitForFirstConsumer"
-  // allocation is to be attempted.
-  //
-  // +optional
-  optional string selectedNode = 1;
-
-  // PotentialNodes lists nodes where the Pod might be able to run.
-  //
-  // The size of this field is limited to 128. This is large enough for
-  // many clusters. Larger clusters may need more attempts to find a node
-  // that suits all pending resources. This may get increased in the
-  // future, but not reduced.
-  //
-  // +optional
-  // +listType=atomic
-  repeated string potentialNodes = 2;
-}
-
-// PodSchedulingContextStatus describes where resources for the Pod can be allocated.
-message PodSchedulingContextStatus {
-  // ResourceClaims describes resource availability for each
-  // pod.spec.resourceClaim entry where the corresponding ResourceClaim
-  // uses "WaitForFirstConsumer" allocation mode.
-  //
-  // +listType=map
-  // +listMapKey=name
-  // +optional
-  repeated ResourceClaimSchedulingStatus resourceClaims = 1;
 }
 
 // ResourceClaim describes a request for access to resources in the cluster,
@@ -634,46 +642,12 @@ message ResourceClaimList {
   repeated ResourceClaim items = 2;
 }
 
-// ResourceClaimSchedulingStatus contains information about one particular
-// ResourceClaim with "WaitForFirstConsumer" allocation mode.
-message ResourceClaimSchedulingStatus {
-  // Name matches the pod.spec.resourceClaims[*].Name field.
-  //
-  // +required
-  optional string name = 1;
-
-  // UnsuitableNodes lists nodes that the ResourceClaim cannot be
-  // allocated for.
-  //
-  // The size of this field is limited to 128, the same as for
-  // PodSchedulingSpec.PotentialNodes. This may get increased in the
-  // future, but not reduced.
-  //
-  // +optional
-  // +listType=atomic
-  repeated string unsuitableNodes = 2;
-}
-
 // ResourceClaimSpec defines what is being requested in a ResourceClaim and how to configure it.
 message ResourceClaimSpec {
   // Devices defines how to request devices.
   //
   // +optional
   optional DeviceClaim devices = 1;
-
-  // Controller is the name of the DRA driver that is meant
-  // to handle allocation of this claim. If empty, allocation is handled
-  // by the scheduler while scheduling a pod.
-  //
-  // Must be a DNS subdomain and should end with a DNS domain owned by the
-  // vendor of the driver.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
-  //
-  // +optional
-  // +featureGate=DRAControlPlaneController
-  optional string controller = 2;
 }
 
 // ResourceClaimStatus tracks whether the resource has been allocated and what
@@ -701,7 +675,7 @@ message ResourceClaimStatus {
   // which issued it knows that it must put the pod back into the queue,
   // waiting for the ResourceClaim to become usable again.
   //
-  // There can be at most 32 such reservations. This may get increased in
+  // There can be at most 256 such reservations. This may get increased in
   // the future, but not reduced.
   //
   // +optional
@@ -711,19 +685,17 @@ message ResourceClaimStatus {
   // +patchMergeKey=uid
   repeated ResourceClaimConsumerReference reservedFor = 2;
 
-  // Indicates that a claim is to be deallocated. While this is set,
-  // no new consumers may be added to ReservedFor.
-  //
-  // This is only used if the claim needs to be deallocated by a DRA driver.
-  // That driver then must deallocate this claim and reset the field
-  // together with clearing the Allocation field.
-  //
-  // This is an alpha field and requires enabling the DRAControlPlaneController
-  // feature gate.
+  // Devices contains the status of each device allocated for this
+  // claim, as reported by the driver. This can include driver-specific
+  // information. Entries are owned by their respective drivers.
   //
   // +optional
-  // +featureGate=DRAControlPlaneController
-  optional bool deallocationRequested = 3;
+  // +listType=map
+  // +listMapKey=driver
+  // +listMapKey=device
+  // +listMapKey=pool
+  // +featureGate=DRAResourceClaimDeviceStatus
+  repeated AllocatedDeviceStatus devices = 4;
 }
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
@@ -755,7 +727,7 @@ message ResourceClaimTemplateList {
 
 // ResourceClaimTemplateSpec contains the metadata and fields for a ResourceClaim.
 message ResourceClaimTemplateSpec {
-  // ObjectMeta may contain labels and annotations that will be copied into the PVC
+  // ObjectMeta may contain labels and annotations that will be copied into the ResourceClaim
   // when creating it. No other fields are allowed and will be rejected during
   // validation.
   // +optional

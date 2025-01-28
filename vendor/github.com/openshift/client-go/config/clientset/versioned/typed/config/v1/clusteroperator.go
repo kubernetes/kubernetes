@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type ClusterOperatorsGetter interface {
 
 // ClusterOperatorInterface has methods to work with ClusterOperator resources.
 type ClusterOperatorInterface interface {
-	Create(ctx context.Context, clusterOperator *v1.ClusterOperator, opts metav1.CreateOptions) (*v1.ClusterOperator, error)
-	Update(ctx context.Context, clusterOperator *v1.ClusterOperator, opts metav1.UpdateOptions) (*v1.ClusterOperator, error)
+	Create(ctx context.Context, clusterOperator *configv1.ClusterOperator, opts metav1.CreateOptions) (*configv1.ClusterOperator, error)
+	Update(ctx context.Context, clusterOperator *configv1.ClusterOperator, opts metav1.UpdateOptions) (*configv1.ClusterOperator, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, clusterOperator *v1.ClusterOperator, opts metav1.UpdateOptions) (*v1.ClusterOperator, error)
+	UpdateStatus(ctx context.Context, clusterOperator *configv1.ClusterOperator, opts metav1.UpdateOptions) (*configv1.ClusterOperator, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClusterOperator, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClusterOperatorList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.ClusterOperator, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.ClusterOperatorList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClusterOperator, err error)
-	Apply(ctx context.Context, clusterOperator *configv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterOperator, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.ClusterOperator, err error)
+	Apply(ctx context.Context, clusterOperator *applyconfigurationsconfigv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.ClusterOperator, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, clusterOperator *configv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ClusterOperator, err error)
+	ApplyStatus(ctx context.Context, clusterOperator *applyconfigurationsconfigv1.ClusterOperatorApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.ClusterOperator, err error)
 	ClusterOperatorExpansion
 }
 
 // clusterOperators implements ClusterOperatorInterface
 type clusterOperators struct {
-	*gentype.ClientWithListAndApply[*v1.ClusterOperator, *v1.ClusterOperatorList, *configv1.ClusterOperatorApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.ClusterOperator, *configv1.ClusterOperatorList, *applyconfigurationsconfigv1.ClusterOperatorApplyConfiguration]
 }
 
 // newClusterOperators returns a ClusterOperators
 func newClusterOperators(c *ConfigV1Client) *clusterOperators {
 	return &clusterOperators{
-		gentype.NewClientWithListAndApply[*v1.ClusterOperator, *v1.ClusterOperatorList, *configv1.ClusterOperatorApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.ClusterOperator, *configv1.ClusterOperatorList, *applyconfigurationsconfigv1.ClusterOperatorApplyConfiguration](
 			"clusteroperators",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ClusterOperator { return &v1.ClusterOperator{} },
-			func() *v1.ClusterOperatorList { return &v1.ClusterOperatorList{} }),
+			func() *configv1.ClusterOperator { return &configv1.ClusterOperator{} },
+			func() *configv1.ClusterOperatorList { return &configv1.ClusterOperatorList{} },
+		),
 	}
 }

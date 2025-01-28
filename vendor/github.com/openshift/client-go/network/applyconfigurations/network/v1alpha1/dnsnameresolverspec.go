@@ -3,13 +3,13 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openshift/api/network/v1alpha1"
+	networkv1alpha1 "github.com/openshift/api/network/v1alpha1"
 )
 
 // DNSNameResolverSpecApplyConfiguration represents a declarative configuration of the DNSNameResolverSpec type for use
 // with apply.
 type DNSNameResolverSpecApplyConfiguration struct {
-	Name *v1alpha1.DNSName `json:"name,omitempty"`
+	Name *networkv1alpha1.DNSName `json:"name,omitempty"`
 }
 
 // DNSNameResolverSpecApplyConfiguration constructs a declarative configuration of the DNSNameResolverSpec type for use with
@@ -21,7 +21,7 @@ func DNSNameResolverSpec() *DNSNameResolverSpecApplyConfiguration {
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Name field is set to the value of the last call.
-func (b *DNSNameResolverSpecApplyConfiguration) WithName(value v1alpha1.DNSName) *DNSNameResolverSpecApplyConfiguration {
+func (b *DNSNameResolverSpecApplyConfiguration) WithName(value networkv1alpha1.DNSName) *DNSNameResolverSpecApplyConfiguration {
 	b.Name = &value
 	return b
 }

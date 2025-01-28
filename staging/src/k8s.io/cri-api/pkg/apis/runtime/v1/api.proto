@@ -221,8 +221,10 @@ enum MountPropagation {
 message Mount {
     // Path of the mount within the container.
     string container_path = 1;
-    // Path of the mount on the host. If the hostPath doesn't exist, then runtimes
-    // should report error. If the hostpath is a symbolic link, runtimes should
+    // Path of the mount on the host. Has to be empty if the image field below
+    // is provided, because those fields are mutually exclusive. If the image
+    // field below is nil and the host path doesn't exist, then runtimes should
+    // report an error. If the hostpath is a symbolic link, runtimes should
     // follow the symlink and mount the real destination to container.
     string host_path = 2;
     // If set, the mount is read-only.
@@ -601,7 +603,7 @@ message PodSandboxStatusResponse {
     map<string, string> info = 2;
     // Container statuses
     repeated ContainerStatus containers_statuses = 3;
-    // Timestamp at which container and pod statuses were recorded
+    // Timestamp in nanoseconds at which container and pod statuses were recorded
     int64 timestamp = 4;
 }
 
@@ -1053,6 +1055,19 @@ message WindowsContainerResources {
     int64 memory_limit_in_bytes = 4;
     // Specifies the size of the rootfs / scratch space in bytes to be configured for this container. Default: 0 (not specified).
     int64 rootfs_size_in_bytes = 5;
+    // Optionally specifies the set of CPUs to affinitize for this container.
+    repeated WindowsCpuGroupAffinity affinity_cpus = 6;
+}
+
+// WindowsCpuGroupAffinity specifies the CPU mask and group to affinitize.
+// This is similar to the following _GROUP_AFFINITY structure:
+// https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/miniport/ns-miniport-_group_affinity
+message WindowsCpuGroupAffinity {
+    // CPU mask relative to this CPU group.
+    uint64 cpu_mask = 1;
+    // Processor group the mask refers to, as returned by
+    // GetLogicalProcessorInformationEx.
+    uint32 cpu_group = 2;
 }
 
 // ContainerMetadata holds all necessary information for building the container
@@ -1344,7 +1359,7 @@ message ContainerResources {
 
 message ContainerUser {
     // User identities initially attached to first process in the Linux container.
-	// Note that the actual running identity can be changed if the process has enough privilege to do so.
+    // Note that the actual running identity can be changed if the process has enough privilege to do so.
     LinuxContainerUser linux = 1;
 
     // User identities initially attached to first process in the Windows container
@@ -1863,7 +1878,7 @@ message ContainerEventResponse {
     // Type of the container event
     ContainerEventType container_event_type = 2;
 
-    // Creation timestamp of this event
+    // Creation timestamp in nanoseconds of this event
     int64 created_at = 3;
 
     // Sandbox status
@@ -1927,7 +1942,7 @@ message Metric {
     // otherwise, it will be ignored.
     string name = 1;
     // Timestamp should be 0 if the metric was gathered live.
-    // If it was cached, the Timestamp should reflect the time it was collected.
+    // If it was cached, the Timestamp should reflect the time in nanoseconds it was collected.
     int64 timestamp = 2;
     MetricType metric_type = 3;
     // The corresponding LabelValues to the LabelKeys defined in the MetricDescriptor.

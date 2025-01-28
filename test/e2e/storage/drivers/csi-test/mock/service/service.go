@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"sync/atomic"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
 
@@ -51,16 +51,17 @@ var Manifest = map[string]string{
 }
 
 type Config struct {
-	DisableAttach              bool
-	DriverName                 string
-	AttachLimit                int64
-	NodeExpansionRequired      bool
-	VolumeMountGroupRequired   bool
-	DisableControllerExpansion bool
-	DisableOnlineExpansion     bool
-	PermissiveTargetPath       bool
-	EnableTopology             bool
-	IO                         DirIO
+	DisableAttach               bool
+	DriverName                  string
+	AttachLimit                 int64
+	NodeExpansionRequired       bool
+	NodeVolumeConditionRequired bool
+	VolumeMountGroupRequired    bool
+	DisableControllerExpansion  bool
+	DisableOnlineExpansion      bool
+	PermissiveTargetPath        bool
+	EnableTopology              bool
+	IO                          DirIO
 }
 
 // DirIO is an abstraction over direct os calls.

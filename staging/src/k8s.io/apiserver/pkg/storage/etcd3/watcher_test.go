@@ -64,7 +64,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 
 func TestWatchFromZero(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client))
+	storagetesting.RunTestWatchFromZero(ctx, t, store, compactStorage(client.Client))
 }
 
 // TestWatchFromNonZero tests that
@@ -112,6 +112,12 @@ func TestProgressNotify(t *testing.T) {
 	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
 }
 
+func TestWatchWithUnsafeDelete(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
+}
+
 // TestWatchDispatchBookmarkEvents makes sure that
 // setting allowWatchBookmarks query param against
 // etcd implementation doesn't have any effect.
@@ -142,6 +148,11 @@ func TestEtcdWatchSemanticsWithConcurrentDecode(t *testing.T) {
 func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
 	ctx, store, _ := testSetup(t)
 	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
+}
+
+func TestWatchListMatchSingle(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchListMatchSingle(ctx, t, store)
 }
 
 // =======================================================================

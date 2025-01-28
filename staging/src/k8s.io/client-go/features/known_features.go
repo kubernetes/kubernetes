@@ -28,6 +28,31 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @benluddy
+	// kep: https://kep.k8s.io/4222
+	// alpha: 1.32
+	//
+	// If disabled, clients configured to accept "application/cbor" will instead accept
+	// "application/json" with the same relative preference, and clients configured to write
+	// "application/cbor" or "application/apply-patch+cbor" will instead write
+	// "application/json" or "application/apply-patch+yaml", respectively.
+	ClientsAllowCBOR Feature = "ClientsAllowCBOR"
+
+	// owner: @benluddy
+	// kep: https://kep.k8s.io/4222
+	// alpha: 1.32
+	//
+	// If enabled, and only if ClientsAllowCBOR is also enabled, the default request content
+	// type (if not explicitly configured) and the dynamic client's request content type both
+	// become "application/cbor" instead of "application/json". The default content type for
+	// apply patch requests becomes "application/apply-patch+cbor" instead of
+	// "application/apply-patch+yaml".
+	ClientsPreferCBOR Feature = "ClientsPreferCBOR"
+
+	// owner: @nilekhc
+	// alpha: v1.30
+	InformerResourceVersion Feature = "InformerResourceVersion"
+
 	// owner: @p0lyn0mial
 	// beta: v1.30
 	//
@@ -37,10 +62,6 @@ const (
 	//  The feature is disabled in Beta by default because
 	//  it will only be turned on for selected control plane component(s).
 	WatchListClient Feature = "WatchListClient"
-
-	// owner: @nilekhc
-	// alpha: v1.30
-	InformerResourceVersion Feature = "InformerResourceVersion"
 )
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -49,6 +70,8 @@ const (
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
 var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
-	WatchListClient:         {Default: false, PreRelease: Beta},
+	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
+	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
 	InformerResourceVersion: {Default: false, PreRelease: Alpha},
+	WatchListClient:         {Default: false, PreRelease: Beta},
 }

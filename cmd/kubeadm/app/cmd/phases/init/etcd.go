@@ -47,7 +47,6 @@ func NewEtcdPhase() workflow.Phase {
 	phase := workflow.Phase{
 		Name:  "etcd",
 		Short: "Generate static Pod manifest file for local etcd",
-		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			newEtcdLocalSubPhase(),
 		},

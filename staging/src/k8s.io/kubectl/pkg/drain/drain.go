@@ -159,7 +159,7 @@ func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersi
 			},
 			DeleteOptions: &delOpts,
 		}
-		return d.Client.PolicyV1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
+		return d.Client.PolicyV1().Evictions(eviction.Namespace).Evict(d.getContext(), eviction)
 
 	default:
 		// otherwise, fall back to policy/v1beta1, supported by all servers that support the eviction subresource
@@ -170,7 +170,7 @@ func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersi
 			},
 			DeleteOptions: &delOpts,
 		}
-		return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
+		return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(d.getContext(), eviction)
 	}
 }
 
@@ -413,7 +413,10 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 
 func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
 	pods := params.pods
-	err := wait.PollImmediate(params.interval, params.timeout, func() (bool, error) {
+	if params.ctx == nil {
+		params.ctx = context.Background()
+	}
+	err := wait.PollUntilContextTimeout(params.ctx, params.interval, params.timeout, true, func(ctx context.Context) (done bool, err error) {
 		pendingPods := []corev1.Pod{}
 		for i, pod := range pods {
 			p, err := params.getPodFn(pod.Namespace, pod.Name)
@@ -440,15 +443,7 @@ func waitForDelete(params waitForDeleteParams) ([]corev1.Pod, error) {
 			}
 		}
 		pods = pendingPods
-		if len(pendingPods) > 0 {
-			select {
-			case <-params.ctx.Done():
-				return false, fmt.Errorf("global timeout reached: %v", params.globalTimeout)
-			default:
-				return false, nil
-			}
-		}
-		return true, nil
+		return len(pods) == 0, nil
 	})
 	return pods, err
 }

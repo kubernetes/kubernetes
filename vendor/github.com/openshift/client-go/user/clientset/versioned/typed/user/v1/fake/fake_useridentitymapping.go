@@ -3,58 +3,26 @@
 package fake
 
 import (
-	"context"
-
 	v1 "github.com/openshift/api/user/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	testing "k8s.io/client-go/testing"
+	userv1 "github.com/openshift/client-go/user/clientset/versioned/typed/user/v1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeUserIdentityMappings implements UserIdentityMappingInterface
-type FakeUserIdentityMappings struct {
+// fakeUserIdentityMappings implements UserIdentityMappingInterface
+type fakeUserIdentityMappings struct {
+	*gentype.FakeClient[*v1.UserIdentityMapping]
 	Fake *FakeUserV1
 }
 
-var useridentitymappingsResource = v1.SchemeGroupVersion.WithResource("useridentitymappings")
-
-var useridentitymappingsKind = v1.SchemeGroupVersion.WithKind("UserIdentityMapping")
-
-// Get takes name of the userIdentityMapping, and returns the corresponding userIdentityMapping object, and an error if there is any.
-func (c *FakeUserIdentityMappings) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.UserIdentityMapping, err error) {
-	emptyResult := &v1.UserIdentityMapping{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(useridentitymappingsResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeUserIdentityMappings(fake *FakeUserV1) userv1.UserIdentityMappingInterface {
+	return &fakeUserIdentityMappings{
+		gentype.NewFakeClient[*v1.UserIdentityMapping](
+			fake.Fake,
+			"",
+			v1.SchemeGroupVersion.WithResource("useridentitymappings"),
+			v1.SchemeGroupVersion.WithKind("UserIdentityMapping"),
+			func() *v1.UserIdentityMapping { return &v1.UserIdentityMapping{} },
+		),
+		fake,
 	}
-	return obj.(*v1.UserIdentityMapping), err
-}
-
-// Create takes the representation of a userIdentityMapping and creates it.  Returns the server's representation of the userIdentityMapping, and an error, if there is any.
-func (c *FakeUserIdentityMappings) Create(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.CreateOptions) (result *v1.UserIdentityMapping, err error) {
-	emptyResult := &v1.UserIdentityMapping{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(useridentitymappingsResource, userIdentityMapping, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.UserIdentityMapping), err
-}
-
-// Update takes the representation of a userIdentityMapping and updates it. Returns the server's representation of the userIdentityMapping, and an error, if there is any.
-func (c *FakeUserIdentityMappings) Update(ctx context.Context, userIdentityMapping *v1.UserIdentityMapping, opts metav1.UpdateOptions) (result *v1.UserIdentityMapping, err error) {
-	emptyResult := &v1.UserIdentityMapping{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(useridentitymappingsResource, userIdentityMapping, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1.UserIdentityMapping), err
-}
-
-// Delete takes name of the userIdentityMapping and deletes it. Returns an error if one occurs.
-func (c *FakeUserIdentityMappings) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(useridentitymappingsResource, name, opts), &v1.UserIdentityMapping{})
-	return err
 }

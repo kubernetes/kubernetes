@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-unsched-
+  labels:
+    type: unsched
+spec:
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause
+  volumes:
+  - name: vol
+    persistentVolumeClaim:
+      claimName: pvc-{{ .Index }}

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type ImageContentPoliciesGetter interface {
 
 // ImageContentPolicyInterface has methods to work with ImageContentPolicy resources.
 type ImageContentPolicyInterface interface {
-	Create(ctx context.Context, imageContentPolicy *v1.ImageContentPolicy, opts metav1.CreateOptions) (*v1.ImageContentPolicy, error)
-	Update(ctx context.Context, imageContentPolicy *v1.ImageContentPolicy, opts metav1.UpdateOptions) (*v1.ImageContentPolicy, error)
+	Create(ctx context.Context, imageContentPolicy *configv1.ImageContentPolicy, opts metav1.CreateOptions) (*configv1.ImageContentPolicy, error)
+	Update(ctx context.Context, imageContentPolicy *configv1.ImageContentPolicy, opts metav1.UpdateOptions) (*configv1.ImageContentPolicy, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ImageContentPolicy, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageContentPolicyList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.ImageContentPolicy, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.ImageContentPolicyList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageContentPolicy, err error)
-	Apply(ctx context.Context, imageContentPolicy *configv1.ImageContentPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageContentPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.ImageContentPolicy, err error)
+	Apply(ctx context.Context, imageContentPolicy *applyconfigurationsconfigv1.ImageContentPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.ImageContentPolicy, err error)
 	ImageContentPolicyExpansion
 }
 
 // imageContentPolicies implements ImageContentPolicyInterface
 type imageContentPolicies struct {
-	*gentype.ClientWithListAndApply[*v1.ImageContentPolicy, *v1.ImageContentPolicyList, *configv1.ImageContentPolicyApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.ImageContentPolicy, *configv1.ImageContentPolicyList, *applyconfigurationsconfigv1.ImageContentPolicyApplyConfiguration]
 }
 
 // newImageContentPolicies returns a ImageContentPolicies
 func newImageContentPolicies(c *ConfigV1Client) *imageContentPolicies {
 	return &imageContentPolicies{
-		gentype.NewClientWithListAndApply[*v1.ImageContentPolicy, *v1.ImageContentPolicyList, *configv1.ImageContentPolicyApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.ImageContentPolicy, *configv1.ImageContentPolicyList, *applyconfigurationsconfigv1.ImageContentPolicyApplyConfiguration](
 			"imagecontentpolicies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ImageContentPolicy { return &v1.ImageContentPolicy{} },
-			func() *v1.ImageContentPolicyList { return &v1.ImageContentPolicyList{} }),
+			func() *configv1.ImageContentPolicy { return &configv1.ImageContentPolicy{} },
+			func() *configv1.ImageContentPolicyList { return &configv1.ImageContentPolicyList{} },
+		),
 	}
 }

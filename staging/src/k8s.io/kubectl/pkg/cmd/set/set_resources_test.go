@@ -487,7 +487,7 @@ func TestSetResourcesRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						assert.Contains(t, string(bytes), "200m", fmt.Sprintf("resources not updated for %#v", input.object))
+						assert.Containsf(t, string(bytes), "200m", "resources not updated for %#v", input.object)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "resources", req.Method, req.URL, req)

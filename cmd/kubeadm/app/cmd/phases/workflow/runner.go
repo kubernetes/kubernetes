@@ -23,6 +23,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 )
 
 // phaseSeparator defines the separator to be used when concatenating nested
@@ -284,7 +286,7 @@ func (e *Runner) Help(cmdUse string) string {
 	})
 
 	// prints the list of phases indented by level and formatted using the maxlength
-	// the list is enclosed in a mardown code block for ensuring better readability in the public web site
+	// the list is enclosed in a markdown code block for ensuring better readability in the public web site
 	line := fmt.Sprintf("The %q command executes the following phases:\n", cmdUse)
 	line += "```\n"
 	offset := 2
@@ -332,8 +334,9 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 	// adds the phases subcommand
 	phaseCommand := &cobra.Command{
 		Use:   "phase",
-		Short: fmt.Sprintf("Use this command to invoke single phase of the %s workflow", cmd.Name()),
+		Short: fmt.Sprintf("Use this command to invoke single phase of the %q workflow", cmd.Name()),
 	}
+	cmdutil.RequireSubcommand(phaseCommand)
 
 	cmd.AddCommand(phaseCommand)
 
@@ -363,7 +366,8 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			RunE: func(cmd *cobra.Command, args []string) error {
 				// if the phase has subphases, print the help and exits
 				if len(p.Phases) > 0 {
-					return cmd.Help()
+					_ = cmd.Help()
+					return cmdutil.ErrorSubcommandRequired
 				}
 
 				// overrides the command triggering the Runner using the phaseCmd

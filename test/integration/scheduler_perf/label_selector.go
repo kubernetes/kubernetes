@@ -16,15 +16,13 @@ limitations under the License.
 
 package benchmark
 
-import "strings"
-
 // enabled checks a a label filter that works as in GitHub:
 // - empty string means enabled
 // - individual labels are comma-separated
 // - [+]<label> means the workload must have that label
 // - -<label> means the workload must not have that label
-func enabled(labelFilter string, labels ...string) bool {
-	for _, label := range strings.Split(labelFilter, ",") {
+func enabled(labelFilters []string, labels ...string) bool {
+	for _, label := range labelFilters {
 		if label == "" {
 			continue
 		}

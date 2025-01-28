@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // ImageTagMirrorsApplyConfiguration represents a declarative configuration of the ImageTagMirrors type for use
 // with apply.
 type ImageTagMirrorsApplyConfiguration struct {
-	Source             *string                `json:"source,omitempty"`
-	Mirrors            []v1.ImageMirror       `json:"mirrors,omitempty"`
-	MirrorSourcePolicy *v1.MirrorSourcePolicy `json:"mirrorSourcePolicy,omitempty"`
+	Source             *string                      `json:"source,omitempty"`
+	Mirrors            []configv1.ImageMirror       `json:"mirrors,omitempty"`
+	MirrorSourcePolicy *configv1.MirrorSourcePolicy `json:"mirrorSourcePolicy,omitempty"`
 }
 
 // ImageTagMirrorsApplyConfiguration constructs a declarative configuration of the ImageTagMirrors type for use with
@@ -31,7 +31,7 @@ func (b *ImageTagMirrorsApplyConfiguration) WithSource(value string) *ImageTagMi
 // WithMirrors adds the given value to the Mirrors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Mirrors field.
-func (b *ImageTagMirrorsApplyConfiguration) WithMirrors(values ...v1.ImageMirror) *ImageTagMirrorsApplyConfiguration {
+func (b *ImageTagMirrorsApplyConfiguration) WithMirrors(values ...configv1.ImageMirror) *ImageTagMirrorsApplyConfiguration {
 	for i := range values {
 		b.Mirrors = append(b.Mirrors, values[i])
 	}
@@ -41,7 +41,7 @@ func (b *ImageTagMirrorsApplyConfiguration) WithMirrors(values ...v1.ImageMirror
 // WithMirrorSourcePolicy sets the MirrorSourcePolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MirrorSourcePolicy field is set to the value of the last call.
-func (b *ImageTagMirrorsApplyConfiguration) WithMirrorSourcePolicy(value v1.MirrorSourcePolicy) *ImageTagMirrorsApplyConfiguration {
+func (b *ImageTagMirrorsApplyConfiguration) WithMirrorSourcePolicy(value configv1.MirrorSourcePolicy) *ImageTagMirrorsApplyConfiguration {
 	b.MirrorSourcePolicy = &value
 	return b
 }

@@ -5,7 +5,7 @@ package v1
 import (
 	time "time"
 
-	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -13,9 +13,9 @@ import (
 // BuildStatusApplyConfiguration represents a declarative configuration of the BuildStatus type for use
 // with apply.
 type BuildStatusApplyConfiguration struct {
-	Phase                      *v1.BuildPhase                       `json:"phase,omitempty"`
+	Phase                      *buildv1.BuildPhase                  `json:"phase,omitempty"`
 	Cancelled                  *bool                                `json:"cancelled,omitempty"`
-	Reason                     *v1.StatusReason                     `json:"reason,omitempty"`
+	Reason                     *buildv1.StatusReason                `json:"reason,omitempty"`
 	Message                    *string                              `json:"message,omitempty"`
 	StartTimestamp             *metav1.Time                         `json:"startTimestamp,omitempty"`
 	CompletionTimestamp        *metav1.Time                         `json:"completionTimestamp,omitempty"`
@@ -37,7 +37,7 @@ func BuildStatus() *BuildStatusApplyConfiguration {
 // WithPhase sets the Phase field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Phase field is set to the value of the last call.
-func (b *BuildStatusApplyConfiguration) WithPhase(value v1.BuildPhase) *BuildStatusApplyConfiguration {
+func (b *BuildStatusApplyConfiguration) WithPhase(value buildv1.BuildPhase) *BuildStatusApplyConfiguration {
 	b.Phase = &value
 	return b
 }
@@ -53,7 +53,7 @@ func (b *BuildStatusApplyConfiguration) WithCancelled(value bool) *BuildStatusAp
 // WithReason sets the Reason field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Reason field is set to the value of the last call.
-func (b *BuildStatusApplyConfiguration) WithReason(value v1.StatusReason) *BuildStatusApplyConfiguration {
+func (b *BuildStatusApplyConfiguration) WithReason(value buildv1.StatusReason) *BuildStatusApplyConfiguration {
 	b.Reason = &value
 	return b
 }

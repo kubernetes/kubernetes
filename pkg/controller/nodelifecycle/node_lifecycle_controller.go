@@ -270,9 +270,7 @@ type Controller struct {
 	// Controller will not proactively sync node health, but will monitor node
 	// health signal updated from kubelet. There are 2 kinds of node healthiness
 	// signals: NodeStatus and NodeLease. If it doesn't receive update for this amount
-	// of time, it will start posting "NodeReady==ConditionUnknown". The amount of
-	// time before which Controller start evicting pods is controlled via flag
-	// 'pod-eviction-timeout'.
+	// of time, it will start posting "NodeReady==ConditionUnknown".
 	// Note: be cautious when changing the constant, it must work with
 	// nodeStatusUpdateFrequency in kubelet and renewInterval in NodeLease
 	// controller. The node health signal update frequency is the minimal of the
@@ -284,7 +282,11 @@ type Controller struct {
 	//    be less than the node health signal update frequency, since there will
 	//    only be fresh values from Kubelet at an interval of node health signal
 	//    update frequency.
-	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger
+	// 2. nodeMonitorGracePeriod should be greater than the sum of HTTP2_PING_TIMEOUT_SECONDS (30s)
+	// 	  and HTTP2_READ_IDLE_TIMEOUT_SECONDS (15s) from the http2 health check
+	// 	  to ensure that the server has adequate time to handle slow or idle connections
+	//    properly before marking a node as unhealthy.
+	// 3. nodeMonitorGracePeriod can't be too large for user experience - larger
 	//    value takes longer for user to see up-to-date node health.
 	nodeMonitorGracePeriod time.Duration
 
@@ -807,7 +809,7 @@ func (nc *Controller) processTaintBaseEviction(ctx context.Context, node *v1.Nod
 			logger.Error(nil, "Failed to remove taints from node. Will retry in next iteration", "node", klog.KObj(node))
 		}
 		if removed {
-			logger.V(2).Info("Node is healthy again, removing all taints", "node", klog.KObj(node))
+			logger.V(2).Info("Node is healthy again, removed all taints", "node", klog.KObj(node))
 		}
 	}
 }
@@ -1256,12 +1258,12 @@ func (nc *Controller) markNodeAsReachable(ctx context.Context, node *v1.Node) (b
 	err := controller.RemoveTaintOffNode(ctx, nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
 	logger := klog.FromContext(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to remove taint from node", "node", klog.KObj(node))
+		logger.Error(err, "Failed to remove unreachable taint from node", "node", klog.KObj(node))
 		return false, err
 	}
 	err = controller.RemoveTaintOffNode(ctx, nc.kubeClient, node.Name, node, NotReadyTaintTemplate)
 	if err != nil {
-		logger.Error(err, "Failed to remove taint from node", "node", klog.KObj(node))
+		logger.Error(err, "Failed to remove not-ready taint from node", "node", klog.KObj(node))
 		return false, err
 	}
 	nc.evictorLock.Lock()

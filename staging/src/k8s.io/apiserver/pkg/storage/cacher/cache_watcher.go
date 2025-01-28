@@ -510,6 +510,10 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
 	}
 
+	// send bookmark after sending all events in cacheInterval for watchlist request
+	if cacheInterval.initialEventsEndBookmark != nil {
+		c.sendWatchCacheEvent(cacheInterval.initialEventsEndBookmark)
+	}
 	c.process(ctx, resourceVersion)
 }
 

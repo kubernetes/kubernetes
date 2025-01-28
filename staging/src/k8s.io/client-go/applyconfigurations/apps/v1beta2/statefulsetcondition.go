@@ -19,7 +19,7 @@ limitations under the License.
 package v1beta2
 
 import (
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,11 +27,11 @@ import (
 // StatefulSetConditionApplyConfiguration represents a declarative configuration of the StatefulSetCondition type for use
 // with apply.
 type StatefulSetConditionApplyConfiguration struct {
-	Type               *v1beta2.StatefulSetConditionType `json:"type,omitempty"`
-	Status             *v1.ConditionStatus               `json:"status,omitempty"`
-	LastTransitionTime *metav1.Time                      `json:"lastTransitionTime,omitempty"`
-	Reason             *string                           `json:"reason,omitempty"`
-	Message            *string                           `json:"message,omitempty"`
+	Type               *appsv1beta2.StatefulSetConditionType `json:"type,omitempty"`
+	Status             *v1.ConditionStatus                   `json:"status,omitempty"`
+	LastTransitionTime *metav1.Time                          `json:"lastTransitionTime,omitempty"`
+	Reason             *string                               `json:"reason,omitempty"`
+	Message            *string                               `json:"message,omitempty"`
 }
 
 // StatefulSetConditionApplyConfiguration constructs a declarative configuration of the StatefulSetCondition type for use with
@@ -43,7 +43,7 @@ func StatefulSetCondition() *StatefulSetConditionApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *StatefulSetConditionApplyConfiguration) WithType(value v1beta2.StatefulSetConditionType) *StatefulSetConditionApplyConfiguration {
+func (b *StatefulSetConditionApplyConfiguration) WithType(value appsv1beta2.StatefulSetConditionType) *StatefulSetConditionApplyConfiguration {
 	b.Type = &value
 	return b
 }

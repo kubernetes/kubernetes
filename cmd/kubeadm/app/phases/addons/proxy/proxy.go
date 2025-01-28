@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -204,8 +205,14 @@ func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoin
 	if err != nil {
 		return []byte(""), errors.Wrap(err, "error when marshaling")
 	}
+
+	// Indent the proxy CM bytes with 4 spaces to comply with the location in the template.
 	var prefixBytes bytes.Buffer
-	apiclient.PrintBytesWithLinePrefix(&prefixBytes, proxyBytes, "    ")
+	scanner := bufio.NewScanner(bytes.NewReader(proxyBytes))
+	for scanner.Scan() {
+		fmt.Fprintf(&prefixBytes, "    %s\n", scanner.Text())
+	}
+
 	configMapBytes, err := kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
 		struct {
 			ControlPlaneEndpoint string
@@ -259,7 +266,7 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 	}
 	// Propagate the http/https proxy host environment variables to the container
 	env := &kubeproxyDaemonSet.Spec.Template.Spec.Containers[0].Env
-	*env = append(*env, kubeadmutil.MergeKubeadmEnvVars(kubeadmutil.GetProxyEnvVars())...)
+	*env = append(*env, kubeadmutil.MergeKubeadmEnvVars(kubeadmutil.GetProxyEnvVars(nil))...)
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
 	return []byte(""), apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet)

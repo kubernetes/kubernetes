@@ -4,13 +4,13 @@ package v1
 
 import (
 	quotav1 "github.com/openshift/api/quota/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ClusterResourceQuotaStatusApplyConfiguration represents a declarative configuration of the ClusterResourceQuotaStatus type for use
 // with apply.
 type ClusterResourceQuotaStatusApplyConfiguration struct {
-	Total      *v1.ResourceQuotaStatus                  `json:"total,omitempty"`
+	Total      *corev1.ResourceQuotaStatus              `json:"total,omitempty"`
 	Namespaces *quotav1.ResourceQuotasStatusByNamespace `json:"namespaces,omitempty"`
 }
 
@@ -23,7 +23,7 @@ func ClusterResourceQuotaStatus() *ClusterResourceQuotaStatusApplyConfiguration 
 // WithTotal sets the Total field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Total field is set to the value of the last call.
-func (b *ClusterResourceQuotaStatusApplyConfiguration) WithTotal(value v1.ResourceQuotaStatus) *ClusterResourceQuotaStatusApplyConfiguration {
+func (b *ClusterResourceQuotaStatusApplyConfiguration) WithTotal(value corev1.ResourceQuotaStatus) *ClusterResourceQuotaStatusApplyConfiguration {
 	b.Total = &value
 	return b
 }

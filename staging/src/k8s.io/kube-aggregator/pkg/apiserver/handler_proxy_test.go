@@ -34,31 +34,34 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-	"k8s.io/client-go/transport"
-
-	"golang.org/x/net/websocket"
-
+	"github.com/google/go-cmp/cmp"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/net/websocket"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/filters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
+	"k8s.io/client-go/transport"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -130,6 +133,8 @@ func TestProxyHandler(t *testing.T) {
 		expectedBody       string
 		expectedCalled     bool
 		expectedHeaders    map[string][]string
+
+		enableFeatureGates []featuregate.Feature
 	}{
 		"no target": {
 			expectedStatusCode: http.StatusNotFound,
@@ -138,7 +143,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+					Service: &apiregistration.ServiceReference{Port: ptr.To[int32](443)},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -154,13 +159,14 @@ func TestProxyHandler(t *testing.T) {
 		"proxy with user, insecure": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:               &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+					Service:               &apiregistration.ServiceReference{Port: ptr.To[int32](443)},
 					Group:                 "foo",
 					Version:               "v1",
 					InsecureSkipTLSVerify: true,
@@ -183,16 +189,52 @@ func TestProxyHandler(t *testing.T) {
 				"X-Remote-Group":    {"one", "two"},
 			},
 		},
-		"proxy with user, cabundle": {
+		"[RemoteRequestHeaderUID] proxy with user, insecure": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:               &apiregistration.ServiceReference{Port: ptr.To[int32](443)},
+					Group:                 "foo",
+					Version:               "v1",
+					InsecureSkipTLSVerify: true,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			enableFeatureGates: []featuregate.Feature{features.RemoteRequestHeaderUID},
+			expectedStatusCode: http.StatusOK,
+			expectedCalled:     true,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
+				"X-Remote-Uid":      {"6b60d791-1af9-4513-92e5-e4252a1e0a78"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"proxy with user, cabundle": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -215,16 +257,52 @@ func TestProxyHandler(t *testing.T) {
 				"X-Remote-Group":    {"one", "two"},
 			},
 		},
-		"service unavailable": {
+		"[RemoteRequestHeaderUID] proxy with user, cabundle": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			enableFeatureGates: []featuregate.Feature{features.RemoteRequestHeaderUID},
+			expectedStatusCode: http.StatusOK,
+			expectedCalled:     true,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
+				"X-Remote-Uid":      {"6b60d791-1af9-4513-92e5-e4252a1e0a78"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"service unavailable": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -240,6 +318,7 @@ func TestProxyHandler(t *testing.T) {
 		"service unresolveable": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path:            "/request/path",
@@ -247,7 +326,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "bad-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "bad-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -263,13 +342,14 @@ func TestProxyHandler(t *testing.T) {
 		"fail on bad serving cert": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+					Service: &apiregistration.ServiceReference{Port: ptr.To[int32](443)},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -284,13 +364,14 @@ func TestProxyHandler(t *testing.T) {
 		"fail on bad serving cert w/o SAN and increase SAN error counter metrics": {
 			user: &user.DefaultInfo{
 				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
 				Groups: []string{"one", "two"},
 			},
 			path: "/request/path",
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -312,7 +393,11 @@ func TestProxyHandler(t *testing.T) {
 		target.Reset()
 		legacyregistry.Reset()
 
-		func() {
+		t.Run(name, func(t *testing.T) {
+			for _, f := range tc.enableFeatureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
+			}
+
 			targetServer := httptest.NewUnstartedServer(target)
 			serviceCert := tc.serviceCertOverride
 			if serviceCert == nil {
@@ -346,37 +431,37 @@ func TestProxyHandler(t *testing.T) {
 
 			resp, err := http.Get(server.URL + tc.path)
 			if err != nil {
-				t.Errorf("%s: %v", name, err)
+				t.Errorf("%v", err)
 				return
 			}
 			if e, a := tc.expectedStatusCode, resp.StatusCode; e != a {
 				body, _ := httputil.DumpResponse(resp, true)
-				t.Logf("%s: %v", name, string(body))
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Logf("%v", string(body))
+				t.Errorf("expected %v, got %v", e, a)
 				return
 			}
 			bytes, err := io.ReadAll(resp.Body)
 			if err != nil {
-				t.Errorf("%s: %v", name, err)
+				t.Errorf("%v", err)
 				return
 			}
 			if !strings.Contains(string(bytes), tc.expectedBody) {
-				t.Errorf("%s: expected %q, got %q", name, tc.expectedBody, string(bytes))
+				t.Errorf("expected %q, got %q", tc.expectedBody, string(bytes))
 				return
 			}
 
 			if e, a := tc.expectedCalled, target.called; e != a {
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Errorf("expected %v, got %v", e, a)
 				return
 			}
 			// this varies every test
 			delete(target.headers, "X-Forwarded-Host")
 			if e, a := tc.expectedHeaders, target.headers; !reflect.DeepEqual(e, a) {
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Errorf("expected != got %v", cmp.Diff(e, a))
 				return
 			}
 			if e, a := targetServer.Listener.Addr().String(), target.host; tc.expectedCalled && !reflect.DeepEqual(e, a) {
-				t.Errorf("%s: expected %v, got %v", name, e, a)
+				t.Errorf("expected %v, got %v", e, a)
 				return
 			}
 
@@ -389,7 +474,7 @@ func TestProxyHandler(t *testing.T) {
 					t.Errorf("expected the x509_missing_san_total to be 1, but it's %d", errorCounter)
 				}
 			}
-		}()
+		})
 	}
 }
 
@@ -424,7 +509,10 @@ func newBrokenDialerAndSelector() (*mockEgressDialer, *egressselector.EgressSele
 }
 
 func TestProxyUpgrade(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoteRequestHeaderUID, true)
+
 	upgradeUser := "upgradeUser"
+	upgradeUID := "upgradeUser-UID"
 	testcases := map[string]struct {
 		APIService        *apiregistration.APIService
 		NewEgressSelector func() (*mockEgressDialer, *egressselector.EgressSelector)
@@ -437,7 +525,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -454,7 +542,7 @@ func TestProxyUpgrade(t *testing.T) {
 					InsecureSkipTLSVerify: true,
 					Group:                 "mygroup",
 					Version:               "v1",
-					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32Ptr(443)},
+					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: ptr.To[int32](443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -471,7 +559,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: ptr.To[int32](443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -488,7 +576,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -506,7 +594,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -533,6 +621,10 @@ func TestProxyUpgrade(t *testing.T) {
 				user := req.Header.Get("X-Remote-User")
 				if user != upgradeUser {
 					t.Errorf("expected user %q, got %q", upgradeUser, user)
+				}
+				uid := req.Header.Get("X-Remote-Uid")
+				if uid != upgradeUID {
+					t.Errorf("expected UID %q, got %q", upgradeUID, uid)
 				}
 				body := make([]byte, 5)
 				ws.Read(body)
@@ -576,7 +668,7 @@ func TestProxyUpgrade(t *testing.T) {
 			}
 
 			proxyHandler.updateAPIService(tc.APIService)
-			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: upgradeUser}))
+			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: upgradeUser, UID: upgradeUID}))
 			defer aggregator.Close()
 
 			ws, err := websocket.Dial("ws://"+aggregator.Listener.Addr().String()+path, "", "http://127.0.0.1/")
@@ -983,7 +1075,7 @@ func TestProxyCertReload(t *testing.T) {
 	apiService := &apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 		Spec: apiregistration.APIServiceSpec{
-			Service:  &apiregistration.ServiceReference{Name: "test-service2", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+			Service:  &apiregistration.ServiceReference{Name: "test-service2", Namespace: "test-ns", Port: ptr.To[int32](443)},
 			Group:    "foo",
 			Version:  "v1",
 			CABundle: backendCaCertificate(), // used to validate backendCertificate()

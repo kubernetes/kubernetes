@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/user/v1"
-	userv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
+	userv1 "github.com/openshift/api/user/v1"
+	applyconfigurationsuserv1 "github.com/openshift/client-go/user/applyconfigurations/user/v1"
 	scheme "github.com/openshift/client-go/user/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type GroupsGetter interface {
 
 // GroupInterface has methods to work with Group resources.
 type GroupInterface interface {
-	Create(ctx context.Context, group *v1.Group, opts metav1.CreateOptions) (*v1.Group, error)
-	Update(ctx context.Context, group *v1.Group, opts metav1.UpdateOptions) (*v1.Group, error)
+	Create(ctx context.Context, group *userv1.Group, opts metav1.CreateOptions) (*userv1.Group, error)
+	Update(ctx context.Context, group *userv1.Group, opts metav1.UpdateOptions) (*userv1.Group, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Group, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.GroupList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*userv1.Group, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*userv1.GroupList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Group, err error)
-	Apply(ctx context.Context, group *userv1.GroupApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Group, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *userv1.Group, err error)
+	Apply(ctx context.Context, group *applyconfigurationsuserv1.GroupApplyConfiguration, opts metav1.ApplyOptions) (result *userv1.Group, err error)
 	GroupExpansion
 }
 
 // groups implements GroupInterface
 type groups struct {
-	*gentype.ClientWithListAndApply[*v1.Group, *v1.GroupList, *userv1.GroupApplyConfiguration]
+	*gentype.ClientWithListAndApply[*userv1.Group, *userv1.GroupList, *applyconfigurationsuserv1.GroupApplyConfiguration]
 }
 
 // newGroups returns a Groups
 func newGroups(c *UserV1Client) *groups {
 	return &groups{
-		gentype.NewClientWithListAndApply[*v1.Group, *v1.GroupList, *userv1.GroupApplyConfiguration](
+		gentype.NewClientWithListAndApply[*userv1.Group, *userv1.GroupList, *applyconfigurationsuserv1.GroupApplyConfiguration](
 			"groups",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Group { return &v1.Group{} },
-			func() *v1.GroupList { return &v1.GroupList{} }),
+			func() *userv1.Group { return &userv1.Group{} },
+			func() *userv1.GroupList { return &userv1.GroupList{} },
+		),
 	}
 }

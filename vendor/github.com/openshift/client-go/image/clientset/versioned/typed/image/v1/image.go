@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/image/v1"
-	imagev1 "github.com/openshift/client-go/image/applyconfigurations/image/v1"
+	imagev1 "github.com/openshift/api/image/v1"
+	applyconfigurationsimagev1 "github.com/openshift/client-go/image/applyconfigurations/image/v1"
 	scheme "github.com/openshift/client-go/image/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type ImagesGetter interface {
 
 // ImageInterface has methods to work with Image resources.
 type ImageInterface interface {
-	Create(ctx context.Context, image *v1.Image, opts metav1.CreateOptions) (*v1.Image, error)
-	Update(ctx context.Context, image *v1.Image, opts metav1.UpdateOptions) (*v1.Image, error)
+	Create(ctx context.Context, image *imagev1.Image, opts metav1.CreateOptions) (*imagev1.Image, error)
+	Update(ctx context.Context, image *imagev1.Image, opts metav1.UpdateOptions) (*imagev1.Image, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Image, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*imagev1.Image, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*imagev1.ImageList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Image, err error)
-	Apply(ctx context.Context, image *imagev1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Image, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *imagev1.Image, err error)
+	Apply(ctx context.Context, image *applyconfigurationsimagev1.ImageApplyConfiguration, opts metav1.ApplyOptions) (result *imagev1.Image, err error)
 	ImageExpansion
 }
 
 // images implements ImageInterface
 type images struct {
-	*gentype.ClientWithListAndApply[*v1.Image, *v1.ImageList, *imagev1.ImageApplyConfiguration]
+	*gentype.ClientWithListAndApply[*imagev1.Image, *imagev1.ImageList, *applyconfigurationsimagev1.ImageApplyConfiguration]
 }
 
 // newImages returns a Images
 func newImages(c *ImageV1Client) *images {
 	return &images{
-		gentype.NewClientWithListAndApply[*v1.Image, *v1.ImageList, *imagev1.ImageApplyConfiguration](
+		gentype.NewClientWithListAndApply[*imagev1.Image, *imagev1.ImageList, *applyconfigurationsimagev1.ImageApplyConfiguration](
 			"images",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.Image { return &v1.Image{} },
-			func() *v1.ImageList { return &v1.ImageList{} }),
+			func() *imagev1.Image { return &imagev1.Image{} },
+			func() *imagev1.ImageList { return &imagev1.ImageList{} },
+		),
 	}
 }

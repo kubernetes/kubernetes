@@ -13,13 +13,13 @@ option go_package = "github.com/openshift/api/oauth/v1";
 
 // ClusterRoleScopeRestriction describes restrictions on cluster role scopes
 message ClusterRoleScopeRestriction {
-  // RoleNames is the list of cluster roles that can referenced.  * means anything
+  // roleNames is the list of cluster roles that can referenced.  * means anything
   repeated string roleNames = 1;
 
-  // Namespaces is the list of namespaces that can be referenced.  * means any of them (including *)
+  // namespaces is the list of namespaces that can be referenced.  * means any of them (including *)
   repeated string namespaces = 2;
 
-  // AllowEscalation indicates whether you can request roles and their escalating resources
+  // allowEscalation indicates whether you can request roles and their escalating resources
   optional bool allowEscalation = 3;
 }
 
@@ -37,31 +37,31 @@ message OAuthAccessToken {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // ClientName references the client that created this token.
+  // clientName references the client that created this token.
   optional string clientName = 2;
 
-  // ExpiresIn is the seconds from CreationTime before this token expires.
+  // expiresIn is the seconds from CreationTime before this token expires.
   optional int64 expiresIn = 3;
 
-  // Scopes is an array of the requested scopes.
+  // scopes is an array of the requested scopes.
   repeated string scopes = 4;
 
-  // RedirectURI is the redirection associated with the token.
+  // redirectURI is the redirection associated with the token.
   optional string redirectURI = 5;
 
-  // UserName is the user name associated with this token
+  // userName is the user name associated with this token
   optional string userName = 6;
 
-  // UserUID is the unique UID associated with this token
+  // userUID is the unique UID associated with this token
   optional string userUID = 7;
 
-  // AuthorizeToken contains the token that authorized this token
+  // authorizeToken contains the token that authorized this token
   optional string authorizeToken = 8;
 
-  // RefreshToken is the value by which this token can be renewed. Can be blank.
+  // refreshToken is the value by which this token can be renewed. Can be blank.
   optional string refreshToken = 9;
 
-  // InactivityTimeoutSeconds is the value in seconds, from the
+  // inactivityTimeoutSeconds is the value in seconds, from the
   // CreationTimestamp, after which this token can no longer be used.
   // The value is automatically incremented when the token is used.
   optional int32 inactivityTimeoutSeconds = 10;
@@ -76,7 +76,7 @@ message OAuthAccessTokenList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of OAuth access tokens
+  // items is the list of OAuth access tokens
   repeated OAuthAccessToken items = 2;
 }
 
@@ -89,32 +89,32 @@ message OAuthAuthorizeToken {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // ClientName references the client that created this token.
+  // clientName references the client that created this token.
   optional string clientName = 2;
 
-  // ExpiresIn is the seconds from CreationTime before this token expires.
+  // expiresIn is the seconds from CreationTime before this token expires.
   optional int64 expiresIn = 3;
 
-  // Scopes is an array of the requested scopes.
+  // scopes is an array of the requested scopes.
   repeated string scopes = 4;
 
-  // RedirectURI is the redirection associated with the token.
+  // redirectURI is the redirection associated with the token.
   optional string redirectURI = 5;
 
-  // State data from request
+  // state data from request
   optional string state = 6;
 
-  // UserName is the user name associated with this token
+  // userName is the user name associated with this token
   optional string userName = 7;
 
-  // UserUID is the unique UID associated with this token. UserUID and UserName must both match
+  // userUID is the unique UID associated with this token. UserUID and UserName must both match
   // for this token to be valid.
   optional string userUID = 8;
 
-  // CodeChallenge is the optional code_challenge associated with this authorization code, as described in rfc7636
+  // codeChallenge is the optional code_challenge associated with this authorization code, as described in rfc7636
   optional string codeChallenge = 9;
 
-  // CodeChallengeMethod is the optional code_challenge_method associated with this authorization code, as described in rfc7636
+  // codeChallengeMethod is the optional code_challenge_method associated with this authorization code, as described in rfc7636
   optional string codeChallengeMethod = 10;
 }
 
@@ -127,7 +127,7 @@ message OAuthAuthorizeTokenList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of OAuth authorization tokens
+  // items is the list of OAuth authorization tokens
   repeated OAuthAuthorizeToken items = 2;
 }
 
@@ -140,36 +140,36 @@ message OAuthClient {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Secret is the unique secret associated with a client
+  // secret is the unique secret associated with a client
   optional string secret = 2;
 
-  // AdditionalSecrets holds other secrets that may be used to identify the client.  This is useful for rotation
+  // additionalSecrets holds other secrets that may be used to identify the client.  This is useful for rotation
   // and for service account token validation
   repeated string additionalSecrets = 3;
 
-  // RespondWithChallenges indicates whether the client wants authentication needed responses made in the form of challenges instead of redirects
+  // respondWithChallenges indicates whether the client wants authentication needed responses made in the form of challenges instead of redirects
   optional bool respondWithChallenges = 4;
 
-  // RedirectURIs is the valid redirection URIs associated with a client
+  // redirectURIs is the valid redirection URIs associated with a client
   // +patchStrategy=merge
   repeated string redirectURIs = 5;
 
-  // GrantMethod is a required field which determines how to handle grants for this client.
+  // grantMethod is a required field which determines how to handle grants for this client.
   // Valid grant handling methods are:
   //  - auto:   always approves grant requests, useful for trusted clients
   //  - prompt: prompts the end user for approval of grant requests, useful for third-party clients
   optional string grantMethod = 6;
 
-  // ScopeRestrictions describes which scopes this client can request.  Each requested scope
+  // scopeRestrictions describes which scopes this client can request.  Each requested scope
   // is checked against each restriction.  If any restriction matches, then the scope is allowed.
   // If no restriction matches, then the scope is denied.
   repeated ScopeRestriction scopeRestrictions = 7;
 
-  // AccessTokenMaxAgeSeconds overrides the default access token max age for tokens granted to this client.
+  // accessTokenMaxAgeSeconds overrides the default access token max age for tokens granted to this client.
   // 0 means no expiration.
   optional int32 accessTokenMaxAgeSeconds = 8;
 
-  // AccessTokenInactivityTimeoutSeconds overrides the default token
+  // accessTokenInactivityTimeoutSeconds overrides the default token
   // inactivity timeout for tokens granted to this client.
   // The value represents the maximum amount of time that can occur between
   // consecutive uses of the token. Tokens become invalid if they are not
@@ -194,17 +194,17 @@ message OAuthClientAuthorization {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // ClientName references the client that created this authorization
+  // clientName references the client that created this authorization
   optional string clientName = 2;
 
-  // UserName is the user name that authorized this client
+  // userName is the user name that authorized this client
   optional string userName = 3;
 
-  // UserUID is the unique UID associated with this authorization. UserUID and UserName
+  // userUID is the unique UID associated with this authorization. UserUID and UserName
   // must both match for this authorization to be valid.
   optional string userUID = 4;
 
-  // Scopes is an array of the granted scopes.
+  // scopes is an array of the granted scopes.
   repeated string scopes = 5;
 }
 
@@ -217,7 +217,7 @@ message OAuthClientAuthorizationList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of OAuth client authorizations
+  // items is the list of OAuth client authorizations
   repeated OAuthClientAuthorization items = 2;
 }
 
@@ -230,7 +230,7 @@ message OAuthClientList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of OAuth clients
+  // items is the list of OAuth clients
   repeated OAuthClient items = 2;
 }
 
@@ -264,7 +264,7 @@ message ScopeRestriction {
   // ExactValues means the scope has to match a particular set of strings exactly
   repeated string literals = 1;
 
-  // ClusterRole describes a set of restrictions for cluster role scoping.
+  // clusterRole describes a set of restrictions for cluster role scoping.
   optional ClusterRoleScopeRestriction clusterRole = 2;
 }
 
@@ -276,31 +276,31 @@ message UserOAuthAccessToken {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // ClientName references the client that created this token.
+  // clientName references the client that created this token.
   optional string clientName = 2;
 
-  // ExpiresIn is the seconds from CreationTime before this token expires.
+  // expiresIn is the seconds from CreationTime before this token expires.
   optional int64 expiresIn = 3;
 
-  // Scopes is an array of the requested scopes.
+  // scopes is an array of the requested scopes.
   repeated string scopes = 4;
 
-  // RedirectURI is the redirection associated with the token.
+  // redirectURI is the redirection associated with the token.
   optional string redirectURI = 5;
 
-  // UserName is the user name associated with this token
+  // userName is the user name associated with this token
   optional string userName = 6;
 
-  // UserUID is the unique UID associated with this token
+  // userUID is the unique UID associated with this token
   optional string userUID = 7;
 
-  // AuthorizeToken contains the token that authorized this token
+  // authorizeToken contains the token that authorized this token
   optional string authorizeToken = 8;
 
-  // RefreshToken is the value by which this token can be renewed. Can be blank.
+  // refreshToken is the value by which this token can be renewed. Can be blank.
   optional string refreshToken = 9;
 
-  // InactivityTimeoutSeconds is the value in seconds, from the
+  // inactivityTimeoutSeconds is the value in seconds, from the
   // CreationTimestamp, after which this token can no longer be used.
   // The value is automatically incremented when the token is used.
   optional int32 inactivityTimeoutSeconds = 10;

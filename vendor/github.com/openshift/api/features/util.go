@@ -3,6 +3,8 @@ package features
 import (
 	"fmt"
 	configv1 "github.com/openshift/api/config/v1"
+	"net/url"
+	"strings"
 )
 
 // FeatureGateDescription is a golang-only interface used to contains details for a feature gate.
@@ -18,6 +20,8 @@ type FeatureGateDescription struct {
 	ResponsiblePerson string
 	// OwningProduct is the product that owns the lifecycle of the gate.
 	OwningProduct OwningProduct
+	// EnhancementPR is the PR for the enhancement.
+	EnhancementPR string
 }
 
 type FeatureGateEnabledDisabled struct {
@@ -45,9 +49,14 @@ type featureGateBuilder struct {
 	owningJiraComponent string
 	responsiblePerson   string
 	owningProduct       OwningProduct
+	enhancementPRURL    string
 
 	statusByClusterProfileByFeatureSet map[ClusterProfileName]map[configv1.FeatureSet]bool
 }
+
+const (
+	legacyFeatureGateWithoutEnhancement = "FeatureGate predates 4.18"
+)
 
 // newFeatureGate featuregate are disabled in every FeatureSet and selectively enabled
 func newFeatureGate(name string) *featureGateBuilder {
@@ -80,6 +89,11 @@ func (b *featureGateBuilder) productScope(owningProduct OwningProduct) *featureG
 	return b
 }
 
+func (b *featureGateBuilder) enhancementPR(url string) *featureGateBuilder {
+	b.enhancementPRURL = url
+	return b
+}
+
 func (b *featureGateBuilder) enableIn(featureSets ...configv1.FeatureSet) *featureGateBuilder {
 	for clusterProfile := range b.statusByClusterProfileByFeatureSet {
 		for _, featureSet := range featureSets {
@@ -109,6 +123,22 @@ func (b *featureGateBuilder) register() (configv1.FeatureGateName, error) {
 	if len(b.owningProduct) == 0 {
 		return "", fmt.Errorf("missing owningProduct")
 	}
+	_, enhancementPRErr := url.Parse(b.enhancementPRURL)
+	switch {
+	case b.enhancementPRURL == legacyFeatureGateWithoutEnhancement:
+		if !legacyFeatureGates.Has(b.name) {
+			return "", fmt.Errorf("FeatureGate/%s is a new feature gate, not an existing one.  It must have an enhancementPR with GA Graduation Criteria like https://github.com/openshift/enhancements/pull/#### or https://github.com/kubernetes/enhancements/issues/####", b.name)
+		}
+
+	case len(b.enhancementPRURL) == 0:
+		return "", fmt.Errorf("FeatureGate/%s is missing an enhancementPR with GA Graduation Criteria like https://github.com/openshift/enhancements/pull/#### or https://github.com/kubernetes/enhancements/issues/####", b.name)
+
+	case !strings.HasPrefix(b.enhancementPRURL, "https://github.com/openshift/enhancements/pull/") && !strings.HasPrefix(b.enhancementPRURL, "https://github.com/kubernetes/enhancements/issues/"):
+		return "", fmt.Errorf("FeatureGate/%s enhancementPR format is incorrect; must be like https://github.com/openshift/enhancements/pull/#### or https://github.com/kubernetes/enhancements/issues/####", b.name)
+
+	case enhancementPRErr != nil:
+		return "", fmt.Errorf("FeatureGate/%s is enhancementPR is invalid: %w", b.name, enhancementPRErr)
+	}
 
 	featureGateName := configv1.FeatureGateName(b.name)
 	description := FeatureGateDescription{
@@ -118,6 +148,7 @@ func (b *featureGateBuilder) register() (configv1.FeatureGateName, error) {
 		OwningJiraComponent: b.owningJiraComponent,
 		ResponsiblePerson:   b.responsiblePerson,
 		OwningProduct:       b.owningProduct,
+		EnhancementPR:       b.enhancementPRURL,
 	}
 
 	// statusByClusterProfileByFeatureSet is initialized by constructor to be false for every combination

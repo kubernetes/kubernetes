@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-unsched-
+  labels:
+    topology: blue
+    type: unsched
+spec:
+  topologySpreadConstraints:
+    - maxSkew: 11
+      minDomains: 10000
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          topology: blue
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause

@@ -74,7 +74,7 @@ func (PerResourceAPIRequestLog) SwaggerDoc() map[string]string {
 
 var map_PerUserAPIRequestCount = map[string]string{
 	"":             "PerUserAPIRequestCount contains logs of a user's requests.",
-	"username":     "userName that made the request.",
+	"username":     "username that made the request.",
 	"userAgent":    "userAgent that made the request. The same user often has multiple binaries which connect (pods with many containers).  The different binaries will have different userAgents, but the same user.  In addition, we have userAgents with version information embedded and the userName isn't likely to change.",
 	"requestCount": "requestCount of requests by the user across all verbs.",
 	"byVerb":       "byVerb details by verb.",

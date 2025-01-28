@@ -3,10 +3,10 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "github.com/openshift/api/config/v1alpha1"
-	configv1alpha1 "github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
+	applyconfigurationsconfigv1alpha1 "github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type ClusterImagePoliciesGetter interface {
 
 // ClusterImagePolicyInterface has methods to work with ClusterImagePolicy resources.
 type ClusterImagePolicyInterface interface {
-	Create(ctx context.Context, clusterImagePolicy *v1alpha1.ClusterImagePolicy, opts v1.CreateOptions) (*v1alpha1.ClusterImagePolicy, error)
-	Update(ctx context.Context, clusterImagePolicy *v1alpha1.ClusterImagePolicy, opts v1.UpdateOptions) (*v1alpha1.ClusterImagePolicy, error)
+	Create(ctx context.Context, clusterImagePolicy *configv1alpha1.ClusterImagePolicy, opts v1.CreateOptions) (*configv1alpha1.ClusterImagePolicy, error)
+	Update(ctx context.Context, clusterImagePolicy *configv1alpha1.ClusterImagePolicy, opts v1.UpdateOptions) (*configv1alpha1.ClusterImagePolicy, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, clusterImagePolicy *v1alpha1.ClusterImagePolicy, opts v1.UpdateOptions) (*v1alpha1.ClusterImagePolicy, error)
+	UpdateStatus(ctx context.Context, clusterImagePolicy *configv1alpha1.ClusterImagePolicy, opts v1.UpdateOptions) (*configv1alpha1.ClusterImagePolicy, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.ClusterImagePolicy, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.ClusterImagePolicyList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*configv1alpha1.ClusterImagePolicy, error)
+	List(ctx context.Context, opts v1.ListOptions) (*configv1alpha1.ClusterImagePolicyList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ClusterImagePolicy, err error)
-	Apply(ctx context.Context, clusterImagePolicy *configv1alpha1.ClusterImagePolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterImagePolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *configv1alpha1.ClusterImagePolicy, err error)
+	Apply(ctx context.Context, clusterImagePolicy *applyconfigurationsconfigv1alpha1.ClusterImagePolicyApplyConfiguration, opts v1.ApplyOptions) (result *configv1alpha1.ClusterImagePolicy, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, clusterImagePolicy *configv1alpha1.ClusterImagePolicyApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.ClusterImagePolicy, err error)
+	ApplyStatus(ctx context.Context, clusterImagePolicy *applyconfigurationsconfigv1alpha1.ClusterImagePolicyApplyConfiguration, opts v1.ApplyOptions) (result *configv1alpha1.ClusterImagePolicy, err error)
 	ClusterImagePolicyExpansion
 }
 
 // clusterImagePolicies implements ClusterImagePolicyInterface
 type clusterImagePolicies struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.ClusterImagePolicy, *v1alpha1.ClusterImagePolicyList, *configv1alpha1.ClusterImagePolicyApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1alpha1.ClusterImagePolicy, *configv1alpha1.ClusterImagePolicyList, *applyconfigurationsconfigv1alpha1.ClusterImagePolicyApplyConfiguration]
 }
 
 // newClusterImagePolicies returns a ClusterImagePolicies
 func newClusterImagePolicies(c *ConfigV1alpha1Client) *clusterImagePolicies {
 	return &clusterImagePolicies{
-		gentype.NewClientWithListAndApply[*v1alpha1.ClusterImagePolicy, *v1alpha1.ClusterImagePolicyList, *configv1alpha1.ClusterImagePolicyApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1alpha1.ClusterImagePolicy, *configv1alpha1.ClusterImagePolicyList, *applyconfigurationsconfigv1alpha1.ClusterImagePolicyApplyConfiguration](
 			"clusterimagepolicies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.ClusterImagePolicy { return &v1alpha1.ClusterImagePolicy{} },
-			func() *v1alpha1.ClusterImagePolicyList { return &v1alpha1.ClusterImagePolicyList{} }),
+			func() *configv1alpha1.ClusterImagePolicy { return &configv1alpha1.ClusterImagePolicy{} },
+			func() *configv1alpha1.ClusterImagePolicyList { return &configv1alpha1.ClusterImagePolicyList{} },
+		),
 	}
 }

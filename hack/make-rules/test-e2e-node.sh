@@ -110,6 +110,8 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   gubernator=${GUBERNATOR:-"false"}
   instance_type=${INSTANCE_TYPE:-""}
   node_env="${NODE_ENV:-""}"
+  network="${NETWORK:-""}"
+  subnet="${SUBNET:-""}"
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   image_config_dir=${IMAGE_CONFIG_DIR:-""}
   use_dockerized_build=${USE_DOCKERIZED_BUILD:-"false"}
@@ -132,6 +134,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
 
   # Get the compute zone
   zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone.value)')"}
+  zone=${zone// /}
   if [[ ${zone} == "" ]]; then
     echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone.value)'\`"
     exit 1
@@ -139,6 +142,7 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
 
   # Get the compute project
   project=$(gcloud info --format='value(config.project)')
+  project=${project// /}
   if [[ ${project} == "" ]]; then
     echo "Could not find gcloud project when running: \`gcloud info --format='value(config.project)'\`"
     exit 1
@@ -194,16 +198,23 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   if [[ -n ${instance_type} ]]; then
     echo "Instance Type: ${instance_type}"
   fi
+  if [[ -n ${network} ]]; then
+    echo "Network: ${network}"
+  fi
+  if [[ -n ${subnet} ]]; then
+    echo "Subnet: ${subnet}"
+  fi
   echo "Kubelet Config File: ${kubelet_config_file}"
 
   # Invoke the runner
   go run test/e2e_node/runner/remote/run_remote.go  --vmodule=*=4 --ssh-env="gce" \
     --zone="${zone}" --project="${project}" --gubernator="${gubernator}" \
     --hosts="${hosts}" --images="${images}" --cleanup="${cleanup}" \
-    --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" --runtime-config="${runtime_config}" \
+    --results-dir="${artifacts}" --ginkgo-flags="${ginkgoflags}" \
     --image-project="${image_project}" --instance-name-prefix="${instance_prefix}" \
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
+    --network="${network}" --subnet="${subnet}" \
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
     --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" --ssh-options="${ssh_options}" \
     --image-config-dir="${image_config_dir}" --node-env="${node_env}" \

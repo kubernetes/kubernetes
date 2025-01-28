@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	authorizationv1 "github.com/openshift/api/authorization/v1"
+	apiauthorizationv1 "github.com/openshift/api/authorization/v1"
 	versioned "github.com/openshift/client-go/authorization/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/authorization/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/authorization/listers/authorization/v1"
+	authorizationv1 "github.com/openshift/client-go/authorization/listers/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // RoleBindings.
 type RoleBindingInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.RoleBindingLister
+	Lister() authorizationv1.RoleBindingLister
 }
 
 type roleBindingInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredRoleBindingInformer(client versioned.Interface, namespace string
 				return client.AuthorizationV1().RoleBindings(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&authorizationv1.RoleBinding{},
+		&apiauthorizationv1.RoleBinding{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *roleBindingInformer) defaultInformer(client versioned.Interface, resync
 }
 
 func (f *roleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&authorizationv1.RoleBinding{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiauthorizationv1.RoleBinding{}, f.defaultInformer)
 }
 
-func (f *roleBindingInformer) Lister() v1.RoleBindingLister {
-	return v1.NewRoleBindingLister(f.Informer().GetIndexer())
+func (f *roleBindingInformer) Lister() authorizationv1.RoleBindingLister {
+	return authorizationv1.NewRoleBindingLister(f.Informer().GetIndexer())
 }

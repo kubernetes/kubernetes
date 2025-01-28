@@ -8,7 +8,7 @@
 // This package currently lacks some features found in an alternative
 // and more actively maintained WebSocket package:
 //
-//	https://pkg.go.dev/nhooyr.io/websocket
+//	https://pkg.go.dev/github.com/coder/websocket
 package websocket // import "golang.org/x/net/websocket"
 
 import (

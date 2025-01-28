@@ -19,13 +19,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 
-	v1alpha1 "k8s.io/api/node/v1alpha1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	nodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
+	applyconfigurationsnodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type RuntimeClassesGetter interface {
 
 // RuntimeClassInterface has methods to work with RuntimeClass resources.
 type RuntimeClassInterface interface {
-	Create(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.CreateOptions) (*v1alpha1.RuntimeClass, error)
-	Update(ctx context.Context, runtimeClass *v1alpha1.RuntimeClass, opts v1.UpdateOptions) (*v1alpha1.RuntimeClass, error)
+	Create(ctx context.Context, runtimeClass *nodev1alpha1.RuntimeClass, opts v1.CreateOptions) (*nodev1alpha1.RuntimeClass, error)
+	Update(ctx context.Context, runtimeClass *nodev1alpha1.RuntimeClass, opts v1.UpdateOptions) (*nodev1alpha1.RuntimeClass, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.RuntimeClass, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.RuntimeClassList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*nodev1alpha1.RuntimeClass, error)
+	List(ctx context.Context, opts v1.ListOptions) (*nodev1alpha1.RuntimeClassList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.RuntimeClass, err error)
-	Apply(ctx context.Context, runtimeClass *nodev1alpha1.RuntimeClassApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.RuntimeClass, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *nodev1alpha1.RuntimeClass, err error)
+	Apply(ctx context.Context, runtimeClass *applyconfigurationsnodev1alpha1.RuntimeClassApplyConfiguration, opts v1.ApplyOptions) (result *nodev1alpha1.RuntimeClass, err error)
 	RuntimeClassExpansion
 }
 
 // runtimeClasses implements RuntimeClassInterface
 type runtimeClasses struct {
-	*gentype.ClientWithListAndApply[*v1alpha1.RuntimeClass, *v1alpha1.RuntimeClassList, *nodev1alpha1.RuntimeClassApplyConfiguration]
+	*gentype.ClientWithListAndApply[*nodev1alpha1.RuntimeClass, *nodev1alpha1.RuntimeClassList, *applyconfigurationsnodev1alpha1.RuntimeClassApplyConfiguration]
 }
 
 // newRuntimeClasses returns a RuntimeClasses
 func newRuntimeClasses(c *NodeV1alpha1Client) *runtimeClasses {
 	return &runtimeClasses{
-		gentype.NewClientWithListAndApply[*v1alpha1.RuntimeClass, *v1alpha1.RuntimeClassList, *nodev1alpha1.RuntimeClassApplyConfiguration](
+		gentype.NewClientWithListAndApply[*nodev1alpha1.RuntimeClass, *nodev1alpha1.RuntimeClassList, *applyconfigurationsnodev1alpha1.RuntimeClassApplyConfiguration](
 			"runtimeclasses",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1alpha1.RuntimeClass { return &v1alpha1.RuntimeClass{} },
-			func() *v1alpha1.RuntimeClassList { return &v1alpha1.RuntimeClassList{} }),
+			func() *nodev1alpha1.RuntimeClass { return &nodev1alpha1.RuntimeClass{} },
+			func() *nodev1alpha1.RuntimeClassList { return &nodev1alpha1.RuntimeClassList{} },
+			gentype.PrefersProtobuf[*nodev1alpha1.RuntimeClass](),
+		),
 	}
 }

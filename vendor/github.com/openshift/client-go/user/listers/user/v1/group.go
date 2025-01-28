@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/user/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	userv1 "github.com/openshift/api/user/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // GroupLister helps list Groups.
@@ -14,19 +14,19 @@ import (
 type GroupLister interface {
 	// List lists all Groups in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Group, err error)
+	List(selector labels.Selector) (ret []*userv1.Group, err error)
 	// Get retrieves the Group from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Group, error)
+	Get(name string) (*userv1.Group, error)
 	GroupListerExpansion
 }
 
 // groupLister implements the GroupLister interface.
 type groupLister struct {
-	listers.ResourceIndexer[*v1.Group]
+	listers.ResourceIndexer[*userv1.Group]
 }
 
 // NewGroupLister returns a new GroupLister.
 func NewGroupLister(indexer cache.Indexer) GroupLister {
-	return &groupLister{listers.New[*v1.Group](indexer, v1.Resource("group"))}
+	return &groupLister{listers.New[*userv1.Group](indexer, userv1.Resource("group"))}
 }

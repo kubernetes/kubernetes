@@ -81,10 +81,10 @@ message Build {
 
 // BuildCondition describes the state of a build at a certain point.
 message BuildCondition {
-  // Type of build condition.
+  // type of build condition.
   optional string type = 1;
 
-  // Status of the condition, one of True, False, Unknown.
+  // status of the condition, one of True, False, Unknown.
   optional string status = 2;
 
   // The last time this condition was updated.
@@ -141,7 +141,7 @@ message BuildConfigSpec {
   // +optional
   repeated BuildTriggerPolicy triggers = 1;
 
-  // RunPolicy describes how the new build created from this build
+  // runPolicy describes how the new build created from this build
   // configuration will be scheduled for execution.
   // This is optional, if not specified we default to "Serial".
   optional string runPolicy = 2;
@@ -165,7 +165,7 @@ message BuildConfigStatus {
   // lastVersion is used to inform about number of last triggered build.
   optional int64 lastVersion = 1;
 
-  // ImageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
+  // imageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
   // including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry
   // in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.
   repeated ImageChangeTriggerStatus imageChangeTriggers = 2;
@@ -231,7 +231,7 @@ message BuildLogOptions {
   // slightly more or slightly less than the specified limit.
   optional int64 limitBytes = 8;
 
-  // noWait if true causes the call to return immediately even if the build
+  // nowait if true causes the call to return immediately even if the build
   // is not available yet. Otherwise the server will wait until the build has started.
   // TODO: Fix the tag to 'noWait' in v2
   optional bool nowait = 9;
@@ -259,7 +259,7 @@ message BuildOutput {
   // the build unless Namespace is specified.
   optional .k8s.io.api.core.v1.ObjectReference to = 1;
 
-  // PushSecret is the name of a Secret that would be used for setting
+  // pushSecret is the name of a Secret that would be used for setting
   // up the authentication for executing the Docker push to authentication
   // enabled Docker Registry (or Docker Hub).
   optional .k8s.io.api.core.v1.LocalObjectReference pushSecret = 2;
@@ -392,10 +392,10 @@ message BuildRequest {
   // build configuration and contains information about those triggers.
   repeated BuildTriggerCause triggeredBy = 8;
 
-  // DockerStrategyOptions contains additional docker-strategy specific options for the build
+  // dockerStrategyOptions contains additional docker-strategy specific options for the build
   optional DockerStrategyOptions dockerStrategyOptions = 9;
 
-  // SourceStrategyOptions contains additional source-strategy specific options for the build
+  // sourceStrategyOptions contains additional source-strategy specific options for the build
   optional SourceStrategyOptions sourceStrategyOptions = 10;
 }
 
@@ -510,7 +510,7 @@ message BuildStatus {
   // logSnippet is the last few lines of the build log.  This value is only set for builds that failed.
   optional string logSnippet = 12;
 
-  // Conditions represents the latest available observations of a build's current state.
+  // conditions represents the latest available observations of a build's current state.
   // +patchMergeKey=type
   // +patchStrategy=merge
   repeated BuildCondition conditions = 13;
@@ -550,7 +550,7 @@ message BuildStrategy {
   // customStrategy holds the parameters to the Custom build strategy
   optional CustomBuildStrategy customStrategy = 4;
 
-  // JenkinsPipelineStrategy holds the parameters to the Jenkins Pipeline build strategy.
+  // jenkinsPipelineStrategy holds the parameters to the Jenkins Pipeline build strategy.
   // Deprecated: use OpenShift Pipelines
   optional JenkinsPipelineBuildStrategy jenkinsPipelineStrategy = 5;
 }
@@ -567,7 +567,7 @@ message BuildTriggerCause {
   // genericWebHook holds data about a builds generic webhook trigger.
   optional GenericWebHookCause genericWebHook = 2;
 
-  // gitHubWebHook represents data for a GitHub webhook that fired a
+  // githubWebHook represents data for a GitHub webhook that fired a
   // specific build.
   optional GitHubWebHookCause githubWebHook = 3;
 
@@ -575,11 +575,11 @@ message BuildTriggerCause {
   // that triggered a new build.
   optional ImageChangeCause imageChangeBuild = 4;
 
-  // GitLabWebHook represents data for a GitLab webhook that fired a specific
+  // gitlabWebHook represents data for a GitLab webhook that fired a specific
   // build.
   optional GitLabWebHookCause gitlabWebHook = 5;
 
-  // BitbucketWebHook represents data for a Bitbucket webhook that fired a
+  // bitbucketWebHook represents data for a Bitbucket webhook that fired a
   // specific build.
   optional BitbucketWebHookCause bitbucketWebHook = 6;
 }
@@ -743,10 +743,10 @@ message CommonSpec {
 // causes into struct so we can share it in the specific causes;  it is too late for
 // GitHub and Generic but we can leverage this pattern with GitLab and Bitbucket.
 message CommonWebHookCause {
-  // Revision is the git source revision information of the trigger.
+  // revision is the git source revision information of the trigger.
   optional SourceRevision revision = 1;
 
-  // Secret is the obfuscated webhook secret that triggered a build.
+  // secret is the obfuscated webhook secret that triggered a build.
   optional string secret = 2;
 }
 
@@ -884,7 +884,7 @@ message GenericWebHookEvent {
   // ValueFrom is not supported.
   repeated .k8s.io.api.core.v1.EnvVar env = 3;
 
-  // DockerStrategyOptions contains additional docker-strategy specific options for the build
+  // dockerStrategyOptions contains additional docker-strategy specific options for the build
   optional DockerStrategyOptions dockerStrategyOptions = 4;
 }
 
@@ -918,7 +918,7 @@ message GitInfo {
 
   optional GitSourceRevision gitSourceRevision = 2;
 
-  // Refs is a list of GitRefs for the provided repo - generally sent
+  // refs is a list of GitRefs for the provided repo - generally sent
   // when used from a post-receive hook. This field is optional and is
   // used when sending multiple refs
   repeated GitRefInfo refs = 3;
@@ -1061,12 +1061,12 @@ message ImageStreamTagReference {
 // JenkinsPipelineBuildStrategy holds parameters specific to a Jenkins Pipeline build.
 // Deprecated: use OpenShift Pipelines
 message JenkinsPipelineBuildStrategy {
-  // JenkinsfilePath is the optional path of the Jenkinsfile that will be used to configure the pipeline
+  // jenkinsfilePath is the optional path of the Jenkinsfile that will be used to configure the pipeline
   // relative to the root of the context (contextDir). If both JenkinsfilePath & Jenkinsfile are
   // both not specified, this defaults to Jenkinsfile in the root of the specified contextDir.
   optional string jenkinsfilePath = 1;
 
-  // Jenkinsfile defines the optional raw contents of a Jenkinsfile which defines a Jenkins pipeline build.
+  // jenkinsfile defines the optional raw contents of a Jenkinsfile which defines a Jenkins pipeline build.
   optional string jenkinsfile = 2;
 
   // env contains additional environment variables you want to pass into a build pipeline.
@@ -1115,7 +1115,7 @@ message SecretBuildSource {
 
 // SecretLocalReference contains information that points to the local secret being used
 message SecretLocalReference {
-  // Name is the name of the resource in the same namespace being referenced
+  // name is the name of the resource in the same namespace being referenced
   optional string name = 1;
 }
 
@@ -1176,7 +1176,7 @@ message SourceRevision {
   // +k8s:conversion-gen=false
   optional string type = 1;
 
-  // Git contains information about git-based build source
+  // git contains information about git-based build source
   optional GitSourceRevision git = 2;
 }
 

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/network/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	networkv1 "github.com/openshift/api/network/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ClusterNetworkLister helps list ClusterNetworks.
@@ -14,19 +14,19 @@ import (
 type ClusterNetworkLister interface {
 	// List lists all ClusterNetworks in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ClusterNetwork, err error)
+	List(selector labels.Selector) (ret []*networkv1.ClusterNetwork, err error)
 	// Get retrieves the ClusterNetwork from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ClusterNetwork, error)
+	Get(name string) (*networkv1.ClusterNetwork, error)
 	ClusterNetworkListerExpansion
 }
 
 // clusterNetworkLister implements the ClusterNetworkLister interface.
 type clusterNetworkLister struct {
-	listers.ResourceIndexer[*v1.ClusterNetwork]
+	listers.ResourceIndexer[*networkv1.ClusterNetwork]
 }
 
 // NewClusterNetworkLister returns a new ClusterNetworkLister.
 func NewClusterNetworkLister(indexer cache.Indexer) ClusterNetworkLister {
-	return &clusterNetworkLister{listers.New[*v1.ClusterNetwork](indexer, v1.Resource("clusternetwork"))}
+	return &clusterNetworkLister{listers.New[*networkv1.ClusterNetwork](indexer, networkv1.Resource("clusternetwork"))}
 }

@@ -201,7 +201,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers
 		}
 	}
 	if o.WebhookServing != nil {
-		if err = o.WebhookServing.ApplyTo(&c.WebhookSecureServing); err != nil {
+		if err = o.WebhookServing.ApplyTo(&c.WebhookSecureServing, c.ComponentConfig.Webhook); err != nil {
 			return err
 		}
 	}

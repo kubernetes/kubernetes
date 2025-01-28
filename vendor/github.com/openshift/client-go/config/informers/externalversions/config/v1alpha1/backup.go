@@ -3,13 +3,13 @@
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
+	apiconfigv1alpha1 "github.com/openshift/api/config/v1alpha1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openshift/client-go/config/listers/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/client-go/config/listers/config/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Backups.
 type BackupInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.BackupLister
+	Lister() configv1alpha1.BackupLister
 }
 
 type backupInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredBackupInformer(client versioned.Interface, resyncPeriod time.Dur
 				return client.ConfigV1alpha1().Backups().Watch(context.TODO(), options)
 			},
 		},
-		&configv1alpha1.Backup{},
+		&apiconfigv1alpha1.Backup{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *backupInformer) defaultInformer(client versioned.Interface, resyncPerio
 }
 
 func (f *backupInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1alpha1.Backup{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1alpha1.Backup{}, f.defaultInformer)
 }
 
-func (f *backupInformer) Lister() v1alpha1.BackupLister {
-	return v1alpha1.NewBackupLister(f.Informer().GetIndexer())
+func (f *backupInformer) Lister() configv1alpha1.BackupLister {
+	return configv1alpha1.NewBackupLister(f.Informer().GetIndexer())
 }

@@ -24,7 +24,7 @@ func UsernameClaimMapping() *UsernameClaimMappingApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Claim field is set to the value of the last call.
 func (b *UsernameClaimMappingApplyConfiguration) WithClaim(value string) *UsernameClaimMappingApplyConfiguration {
-	b.Claim = &value
+	b.TokenClaimMappingApplyConfiguration.Claim = &value
 	return b
 }
 

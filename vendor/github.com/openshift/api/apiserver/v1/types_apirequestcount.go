@@ -35,7 +35,6 @@ type APIRequestCount struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec defines the characteristics of the resource.
-	// +kubebuilder:validation:Required
 	// +required
 	Spec APIRequestCountSpec `json:"spec"`
 
@@ -126,7 +125,7 @@ type PerNodeAPIRequestLog struct {
 // PerUserAPIRequestCount contains logs of a user's requests.
 type PerUserAPIRequestCount struct {
 
-	// userName that made the request.
+	// username that made the request.
 	// +kubebuilder:validation:MaxLength=512
 	UserName string `json:"username"`
 

@@ -945,7 +945,7 @@ func TestGetPodVolumeNames(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mounts, devices, contexts := GetPodVolumeNames(test.pod)
+			mounts, devices, contexts := GetPodVolumeNames(test.pod, true /* collectSELinuxOptions */)
 			if !mounts.Equal(test.expectedMounts) {
 				t.Errorf("Expected mounts: %q, got %q", sets.List[string](mounts), sets.List[string](test.expectedMounts))
 			}

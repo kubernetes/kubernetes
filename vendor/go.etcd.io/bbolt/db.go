@@ -524,7 +524,7 @@ func (db *DB) munmap() error {
 	// gofail: var unmapError string
 	// return errors.New(unmapError)
 	if err := munmap(db); err != nil {
-		return fmt.Errorf("unmap error: " + err.Error())
+		return fmt.Errorf("unmap error: %v", err.Error())
 	}
 
 	return nil
@@ -571,7 +571,7 @@ func (db *DB) munlock(fileSize int) error {
 	// gofail: var munlockError string
 	// return errors.New(munlockError)
 	if err := munlock(db, fileSize); err != nil {
-		return fmt.Errorf("munlock error: " + err.Error())
+		return fmt.Errorf("munlock error: %v", err.Error())
 	}
 	return nil
 }
@@ -580,7 +580,7 @@ func (db *DB) mlock(fileSize int) error {
 	// gofail: var mlockError string
 	// return errors.New(mlockError)
 	if err := mlock(db, fileSize); err != nil {
-		return fmt.Errorf("mlock error: " + err.Error())
+		return fmt.Errorf("mlock error: %v", err.Error())
 	}
 	return nil
 }
@@ -1159,6 +1159,8 @@ func (db *DB) grow(sz int) error {
 	// https://github.com/boltdb/bolt/issues/284
 	if !db.NoGrowSync && !db.readOnly {
 		if runtime.GOOS != "windows" {
+			// gofail: var resizeFileError string
+			// return errors.New(resizeFileError)
 			if err := db.file.Truncate(int64(sz)); err != nil {
 				return fmt.Errorf("file resize error: %s", err)
 			}

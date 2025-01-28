@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // TLSProfileSpecApplyConfiguration represents a declarative configuration of the TLSProfileSpec type for use
 // with apply.
 type TLSProfileSpecApplyConfiguration struct {
-	Ciphers       []string               `json:"ciphers,omitempty"`
-	MinTLSVersion *v1.TLSProtocolVersion `json:"minTLSVersion,omitempty"`
+	Ciphers       []string                     `json:"ciphers,omitempty"`
+	MinTLSVersion *configv1.TLSProtocolVersion `json:"minTLSVersion,omitempty"`
 }
 
 // TLSProfileSpecApplyConfiguration constructs a declarative configuration of the TLSProfileSpec type for use with
@@ -32,7 +32,7 @@ func (b *TLSProfileSpecApplyConfiguration) WithCiphers(values ...string) *TLSPro
 // WithMinTLSVersion sets the MinTLSVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the MinTLSVersion field is set to the value of the last call.
-func (b *TLSProfileSpecApplyConfiguration) WithMinTLSVersion(value v1.TLSProtocolVersion) *TLSProfileSpecApplyConfiguration {
+func (b *TLSProfileSpecApplyConfiguration) WithMinTLSVersion(value configv1.TLSProtocolVersion) *TLSProfileSpecApplyConfiguration {
 	b.MinTLSVersion = &value
 	return b
 }

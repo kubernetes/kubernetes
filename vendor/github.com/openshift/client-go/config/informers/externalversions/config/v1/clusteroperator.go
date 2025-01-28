@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // ClusterOperators.
 type ClusterOperatorInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ClusterOperatorLister
+	Lister() configv1.ClusterOperatorLister
 }
 
 type clusterOperatorInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredClusterOperatorInformer(client versioned.Interface, resyncPeriod
 				return client.ConfigV1().ClusterOperators().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.ClusterOperator{},
+		&apiconfigv1.ClusterOperator{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *clusterOperatorInformer) defaultInformer(client versioned.Interface, re
 }
 
 func (f *clusterOperatorInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.ClusterOperator{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.ClusterOperator{}, f.defaultInformer)
 }
 
-func (f *clusterOperatorInformer) Lister() v1.ClusterOperatorLister {
-	return v1.NewClusterOperatorLister(f.Informer().GetIndexer())
+func (f *clusterOperatorInformer) Lister() configv1.ClusterOperatorLister {
+	return configv1.NewClusterOperatorLister(f.Informer().GetIndexer())
 }

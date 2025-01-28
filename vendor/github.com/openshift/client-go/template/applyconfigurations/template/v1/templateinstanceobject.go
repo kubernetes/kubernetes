@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // TemplateInstanceObjectApplyConfiguration represents a declarative configuration of the TemplateInstanceObject type for use
 // with apply.
 type TemplateInstanceObjectApplyConfiguration struct {
-	Ref *v1.ObjectReference `json:"ref,omitempty"`
+	Ref *corev1.ObjectReference `json:"ref,omitempty"`
 }
 
 // TemplateInstanceObjectApplyConfiguration constructs a declarative configuration of the TemplateInstanceObject type for use with
@@ -21,7 +21,7 @@ func TemplateInstanceObject() *TemplateInstanceObjectApplyConfiguration {
 // WithRef sets the Ref field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Ref field is set to the value of the last call.
-func (b *TemplateInstanceObjectApplyConfiguration) WithRef(value v1.ObjectReference) *TemplateInstanceObjectApplyConfiguration {
+func (b *TemplateInstanceObjectApplyConfiguration) WithRef(value corev1.ObjectReference) *TemplateInstanceObjectApplyConfiguration {
 	b.Ref = &value
 	return b
 }

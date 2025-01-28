@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"gopkg.in/yaml.v2"
+	yaml "sigs.k8s.io/yaml/goyaml.v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this

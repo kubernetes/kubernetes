@@ -3,16 +3,16 @@
 package v1
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TagEventApplyConfiguration represents a declarative configuration of the TagEvent type for use
 // with apply.
 type TagEventApplyConfiguration struct {
-	Created              *v1.Time `json:"created,omitempty"`
-	DockerImageReference *string  `json:"dockerImageReference,omitempty"`
-	Image                *string  `json:"image,omitempty"`
-	Generation           *int64   `json:"generation,omitempty"`
+	Created              *metav1.Time `json:"created,omitempty"`
+	DockerImageReference *string      `json:"dockerImageReference,omitempty"`
+	Image                *string      `json:"image,omitempty"`
+	Generation           *int64       `json:"generation,omitempty"`
 }
 
 // TagEventApplyConfiguration constructs a declarative configuration of the TagEvent type for use with
@@ -24,7 +24,7 @@ func TagEvent() *TagEventApplyConfiguration {
 // WithCreated sets the Created field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Created field is set to the value of the last call.
-func (b *TagEventApplyConfiguration) WithCreated(value v1.Time) *TagEventApplyConfiguration {
+func (b *TagEventApplyConfiguration) WithCreated(value metav1.Time) *TagEventApplyConfiguration {
 	b.Created = &value
 	return b
 }

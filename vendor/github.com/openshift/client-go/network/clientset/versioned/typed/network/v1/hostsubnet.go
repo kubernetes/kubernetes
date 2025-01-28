@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/network/v1"
-	networkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
+	networkv1 "github.com/openshift/api/network/v1"
+	applyconfigurationsnetworkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
 	scheme "github.com/openshift/client-go/network/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type HostSubnetsGetter interface {
 
 // HostSubnetInterface has methods to work with HostSubnet resources.
 type HostSubnetInterface interface {
-	Create(ctx context.Context, hostSubnet *v1.HostSubnet, opts metav1.CreateOptions) (*v1.HostSubnet, error)
-	Update(ctx context.Context, hostSubnet *v1.HostSubnet, opts metav1.UpdateOptions) (*v1.HostSubnet, error)
+	Create(ctx context.Context, hostSubnet *networkv1.HostSubnet, opts metav1.CreateOptions) (*networkv1.HostSubnet, error)
+	Update(ctx context.Context, hostSubnet *networkv1.HostSubnet, opts metav1.UpdateOptions) (*networkv1.HostSubnet, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.HostSubnet, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.HostSubnetList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*networkv1.HostSubnet, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*networkv1.HostSubnetList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.HostSubnet, err error)
-	Apply(ctx context.Context, hostSubnet *networkv1.HostSubnetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.HostSubnet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *networkv1.HostSubnet, err error)
+	Apply(ctx context.Context, hostSubnet *applyconfigurationsnetworkv1.HostSubnetApplyConfiguration, opts metav1.ApplyOptions) (result *networkv1.HostSubnet, err error)
 	HostSubnetExpansion
 }
 
 // hostSubnets implements HostSubnetInterface
 type hostSubnets struct {
-	*gentype.ClientWithListAndApply[*v1.HostSubnet, *v1.HostSubnetList, *networkv1.HostSubnetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkv1.HostSubnet, *networkv1.HostSubnetList, *applyconfigurationsnetworkv1.HostSubnetApplyConfiguration]
 }
 
 // newHostSubnets returns a HostSubnets
 func newHostSubnets(c *NetworkV1Client) *hostSubnets {
 	return &hostSubnets{
-		gentype.NewClientWithListAndApply[*v1.HostSubnet, *v1.HostSubnetList, *networkv1.HostSubnetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkv1.HostSubnet, *networkv1.HostSubnetList, *applyconfigurationsnetworkv1.HostSubnetApplyConfiguration](
 			"hostsubnets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.HostSubnet { return &v1.HostSubnet{} },
-			func() *v1.HostSubnetList { return &v1.HostSubnetList{} }),
+			func() *networkv1.HostSubnet { return &networkv1.HostSubnet{} },
+			func() *networkv1.HostSubnetList { return &networkv1.HostSubnetList{} },
+		),
 	}
 }

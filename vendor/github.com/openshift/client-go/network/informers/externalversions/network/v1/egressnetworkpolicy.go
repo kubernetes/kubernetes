@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	networkv1 "github.com/openshift/api/network/v1"
+	apinetworkv1 "github.com/openshift/api/network/v1"
 	versioned "github.com/openshift/client-go/network/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/network/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/network/listers/network/v1"
+	networkv1 "github.com/openshift/client-go/network/listers/network/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // EgressNetworkPolicies.
 type EgressNetworkPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.EgressNetworkPolicyLister
+	Lister() networkv1.EgressNetworkPolicyLister
 }
 
 type egressNetworkPolicyInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredEgressNetworkPolicyInformer(client versioned.Interface, namespac
 				return client.NetworkV1().EgressNetworkPolicies(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&networkv1.EgressNetworkPolicy{},
+		&apinetworkv1.EgressNetworkPolicy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *egressNetworkPolicyInformer) defaultInformer(client versioned.Interface
 }
 
 func (f *egressNetworkPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&networkv1.EgressNetworkPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&apinetworkv1.EgressNetworkPolicy{}, f.defaultInformer)
 }
 
-func (f *egressNetworkPolicyInformer) Lister() v1.EgressNetworkPolicyLister {
-	return v1.NewEgressNetworkPolicyLister(f.Informer().GetIndexer())
+func (f *egressNetworkPolicyInformer) Lister() networkv1.EgressNetworkPolicyLister {
+	return networkv1.NewEgressNetworkPolicyLister(f.Informer().GetIndexer())
 }

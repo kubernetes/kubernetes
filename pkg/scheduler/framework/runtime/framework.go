@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 	"k8s.io/kubernetes/pkg/util/slice"
 )
 
@@ -72,12 +71,12 @@ type frameworkImpl struct {
 	// pluginsMap contains all plugins, by name.
 	pluginsMap map[string]framework.Plugin
 
-	clientSet          clientset.Interface
-	kubeConfig         *restclient.Config
-	eventRecorder      events.EventRecorder
-	informerFactory    informers.SharedInformerFactory
-	resourceClaimCache *assumecache.AssumeCache
-	logger             klog.Logger
+	clientSet        clientset.Interface
+	kubeConfig       *restclient.Config
+	eventRecorder    events.EventRecorder
+	informerFactory  informers.SharedInformerFactory
+	sharedDRAManager framework.SharedDRAManager
+	logger           klog.Logger
 
 	metricsRecorder          *metrics.MetricAsyncRecorder
 	profileName              string
@@ -85,6 +84,7 @@ type frameworkImpl struct {
 
 	extenders []framework.Extender
 	framework.PodNominator
+	framework.PodActivator
 
 	parallelizer parallelize.Parallelizer
 }
@@ -128,10 +128,11 @@ type frameworkOptions struct {
 	kubeConfig             *restclient.Config
 	eventRecorder          events.EventRecorder
 	informerFactory        informers.SharedInformerFactory
-	resourceClaimCache     *assumecache.AssumeCache
+	sharedDRAManager       framework.SharedDRAManager
 	snapshotSharedLister   framework.SharedLister
 	metricsRecorder        *metrics.MetricAsyncRecorder
 	podNominator           framework.PodNominator
+	podActivator           framework.PodActivator
 	extenders              []framework.Extender
 	captureProfile         CaptureProfile
 	parallelizer           parallelize.Parallelizer
@@ -180,10 +181,10 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 	}
 }
 
-// WithResourceClaimCache sets the resource claim cache for the scheduling frameworkImpl.
-func WithResourceClaimCache(resourceClaimCache *assumecache.AssumeCache) Option {
+// WithSharedDRAManager sets SharedDRAManager for the framework.
+func WithSharedDRAManager(sharedDRAManager framework.SharedDRAManager) Option {
 	return func(o *frameworkOptions) {
-		o.resourceClaimCache = resourceClaimCache
+		o.sharedDRAManager = sharedDRAManager
 	}
 }
 
@@ -198,6 +199,12 @@ func WithSnapshotSharedLister(snapshotSharedLister framework.SharedLister) Optio
 func WithPodNominator(nominator framework.PodNominator) Option {
 	return func(o *frameworkOptions) {
 		o.podNominator = nominator
+	}
+}
+
+func WithPodActivator(activator framework.PodActivator) Option {
+	return func(o *frameworkOptions) {
+		o.podActivator = activator
 	}
 }
 
@@ -267,7 +274,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	if options.logger != nil {
 		logger = *options.logger
 	}
-
 	f := &frameworkImpl{
 		registry:             r,
 		snapshotSharedLister: options.snapshotSharedLister,
@@ -277,10 +283,11 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		kubeConfig:           options.kubeConfig,
 		eventRecorder:        options.eventRecorder,
 		informerFactory:      options.informerFactory,
-		resourceClaimCache:   options.resourceClaimCache,
+		sharedDRAManager:     options.sharedDRAManager,
 		metricsRecorder:      options.metricsRecorder,
 		extenders:            options.extenders,
 		PodNominator:         options.podNominator,
+		PodActivator:         options.podActivator,
 		parallelizer:         options.parallelizer,
 		logger:               logger,
 	}
@@ -427,6 +434,10 @@ func (f *frameworkImpl) setInstrumentedPlugins() {
 
 func (f *frameworkImpl) SetPodNominator(n framework.PodNominator) {
 	f.PodNominator = n
+}
+
+func (f *frameworkImpl) SetPodActivator(a framework.PodActivator) {
+	f.PodActivator = a
 }
 
 // Close closes each plugin, when they implement io.Closer interface.
@@ -905,7 +916,7 @@ func (f *frameworkImpl) runFilterPlugin(ctx context.Context, pl framework.Filter
 
 // RunPostFilterPlugins runs the set of configured PostFilter plugins until the first
 // Success, Error or UnschedulableAndUnresolvable is met; otherwise continues to execute all plugins.
-func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (_ *framework.PostFilterResult, status *framework.Status) {
+func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (_ *framework.PostFilterResult, status *framework.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PostFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
@@ -950,7 +961,7 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 	return result, framework.NewStatus(framework.Unschedulable, reasons...).WithPlugin(rejectorPlugin)
 }
 
-func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
+func (f *frameworkImpl) runPostFilterPlugin(ctx context.Context, pl framework.PostFilterPlugin, state *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PostFilter(ctx, state, pod, filteredNodeStatusMap)
 	}
@@ -1617,8 +1628,9 @@ func (f *frameworkImpl) SharedInformerFactory() informers.SharedInformerFactory 
 	return f.informerFactory
 }
 
-func (f *frameworkImpl) ResourceClaimCache() *assumecache.AssumeCache {
-	return f.resourceClaimCache
+// SharedDRAManager returns the SharedDRAManager of the framework.
+func (f *frameworkImpl) SharedDRAManager() framework.SharedDRAManager {
+	return f.sharedDRAManager
 }
 
 func (f *frameworkImpl) pluginsNeeded(plugins *config.Plugins) sets.Set[string] {

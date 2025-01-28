@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/oauth/v1"
-	oauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
+	oauthv1 "github.com/openshift/api/oauth/v1"
+	applyconfigurationsoauthv1 "github.com/openshift/client-go/oauth/applyconfigurations/oauth/v1"
 	scheme "github.com/openshift/client-go/oauth/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type OAuthAuthorizeTokensGetter interface {
 
 // OAuthAuthorizeTokenInterface has methods to work with OAuthAuthorizeToken resources.
 type OAuthAuthorizeTokenInterface interface {
-	Create(ctx context.Context, oAuthAuthorizeToken *v1.OAuthAuthorizeToken, opts metav1.CreateOptions) (*v1.OAuthAuthorizeToken, error)
-	Update(ctx context.Context, oAuthAuthorizeToken *v1.OAuthAuthorizeToken, opts metav1.UpdateOptions) (*v1.OAuthAuthorizeToken, error)
+	Create(ctx context.Context, oAuthAuthorizeToken *oauthv1.OAuthAuthorizeToken, opts metav1.CreateOptions) (*oauthv1.OAuthAuthorizeToken, error)
+	Update(ctx context.Context, oAuthAuthorizeToken *oauthv1.OAuthAuthorizeToken, opts metav1.UpdateOptions) (*oauthv1.OAuthAuthorizeToken, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.OAuthAuthorizeToken, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.OAuthAuthorizeTokenList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*oauthv1.OAuthAuthorizeToken, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*oauthv1.OAuthAuthorizeTokenList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OAuthAuthorizeToken, err error)
-	Apply(ctx context.Context, oAuthAuthorizeToken *oauthv1.OAuthAuthorizeTokenApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuthAuthorizeToken, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *oauthv1.OAuthAuthorizeToken, err error)
+	Apply(ctx context.Context, oAuthAuthorizeToken *applyconfigurationsoauthv1.OAuthAuthorizeTokenApplyConfiguration, opts metav1.ApplyOptions) (result *oauthv1.OAuthAuthorizeToken, err error)
 	OAuthAuthorizeTokenExpansion
 }
 
 // oAuthAuthorizeTokens implements OAuthAuthorizeTokenInterface
 type oAuthAuthorizeTokens struct {
-	*gentype.ClientWithListAndApply[*v1.OAuthAuthorizeToken, *v1.OAuthAuthorizeTokenList, *oauthv1.OAuthAuthorizeTokenApplyConfiguration]
+	*gentype.ClientWithListAndApply[*oauthv1.OAuthAuthorizeToken, *oauthv1.OAuthAuthorizeTokenList, *applyconfigurationsoauthv1.OAuthAuthorizeTokenApplyConfiguration]
 }
 
 // newOAuthAuthorizeTokens returns a OAuthAuthorizeTokens
 func newOAuthAuthorizeTokens(c *OauthV1Client) *oAuthAuthorizeTokens {
 	return &oAuthAuthorizeTokens{
-		gentype.NewClientWithListAndApply[*v1.OAuthAuthorizeToken, *v1.OAuthAuthorizeTokenList, *oauthv1.OAuthAuthorizeTokenApplyConfiguration](
+		gentype.NewClientWithListAndApply[*oauthv1.OAuthAuthorizeToken, *oauthv1.OAuthAuthorizeTokenList, *applyconfigurationsoauthv1.OAuthAuthorizeTokenApplyConfiguration](
 			"oauthauthorizetokens",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.OAuthAuthorizeToken { return &v1.OAuthAuthorizeToken{} },
-			func() *v1.OAuthAuthorizeTokenList { return &v1.OAuthAuthorizeTokenList{} }),
+			func() *oauthv1.OAuthAuthorizeToken { return &oauthv1.OAuthAuthorizeToken{} },
+			func() *oauthv1.OAuthAuthorizeTokenList { return &oauthv1.OAuthAuthorizeTokenList{} },
+		),
 	}
 }

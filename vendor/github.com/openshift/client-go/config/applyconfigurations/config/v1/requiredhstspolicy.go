@@ -3,18 +3,18 @@
 package v1
 
 import (
-	apiconfigv1 "github.com/openshift/api/config/v1"
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // RequiredHSTSPolicyApplyConfiguration represents a declarative configuration of the RequiredHSTSPolicy type for use
 // with apply.
 type RequiredHSTSPolicyApplyConfiguration struct {
-	NamespaceSelector       *v1.LabelSelectorApplyConfiguration  `json:"namespaceSelector,omitempty"`
-	DomainPatterns          []string                             `json:"domainPatterns,omitempty"`
-	MaxAge                  *MaxAgePolicyApplyConfiguration      `json:"maxAge,omitempty"`
-	PreloadPolicy           *apiconfigv1.PreloadPolicy           `json:"preloadPolicy,omitempty"`
-	IncludeSubDomainsPolicy *apiconfigv1.IncludeSubDomainsPolicy `json:"includeSubDomainsPolicy,omitempty"`
+	NamespaceSelector       *metav1.LabelSelectorApplyConfiguration `json:"namespaceSelector,omitempty"`
+	DomainPatterns          []string                                `json:"domainPatterns,omitempty"`
+	MaxAge                  *MaxAgePolicyApplyConfiguration         `json:"maxAge,omitempty"`
+	PreloadPolicy           *configv1.PreloadPolicy                 `json:"preloadPolicy,omitempty"`
+	IncludeSubDomainsPolicy *configv1.IncludeSubDomainsPolicy       `json:"includeSubDomainsPolicy,omitempty"`
 }
 
 // RequiredHSTSPolicyApplyConfiguration constructs a declarative configuration of the RequiredHSTSPolicy type for use with
@@ -26,7 +26,7 @@ func RequiredHSTSPolicy() *RequiredHSTSPolicyApplyConfiguration {
 // WithNamespaceSelector sets the NamespaceSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the NamespaceSelector field is set to the value of the last call.
-func (b *RequiredHSTSPolicyApplyConfiguration) WithNamespaceSelector(value *v1.LabelSelectorApplyConfiguration) *RequiredHSTSPolicyApplyConfiguration {
+func (b *RequiredHSTSPolicyApplyConfiguration) WithNamespaceSelector(value *metav1.LabelSelectorApplyConfiguration) *RequiredHSTSPolicyApplyConfiguration {
 	b.NamespaceSelector = value
 	return b
 }
@@ -52,7 +52,7 @@ func (b *RequiredHSTSPolicyApplyConfiguration) WithMaxAge(value *MaxAgePolicyApp
 // WithPreloadPolicy sets the PreloadPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PreloadPolicy field is set to the value of the last call.
-func (b *RequiredHSTSPolicyApplyConfiguration) WithPreloadPolicy(value apiconfigv1.PreloadPolicy) *RequiredHSTSPolicyApplyConfiguration {
+func (b *RequiredHSTSPolicyApplyConfiguration) WithPreloadPolicy(value configv1.PreloadPolicy) *RequiredHSTSPolicyApplyConfiguration {
 	b.PreloadPolicy = &value
 	return b
 }
@@ -60,7 +60,7 @@ func (b *RequiredHSTSPolicyApplyConfiguration) WithPreloadPolicy(value apiconfig
 // WithIncludeSubDomainsPolicy sets the IncludeSubDomainsPolicy field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the IncludeSubDomainsPolicy field is set to the value of the last call.
-func (b *RequiredHSTSPolicyApplyConfiguration) WithIncludeSubDomainsPolicy(value apiconfigv1.IncludeSubDomainsPolicy) *RequiredHSTSPolicyApplyConfiguration {
+func (b *RequiredHSTSPolicyApplyConfiguration) WithIncludeSubDomainsPolicy(value configv1.IncludeSubDomainsPolicy) *RequiredHSTSPolicyApplyConfiguration {
 	b.IncludeSubDomainsPolicy = &value
 	return b
 }

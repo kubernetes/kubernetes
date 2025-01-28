@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	batchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
+	applyconfigurationsbatchv1 "k8s.io/client-go/applyconfigurations/batch/v1"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,36 +38,38 @@ type CronJobsGetter interface {
 
 // CronJobInterface has methods to work with CronJob resources.
 type CronJobInterface interface {
-	Create(ctx context.Context, cronJob *v1.CronJob, opts metav1.CreateOptions) (*v1.CronJob, error)
-	Update(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (*v1.CronJob, error)
+	Create(ctx context.Context, cronJob *batchv1.CronJob, opts metav1.CreateOptions) (*batchv1.CronJob, error)
+	Update(ctx context.Context, cronJob *batchv1.CronJob, opts metav1.UpdateOptions) (*batchv1.CronJob, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (*v1.CronJob, error)
+	UpdateStatus(ctx context.Context, cronJob *batchv1.CronJob, opts metav1.UpdateOptions) (*batchv1.CronJob, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.CronJob, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.CronJobList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*batchv1.CronJob, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*batchv1.CronJobList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CronJob, err error)
-	Apply(ctx context.Context, cronJob *batchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CronJob, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *batchv1.CronJob, err error)
+	Apply(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *batchv1.CronJob, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, cronJob *batchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.CronJob, err error)
+	ApplyStatus(ctx context.Context, cronJob *applyconfigurationsbatchv1.CronJobApplyConfiguration, opts metav1.ApplyOptions) (result *batchv1.CronJob, err error)
 	CronJobExpansion
 }
 
 // cronJobs implements CronJobInterface
 type cronJobs struct {
-	*gentype.ClientWithListAndApply[*v1.CronJob, *v1.CronJobList, *batchv1.CronJobApplyConfiguration]
+	*gentype.ClientWithListAndApply[*batchv1.CronJob, *batchv1.CronJobList, *applyconfigurationsbatchv1.CronJobApplyConfiguration]
 }
 
 // newCronJobs returns a CronJobs
 func newCronJobs(c *BatchV1Client, namespace string) *cronJobs {
 	return &cronJobs{
-		gentype.NewClientWithListAndApply[*v1.CronJob, *v1.CronJobList, *batchv1.CronJobApplyConfiguration](
+		gentype.NewClientWithListAndApply[*batchv1.CronJob, *batchv1.CronJobList, *applyconfigurationsbatchv1.CronJobApplyConfiguration](
 			"cronjobs",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.CronJob { return &v1.CronJob{} },
-			func() *v1.CronJobList { return &v1.CronJobList{} }),
+			func() *batchv1.CronJob { return &batchv1.CronJob{} },
+			func() *batchv1.CronJobList { return &batchv1.CronJobList{} },
+			gentype.PrefersProtobuf[*batchv1.CronJob](),
+		),
 	}
 }

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type ImageDigestMirrorSetsGetter interface {
 
 // ImageDigestMirrorSetInterface has methods to work with ImageDigestMirrorSet resources.
 type ImageDigestMirrorSetInterface interface {
-	Create(ctx context.Context, imageDigestMirrorSet *v1.ImageDigestMirrorSet, opts metav1.CreateOptions) (*v1.ImageDigestMirrorSet, error)
-	Update(ctx context.Context, imageDigestMirrorSet *v1.ImageDigestMirrorSet, opts metav1.UpdateOptions) (*v1.ImageDigestMirrorSet, error)
+	Create(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSet, opts metav1.CreateOptions) (*configv1.ImageDigestMirrorSet, error)
+	Update(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSet, opts metav1.UpdateOptions) (*configv1.ImageDigestMirrorSet, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, imageDigestMirrorSet *v1.ImageDigestMirrorSet, opts metav1.UpdateOptions) (*v1.ImageDigestMirrorSet, error)
+	UpdateStatus(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSet, opts metav1.UpdateOptions) (*configv1.ImageDigestMirrorSet, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ImageDigestMirrorSet, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.ImageDigestMirrorSetList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.ImageDigestMirrorSet, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.ImageDigestMirrorSetList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ImageDigestMirrorSet, err error)
-	Apply(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageDigestMirrorSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.ImageDigestMirrorSet, err error)
+	Apply(ctx context.Context, imageDigestMirrorSet *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.ImageDigestMirrorSet, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, imageDigestMirrorSet *configv1.ImageDigestMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *v1.ImageDigestMirrorSet, err error)
+	ApplyStatus(ctx context.Context, imageDigestMirrorSet *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.ImageDigestMirrorSet, err error)
 	ImageDigestMirrorSetExpansion
 }
 
 // imageDigestMirrorSets implements ImageDigestMirrorSetInterface
 type imageDigestMirrorSets struct {
-	*gentype.ClientWithListAndApply[*v1.ImageDigestMirrorSet, *v1.ImageDigestMirrorSetList, *configv1.ImageDigestMirrorSetApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.ImageDigestMirrorSet, *configv1.ImageDigestMirrorSetList, *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration]
 }
 
 // newImageDigestMirrorSets returns a ImageDigestMirrorSets
 func newImageDigestMirrorSets(c *ConfigV1Client) *imageDigestMirrorSets {
 	return &imageDigestMirrorSets{
-		gentype.NewClientWithListAndApply[*v1.ImageDigestMirrorSet, *v1.ImageDigestMirrorSetList, *configv1.ImageDigestMirrorSetApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.ImageDigestMirrorSet, *configv1.ImageDigestMirrorSetList, *applyconfigurationsconfigv1.ImageDigestMirrorSetApplyConfiguration](
 			"imagedigestmirrorsets",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.ImageDigestMirrorSet { return &v1.ImageDigestMirrorSet{} },
-			func() *v1.ImageDigestMirrorSetList { return &v1.ImageDigestMirrorSetList{} }),
+			func() *configv1.ImageDigestMirrorSet { return &configv1.ImageDigestMirrorSet{} },
+			func() *configv1.ImageDigestMirrorSetList { return &configv1.ImageDigestMirrorSetList{} },
+		),
 	}
 }

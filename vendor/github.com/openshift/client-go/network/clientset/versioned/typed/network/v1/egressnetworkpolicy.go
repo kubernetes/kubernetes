@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/network/v1"
-	networkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
+	networkv1 "github.com/openshift/api/network/v1"
+	applyconfigurationsnetworkv1 "github.com/openshift/client-go/network/applyconfigurations/network/v1"
 	scheme "github.com/openshift/client-go/network/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,32 +22,33 @@ type EgressNetworkPoliciesGetter interface {
 
 // EgressNetworkPolicyInterface has methods to work with EgressNetworkPolicy resources.
 type EgressNetworkPolicyInterface interface {
-	Create(ctx context.Context, egressNetworkPolicy *v1.EgressNetworkPolicy, opts metav1.CreateOptions) (*v1.EgressNetworkPolicy, error)
-	Update(ctx context.Context, egressNetworkPolicy *v1.EgressNetworkPolicy, opts metav1.UpdateOptions) (*v1.EgressNetworkPolicy, error)
+	Create(ctx context.Context, egressNetworkPolicy *networkv1.EgressNetworkPolicy, opts metav1.CreateOptions) (*networkv1.EgressNetworkPolicy, error)
+	Update(ctx context.Context, egressNetworkPolicy *networkv1.EgressNetworkPolicy, opts metav1.UpdateOptions) (*networkv1.EgressNetworkPolicy, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.EgressNetworkPolicy, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.EgressNetworkPolicyList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*networkv1.EgressNetworkPolicy, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*networkv1.EgressNetworkPolicyList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.EgressNetworkPolicy, err error)
-	Apply(ctx context.Context, egressNetworkPolicy *networkv1.EgressNetworkPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *v1.EgressNetworkPolicy, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *networkv1.EgressNetworkPolicy, err error)
+	Apply(ctx context.Context, egressNetworkPolicy *applyconfigurationsnetworkv1.EgressNetworkPolicyApplyConfiguration, opts metav1.ApplyOptions) (result *networkv1.EgressNetworkPolicy, err error)
 	EgressNetworkPolicyExpansion
 }
 
 // egressNetworkPolicies implements EgressNetworkPolicyInterface
 type egressNetworkPolicies struct {
-	*gentype.ClientWithListAndApply[*v1.EgressNetworkPolicy, *v1.EgressNetworkPolicyList, *networkv1.EgressNetworkPolicyApplyConfiguration]
+	*gentype.ClientWithListAndApply[*networkv1.EgressNetworkPolicy, *networkv1.EgressNetworkPolicyList, *applyconfigurationsnetworkv1.EgressNetworkPolicyApplyConfiguration]
 }
 
 // newEgressNetworkPolicies returns a EgressNetworkPolicies
 func newEgressNetworkPolicies(c *NetworkV1Client, namespace string) *egressNetworkPolicies {
 	return &egressNetworkPolicies{
-		gentype.NewClientWithListAndApply[*v1.EgressNetworkPolicy, *v1.EgressNetworkPolicyList, *networkv1.EgressNetworkPolicyApplyConfiguration](
+		gentype.NewClientWithListAndApply[*networkv1.EgressNetworkPolicy, *networkv1.EgressNetworkPolicyList, *applyconfigurationsnetworkv1.EgressNetworkPolicyApplyConfiguration](
 			"egressnetworkpolicies",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.EgressNetworkPolicy { return &v1.EgressNetworkPolicy{} },
-			func() *v1.EgressNetworkPolicyList { return &v1.EgressNetworkPolicyList{} }),
+			func() *networkv1.EgressNetworkPolicy { return &networkv1.EgressNetworkPolicy{} },
+			func() *networkv1.EgressNetworkPolicyList { return &networkv1.EgressNetworkPolicyList{} },
+		),
 	}
 }

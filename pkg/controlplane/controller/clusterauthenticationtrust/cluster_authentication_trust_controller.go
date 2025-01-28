@@ -35,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -77,6 +79,8 @@ type ClusterAuthenticationInfo struct {
 
 	// RequestHeaderUsernameHeaders are the headers used by this kube-apiserver to determine username
 	RequestHeaderUsernameHeaders headerrequest.StringSliceProvider
+	// RequestHeaderUIDHeaders are the headers used by this kube-apiserver to determine UID
+	RequestHeaderUIDHeaders headerrequest.StringSliceProvider
 	// RequestHeaderGroupHeaders are the headers used by this kube-apiserver to determine groups
 	RequestHeaderGroupHeaders headerrequest.StringSliceProvider
 	// RequestHeaderExtraHeaderPrefixes are the headers used by this kube-apiserver to determine user.extra
@@ -224,6 +228,7 @@ func combinedClusterAuthenticationInfo(lhs, rhs ClusterAuthenticationInfo) (Clus
 		RequestHeaderExtraHeaderPrefixes: combineUniqueStringSlices(lhs.RequestHeaderExtraHeaderPrefixes, rhs.RequestHeaderExtraHeaderPrefixes),
 		RequestHeaderGroupHeaders:        combineUniqueStringSlices(lhs.RequestHeaderGroupHeaders, rhs.RequestHeaderGroupHeaders),
 		RequestHeaderUsernameHeaders:     combineUniqueStringSlices(lhs.RequestHeaderUsernameHeaders, rhs.RequestHeaderUsernameHeaders),
+		RequestHeaderUIDHeaders:          combineUniqueStringSlices(lhs.RequestHeaderUIDHeaders, rhs.RequestHeaderUIDHeaders),
 	}
 
 	var err error
@@ -259,6 +264,13 @@ func getConfigMapDataFor(authenticationInfo ClusterAuthenticationInfo) (map[stri
 		if err != nil {
 			return nil, err
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) && len(authenticationInfo.RequestHeaderUIDHeaders.Value()) > 0 {
+			data["requestheader-uid-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderUIDHeaders.Value())
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		data["requestheader-group-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderGroupHeaders.Value())
 		if err != nil {
 			return nil, err
@@ -297,6 +309,13 @@ func getClusterAuthenticationInfoFor(data map[string]string) (ClusterAuthenticat
 	ret.RequestHeaderUsernameHeaders, err = jsonDeserializeStringSlice(data["requestheader-username-headers"])
 	if err != nil {
 		return ClusterAuthenticationInfo{}, err
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) {
+		ret.RequestHeaderUIDHeaders, err = jsonDeserializeStringSlice(data["requestheader-uid-headers"])
+		if err != nil {
+			return ClusterAuthenticationInfo{}, err
+		}
 	}
 
 	if caBundle := data["requestheader-client-ca-file"]; len(caBundle) > 0 {

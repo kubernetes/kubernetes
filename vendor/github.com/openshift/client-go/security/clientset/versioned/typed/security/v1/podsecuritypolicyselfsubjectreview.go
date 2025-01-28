@@ -3,9 +3,9 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/security/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 	scheme "github.com/openshift/client-go/security/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gentype "k8s.io/client-go/gentype"
@@ -19,23 +19,26 @@ type PodSecurityPolicySelfSubjectReviewsGetter interface {
 
 // PodSecurityPolicySelfSubjectReviewInterface has methods to work with PodSecurityPolicySelfSubjectReview resources.
 type PodSecurityPolicySelfSubjectReviewInterface interface {
-	Create(ctx context.Context, podSecurityPolicySelfSubjectReview *v1.PodSecurityPolicySelfSubjectReview, opts metav1.CreateOptions) (*v1.PodSecurityPolicySelfSubjectReview, error)
+	Create(ctx context.Context, podSecurityPolicySelfSubjectReview *securityv1.PodSecurityPolicySelfSubjectReview, opts metav1.CreateOptions) (*securityv1.PodSecurityPolicySelfSubjectReview, error)
 	PodSecurityPolicySelfSubjectReviewExpansion
 }
 
 // podSecurityPolicySelfSubjectReviews implements PodSecurityPolicySelfSubjectReviewInterface
 type podSecurityPolicySelfSubjectReviews struct {
-	*gentype.Client[*v1.PodSecurityPolicySelfSubjectReview]
+	*gentype.Client[*securityv1.PodSecurityPolicySelfSubjectReview]
 }
 
 // newPodSecurityPolicySelfSubjectReviews returns a PodSecurityPolicySelfSubjectReviews
 func newPodSecurityPolicySelfSubjectReviews(c *SecurityV1Client, namespace string) *podSecurityPolicySelfSubjectReviews {
 	return &podSecurityPolicySelfSubjectReviews{
-		gentype.NewClient[*v1.PodSecurityPolicySelfSubjectReview](
+		gentype.NewClient[*securityv1.PodSecurityPolicySelfSubjectReview](
 			"podsecuritypolicyselfsubjectreviews",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1.PodSecurityPolicySelfSubjectReview { return &v1.PodSecurityPolicySelfSubjectReview{} }),
+			func() *securityv1.PodSecurityPolicySelfSubjectReview {
+				return &securityv1.PodSecurityPolicySelfSubjectReview{}
+			},
+		),
 	}
 }

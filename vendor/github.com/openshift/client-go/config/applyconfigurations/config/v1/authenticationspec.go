@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // AuthenticationSpecApplyConfiguration represents a declarative configuration of the AuthenticationSpec type for use
 // with apply.
 type AuthenticationSpecApplyConfiguration struct {
-	Type                       *v1.AuthenticationType                                  `json:"type,omitempty"`
+	Type                       *configv1.AuthenticationType                            `json:"type,omitempty"`
 	OAuthMetadata              *ConfigMapNameReferenceApplyConfiguration               `json:"oauthMetadata,omitempty"`
 	WebhookTokenAuthenticators []DeprecatedWebhookTokenAuthenticatorApplyConfiguration `json:"webhookTokenAuthenticators,omitempty"`
 	WebhookTokenAuthenticator  *WebhookTokenAuthenticatorApplyConfiguration            `json:"webhookTokenAuthenticator,omitempty"`
@@ -26,7 +26,7 @@ func AuthenticationSpec() *AuthenticationSpecApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *AuthenticationSpecApplyConfiguration) WithType(value v1.AuthenticationType) *AuthenticationSpecApplyConfiguration {
+func (b *AuthenticationSpecApplyConfiguration) WithType(value configv1.AuthenticationType) *AuthenticationSpecApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -251,7 +251,7 @@ type RouteHTTPHeader struct {
 	// Strict-Transport-Security, Proxy, Cookie, Set-Cookie.
 	// It must be no more than 255 characters in length.
 	// Header name must be unique.
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=255
 	// +kubebuilder:validation:Pattern="^[-!#$%&'*+.0-9A-Z^_`a-z|~]+$"
@@ -262,7 +262,7 @@ type RouteHTTPHeader struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// action specifies actions to perform on headers, such as setting or deleting headers.
-	// +kubebuilder:validation:Required
+	// +required
 	Action RouteHTTPHeaderActionUnion `json:"action" protobuf:"bytes,2,opt,name=action"`
 }
 
@@ -276,7 +276,7 @@ type RouteHTTPHeaderActionUnion struct {
 	// Delete allows you to delete HTTP request and response headers.
 	// +unionDiscriminator
 	// +kubebuilder:validation:Enum:=Set;Delete
-	// +kubebuilder:validation:Required
+	// +required
 	Type RouteHTTPHeaderActionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RouteHTTPHeaderActionType"`
 
 	// set defines the HTTP header that should be set: added if it doesn't exist or replaced if it does.
@@ -299,7 +299,7 @@ type RouteSetHTTPHeader struct {
 	// + ---
 	// + Note: This limit was selected as most common web servers have a limit of 16384 characters or some lower limit.
 	// + See <https://www.geekersdigest.com/max-http-request-header-size-server-comparison/>.
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=16384
 	Value string `json:"value" protobuf:"bytes,1,opt,name=value"`
@@ -359,11 +359,11 @@ type RouteStatus struct {
 
 // RouteIngress holds information about the places where a route is exposed.
 type RouteIngress struct {
-	// Host is the host string under which the route is exposed; this value is required
+	// host is the host string under which the route is exposed; this value is required
 	Host string `json:"host,omitempty" protobuf:"bytes,1,opt,name=host"`
 	// Name is a name chosen by the router to identify itself; this value is required
 	RouterName string `json:"routerName,omitempty" protobuf:"bytes,2,opt,name=routerName"`
-	// Conditions is the state of the route, may be empty.
+	// conditions is the state of the route, may be empty.
 	// +listType=map
 	// +listMapKey=type
 	Conditions []RouteIngressCondition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
@@ -389,10 +389,10 @@ const (
 // RouteIngressCondition contains details for the current condition of this route on a particular
 // router.
 type RouteIngressCondition struct {
-	// Type is the type of the condition.
+	// type is the type of the condition.
 	// Currently only Admitted or UnservableInFutureVersions.
 	Type RouteIngressConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RouteIngressConditionType"`
-	// Status is the status of the condition.
+	// status is the status of the condition.
 	// Can be True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=k8s.io/api/core/v1.ConditionStatus"`
 	// (brief) reason for the condition's last transition, and is usually a machine and human

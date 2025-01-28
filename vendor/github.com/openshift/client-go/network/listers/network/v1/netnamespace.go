@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/network/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	networkv1 "github.com/openshift/api/network/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NetNamespaceLister helps list NetNamespaces.
@@ -14,19 +14,19 @@ import (
 type NetNamespaceLister interface {
 	// List lists all NetNamespaces in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.NetNamespace, err error)
+	List(selector labels.Selector) (ret []*networkv1.NetNamespace, err error)
 	// Get retrieves the NetNamespace from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.NetNamespace, error)
+	Get(name string) (*networkv1.NetNamespace, error)
 	NetNamespaceListerExpansion
 }
 
 // netNamespaceLister implements the NetNamespaceLister interface.
 type netNamespaceLister struct {
-	listers.ResourceIndexer[*v1.NetNamespace]
+	listers.ResourceIndexer[*networkv1.NetNamespace]
 }
 
 // NewNetNamespaceLister returns a new NetNamespaceLister.
 func NewNetNamespaceLister(indexer cache.Indexer) NetNamespaceLister {
-	return &netNamespaceLister{listers.New[*v1.NetNamespace](indexer, v1.Resource("netnamespace"))}
+	return &netNamespaceLister{listers.New[*networkv1.NetNamespace](indexer, networkv1.Resource("netnamespace"))}
 }

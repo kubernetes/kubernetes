@@ -24,7 +24,7 @@ package v1
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
@@ -42,180 +42,180 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
-	if err := s.AddGeneratedConversionFunc((*v1.CronJob)(nil), (*batch.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CronJob_To_batch_CronJob(a.(*v1.CronJob), b.(*batch.CronJob), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.CronJob)(nil), (*batch.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_CronJob_To_batch_CronJob(a.(*batchv1.CronJob), b.(*batch.CronJob), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.CronJob)(nil), (*v1.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_CronJob_To_v1_CronJob(a.(*batch.CronJob), b.(*v1.CronJob), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.CronJob)(nil), (*batchv1.CronJob)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJob_To_v1_CronJob(a.(*batch.CronJob), b.(*batchv1.CronJob), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.CronJobList)(nil), (*batch.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CronJobList_To_batch_CronJobList(a.(*v1.CronJobList), b.(*batch.CronJobList), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.CronJobList)(nil), (*batch.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_CronJobList_To_batch_CronJobList(a.(*batchv1.CronJobList), b.(*batch.CronJobList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.CronJobList)(nil), (*v1.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_CronJobList_To_v1_CronJobList(a.(*batch.CronJobList), b.(*v1.CronJobList), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobList)(nil), (*batchv1.CronJobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobList_To_v1_CronJobList(a.(*batch.CronJobList), b.(*batchv1.CronJobList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.CronJobSpec)(nil), (*batch.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CronJobSpec_To_batch_CronJobSpec(a.(*v1.CronJobSpec), b.(*batch.CronJobSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.CronJobSpec)(nil), (*batch.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_CronJobSpec_To_batch_CronJobSpec(a.(*batchv1.CronJobSpec), b.(*batch.CronJobSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.CronJobSpec)(nil), (*v1.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_CronJobSpec_To_v1_CronJobSpec(a.(*batch.CronJobSpec), b.(*v1.CronJobSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobSpec)(nil), (*batchv1.CronJobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobSpec_To_v1_CronJobSpec(a.(*batch.CronJobSpec), b.(*batchv1.CronJobSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.CronJobStatus)(nil), (*batch.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_CronJobStatus_To_batch_CronJobStatus(a.(*v1.CronJobStatus), b.(*batch.CronJobStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.CronJobStatus)(nil), (*batch.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_CronJobStatus_To_batch_CronJobStatus(a.(*batchv1.CronJobStatus), b.(*batch.CronJobStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.CronJobStatus)(nil), (*v1.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_CronJobStatus_To_v1_CronJobStatus(a.(*batch.CronJobStatus), b.(*v1.CronJobStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.CronJobStatus)(nil), (*batchv1.CronJobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_CronJobStatus_To_v1_CronJobStatus(a.(*batch.CronJobStatus), b.(*batchv1.CronJobStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Job)(nil), (*batch.Job)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Job_To_batch_Job(a.(*v1.Job), b.(*batch.Job), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.Job)(nil), (*batch.Job)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Job_To_batch_Job(a.(*batchv1.Job), b.(*batch.Job), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.Job)(nil), (*v1.Job)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_Job_To_v1_Job(a.(*batch.Job), b.(*v1.Job), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.Job)(nil), (*batchv1.Job)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_Job_To_v1_Job(a.(*batch.Job), b.(*batchv1.Job), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.JobCondition)(nil), (*batch.JobCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JobCondition_To_batch_JobCondition(a.(*v1.JobCondition), b.(*batch.JobCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.JobCondition)(nil), (*batch.JobCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobCondition_To_batch_JobCondition(a.(*batchv1.JobCondition), b.(*batch.JobCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.JobCondition)(nil), (*v1.JobCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_JobCondition_To_v1_JobCondition(a.(*batch.JobCondition), b.(*v1.JobCondition), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.JobCondition)(nil), (*batchv1.JobCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobCondition_To_v1_JobCondition(a.(*batch.JobCondition), b.(*batchv1.JobCondition), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.JobList)(nil), (*batch.JobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JobList_To_batch_JobList(a.(*v1.JobList), b.(*batch.JobList), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.JobList)(nil), (*batch.JobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobList_To_batch_JobList(a.(*batchv1.JobList), b.(*batch.JobList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.JobList)(nil), (*v1.JobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_JobList_To_v1_JobList(a.(*batch.JobList), b.(*v1.JobList), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.JobList)(nil), (*batchv1.JobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobList_To_v1_JobList(a.(*batch.JobList), b.(*batchv1.JobList), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.JobStatus)(nil), (*batch.JobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JobStatus_To_batch_JobStatus(a.(*v1.JobStatus), b.(*batch.JobStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.JobStatus)(nil), (*batch.JobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobStatus_To_batch_JobStatus(a.(*batchv1.JobStatus), b.(*batch.JobStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.JobStatus)(nil), (*v1.JobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_JobStatus_To_v1_JobStatus(a.(*batch.JobStatus), b.(*v1.JobStatus), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.JobStatus)(nil), (*batchv1.JobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobStatus_To_v1_JobStatus(a.(*batch.JobStatus), b.(*batchv1.JobStatus), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.JobTemplateSpec)(nil), (*batch.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(a.(*v1.JobTemplateSpec), b.(*batch.JobTemplateSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.JobTemplateSpec)(nil), (*batch.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(a.(*batchv1.JobTemplateSpec), b.(*batch.JobTemplateSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.JobTemplateSpec)(nil), (*v1.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(a.(*batch.JobTemplateSpec), b.(*v1.JobTemplateSpec), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.JobTemplateSpec)(nil), (*batchv1.JobTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(a.(*batch.JobTemplateSpec), b.(*batchv1.JobTemplateSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodFailurePolicy)(nil), (*batch.PodFailurePolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(a.(*v1.PodFailurePolicy), b.(*batch.PodFailurePolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.PodFailurePolicy)(nil), (*batch.PodFailurePolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(a.(*batchv1.PodFailurePolicy), b.(*batch.PodFailurePolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicy)(nil), (*v1.PodFailurePolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(a.(*batch.PodFailurePolicy), b.(*v1.PodFailurePolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicy)(nil), (*batchv1.PodFailurePolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(a.(*batch.PodFailurePolicy), b.(*batchv1.PodFailurePolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodFailurePolicyOnExitCodesRequirement)(nil), (*batch.PodFailurePolicyOnExitCodesRequirement)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(a.(*v1.PodFailurePolicyOnExitCodesRequirement), b.(*batch.PodFailurePolicyOnExitCodesRequirement), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.PodFailurePolicyOnExitCodesRequirement)(nil), (*batch.PodFailurePolicyOnExitCodesRequirement)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(a.(*batchv1.PodFailurePolicyOnExitCodesRequirement), b.(*batch.PodFailurePolicyOnExitCodesRequirement), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicyOnExitCodesRequirement)(nil), (*v1.PodFailurePolicyOnExitCodesRequirement)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(a.(*batch.PodFailurePolicyOnExitCodesRequirement), b.(*v1.PodFailurePolicyOnExitCodesRequirement), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicyOnExitCodesRequirement)(nil), (*batchv1.PodFailurePolicyOnExitCodesRequirement)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(a.(*batch.PodFailurePolicyOnExitCodesRequirement), b.(*batchv1.PodFailurePolicyOnExitCodesRequirement), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodFailurePolicyOnPodConditionsPattern)(nil), (*batch.PodFailurePolicyOnPodConditionsPattern)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(a.(*v1.PodFailurePolicyOnPodConditionsPattern), b.(*batch.PodFailurePolicyOnPodConditionsPattern), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.PodFailurePolicyOnPodConditionsPattern)(nil), (*batch.PodFailurePolicyOnPodConditionsPattern)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(a.(*batchv1.PodFailurePolicyOnPodConditionsPattern), b.(*batch.PodFailurePolicyOnPodConditionsPattern), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicyOnPodConditionsPattern)(nil), (*v1.PodFailurePolicyOnPodConditionsPattern)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(a.(*batch.PodFailurePolicyOnPodConditionsPattern), b.(*v1.PodFailurePolicyOnPodConditionsPattern), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicyOnPodConditionsPattern)(nil), (*batchv1.PodFailurePolicyOnPodConditionsPattern)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(a.(*batch.PodFailurePolicyOnPodConditionsPattern), b.(*batchv1.PodFailurePolicyOnPodConditionsPattern), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodFailurePolicyRule)(nil), (*batch.PodFailurePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(a.(*v1.PodFailurePolicyRule), b.(*batch.PodFailurePolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.PodFailurePolicyRule)(nil), (*batch.PodFailurePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(a.(*batchv1.PodFailurePolicyRule), b.(*batch.PodFailurePolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicyRule)(nil), (*v1.PodFailurePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(a.(*batch.PodFailurePolicyRule), b.(*v1.PodFailurePolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.PodFailurePolicyRule)(nil), (*batchv1.PodFailurePolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(a.(*batch.PodFailurePolicyRule), b.(*batchv1.PodFailurePolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.SuccessPolicy)(nil), (*batch.SuccessPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_SuccessPolicy_To_batch_SuccessPolicy(a.(*v1.SuccessPolicy), b.(*batch.SuccessPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.SuccessPolicy)(nil), (*batch.SuccessPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_SuccessPolicy_To_batch_SuccessPolicy(a.(*batchv1.SuccessPolicy), b.(*batch.SuccessPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.SuccessPolicy)(nil), (*v1.SuccessPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_SuccessPolicy_To_v1_SuccessPolicy(a.(*batch.SuccessPolicy), b.(*v1.SuccessPolicy), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.SuccessPolicy)(nil), (*batchv1.SuccessPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_SuccessPolicy_To_v1_SuccessPolicy(a.(*batch.SuccessPolicy), b.(*batchv1.SuccessPolicy), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.SuccessPolicyRule)(nil), (*batch.SuccessPolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(a.(*v1.SuccessPolicyRule), b.(*batch.SuccessPolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.SuccessPolicyRule)(nil), (*batch.SuccessPolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(a.(*batchv1.SuccessPolicyRule), b.(*batch.SuccessPolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.SuccessPolicyRule)(nil), (*v1.SuccessPolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(a.(*batch.SuccessPolicyRule), b.(*v1.SuccessPolicyRule), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.SuccessPolicyRule)(nil), (*batchv1.SuccessPolicyRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(a.(*batch.SuccessPolicyRule), b.(*batchv1.SuccessPolicyRule), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.UncountedTerminatedPods)(nil), (*batch.UncountedTerminatedPods)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(a.(*v1.UncountedTerminatedPods), b.(*batch.UncountedTerminatedPods), scope)
+	if err := s.AddGeneratedConversionFunc((*batchv1.UncountedTerminatedPods)(nil), (*batch.UncountedTerminatedPods)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(a.(*batchv1.UncountedTerminatedPods), b.(*batch.UncountedTerminatedPods), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*batch.UncountedTerminatedPods)(nil), (*v1.UncountedTerminatedPods)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(a.(*batch.UncountedTerminatedPods), b.(*v1.UncountedTerminatedPods), scope)
+	if err := s.AddGeneratedConversionFunc((*batch.UncountedTerminatedPods)(nil), (*batchv1.UncountedTerminatedPods)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(a.(*batch.UncountedTerminatedPods), b.(*batchv1.UncountedTerminatedPods), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*batch.JobSpec)(nil), (*v1.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_batch_JobSpec_To_v1_JobSpec(a.(*batch.JobSpec), b.(*v1.JobSpec), scope)
+	if err := s.AddConversionFunc((*batch.JobSpec)(nil), (*batchv1.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobSpec_To_v1_JobSpec(a.(*batch.JobSpec), b.(*batchv1.JobSpec), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddConversionFunc((*v1.JobSpec)(nil), (*batch.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_JobSpec_To_batch_JobSpec(a.(*v1.JobSpec), b.(*batch.JobSpec), scope)
+	if err := s.AddConversionFunc((*batchv1.JobSpec)(nil), (*batch.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobSpec_To_batch_JobSpec(a.(*batchv1.JobSpec), b.(*batch.JobSpec), scope)
 	}); err != nil {
 		return err
 	}
 	return nil
 }
 
-func autoConvert_v1_CronJob_To_batch_CronJob(in *v1.CronJob, out *batch.CronJob, s conversion.Scope) error {
+func autoConvert_v1_CronJob_To_batch_CronJob(in *batchv1.CronJob, out *batch.CronJob, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_CronJobSpec_To_batch_CronJobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -227,11 +227,11 @@ func autoConvert_v1_CronJob_To_batch_CronJob(in *v1.CronJob, out *batch.CronJob,
 }
 
 // Convert_v1_CronJob_To_batch_CronJob is an autogenerated conversion function.
-func Convert_v1_CronJob_To_batch_CronJob(in *v1.CronJob, out *batch.CronJob, s conversion.Scope) error {
+func Convert_v1_CronJob_To_batch_CronJob(in *batchv1.CronJob, out *batch.CronJob, s conversion.Scope) error {
 	return autoConvert_v1_CronJob_To_batch_CronJob(in, out, s)
 }
 
-func autoConvert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *v1.CronJob, s conversion.Scope) error {
+func autoConvert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *batchv1.CronJob, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_batch_CronJobSpec_To_v1_CronJobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -243,11 +243,11 @@ func autoConvert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *v1.CronJob,
 }
 
 // Convert_batch_CronJob_To_v1_CronJob is an autogenerated conversion function.
-func Convert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *v1.CronJob, s conversion.Scope) error {
+func Convert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *batchv1.CronJob, s conversion.Scope) error {
 	return autoConvert_batch_CronJob_To_v1_CronJob(in, out, s)
 }
 
-func autoConvert_v1_CronJobList_To_batch_CronJobList(in *v1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
+func autoConvert_v1_CronJobList_To_batch_CronJobList(in *batchv1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -264,15 +264,15 @@ func autoConvert_v1_CronJobList_To_batch_CronJobList(in *v1.CronJobList, out *ba
 }
 
 // Convert_v1_CronJobList_To_batch_CronJobList is an autogenerated conversion function.
-func Convert_v1_CronJobList_To_batch_CronJobList(in *v1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
+func Convert_v1_CronJobList_To_batch_CronJobList(in *batchv1.CronJobList, out *batch.CronJobList, s conversion.Scope) error {
 	return autoConvert_v1_CronJobList_To_batch_CronJobList(in, out, s)
 }
 
-func autoConvert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *v1.CronJobList, s conversion.Scope) error {
+func autoConvert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *batchv1.CronJobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.CronJob, len(*in))
+		*out = make([]batchv1.CronJob, len(*in))
 		for i := range *in {
 			if err := Convert_batch_CronJob_To_v1_CronJob(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -285,11 +285,11 @@ func autoConvert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out 
 }
 
 // Convert_batch_CronJobList_To_v1_CronJobList is an autogenerated conversion function.
-func Convert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *v1.CronJobList, s conversion.Scope) error {
+func Convert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *batchv1.CronJobList, s conversion.Scope) error {
 	return autoConvert_batch_CronJobList_To_v1_CronJobList(in, out, s)
 }
 
-func autoConvert_v1_CronJobSpec_To_batch_CronJobSpec(in *v1.CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
+func autoConvert_v1_CronJobSpec_To_batch_CronJobSpec(in *batchv1.CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
 	out.Schedule = in.Schedule
 	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
 	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
@@ -304,15 +304,15 @@ func autoConvert_v1_CronJobSpec_To_batch_CronJobSpec(in *v1.CronJobSpec, out *ba
 }
 
 // Convert_v1_CronJobSpec_To_batch_CronJobSpec is an autogenerated conversion function.
-func Convert_v1_CronJobSpec_To_batch_CronJobSpec(in *v1.CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
+func Convert_v1_CronJobSpec_To_batch_CronJobSpec(in *batchv1.CronJobSpec, out *batch.CronJobSpec, s conversion.Scope) error {
 	return autoConvert_v1_CronJobSpec_To_batch_CronJobSpec(in, out, s)
 }
 
-func autoConvert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out *v1.CronJobSpec, s conversion.Scope) error {
+func autoConvert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out *batchv1.CronJobSpec, s conversion.Scope) error {
 	out.Schedule = in.Schedule
 	out.TimeZone = (*string)(unsafe.Pointer(in.TimeZone))
 	out.StartingDeadlineSeconds = (*int64)(unsafe.Pointer(in.StartingDeadlineSeconds))
-	out.ConcurrencyPolicy = v1.ConcurrencyPolicy(in.ConcurrencyPolicy)
+	out.ConcurrencyPolicy = batchv1.ConcurrencyPolicy(in.ConcurrencyPolicy)
 	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
 	if err := Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(&in.JobTemplate, &out.JobTemplate, s); err != nil {
 		return err
@@ -323,11 +323,11 @@ func autoConvert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out 
 }
 
 // Convert_batch_CronJobSpec_To_v1_CronJobSpec is an autogenerated conversion function.
-func Convert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out *v1.CronJobSpec, s conversion.Scope) error {
+func Convert_batch_CronJobSpec_To_v1_CronJobSpec(in *batch.CronJobSpec, out *batchv1.CronJobSpec, s conversion.Scope) error {
 	return autoConvert_batch_CronJobSpec_To_v1_CronJobSpec(in, out, s)
 }
 
-func autoConvert_v1_CronJobStatus_To_batch_CronJobStatus(in *v1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
+func autoConvert_v1_CronJobStatus_To_batch_CronJobStatus(in *batchv1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
 	out.Active = *(*[]core.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*metav1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	out.LastSuccessfulTime = (*metav1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
@@ -335,11 +335,11 @@ func autoConvert_v1_CronJobStatus_To_batch_CronJobStatus(in *v1.CronJobStatus, o
 }
 
 // Convert_v1_CronJobStatus_To_batch_CronJobStatus is an autogenerated conversion function.
-func Convert_v1_CronJobStatus_To_batch_CronJobStatus(in *v1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
+func Convert_v1_CronJobStatus_To_batch_CronJobStatus(in *batchv1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
 	return autoConvert_v1_CronJobStatus_To_batch_CronJobStatus(in, out, s)
 }
 
-func autoConvert_batch_CronJobStatus_To_v1_CronJobStatus(in *batch.CronJobStatus, out *v1.CronJobStatus, s conversion.Scope) error {
+func autoConvert_batch_CronJobStatus_To_v1_CronJobStatus(in *batch.CronJobStatus, out *batchv1.CronJobStatus, s conversion.Scope) error {
 	out.Active = *(*[]corev1.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*metav1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	out.LastSuccessfulTime = (*metav1.Time)(unsafe.Pointer(in.LastSuccessfulTime))
@@ -347,11 +347,11 @@ func autoConvert_batch_CronJobStatus_To_v1_CronJobStatus(in *batch.CronJobStatus
 }
 
 // Convert_batch_CronJobStatus_To_v1_CronJobStatus is an autogenerated conversion function.
-func Convert_batch_CronJobStatus_To_v1_CronJobStatus(in *batch.CronJobStatus, out *v1.CronJobStatus, s conversion.Scope) error {
+func Convert_batch_CronJobStatus_To_v1_CronJobStatus(in *batch.CronJobStatus, out *batchv1.CronJobStatus, s conversion.Scope) error {
 	return autoConvert_batch_CronJobStatus_To_v1_CronJobStatus(in, out, s)
 }
 
-func autoConvert_v1_Job_To_batch_Job(in *v1.Job, out *batch.Job, s conversion.Scope) error {
+func autoConvert_v1_Job_To_batch_Job(in *batchv1.Job, out *batch.Job, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -363,11 +363,11 @@ func autoConvert_v1_Job_To_batch_Job(in *v1.Job, out *batch.Job, s conversion.Sc
 }
 
 // Convert_v1_Job_To_batch_Job is an autogenerated conversion function.
-func Convert_v1_Job_To_batch_Job(in *v1.Job, out *batch.Job, s conversion.Scope) error {
+func Convert_v1_Job_To_batch_Job(in *batchv1.Job, out *batch.Job, s conversion.Scope) error {
 	return autoConvert_v1_Job_To_batch_Job(in, out, s)
 }
 
-func autoConvert_batch_Job_To_v1_Job(in *batch.Job, out *v1.Job, s conversion.Scope) error {
+func autoConvert_batch_Job_To_v1_Job(in *batch.Job, out *batchv1.Job, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -379,11 +379,11 @@ func autoConvert_batch_Job_To_v1_Job(in *batch.Job, out *v1.Job, s conversion.Sc
 }
 
 // Convert_batch_Job_To_v1_Job is an autogenerated conversion function.
-func Convert_batch_Job_To_v1_Job(in *batch.Job, out *v1.Job, s conversion.Scope) error {
+func Convert_batch_Job_To_v1_Job(in *batch.Job, out *batchv1.Job, s conversion.Scope) error {
 	return autoConvert_batch_Job_To_v1_Job(in, out, s)
 }
 
-func autoConvert_v1_JobCondition_To_batch_JobCondition(in *v1.JobCondition, out *batch.JobCondition, s conversion.Scope) error {
+func autoConvert_v1_JobCondition_To_batch_JobCondition(in *batchv1.JobCondition, out *batch.JobCondition, s conversion.Scope) error {
 	out.Type = batch.JobConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
@@ -394,12 +394,12 @@ func autoConvert_v1_JobCondition_To_batch_JobCondition(in *v1.JobCondition, out 
 }
 
 // Convert_v1_JobCondition_To_batch_JobCondition is an autogenerated conversion function.
-func Convert_v1_JobCondition_To_batch_JobCondition(in *v1.JobCondition, out *batch.JobCondition, s conversion.Scope) error {
+func Convert_v1_JobCondition_To_batch_JobCondition(in *batchv1.JobCondition, out *batch.JobCondition, s conversion.Scope) error {
 	return autoConvert_v1_JobCondition_To_batch_JobCondition(in, out, s)
 }
 
-func autoConvert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *v1.JobCondition, s conversion.Scope) error {
-	out.Type = v1.JobConditionType(in.Type)
+func autoConvert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *batchv1.JobCondition, s conversion.Scope) error {
+	out.Type = batchv1.JobConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
@@ -409,11 +409,11 @@ func autoConvert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, o
 }
 
 // Convert_batch_JobCondition_To_v1_JobCondition is an autogenerated conversion function.
-func Convert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *v1.JobCondition, s conversion.Scope) error {
+func Convert_batch_JobCondition_To_v1_JobCondition(in *batch.JobCondition, out *batchv1.JobCondition, s conversion.Scope) error {
 	return autoConvert_batch_JobCondition_To_v1_JobCondition(in, out, s)
 }
 
-func autoConvert_v1_JobList_To_batch_JobList(in *v1.JobList, out *batch.JobList, s conversion.Scope) error {
+func autoConvert_v1_JobList_To_batch_JobList(in *batchv1.JobList, out *batch.JobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -430,15 +430,15 @@ func autoConvert_v1_JobList_To_batch_JobList(in *v1.JobList, out *batch.JobList,
 }
 
 // Convert_v1_JobList_To_batch_JobList is an autogenerated conversion function.
-func Convert_v1_JobList_To_batch_JobList(in *v1.JobList, out *batch.JobList, s conversion.Scope) error {
+func Convert_v1_JobList_To_batch_JobList(in *batchv1.JobList, out *batch.JobList, s conversion.Scope) error {
 	return autoConvert_v1_JobList_To_batch_JobList(in, out, s)
 }
 
-func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *v1.JobList, s conversion.Scope) error {
+func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *batchv1.JobList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]v1.Job, len(*in))
+		*out = make([]batchv1.Job, len(*in))
 		for i := range *in {
 			if err := Convert_batch_Job_To_v1_Job(&(*in)[i], &(*out)[i], s); err != nil {
 				return err
@@ -451,11 +451,11 @@ func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *v1.JobList,
 }
 
 // Convert_batch_JobList_To_v1_JobList is an autogenerated conversion function.
-func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *v1.JobList, s conversion.Scope) error {
+func Convert_batch_JobList_To_v1_JobList(in *batch.JobList, out *batchv1.JobList, s conversion.Scope) error {
 	return autoConvert_batch_JobList_To_v1_JobList(in, out, s)
 }
 
-func autoConvert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
+func autoConvert_v1_JobSpec_To_batch_JobSpec(in *batchv1.JobSpec, out *batch.JobSpec, s conversion.Scope) error {
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -477,11 +477,11 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec,
 	return nil
 }
 
-func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec, s conversion.Scope) error {
+func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *batchv1.JobSpec, s conversion.Scope) error {
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
-	out.PodFailurePolicy = (*v1.PodFailurePolicy)(unsafe.Pointer(in.PodFailurePolicy))
-	out.SuccessPolicy = (*v1.SuccessPolicy)(unsafe.Pointer(in.SuccessPolicy))
+	out.PodFailurePolicy = (*batchv1.PodFailurePolicy)(unsafe.Pointer(in.PodFailurePolicy))
+	out.SuccessPolicy = (*batchv1.SuccessPolicy)(unsafe.Pointer(in.SuccessPolicy))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
 	out.BackoffLimitPerIndex = (*int32)(unsafe.Pointer(in.BackoffLimitPerIndex))
@@ -492,14 +492,14 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec,
 		return err
 	}
 	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
-	out.CompletionMode = (*v1.CompletionMode)(unsafe.Pointer(in.CompletionMode))
+	out.CompletionMode = (*batchv1.CompletionMode)(unsafe.Pointer(in.CompletionMode))
 	out.Suspend = (*bool)(unsafe.Pointer(in.Suspend))
-	out.PodReplacementPolicy = (*v1.PodReplacementPolicy)(unsafe.Pointer(in.PodReplacementPolicy))
+	out.PodReplacementPolicy = (*batchv1.PodReplacementPolicy)(unsafe.Pointer(in.PodReplacementPolicy))
 	out.ManagedBy = (*string)(unsafe.Pointer(in.ManagedBy))
 	return nil
 }
 
-func autoConvert_v1_JobStatus_To_batch_JobStatus(in *v1.JobStatus, out *batch.JobStatus, s conversion.Scope) error {
+func autoConvert_v1_JobStatus_To_batch_JobStatus(in *batchv1.JobStatus, out *batch.JobStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]batch.JobCondition)(unsafe.Pointer(&in.Conditions))
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
@@ -515,12 +515,12 @@ func autoConvert_v1_JobStatus_To_batch_JobStatus(in *v1.JobStatus, out *batch.Jo
 }
 
 // Convert_v1_JobStatus_To_batch_JobStatus is an autogenerated conversion function.
-func Convert_v1_JobStatus_To_batch_JobStatus(in *v1.JobStatus, out *batch.JobStatus, s conversion.Scope) error {
+func Convert_v1_JobStatus_To_batch_JobStatus(in *batchv1.JobStatus, out *batch.JobStatus, s conversion.Scope) error {
 	return autoConvert_v1_JobStatus_To_batch_JobStatus(in, out, s)
 }
 
-func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *v1.JobStatus, s conversion.Scope) error {
-	out.Conditions = *(*[]v1.JobCondition)(unsafe.Pointer(&in.Conditions))
+func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *batchv1.JobStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]batchv1.JobCondition)(unsafe.Pointer(&in.Conditions))
 	out.StartTime = (*metav1.Time)(unsafe.Pointer(in.StartTime))
 	out.CompletionTime = (*metav1.Time)(unsafe.Pointer(in.CompletionTime))
 	out.Active = in.Active
@@ -530,16 +530,16 @@ func autoConvert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *v1.Jo
 	out.Failed = in.Failed
 	out.CompletedIndexes = in.CompletedIndexes
 	out.FailedIndexes = (*string)(unsafe.Pointer(in.FailedIndexes))
-	out.UncountedTerminatedPods = (*v1.UncountedTerminatedPods)(unsafe.Pointer(in.UncountedTerminatedPods))
+	out.UncountedTerminatedPods = (*batchv1.UncountedTerminatedPods)(unsafe.Pointer(in.UncountedTerminatedPods))
 	return nil
 }
 
 // Convert_batch_JobStatus_To_v1_JobStatus is an autogenerated conversion function.
-func Convert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *v1.JobStatus, s conversion.Scope) error {
+func Convert_batch_JobStatus_To_v1_JobStatus(in *batch.JobStatus, out *batchv1.JobStatus, s conversion.Scope) error {
 	return autoConvert_batch_JobStatus_To_v1_JobStatus(in, out, s)
 }
 
-func autoConvert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
+func autoConvert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_JobSpec_To_batch_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -548,11 +548,11 @@ func autoConvert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v1.JobTemplateS
 }
 
 // Convert_v1_JobTemplateSpec_To_batch_JobTemplateSpec is an autogenerated conversion function.
-func Convert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in *v1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
+func Convert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in *batchv1.JobTemplateSpec, out *batch.JobTemplateSpec, s conversion.Scope) error {
 	return autoConvert_v1_JobTemplateSpec_To_batch_JobTemplateSpec(in, out, s)
 }
 
-func autoConvert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTemplateSpec, out *v1.JobTemplateSpec, s conversion.Scope) error {
+func autoConvert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTemplateSpec, out *batchv1.JobTemplateSpec, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -561,31 +561,31 @@ func autoConvert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTempla
 }
 
 // Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec is an autogenerated conversion function.
-func Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTemplateSpec, out *v1.JobTemplateSpec, s conversion.Scope) error {
+func Convert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in *batch.JobTemplateSpec, out *batchv1.JobTemplateSpec, s conversion.Scope) error {
 	return autoConvert_batch_JobTemplateSpec_To_v1_JobTemplateSpec(in, out, s)
 }
 
-func autoConvert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *v1.PodFailurePolicy, out *batch.PodFailurePolicy, s conversion.Scope) error {
+func autoConvert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *batchv1.PodFailurePolicy, out *batch.PodFailurePolicy, s conversion.Scope) error {
 	out.Rules = *(*[]batch.PodFailurePolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy is an autogenerated conversion function.
-func Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *v1.PodFailurePolicy, out *batch.PodFailurePolicy, s conversion.Scope) error {
+func Convert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in *batchv1.PodFailurePolicy, out *batch.PodFailurePolicy, s conversion.Scope) error {
 	return autoConvert_v1_PodFailurePolicy_To_batch_PodFailurePolicy(in, out, s)
 }
 
-func autoConvert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in *batch.PodFailurePolicy, out *v1.PodFailurePolicy, s conversion.Scope) error {
-	out.Rules = *(*[]v1.PodFailurePolicyRule)(unsafe.Pointer(&in.Rules))
+func autoConvert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in *batch.PodFailurePolicy, out *batchv1.PodFailurePolicy, s conversion.Scope) error {
+	out.Rules = *(*[]batchv1.PodFailurePolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_batch_PodFailurePolicy_To_v1_PodFailurePolicy is an autogenerated conversion function.
-func Convert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in *batch.PodFailurePolicy, out *v1.PodFailurePolicy, s conversion.Scope) error {
+func Convert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in *batch.PodFailurePolicy, out *batchv1.PodFailurePolicy, s conversion.Scope) error {
 	return autoConvert_batch_PodFailurePolicy_To_v1_PodFailurePolicy(in, out, s)
 }
 
-func autoConvert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(in *v1.PodFailurePolicyOnExitCodesRequirement, out *batch.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
+func autoConvert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(in *batchv1.PodFailurePolicyOnExitCodesRequirement, out *batch.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
 	out.ContainerName = (*string)(unsafe.Pointer(in.ContainerName))
 	out.Operator = batch.PodFailurePolicyOnExitCodesOperator(in.Operator)
 	out.Values = *(*[]int32)(unsafe.Pointer(&in.Values))
@@ -593,45 +593,45 @@ func autoConvert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePo
 }
 
 // Convert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement is an autogenerated conversion function.
-func Convert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(in *v1.PodFailurePolicyOnExitCodesRequirement, out *batch.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
+func Convert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(in *batchv1.PodFailurePolicyOnExitCodesRequirement, out *batch.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
 	return autoConvert_v1_PodFailurePolicyOnExitCodesRequirement_To_batch_PodFailurePolicyOnExitCodesRequirement(in, out, s)
 }
 
-func autoConvert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(in *batch.PodFailurePolicyOnExitCodesRequirement, out *v1.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
+func autoConvert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(in *batch.PodFailurePolicyOnExitCodesRequirement, out *batchv1.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
 	out.ContainerName = (*string)(unsafe.Pointer(in.ContainerName))
-	out.Operator = v1.PodFailurePolicyOnExitCodesOperator(in.Operator)
+	out.Operator = batchv1.PodFailurePolicyOnExitCodesOperator(in.Operator)
 	out.Values = *(*[]int32)(unsafe.Pointer(&in.Values))
 	return nil
 }
 
 // Convert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement is an autogenerated conversion function.
-func Convert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(in *batch.PodFailurePolicyOnExitCodesRequirement, out *v1.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
+func Convert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(in *batch.PodFailurePolicyOnExitCodesRequirement, out *batchv1.PodFailurePolicyOnExitCodesRequirement, s conversion.Scope) error {
 	return autoConvert_batch_PodFailurePolicyOnExitCodesRequirement_To_v1_PodFailurePolicyOnExitCodesRequirement(in, out, s)
 }
 
-func autoConvert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(in *v1.PodFailurePolicyOnPodConditionsPattern, out *batch.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
+func autoConvert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(in *batchv1.PodFailurePolicyOnPodConditionsPattern, out *batch.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
 	out.Type = core.PodConditionType(in.Type)
 	out.Status = core.ConditionStatus(in.Status)
 	return nil
 }
 
 // Convert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern is an autogenerated conversion function.
-func Convert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(in *v1.PodFailurePolicyOnPodConditionsPattern, out *batch.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
+func Convert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(in *batchv1.PodFailurePolicyOnPodConditionsPattern, out *batch.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
 	return autoConvert_v1_PodFailurePolicyOnPodConditionsPattern_To_batch_PodFailurePolicyOnPodConditionsPattern(in, out, s)
 }
 
-func autoConvert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(in *batch.PodFailurePolicyOnPodConditionsPattern, out *v1.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
+func autoConvert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(in *batch.PodFailurePolicyOnPodConditionsPattern, out *batchv1.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
 	out.Type = corev1.PodConditionType(in.Type)
 	out.Status = corev1.ConditionStatus(in.Status)
 	return nil
 }
 
 // Convert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern is an autogenerated conversion function.
-func Convert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(in *batch.PodFailurePolicyOnPodConditionsPattern, out *v1.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
+func Convert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(in *batch.PodFailurePolicyOnPodConditionsPattern, out *batchv1.PodFailurePolicyOnPodConditionsPattern, s conversion.Scope) error {
 	return autoConvert_batch_PodFailurePolicyOnPodConditionsPattern_To_v1_PodFailurePolicyOnPodConditionsPattern(in, out, s)
 }
 
-func autoConvert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *v1.PodFailurePolicyRule, out *batch.PodFailurePolicyRule, s conversion.Scope) error {
+func autoConvert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *batchv1.PodFailurePolicyRule, out *batch.PodFailurePolicyRule, s conversion.Scope) error {
 	out.Action = batch.PodFailurePolicyAction(in.Action)
 	out.OnExitCodes = (*batch.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in.OnExitCodes))
 	out.OnPodConditions = *(*[]batch.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(&in.OnPodConditions))
@@ -639,82 +639,82 @@ func autoConvert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *v1.Po
 }
 
 // Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule is an autogenerated conversion function.
-func Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *v1.PodFailurePolicyRule, out *batch.PodFailurePolicyRule, s conversion.Scope) error {
+func Convert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in *batchv1.PodFailurePolicyRule, out *batch.PodFailurePolicyRule, s conversion.Scope) error {
 	return autoConvert_v1_PodFailurePolicyRule_To_batch_PodFailurePolicyRule(in, out, s)
 }
 
-func autoConvert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in *batch.PodFailurePolicyRule, out *v1.PodFailurePolicyRule, s conversion.Scope) error {
-	out.Action = v1.PodFailurePolicyAction(in.Action)
-	out.OnExitCodes = (*v1.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in.OnExitCodes))
-	out.OnPodConditions = *(*[]v1.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(&in.OnPodConditions))
+func autoConvert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in *batch.PodFailurePolicyRule, out *batchv1.PodFailurePolicyRule, s conversion.Scope) error {
+	out.Action = batchv1.PodFailurePolicyAction(in.Action)
+	out.OnExitCodes = (*batchv1.PodFailurePolicyOnExitCodesRequirement)(unsafe.Pointer(in.OnExitCodes))
+	out.OnPodConditions = *(*[]batchv1.PodFailurePolicyOnPodConditionsPattern)(unsafe.Pointer(&in.OnPodConditions))
 	return nil
 }
 
 // Convert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule is an autogenerated conversion function.
-func Convert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in *batch.PodFailurePolicyRule, out *v1.PodFailurePolicyRule, s conversion.Scope) error {
+func Convert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in *batch.PodFailurePolicyRule, out *batchv1.PodFailurePolicyRule, s conversion.Scope) error {
 	return autoConvert_batch_PodFailurePolicyRule_To_v1_PodFailurePolicyRule(in, out, s)
 }
 
-func autoConvert_v1_SuccessPolicy_To_batch_SuccessPolicy(in *v1.SuccessPolicy, out *batch.SuccessPolicy, s conversion.Scope) error {
+func autoConvert_v1_SuccessPolicy_To_batch_SuccessPolicy(in *batchv1.SuccessPolicy, out *batch.SuccessPolicy, s conversion.Scope) error {
 	out.Rules = *(*[]batch.SuccessPolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_v1_SuccessPolicy_To_batch_SuccessPolicy is an autogenerated conversion function.
-func Convert_v1_SuccessPolicy_To_batch_SuccessPolicy(in *v1.SuccessPolicy, out *batch.SuccessPolicy, s conversion.Scope) error {
+func Convert_v1_SuccessPolicy_To_batch_SuccessPolicy(in *batchv1.SuccessPolicy, out *batch.SuccessPolicy, s conversion.Scope) error {
 	return autoConvert_v1_SuccessPolicy_To_batch_SuccessPolicy(in, out, s)
 }
 
-func autoConvert_batch_SuccessPolicy_To_v1_SuccessPolicy(in *batch.SuccessPolicy, out *v1.SuccessPolicy, s conversion.Scope) error {
-	out.Rules = *(*[]v1.SuccessPolicyRule)(unsafe.Pointer(&in.Rules))
+func autoConvert_batch_SuccessPolicy_To_v1_SuccessPolicy(in *batch.SuccessPolicy, out *batchv1.SuccessPolicy, s conversion.Scope) error {
+	out.Rules = *(*[]batchv1.SuccessPolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
 }
 
 // Convert_batch_SuccessPolicy_To_v1_SuccessPolicy is an autogenerated conversion function.
-func Convert_batch_SuccessPolicy_To_v1_SuccessPolicy(in *batch.SuccessPolicy, out *v1.SuccessPolicy, s conversion.Scope) error {
+func Convert_batch_SuccessPolicy_To_v1_SuccessPolicy(in *batch.SuccessPolicy, out *batchv1.SuccessPolicy, s conversion.Scope) error {
 	return autoConvert_batch_SuccessPolicy_To_v1_SuccessPolicy(in, out, s)
 }
 
-func autoConvert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(in *v1.SuccessPolicyRule, out *batch.SuccessPolicyRule, s conversion.Scope) error {
+func autoConvert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(in *batchv1.SuccessPolicyRule, out *batch.SuccessPolicyRule, s conversion.Scope) error {
 	out.SucceededIndexes = (*string)(unsafe.Pointer(in.SucceededIndexes))
 	out.SucceededCount = (*int32)(unsafe.Pointer(in.SucceededCount))
 	return nil
 }
 
 // Convert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule is an autogenerated conversion function.
-func Convert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(in *v1.SuccessPolicyRule, out *batch.SuccessPolicyRule, s conversion.Scope) error {
+func Convert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(in *batchv1.SuccessPolicyRule, out *batch.SuccessPolicyRule, s conversion.Scope) error {
 	return autoConvert_v1_SuccessPolicyRule_To_batch_SuccessPolicyRule(in, out, s)
 }
 
-func autoConvert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(in *batch.SuccessPolicyRule, out *v1.SuccessPolicyRule, s conversion.Scope) error {
+func autoConvert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(in *batch.SuccessPolicyRule, out *batchv1.SuccessPolicyRule, s conversion.Scope) error {
 	out.SucceededIndexes = (*string)(unsafe.Pointer(in.SucceededIndexes))
 	out.SucceededCount = (*int32)(unsafe.Pointer(in.SucceededCount))
 	return nil
 }
 
 // Convert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule is an autogenerated conversion function.
-func Convert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(in *batch.SuccessPolicyRule, out *v1.SuccessPolicyRule, s conversion.Scope) error {
+func Convert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(in *batch.SuccessPolicyRule, out *batchv1.SuccessPolicyRule, s conversion.Scope) error {
 	return autoConvert_batch_SuccessPolicyRule_To_v1_SuccessPolicyRule(in, out, s)
 }
 
-func autoConvert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(in *v1.UncountedTerminatedPods, out *batch.UncountedTerminatedPods, s conversion.Scope) error {
+func autoConvert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(in *batchv1.UncountedTerminatedPods, out *batch.UncountedTerminatedPods, s conversion.Scope) error {
 	out.Succeeded = *(*[]types.UID)(unsafe.Pointer(&in.Succeeded))
 	out.Failed = *(*[]types.UID)(unsafe.Pointer(&in.Failed))
 	return nil
 }
 
 // Convert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods is an autogenerated conversion function.
-func Convert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(in *v1.UncountedTerminatedPods, out *batch.UncountedTerminatedPods, s conversion.Scope) error {
+func Convert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(in *batchv1.UncountedTerminatedPods, out *batch.UncountedTerminatedPods, s conversion.Scope) error {
 	return autoConvert_v1_UncountedTerminatedPods_To_batch_UncountedTerminatedPods(in, out, s)
 }
 
-func autoConvert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(in *batch.UncountedTerminatedPods, out *v1.UncountedTerminatedPods, s conversion.Scope) error {
+func autoConvert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(in *batch.UncountedTerminatedPods, out *batchv1.UncountedTerminatedPods, s conversion.Scope) error {
 	out.Succeeded = *(*[]types.UID)(unsafe.Pointer(&in.Succeeded))
 	out.Failed = *(*[]types.UID)(unsafe.Pointer(&in.Failed))
 	return nil
 }
 
 // Convert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods is an autogenerated conversion function.
-func Convert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(in *batch.UncountedTerminatedPods, out *v1.UncountedTerminatedPods, s conversion.Scope) error {
+func Convert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(in *batch.UncountedTerminatedPods, out *batchv1.UncountedTerminatedPods, s conversion.Scope) error {
 	return autoConvert_batch_UncountedTerminatedPods_To_v1_UncountedTerminatedPods(in, out, s)
 }

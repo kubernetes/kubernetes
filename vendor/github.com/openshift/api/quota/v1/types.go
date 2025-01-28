@@ -27,22 +27,22 @@ type ClusterResourceQuota struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec defines the desired quota
+	// spec defines the desired quota
 	Spec ClusterResourceQuotaSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status defines the actual enforced quota and its current usage
+	// status defines the actual enforced quota and its current usage
 	Status ClusterResourceQuotaStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // ClusterResourceQuotaSpec defines the desired quota restrictions
 type ClusterResourceQuotaSpec struct {
-	// Selector is the selector used to match projects.
+	// selector is the selector used to match projects.
 	// It should only select active projects on the scale of dozens (though it can select
 	// many more less active projects).  These projects will contend on object creation through
 	// this resource.
 	Selector ClusterResourceQuotaSelector `json:"selector" protobuf:"bytes,1,opt,name=selector"`
 
-	// Quota defines the desired quota
+	// quota defines the desired quota
 	Quota corev1.ResourceQuotaSpec `json:"quota" protobuf:"bytes,2,opt,name=quota"`
 }
 
@@ -63,10 +63,10 @@ type ClusterResourceQuotaSelector struct {
 
 // ClusterResourceQuotaStatus defines the actual enforced quota and its current usage
 type ClusterResourceQuotaStatus struct {
-	// Total defines the actual enforced quota and its current usage across all projects
+	// total defines the actual enforced quota and its current usage across all projects
 	Total corev1.ResourceQuotaStatus `json:"total" protobuf:"bytes,1,opt,name=total"`
 
-	// Namespaces slices the usage by project.  This division allows for quick resolution of
+	// namespaces slices the usage by project.  This division allows for quick resolution of
 	// deletion reconciliation inside of a single project without requiring a recalculation
 	// across all projects.  This can be used to pull the deltas for a given project.
 	// +optional
@@ -87,7 +87,7 @@ type ClusterResourceQuotaList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of ClusterResourceQuotas
+	// items is a list of ClusterResourceQuotas
 	Items []ClusterResourceQuota `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -96,10 +96,10 @@ type ResourceQuotasStatusByNamespace []ResourceQuotaStatusByNamespace
 
 // ResourceQuotaStatusByNamespace gives status for a particular project
 type ResourceQuotaStatusByNamespace struct {
-	// Namespace the project this status applies to
+	// namespace the project this status applies to
 	Namespace string `json:"namespace" protobuf:"bytes,1,opt,name=namespace"`
 
-	// Status indicates how many resources have been consumed by this project
+	// status indicates how many resources have been consumed by this project
 	Status corev1.ResourceQuotaStatus `json:"status" protobuf:"bytes,2,opt,name=status"`
 }
 
@@ -120,10 +120,10 @@ type AppliedClusterResourceQuota struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Spec defines the desired quota
+	// spec defines the desired quota
 	Spec ClusterResourceQuotaSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// Status defines the actual enforced quota and its current usage
+	// status defines the actual enforced quota and its current usage
 	Status ClusterResourceQuotaStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
@@ -140,6 +140,6 @@ type AppliedClusterResourceQuotaList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is a list of AppliedClusterResourceQuota
+	// items is a list of AppliedClusterResourceQuota
 	Items []AppliedClusterResourceQuota `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

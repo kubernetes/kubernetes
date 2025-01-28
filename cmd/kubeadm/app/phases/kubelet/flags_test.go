@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -37,11 +39,11 @@ func TestBuildKubeletArgs(t *testing.T) {
 			name: "hostname override",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "unix:///var/run/containerd/containerd.sock",
 					KubeletExtraArgs: []kubeadmapi.Arg{
 						{Name: "hostname-override", Value: "override-name"},
 					},
 				},
+				criSocket: "unix:///var/run/containerd/containerd.sock",
 			},
 			expected: []kubeadmapi.Arg{
 				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
@@ -52,7 +54,6 @@ func TestBuildKubeletArgs(t *testing.T) {
 			name: "register with taints",
 			opts: kubeletFlagsOpts{
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "unix:///var/run/containerd/containerd.sock",
 					Taints: []v1.Taint{
 						{
 							Key:    "foo",
@@ -66,6 +67,7 @@ func TestBuildKubeletArgs(t *testing.T) {
 						},
 					},
 				},
+				criSocket:                "unix:///var/run/containerd/containerd.sock",
 				registerTaintsUsingFlags: true,
 			},
 			expected: []kubeadmapi.Arg{
@@ -76,10 +78,9 @@ func TestBuildKubeletArgs(t *testing.T) {
 		{
 			name: "pause image is set",
 			opts: kubeletFlagsOpts{
-				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
-					CRISocket: "unix:///var/run/containerd/containerd.sock",
-				},
-				pauseImage: "registry.k8s.io/pause:ver",
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{},
+				criSocket:   "unix:///var/run/containerd/containerd.sock",
+				pauseImage:  "registry.k8s.io/pause:ver",
 			},
 			expected: []kubeadmapi.Arg{
 				{Name: "container-runtime-endpoint", Value: "unix:///var/run/containerd/containerd.sock"},
@@ -186,6 +187,84 @@ func TestGetNodeNameAndHostname(t *testing.T) {
 			if hostname != tc.expectedHostName {
 				t.Errorf("expected hostname: %v, got %v", tc.expectedHostName, hostname)
 			}
+		})
+	}
+}
+
+func TestReadKubeadmFlags(t *testing.T) {
+	tests := []struct {
+		name          string
+		fileContent   string
+		expectedValue []string
+		expectError   bool
+	}{
+		{
+			name:          "valid kubeadm flags with container-runtime-endpoint",
+			fileContent:   `KUBELET_KUBEADM_ARGS="--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --pod-infra-container-image=registry.k8s.io/pause:1.0"`,
+			expectedValue: []string{"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock", "--pod-infra-container-image=registry.k8s.io/pause:1.0"},
+			expectError:   false,
+		},
+		{
+			name:          "no container-runtime-endpoint found",
+			fileContent:   `KUBELET_KUBEADM_ARGS="--pod-infra-container-image=registry.k8s.io/pause:1.0"`,
+			expectedValue: []string{"--pod-infra-container-image=registry.k8s.io/pause:1.0"},
+			expectError:   true,
+		},
+		{
+			name:          "no KUBELET_KUBEADM_ARGS line",
+			fileContent:   `# This is a comment, no args here`,
+			expectedValue: nil,
+			expectError:   true,
+		},
+		{
+			name:          "invalid file format",
+			fileContent:   "",
+			expectedValue: nil,
+			expectError:   true,
+		},
+		{
+			name:          "multiple flags with mixed equals and no equals",
+			fileContent:   `KUBELET_KUBEADM_ARGS="--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --foo bar --baz=qux"`,
+			expectedValue: []string{"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock", "--foo=bar", "--baz=qux"},
+			expectError:   false,
+		},
+		{
+			name:          "multiple flags with no equals",
+			fileContent:   `KUBELET_KUBEADM_ARGS="--container-runtime-endpoint unix:///var/run/containerd/containerd.sock --foo bar --baz qux"`,
+			expectedValue: []string{"--container-runtime-endpoint=unix:///var/run/containerd/containerd.sock", "--foo=bar", "--baz=qux"},
+			expectError:   false,
+		},
+		{
+			name:          "invalid prefix",
+			fileContent:   `"--foo bar"`,
+			expectedValue: nil,
+			expectError:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile, err := os.CreateTemp("", "kubeadm-flags-*.env")
+			if err != nil {
+				t.Errorf("Error creating temporary file: %v", err)
+			}
+
+			defer func() {
+				_ = os.Remove(tmpFile.Name())
+				_ = tmpFile.Close()
+			}()
+
+			_, err = tmpFile.WriteString(tt.fileContent)
+			if err != nil {
+				t.Errorf("Error writing args to file: %v", err)
+			}
+
+			value, err := ReadKubeletDynamicEnvFile(tmpFile.Name())
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			assert.Equal(t, tt.expectedValue, value)
 		})
 	}
 }

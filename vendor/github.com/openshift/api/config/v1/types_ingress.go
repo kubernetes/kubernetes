@@ -27,7 +27,6 @@ type Ingress struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec IngressSpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.
@@ -150,7 +149,7 @@ type AWSIngressSpec struct {
 	//     https://docs.aws.amazon.com/AmazonECS/latest/developerguide/load-balancer-types.html#nlb
 	// +unionDiscriminator
 	// +kubebuilder:validation:Enum:=NLB;Classic
-	// +kubebuilder:validation:Required
+	// +required
 	Type AWSLBType `json:"type,omitempty"`
 }
 
@@ -223,7 +222,6 @@ type ComponentRouteSpec struct {
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Required
 	// +required
 	Namespace string `json:"namespace"`
 
@@ -233,12 +231,10 @@ type ComponentRouteSpec struct {
 	// entry in the list of status.componentRoutes if the route is to be customized.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
-	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
 
 	// hostname is the hostname that should be used by the route.
-	// +kubebuilder:validation:Required
 	// +required
 	Hostname Hostname `json:"hostname"`
 
@@ -260,7 +256,6 @@ type ComponentRouteStatus struct {
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Required
 	// +required
 	Namespace string `json:"namespace"`
 
@@ -271,12 +266,10 @@ type ComponentRouteStatus struct {
 	// entry in the list of spec.componentRoutes if the route is to be customized.
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=256
-	// +kubebuilder:validation:Required
 	// +required
 	Name string `json:"name"`
 
 	// defaultHostname is the hostname of this route prior to customization.
-	// +kubebuilder:validation:Required
 	// +required
 	DefaultHostname Hostname `json:"defaultHostname"`
 
@@ -310,7 +303,6 @@ type ComponentRouteStatus struct {
 
 	// relatedObjects is a list of resources which are useful when debugging or inspecting how spec.componentRoutes is applied.
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:Required
 	// +required
 	RelatedObjects []ObjectReference `json:"relatedObjects"`
 }

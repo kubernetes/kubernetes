@@ -209,8 +209,8 @@ var _ = SIGDescribe("DisruptionController", func() {
 					return false, err
 				}
 				return isPDBErroring(pdb), nil
-			}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod shouldn't error for "+
-				"unmanaged pod")
+			}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrueBecause("pod shouldn't error for " +
+				"unmanaged pod"))
 		})
 
 	evictionCases := []struct {

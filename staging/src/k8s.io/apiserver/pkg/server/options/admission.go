@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	mutatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/mutating"
 	validatingadmissionpolicy "k8s.io/apiserver/pkg/admission/plugin/policy/validating"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
@@ -90,7 +91,7 @@ func NewAdmissionOptions() *AdmissionOptions {
 		// admission plugins. The apiserver always runs the validating ones
 		// after all the mutating ones, so their relative order in this list
 		// doesn't matter.
-		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingwebhook.PluginName, validatingadmissionpolicy.PluginName, validatingwebhook.PluginName},
+		RecommendedPluginOrder: []string{lifecycle.PluginName, mutatingadmissionpolicy.PluginName, mutatingwebhook.PluginName, validatingadmissionpolicy.PluginName, validatingwebhook.PluginName},
 		DefaultOffPlugins:      sets.Set[string]{},
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
@@ -157,9 +158,9 @@ func (a *AdmissionOptions) ApplyTo(
 	initializersChain := admission.PluginInitializers{genericInitializer}
 	initializersChain = append(initializersChain, pluginInitializers...)
 
-	admissionPostStartHook := func(context server.PostStartHookContext) error {
+	admissionPostStartHook := func(hookContext server.PostStartHookContext) error {
 		discoveryRESTMapper.Reset()
-		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, context.StopCh)
+		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, hookContext.Done())
 		return nil
 	}
 

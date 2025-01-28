@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type OAuthsGetter interface {
 
 // OAuthInterface has methods to work with OAuth resources.
 type OAuthInterface interface {
-	Create(ctx context.Context, oAuth *v1.OAuth, opts metav1.CreateOptions) (*v1.OAuth, error)
-	Update(ctx context.Context, oAuth *v1.OAuth, opts metav1.UpdateOptions) (*v1.OAuth, error)
+	Create(ctx context.Context, oAuth *configv1.OAuth, opts metav1.CreateOptions) (*configv1.OAuth, error)
+	Update(ctx context.Context, oAuth *configv1.OAuth, opts metav1.UpdateOptions) (*configv1.OAuth, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, oAuth *v1.OAuth, opts metav1.UpdateOptions) (*v1.OAuth, error)
+	UpdateStatus(ctx context.Context, oAuth *configv1.OAuth, opts metav1.UpdateOptions) (*configv1.OAuth, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.OAuth, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.OAuthList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.OAuth, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.OAuthList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.OAuth, err error)
-	Apply(ctx context.Context, oAuth *configv1.OAuthApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuth, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.OAuth, err error)
+	Apply(ctx context.Context, oAuth *applyconfigurationsconfigv1.OAuthApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.OAuth, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, oAuth *configv1.OAuthApplyConfiguration, opts metav1.ApplyOptions) (result *v1.OAuth, err error)
+	ApplyStatus(ctx context.Context, oAuth *applyconfigurationsconfigv1.OAuthApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.OAuth, err error)
 	OAuthExpansion
 }
 
 // oAuths implements OAuthInterface
 type oAuths struct {
-	*gentype.ClientWithListAndApply[*v1.OAuth, *v1.OAuthList, *configv1.OAuthApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.OAuth, *configv1.OAuthList, *applyconfigurationsconfigv1.OAuthApplyConfiguration]
 }
 
 // newOAuths returns a OAuths
 func newOAuths(c *ConfigV1Client) *oAuths {
 	return &oAuths{
-		gentype.NewClientWithListAndApply[*v1.OAuth, *v1.OAuthList, *configv1.OAuthApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.OAuth, *configv1.OAuthList, *applyconfigurationsconfigv1.OAuthApplyConfiguration](
 			"oauths",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.OAuth { return &v1.OAuth{} },
-			func() *v1.OAuthList { return &v1.OAuthList{} }),
+			func() *configv1.OAuth { return &configv1.OAuth{} },
+			func() *configv1.OAuthList { return &configv1.OAuthList{} },
+		),
 	}
 }

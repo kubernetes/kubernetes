@@ -182,15 +182,11 @@ func kubeOpenAPIResultToFieldErrors(fldPath *field.Path, result *validate.Result
 				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
 
 			case openapierrors.TooLongFailCode:
-				value := interface{}("")
-				if err.Value != nil {
-					value = err.Value
-				}
 				max := int64(-1)
 				if i, ok := err.Valid.(int64); ok {
 					max = i
 				}
-				allErrs = append(allErrs, field.TooLongMaxLength(errPath, value, int(max)))
+				allErrs = append(allErrs, field.TooLong(errPath, "" /*unused*/, int(max)))
 
 			case openapierrors.MaxItemsFailCode:
 				actual := int64(-1)

@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//common/runes:go_default_library",
         "@org_golang_google_genproto_googleapis_api//expr/v1alpha1:go_default_library",
-        "@org_golang_x_text//width:go_default_library",
     ],
 )
 

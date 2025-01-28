@@ -57,8 +57,8 @@ func (Build) SwaggerDoc() map[string]string {
 
 var map_BuildCondition = map[string]string{
 	"":                   "BuildCondition describes the state of a build at a certain point.",
-	"type":               "Type of build condition.",
-	"status":             "Status of the condition, one of True, False, Unknown.",
+	"type":               "type of build condition.",
+	"status":             "status of the condition, one of True, False, Unknown.",
 	"lastUpdateTime":     "The last time this condition was updated.",
 	"lastTransitionTime": "The last time the condition transitioned from one status to another.",
 	"reason":             "The reason for the condition's last transition.",
@@ -93,7 +93,7 @@ func (BuildConfigList) SwaggerDoc() map[string]string {
 var map_BuildConfigSpec = map[string]string{
 	"":                             "BuildConfigSpec describes when and how builds are created",
 	"triggers":                     "triggers determine how new Builds can be launched from a BuildConfig. If no triggers are defined, a new build can only occur as a result of an explicit client build creation.",
-	"runPolicy":                    "RunPolicy describes how the new build created from this build configuration will be scheduled for execution. This is optional, if not specified we default to \"Serial\".",
+	"runPolicy":                    "runPolicy describes how the new build created from this build configuration will be scheduled for execution. This is optional, if not specified we default to \"Serial\".",
 	"successfulBuildsHistoryLimit": "successfulBuildsHistoryLimit is the number of old successful builds to retain. When a BuildConfig is created, the 5 most recent successful builds are retained unless this value is set. If removed after the BuildConfig has been created, all successful builds are retained.",
 	"failedBuildsHistoryLimit":     "failedBuildsHistoryLimit is the number of old failed builds to retain. When a BuildConfig is created, the 5 most recent failed builds are retained unless this value is set. If removed after the BuildConfig has been created, all failed builds are retained.",
 }
@@ -105,7 +105,7 @@ func (BuildConfigSpec) SwaggerDoc() map[string]string {
 var map_BuildConfigStatus = map[string]string{
 	"":                    "BuildConfigStatus contains current state of the build config object.",
 	"lastVersion":         "lastVersion is used to inform about number of last triggered build.",
-	"imageChangeTriggers": "ImageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec, including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.",
+	"imageChangeTriggers": "imageChangeTriggers captures the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec, including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID. There is a single entry in this array for each image change trigger in spec. Each trigger status references the ImageStreamTag that acts as the source of the trigger.",
 }
 
 func (BuildConfigStatus) SwaggerDoc() map[string]string {
@@ -140,7 +140,7 @@ var map_BuildLogOptions = map[string]string{
 	"timestamps":                   "timestamps, If true, add an RFC3339 or RFC3339Nano timestamp at the beginning of every line of log output. Defaults to false.",
 	"tailLines":                    "tailLines, If set, is the number of lines from the end of the logs to show. If not specified, logs are shown from the creation of the container or sinceSeconds or sinceTime",
 	"limitBytes":                   "limitBytes, If set, is the number of bytes to read from the server before terminating the log output. This may not display a complete final line of logging, and may return slightly more or slightly less than the specified limit.",
-	"nowait":                       "noWait if true causes the call to return immediately even if the build is not available yet. Otherwise the server will wait until the build has started.",
+	"nowait":                       "nowait if true causes the call to return immediately even if the build is not available yet. Otherwise the server will wait until the build has started.",
 	"version":                      "version of the build for which to view logs.",
 	"insecureSkipTLSVerifyBackend": "insecureSkipTLSVerifyBackend indicates that the apiserver should not confirm the validity of the serving certificate of the backend it is connecting to.  This will make the HTTPS connection between the apiserver and the backend insecure. This means the apiserver cannot verify the log data it is receiving came from the real kubelet.  If the kubelet is configured to verify the apiserver's TLS credentials, it does not mean the connection to the real kubelet is vulnerable to a man in the middle attack (e.g. an attacker could not intercept the actual log data coming from the real kubelet).",
 }
@@ -152,7 +152,7 @@ func (BuildLogOptions) SwaggerDoc() map[string]string {
 var map_BuildOutput = map[string]string{
 	"":            "BuildOutput is input to a build strategy and describes the container image that the strategy should produce.",
 	"to":          "to defines an optional location to push the output of this build to. Kind must be one of 'ImageStreamTag' or 'DockerImage'. This value will be used to look up a container image repository to push to. In the case of an ImageStreamTag, the ImageStreamTag will be looked for in the namespace of the build unless Namespace is specified.",
-	"pushSecret":  "PushSecret is the name of a Secret that would be used for setting up the authentication for executing the Docker push to authentication enabled Docker Registry (or Docker Hub).",
+	"pushSecret":  "pushSecret is the name of a Secret that would be used for setting up the authentication for executing the Docker push to authentication enabled Docker Registry (or Docker Hub).",
 	"imageLabels": "imageLabels define a list of labels that are applied to the resulting image. If there are multiple labels with the same name then the last one in the list is used.",
 }
 
@@ -181,8 +181,8 @@ var map_BuildRequest = map[string]string{
 	"lastVersion":           "lastVersion (optional) is the LastVersion of the BuildConfig that was used to generate the build. If the BuildConfig in the generator doesn't match, a build will not be generated.",
 	"env":                   "env contains additional environment variables you want to pass into a builder container.",
 	"triggeredBy":           "triggeredBy describes which triggers started the most recent update to the build configuration and contains information about those triggers.",
-	"dockerStrategyOptions": "DockerStrategyOptions contains additional docker-strategy specific options for the build",
-	"sourceStrategyOptions": "SourceStrategyOptions contains additional source-strategy specific options for the build",
+	"dockerStrategyOptions": "dockerStrategyOptions contains additional docker-strategy specific options for the build",
+	"sourceStrategyOptions": "sourceStrategyOptions contains additional source-strategy specific options for the build",
 }
 
 func (BuildRequest) SwaggerDoc() map[string]string {
@@ -229,7 +229,7 @@ var map_BuildStatus = map[string]string{
 	"output":                     "output describes the container image the build has produced.",
 	"stages":                     "stages contains details about each stage that occurs during the build including start time, duration (in milliseconds), and the steps that occured within each stage.",
 	"logSnippet":                 "logSnippet is the last few lines of the build log.  This value is only set for builds that failed.",
-	"conditions":                 "Conditions represents the latest available observations of a build's current state.",
+	"conditions":                 "conditions represents the latest available observations of a build's current state.",
 }
 
 func (BuildStatus) SwaggerDoc() map[string]string {
@@ -260,7 +260,7 @@ var map_BuildStrategy = map[string]string{
 	"dockerStrategy":          "dockerStrategy holds the parameters to the container image build strategy.",
 	"sourceStrategy":          "sourceStrategy holds the parameters to the Source build strategy.",
 	"customStrategy":          "customStrategy holds the parameters to the Custom build strategy",
-	"jenkinsPipelineStrategy": "JenkinsPipelineStrategy holds the parameters to the Jenkins Pipeline build strategy. Deprecated: use OpenShift Pipelines",
+	"jenkinsPipelineStrategy": "jenkinsPipelineStrategy holds the parameters to the Jenkins Pipeline build strategy. Deprecated: use OpenShift Pipelines",
 }
 
 func (BuildStrategy) SwaggerDoc() map[string]string {
@@ -271,10 +271,10 @@ var map_BuildTriggerCause = map[string]string{
 	"":                 "BuildTriggerCause holds information about a triggered build. It is used for displaying build trigger data for each build and build configuration in oc describe. It is also used to describe which triggers led to the most recent update in the build configuration.",
 	"message":          "message is used to store a human readable message for why the build was triggered. E.g.: \"Manually triggered by user\", \"Configuration change\",etc.",
 	"genericWebHook":   "genericWebHook holds data about a builds generic webhook trigger.",
-	"githubWebHook":    "gitHubWebHook represents data for a GitHub webhook that fired a specific build.",
+	"githubWebHook":    "githubWebHook represents data for a GitHub webhook that fired a specific build.",
 	"imageChangeBuild": "imageChangeBuild stores information about an imagechange event that triggered a new build.",
-	"gitlabWebHook":    "GitLabWebHook represents data for a GitLab webhook that fired a specific build.",
-	"bitbucketWebHook": "BitbucketWebHook represents data for a Bitbucket webhook that fired a specific build.",
+	"gitlabWebHook":    "gitlabWebHook represents data for a GitLab webhook that fired a specific build.",
+	"bitbucketWebHook": "bitbucketWebHook represents data for a Bitbucket webhook that fired a specific build.",
 }
 
 func (BuildTriggerCause) SwaggerDoc() map[string]string {
@@ -347,8 +347,8 @@ func (CommonSpec) SwaggerDoc() map[string]string {
 
 var map_CommonWebHookCause = map[string]string{
 	"":         "CommonWebHookCause factors out the identical format of these webhook causes into struct so we can share it in the specific causes;  it is too late for GitHub and Generic but we can leverage this pattern with GitLab and Bitbucket.",
-	"revision": "Revision is the git source revision information of the trigger.",
-	"secret":   "Secret is the obfuscated webhook secret that triggered a build.",
+	"revision": "revision is the git source revision information of the trigger.",
+	"secret":   "secret is the obfuscated webhook secret that triggered a build.",
 }
 
 func (CommonWebHookCause) SwaggerDoc() map[string]string {
@@ -422,7 +422,7 @@ var map_GenericWebHookEvent = map[string]string{
 	"type":                  "type is the type of source repository",
 	"git":                   "git is the git information if the Type is BuildSourceGit",
 	"env":                   "env contains additional environment variables you want to pass into a builder container. ValueFrom is not supported.",
-	"dockerStrategyOptions": "DockerStrategyOptions contains additional docker-strategy specific options for the build",
+	"dockerStrategyOptions": "dockerStrategyOptions contains additional docker-strategy specific options for the build",
 }
 
 func (GenericWebHookEvent) SwaggerDoc() map[string]string {
@@ -451,7 +451,7 @@ func (GitHubWebHookCause) SwaggerDoc() map[string]string {
 
 var map_GitInfo = map[string]string{
 	"":     "GitInfo is the aggregated git information for a generic webhook post",
-	"refs": "Refs is a list of GitRefs for the provided repo - generally sent when used from a post-receive hook. This field is optional and is used when sending multiple refs",
+	"refs": "refs is a list of GitRefs for the provided repo - generally sent when used from a post-receive hook. This field is optional and is used when sending multiple refs",
 }
 
 func (GitInfo) SwaggerDoc() map[string]string {
@@ -562,8 +562,8 @@ func (ImageStreamTagReference) SwaggerDoc() map[string]string {
 
 var map_JenkinsPipelineBuildStrategy = map[string]string{
 	"":                "JenkinsPipelineBuildStrategy holds parameters specific to a Jenkins Pipeline build. Deprecated: use OpenShift Pipelines",
-	"jenkinsfilePath": "JenkinsfilePath is the optional path of the Jenkinsfile that will be used to configure the pipeline relative to the root of the context (contextDir). If both JenkinsfilePath & Jenkinsfile are both not specified, this defaults to Jenkinsfile in the root of the specified contextDir.",
-	"jenkinsfile":     "Jenkinsfile defines the optional raw contents of a Jenkinsfile which defines a Jenkins pipeline build.",
+	"jenkinsfilePath": "jenkinsfilePath is the optional path of the Jenkinsfile that will be used to configure the pipeline relative to the root of the context (contextDir). If both JenkinsfilePath & Jenkinsfile are both not specified, this defaults to Jenkinsfile in the root of the specified contextDir.",
+	"jenkinsfile":     "jenkinsfile defines the optional raw contents of a Jenkinsfile which defines a Jenkins pipeline build.",
 	"env":             "env contains additional environment variables you want to pass into a build pipeline.",
 }
 
@@ -594,7 +594,7 @@ func (SecretBuildSource) SwaggerDoc() map[string]string {
 
 var map_SecretLocalReference = map[string]string{
 	"":     "SecretLocalReference contains information that points to the local secret being used",
-	"name": "Name is the name of the resource in the same namespace being referenced",
+	"name": "name is the name of the resource in the same namespace being referenced",
 }
 
 func (SecretLocalReference) SwaggerDoc() map[string]string {
@@ -639,7 +639,7 @@ func (SourceControlUser) SwaggerDoc() map[string]string {
 var map_SourceRevision = map[string]string{
 	"":     "SourceRevision is the revision or commit information from the source for the build",
 	"type": "type of the build source, may be one of 'Source', 'Dockerfile', 'Binary', or 'Images'",
-	"git":  "Git contains information about git-based build source",
+	"git":  "git contains information about git-based build source",
 }
 
 func (SourceRevision) SwaggerDoc() map[string]string {

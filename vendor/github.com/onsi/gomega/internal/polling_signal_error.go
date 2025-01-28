@@ -17,6 +17,7 @@ type PollingSignalError interface {
 	error
 	Wrap(err error) PollingSignalError
 	Attach(description string, obj any) PollingSignalError
+	Successfully() PollingSignalError
 	Now()
 }
 
@@ -45,6 +46,7 @@ type PollingSignalErrorImpl struct {
 	wrappedErr             error
 	pollingSignalErrorType PollingSignalErrorType
 	duration               time.Duration
+	successful             bool
 	Attachments            []PollingSignalErrorAttachment
 }
 
@@ -73,12 +75,21 @@ func (s *PollingSignalErrorImpl) Unwrap() error {
 	return s.wrappedErr
 }
 
+func (s *PollingSignalErrorImpl) Successfully() PollingSignalError {
+	s.successful = true
+	return s
+}
+
 func (s *PollingSignalErrorImpl) Now() {
 	panic(s)
 }
 
 func (s *PollingSignalErrorImpl) IsStopTrying() bool {
 	return s.pollingSignalErrorType == PollingSignalErrorTypeStopTrying
+}
+
+func (s *PollingSignalErrorImpl) IsSuccessful() bool {
+	return s.successful
 }
 
 func (s *PollingSignalErrorImpl) IsTryAgainAfter() bool {

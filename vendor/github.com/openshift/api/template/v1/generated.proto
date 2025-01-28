@@ -42,7 +42,7 @@ message BrokerTemplateInstanceList {
 
 // BrokerTemplateInstanceSpec describes the state of a BrokerTemplateInstance.
 message BrokerTemplateInstanceSpec {
-  // templateinstance is a reference to a TemplateInstance object residing
+  // templateInstance is a reference to a TemplateInstance object residing
   // in a namespace.
   optional .k8s.io.api.core.v1.ObjectReference templateInstance = 1;
 
@@ -50,7 +50,7 @@ message BrokerTemplateInstanceSpec {
   // containing the necessary template parameters.
   optional .k8s.io.api.core.v1.ObjectReference secret = 2;
 
-  // bindingids is a list of 'binding_id's provided during successive bind
+  // bindingIDs is a list of 'binding_id's provided during successive bind
   // calls to the template service broker.
   repeated string bindingIDs = 3;
 }
@@ -67,17 +67,17 @@ message ExtraValue {
 // Parameter defines a name/value variable that is to be processed during
 // the Template to Config transformation.
 message Parameter {
-  // Name must be set and it can be referenced in Template
+  // name must be set and it can be referenced in Template
   // Items using ${PARAMETER_NAME}. Required.
   optional string name = 1;
 
   // Optional: The name that will show in UI instead of parameter 'Name'
   optional string displayName = 2;
 
-  // Description of a parameter. Optional.
+  // description of a parameter. Optional.
   optional string description = 3;
 
-  // Value holds the Parameter data. If specified, the generator will be
+  // value holds the Parameter data. If specified, the generator will be
   // ignored. The value replaces all occurrences of the Parameter ${Name}
   // expression during the Template to Config transformation. Optional.
   optional string value = 4;
@@ -101,7 +101,7 @@ message Parameter {
   // "[a-zA-Z0-9]{8}" | "hW4yQU5i"
   optional string generate = 5;
 
-  // From is an input value for the generator. Optional.
+  // from is an input value for the generator. Optional.
   optional string from = 6;
 
   // Optional: Indicates the parameter must have a value.  Defaults to false.
@@ -164,21 +164,21 @@ message TemplateInstance {
 // TemplateInstanceCondition contains condition information for a
 // TemplateInstance.
 message TemplateInstanceCondition {
-  // Type of the condition, currently Ready or InstantiateFailure.
+  // type of the condition, currently Ready or InstantiateFailure.
   optional string type = 1;
 
-  // Status of the condition, one of True, False or Unknown.
+  // status of the condition, one of True, False or Unknown.
   optional string status = 2;
 
-  // LastTransitionTime is the last time a condition status transitioned from
+  // lastTransitionTime is the last time a condition status transitioned from
   // one state to another.
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
 
-  // Reason is a brief machine readable explanation for the condition's last
+  // reason is a brief machine readable explanation for the condition's last
   // transition.
   optional string reason = 4;
 
-  // Message is a human readable description of the details of the last
+  // message is a human readable description of the details of the last
   // transition, complementing reason.
   optional string message = 5;
 }
@@ -243,7 +243,7 @@ message TemplateInstanceStatus {
   // TemplateInstance's current state.
   repeated TemplateInstanceCondition conditions = 1;
 
-  // Objects references the objects created by the TemplateInstance.
+  // objects references the objects created by the TemplateInstance.
   repeated TemplateInstanceObject objects = 2;
 }
 
@@ -256,7 +256,7 @@ message TemplateList {
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of templates
+  // items is a list of templates
   repeated Template items = 2;
 }
 

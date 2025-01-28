@@ -3,10 +3,10 @@
 package v1
 
 import (
-	"context"
+	context "context"
 
-	v1 "github.com/openshift/api/config/v1"
-	configv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
+	applyconfigurationsconfigv1 "github.com/openshift/client-go/config/applyconfigurations/config/v1"
 	scheme "github.com/openshift/client-go/config/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -22,36 +22,37 @@ type FeatureGatesGetter interface {
 
 // FeatureGateInterface has methods to work with FeatureGate resources.
 type FeatureGateInterface interface {
-	Create(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.CreateOptions) (*v1.FeatureGate, error)
-	Update(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.UpdateOptions) (*v1.FeatureGate, error)
+	Create(ctx context.Context, featureGate *configv1.FeatureGate, opts metav1.CreateOptions) (*configv1.FeatureGate, error)
+	Update(ctx context.Context, featureGate *configv1.FeatureGate, opts metav1.UpdateOptions) (*configv1.FeatureGate, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, featureGate *v1.FeatureGate, opts metav1.UpdateOptions) (*v1.FeatureGate, error)
+	UpdateStatus(ctx context.Context, featureGate *configv1.FeatureGate, opts metav1.UpdateOptions) (*configv1.FeatureGate, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.FeatureGate, error)
-	List(ctx context.Context, opts metav1.ListOptions) (*v1.FeatureGateList, error)
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*configv1.FeatureGate, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*configv1.FeatureGateList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.FeatureGate, err error)
-	Apply(ctx context.Context, featureGate *configv1.FeatureGateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.FeatureGate, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *configv1.FeatureGate, err error)
+	Apply(ctx context.Context, featureGate *applyconfigurationsconfigv1.FeatureGateApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.FeatureGate, err error)
 	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, featureGate *configv1.FeatureGateApplyConfiguration, opts metav1.ApplyOptions) (result *v1.FeatureGate, err error)
+	ApplyStatus(ctx context.Context, featureGate *applyconfigurationsconfigv1.FeatureGateApplyConfiguration, opts metav1.ApplyOptions) (result *configv1.FeatureGate, err error)
 	FeatureGateExpansion
 }
 
 // featureGates implements FeatureGateInterface
 type featureGates struct {
-	*gentype.ClientWithListAndApply[*v1.FeatureGate, *v1.FeatureGateList, *configv1.FeatureGateApplyConfiguration]
+	*gentype.ClientWithListAndApply[*configv1.FeatureGate, *configv1.FeatureGateList, *applyconfigurationsconfigv1.FeatureGateApplyConfiguration]
 }
 
 // newFeatureGates returns a FeatureGates
 func newFeatureGates(c *ConfigV1Client) *featureGates {
 	return &featureGates{
-		gentype.NewClientWithListAndApply[*v1.FeatureGate, *v1.FeatureGateList, *configv1.FeatureGateApplyConfiguration](
+		gentype.NewClientWithListAndApply[*configv1.FeatureGate, *configv1.FeatureGateList, *applyconfigurationsconfigv1.FeatureGateApplyConfiguration](
 			"featuregates",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			"",
-			func() *v1.FeatureGate { return &v1.FeatureGate{} },
-			func() *v1.FeatureGateList { return &v1.FeatureGateList{} }),
+			func() *configv1.FeatureGate { return &configv1.FeatureGate{} },
+			func() *configv1.FeatureGateList { return &configv1.FeatureGateList{} },
+		),
 	}
 }

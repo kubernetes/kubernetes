@@ -431,13 +431,6 @@ var _ = utils.SIGDescribe(framework.WithSerial(), "Volume metrics", func() {
 			e2eskipper.Skipf("Could not get controller-manager metrics - skipping")
 		}
 
-		// Forced detach metric should be present
-		forceDetachKey := "attachdetach_controller_forced_detaches"
-		_, ok := updatedControllerMetrics[forceDetachKey]
-		if !ok {
-			framework.Failf("Key %q not found in A/D Controller metrics", forceDetachKey)
-		}
-
 		// Wait and validate
 		totalVolumesKey := "attachdetach_controller_total_volumes"
 		states := []string{"actual_state_of_world", "desired_state_of_world"}

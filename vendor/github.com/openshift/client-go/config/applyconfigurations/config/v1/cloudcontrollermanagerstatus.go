@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // CloudControllerManagerStatusApplyConfiguration represents a declarative configuration of the CloudControllerManagerStatus type for use
 // with apply.
 type CloudControllerManagerStatusApplyConfiguration struct {
-	State *v1.CloudControllerManagerState `json:"state,omitempty"`
+	State *configv1.CloudControllerManagerState `json:"state,omitempty"`
 }
 
 // CloudControllerManagerStatusApplyConfiguration constructs a declarative configuration of the CloudControllerManagerStatus type for use with
@@ -21,7 +21,7 @@ func CloudControllerManagerStatus() *CloudControllerManagerStatusApplyConfigurat
 // WithState sets the State field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the State field is set to the value of the last call.
-func (b *CloudControllerManagerStatusApplyConfiguration) WithState(value v1.CloudControllerManagerState) *CloudControllerManagerStatusApplyConfiguration {
+func (b *CloudControllerManagerStatusApplyConfiguration) WithState(value configv1.CloudControllerManagerState) *CloudControllerManagerStatusApplyConfiguration {
 	b.State = &value
 	return b
 }

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
+	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
 // FeatureGateStatusApplyConfiguration represents a declarative configuration of the FeatureGateStatus type for use
 // with apply.
 type FeatureGateStatusApplyConfiguration struct {
-	Conditions   []v1.ConditionApplyConfiguration       `json:"conditions,omitempty"`
+	Conditions   []metav1.ConditionApplyConfiguration   `json:"conditions,omitempty"`
 	FeatureGates []FeatureGateDetailsApplyConfiguration `json:"featureGates,omitempty"`
 }
 
@@ -22,7 +22,7 @@ func FeatureGateStatus() *FeatureGateStatusApplyConfiguration {
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Conditions field.
-func (b *FeatureGateStatusApplyConfiguration) WithConditions(values ...*v1.ConditionApplyConfiguration) *FeatureGateStatusApplyConfiguration {
+func (b *FeatureGateStatusApplyConfiguration) WithConditions(values ...*metav1.ConditionApplyConfiguration) *FeatureGateStatusApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
 			panic("nil value passed to WithConditions")

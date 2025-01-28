@@ -3,20 +3,20 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // UpdateHistoryApplyConfiguration represents a declarative configuration of the UpdateHistory type for use
 // with apply.
 type UpdateHistoryApplyConfiguration struct {
-	State          *v1.UpdateState `json:"state,omitempty"`
-	StartedTime    *metav1.Time    `json:"startedTime,omitempty"`
-	CompletionTime *metav1.Time    `json:"completionTime,omitempty"`
-	Version        *string         `json:"version,omitempty"`
-	Image          *string         `json:"image,omitempty"`
-	Verified       *bool           `json:"verified,omitempty"`
-	AcceptedRisks  *string         `json:"acceptedRisks,omitempty"`
+	State          *configv1.UpdateState `json:"state,omitempty"`
+	StartedTime    *metav1.Time          `json:"startedTime,omitempty"`
+	CompletionTime *metav1.Time          `json:"completionTime,omitempty"`
+	Version        *string               `json:"version,omitempty"`
+	Image          *string               `json:"image,omitempty"`
+	Verified       *bool                 `json:"verified,omitempty"`
+	AcceptedRisks  *string               `json:"acceptedRisks,omitempty"`
 }
 
 // UpdateHistoryApplyConfiguration constructs a declarative configuration of the UpdateHistory type for use with
@@ -28,7 +28,7 @@ func UpdateHistory() *UpdateHistoryApplyConfiguration {
 // WithState sets the State field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the State field is set to the value of the last call.
-func (b *UpdateHistoryApplyConfiguration) WithState(value v1.UpdateState) *UpdateHistoryApplyConfiguration {
+func (b *UpdateHistoryApplyConfiguration) WithState(value configv1.UpdateState) *UpdateHistoryApplyConfiguration {
 	b.State = &value
 	return b
 }

@@ -26,7 +26,7 @@ type DNSNameResolver struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec is the specification of the desired behavior of the DNSNameResolver.
-	// +kubebuilder:validation:Required
+	// +required
 	Spec DNSNameResolverSpec `json:"spec"`
 	// status is the most recently observed status of the DNSNameResolver.
 	// +optional
@@ -47,7 +47,7 @@ type DNSNameResolverSpec struct {
 	// For a wildcard DNS name, the '*' will match only one label. Additionally, only a single
 	// '*' can be used at the beginning of the wildcard DNS name. For example, '*.example.com.'
 	// will match 'sub1.example.com.' but won't match 'sub2.sub1.example.com.'
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="spec.name is immutable"
 	Name DNSName `json:"name"`
 }
@@ -82,12 +82,12 @@ type DNSNameResolverResolvedName struct {
 	// will store the regular DNS names which match the wildcard DNS name and have been successfully resolved.
 	// If the wildcard DNS name can also be successfully resolved, then this field will store the wildcard
 	// DNS name as well.
-	// +kubebuilder:validation:Required
+	// +required
 	DNSName DNSName `json:"dnsName"`
 
 	// resolvedAddresses gives the list of associated IP addresses and their corresponding TTLs and last
 	// lookup times for the dnsName.
-	// +kubebuilder:validation:Required
+	// +required
 	// +listType=map
 	// +listMapKey=ip
 	ResolvedAddresses []DNSNameResolverResolvedAddress `json:"resolvedAddresses"`
@@ -106,21 +106,21 @@ type DNSNameResolverResolvedAddress struct {
 	// lastLookupTime + ttlSeconds. To refresh the information, a DNS lookup will be performed upon
 	// the expiration of the IP address's validity. If the information is not refreshed then it will
 	// be removed with a grace period after the expiration of the IP address's validity.
-	// +kubebuilder:validation:Required
+	// +required
 	IP string `json:"ip"`
 
 	// ttlSeconds is the time-to-live value of the IP address. The validity of the IP address expires after
 	// lastLookupTime + ttlSeconds. On a successful DNS lookup the value of this field will be updated with
 	// the current time-to-live value. If the information is not refreshed then it will be removed with a
 	// grace period after the expiration of the IP address's validity.
-	// +kubebuilder:validation:Required
+	// +required
 	TTLSeconds int32 `json:"ttlSeconds"`
 
 	// lastLookupTime is the timestamp when the last DNS lookup was completed successfully. The validity of
 	// the IP address expires after lastLookupTime + ttlSeconds. The value of this field will be updated to
 	// the current time on a successful DNS lookup. If the information is not refreshed then it will be
 	// removed with a grace period after the expiration of the IP address's validity.
-	// +kubebuilder:validation:Required
+	// +required
 	LastLookupTime *metav1.Time `json:"lastLookupTime"`
 }
 

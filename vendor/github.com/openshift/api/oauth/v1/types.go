@@ -24,31 +24,31 @@ type OAuthAccessToken struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// ClientName references the client that created this token.
+	// clientName references the client that created this token.
 	ClientName string `json:"clientName,omitempty" protobuf:"bytes,2,opt,name=clientName"`
 
-	// ExpiresIn is the seconds from CreationTime before this token expires.
+	// expiresIn is the seconds from CreationTime before this token expires.
 	ExpiresIn int64 `json:"expiresIn,omitempty" protobuf:"varint,3,opt,name=expiresIn"`
 
-	// Scopes is an array of the requested scopes.
+	// scopes is an array of the requested scopes.
 	Scopes []string `json:"scopes,omitempty" protobuf:"bytes,4,rep,name=scopes"`
 
-	// RedirectURI is the redirection associated with the token.
+	// redirectURI is the redirection associated with the token.
 	RedirectURI string `json:"redirectURI,omitempty" protobuf:"bytes,5,opt,name=redirectURI"`
 
-	// UserName is the user name associated with this token
+	// userName is the user name associated with this token
 	UserName string `json:"userName,omitempty" protobuf:"bytes,6,opt,name=userName"`
 
-	// UserUID is the unique UID associated with this token
+	// userUID is the unique UID associated with this token
 	UserUID string `json:"userUID,omitempty" protobuf:"bytes,7,opt,name=userUID"`
 
-	// AuthorizeToken contains the token that authorized this token
+	// authorizeToken contains the token that authorized this token
 	AuthorizeToken string `json:"authorizeToken,omitempty" protobuf:"bytes,8,opt,name=authorizeToken"`
 
-	// RefreshToken is the value by which this token can be renewed. Can be blank.
+	// refreshToken is the value by which this token can be renewed. Can be blank.
 	RefreshToken string `json:"refreshToken,omitempty" protobuf:"bytes,9,opt,name=refreshToken"`
 
-	// InactivityTimeoutSeconds is the value in seconds, from the
+	// inactivityTimeoutSeconds is the value in seconds, from the
 	// CreationTimestamp, after which this token can no longer be used.
 	// The value is automatically incremented when the token is used.
 	InactivityTimeoutSeconds int32 `json:"inactivityTimeoutSeconds,omitempty" protobuf:"varint,10,opt,name=inactivityTimeoutSeconds"`
@@ -69,32 +69,32 @@ type OAuthAuthorizeToken struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// ClientName references the client that created this token.
+	// clientName references the client that created this token.
 	ClientName string `json:"clientName,omitempty" protobuf:"bytes,2,opt,name=clientName"`
 
-	// ExpiresIn is the seconds from CreationTime before this token expires.
+	// expiresIn is the seconds from CreationTime before this token expires.
 	ExpiresIn int64 `json:"expiresIn,omitempty" protobuf:"varint,3,opt,name=expiresIn"`
 
-	// Scopes is an array of the requested scopes.
+	// scopes is an array of the requested scopes.
 	Scopes []string `json:"scopes,omitempty" protobuf:"bytes,4,rep,name=scopes"`
 
-	// RedirectURI is the redirection associated with the token.
+	// redirectURI is the redirection associated with the token.
 	RedirectURI string `json:"redirectURI,omitempty" protobuf:"bytes,5,opt,name=redirectURI"`
 
-	// State data from request
+	// state data from request
 	State string `json:"state,omitempty" protobuf:"bytes,6,opt,name=state"`
 
-	// UserName is the user name associated with this token
+	// userName is the user name associated with this token
 	UserName string `json:"userName,omitempty" protobuf:"bytes,7,opt,name=userName"`
 
-	// UserUID is the unique UID associated with this token. UserUID and UserName must both match
+	// userUID is the unique UID associated with this token. UserUID and UserName must both match
 	// for this token to be valid.
 	UserUID string `json:"userUID,omitempty" protobuf:"bytes,8,opt,name=userUID"`
 
-	// CodeChallenge is the optional code_challenge associated with this authorization code, as described in rfc7636
+	// codeChallenge is the optional code_challenge associated with this authorization code, as described in rfc7636
 	CodeChallenge string `json:"codeChallenge,omitempty" protobuf:"bytes,9,opt,name=codeChallenge"`
 
-	// CodeChallengeMethod is the optional code_challenge_method associated with this authorization code, as described in rfc7636
+	// codeChallengeMethod is the optional code_challenge_method associated with this authorization code, as described in rfc7636
 	CodeChallengeMethod string `json:"codeChallengeMethod,omitempty" protobuf:"bytes,10,opt,name=codeChallengeMethod"`
 }
 
@@ -113,36 +113,36 @@ type OAuthClient struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Secret is the unique secret associated with a client
+	// secret is the unique secret associated with a client
 	Secret string `json:"secret,omitempty" protobuf:"bytes,2,opt,name=secret"`
 
-	// AdditionalSecrets holds other secrets that may be used to identify the client.  This is useful for rotation
+	// additionalSecrets holds other secrets that may be used to identify the client.  This is useful for rotation
 	// and for service account token validation
 	AdditionalSecrets []string `json:"additionalSecrets,omitempty" protobuf:"bytes,3,rep,name=additionalSecrets"`
 
-	// RespondWithChallenges indicates whether the client wants authentication needed responses made in the form of challenges instead of redirects
+	// respondWithChallenges indicates whether the client wants authentication needed responses made in the form of challenges instead of redirects
 	RespondWithChallenges bool `json:"respondWithChallenges,omitempty" protobuf:"varint,4,opt,name=respondWithChallenges"`
 
-	// RedirectURIs is the valid redirection URIs associated with a client
+	// redirectURIs is the valid redirection URIs associated with a client
 	// +patchStrategy=merge
 	RedirectURIs []string `json:"redirectURIs,omitempty" patchStrategy:"merge" protobuf:"bytes,5,rep,name=redirectURIs"`
 
-	// GrantMethod is a required field which determines how to handle grants for this client.
+	// grantMethod is a required field which determines how to handle grants for this client.
 	// Valid grant handling methods are:
 	//  - auto:   always approves grant requests, useful for trusted clients
 	//  - prompt: prompts the end user for approval of grant requests, useful for third-party clients
 	GrantMethod GrantHandlerType `json:"grantMethod,omitempty" protobuf:"bytes,6,opt,name=grantMethod,casttype=GrantHandlerType"`
 
-	// ScopeRestrictions describes which scopes this client can request.  Each requested scope
+	// scopeRestrictions describes which scopes this client can request.  Each requested scope
 	// is checked against each restriction.  If any restriction matches, then the scope is allowed.
 	// If no restriction matches, then the scope is denied.
 	ScopeRestrictions []ScopeRestriction `json:"scopeRestrictions,omitempty" protobuf:"bytes,7,rep,name=scopeRestrictions"`
 
-	// AccessTokenMaxAgeSeconds overrides the default access token max age for tokens granted to this client.
+	// accessTokenMaxAgeSeconds overrides the default access token max age for tokens granted to this client.
 	// 0 means no expiration.
 	AccessTokenMaxAgeSeconds *int32 `json:"accessTokenMaxAgeSeconds,omitempty" protobuf:"varint,8,opt,name=accessTokenMaxAgeSeconds"`
 
-	// AccessTokenInactivityTimeoutSeconds overrides the default token
+	// accessTokenInactivityTimeoutSeconds overrides the default token
 	// inactivity timeout for tokens granted to this client.
 	// The value represents the maximum amount of time that can occur between
 	// consecutive uses of the token. Tokens become invalid if they are not
@@ -174,17 +174,17 @@ type ScopeRestriction struct {
 	// ExactValues means the scope has to match a particular set of strings exactly
 	ExactValues []string `json:"literals,omitempty" protobuf:"bytes,1,rep,name=literals"`
 
-	// ClusterRole describes a set of restrictions for cluster role scoping.
+	// clusterRole describes a set of restrictions for cluster role scoping.
 	ClusterRole *ClusterRoleScopeRestriction `json:"clusterRole,omitempty" protobuf:"bytes,2,opt,name=clusterRole"`
 }
 
 // ClusterRoleScopeRestriction describes restrictions on cluster role scopes
 type ClusterRoleScopeRestriction struct {
-	// RoleNames is the list of cluster roles that can referenced.  * means anything
+	// roleNames is the list of cluster roles that can referenced.  * means anything
 	RoleNames []string `json:"roleNames" protobuf:"bytes,1,rep,name=roleNames"`
-	// Namespaces is the list of namespaces that can be referenced.  * means any of them (including *)
+	// namespaces is the list of namespaces that can be referenced.  * means any of them (including *)
 	Namespaces []string `json:"namespaces" protobuf:"bytes,2,rep,name=namespaces"`
-	// AllowEscalation indicates whether you can request roles and their escalating resources
+	// allowEscalation indicates whether you can request roles and their escalating resources
 	AllowEscalation bool `json:"allowEscalation" protobuf:"varint,3,opt,name=allowEscalation"`
 }
 
@@ -203,17 +203,17 @@ type OAuthClientAuthorization struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// ClientName references the client that created this authorization
+	// clientName references the client that created this authorization
 	ClientName string `json:"clientName,omitempty" protobuf:"bytes,2,opt,name=clientName"`
 
-	// UserName is the user name that authorized this client
+	// userName is the user name that authorized this client
 	UserName string `json:"userName,omitempty" protobuf:"bytes,3,opt,name=userName"`
 
-	// UserUID is the unique UID associated with this authorization. UserUID and UserName
+	// userUID is the unique UID associated with this authorization. UserUID and UserName
 	// must both match for this authorization to be valid.
 	UserUID string `json:"userUID,omitempty" protobuf:"bytes,4,opt,name=userUID"`
 
-	// Scopes is an array of the granted scopes.
+	// scopes is an array of the granted scopes.
 	Scopes []string `json:"scopes,omitempty" protobuf:"bytes,5,rep,name=scopes"`
 }
 
@@ -230,7 +230,7 @@ type OAuthAccessTokenList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of OAuth access tokens
+	// items is the list of OAuth access tokens
 	Items []OAuthAccessToken `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -247,7 +247,7 @@ type OAuthAuthorizeTokenList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of OAuth authorization tokens
+	// items is the list of OAuth authorization tokens
 	Items []OAuthAuthorizeToken `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -264,7 +264,7 @@ type OAuthClientList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of OAuth clients
+	// items is the list of OAuth clients
 	Items []OAuthClient `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -281,7 +281,7 @@ type OAuthClientAuthorizationList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// Items is the list of OAuth client authorizations
+	// items is the list of OAuth client authorizations
 	Items []OAuthClientAuthorization `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 

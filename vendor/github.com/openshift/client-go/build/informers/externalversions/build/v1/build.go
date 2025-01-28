@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	buildv1 "github.com/openshift/api/build/v1"
+	apibuildv1 "github.com/openshift/api/build/v1"
 	versioned "github.com/openshift/client-go/build/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/build/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/build/listers/build/v1"
+	buildv1 "github.com/openshift/client-go/build/listers/build/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Builds.
 type BuildInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.BuildLister
+	Lister() buildv1.BuildLister
 }
 
 type buildInformer struct {
@@ -55,7 +55,7 @@ func NewFilteredBuildInformer(client versioned.Interface, namespace string, resy
 				return client.BuildV1().Builds(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&buildv1.Build{},
+		&apibuildv1.Build{},
 		resyncPeriod,
 		indexers,
 	)
@@ -66,9 +66,9 @@ func (f *buildInformer) defaultInformer(client versioned.Interface, resyncPeriod
 }
 
 func (f *buildInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&buildv1.Build{}, f.defaultInformer)
+	return f.factory.InformerFor(&apibuildv1.Build{}, f.defaultInformer)
 }
 
-func (f *buildInformer) Lister() v1.BuildLister {
-	return v1.NewBuildLister(f.Informer().GetIndexer())
+func (f *buildInformer) Lister() buildv1.BuildLister {
+	return buildv1.NewBuildLister(f.Informer().GetIndexer())
 }

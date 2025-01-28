@@ -3,14 +3,14 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openshift/api/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
 // PolicyMatchRemapIdentityApplyConfiguration represents a declarative configuration of the PolicyMatchRemapIdentity type for use
 // with apply.
 type PolicyMatchRemapIdentityApplyConfiguration struct {
-	Prefix       *v1alpha1.IdentityRepositoryPrefix `json:"prefix,omitempty"`
-	SignedPrefix *v1alpha1.IdentityRepositoryPrefix `json:"signedPrefix,omitempty"`
+	Prefix       *configv1alpha1.IdentityRepositoryPrefix `json:"prefix,omitempty"`
+	SignedPrefix *configv1alpha1.IdentityRepositoryPrefix `json:"signedPrefix,omitempty"`
 }
 
 // PolicyMatchRemapIdentityApplyConfiguration constructs a declarative configuration of the PolicyMatchRemapIdentity type for use with
@@ -22,7 +22,7 @@ func PolicyMatchRemapIdentity() *PolicyMatchRemapIdentityApplyConfiguration {
 // WithPrefix sets the Prefix field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Prefix field is set to the value of the last call.
-func (b *PolicyMatchRemapIdentityApplyConfiguration) WithPrefix(value v1alpha1.IdentityRepositoryPrefix) *PolicyMatchRemapIdentityApplyConfiguration {
+func (b *PolicyMatchRemapIdentityApplyConfiguration) WithPrefix(value configv1alpha1.IdentityRepositoryPrefix) *PolicyMatchRemapIdentityApplyConfiguration {
 	b.Prefix = &value
 	return b
 }
@@ -30,7 +30,7 @@ func (b *PolicyMatchRemapIdentityApplyConfiguration) WithPrefix(value v1alpha1.I
 // WithSignedPrefix sets the SignedPrefix field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the SignedPrefix field is set to the value of the last call.
-func (b *PolicyMatchRemapIdentityApplyConfiguration) WithSignedPrefix(value v1alpha1.IdentityRepositoryPrefix) *PolicyMatchRemapIdentityApplyConfiguration {
+func (b *PolicyMatchRemapIdentityApplyConfiguration) WithSignedPrefix(value configv1alpha1.IdentityRepositoryPrefix) *PolicyMatchRemapIdentityApplyConfiguration {
 	b.SignedPrefix = &value
 	return b
 }

@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/security/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // SELinuxContextStrategyOptionsApplyConfiguration represents a declarative configuration of the SELinuxContextStrategyOptions type for use
 // with apply.
 type SELinuxContextStrategyOptionsApplyConfiguration struct {
-	Type           *v1.SELinuxContextStrategyType `json:"type,omitempty"`
-	SELinuxOptions *corev1.SELinuxOptions         `json:"seLinuxOptions,omitempty"`
+	Type           *securityv1.SELinuxContextStrategyType `json:"type,omitempty"`
+	SELinuxOptions *corev1.SELinuxOptions                 `json:"seLinuxOptions,omitempty"`
 }
 
 // SELinuxContextStrategyOptionsApplyConfiguration constructs a declarative configuration of the SELinuxContextStrategyOptions type for use with
@@ -23,7 +23,7 @@ func SELinuxContextStrategyOptions() *SELinuxContextStrategyOptionsApplyConfigur
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *SELinuxContextStrategyOptionsApplyConfiguration) WithType(value v1.SELinuxContextStrategyType) *SELinuxContextStrategyOptionsApplyConfiguration {
+func (b *SELinuxContextStrategyOptionsApplyConfiguration) WithType(value securityv1.SELinuxContextStrategyType) *SELinuxContextStrategyOptionsApplyConfiguration {
 	b.Type = &value
 	return b
 }

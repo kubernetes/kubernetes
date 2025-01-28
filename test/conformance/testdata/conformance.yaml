@@ -330,6 +330,19 @@
     resources are available.
   release: v1.16
   file: test/e2e/apimachinery/custom_resource_definition.go
+- testname: custom-resource-definition-field-selectors-list-watch-register-informers
+  codename: '[sig-api-machinery] CustomResourceFieldSelectors [Privileged:ClusterAdmin]
+    CustomResourceFieldSelectors MUST list and watch custom resources matching the
+    field selector [Conformance]'
+  description: Create a Custom Resource Definition with SelectableFields. Create a
+    custom resource with two versions and a conversion webhook that converts between
+    the versions. Attempt to list, watch and register informers for the custom resources
+    with field selectors; the lists, watches and informers MUST return only custom
+    resources matching the field selector. Delete and update some of the resources
+    with field selectors; the lists, watches and informers MUST return only the custom
+    resources matching custom resources.
+  release: v1.32
+  file: test/e2e/apimachinery/crd_selectable_fields.go
 - testname: Custom Resource OpenAPI Publish, stop serving version
   codename: '[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]
     removes definition from spec when one version gets changed to not be served [Conformance]'
@@ -1055,6 +1068,18 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Ensure pod failure policy allows to ignore failure matching on the DisruptionTarget
+    condition
+  codename: '[sig-apps] Job should allow to use a pod failure policy to ignore failure
+    matching on DisruptionTarget condition [Conformance]'
+  description: This test is using an indexed job. The pod corresponding to each index
+    creates a marker file on the host and runs 'forever' until evicted. Once the marker
+    file is created the pod succeeds seeing it on restart. Thus, we trigger one failure
+    per index due to eviction (DisruptionTarget condition is added in the process).
+    The Job would be marked as failed, if not for the ignore rule matching on exit
+    codes.
+  release: v1.32
+  file: test/e2e/apps/job.go
 - testname: Verify Pod Failure policy allows to fail job early on exit code.
   codename: '[sig-apps] Job should allow to use the pod failure policy on exit code
     to fail the job early [Conformance]'
@@ -1313,6 +1338,14 @@
     false, this include test cases 1a,1b,2a,2b and 2c. In the test cases 1c,3a,3b
     and 3c the ServiceTokenVolume MUST not be auto mounted.
   release: v1.9
+  file: test/e2e/auth/service_accounts.go
+- testname: ServiceAccount, create and review token
+  codename: '[sig-auth] ServiceAccounts should create a serviceAccountToken and ensure
+    a successful TokenReview [Conformance]'
+  description: Creating a ServiceAccount MUST succeed. Creating a ServiceAccountToken
+    MUST succeed. The token MUST not be empty. Creating a TokenReview MUST succeed.
+    The TokenReview MUST be authenticated without any errors.
+  release: v1.32
   file: test/e2e/auth/service_accounts.go
 - testname: RootCA ConfigMap test
   codename: '[sig-auth] ServiceAccounts should guarantee kube-root-ca.crt exist in
@@ -2127,6 +2160,14 @@
     in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
+- testname: DownwardAPI, environment for hostIPs
+  codename: '[sig-node] Downward API should provide hostIPs as an env var [NodeConformance]
+    [Conformance]'
+  description: Downward API MUST expose Pod and Container fields as environment variables.
+    Specify hostIPs as environment variable in the Pod Spec are visible at runtime
+    in the container.
+  release: v1.32
+  file: test/e2e/common/node/downwardapi.go
 - testname: DownwardAPI, environment for Pod UID
   codename: '[sig-node] Downward API should provide pod UID as env vars [NodeConformance]
     [Conformance]'
@@ -2229,15 +2270,14 @@
   file: test/e2e/common/node/kubelet.go
 - testname: Kubelet, managed etc hosts
   codename: '[sig-node] KubeletManagedEtcHosts should test kubelet managed /etc/hosts
-    file [LinuxOnly] [NodeConformance] [Conformance]'
+    file [NodeConformance] [Conformance]'
   description: Create a Pod with containers with hostNetwork set to false, one of
     the containers mounts the /etc/hosts file form the host. Create a second Pod with
     hostNetwork set to true. 1. The Pod with hostNetwork=false MUST have /etc/hosts
     of containers managed by the Kubelet. 2. The Pod with hostNetwork=false but the
     container mounts /etc/hosts file from the host. The /etc/hosts file MUST not be
     managed by the Kubelet. 3. The Pod with hostNetwork=true , /etc/hosts file MUST
-    not be managed by the Kubelet. This test is marked LinuxOnly since Windows cannot
-    mount individual files in Containers.
+    not be managed by the Kubelet.
   release: v1.9
   file: test/e2e/common/node/kubelet_etc_hosts.go
 - testname: lease API should be available
@@ -2268,6 +2308,15 @@
     be evicted if the taint is removed before toleration time ends.
   release: v1.16
   file: test/e2e/node/taints.go
+- testname: Node, resource lifecycle
+  codename: '[sig-node] Node Lifecycle should run through the lifecycle of a node
+    [Conformance]'
+  description: Creating and Reading a Node MUST succeed with required name retrieved.
+    Patching a Node MUST succeed with its new label found. Listing Nodes with a labelSelector
+    MUST succeed with only a single node found. Updating a Node MUST succeed with
+    its new label found. Deleting the Node MUST succeed and its deletion MUST be confirmed.
+  release: v1.32
+  file: test/e2e/node/node_lifecycle.go
 - testname: PodTemplate, delete a collection
   codename: '[sig-node] PodTemplates should delete a collection of pod templates [Conformance]'
   description: A set of Pod Templates is created with a label selector which MUST
@@ -2648,21 +2697,21 @@
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with absolute path
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
-    subpath with absolute path [Slow] [Conformance]'
+    subpath with absolute path [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when absolute path is supplied.
   release: v1.19
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath with backticks
   codename: '[sig-node] Variable Expansion should fail substituting values in a volume
-    subpath with backticks [Slow] [Conformance]'
+    subpath with backticks [Conformance]'
   description: Make sure a container's subpath can not be set using an expansion of
     environment variables when backticks are supplied.
   release: v1.19
   file: test/e2e/common/node/expansion.go
 - testname: VolumeSubpathEnvExpansion, subpath test writes
   codename: '[sig-node] Variable Expansion should succeed in writing subpaths in container
-    [Slow] [Conformance]'
+    [Conformance]'
   description: "Verify that a subpath expansion can be used to write files into subpaths.
     1.\tvalid subpathexpr starts a container running 2.\ttest for valid subpath writes
     3.\tsuccessful expansion of the subpathexpr isn't required for volume cleanup"
@@ -2783,6 +2832,18 @@
     patch, and delete operations.
   release: v1.26
   file: test/e2e/storage/csi_inline.go
+- testname: CSINode, lifecycle
+  codename: '[sig-storage] CSINodes CSI Conformance should run through the lifecycle
+    of a csinode [Conformance]'
+  description: Creating an initial CSINode MUST succeed. Reading a CSINode MUST succeed
+    with required name retrieved. Patching a CSINode MUST succeed with its new label
+    found. Listing CSINode with a labelSelector MUST succeed. Deleting a CSINode MUST
+    succeed and it MUST be confirmed. Creating a replacement CSINode MUST succeed.
+    Reading a CSINode MUST succeed with required name retrieved. Updating a CSINode
+    MUST succeed with its new label found. Deleting the CSINode via deleteCollection
+    MUST succeed and it MUST be confirmed.
+  release: v1.32
+  file: test/e2e/storage/csi_node.go
 - testname: CSIStorageCapacity API
   codename: '[sig-storage] CSIStorageCapacity should support CSIStorageCapacities
     API operations [Conformance]'
@@ -3584,6 +3645,17 @@
     was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
+- testname: VolumeAttachment, apply changes to a volumeattachment status
+  codename: '[sig-storage] VolumeAttachment Conformance should apply changes to a
+    volumeattachment status [Conformance]'
+  description: Creating an initial VolumeAttachment MUST succeed. Patching a VolumeAttachment
+    MUST succeed with its new label found. Reading VolumeAttachment status MUST succeed
+    with its attached status being false. Patching the VolumeAttachment status MUST
+    succeed with its attached status being true. Updating the VolumeAttachment status
+    MUST succeed with its attached status being false. Deleting a VolumeAttachment
+    MUST succeed and it MUST be confirmed.
+  release: v1.32
+  file: test/e2e/storage/volume_attachment.go
 - testname: VolumeAttachment, lifecycle
   codename: '[sig-storage] VolumeAttachment Conformance should run through the lifecycle
     of a VolumeAttachment [Conformance]'

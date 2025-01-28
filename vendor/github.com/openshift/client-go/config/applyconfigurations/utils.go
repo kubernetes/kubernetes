@@ -384,6 +384,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &configv1.UsernameClaimMappingApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("UsernamePrefix"):
 		return &configv1.UsernamePrefixApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("VSphereFailureDomainHostGroup"):
+		return &configv1.VSphereFailureDomainHostGroupApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("VSphereFailureDomainRegionAffinity"):
+		return &configv1.VSphereFailureDomainRegionAffinityApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("VSphereFailureDomainZoneAffinity"):
+		return &configv1.VSphereFailureDomainZoneAffinityApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("VSpherePlatformFailureDomainSpec"):
 		return &configv1.VSpherePlatformFailureDomainSpecApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("VSpherePlatformLoadBalancer"):
@@ -414,6 +420,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &configv1alpha1.ClusterImagePolicySpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ClusterImagePolicyStatus"):
 		return &configv1alpha1.ClusterImagePolicyStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterMonitoring"):
+		return &configv1alpha1.ClusterMonitoringApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("ClusterMonitoringSpec"):
+		return &configv1alpha1.ClusterMonitoringSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("EtcdBackupSpec"):
 		return &configv1alpha1.EtcdBackupSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("FulcioCAWithRekor"):
@@ -450,6 +460,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &configv1alpha1.RetentionPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("RetentionSizeConfig"):
 		return &configv1alpha1.RetentionSizeConfigApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("UserDefinedMonitoring"):
+		return &configv1alpha1.UserDefinedMonitoringApplyConfiguration{}
 
 	}
 	return nil

@@ -25,7 +25,6 @@ type KubeScheduler struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	// spec is the specification of the desired behavior of the Kubernetes Scheduler
-	// +kubebuilder:validation:Required
 	// +required
 	Spec KubeSchedulerSpec `json:"spec"`
 
@@ -55,6 +54,6 @@ type KubeSchedulerList struct {
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ListMeta `json:"metadata"`
 
-	// Items contains the items
+	// items contains the items
 	Items []KubeScheduler `json:"items"`
 }

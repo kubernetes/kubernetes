@@ -95,7 +95,7 @@ var (
 	csiNodeResource       = storageapi.Resource("csinodes")
 )
 
-func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+func (r *NodeAuthorizer) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	if _, isNode := r.identifier.NodeIdentity(user); isNode {
 		// indicate nodes do not have fully enumerated permissions
 		return nil, nil, true, fmt.Errorf("node authorizer does not support user rule resolution")
@@ -448,19 +448,27 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 	r.graph.lock.RLock()
 	defer r.graph.lock.RUnlock()
 
-	nodeVertex, exists := r.graph.getVertex_rlocked(nodeVertexType, "", nodeName)
+	nodeVertex, exists := r.graph.getVertexRLocked(nodeVertexType, "", nodeName)
 	if !exists {
 		return false, fmt.Errorf("unknown node '%s' cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
-	startingVertex, exists := r.graph.getVertex_rlocked(startingType, startingNamespace, startingName)
+	startingVertex, exists := r.graph.getVertexRLocked(startingType, startingNamespace, startingName)
 	if !exists {
 		return false, fmt.Errorf("node '%s' cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
-	// Fast check to see if we know of a destination edge
-	if r.graph.destinationEdgeIndex[startingVertex.ID()].has(nodeVertex.ID()) {
-		return true, nil
+	if index, indexExists := r.graph.destinationEdgeIndex[startingVertex.ID()]; indexExists {
+		// Fast check to see if we know of a destination edge
+		if index.has(nodeVertex.ID()) {
+			return true, nil
+		}
+		// For some types of vertices, the destination edge index is authoritative
+		// (as long as it exists), hence we can fail-fast here instead of running
+		// a potentially costly DFS below.
+		if vertexTypeWithAuthoritativeIndex[startingType] {
+			return false, fmt.Errorf("node '%s' cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		}
 	}
 
 	found := false

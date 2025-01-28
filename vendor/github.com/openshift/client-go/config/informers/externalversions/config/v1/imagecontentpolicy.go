@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // ImageContentPolicies.
 type ImageContentPolicyInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ImageContentPolicyLister
+	Lister() configv1.ImageContentPolicyLister
 }
 
 type imageContentPolicyInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredImageContentPolicyInformer(client versioned.Interface, resyncPer
 				return client.ConfigV1().ImageContentPolicies().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.ImageContentPolicy{},
+		&apiconfigv1.ImageContentPolicy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *imageContentPolicyInformer) defaultInformer(client versioned.Interface,
 }
 
 func (f *imageContentPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.ImageContentPolicy{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.ImageContentPolicy{}, f.defaultInformer)
 }
 
-func (f *imageContentPolicyInformer) Lister() v1.ImageContentPolicyLister {
-	return v1.NewImageContentPolicyLister(f.Informer().GetIndexer())
+func (f *imageContentPolicyInformer) Lister() configv1.ImageContentPolicyLister {
+	return configv1.NewImageContentPolicyLister(f.Informer().GetIndexer())
 }

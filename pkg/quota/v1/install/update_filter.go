@@ -18,7 +18,11 @@ package install
 
 import (
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	"k8s.io/utils/clock"
 )
@@ -30,6 +34,10 @@ func DefaultUpdateFilter() func(resource schema.GroupVersionResource, oldObj, ne
 		case schema.GroupResource{Resource: "pods"}:
 			oldPod := oldObj.(*v1.Pod)
 			newPod := newObj.(*v1.Pod)
+			// when Resources changed
+			if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && hasResourcesChanged(oldPod, newPod) {
+				return true
+			}
 			return core.QuotaV1Pod(oldPod, clock.RealClock{}) && !core.QuotaV1Pod(newPod, clock.RealClock{})
 		case schema.GroupResource{Resource: "services"}:
 			oldService := oldObj.(*v1.Service)
@@ -43,4 +51,21 @@ func DefaultUpdateFilter() func(resource schema.GroupVersionResource, oldObj, ne
 
 		return false
 	}
+}
+
+// hasResourcesChanged function to compare resources in container statuses
+func hasResourcesChanged(oldPod *v1.Pod, newPod *v1.Pod) bool {
+	for _, oldStatus := range oldPod.Status.ContainerStatuses {
+		newStatus, ok := podutil.GetContainerStatus(newPod.Status.ContainerStatuses, oldStatus.Name)
+		if ok && !apiequality.Semantic.DeepEqual(oldStatus.Resources, newStatus.Resources) {
+			return true
+		}
+	}
+	for _, oldInitContainerStatus := range oldPod.Status.InitContainerStatuses {
+		newInitContainerStatus, ok := podutil.GetContainerStatus(newPod.Status.InitContainerStatuses, oldInitContainerStatus.Name)
+		if ok && !apiequality.Semantic.DeepEqual(oldInitContainerStatus.Resources, newInitContainerStatus.Resources) {
+			return true
+		}
+	}
+	return false
 }

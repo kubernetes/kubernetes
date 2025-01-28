@@ -1,44 +1,24 @@
 {
   "components": {
     "schemas": {
-      "io.k8s.api.admissionregistration.v1alpha1.AuditAnnotation": {
-        "description": "AuditAnnotation describes how to produce an audit annotation for an API request.",
+      "io.k8s.api.admissionregistration.v1alpha1.ApplyConfiguration": {
+        "description": "ApplyConfiguration defines the desired configuration values of an object.",
         "properties": {
-          "key": {
-            "default": "",
-            "description": "key specifies the audit annotation key. The audit annotation keys of a ValidatingAdmissionPolicy must be unique. The key must be a qualified name ([A-Za-z0-9][-A-Za-z0-9_.]*) no more than 63 bytes in length.\n\nThe key is combined with the resource name of the ValidatingAdmissionPolicy to construct an audit annotation key: \"{ValidatingAdmissionPolicy name}/{key}\".\n\nIf an admission webhook uses the same resource name as this ValidatingAdmissionPolicy and the same audit annotation key, the annotation key will be identical. In this case, the first annotation written with the key will be included in the audit event and all subsequent annotations with the same key will be discarded.\n\nRequired.",
-            "type": "string"
-          },
-          "valueExpression": {
-            "default": "",
-            "description": "valueExpression represents the expression which is evaluated by CEL to produce an audit annotation value. The expression must evaluate to either a string or null value. If the expression evaluates to a string, the audit annotation is included with the string value. If the expression evaluates to null or empty string the audit annotation will be omitted. The valueExpression may be no longer than 5kb in length. If the result of the valueExpression is more than 10kb in length, it will be truncated to 10kb.\n\nIf multiple ValidatingAdmissionPolicyBinding resources match an API request, then the valueExpression will be evaluated for each binding. All unique values produced by the valueExpressions will be joined together in a comma-separated list.\n\nRequired.",
+          "expression": {
+            "description": "expression will be evaluated by CEL to create an apply configuration. ref: https://github.com/google/cel-spec\n\nApply configurations are declared in CEL using object initialization. For example, this CEL expression returns an apply configuration to set a single field:\n\n\tObject{\n\t  spec: Object.spec{\n\t    serviceAccountName: \"example\"\n\t  }\n\t}\n\nApply configurations may not modify atomic structs, maps or arrays due to the risk of accidental deletion of values not included in the apply configuration.\n\nCEL expressions have access to the object types needed to create apply configurations:\n\n- 'Object' - CEL type of the resource object. - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec') - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')\n\nCEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:\n\n- 'object' - The object from the incoming request. The value is null for DELETE requests. - 'oldObject' - The existing object. The value is null for CREATE requests. - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind. - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources. - 'variables' - Map of composited variables, from its name to its lazily evaluated value.\n  For example, a variable named 'foo' can be accessed as 'variables.foo'.\n- 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n- 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object. No other metadata properties are accessible.\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Required.",
             "type": "string"
           }
         },
-        "required": [
-          "key",
-          "valueExpression"
-        ],
         "type": "object"
       },
-      "io.k8s.api.admissionregistration.v1alpha1.ExpressionWarning": {
-        "description": "ExpressionWarning is a warning information that targets a specific expression.",
+      "io.k8s.api.admissionregistration.v1alpha1.JSONPatch": {
+        "description": "JSONPatch defines a JSON Patch.",
         "properties": {
-          "fieldRef": {
-            "default": "",
-            "description": "The path to the field that refers the expression. For example, the reference to the expression of the first item of validations is \"spec.validations[0].expression\"",
-            "type": "string"
-          },
-          "warning": {
-            "default": "",
-            "description": "The content of type checking information in a human-readable form. Each line of the warning contains the type that the expression is checked against, followed by the type check error from the compiler.",
+          "expression": {
+            "description": "expression will be evaluated by CEL to create a [JSON patch](https://jsonpatch.com/). ref: https://github.com/google/cel-spec\n\nexpression must return an array of JSONPatch values.\n\nFor example, this CEL expression returns a JSON patch to conditionally modify a value:\n\n\t  [\n\t    JSONPatch{op: \"test\", path: \"/spec/example\", value: \"Red\"},\n\t    JSONPatch{op: \"replace\", path: \"/spec/example\", value: \"Green\"}\n\t  ]\n\nTo define an object for the patch value, use Object types. For example:\n\n\t  [\n\t    JSONPatch{\n\t      op: \"add\",\n\t      path: \"/spec/selector\",\n\t      value: Object.spec.selector{matchLabels: {\"environment\": \"test\"}}\n\t    }\n\t  ]\n\nTo use strings containing '/' and '~' as JSONPatch path keys, use \"jsonpatch.escapeKey\". For example:\n\n\t  [\n\t    JSONPatch{\n\t      op: \"add\",\n\t      path: \"/metadata/labels/\" + jsonpatch.escapeKey(\"example.com/environment\"),\n\t      value: \"test\"\n\t    },\n\t  ]\n\nCEL expressions have access to the types needed to create JSON patches and objects:\n\n- 'JSONPatch' - CEL type of JSON Patch operations. JSONPatch has the fields 'op', 'from', 'path' and 'value'.\n  See [JSON patch](https://jsonpatch.com/) for more details. The 'value' field may be set to any of: string,\n  integer, array, map or object.  If set, the 'path' and 'from' fields must be set to a\n  [JSON pointer](https://datatracker.ietf.org/doc/html/rfc6901/) string, where the 'jsonpatch.escapeKey()' CEL\n  function may be used to escape path keys containing '/' and '~'.\n- 'Object' - CEL type of the resource object. - 'Object.<fieldName>' - CEL type of object field (such as 'Object.spec') - 'Object.<fieldName1>.<fieldName2>...<fieldNameN>` - CEL type of nested field (such as 'Object.spec.containers')\n\nCEL expressions have access to the contents of the API request, organized into CEL variables as well as some other useful variables:\n\n- 'object' - The object from the incoming request. The value is null for DELETE requests. - 'oldObject' - The existing object. The value is null for CREATE requests. - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind. - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources. - 'variables' - Map of composited variables, from its name to its lazily evaluated value.\n  For example, a variable named 'foo' can be accessed as 'variables.foo'.\n- 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n- 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\n\nCEL expressions have access to [Kubernetes CEL function libraries](https://kubernetes.io/docs/reference/using-api/cel/#cel-options-language-features-and-libraries) as well as:\n\n- 'jsonpatch.escapeKey' - Performs JSONPatch key escaping. '~' and  '/' are escaped as '~0' and `~1' respectively).\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Required.",
             "type": "string"
           }
         },
-        "required": [
-          "fieldRef",
-          "warning"
-        ],
         "type": "object"
       },
       "io.k8s.api.admissionregistration.v1alpha1.MatchCondition": {
@@ -112,6 +92,304 @@
         },
         "type": "object",
         "x-kubernetes-map-type": "atomic"
+      },
+      "io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy": {
+        "description": "MutatingAdmissionPolicy describes the definition of an admission mutation policy that mutates the object coming into admission chain.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
+            "default": {},
+            "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
+          },
+          "spec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicySpec"
+              }
+            ],
+            "default": {},
+            "description": "Specification of the desired behavior of the MutatingAdmissionPolicy."
+          }
+        },
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "MutatingAdmissionPolicy",
+            "version": "v1alpha1"
+          }
+        ]
+      },
+      "io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding": {
+        "description": "MutatingAdmissionPolicyBinding binds the MutatingAdmissionPolicy with parametrized resources. MutatingAdmissionPolicyBinding and the optional parameter resource together define how cluster administrators configure policies for clusters.\n\nFor a given admission request, each binding will cause its policy to be evaluated N times, where N is 1 for policies/bindings that don't use params, otherwise N is the number of parameters selected by the binding. Each evaluation is constrained by a [runtime cost budget](https://kubernetes.io/docs/reference/using-api/cel/#runtime-cost-budget).\n\nAdding/removing policies, bindings, or params can not affect whether a given (policy, binding, param) combination is within its own CEL budget.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
+            "default": {},
+            "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
+          },
+          "spec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingSpec"
+              }
+            ],
+            "default": {},
+            "description": "Specification of the desired behavior of the MutatingAdmissionPolicyBinding."
+          }
+        },
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "MutatingAdmissionPolicyBinding",
+            "version": "v1alpha1"
+          }
+        ]
+      },
+      "io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList": {
+        "description": "MutatingAdmissionPolicyBindingList is a list of MutatingAdmissionPolicyBinding.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "description": "List of PolicyBinding.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ],
+            "default": {},
+            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "MutatingAdmissionPolicyBindingList",
+            "version": "v1alpha1"
+          }
+        ]
+      },
+      "io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingSpec": {
+        "description": "MutatingAdmissionPolicyBindingSpec is the specification of the MutatingAdmissionPolicyBinding.",
+        "properties": {
+          "matchResources": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MatchResources"
+              }
+            ],
+            "description": "matchResources limits what resources match this binding and may be mutated by it. Note that if matchResources matches a resource, the resource must also match a policy's matchConstraints and matchConditions before the resource may be mutated. When matchResources is unset, it does not constrain resource matching, and only the policy's matchConstraints and matchConditions must match for the resource to be mutated. Additionally, matchResources.resourceRules are optional and do not constraint matching when unset. Note that this is differs from MutatingAdmissionPolicy matchConstraints, where resourceRules are required. The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched. '*' matches CREATE, UPDATE and CONNECT."
+          },
+          "paramRef": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ParamRef"
+              }
+            ],
+            "description": "paramRef specifies the parameter resource used to configure the admission control policy. It should point to a resource of the type specified in spec.ParamKind of the bound MutatingAdmissionPolicy. If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the MutatingAdmissionPolicy applied. If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param."
+          },
+          "policyName": {
+            "description": "policyName references a MutatingAdmissionPolicy name which the MutatingAdmissionPolicyBinding binds to. If the referenced resource does not exist, this binding is considered invalid and will be ignored Required.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList": {
+        "description": "MutatingAdmissionPolicyList is a list of MutatingAdmissionPolicy.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "items": {
+            "description": "List of ValidatingAdmissionPolicy.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "metadata": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+              }
+            ],
+            "default": {},
+            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "MutatingAdmissionPolicyList",
+            "version": "v1alpha1"
+          }
+        ]
+      },
+      "io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicySpec": {
+        "description": "MutatingAdmissionPolicySpec is the specification of the desired behavior of the admission policy.",
+        "properties": {
+          "failurePolicy": {
+            "description": "failurePolicy defines how to handle failures for the admission policy. Failures can occur from CEL expression parse errors, type check errors, runtime errors and invalid or mis-configured policy definitions or bindings.\n\nA policy is invalid if paramKind refers to a non-existent Kind. A binding is invalid if paramRef.name refers to a non-existent resource.\n\nfailurePolicy does not define how validations that evaluate to false are handled.\n\nAllowed values are Ignore or Fail. Defaults to Fail.",
+            "type": "string"
+          },
+          "matchConditions": {
+            "description": "matchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the matchConstraints. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed.\n\nIf a parameter object is provided, it can be accessed via the `params` handle in the same manner as validation expressions.\n\nThe exact matching logic is (in order):\n  1. If ANY matchCondition evaluates to FALSE, the policy is skipped.\n  2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.\n  3. If any matchCondition evaluates to an error (but none are FALSE):\n     - If failurePolicy=Fail, reject the request\n     - If failurePolicy=Ignore, the policy is skipped",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MatchCondition"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge"
+          },
+          "matchConstraints": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MatchResources"
+              }
+            ],
+            "description": "matchConstraints specifies what resources this policy is designed to validate. The MutatingAdmissionPolicy cares about a request if it matches _all_ Constraints. However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API MutatingAdmissionPolicy cannot match MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding. The CREATE, UPDATE and CONNECT operations are allowed.  The DELETE operation may not be matched. '*' matches CREATE, UPDATE and CONNECT. Required."
+          },
+          "mutations": {
+            "description": "mutations contain operations to perform on matching objects. mutations may not be empty; a minimum of one mutation is required. mutations are evaluated in order, and are reinvoked according to the reinvocationPolicy. The mutations of a policy are invoked for each binding of this policy and reinvocation of mutations occurs on a per binding basis.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.Mutation"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "paramKind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ParamKind"
+              }
+            ],
+            "description": "paramKind specifies the kind of resources used to parameterize this policy. If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions. If paramKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied. If paramKind is specified but paramRef is unset in MutatingAdmissionPolicyBinding, the params variable will be null."
+          },
+          "reinvocationPolicy": {
+            "description": "reinvocationPolicy indicates whether mutations may be called multiple times per MutatingAdmissionPolicyBinding as part of a single admission evaluation. Allowed values are \"Never\" and \"IfNeeded\".\n\nNever: These mutations will not be called more than once per binding in a single admission evaluation.\n\nIfNeeded: These mutations may be invoked more than once per binding for a single admission request and there is no guarantee of order with respect to other admission plugins, admission webhooks, bindings of this policy and admission policies.  Mutations are only reinvoked when mutations change the object after this mutation is invoked. Required.",
+            "type": "string"
+          },
+          "variables": {
+            "description": "variables contain definitions of variables that can be used in composition of other expressions. Each variable is defined as a named CEL expression. The variables defined here will be available under `variables` in other expressions of the policy except matchConditions because matchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after. Thus, variables must be sorted by the order of first appearance and acyclic.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.Variable"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "type": "object"
+      },
+      "io.k8s.api.admissionregistration.v1alpha1.Mutation": {
+        "description": "Mutation specifies the CEL expression which is used to apply the Mutation.",
+        "properties": {
+          "applyConfiguration": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ApplyConfiguration"
+              }
+            ],
+            "description": "applyConfiguration defines the desired configuration values of an object. The configuration is applied to the admission object using [structured merge diff](https://github.com/kubernetes-sigs/structured-merge-diff). A CEL expression is used to create apply configuration."
+          },
+          "jsonPatch": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.JSONPatch"
+              }
+            ],
+            "description": "jsonPatch defines a [JSON patch](https://jsonpatch.com/) operation to perform a mutation to the object. A CEL expression is used to create the JSON patch."
+          },
+          "patchType": {
+            "default": "",
+            "description": "patchType indicates the patch strategy used. Allowed values are \"ApplyConfiguration\" and \"JSONPatch\". Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "patchType"
+        ],
+        "type": "object"
       },
       "io.k8s.api.admissionregistration.v1alpha1.NamedRuleWithOperations": {
         "description": "NamedRuleWithOperations is a tuple of Operations and Resources with ResourceNames.",
@@ -210,386 +488,6 @@
         },
         "type": "object",
         "x-kubernetes-map-type": "atomic"
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.TypeChecking": {
-        "description": "TypeChecking contains results of type checking the expressions in the ValidatingAdmissionPolicy",
-        "properties": {
-          "expressionWarnings": {
-            "description": "The type checking warnings for each expression.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ExpressionWarning"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy": {
-        "description": "ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
-              }
-            ],
-            "default": {},
-            "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
-          },
-          "spec": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicySpec"
-              }
-            ],
-            "default": {},
-            "description": "Specification of the desired behavior of the ValidatingAdmissionPolicy."
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyStatus"
-              }
-            ],
-            "default": {},
-            "description": "The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy behaves in the expected way. Populated by the system. Read-only."
-          }
-        },
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "ValidatingAdmissionPolicy",
-            "version": "v1alpha1"
-          }
-        ]
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding": {
-        "description": "ValidatingAdmissionPolicyBinding binds the ValidatingAdmissionPolicy with paramerized resources. ValidatingAdmissionPolicyBinding and parameter CRDs together define how cluster administrators configure policies for clusters.\n\nFor a given admission request, each binding will cause its policy to be evaluated N times, where N is 1 for policies/bindings that don't use params, otherwise N is the number of parameters selected by the binding.\n\nThe CEL expressions of a policy must have a computed CEL cost below the maximum CEL budget. Each evaluation of the policy is given an independent CEL cost budget. Adding/removing policies, bindings, or params can not affect whether a given (policy, binding, param) combination is within its own CEL budget.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
-              }
-            ],
-            "default": {},
-            "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata."
-          },
-          "spec": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingSpec"
-              }
-            ],
-            "default": {},
-            "description": "Specification of the desired behavior of the ValidatingAdmissionPolicyBinding."
-          }
-        },
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "ValidatingAdmissionPolicyBinding",
-            "version": "v1alpha1"
-          }
-        ]
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingList": {
-        "description": "ValidatingAdmissionPolicyBindingList is a list of ValidatingAdmissionPolicyBinding.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "items": {
-            "description": "List of PolicyBinding.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
-              }
-            ],
-            "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "ValidatingAdmissionPolicyBindingList",
-            "version": "v1alpha1"
-          }
-        ]
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingSpec": {
-        "description": "ValidatingAdmissionPolicyBindingSpec is the specification of the ValidatingAdmissionPolicyBinding.",
-        "properties": {
-          "matchResources": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MatchResources"
-              }
-            ],
-            "description": "MatchResources declares what resources match this binding and will be validated by it. Note that this is intersected with the policy's matchConstraints, so only requests that are matched by the policy can be selected by this. If this is unset, all resources matched by the policy are validated by this binding When resourceRules is unset, it does not constrain resource matching. If a resource is matched by the other fields of this object, it will be validated. Note that this is differs from ValidatingAdmissionPolicy matchConstraints, where resourceRules are required."
-          },
-          "paramRef": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ParamRef"
-              }
-            ],
-            "description": "paramRef specifies the parameter resource used to configure the admission control policy. It should point to a resource of the type specified in ParamKind of the bound ValidatingAdmissionPolicy. If the policy specifies a ParamKind and the resource referred to by ParamRef does not exist, this binding is considered mis-configured and the FailurePolicy of the ValidatingAdmissionPolicy applied. If the policy does not specify a ParamKind then this field is ignored, and the rules are evaluated without a param."
-          },
-          "policyName": {
-            "description": "PolicyName references a ValidatingAdmissionPolicy name which the ValidatingAdmissionPolicyBinding binds to. If the referenced resource does not exist, this binding is considered invalid and will be ignored Required.",
-            "type": "string"
-          },
-          "validationActions": {
-            "description": "validationActions declares how Validations of the referenced ValidatingAdmissionPolicy are enforced. If a validation evaluates to false it is always enforced according to these actions.\n\nFailures defined by the ValidatingAdmissionPolicy's FailurePolicy are enforced according to these actions only if the FailurePolicy is set to Fail, otherwise the failures are ignored. This includes compilation errors, runtime errors and misconfigurations of the policy.\n\nvalidationActions is declared as a set of action values. Order does not matter. validationActions may not contain duplicates of the same action.\n\nThe supported actions values are:\n\n\"Deny\" specifies that a validation failure results in a denied request.\n\n\"Warn\" specifies that a validation failure is reported to the request client in HTTP Warning headers, with a warning code of 299. Warnings can be sent both for allowed or denied admission responses.\n\n\"Audit\" specifies that a validation failure is included in the published audit event for the request. The audit event will contain a `validation.policy.admission.k8s.io/validation_failure` audit annotation with a value containing the details of the validation failures, formatted as a JSON list of objects, each with the following fields: - message: The validation failure message string - policy: The resource name of the ValidatingAdmissionPolicy - binding: The resource name of the ValidatingAdmissionPolicyBinding - expressionIndex: The index of the failed validations in the ValidatingAdmissionPolicy - validationActions: The enforcement actions enacted for the validation failure Example audit annotation: `\"validation.policy.admission.k8s.io/validation_failure\": \"[{\"message\": \"Invalid value\", {\"policy\": \"policy.example.com\", {\"binding\": \"policybinding.example.com\", {\"expressionIndex\": \"1\", {\"validationActions\": [\"Audit\"]}]\"`\n\nClients should expect to handle additional values by ignoring any values not recognized.\n\n\"Deny\" and \"Warn\" may not be used together since this combination needlessly duplicates the validation failure both in the API response body and the HTTP warning headers.\n\nRequired.",
-            "items": {
-              "default": "",
-              "type": "string"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "set"
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyList": {
-        "description": "ValidatingAdmissionPolicyList is a list of ValidatingAdmissionPolicy.",
-        "properties": {
-          "apiVersion": {
-            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-            "type": "string"
-          },
-          "items": {
-            "description": "List of ValidatingAdmissionPolicy.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array"
-          },
-          "kind": {
-            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-            "type": "string"
-          },
-          "metadata": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
-              }
-            ],
-            "default": {},
-            "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
-          }
-        },
-        "required": [
-          "items"
-        ],
-        "type": "object",
-        "x-kubernetes-group-version-kind": [
-          {
-            "group": "admissionregistration.k8s.io",
-            "kind": "ValidatingAdmissionPolicyList",
-            "version": "v1alpha1"
-          }
-        ]
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicySpec": {
-        "description": "ValidatingAdmissionPolicySpec is the specification of the desired behavior of the AdmissionPolicy.",
-        "properties": {
-          "auditAnnotations": {
-            "description": "auditAnnotations contains CEL expressions which are used to produce audit annotations for the audit event of the API request. validations and auditAnnotations may not both be empty; a least one of validations or auditAnnotations is required.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.AuditAnnotation"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          },
-          "failurePolicy": {
-            "description": "failurePolicy defines how to handle failures for the admission policy. Failures can occur from CEL expression parse errors, type check errors, runtime errors and invalid or mis-configured policy definitions or bindings.\n\nA policy is invalid if spec.paramKind refers to a non-existent Kind. A binding is invalid if spec.paramRef.name refers to a non-existent resource.\n\nfailurePolicy does not define how validations that evaluate to false are handled.\n\nWhen failurePolicy is set to Fail, ValidatingAdmissionPolicyBinding validationActions define how failures are enforced.\n\nAllowed values are Ignore or Fail. Defaults to Fail.",
-            "type": "string"
-          },
-          "matchConditions": {
-            "description": "MatchConditions is a list of conditions that must be met for a request to be validated. Match conditions filter requests that have already been matched by the rules, namespaceSelector, and objectSelector. An empty list of matchConditions matches all requests. There are a maximum of 64 match conditions allowed.\n\nIf a parameter object is provided, it can be accessed via the `params` handle in the same manner as validation expressions.\n\nThe exact matching logic is (in order):\n  1. If ANY matchCondition evaluates to FALSE, the policy is skipped.\n  2. If ALL matchConditions evaluate to TRUE, the policy is evaluated.\n  3. If any matchCondition evaluates to an error (but none are FALSE):\n     - If failurePolicy=Fail, reject the request\n     - If failurePolicy=Ignore, the policy is skipped",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MatchCondition"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
-          },
-          "matchConstraints": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MatchResources"
-              }
-            ],
-            "description": "MatchConstraints specifies what resources this policy is designed to validate. The AdmissionPolicy cares about a request if it matches _all_ Constraints. However, in order to prevent clusters from being put into an unstable state that cannot be recovered from via the API ValidatingAdmissionPolicy cannot match ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding. Required."
-          },
-          "paramKind": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ParamKind"
-              }
-            ],
-            "description": "ParamKind specifies the kind of resources used to parameterize this policy. If absent, there are no parameters for this policy and the param CEL variable will not be provided to validation expressions. If ParamKind refers to a non-existent kind, this policy definition is mis-configured and the FailurePolicy is applied. If paramKind is specified but paramRef is unset in ValidatingAdmissionPolicyBinding, the params variable will be null."
-          },
-          "validations": {
-            "description": "Validations contain CEL expressions which is used to apply the validation. Validations and AuditAnnotations may not both be empty; a minimum of one Validations or AuditAnnotations is required.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.Validation"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          },
-          "variables": {
-            "description": "Variables contain definitions of variables that can be used in composition of other expressions. Each variable is defined as a named CEL expression. The variables defined here will be available under `variables` in other expressions of the policy except MatchConditions because MatchConditions are evaluated before the rest of the policy.\n\nThe expression of a variable can refer to other variables defined earlier in the list but not those after. Thus, Variables must be sorted by the order of first appearance and acyclic.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.Variable"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "name"
-            ],
-            "x-kubernetes-list-type": "map",
-            "x-kubernetes-patch-merge-key": "name",
-            "x-kubernetes-patch-strategy": "merge"
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyStatus": {
-        "description": "ValidatingAdmissionPolicyStatus represents the status of a ValidatingAdmissionPolicy.",
-        "properties": {
-          "conditions": {
-            "description": "The conditions represent the latest available observations of a policy's current state.",
-            "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
-                }
-              ],
-              "default": {}
-            },
-            "type": "array",
-            "x-kubernetes-list-map-keys": [
-              "type"
-            ],
-            "x-kubernetes-list-type": "map"
-          },
-          "observedGeneration": {
-            "description": "The generation observed by the controller.",
-            "format": "int64",
-            "type": "integer"
-          },
-          "typeChecking": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.TypeChecking"
-              }
-            ],
-            "description": "The results of type checking for each expression. Presence of this field indicates the completion of the type checking."
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.admissionregistration.v1alpha1.Validation": {
-        "description": "Validation specifies the CEL expression which is used to apply the validation.",
-        "properties": {
-          "expression": {
-            "default": "",
-            "description": "Expression represents the expression which will be evaluated by CEL. ref: https://github.com/google/cel-spec CEL expressions have access to the contents of the API request/response, organized into CEL variables as well as some other useful variables:\n\n- 'object' - The object from the incoming request. The value is null for DELETE requests. - 'oldObject' - The existing object. The value is null for CREATE requests. - 'request' - Attributes of the API request([ref](/pkg/apis/admission/types.go#AdmissionRequest)). - 'params' - Parameter resource referred to by the policy binding being evaluated. Only populated if the policy has a ParamKind. - 'namespaceObject' - The namespace object that the incoming object belongs to. The value is null for cluster-scoped resources. - 'variables' - Map of composited variables, from its name to its lazily evaluated value.\n  For example, a variable named 'foo' can be accessed as 'variables.foo'.\n- 'authorizer' - A CEL Authorizer. May be used to perform authorization checks for the principal (user or service account) of the request.\n  See https://pkg.go.dev/k8s.io/apiserver/pkg/cel/library#Authz\n- 'authorizer.requestResource' - A CEL ResourceCheck constructed from the 'authorizer' and configured with the\n  request resource.\n\nThe `apiVersion`, `kind`, `metadata.name` and `metadata.generateName` are always accessible from the root of the object. No other metadata properties are accessible.\n\nOnly property names of the form `[a-zA-Z_.-/][a-zA-Z0-9_.-/]*` are accessible. Accessible property names are escaped according to the following rules when accessed in the expression: - '__' escapes to '__underscores__' - '.' escapes to '__dot__' - '-' escapes to '__dash__' - '/' escapes to '__slash__' - Property names that exactly match a CEL RESERVED keyword escape to '__{keyword}__'. The keywords are:\n\t  \"true\", \"false\", \"null\", \"in\", \"as\", \"break\", \"const\", \"continue\", \"else\", \"for\", \"function\", \"if\",\n\t  \"import\", \"let\", \"loop\", \"package\", \"namespace\", \"return\".\nExamples:\n  - Expression accessing a property named \"namespace\": {\"Expression\": \"object.__namespace__ > 0\"}\n  - Expression accessing a property named \"x-prop\": {\"Expression\": \"object.x__dash__prop > 0\"}\n  - Expression accessing a property named \"redact__d\": {\"Expression\": \"object.redact__underscores__d > 0\"}\n\nEquality on arrays with list type of 'set' or 'map' ignores element order, i.e. [1, 2] == [2, 1]. Concatenation on arrays with x-kubernetes-list-type use the semantics of the list type:\n  - 'set': `X + Y` performs a union where the array positions of all elements in `X` are preserved and\n    non-intersecting elements in `Y` are appended, retaining their partial order.\n  - 'map': `X + Y` performs a merge where the array positions of all keys in `X` are preserved but the values\n    are overwritten by values in `Y` when the key sets of `X` and `Y` intersect. Elements in `Y` with\n    non-intersecting keys are appended, retaining their partial order.\nRequired.",
-            "type": "string"
-          },
-          "message": {
-            "description": "Message represents the message displayed when validation fails. The message is required if the Expression contains line breaks. The message must not contain line breaks. If unset, the message is \"failed rule: {Rule}\". e.g. \"must be a URL with the host matching spec.host\" If the Expression contains line breaks. Message is required. The message must not contain line breaks. If unset, the message is \"failed Expression: {Expression}\".",
-            "type": "string"
-          },
-          "messageExpression": {
-            "description": "messageExpression declares a CEL expression that evaluates to the validation failure message that is returned when this rule fails. Since messageExpression is used as a failure message, it must evaluate to a string. If both message and messageExpression are present on a validation, then messageExpression will be used if validation fails. If messageExpression results in a runtime error, the runtime error is logged, and the validation failure message is produced as if the messageExpression field were unset. If messageExpression evaluates to an empty string, a string with only spaces, or a string that contains line breaks, then the validation failure message will also be produced as if the messageExpression field were unset, and the fact that messageExpression produced an empty string/string with only spaces/string with line breaks will be logged. messageExpression has access to all the same variables as the `expression` except for 'authorizer' and 'authorizer.requestResource'. Example: \"object.x must be less than max (\"+string(params.max)+\")\"",
-            "type": "string"
-          },
-          "reason": {
-            "description": "Reason represents a machine-readable description of why this validation failed. If this is the first validation in the list to fail, this reason, as well as the corresponding HTTP response code, are used in the HTTP response to the client. The currently supported reasons are: \"Unauthorized\", \"Forbidden\", \"Invalid\", \"RequestEntityTooLarge\". If not set, StatusReasonInvalid is used in the response to the client.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "expression"
-        ],
-        "type": "object"
       },
       "io.k8s.api.admissionregistration.v1alpha1.Variable": {
         "description": "Variable is the definition of a variable that is used for composition.",
@@ -725,52 +623,6 @@
           }
         ]
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.Condition": {
-        "description": "Condition contains details for one aspect of the current state of this API Resource.",
-        "properties": {
-          "lastTransitionTime": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
-              }
-            ],
-            "description": "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable."
-          },
-          "message": {
-            "default": "",
-            "description": "message is a human readable message indicating details about the transition. This may be an empty string.",
-            "type": "string"
-          },
-          "observedGeneration": {
-            "description": "observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.",
-            "format": "int64",
-            "type": "integer"
-          },
-          "reason": {
-            "default": "",
-            "description": "reason contains a programmatic identifier indicating the reason for the condition's last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.",
-            "type": "string"
-          },
-          "status": {
-            "default": "",
-            "description": "status of the condition, one of True, False, Unknown.",
-            "type": "string"
-          },
-          "type": {
-            "default": "",
-            "description": "type of condition in CamelCase or in foo.example.com/CamelCase.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "status",
-          "lastTransitionTime",
-          "reason",
-          "message"
-        ],
-        "type": "object"
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions": {
         "description": "DeleteOptions may be provided when deleting an API object.",
         "properties": {
@@ -791,6 +643,10 @@
             "description": "The duration in seconds before the object should be deleted. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period for the specified type will be used. Defaults to a per object value if not specified. zero means delete immediately.",
             "format": "int64",
             "type": "integer"
+          },
+          "ignoreStoreReadErrorWithClusterBreakingPotential": {
+            "description": "if set to true, it will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage successfully because of a) its data can not be transformed e.g. decryption failure, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalizer constraints, skips precondition checks, and removes the object from the storage. WARNING: This may potentially break the cluster if the workload associated with the resource being unsafe-deleted relies on normal deletion flow. Use only if you REALLY know what you are doing. The default value is false, and the user must opt in to enable it",
+            "type": "boolean"
           },
           "kind": {
             "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
@@ -958,7 +814,7 @@
           {
             "group": "coordination.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
+            "version": "v1alpha2"
           },
           {
             "group": "coordination.k8s.io",
@@ -1079,6 +935,11 @@
             "group": "resource.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1alpha3"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
           },
           {
             "group": "scheduling.k8s.io",
@@ -1699,7 +1560,7 @@
           {
             "group": "coordination.k8s.io",
             "kind": "WatchEvent",
-            "version": "v1alpha1"
+            "version": "v1alpha2"
           },
           {
             "group": "coordination.k8s.io",
@@ -1822,6 +1683,11 @@
             "version": "v1alpha3"
           },
           {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
             "group": "scheduling.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
@@ -1885,6 +1751,11 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
@@ -1912,10 +1783,10 @@
         ]
       }
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/validatingadmissionpolicies": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/mutatingadmissionpolicies": {
       "delete": {
-        "description": "delete collection of ValidatingAdmissionPolicy",
-        "operationId": "deleteAdmissionregistrationV1alpha1CollectionValidatingAdmissionPolicy",
+        "description": "delete collection of MutatingAdmissionPolicy",
+        "operationId": "deleteAdmissionregistrationV1alpha1CollectionMutatingAdmissionPolicy",
         "parameters": [
           {
             "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
@@ -1950,6 +1821,15 @@
             "name": "gracePeriodSeconds",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "if set to true, it will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage successfully because of a) its data can not be transformed e.g. decryption failure, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalizer constraints, skips precondition checks, and removes the object from the storage. WARNING: This may potentially break the cluster if the workload associated with the resource being unsafe-deleted relies on normal deletion flow. Use only if you REALLY know what you are doing. The default value is false, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -2038,6 +1918,11 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
@@ -2066,13 +1951,13 @@
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       },
       "get": {
-        "description": "list or watch objects of kind ValidatingAdmissionPolicy",
-        "operationId": "listAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
+        "description": "list or watch objects of kind MutatingAdmissionPolicy",
+        "operationId": "listAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
         "parameters": [
           {
             "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
@@ -2168,29 +2053,39 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList"
+                }
+              },
+              "application/cbor-seq": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyList"
                 }
               }
             },
@@ -2206,7 +2101,7 @@
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       },
@@ -2222,8 +2117,8 @@
         }
       ],
       "post": {
-        "description": "create a ValidatingAdmissionPolicy",
-        "operationId": "createAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
+        "description": "create a MutatingAdmissionPolicy",
+        "operationId": "createAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2257,7 +2152,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
               }
             }
           },
@@ -2266,19 +2161,24 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2286,19 +2186,24 @@
           },
           "201": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2306,19 +2211,24 @@
           },
           "202": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2334,15 +2244,15 @@
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       }
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/validatingadmissionpolicies/{name}": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/mutatingadmissionpolicies/{name}": {
       "delete": {
-        "description": "delete a ValidatingAdmissionPolicy",
-        "operationId": "deleteAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
+        "description": "delete a MutatingAdmissionPolicy",
+        "operationId": "deleteAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2359,6 +2269,15 @@
             "name": "gracePeriodSeconds",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "if set to true, it will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage successfully because of a) its data can not be transformed e.g. decryption failure, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalizer constraints, skips precondition checks, and removes the object from the storage. WARNING: This may potentially break the cluster if the workload associated with the resource being unsafe-deleted relies on normal deletion flow. Use only if you REALLY know what you are doing. The default value is false, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -2393,6 +2312,11 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
@@ -2413,6 +2337,11 @@
           },
           "202": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
@@ -2441,29 +2370,34 @@
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       },
       "get": {
-        "description": "read the specified ValidatingAdmissionPolicy",
-        "operationId": "readAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
+        "description": "read the specified MutatingAdmissionPolicy",
+        "operationId": "readAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2479,13 +2413,13 @@
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       },
       "parameters": [
         {
-          "description": "name of the ValidatingAdmissionPolicy",
+          "description": "name of the MutatingAdmissionPolicy",
           "in": "path",
           "name": "name",
           "required": true,
@@ -2505,8 +2439,8 @@
         }
       ],
       "patch": {
-        "description": "partially update the specified ValidatingAdmissionPolicy",
-        "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
+        "description": "partially update the specified MutatingAdmissionPolicy",
+        "operationId": "patchAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2547,6 +2481,11 @@
         ],
         "requestBody": {
           "content": {
+            "application/apply-patch+cbor": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
             "application/apply-patch+yaml": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
@@ -2573,19 +2512,24 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2593,19 +2537,24 @@
           },
           "201": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2621,13 +2570,13 @@
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       },
       "put": {
-        "description": "replace the specified ValidatingAdmissionPolicy",
-        "operationId": "replaceAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
+        "description": "replace the specified MutatingAdmissionPolicy",
+        "operationId": "replaceAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -2661,7 +2610,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
               }
             }
           },
@@ -2670,19 +2619,24 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2690,19 +2644,24 @@
           },
           "201": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicy"
                 }
               }
             },
@@ -2718,294 +2677,15 @@
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       }
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/validatingadmissionpolicies/{name}/status": {
-      "get": {
-        "description": "read status of the specified ValidatingAdmissionPolicy",
-        "operationId": "readAdmissionregistrationV1alpha1ValidatingAdmissionPolicyStatus",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/vnd.kubernetes.protobuf": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/yaml": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "tags": [
-          "admissionregistration_v1alpha1"
-        ],
-        "x-kubernetes-action": "get",
-        "x-kubernetes-group-version-kind": {
-          "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
-          "version": "v1alpha1"
-        }
-      },
-      "parameters": [
-        {
-          "description": "name of the ValidatingAdmissionPolicy",
-          "in": "path",
-          "name": "name",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
-          "description": "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).",
-          "in": "query",
-          "name": "pretty",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        }
-      ],
-      "patch": {
-        "description": "partially update status of the specified ValidatingAdmissionPolicy",
-        "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyStatus",
-        "parameters": [
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
-            "in": "query",
-            "name": "fieldManager",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
-            "in": "query",
-            "name": "fieldValidation",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
-            "in": "query",
-            "name": "force",
-            "schema": {
-              "type": "boolean",
-              "uniqueItems": true
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/apply-patch+yaml": {
-              "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-              }
-            },
-            "application/json-patch+json": {
-              "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-              }
-            },
-            "application/merge-patch+json": {
-              "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-              }
-            },
-            "application/strategic-merge-patch+json": {
-              "schema": {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/vnd.kubernetes.protobuf": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/yaml": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/vnd.kubernetes.protobuf": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/yaml": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              }
-            },
-            "description": "Created"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "tags": [
-          "admissionregistration_v1alpha1"
-        ],
-        "x-kubernetes-action": "patch",
-        "x-kubernetes-group-version-kind": {
-          "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
-          "version": "v1alpha1"
-        }
-      },
-      "put": {
-        "description": "replace status of the specified ValidatingAdmissionPolicy",
-        "operationId": "replaceAdmissionregistrationV1alpha1ValidatingAdmissionPolicyStatus",
-        "parameters": [
-          {
-            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-            "in": "query",
-            "name": "dryRun",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
-            "in": "query",
-            "name": "fieldManager",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
-            "in": "query",
-            "name": "fieldValidation",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "*/*": {
-              "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/vnd.kubernetes.protobuf": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/yaml": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/vnd.kubernetes.protobuf": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              },
-              "application/yaml": {
-                "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicy"
-                }
-              }
-            },
-            "description": "Created"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "tags": [
-          "admissionregistration_v1alpha1"
-        ],
-        "x-kubernetes-action": "put",
-        "x-kubernetes-group-version-kind": {
-          "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
-          "version": "v1alpha1"
-        }
-      }
-    },
-    "/apis/admissionregistration.k8s.io/v1alpha1/validatingadmissionpolicybindings": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/mutatingadmissionpolicybindings": {
       "delete": {
-        "description": "delete collection of ValidatingAdmissionPolicyBinding",
-        "operationId": "deleteAdmissionregistrationV1alpha1CollectionValidatingAdmissionPolicyBinding",
+        "description": "delete collection of MutatingAdmissionPolicyBinding",
+        "operationId": "deleteAdmissionregistrationV1alpha1CollectionMutatingAdmissionPolicyBinding",
         "parameters": [
           {
             "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
@@ -3040,6 +2720,15 @@
             "name": "gracePeriodSeconds",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "if set to true, it will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage successfully because of a) its data can not be transformed e.g. decryption failure, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalizer constraints, skips precondition checks, and removes the object from the storage. WARNING: This may potentially break the cluster if the workload associated with the resource being unsafe-deleted relies on normal deletion flow. Use only if you REALLY know what you are doing. The default value is false, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -3128,6 +2817,11 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
@@ -3156,13 +2850,13 @@
         "x-kubernetes-action": "deletecollection",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       },
       "get": {
-        "description": "list or watch objects of kind ValidatingAdmissionPolicyBinding",
-        "operationId": "listAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
+        "description": "list or watch objects of kind MutatingAdmissionPolicyBinding",
+        "operationId": "listAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
         "parameters": [
           {
             "description": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored.",
@@ -3258,29 +2952,39 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList"
+                }
+              },
+              "application/cbor-seq": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList"
                 }
               },
               "application/json;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList"
                 }
               },
               "application/vnd.kubernetes.protobuf;stream=watch": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBindingList"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBindingList"
                 }
               }
             },
@@ -3296,7 +3000,7 @@
         "x-kubernetes-action": "list",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       },
@@ -3312,8 +3016,8 @@
         }
       ],
       "post": {
-        "description": "create a ValidatingAdmissionPolicyBinding",
-        "operationId": "createAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
+        "description": "create a MutatingAdmissionPolicyBinding",
+        "operationId": "createAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -3347,7 +3051,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
               }
             }
           },
@@ -3356,19 +3060,24 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3376,19 +3085,24 @@
           },
           "201": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3396,19 +3110,24 @@
           },
           "202": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3424,15 +3143,15 @@
         "x-kubernetes-action": "post",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       }
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/validatingadmissionpolicybindings/{name}": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/mutatingadmissionpolicybindings/{name}": {
       "delete": {
-        "description": "delete a ValidatingAdmissionPolicyBinding",
-        "operationId": "deleteAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
+        "description": "delete a MutatingAdmissionPolicyBinding",
+        "operationId": "deleteAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -3449,6 +3168,15 @@
             "name": "gracePeriodSeconds",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "description": "if set to true, it will trigger an unsafe deletion of the resource in case the normal deletion flow fails with a corrupt object error. A resource is considered corrupt if it can not be retrieved from the underlying storage successfully because of a) its data can not be transformed e.g. decryption failure, or b) it fails to decode into an object. NOTE: unsafe deletion ignores finalizer constraints, skips precondition checks, and removes the object from the storage. WARNING: This may potentially break the cluster if the workload associated with the resource being unsafe-deleted relies on normal deletion flow. Use only if you REALLY know what you are doing. The default value is false, and the user must opt in to enable it",
+            "in": "query",
+            "name": "ignoreStoreReadErrorWithClusterBreakingPotential",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -3483,6 +3211,11 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
@@ -3503,6 +3236,11 @@
           },
           "202": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
@@ -3531,29 +3269,34 @@
         "x-kubernetes-action": "delete",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       },
       "get": {
-        "description": "read the specified ValidatingAdmissionPolicyBinding",
-        "operationId": "readAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
+        "description": "read the specified MutatingAdmissionPolicyBinding",
+        "operationId": "readAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3569,13 +3312,13 @@
         "x-kubernetes-action": "get",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       },
       "parameters": [
         {
-          "description": "name of the ValidatingAdmissionPolicyBinding",
+          "description": "name of the MutatingAdmissionPolicyBinding",
           "in": "path",
           "name": "name",
           "required": true,
@@ -3595,8 +3338,8 @@
         }
       ],
       "patch": {
-        "description": "partially update the specified ValidatingAdmissionPolicyBinding",
-        "operationId": "patchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
+        "description": "partially update the specified MutatingAdmissionPolicyBinding",
+        "operationId": "patchAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -3637,6 +3380,11 @@
         ],
         "requestBody": {
           "content": {
+            "application/apply-patch+cbor": {
+              "schema": {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+              }
+            },
             "application/apply-patch+yaml": {
               "schema": {
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
@@ -3663,19 +3411,24 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3683,19 +3436,24 @@
           },
           "201": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3711,13 +3469,13 @@
         "x-kubernetes-action": "patch",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       },
       "put": {
-        "description": "replace the specified ValidatingAdmissionPolicyBinding",
-        "operationId": "replaceAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
+        "description": "replace the specified MutatingAdmissionPolicyBinding",
+        "operationId": "replaceAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
         "parameters": [
           {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
@@ -3751,7 +3509,7 @@
           "content": {
             "*/*": {
               "schema": {
-                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
               }
             }
           },
@@ -3760,19 +3518,24 @@
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3780,19 +3543,24 @@
           },
           "201": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/vnd.kubernetes.protobuf": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               },
               "application/yaml": {
                 "schema": {
-                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.ValidatingAdmissionPolicyBinding"
+                  "$ref": "#/components/schemas/io.k8s.api.admissionregistration.v1alpha1.MutatingAdmissionPolicyBinding"
                 }
               }
             },
@@ -3808,18 +3576,28 @@
         "x-kubernetes-action": "put",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       }
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/watch/validatingadmissionpolicies": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/watch/mutatingadmissionpolicies": {
       "get": {
-        "description": "watch individual changes to a list of ValidatingAdmissionPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyList",
+        "description": "watch individual changes to a list of MutatingAdmissionPolicy. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchAdmissionregistrationV1alpha1MutatingAdmissionPolicyList",
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/cbor-seq": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
@@ -3858,7 +3636,7 @@
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       },
@@ -3964,13 +3742,23 @@
         }
       ]
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/watch/validatingadmissionpolicies/{name}": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/watch/mutatingadmissionpolicies/{name}": {
       "get": {
-        "description": "watch changes to an object of kind ValidatingAdmissionPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchAdmissionregistrationV1alpha1ValidatingAdmissionPolicy",
+        "description": "watch changes to an object of kind MutatingAdmissionPolicy. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
+        "operationId": "watchAdmissionregistrationV1alpha1MutatingAdmissionPolicy",
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/cbor-seq": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
@@ -4009,7 +3797,7 @@
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicy",
+          "kind": "MutatingAdmissionPolicy",
           "version": "v1alpha1"
         }
       },
@@ -4060,7 +3848,7 @@
           }
         },
         {
-          "description": "name of the ValidatingAdmissionPolicy",
+          "description": "name of the MutatingAdmissionPolicy",
           "in": "path",
           "name": "name",
           "required": true,
@@ -4125,13 +3913,23 @@
         }
       ]
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/watch/validatingadmissionpolicybindings": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/watch/mutatingadmissionpolicybindings": {
       "get": {
-        "description": "watch individual changes to a list of ValidatingAdmissionPolicyBinding. deprecated: use the 'watch' parameter with a list operation instead.",
-        "operationId": "watchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBindingList",
+        "description": "watch individual changes to a list of MutatingAdmissionPolicyBinding. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchAdmissionregistrationV1alpha1MutatingAdmissionPolicyBindingList",
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/cbor-seq": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
@@ -4170,7 +3968,7 @@
         "x-kubernetes-action": "watchlist",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       },
@@ -4276,13 +4074,23 @@
         }
       ]
     },
-    "/apis/admissionregistration.k8s.io/v1alpha1/watch/validatingadmissionpolicybindings/{name}": {
+    "/apis/admissionregistration.k8s.io/v1alpha1/watch/mutatingadmissionpolicybindings/{name}": {
       "get": {
-        "description": "watch changes to an object of kind ValidatingAdmissionPolicyBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
-        "operationId": "watchAdmissionregistrationV1alpha1ValidatingAdmissionPolicyBinding",
+        "description": "watch changes to an object of kind MutatingAdmissionPolicyBinding. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
+        "operationId": "watchAdmissionregistrationV1alpha1MutatingAdmissionPolicyBinding",
         "responses": {
           "200": {
             "content": {
+              "application/cbor": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
+              "application/cbor-seq": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+                }
+              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
@@ -4321,7 +4129,7 @@
         "x-kubernetes-action": "watch",
         "x-kubernetes-group-version-kind": {
           "group": "admissionregistration.k8s.io",
-          "kind": "ValidatingAdmissionPolicyBinding",
+          "kind": "MutatingAdmissionPolicyBinding",
           "version": "v1alpha1"
         }
       },
@@ -4372,7 +4180,7 @@
           }
         },
         {
-          "description": "name of the ValidatingAdmissionPolicyBinding",
+          "description": "name of the MutatingAdmissionPolicyBinding",
           "in": "path",
           "name": "name",
           "required": true,

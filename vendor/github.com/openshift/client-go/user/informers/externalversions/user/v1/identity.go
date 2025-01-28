@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	userv1 "github.com/openshift/api/user/v1"
+	apiuserv1 "github.com/openshift/api/user/v1"
 	versioned "github.com/openshift/client-go/user/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/user/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/user/listers/user/v1"
+	userv1 "github.com/openshift/client-go/user/listers/user/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Identities.
 type IdentityInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.IdentityLister
+	Lister() userv1.IdentityLister
 }
 
 type identityInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredIdentityInformer(client versioned.Interface, resyncPeriod time.D
 				return client.UserV1().Identities().Watch(context.TODO(), options)
 			},
 		},
-		&userv1.Identity{},
+		&apiuserv1.Identity{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *identityInformer) defaultInformer(client versioned.Interface, resyncPer
 }
 
 func (f *identityInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&userv1.Identity{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiuserv1.Identity{}, f.defaultInformer)
 }
 
-func (f *identityInformer) Lister() v1.IdentityLister {
-	return v1.NewIdentityLister(f.Informer().GetIndexer())
+func (f *identityInformer) Lister() userv1.IdentityLister {
+	return userv1.NewIdentityLister(f.Informer().GetIndexer())
 }

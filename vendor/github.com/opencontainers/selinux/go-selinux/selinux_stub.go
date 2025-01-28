@@ -7,7 +7,7 @@ func attrPath(string) string {
 	return ""
 }
 
-func readCon(fpath string) (string, error) {
+func readCon(string) (string, error) {
 	return "", nil
 }
 
@@ -21,27 +21,27 @@ func getEnabled() bool {
 	return false
 }
 
-func classIndex(class string) (int, error) {
+func classIndex(string) (int, error) {
 	return -1, nil
 }
 
-func setFileLabel(fpath string, label string) error {
+func setFileLabel(string, string) error {
 	return nil
 }
 
-func lSetFileLabel(fpath string, label string) error {
+func lSetFileLabel(string, string) error {
 	return nil
 }
 
-func fileLabel(fpath string) (string, error) {
+func fileLabel(string) (string, error) {
 	return "", nil
 }
 
-func lFileLabel(fpath string) (string, error) {
+func lFileLabel(string) (string, error) {
 	return "", nil
 }
 
-func setFSCreateLabel(label string) error {
+func setFSCreateLabel(string) error {
 	return nil
 }
 
@@ -53,7 +53,7 @@ func currentLabel() (string, error) {
 	return "", nil
 }
 
-func pidLabel(pid int) (string, error) {
+func pidLabel(int) (string, error) {
 	return "", nil
 }
 
@@ -61,23 +61,23 @@ func execLabel() (string, error) {
 	return "", nil
 }
 
-func canonicalizeContext(val string) (string, error) {
+func canonicalizeContext(string) (string, error) {
 	return "", nil
 }
 
-func computeCreateContext(source string, target string, class string) (string, error) {
+func computeCreateContext(string, string, string) (string, error) {
 	return "", nil
 }
 
-func calculateGlbLub(sourceRange, targetRange string) (string, error) {
+func calculateGlbLub(string, string) (string, error) {
 	return "", nil
 }
 
-func peerLabel(fd uintptr) (string, error) {
+func peerLabel(uintptr) (string, error) {
 	return "", nil
 }
 
-func setKeyLabel(label string) error {
+func setKeyLabel(string) error {
 	return nil
 }
 
@@ -85,14 +85,14 @@ func (c Context) get() string {
 	return ""
 }
 
-func newContext(label string) (Context, error) {
+func newContext(string) (Context, error) {
 	return Context{}, nil
 }
 
 func clearLabels() {
 }
 
-func reserveLabel(label string) {
+func reserveLabel(string) {
 }
 
 func isMLSEnabled() bool {
@@ -103,7 +103,7 @@ func enforceMode() int {
 	return Disabled
 }
 
-func setEnforceMode(mode int) error {
+func setEnforceMode(int) error {
 	return nil
 }
 
@@ -111,7 +111,7 @@ func defaultEnforceMode() int {
 	return Disabled
 }
 
-func releaseLabel(label string) {
+func releaseLabel(string) {
 }
 
 func roFileLabel() string {
@@ -126,27 +126,27 @@ func initContainerLabels() (string, string) {
 	return "", ""
 }
 
-func containerLabels() (processLabel string, fileLabel string) {
+func containerLabels() (string, string) {
 	return "", ""
 }
 
-func securityCheckContext(val string) error {
+func securityCheckContext(string) error {
 	return nil
 }
 
-func copyLevel(src, dest string) (string, error) {
+func copyLevel(string, string) (string, error) {
 	return "", nil
 }
 
-func chcon(fpath string, label string, recurse bool) error {
+func chcon(string, string, bool) error {
 	return nil
 }
 
-func dupSecOpt(src string) ([]string, error) {
+func dupSecOpt(string) ([]string, error) {
 	return nil, nil
 }
 
-func getDefaultContextWithLevel(user, level, scon string) (string, error) {
+func getDefaultContextWithLevel(string, string, string) (string, error) {
 	return "", nil
 }
 

@@ -3,14 +3,14 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openshift/api/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
 // ImagePolicySpecApplyConfiguration represents a declarative configuration of the ImagePolicySpec type for use
 // with apply.
 type ImagePolicySpecApplyConfiguration struct {
-	Scopes []v1alpha1.ImageScope     `json:"scopes,omitempty"`
-	Policy *PolicyApplyConfiguration `json:"policy,omitempty"`
+	Scopes []configv1alpha1.ImageScope `json:"scopes,omitempty"`
+	Policy *PolicyApplyConfiguration   `json:"policy,omitempty"`
 }
 
 // ImagePolicySpecApplyConfiguration constructs a declarative configuration of the ImagePolicySpec type for use with
@@ -22,7 +22,7 @@ func ImagePolicySpec() *ImagePolicySpecApplyConfiguration {
 // WithScopes adds the given value to the Scopes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Scopes field.
-func (b *ImagePolicySpecApplyConfiguration) WithScopes(values ...v1alpha1.ImageScope) *ImagePolicySpecApplyConfiguration {
+func (b *ImagePolicySpecApplyConfiguration) WithScopes(values ...configv1alpha1.ImageScope) *ImagePolicySpecApplyConfiguration {
 	for i := range values {
 		b.Scopes = append(b.Scopes, values[i])
 	}

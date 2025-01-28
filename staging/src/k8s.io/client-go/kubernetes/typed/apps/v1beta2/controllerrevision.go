@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta2
 
 import (
-	"context"
+	context "context"
 
-	v1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
+	applyconfigurationsappsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	gentype "k8s.io/client-go/gentype"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 )
@@ -38,32 +38,34 @@ type ControllerRevisionsGetter interface {
 
 // ControllerRevisionInterface has methods to work with ControllerRevision resources.
 type ControllerRevisionInterface interface {
-	Create(ctx context.Context, controllerRevision *v1beta2.ControllerRevision, opts v1.CreateOptions) (*v1beta2.ControllerRevision, error)
-	Update(ctx context.Context, controllerRevision *v1beta2.ControllerRevision, opts v1.UpdateOptions) (*v1beta2.ControllerRevision, error)
+	Create(ctx context.Context, controllerRevision *appsv1beta2.ControllerRevision, opts v1.CreateOptions) (*appsv1beta2.ControllerRevision, error)
+	Update(ctx context.Context, controllerRevision *appsv1beta2.ControllerRevision, opts v1.UpdateOptions) (*appsv1beta2.ControllerRevision, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta2.ControllerRevision, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1beta2.ControllerRevisionList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1beta2.ControllerRevision, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1beta2.ControllerRevisionList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.ControllerRevision, err error)
-	Apply(ctx context.Context, controllerRevision *appsv1beta2.ControllerRevisionApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.ControllerRevision, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1beta2.ControllerRevision, err error)
+	Apply(ctx context.Context, controllerRevision *applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration, opts v1.ApplyOptions) (result *appsv1beta2.ControllerRevision, err error)
 	ControllerRevisionExpansion
 }
 
 // controllerRevisions implements ControllerRevisionInterface
 type controllerRevisions struct {
-	*gentype.ClientWithListAndApply[*v1beta2.ControllerRevision, *v1beta2.ControllerRevisionList, *appsv1beta2.ControllerRevisionApplyConfiguration]
+	*gentype.ClientWithListAndApply[*appsv1beta2.ControllerRevision, *appsv1beta2.ControllerRevisionList, *applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration]
 }
 
 // newControllerRevisions returns a ControllerRevisions
 func newControllerRevisions(c *AppsV1beta2Client, namespace string) *controllerRevisions {
 	return &controllerRevisions{
-		gentype.NewClientWithListAndApply[*v1beta2.ControllerRevision, *v1beta2.ControllerRevisionList, *appsv1beta2.ControllerRevisionApplyConfiguration](
+		gentype.NewClientWithListAndApply[*appsv1beta2.ControllerRevision, *appsv1beta2.ControllerRevisionList, *applyconfigurationsappsv1beta2.ControllerRevisionApplyConfiguration](
 			"controllerrevisions",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *v1beta2.ControllerRevision { return &v1beta2.ControllerRevision{} },
-			func() *v1beta2.ControllerRevisionList { return &v1beta2.ControllerRevisionList{} }),
+			func() *appsv1beta2.ControllerRevision { return &appsv1beta2.ControllerRevision{} },
+			func() *appsv1beta2.ControllerRevisionList { return &appsv1beta2.ControllerRevisionList{} },
+			gentype.PrefersProtobuf[*appsv1beta2.ControllerRevision](),
+		),
 	}
 }

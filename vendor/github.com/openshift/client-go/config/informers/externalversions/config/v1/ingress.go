@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Ingresses.
 type IngressInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.IngressLister
+	Lister() configv1.IngressLister
 }
 
 type ingressInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredIngressInformer(client versioned.Interface, resyncPeriod time.Du
 				return client.ConfigV1().Ingresses().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.Ingress{},
+		&apiconfigv1.Ingress{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *ingressInformer) defaultInformer(client versioned.Interface, resyncPeri
 }
 
 func (f *ingressInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.Ingress{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.Ingress{}, f.defaultInformer)
 }
 
-func (f *ingressInformer) Lister() v1.IngressLister {
-	return v1.NewIngressLister(f.Informer().GetIndexer())
+func (f *ingressInformer) Lister() configv1.IngressLister {
+	return configv1.NewIngressLister(f.Informer().GetIndexer())
 }

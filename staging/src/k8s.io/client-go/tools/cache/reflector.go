@@ -57,7 +57,7 @@ var (
 
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
-	// name identifies this reflector. By default it will be a file:line if possible.
+	// name identifies this reflector. By default, it will be a file:line if possible.
 	name string
 	// The name of the type we expect to place in the store. The name
 	// will be the stringification of expectedGVK if provided, and the
@@ -119,6 +119,14 @@ type Reflector struct {
 	//
 	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList *bool
+}
+
+func (r *Reflector) Name() string {
+	return r.name
+}
+
+func (r *Reflector) TypeDescription() string {
+	return r.typeDescription
 }
 
 // ResourceVersionUpdater is an interface that allows store implementation to

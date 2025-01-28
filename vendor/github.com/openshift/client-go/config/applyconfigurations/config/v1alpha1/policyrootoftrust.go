@@ -3,13 +3,13 @@
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openshift/api/config/v1alpha1"
+	configv1alpha1 "github.com/openshift/api/config/v1alpha1"
 )
 
 // PolicyRootOfTrustApplyConfiguration represents a declarative configuration of the PolicyRootOfTrust type for use
 // with apply.
 type PolicyRootOfTrustApplyConfiguration struct {
-	PolicyType        *v1alpha1.PolicyType                 `json:"policyType,omitempty"`
+	PolicyType        *configv1alpha1.PolicyType           `json:"policyType,omitempty"`
 	PublicKey         *PublicKeyApplyConfiguration         `json:"publicKey,omitempty"`
 	FulcioCAWithRekor *FulcioCAWithRekorApplyConfiguration `json:"fulcioCAWithRekor,omitempty"`
 }
@@ -23,7 +23,7 @@ func PolicyRootOfTrust() *PolicyRootOfTrustApplyConfiguration {
 // WithPolicyType sets the PolicyType field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the PolicyType field is set to the value of the last call.
-func (b *PolicyRootOfTrustApplyConfiguration) WithPolicyType(value v1alpha1.PolicyType) *PolicyRootOfTrustApplyConfiguration {
+func (b *PolicyRootOfTrustApplyConfiguration) WithPolicyType(value configv1alpha1.PolicyType) *PolicyRootOfTrustApplyConfiguration {
 	b.PolicyType = &value
 	return b
 }

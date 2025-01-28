@@ -42,7 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilversion "k8s.io/apiserver/pkg/util/version"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/informers"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -54,7 +53,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -65,7 +63,7 @@ import (
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
-	"k8s.io/component-base/version"
+	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
@@ -98,20 +96,10 @@ const (
 	ConfigzName = "kubecontrollermanager.config.k8s.io"
 )
 
-// ControllerLoopMode is the kube-controller-manager's mode of running controller loops that are cloud provider dependent
-type ControllerLoopMode int
-
-const (
-	// IncludeCloudLoops means the kube-controller-manager include the controller loops that are cloud provider dependent
-	IncludeCloudLoops ControllerLoopMode = iota
-	// ExternalLoops means the kube-controller-manager exclude the controller loops that are cloud provider dependent
-	ExternalLoops
-)
-
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
-	_, _ = utilversion.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
-		utilversion.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
+	_, _ = featuregate.DefaultComponentGlobalsRegistry.ComponentGlobalsOrRegister(
+		featuregate.DefaultKubeComponent, utilversion.DefaultBuildEffectiveVersion(), utilfeature.DefaultMutableFeatureGate)
 
 	s, err := options.NewKubeControllerManagerOptions()
 	if err != nil {
@@ -163,7 +151,7 @@ controller, and serviceaccounts controller.`,
 			}
 
 			// add feature enablement metrics
-			fg := s.ComponentGlobalsRegistry.FeatureGateFor(utilversion.DefaultKubeComponent)
+			fg := s.ComponentGlobalsRegistry.FeatureGateFor(featuregate.DefaultKubeComponent)
 			fg.(featuregate.MutableFeatureGate).AddMetrics()
 
 			stopCh := server.SetupSignalHandler()
@@ -209,7 +197,7 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 	stopCh := mergeCh(ctx.Done(), stopCh2)
 
 	// To help debugging, immediately log version
-	logger.Info("Starting", "version", version.Get())
+	logger.Info("Starting", "version", utilversion.Get())
 
 	logger.Info("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
@@ -258,7 +246,7 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 		}
 	}
 
-	clientBuilder, rootClientBuilder := createClientBuilders(logger, c)
+	clientBuilder, rootClientBuilder := createClientBuilders(c)
 
 	saTokenControllerDescriptor := newServiceAccountTokenControllerDescriptor(rootClientBuilder)
 
@@ -319,11 +307,11 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).BinaryVersion().String())
+		binaryVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).BinaryVersion().String())
 		if err != nil {
 			return err
 		}
-		emulationVersion, err := semver.ParseTolerant(utilversion.DefaultComponentGlobalsRegistry.EffectiveVersionFor(utilversion.DefaultKubeComponent).EmulationVersion().String())
+		emulationVersion, err := semver.ParseTolerant(featuregate.DefaultComponentGlobalsRegistry.EffectiveVersionFor(featuregate.DefaultKubeComponent).EmulationVersion().String())
 		if err != nil {
 			return err
 		}
@@ -336,7 +324,7 @@ func Run(ctx context.Context, c *config.CompletedConfig, stopCh2 <-chan struct{}
 			"kube-controller-manager",
 			binaryVersion.FinalizeVersion(),
 			emulationVersion.FinalizeVersion(),
-			[]coordinationv1.CoordinatedLeaseStrategy{coordinationv1.OldestEmulationVersion},
+			coordinationv1.OldestEmulationVersion,
 		)
 		if err != nil {
 			return err
@@ -439,15 +427,6 @@ type ControllerContext struct {
 	// initialization of the RESTMapper until the first mapping is
 	// requested.
 	RESTMapper *restmapper.DeferredDiscoveryRESTMapper
-
-	// Cloud is the cloud provider interface for the controllers to use.
-	// It must be initialized and ready to use.
-	Cloud cloudprovider.Interface
-
-	// Control for which control loops to be run
-	// IncludeCloudLoops is for a kube-controller-manager running all loops
-	// ExternalLoops is for a kube-controller-manager running with a cloud-controller-manager
-	LoopMode ControllerLoopMode
 
 	// InformersStarted is closed after all of the controllers have been initialized and are running.  After this point it is safe,
 	// for an individual controller to start the shared informers. Before it is closed, they should not.
@@ -630,8 +609,10 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newClusterRoleAggregrationControllerDescriptor())
 	register(newPersistentVolumeClaimProtectionControllerDescriptor())
 	register(newPersistentVolumeProtectionControllerDescriptor())
+	register(newVolumeAttributesClassProtectionControllerDescriptor())
 	register(newTTLAfterFinishedControllerDescriptor())
 	register(newRootCACertificatePublisherControllerDescriptor())
+	register(newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor())
 	register(newServiceCACertPublisher())
 	register(newEphemeralVolumeControllerDescriptor())
 
@@ -643,6 +624,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newTaintEvictionControllerDescriptor())
 	register(newServiceCIDRsControllerDescriptor())
 	register(newStorageVersionMigratorControllerDescriptor())
+	register(newSELinuxWarningControllerDescriptor())
 
 	for _, alias := range aliases.UnsortedList() {
 		if _, ok := controllers[alias]; ok {
@@ -692,12 +674,6 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		restMapper.Reset()
 	}, 30*time.Second, ctx.Done())
 
-	cloud, loopMode, err := createCloudProvider(klog.FromContext(ctx), s.ComponentConfig.KubeCloudShared.CloudProvider.Name, s.ComponentConfig.KubeCloudShared.ExternalCloudVolumePlugin,
-		s.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile, s.ComponentConfig.KubeCloudShared.AllowUntaggedCloud, sharedInformers)
-	if err != nil {
-		return ControllerContext{}, err
-	}
-
 	controllerContext := ControllerContext{
 		OpenShiftContext:                s.OpenShiftContext,
 		ClientBuilder:                   clientBuilder,
@@ -705,8 +681,6 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		ComponentConfig:                 s.ComponentConfig,
 		RESTMapper:                      restMapper,
-		Cloud:                           cloud,
-		LoopMode:                        loopMode,
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("kube-controller-manager"),
@@ -749,12 +723,6 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, cont
 			// HealthChecker should be present when controller has started
 			controllerChecks = append(controllerChecks, check)
 		}
-	}
-
-	// Initialize the cloud provider with a reference to the clientBuilder only after token controller
-	// has started in case the cloud provider uses the client builder.
-	if controllerCtx.Cloud != nil {
-		controllerCtx.Cloud.Initialize(controllerCtx.ClientBuilder, ctx.Done())
 	}
 
 	// Each controller is passed a context where the logger has the name of
@@ -800,8 +768,8 @@ func StartController(ctx context.Context, controllerCtx ControllerContext, contr
 		}
 	}
 
-	if controllerDescriptor.IsCloudProviderController() && controllerCtx.LoopMode != IncludeCloudLoops {
-		logger.Info("Skipping a cloud provider controller", "controller", controllerName, "loopMode", controllerCtx.LoopMode)
+	if controllerDescriptor.IsCloudProviderController() {
+		logger.Info("Skipping a cloud provider controller", "controller", controllerName)
 		return nil, nil
 	}
 
@@ -918,16 +886,12 @@ func readCA(file string) ([]byte, error) {
 }
 
 // createClientBuilders creates clientBuilder and rootClientBuilder from the given configuration
-func createClientBuilders(logger klog.Logger, c *config.CompletedConfig) (clientBuilder clientbuilder.ControllerClientBuilder, rootClientBuilder clientbuilder.ControllerClientBuilder) {
+func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilder.ControllerClientBuilder, rootClientBuilder clientbuilder.ControllerClientBuilder) {
+
 	rootClientBuilder = clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,
 	}
 	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-		if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
-			// It's possible another controller process is creating the tokens for us.
-			// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
-			logger.Info("Warning: --use-service-account-credentials was specified without providing a --service-account-private-key-file")
-		}
 
 		clientBuilder = clientbuilder.NewDynamicClientBuilder(
 			libgorestclient.AnonymousClientConfigWithWrapTransport(c.Kubeconfig),

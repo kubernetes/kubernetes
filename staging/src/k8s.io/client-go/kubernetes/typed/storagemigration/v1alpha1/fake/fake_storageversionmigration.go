@@ -19,168 +19,35 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-	json "encoding/json"
-	"fmt"
-
 	v1alpha1 "k8s.io/api/storagemigration/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
 	storagemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
-	testing "k8s.io/client-go/testing"
+	gentype "k8s.io/client-go/gentype"
+	typedstoragemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
 )
 
-// FakeStorageVersionMigrations implements StorageVersionMigrationInterface
-type FakeStorageVersionMigrations struct {
+// fakeStorageVersionMigrations implements StorageVersionMigrationInterface
+type fakeStorageVersionMigrations struct {
+	*gentype.FakeClientWithListAndApply[*v1alpha1.StorageVersionMigration, *v1alpha1.StorageVersionMigrationList, *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration]
 	Fake *FakeStoragemigrationV1alpha1
 }
 
-var storageversionmigrationsResource = v1alpha1.SchemeGroupVersion.WithResource("storageversionmigrations")
-
-var storageversionmigrationsKind = v1alpha1.SchemeGroupVersion.WithKind("StorageVersionMigration")
-
-// Get takes name of the storageVersionMigration, and returns the corresponding storageVersionMigration object, and an error if there is any.
-func (c *FakeStorageVersionMigrations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.StorageVersionMigration, err error) {
-	emptyResult := &v1alpha1.StorageVersionMigration{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetActionWithOptions(storageversionmigrationsResource, name, options), emptyResult)
-	if obj == nil {
-		return emptyResult, err
+func newFakeStorageVersionMigrations(fake *FakeStoragemigrationV1alpha1) typedstoragemigrationv1alpha1.StorageVersionMigrationInterface {
+	return &fakeStorageVersionMigrations{
+		gentype.NewFakeClientWithListAndApply[*v1alpha1.StorageVersionMigration, *v1alpha1.StorageVersionMigrationList, *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+			v1alpha1.SchemeGroupVersion.WithKind("StorageVersionMigration"),
+			func() *v1alpha1.StorageVersionMigration { return &v1alpha1.StorageVersionMigration{} },
+			func() *v1alpha1.StorageVersionMigrationList { return &v1alpha1.StorageVersionMigrationList{} },
+			func(dst, src *v1alpha1.StorageVersionMigrationList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.StorageVersionMigrationList) []*v1alpha1.StorageVersionMigration {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.StorageVersionMigrationList, items []*v1alpha1.StorageVersionMigration) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.StorageVersionMigration), err
-}
-
-// List takes label and field selectors, and returns the list of StorageVersionMigrations that match those selectors.
-func (c *FakeStorageVersionMigrations) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.StorageVersionMigrationList, err error) {
-	emptyResult := &v1alpha1.StorageVersionMigrationList{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListActionWithOptions(storageversionmigrationsResource, storageversionmigrationsKind, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.StorageVersionMigrationList{ListMeta: obj.(*v1alpha1.StorageVersionMigrationList).ListMeta}
-	for _, item := range obj.(*v1alpha1.StorageVersionMigrationList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested storageVersionMigrations.
-func (c *FakeStorageVersionMigrations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchActionWithOptions(storageversionmigrationsResource, opts))
-}
-
-// Create takes the representation of a storageVersionMigration and creates it.  Returns the server's representation of the storageVersionMigration, and an error, if there is any.
-func (c *FakeStorageVersionMigrations) Create(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.CreateOptions) (result *v1alpha1.StorageVersionMigration, err error) {
-	emptyResult := &v1alpha1.StorageVersionMigration{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateActionWithOptions(storageversionmigrationsResource, storageVersionMigration, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.StorageVersionMigration), err
-}
-
-// Update takes the representation of a storageVersionMigration and updates it. Returns the server's representation of the storageVersionMigration, and an error, if there is any.
-func (c *FakeStorageVersionMigrations) Update(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (result *v1alpha1.StorageVersionMigration, err error) {
-	emptyResult := &v1alpha1.StorageVersionMigration{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateActionWithOptions(storageversionmigrationsResource, storageVersionMigration, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.StorageVersionMigration), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeStorageVersionMigrations) UpdateStatus(ctx context.Context, storageVersionMigration *v1alpha1.StorageVersionMigration, opts v1.UpdateOptions) (result *v1alpha1.StorageVersionMigration, err error) {
-	emptyResult := &v1alpha1.StorageVersionMigration{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceActionWithOptions(storageversionmigrationsResource, "status", storageVersionMigration, opts), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.StorageVersionMigration), err
-}
-
-// Delete takes name of the storageVersionMigration and deletes it. Returns an error if one occurs.
-func (c *FakeStorageVersionMigrations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(storageversionmigrationsResource, name, opts), &v1alpha1.StorageVersionMigration{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeStorageVersionMigrations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionActionWithOptions(storageversionmigrationsResource, opts, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.StorageVersionMigrationList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched storageVersionMigration.
-func (c *FakeStorageVersionMigrations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.StorageVersionMigration, err error) {
-	emptyResult := &v1alpha1.StorageVersionMigration{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionmigrationsResource, name, pt, data, opts, subresources...), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.StorageVersionMigration), err
-}
-
-// Apply takes the given apply declarative configuration, applies it and returns the applied storageVersionMigration.
-func (c *FakeStorageVersionMigrations) Apply(ctx context.Context, storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageVersionMigration, err error) {
-	if storageVersionMigration == nil {
-		return nil, fmt.Errorf("storageVersionMigration provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(storageVersionMigration)
-	if err != nil {
-		return nil, err
-	}
-	name := storageVersionMigration.Name
-	if name == nil {
-		return nil, fmt.Errorf("storageVersionMigration.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.StorageVersionMigration{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionmigrationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions()), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.StorageVersionMigration), err
-}
-
-// ApplyStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-func (c *FakeStorageVersionMigrations) ApplyStatus(ctx context.Context, storageVersionMigration *storagemigrationv1alpha1.StorageVersionMigrationApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageVersionMigration, err error) {
-	if storageVersionMigration == nil {
-		return nil, fmt.Errorf("storageVersionMigration provided to Apply must not be nil")
-	}
-	data, err := json.Marshal(storageVersionMigration)
-	if err != nil {
-		return nil, err
-	}
-	name := storageVersionMigration.Name
-	if name == nil {
-		return nil, fmt.Errorf("storageVersionMigration.Name must be provided to Apply")
-	}
-	emptyResult := &v1alpha1.StorageVersionMigration{}
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceActionWithOptions(storageversionmigrationsResource, *name, types.ApplyPatchType, data, opts.ToPatchOptions(), "status"), emptyResult)
-	if obj == nil {
-		return emptyResult, err
-	}
-	return obj.(*v1alpha1.StorageVersionMigration), err
 }

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // TokenClaimValidationRuleApplyConfiguration represents a declarative configuration of the TokenClaimValidationRule type for use
 // with apply.
 type TokenClaimValidationRuleApplyConfiguration struct {
-	Type          *v1.TokenValidationRuleType           `json:"type,omitempty"`
+	Type          *configv1.TokenValidationRuleType     `json:"type,omitempty"`
 	RequiredClaim *TokenRequiredClaimApplyConfiguration `json:"requiredClaim,omitempty"`
 }
 
@@ -22,7 +22,7 @@ func TokenClaimValidationRule() *TokenClaimValidationRuleApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *TokenClaimValidationRuleApplyConfiguration) WithType(value v1.TokenValidationRuleType) *TokenClaimValidationRuleApplyConfiguration {
+func (b *TokenClaimValidationRuleApplyConfiguration) WithType(value configv1.TokenValidationRuleType) *TokenClaimValidationRuleApplyConfiguration {
 	b.Type = &value
 	return b
 }

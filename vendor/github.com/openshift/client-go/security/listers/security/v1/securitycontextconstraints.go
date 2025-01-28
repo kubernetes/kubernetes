@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/security/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	securityv1 "github.com/openshift/api/security/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // SecurityContextConstraintsLister helps list SecurityContextConstraints.
@@ -14,19 +14,19 @@ import (
 type SecurityContextConstraintsLister interface {
 	// List lists all SecurityContextConstraints in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.SecurityContextConstraints, err error)
+	List(selector labels.Selector) (ret []*securityv1.SecurityContextConstraints, err error)
 	// Get retrieves the SecurityContextConstraints from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.SecurityContextConstraints, error)
+	Get(name string) (*securityv1.SecurityContextConstraints, error)
 	SecurityContextConstraintsListerExpansion
 }
 
 // securityContextConstraintsLister implements the SecurityContextConstraintsLister interface.
 type securityContextConstraintsLister struct {
-	listers.ResourceIndexer[*v1.SecurityContextConstraints]
+	listers.ResourceIndexer[*securityv1.SecurityContextConstraints]
 }
 
 // NewSecurityContextConstraintsLister returns a new SecurityContextConstraintsLister.
 func NewSecurityContextConstraintsLister(indexer cache.Indexer) SecurityContextConstraintsLister {
-	return &securityContextConstraintsLister{listers.New[*v1.SecurityContextConstraints](indexer, v1.Resource("securitycontextconstraints"))}
+	return &securityContextConstraintsLister{listers.New[*securityv1.SecurityContextConstraints](indexer, securityv1.Resource("securitycontextconstraints"))}
 }

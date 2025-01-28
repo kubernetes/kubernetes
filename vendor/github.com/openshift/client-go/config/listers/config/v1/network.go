@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	configv1 "github.com/openshift/api/config/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NetworkLister helps list Networks.
@@ -14,19 +14,19 @@ import (
 type NetworkLister interface {
 	// List lists all Networks in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.Network, err error)
+	List(selector labels.Selector) (ret []*configv1.Network, err error)
 	// Get retrieves the Network from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.Network, error)
+	Get(name string) (*configv1.Network, error)
 	NetworkListerExpansion
 }
 
 // networkLister implements the NetworkLister interface.
 type networkLister struct {
-	listers.ResourceIndexer[*v1.Network]
+	listers.ResourceIndexer[*configv1.Network]
 }
 
 // NewNetworkLister returns a new NetworkLister.
 func NewNetworkLister(indexer cache.Indexer) NetworkLister {
-	return &networkLister{listers.New[*v1.Network](indexer, v1.Resource("network"))}
+	return &networkLister{listers.New[*configv1.Network](indexer, configv1.Resource("network"))}
 }

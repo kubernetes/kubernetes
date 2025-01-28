@@ -23,7 +23,7 @@ type ImagePolicy struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
+	// +required
 	Spec ImagePolicySpec `json:"spec"`
 	// status contains the observed state of the resource.
 	// +optional
@@ -40,15 +40,16 @@ type ImagePolicySpec struct {
 	// If multiple scopes match a given image, only the policy requirements for the most specific scope apply. The policy requirements for more general scopes are ignored.
 	// In addition to setting a policy appropriate for your own deployed applications, make sure that a policy on the OpenShift image repositories
 	// quay.io/openshift-release-dev/ocp-release, quay.io/openshift-release-dev/ocp-v4.0-art-dev (or on a more general scope) allows deployment of the OpenShift images required for cluster operation.
+	// If a scope is configured in both the ClusterImagePolicy and the ImagePolicy, or if the scope in ImagePolicy is nested under one of the scopes from the ClusterImagePolicy, only the policy from the ClusterImagePolicy will be applied.
 	// For additional details about the format, please refer to the document explaining the docker transport field,
 	// which can be found at: https://github.com/containers/image/blob/main/docs/containers-policy.json.5.md#docker
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:MaxItems=256
 	// +listType=set
 	Scopes []ImageScope `json:"scopes"`
 	// policy contains configuration to allow scopes to be verified, and defines how
 	// images not matching the verification policy will be treated.
-	// +kubebuilder:validation:Required
+	// +required
 	Policy Policy `json:"policy"`
 }
 
@@ -61,7 +62,7 @@ type ImageScope string
 // Policy defines the verification policy for the items in the scopes list.
 type Policy struct {
 	// rootOfTrust specifies the root of trust for the policy.
-	// +kubebuilder:validation:Required
+	// +required
 	RootOfTrust PolicyRootOfTrust `json:"rootOfTrust"`
 	// signedIdentity specifies what image identity the signature claims about the image. The required matchPolicy field specifies the approach used in the verification process to verify the identity in the signature and the actual image identity, the default matchPolicy is "MatchRepoDigestOrExact".
 	// +optional
@@ -77,7 +78,7 @@ type PolicyRootOfTrust struct {
 	// "PublicKey" indicates that the policy relies on a sigstore publicKey and may optionally use a Rekor verification.
 	// "FulcioCAWithRekor" indicates that the policy is based on the Fulcio certification and incorporates a Rekor verification.
 	// +unionDiscriminator
-	// +kubebuilder:validation:Required
+	// +required
 	PolicyType PolicyType `json:"policyType"`
 	// publicKey defines the root of trust based on a sigstore public key.
 	// +optional
@@ -101,7 +102,7 @@ const (
 type PublicKey struct {
 	// keyData contains inline base64-encoded data for the PEM format public key.
 	// KeyData must be at most 8192 characters.
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:MaxLength=8192
 	KeyData []byte `json:"keyData"`
 	// rekorKeyData contains inline base64-encoded data for the PEM format from the Rekor public key.
@@ -115,16 +116,16 @@ type PublicKey struct {
 type FulcioCAWithRekor struct {
 	// fulcioCAData contains inline base64-encoded data for the PEM format fulcio CA.
 	// fulcioCAData must be at most 8192 characters.
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:MaxLength=8192
 	FulcioCAData []byte `json:"fulcioCAData"`
 	// rekorKeyData contains inline base64-encoded data for the PEM format from the Rekor public key.
 	// rekorKeyData must be at most 8192 characters.
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:MaxLength=8192
 	RekorKeyData []byte `json:"rekorKeyData"`
 	// fulcioSubject specifies OIDC issuer and the email of the Fulcio authentication configuration.
-	// +kubebuilder:validation:Required
+	// +required
 	FulcioSubject PolicyFulcioSubject `json:"fulcioSubject,omitempty"`
 }
 
@@ -132,12 +133,12 @@ type FulcioCAWithRekor struct {
 type PolicyFulcioSubject struct {
 	// oidcIssuer contains the expected OIDC issuer. It will be verified that the Fulcio-issued certificate contains a (Fulcio-defined) certificate extension pointing at this OIDC issuer URL. When Fulcio issues certificates, it includes a value based on an URL inside the client-provided ID token.
 	// Example: "https://expected.OIDC.issuer/"
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:XValidation:rule="isURL(self)",message="oidcIssuer must be a valid URL"
 	OIDCIssuer string `json:"oidcIssuer"`
 	// signedEmail holds the email address the the Fulcio certificate is issued for.
 	// Example: "expected-signing-user@example.com"
-	// +kubebuilder:validation:Required
+	// +required
 	// +kubebuilder:validation:XValidation:rule=`self.matches('^\\S+@\\S+$')`,message="invalid email address"
 	SignedEmail string `json:"signedEmail"`
 }
@@ -156,7 +157,7 @@ type PolicyIdentity struct {
 	// "ExactRepository" means that the identity in the signature must be in the same repository as a specific identity specified by "repository".
 	// "RemapIdentity" means that the signature must be in the same as the remapped image identity. Remapped image identity is obtained by replacing the "prefix" with the specified “signedPrefix” if the the image identity matches the specified remapPrefix.
 	// +unionDiscriminator
-	// +kubebuilder:validation:Required
+	// +required
 	MatchPolicy IdentityMatchPolicy `json:"matchPolicy"`
 	// exactRepository is required if matchPolicy is set to "ExactRepository".
 	// +optional
@@ -174,7 +175,7 @@ type IdentityRepositoryPrefix string
 type PolicyMatchExactRepository struct {
 	// repository is the reference of the image identity to be matched.
 	// The value should be a repository name (by omitting the tag or digest) in a registry implementing the "Docker Registry HTTP API V2". For example, docker.io/library/busybox
-	// +kubebuilder:validation:Required
+	// +required
 	Repository IdentityRepositoryPrefix `json:"repository"`
 }
 
@@ -185,12 +186,12 @@ type PolicyMatchRemapIdentity struct {
 	// The prefix and signedPrefix values can be either host[:port] values (matching exactly the same host[:port], string), repository namespaces,
 	// or repositories (i.e. they must not contain tags/digests), and match as prefixes of the fully expanded form.
 	// For example, docker.io/library/busybox (not busybox) to specify that single repository, or docker.io/library (not an empty string) to specify the parent namespace of docker.io/library/busybox.
-	// +kubebuilder:validation:Required
+	// +required
 	Prefix IdentityRepositoryPrefix `json:"prefix"`
 	// signedPrefix is the prefix of the image identity to be matched in the signature. The format is the same as "prefix". The values can be either host[:port] values (matching exactly the same host[:port], string), repository namespaces,
 	// or repositories (i.e. they must not contain tags/digests), and match as prefixes of the fully expanded form.
 	// For example, docker.io/library/busybox (not busybox) to specify that single repository, or docker.io/library (not an empty string) to specify the parent namespace of docker.io/library/busybox.
-	// +kubebuilder:validation:Required
+	// +required
 	SignedPrefix IdentityRepositoryPrefix `json:"signedPrefix"`
 }
 

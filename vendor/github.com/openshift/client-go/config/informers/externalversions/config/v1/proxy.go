@@ -3,13 +3,13 @@
 package v1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	configv1 "github.com/openshift/api/config/v1"
+	apiconfigv1 "github.com/openshift/api/config/v1"
 	versioned "github.com/openshift/client-go/config/clientset/versioned"
 	internalinterfaces "github.com/openshift/client-go/config/informers/externalversions/internalinterfaces"
-	v1 "github.com/openshift/client-go/config/listers/config/v1"
+	configv1 "github.com/openshift/client-go/config/listers/config/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -20,7 +20,7 @@ import (
 // Proxies.
 type ProxyInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1.ProxyLister
+	Lister() configv1.ProxyLister
 }
 
 type proxyInformer struct {
@@ -54,7 +54,7 @@ func NewFilteredProxyInformer(client versioned.Interface, resyncPeriod time.Dura
 				return client.ConfigV1().Proxies().Watch(context.TODO(), options)
 			},
 		},
-		&configv1.Proxy{},
+		&apiconfigv1.Proxy{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,9 +65,9 @@ func (f *proxyInformer) defaultInformer(client versioned.Interface, resyncPeriod
 }
 
 func (f *proxyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&configv1.Proxy{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiconfigv1.Proxy{}, f.defaultInformer)
 }
 
-func (f *proxyInformer) Lister() v1.ProxyLister {
-	return v1.NewProxyLister(f.Informer().GetIndexer())
+func (f *proxyInformer) Lister() configv1.ProxyLister {
+	return configv1.NewProxyLister(f.Informer().GetIndexer())
 }

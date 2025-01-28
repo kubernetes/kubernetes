@@ -3,21 +3,21 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // InfrastructureStatusApplyConfiguration represents a declarative configuration of the InfrastructureStatus type for use
 // with apply.
 type InfrastructureStatusApplyConfiguration struct {
 	InfrastructureName     *string                           `json:"infrastructureName,omitempty"`
-	Platform               *v1.PlatformType                  `json:"platform,omitempty"`
+	Platform               *configv1.PlatformType            `json:"platform,omitempty"`
 	PlatformStatus         *PlatformStatusApplyConfiguration `json:"platformStatus,omitempty"`
 	EtcdDiscoveryDomain    *string                           `json:"etcdDiscoveryDomain,omitempty"`
 	APIServerURL           *string                           `json:"apiServerURL,omitempty"`
 	APIServerInternalURL   *string                           `json:"apiServerInternalURI,omitempty"`
-	ControlPlaneTopology   *v1.TopologyMode                  `json:"controlPlaneTopology,omitempty"`
-	InfrastructureTopology *v1.TopologyMode                  `json:"infrastructureTopology,omitempty"`
-	CPUPartitioning        *v1.CPUPartitioningMode           `json:"cpuPartitioning,omitempty"`
+	ControlPlaneTopology   *configv1.TopologyMode            `json:"controlPlaneTopology,omitempty"`
+	InfrastructureTopology *configv1.TopologyMode            `json:"infrastructureTopology,omitempty"`
+	CPUPartitioning        *configv1.CPUPartitioningMode     `json:"cpuPartitioning,omitempty"`
 }
 
 // InfrastructureStatusApplyConfiguration constructs a declarative configuration of the InfrastructureStatus type for use with
@@ -37,7 +37,7 @@ func (b *InfrastructureStatusApplyConfiguration) WithInfrastructureName(value st
 // WithPlatform sets the Platform field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Platform field is set to the value of the last call.
-func (b *InfrastructureStatusApplyConfiguration) WithPlatform(value v1.PlatformType) *InfrastructureStatusApplyConfiguration {
+func (b *InfrastructureStatusApplyConfiguration) WithPlatform(value configv1.PlatformType) *InfrastructureStatusApplyConfiguration {
 	b.Platform = &value
 	return b
 }
@@ -77,7 +77,7 @@ func (b *InfrastructureStatusApplyConfiguration) WithAPIServerInternalURL(value 
 // WithControlPlaneTopology sets the ControlPlaneTopology field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ControlPlaneTopology field is set to the value of the last call.
-func (b *InfrastructureStatusApplyConfiguration) WithControlPlaneTopology(value v1.TopologyMode) *InfrastructureStatusApplyConfiguration {
+func (b *InfrastructureStatusApplyConfiguration) WithControlPlaneTopology(value configv1.TopologyMode) *InfrastructureStatusApplyConfiguration {
 	b.ControlPlaneTopology = &value
 	return b
 }
@@ -85,7 +85,7 @@ func (b *InfrastructureStatusApplyConfiguration) WithControlPlaneTopology(value 
 // WithInfrastructureTopology sets the InfrastructureTopology field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the InfrastructureTopology field is set to the value of the last call.
-func (b *InfrastructureStatusApplyConfiguration) WithInfrastructureTopology(value v1.TopologyMode) *InfrastructureStatusApplyConfiguration {
+func (b *InfrastructureStatusApplyConfiguration) WithInfrastructureTopology(value configv1.TopologyMode) *InfrastructureStatusApplyConfiguration {
 	b.InfrastructureTopology = &value
 	return b
 }
@@ -93,7 +93,7 @@ func (b *InfrastructureStatusApplyConfiguration) WithInfrastructureTopology(valu
 // WithCPUPartitioning sets the CPUPartitioning field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the CPUPartitioning field is set to the value of the last call.
-func (b *InfrastructureStatusApplyConfiguration) WithCPUPartitioning(value v1.CPUPartitioningMode) *InfrastructureStatusApplyConfiguration {
+func (b *InfrastructureStatusApplyConfiguration) WithCPUPartitioning(value configv1.CPUPartitioningMode) *InfrastructureStatusApplyConfiguration {
 	b.CPUPartitioning = &value
 	return b
 }

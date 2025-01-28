@@ -31,12 +31,13 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/ext"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/api/resource"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	"k8s.io/apiserver/pkg/cel/library"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -66,6 +67,10 @@ type CompilationResult struct {
 	OutputType  *cel.Type
 	Environment *cel.Env
 
+	// MaxCost represents the worst-case cost of the compiled MessageExpression in terms of CEL's cost units,
+	// as used by cel.EstimateCost.
+	MaxCost uint64
+
 	emptyMapVal ref.Val
 }
 
@@ -76,7 +81,7 @@ type Device struct {
 	// string attribute.
 	Driver     string
 	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resource.Quantity
+	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -87,10 +92,21 @@ func newCompiler() *compiler {
 	return &compiler{envset: mustBuildEnv()}
 }
 
+// Options contains several additional parameters
+// for [CompileCELExpression]. All of them have reasonable
+// defaults.
+type Options struct {
+	// EnvType allows to override the default environment type [environment.StoredExpressions].
+	EnvType *environment.Type
+
+	// CostLimit allows overriding the default runtime cost limit [resourceapi.CELSelectorExpressionMaxCost].
+	CostLimit *uint64
+}
+
 // CompileCELExpression returns a compiled CEL expression. It evaluates to bool.
 //
 // TODO (https://github.com/kubernetes/kubernetes/issues/125826): validate AST to detect invalid attribute names.
-func (c compiler) CompileCELExpression(expression string, envType environment.Type) CompilationResult {
+func (c compiler) CompileCELExpression(expression string, options Options) CompilationResult {
 	resultError := func(errorString string, errType apiservercel.ErrorType) CompilationResult {
 		return CompilationResult{
 			Error: &apiservercel.Error{
@@ -101,10 +117,14 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		}
 	}
 
-	env, err := c.envset.Env(envType)
+	env, err := c.envset.Env(ptr.Deref(options.EnvType, environment.StoredExpressions))
 	if err != nil {
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
+
+	// We don't have a SizeEstimator. The potential size of the input (= a
+	// device) is already declared in the definition of the environment.
+	estimator := &library.CostEstimator{}
 
 	ast, issues := env.Compile(expression)
 	if issues != nil {
@@ -121,18 +141,32 @@ func (c compiler) CompileCELExpression(expression string, envType environment.Ty
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
 	prog, err := env.Program(ast,
+		// The Kubernetes CEL base environment sets the VAP limit as runtime cost limit.
+		// DRA has its own default cost limit and also allows the caller to change that
+		// limit.
+		cel.CostLimit(ptr.Deref(options.CostLimit, resourceapi.CELSelectorExpressionMaxCost)),
 		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
 	)
 	if err != nil {
 		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
-	return CompilationResult{
+
+	compilationResult := CompilationResult{
 		Program:     prog,
 		Expression:  expression,
 		OutputType:  ast.OutputType(),
 		Environment: env,
 		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
 	}
+
+	costEst, err := env.EstimateCost(ast, estimator)
+	if err != nil {
+		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
+		return compilationResult
+	}
+
+	compilationResult.MaxCost = costEst.Max
+	return compilationResult
 }
 
 // getAttributeValue returns the native representation of the one value that
@@ -151,7 +185,7 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parse semantic version: %w", err)
 		}
-		return Semver{Version: v}, nil
+		return apiservercel.Semver{Version: v}, nil
 	default:
 		return nil, errors.New("unsupported attribute value")
 	}
@@ -159,14 +193,14 @@ func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
 
 var boolType = reflect.TypeOf(true)
 
-func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, error) {
+func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (bool, *cel.EvalDetails, error) {
 	// TODO (future): avoid building these maps and instead use a proxy
 	// which wraps the underlying maps and directly looks up values.
 	attributes := make(map[string]any)
 	for name, attr := range input.Attributes {
 		value, err := getAttributeValue(attr)
 		if err != nil {
-			return false, fmt.Errorf("attribute %s: %w", name, err)
+			return false, nil, fmt.Errorf("attribute %s: %w", name, err)
 		}
 		domain, id := parseQualifiedName(name, input.Driver)
 		if attributes[domain] == nil {
@@ -176,12 +210,12 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	}
 
 	capacity := make(map[string]any)
-	for name, quantity := range input.Capacity {
+	for name, cap := range input.Capacity {
 		domain, id := parseQualifiedName(name, input.Driver)
 		if capacity[domain] == nil {
 			capacity[domain] = make(map[string]apiservercel.Quantity)
 		}
-		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &quantity}
+		capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
 	}
 
 	variables := map[string]any{
@@ -192,23 +226,23 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 		},
 	}
 
-	result, _, err := c.Program.ContextEval(ctx, variables)
+	result, details, err := c.Program.ContextEval(ctx, variables)
 	if err != nil {
-		return false, err
+		return false, details, err
 	}
 	resultAny, err := result.ConvertToNative(boolType)
 	if err != nil {
-		return false, fmt.Errorf("CEL result of type %s could not be converted to bool: %w", result.Type().TypeName(), err)
+		return false, details, fmt.Errorf("CEL result of type %s could not be converted to bool: %w", result.Type().TypeName(), err)
 	}
 	resultBool, ok := resultAny.(bool)
 	if !ok {
-		return false, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
+		return false, details, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
 	}
-	return resultBool, nil
+	return resultBool, details, nil
 }
 
 func mustBuildEnv() *environment.EnvSet {
-	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), false /* strictCost */)
+	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true /* strictCost */)
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
 		return apiservercel.NewDeclField(name, declType, required, nil, nil)
 	}
@@ -227,16 +261,11 @@ func mustBuildEnv() *environment.EnvSet {
 
 	versioned := []environment.VersionedOptions{
 		{
-			// Feature epoch was actually 1.31, but we artificially set it to 1.0 because these
-			// options should always be present.
-			//
-			// TODO (https://github.com/kubernetes/kubernetes/issues/123687): set this
-			// version properly before going to beta.
-			IntroducedVersion: version.MajorMinor(1, 0),
+			IntroducedVersion: version.MajorMinor(1, 31),
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
 
-				SemverLib(),
+				environment.UnversionedLib(library.SemverLib),
 
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
@@ -244,7 +273,7 @@ func mustBuildEnv() *environment.EnvSet {
 				// domain only needs to be given once:
 				//
 				//    cel.bind(dra, device.attributes["dra.example.com"], dra.oneBool && dra.anotherBool)
-				ext.Bindings(),
+				ext.Bindings(ext.BindingsVersion(0)),
 			},
 			DeclTypes: []*apiservercel.DeclType{
 				deviceType,

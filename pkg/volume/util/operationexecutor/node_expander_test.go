@@ -110,8 +110,19 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:       resource.MustParse("1G"),
 		},
 		{
-			name: "pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
+			name: "RWO volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
 			pvc:  getTestPVC("test-vol0", "2G", "2G", "2G", nil),
+			pv:   getTestPV("test-vol0", "2G"),
+
+			expectedResizeStatus:     "",
+			expectResizeCall:         false,
+			assumeResizeOpAsFinished: true,
+			expectFinalErrors:        false,
+			expectedStatusSize:       resource.MustParse("2G"),
+		},
+		{
+			name: "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
+			pvc:  addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany),
 			pv:   getTestPV("test-vol0", "2G"),
 
 			expectedResizeStatus:     "",
@@ -162,7 +173,8 @@ func TestNodeExpander(t *testing.T) {
 			ogInstance, _ := og.(*operationGenerator)
 			nodeExpander := newNodeExpander(resizeOp, ogInstance.kubeClient, ogInstance.recorder)
 
-			_, err, expansionResponse := nodeExpander.expandOnPlugin()
+			_, _, err := nodeExpander.expandOnPlugin()
+			expansionResponse := nodeExpander.testStatus
 
 			pvc = nodeExpander.pvc
 			pvcStatusCap := pvc.Status.Capacity[v1.ResourceStorage]
@@ -265,7 +277,7 @@ func (f *fakeActualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts MarkVolumeOp
 }
 
 // MarkVolumeAsResized implements ActualStateOfWorldMounterUpdater.
-func (f *fakeActualStateOfWorld) MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize *resource.Quantity) bool {
+func (f *fakeActualStateOfWorld) MarkVolumeAsResized(volumeName v1.UniqueVolumeName, claimSize resource.Quantity) bool {
 	panic("unimplemented")
 }
 

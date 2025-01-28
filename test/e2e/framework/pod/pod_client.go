@@ -266,7 +266,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 		}
 		// If the image policy is not PullAlways, the image must be in the pre-pull list and
 		// pre-pulled.
-		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrue(), "Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image)
+		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrueBecause("Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image))
 		// Do not pull images during the tests because the images in pre-pull list should have
 		// been prepulled.
 		c.ImagePullPolicy = v1.PullNever
@@ -308,8 +308,13 @@ func (c *PodClient) WaitForFinish(ctx context.Context, name string, timeout time
 
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(ctx context.Context, pod *v1.Pod) (*v1.Event, error) {
+	return c.WaitForErrorEventOrSuccessWithTimeout(ctx, pod, framework.PodStartTimeout)
+}
+
+// WaitForErrorEventOrSuccessWithTimeout waits for pod to succeed or an error event for that pod for a specified time
+func (c *PodClient) WaitForErrorEventOrSuccessWithTimeout(ctx context.Context, pod *v1.Pod, timeout time.Duration) (*v1.Event, error) {
 	var ev *v1.Event
-	err := wait.PollUntilContextTimeout(ctx, framework.Poll, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(ctx, framework.Poll, timeout, false, func(ctx context.Context) (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %w", err)

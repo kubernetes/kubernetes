@@ -381,7 +381,7 @@ func waitForCRDReady(crd *apiextensionsv1.CustomResourceDefinition, apiExtension
 	if err != nil {
 		return nil, err
 	}
-	return v1CRD, err
+	return v1CRD, nil
 }
 
 // CreateNewV1CustomResourceDefinitionWatchUnsafe creates the CRD and makes sure
@@ -404,7 +404,7 @@ func CreateNewV1CustomResourceDefinitionWatchUnsafe(v1CRD *apiextensionsv1.Custo
 		}
 	}
 
-	return v1CRD, err
+	return v1CRD, nil
 }
 
 // CreateNewV1CustomResourceDefinition creates the given CRD and makes sure its watch cache is primed on the server.

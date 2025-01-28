@@ -25,7 +25,6 @@ type Scheduler struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// spec holds user settable values for configuration
-	// +kubebuilder:validation:Required
 	// +required
 	Spec SchedulerSpec `json:"spec"`
 	// status holds observed values from the cluster. They may not be overridden.
@@ -74,7 +73,7 @@ type SchedulerSpec struct {
 	// would not be applied.
 	// +optional
 	DefaultNodeSelector string `json:"defaultNodeSelector,omitempty"`
-	// MastersSchedulable allows masters nodes to be schedulable. When this flag is
+	// mastersSchedulable allows masters nodes to be schedulable. When this flag is
 	// turned on, all the master nodes in the cluster will be made schedulable,
 	// so that workload pods can run on them. The default value for this field is false,
 	// meaning none of the master nodes are schedulable.

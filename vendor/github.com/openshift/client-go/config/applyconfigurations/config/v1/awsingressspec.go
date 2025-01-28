@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // AWSIngressSpecApplyConfiguration represents a declarative configuration of the AWSIngressSpec type for use
 // with apply.
 type AWSIngressSpecApplyConfiguration struct {
-	Type *v1.AWSLBType `json:"type,omitempty"`
+	Type *configv1.AWSLBType `json:"type,omitempty"`
 }
 
 // AWSIngressSpecApplyConfiguration constructs a declarative configuration of the AWSIngressSpec type for use with
@@ -21,7 +21,7 @@ func AWSIngressSpec() *AWSIngressSpecApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *AWSIngressSpecApplyConfiguration) WithType(value v1.AWSLBType) *AWSIngressSpecApplyConfiguration {
+func (b *AWSIngressSpecApplyConfiguration) WithType(value configv1.AWSLBType) *AWSIngressSpecApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -656,7 +656,7 @@ errors=$(
 signals=$(
 	echo '#include <signal.h>' | $CC -x c - -E -dM $ccflags |
 	awk '$1=="#define" && $2 ~ /^SIG[A-Z0-9]+$/ { print $2 }' |
-	grep -v 'SIGSTKSIZE\|SIGSTKSZ\|SIGRT\|SIGMAX64' |
+	grep -E -v '(SIGSTKSIZE|SIGSTKSZ|SIGRT|SIGMAX64)' |
 	sort
 )
 
@@ -666,7 +666,7 @@ echo '#include <errno.h>' | $CC -x c - -E -dM $ccflags |
 	sort >_error.grep
 echo '#include <signal.h>' | $CC -x c - -E -dM $ccflags |
 	awk '$1=="#define" && $2 ~ /^SIG[A-Z0-9]+$/ { print "^\t" $2 "[ \t]*=" }' |
-	grep -v 'SIGSTKSIZE\|SIGSTKSZ\|SIGRT\|SIGMAX64' |
+	grep -E -v '(SIGSTKSIZE|SIGSTKSZ|SIGRT|SIGMAX64)' |
 	sort >_signal.grep
 
 echo '// mkerrors.sh' "$@"

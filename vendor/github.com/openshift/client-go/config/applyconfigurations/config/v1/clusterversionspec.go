@@ -3,15 +3,15 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // ClusterVersionSpecApplyConfiguration represents a declarative configuration of the ClusterVersionSpec type for use
 // with apply.
 type ClusterVersionSpecApplyConfiguration struct {
-	ClusterID       *v1.ClusterID                                     `json:"clusterID,omitempty"`
+	ClusterID       *configv1.ClusterID                               `json:"clusterID,omitempty"`
 	DesiredUpdate   *UpdateApplyConfiguration                         `json:"desiredUpdate,omitempty"`
-	Upstream        *v1.URL                                           `json:"upstream,omitempty"`
+	Upstream        *configv1.URL                                     `json:"upstream,omitempty"`
 	Channel         *string                                           `json:"channel,omitempty"`
 	Capabilities    *ClusterVersionCapabilitiesSpecApplyConfiguration `json:"capabilities,omitempty"`
 	SignatureStores []SignatureStoreApplyConfiguration                `json:"signatureStores,omitempty"`
@@ -27,7 +27,7 @@ func ClusterVersionSpec() *ClusterVersionSpecApplyConfiguration {
 // WithClusterID sets the ClusterID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ClusterID field is set to the value of the last call.
-func (b *ClusterVersionSpecApplyConfiguration) WithClusterID(value v1.ClusterID) *ClusterVersionSpecApplyConfiguration {
+func (b *ClusterVersionSpecApplyConfiguration) WithClusterID(value configv1.ClusterID) *ClusterVersionSpecApplyConfiguration {
 	b.ClusterID = &value
 	return b
 }
@@ -43,7 +43,7 @@ func (b *ClusterVersionSpecApplyConfiguration) WithDesiredUpdate(value *UpdateAp
 // WithUpstream sets the Upstream field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Upstream field is set to the value of the last call.
-func (b *ClusterVersionSpecApplyConfiguration) WithUpstream(value v1.URL) *ClusterVersionSpecApplyConfiguration {
+func (b *ClusterVersionSpecApplyConfiguration) WithUpstream(value configv1.URL) *ClusterVersionSpecApplyConfiguration {
 	b.Upstream = &value
 	return b
 }

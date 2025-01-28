@@ -3,14 +3,14 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/build/v1"
+	buildv1 "github.com/openshift/api/build/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // BuildSourceApplyConfiguration represents a declarative configuration of the BuildSource type for use
 // with apply.
 type BuildSourceApplyConfiguration struct {
-	Type         *v1.BuildSourceType                      `json:"type,omitempty"`
+	Type         *buildv1.BuildSourceType                 `json:"type,omitempty"`
 	Binary       *BinaryBuildSourceApplyConfiguration     `json:"binary,omitempty"`
 	Dockerfile   *string                                  `json:"dockerfile,omitempty"`
 	Git          *GitBuildSourceApplyConfiguration        `json:"git,omitempty"`
@@ -30,7 +30,7 @@ func BuildSource() *BuildSourceApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *BuildSourceApplyConfiguration) WithType(value v1.BuildSourceType) *BuildSourceApplyConfiguration {
+func (b *BuildSourceApplyConfiguration) WithType(value buildv1.BuildSourceType) *BuildSourceApplyConfiguration {
 	b.Type = &value
 	return b
 }

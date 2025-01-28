@@ -93,7 +93,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		s := New()
 		p, o, err := s.Probe("", "", 32, time.Second)
 		assert.Equal(t, probe.Failure, p)
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 		assert.Equal(t, "timeout: failed to connect service \":32\" within 1s: context deadline exceeded", o)
 	})
 	t.Run("Should: return nil error because connection closed", func(t *testing.T) {
@@ -105,13 +105,13 @@ func TestGrpcProber_Probe(t *testing.T) {
 		assert.Len(t, u, 3)
 
 		port, err := strconv.Atoi(u[2])
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 
 		// take some time to wait server boot
 		time.Sleep(2 * time.Second)
 		p, _, err := s.Probe("127.0.0.1", "", port, time.Second)
 		assert.Equal(t, probe.Failure, p)
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 	})
 	t.Run("Should: return nil error because server response not served", func(t *testing.T) {
 		s := New()
@@ -127,7 +127,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		p, o, err := s.Probe("0.0.0.0", "", port, time.Second)
 		assert.Equal(t, probe.Failure, p)
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 		assert.Equal(t, "service unhealthy (responded with \"NOT_SERVING\")", o)
 	})
 	t.Run("Should: return nil-error because server not response in time", func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		p, o, err := s.Probe("0.0.0.0", "", port, time.Second*2)
 		assert.Equal(t, probe.Failure, p)
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 		assert.Equal(t, "timeout: health rpc did not complete within 2s", o)
 
 	})
@@ -164,7 +164,7 @@ func TestGrpcProber_Probe(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		p, _, err := s.Probe("0.0.0.0", "", port, time.Second*2)
 		assert.Equal(t, probe.Success, p)
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 	})
 	t.Run("Should: not return error because check was success, when listen port is 0", func(t *testing.T) {
 		s := New()
@@ -181,6 +181,6 @@ func TestGrpcProber_Probe(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		p, _, err := s.Probe("0.0.0.0", "", port, time.Second*2)
 		assert.Equal(t, probe.Success, p)
-		assert.Equal(t, nil, err)
+		assert.NoError(t, err)
 	})
 }

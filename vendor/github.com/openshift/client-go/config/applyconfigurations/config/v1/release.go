@@ -3,22 +3,31 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // ReleaseApplyConfiguration represents a declarative configuration of the Release type for use
 // with apply.
 type ReleaseApplyConfiguration struct {
-	Version  *string  `json:"version,omitempty"`
-	Image    *string  `json:"image,omitempty"`
-	URL      *v1.URL  `json:"url,omitempty"`
-	Channels []string `json:"channels,omitempty"`
+	Architecture *configv1.ClusterVersionArchitecture `json:"architecture,omitempty"`
+	Version      *string                              `json:"version,omitempty"`
+	Image        *string                              `json:"image,omitempty"`
+	URL          *configv1.URL                        `json:"url,omitempty"`
+	Channels     []string                             `json:"channels,omitempty"`
 }
 
 // ReleaseApplyConfiguration constructs a declarative configuration of the Release type for use with
 // apply.
 func Release() *ReleaseApplyConfiguration {
 	return &ReleaseApplyConfiguration{}
+}
+
+// WithArchitecture sets the Architecture field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Architecture field is set to the value of the last call.
+func (b *ReleaseApplyConfiguration) WithArchitecture(value configv1.ClusterVersionArchitecture) *ReleaseApplyConfiguration {
+	b.Architecture = &value
+	return b
 }
 
 // WithVersion sets the Version field in the declarative configuration to the given value
@@ -40,7 +49,7 @@ func (b *ReleaseApplyConfiguration) WithImage(value string) *ReleaseApplyConfigu
 // WithURL sets the URL field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the URL field is set to the value of the last call.
-func (b *ReleaseApplyConfiguration) WithURL(value v1.URL) *ReleaseApplyConfiguration {
+func (b *ReleaseApplyConfiguration) WithURL(value configv1.URL) *ReleaseApplyConfiguration {
 	b.URL = &value
 	return b
 }

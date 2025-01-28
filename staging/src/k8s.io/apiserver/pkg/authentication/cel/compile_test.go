@@ -23,7 +23,6 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	apiservercel "k8s.io/apiserver/pkg/cel"
-	"k8s.io/apiserver/pkg/cel/environment"
 )
 
 func TestCompileClaimsExpression(t *testing.T) {
@@ -57,12 +56,10 @@ func TestCompileClaimsExpression(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, expressionAccessor := range tc.expressionAccessors {
-				_, err := compiler.CompileClaimsExpression(expressionAccessor)
+				_, err := NewDefaultCompiler().CompileClaimsExpression(expressionAccessor)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -86,12 +83,10 @@ func TestCompileUserExpression(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, expressionAccessor := range tc.expressionAccessors {
-				_, err := compiler.CompileUserExpression(expressionAccessor)
+				_, err := NewDefaultCompiler().CompileUserExpression(expressionAccessor)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
@@ -135,12 +130,10 @@ func TestCompileClaimsExpressionError(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, expressionAccessor := range tc.expressionAccessors {
-				_, err := compiler.CompileClaimsExpression(expressionAccessor)
+				_, err := NewDefaultCompiler().CompileClaimsExpression(expressionAccessor)
 				if err == nil {
 					t.Errorf("expected error but got nil")
 				}
@@ -205,12 +198,10 @@ func TestCompileUserExpressionError(t *testing.T) {
 		},
 	}
 
-	compiler := NewCompiler(environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true))
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, expressionAccessor := range tc.expressionAccessors {
-				_, err := compiler.CompileUserExpression(expressionAccessor)
+				_, err := NewDefaultCompiler().CompileUserExpression(expressionAccessor)
 				if err == nil {
 					t.Errorf("expected error but got nil")
 				}

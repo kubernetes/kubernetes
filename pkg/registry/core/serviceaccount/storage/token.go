@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -55,15 +56,16 @@ func (r *TokenREST) Destroy() {
 }
 
 type TokenREST struct {
-	svcaccts             rest.Getter
-	pods                 rest.Getter
-	secrets              rest.Getter
-	nodes                rest.Getter
-	issuer               token.TokenGenerator
-	auds                 authenticator.Audiences
-	audsSet              sets.String
-	maxExpirationSeconds int64
-	extendExpiration     bool
+	svcaccts              rest.Getter
+	pods                  rest.Getter
+	secrets               rest.Getter
+	nodes                 rest.Getter
+	issuer                token.TokenGenerator
+	auds                  authenticator.Audiences
+	audsSet               sets.String
+	maxExpirationSeconds  int64
+	extendExpiration      bool
+	isTokenSignerExternal bool
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
@@ -203,7 +205,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	}
 
 	if r.maxExpirationSeconds > 0 && req.Spec.ExpirationSeconds > r.maxExpirationSeconds {
-		//only positive value is valid
+		// only positive value is valid
 		warning.AddWarning(ctx, "", fmt.Sprintf("requested expiration of %d seconds shortened to %d seconds", req.Spec.ExpirationSeconds, r.maxExpirationSeconds))
 		req.Spec.ExpirationSeconds = r.maxExpirationSeconds
 	}
@@ -216,16 +218,22 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	exp := req.Spec.ExpirationSeconds
 	if r.extendExpiration && pod != nil && req.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(req.Spec.Audiences) {
 		warnAfter = exp
-		exp = token.ExpirationExtensionSeconds
+		// If token issuer is external-jwt-signer, then choose the smaller of
+		// ExpirationExtensionSeconds and max token lifetime supported by external signer.
+		if r.isTokenSignerExternal {
+			exp = min(r.maxExpirationSeconds, token.ExpirationExtensionSeconds)
+		} else {
+			exp = token.ExpirationExtensionSeconds
+		}
 	}
 
 	sc, pc, err := token.Claims(*svcacct, pod, secret, node, exp, warnAfter, req.Spec.Audiences)
 	if err != nil {
 		return nil, err
 	}
-	tokdata, err := r.issuer.GenerateToken(sc, pc)
+	tokdata, err := r.issuer.GenerateToken(ctx, sc, pc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate token: %v", err)
+		return nil, errors.NewInternalError(fmt.Errorf("failed to generate token: %v", err))
 	}
 
 	// populate status
@@ -235,7 +243,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 		ExpirationTimestamp: metav1.Time{Time: nowTime.Add(time.Duration(out.Spec.ExpirationSeconds) * time.Second)},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountTokenJTI) && len(sc.ID) > 0 {
-		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, serviceaccount.CredentialIDForJTI(sc.ID))
+		audit.AddAuditAnnotation(ctx, serviceaccount.IssuedCredentialIDAuditAnnotationKey, authenticationtokenjwt.CredentialIDForJTI(sc.ID))
 	}
 	return out, nil
 }

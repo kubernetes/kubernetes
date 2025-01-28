@@ -3,16 +3,16 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/security/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 )
 
 // RunAsUserStrategyOptionsApplyConfiguration represents a declarative configuration of the RunAsUserStrategyOptions type for use
 // with apply.
 type RunAsUserStrategyOptionsApplyConfiguration struct {
-	Type        *v1.RunAsUserStrategyType `json:"type,omitempty"`
-	UID         *int64                    `json:"uid,omitempty"`
-	UIDRangeMin *int64                    `json:"uidRangeMin,omitempty"`
-	UIDRangeMax *int64                    `json:"uidRangeMax,omitempty"`
+	Type        *securityv1.RunAsUserStrategyType `json:"type,omitempty"`
+	UID         *int64                            `json:"uid,omitempty"`
+	UIDRangeMin *int64                            `json:"uidRangeMin,omitempty"`
+	UIDRangeMax *int64                            `json:"uidRangeMax,omitempty"`
 }
 
 // RunAsUserStrategyOptionsApplyConfiguration constructs a declarative configuration of the RunAsUserStrategyOptions type for use with
@@ -24,7 +24,7 @@ func RunAsUserStrategyOptions() *RunAsUserStrategyOptionsApplyConfiguration {
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Type field is set to the value of the last call.
-func (b *RunAsUserStrategyOptionsApplyConfiguration) WithType(value v1.RunAsUserStrategyType) *RunAsUserStrategyOptionsApplyConfiguration {
+func (b *RunAsUserStrategyOptionsApplyConfiguration) WithType(value securityv1.RunAsUserStrategyType) *RunAsUserStrategyOptionsApplyConfiguration {
 	b.Type = &value
 	return b
 }

@@ -170,11 +170,12 @@ type ExprHelper interface {
 	// NewStructField creates a new struct field initializer from the field name and value.
 	NewStructField(field string, init ast.Expr, optional bool) ast.EntryExpr
 
-	// NewComprehension creates a new comprehension instruction.
+	// NewComprehension creates a new one-variable comprehension instruction.
 	//
 	// - iterRange represents the expression that resolves to a list or map where the elements or
 	//   keys (respectively) will be iterated over.
-	// - iterVar is the iteration variable name.
+	// - iterVar is the variable name for the list element value, or the map key, depending on the
+	//   range type.
 	// - accuVar is the accumulation variable name, typically parser.AccumulatorName.
 	// - accuInit is the initial expression whose value will be set for the accuVar prior to
 	//   folding.
@@ -186,11 +187,36 @@ type ExprHelper interface {
 	// environment in the step and condition expressions. Presently, the name __result__ is commonly
 	// used by built-in macros but this may change in the future.
 	NewComprehension(iterRange ast.Expr,
-		iterVar string,
+		iterVar,
 		accuVar string,
-		accuInit ast.Expr,
-		condition ast.Expr,
-		step ast.Expr,
+		accuInit,
+		condition,
+		step,
+		result ast.Expr) ast.Expr
+
+	// NewComprehensionTwoVar creates a new two-variable comprehension instruction.
+	//
+	// - iterRange represents the expression that resolves to a list or map where the elements or
+	//   keys (respectively) will be iterated over.
+	// - iterVar is the iteration variable assigned to the list index or the map key.
+	// - iterVar2 is the iteration variable assigned to the list element value or the map key value.
+	// - accuVar is the accumulation variable name, typically parser.AccumulatorName.
+	// - accuInit is the initial expression whose value will be set for the accuVar prior to
+	//   folding.
+	// - condition is the expression to test to determine whether to continue folding.
+	// - step is the expression to evaluation at the conclusion of a single fold iteration.
+	// - result is the computation to evaluate at the conclusion of the fold.
+	//
+	// The accuVar should not shadow variable names that you would like to reference within the
+	// environment in the step and condition expressions. Presently, the name __result__ is commonly
+	// used by built-in macros but this may change in the future.
+	NewComprehensionTwoVar(iterRange ast.Expr,
+		iterVar,
+		iterVar2,
+		accuVar string,
+		accuInit,
+		condition,
+		step,
 		result ast.Expr) ast.Expr
 
 	// NewIdent creates an identifier Expr value.
@@ -382,13 +408,11 @@ func makeQuantifier(kind quantifierKind, eh ExprHelper, target ast.Expr, args []
 		step = eh.NewCall(operators.LogicalOr, eh.NewAccuIdent(), args[1])
 		result = eh.NewAccuIdent()
 	case quantifierExistsOne:
-		zeroExpr := eh.NewLiteral(types.Int(0))
-		oneExpr := eh.NewLiteral(types.Int(1))
-		init = zeroExpr
+		init = eh.NewLiteral(types.Int(0))
 		condition = eh.NewLiteral(types.True)
 		step = eh.NewCall(operators.Conditional, args[1],
-			eh.NewCall(operators.Add, eh.NewAccuIdent(), oneExpr), eh.NewAccuIdent())
-		result = eh.NewCall(operators.Equals, eh.NewAccuIdent(), oneExpr)
+			eh.NewCall(operators.Add, eh.NewAccuIdent(), eh.NewLiteral(types.Int(1))), eh.NewAccuIdent())
+		result = eh.NewCall(operators.Equals, eh.NewAccuIdent(), eh.NewLiteral(types.Int(1)))
 	default:
 		return nil, eh.NewError(args[0].ID(), fmt.Sprintf("unrecognized quantifier '%v'", kind))
 	}

@@ -3,13 +3,13 @@
 package v1
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // DeploymentCauseImageTriggerApplyConfiguration represents a declarative configuration of the DeploymentCauseImageTrigger type for use
 // with apply.
 type DeploymentCauseImageTriggerApplyConfiguration struct {
-	From *v1.ObjectReference `json:"from,omitempty"`
+	From *corev1.ObjectReference `json:"from,omitempty"`
 }
 
 // DeploymentCauseImageTriggerApplyConfiguration constructs a declarative configuration of the DeploymentCauseImageTrigger type for use with
@@ -21,7 +21,7 @@ func DeploymentCauseImageTrigger() *DeploymentCauseImageTriggerApplyConfiguratio
 // WithFrom sets the From field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the From field is set to the value of the last call.
-func (b *DeploymentCauseImageTriggerApplyConfiguration) WithFrom(value v1.ObjectReference) *DeploymentCauseImageTriggerApplyConfiguration {
+func (b *DeploymentCauseImageTriggerApplyConfiguration) WithFrom(value corev1.ObjectReference) *DeploymentCauseImageTriggerApplyConfiguration {
 	b.From = &value
 	return b
 }

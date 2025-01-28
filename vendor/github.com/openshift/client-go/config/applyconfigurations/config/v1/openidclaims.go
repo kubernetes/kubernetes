@@ -3,16 +3,16 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 // OpenIDClaimsApplyConfiguration represents a declarative configuration of the OpenIDClaims type for use
 // with apply.
 type OpenIDClaimsApplyConfiguration struct {
-	PreferredUsername []string         `json:"preferredUsername,omitempty"`
-	Name              []string         `json:"name,omitempty"`
-	Email             []string         `json:"email,omitempty"`
-	Groups            []v1.OpenIDClaim `json:"groups,omitempty"`
+	PreferredUsername []string               `json:"preferredUsername,omitempty"`
+	Name              []string               `json:"name,omitempty"`
+	Email             []string               `json:"email,omitempty"`
+	Groups            []configv1.OpenIDClaim `json:"groups,omitempty"`
 }
 
 // OpenIDClaimsApplyConfiguration constructs a declarative configuration of the OpenIDClaims type for use with
@@ -54,7 +54,7 @@ func (b *OpenIDClaimsApplyConfiguration) WithEmail(values ...string) *OpenIDClai
 // WithGroups adds the given value to the Groups field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Groups field.
-func (b *OpenIDClaimsApplyConfiguration) WithGroups(values ...v1.OpenIDClaim) *OpenIDClaimsApplyConfiguration {
+func (b *OpenIDClaimsApplyConfiguration) WithGroups(values ...configv1.OpenIDClaim) *OpenIDClaimsApplyConfiguration {
 	for i := range values {
 		b.Groups = append(b.Groups, values[i])
 	}

@@ -3,10 +3,10 @@
 package v1
 
 import (
-	v1 "github.com/openshift/api/image/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/listers"
-	"k8s.io/client-go/tools/cache"
+	imagev1 "github.com/openshift/api/image/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ImageStreamTagLister helps list ImageStreamTags.
@@ -14,7 +14,7 @@ import (
 type ImageStreamTagLister interface {
 	// List lists all ImageStreamTags in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ImageStreamTag, err error)
+	List(selector labels.Selector) (ret []*imagev1.ImageStreamTag, err error)
 	// ImageStreamTags returns an object that can list and get ImageStreamTags.
 	ImageStreamTags(namespace string) ImageStreamTagNamespaceLister
 	ImageStreamTagListerExpansion
@@ -22,17 +22,17 @@ type ImageStreamTagLister interface {
 
 // imageStreamTagLister implements the ImageStreamTagLister interface.
 type imageStreamTagLister struct {
-	listers.ResourceIndexer[*v1.ImageStreamTag]
+	listers.ResourceIndexer[*imagev1.ImageStreamTag]
 }
 
 // NewImageStreamTagLister returns a new ImageStreamTagLister.
 func NewImageStreamTagLister(indexer cache.Indexer) ImageStreamTagLister {
-	return &imageStreamTagLister{listers.New[*v1.ImageStreamTag](indexer, v1.Resource("imagestreamtag"))}
+	return &imageStreamTagLister{listers.New[*imagev1.ImageStreamTag](indexer, imagev1.Resource("imagestreamtag"))}
 }
 
 // ImageStreamTags returns an object that can list and get ImageStreamTags.
 func (s *imageStreamTagLister) ImageStreamTags(namespace string) ImageStreamTagNamespaceLister {
-	return imageStreamTagNamespaceLister{listers.NewNamespaced[*v1.ImageStreamTag](s.ResourceIndexer, namespace)}
+	return imageStreamTagNamespaceLister{listers.NewNamespaced[*imagev1.ImageStreamTag](s.ResourceIndexer, namespace)}
 }
 
 // ImageStreamTagNamespaceLister helps list and get ImageStreamTags.
@@ -40,15 +40,15 @@ func (s *imageStreamTagLister) ImageStreamTags(namespace string) ImageStreamTagN
 type ImageStreamTagNamespaceLister interface {
 	// List lists all ImageStreamTags in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1.ImageStreamTag, err error)
+	List(selector labels.Selector) (ret []*imagev1.ImageStreamTag, err error)
 	// Get retrieves the ImageStreamTag from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1.ImageStreamTag, error)
+	Get(name string) (*imagev1.ImageStreamTag, error)
 	ImageStreamTagNamespaceListerExpansion
 }
 
 // imageStreamTagNamespaceLister implements the ImageStreamTagNamespaceLister
 // interface.
 type imageStreamTagNamespaceLister struct {
-	listers.ResourceIndexer[*v1.ImageStreamTag]
+	listers.ResourceIndexer[*imagev1.ImageStreamTag]
 }
