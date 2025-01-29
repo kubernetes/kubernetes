@@ -849,6 +849,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.27"
+- name: MatchLabelKeysInPodTopologySpreadSelectorMerge
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: MaxUnavailableStatefulSet
   versionedSpecs:
   - default: false

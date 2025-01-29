@@ -456,6 +456,12 @@ const (
 	// Enable MatchLabelKeys in PodTopologySpread.
 	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
 
+	// owner: @mochizuki875
+	// kep: https://kep.k8s.io/3243
+	//
+	// Enable merging key-value labels into LabelSelector corresponding to MatchLabelKeys in PodTopologySpread.
+	MatchLabelKeysInPodTopologySpreadSelectorMerge featuregate.Feature = "MatchLabelKeysInPodTopologySpreadSelectorMerge"
+
 	// owner: @krmayankk
 	//
 	// Enables maxUnavailable for StatefulSet
@@ -1482,6 +1488,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	MatchLabelKeysInPodTopologySpread: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	MatchLabelKeysInPodTopologySpreadSelectorMerge: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	MaxUnavailableStatefulSet: {
