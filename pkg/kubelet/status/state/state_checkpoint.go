@@ -142,14 +142,6 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) error {
 	return sc.storeState()
 }
 
-// ClearState clears the state and saves it in a checkpoint
-func (sc *stateCheckpoint) ClearState() error {
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
-	sc.cache.ClearState()
-	return sc.storeState()
-}
-
 type noopStateCheckpoint struct{}
 
 // NewNoopStateCheckpoint creates a dummy state checkpoint manager
@@ -176,9 +168,5 @@ func (sc *noopStateCheckpoint) SetContainerResourceAllocation(_ string, _ string
 func (sc *noopStateCheckpoint) SetPodResizeStatus(_ string, _ v1.PodResizeStatus) {}
 
 func (sc *noopStateCheckpoint) Delete(_ string, _ string) error {
-	return nil
-}
-
-func (sc *noopStateCheckpoint) ClearState() error {
 	return nil
 }
