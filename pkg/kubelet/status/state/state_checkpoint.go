@@ -116,13 +116,6 @@ func (sc *stateCheckpoint) GetPodResourceAllocation() PodResourceAllocation {
 	return sc.cache.GetPodResourceAllocation()
 }
 
-// GetPodResizeStatus returns the last resize decision for a pod
-func (sc *stateCheckpoint) GetPodResizeStatus(podUID string) v1.PodResizeStatus {
-	sc.mux.RLock()
-	defer sc.mux.RUnlock()
-	return sc.cache.GetPodResizeStatus(podUID)
-}
-
 // SetContainerResourceAllocation sets resources allocated to a pod's container
 func (sc *stateCheckpoint) SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error {
 	sc.mux.Lock()
@@ -137,13 +130,6 @@ func (sc *stateCheckpoint) SetPodResourceAllocation(a PodResourceAllocation) err
 	defer sc.mux.Unlock()
 	sc.cache.SetPodResourceAllocation(a)
 	return sc.storeState()
-}
-
-// SetPodResizeStatus sets the last resize decision for a pod
-func (sc *stateCheckpoint) SetPodResizeStatus(podUID string, resizeStatus v1.PodResizeStatus) {
-	sc.mux.Lock()
-	defer sc.mux.Unlock()
-	sc.cache.SetPodResizeStatus(podUID, resizeStatus)
 }
 
 // Delete deletes allocations for specified pod
@@ -177,10 +163,6 @@ func (sc *noopStateCheckpoint) GetPodResourceAllocation() PodResourceAllocation 
 	return nil
 }
 
-func (sc *noopStateCheckpoint) GetPodResizeStatus(_ string) v1.PodResizeStatus {
-	return ""
-}
-
 func (sc *noopStateCheckpoint) SetContainerResourceAllocation(_ string, _ string, _ v1.ResourceRequirements) error {
 	return nil
 }
@@ -188,8 +170,6 @@ func (sc *noopStateCheckpoint) SetContainerResourceAllocation(_ string, _ string
 func (sc *noopStateCheckpoint) SetPodResourceAllocation(_ PodResourceAllocation) error {
 	return nil
 }
-
-func (sc *noopStateCheckpoint) SetPodResizeStatus(_ string, _ v1.PodResizeStatus) {}
 
 func (sc *noopStateCheckpoint) Delete(_ string, _ string) error {
 	return nil
