@@ -50,7 +50,6 @@ type writer interface {
 	SetPodResourceAllocation(PodResourceAllocation) error
 	SetPodResizeStatus(podUID string, resizeStatus v1.PodResizeStatus)
 	Delete(podUID string, containerName string) error
-	ClearState() error
 }
 
 // State interface provides methods for tracking and setting pod resource allocation
