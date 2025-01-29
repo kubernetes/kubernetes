@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"errors"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"sync"
 	"time"
 
@@ -71,13 +72,6 @@ type Config struct {
 	// returns true, it means the reflector should proceed with the
 	// resync.
 	ShouldResync ShouldResyncFunc
-
-	// If true, when Process() returns an error, re-enqueue the object.
-	// TODO: add interface to let you inject a delay/backoff or drop
-	//       the object completely if desired. Pass the object in
-	//       question to this interface as a parameter.  This is probably moot
-	//       now that this functionality appears at a higher level.
-	RetryOnError bool
 
 	// Called whenever the ListAndWatch drops the connection with an error.
 	//
@@ -213,14 +207,10 @@ func (c *controller) processLoop(ctx context.Context) {
 		// TODO: Plumb through the ctx so that this can
 		// actually exit when the controller is stopped. Or just give up on this stuff
 		// ever being stoppable.
-		obj, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
+		_, err := c.config.Queue.Pop(PopProcessFunc(c.config.Process))
 		if err != nil {
 			if err == ErrFIFOClosed {
 				return
-			}
-			if c.config.RetryOnError {
-				// This is the safe way to re-enqueue.
-				c.config.Queue.AddIfNotPresent(obj)
 			}
 		}
 	}
@@ -603,11 +593,17 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 	// This will hold incoming changes. Note how we pass clientState in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KnownObjects:          clientState,
-		EmitDeltaTypeReplaced: true,
-		Transformer:           options.Transform,
-	})
+
+	var fifo Queue
+	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
+		fifo = NewRealFIFO(MetaNamespaceKeyFunc, clientState, options.Transform)
+	} else {
+		fifo = NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+			KnownObjects:          clientState,
+			EmitDeltaTypeReplaced: true,
+			Transformer:           options.Transform,
+		})
+	}
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -615,7 +611,6 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		ObjectType:       options.ObjectType,
 		FullResyncPeriod: options.ResyncPeriod,
 		MinWatchTimeout:  options.MinWatchTimeout,
-		RetryOnError:     false,
 
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
