@@ -60,6 +60,9 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 	crName := authzSubresource
 	verb := "get"
 	resource := "nodes"
+
+	ginkgo.By(fmt.Sprintf("Creating Service Account:%s/%s", ns, saName))
+
 	_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      saName,
@@ -68,12 +71,15 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 	}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
+	ginkgo.By(fmt.Sprintf("Creating ClusterRole %s with for %s/%s", crName, resource, authzSubresource))
+
 	_, err = f.ClientSet.RbacV1().ClusterRoles().Create(ctx, &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
+				APIGroups: []string{""},
 				Verbs:     []string{verb},
 				Resources: []string{resource + "/" + authzSubresource},
 			},
@@ -87,8 +93,12 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 		Name:      saName,
 	}
 
+	ginkgo.By(fmt.Sprintf("Creating ClusterRoleBinding with ClusterRole %s with subject %s/%s", crName, ns, saName))
+
 	err = e2eauth.BindClusterRole(ctx, f.ClientSet.RbacV1(), crName, ns, subject)
 	framework.ExpectNoError(err)
+
+	ginkgo.By("Waiting for Authorization Update.")
 
 	err = e2eauth.WaitForAuthzUpdate(ctx, f.ClientSet.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns, saName),
@@ -101,6 +111,8 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 		true,
 	)
 	framework.ExpectNoError(err)
+
+	ginkgo.By(fmt.Sprintf("Getting token for ServiceAccount %s/%s.", ns, saName))
 
 	tr, err := f.ClientSet.CoreV1().ServiceAccounts(ns).CreateToken(ctx, saName, &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
