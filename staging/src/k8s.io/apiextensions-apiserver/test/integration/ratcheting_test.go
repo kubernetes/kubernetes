@@ -81,6 +81,7 @@ type ratchetingTestContext struct {
 	*testing.T
 	DynamicClient       dynamic.Interface
 	APIExtensionsClient clientset.Interface
+	StatusSubresource   bool
 }
 
 type ratchetingTestOperation interface {
@@ -164,7 +165,12 @@ func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
 
 	patch := &unstructured.Unstructured{}
 	if obj, ok := a.patch.(map[string]interface{}); ok {
-		patch.Object = obj
+		patch.Object = map[string]interface{}{}
+
+		// Copy the map at the top level to avoid modifying the original.
+		for k, v := range obj {
+			patch.Object[k] = v
+		}
 	} else if str, ok := a.patch.(string); ok {
 		str = FixTabsOrDie(str)
 		if err := utilyaml.NewYAMLOrJSONDecoder(strings.NewReader(str), len(str)).Decode(&patch.Object); err != nil {
@@ -174,24 +180,31 @@ func (a applyPatchOperation) Do(ctx *ratchetingTestContext) error {
 		return fmt.Errorf("invalid patch type: %T", a.patch)
 	}
 
+	if ctx.StatusSubresource {
+		patch.Object = map[string]interface{}{"status": patch.Object}
+	}
+
 	patch.SetKind(kind)
 	patch.SetAPIVersion(a.gvr.GroupVersion().String())
 	patch.SetName(a.name)
 	patch.SetNamespace("default")
 
-	_, err := ctx.DynamicClient.
-		Resource(a.gvr).
-		Namespace(patch.GetNamespace()).
-		Apply(
-			context.TODO(),
-			patch.GetName(),
-			patch,
-			metav1.ApplyOptions{
-				FieldManager: "manager",
-			})
+	c := ctx.DynamicClient.Resource(a.gvr).Namespace(patch.GetNamespace())
+	if ctx.StatusSubresource {
+		if _, err := c.Get(context.TODO(), patch.GetName(), metav1.GetOptions{}); apierrors.IsNotFound(err) {
+			// ApplyStatus will not automatically create an object, we must make sure it exists before we can
+			// apply the status to it.
+			_, err := c.Create(context.TODO(), patch, metav1.CreateOptions{})
+			if err != nil {
+				return err
+			}
+		}
 
+		_, err := c.ApplyStatus(context.TODO(), patch.GetName(), patch, metav1.ApplyOptions{FieldManager: "manager"})
+		return err
+	}
+	_, err := c.Apply(context.TODO(), patch.GetName(), patch, metav1.ApplyOptions{FieldManager: "manager"})
 	return err
-
 }
 
 func (a applyPatchOperation) Description() string {
@@ -219,6 +232,17 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			sch.Properties = map[string]apiextensionsv1.JSONSchemaProps{}
 		}
 
+		if ctx.StatusSubresource {
+			sch = &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"status": *sch,
+				},
+			}
+		}
+
+		// sentinel must be in the root level of the schema.
+		// Do not include this in the status schema.
 		uuidString := string(uuid.NewUUID())
 		sentinelName := "__ratcheting_sentinel_field__"
 		sch.Properties[sentinelName] = apiextensionsv1.JSONSchemaProps{
@@ -232,6 +256,7 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 			if v.Name != myCRDV1Beta1.Version {
 				continue
 			}
+
 			v.Schema.OpenAPIV3Schema = sch
 		}
 
@@ -253,7 +278,12 @@ func (u updateMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 				name: "sentinel-resource",
 				patch: map[string]interface{}{
 					sentinelName: fmt.Sprintf("invalid-%d", counter),
-				}}.Do(ctx)
+				}}.Do(&ratchetingTestContext{
+				T:                   ctx.T,
+				DynamicClient:       ctx.DynamicClient,
+				APIExtensionsClient: ctx.APIExtensionsClient,
+				StatusSubresource:   false, // Do not carry this over, sentinel check is in the root level.
+			})
 
 			if err == nil {
 				return false, errors.New("expected error when creating sentinel resource")
@@ -282,8 +312,17 @@ type patchMyCRDV1Beta1Schema struct {
 }
 
 func (p patchMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
+	patch := p.patch
+	if ctx.StatusSubresource {
+		patch = map[string]interface{}{
+			"properties": map[string]interface{}{
+				"status": patch,
+			},
+		}
+	}
+
 	var err error
-	patchJSON, err := json.Marshal(p.patch)
+	patchJSON, err := json.Marshal(patch)
 	if err != nil {
 		return err
 	}
@@ -315,7 +354,12 @@ func (p patchMyCRDV1Beta1Schema) Do(ctx *ratchetingTestContext) error {
 
 		return updateMyCRDV1Beta1Schema{
 			newSchema: &parsed,
-		}.Do(ctx)
+		}.Do(&ratchetingTestContext{
+			T:                   ctx.T,
+			DynamicClient:       ctx.DynamicClient,
+			APIExtensionsClient: ctx.APIExtensionsClient,
+			StatusSubresource:   false, // We have already handled the status subresource.
+		})
 	}
 
 	return fmt.Errorf("could not find version %v in CRD %v", myCRDV1Beta1.Version, myCRD.Name)
@@ -329,6 +373,7 @@ type ratchetingTestCase struct {
 	Name       string
 	Disabled   bool
 	Operations []ratchetingTestOperation
+	SkipStatus bool
 }
 
 func runTests(t *testing.T, cases []ratchetingTestCase) {
@@ -372,8 +417,14 @@ func runTests(t *testing.T, cases []ratchetingTestCase) {
 									},
 								},
 							},
+							"status": {
+								Type: "object",
+							},
 						},
 					},
+				},
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
 				},
 			}},
 			Names: apiextensionsv1.CustomResourceDefinitionNames{
@@ -394,13 +445,7 @@ func runTests(t *testing.T, cases []ratchetingTestCase) {
 			continue
 		}
 
-		t.Run(c.Name, func(t *testing.T) {
-			ctx := &ratchetingTestContext{
-				T:                   t,
-				DynamicClient:       dynamicClient,
-				APIExtensionsClient: apiExtensionClient,
-			}
-
+		run := func(t *testing.T, ctx *ratchetingTestContext) {
 			for i, op := range c.Operations {
 				t.Logf("Performing Operation: %v", op.Description())
 				if err := op.Do(ctx); err != nil {
@@ -413,7 +458,26 @@ func runTests(t *testing.T, cases []ratchetingTestCase) {
 			if err != nil {
 				t.Fatal(err)
 			}
+		}
+
+		t.Run(c.Name, func(t *testing.T) {
+			run(t, &ratchetingTestContext{
+				T:                   t,
+				DynamicClient:       dynamicClient,
+				APIExtensionsClient: apiExtensionClient,
+			})
 		})
+
+		if !c.SkipStatus {
+			t.Run("Status: "+c.Name, func(t *testing.T) {
+				run(t, &ratchetingTestContext{
+					T:                   t,
+					DynamicClient:       dynamicClient,
+					APIExtensionsClient: apiExtensionClient,
+					StatusSubresource:   true,
+				})
+			})
+		}
 	}
 }
 
@@ -1330,7 +1394,8 @@ func TestRatchetingFunctionality(t *testing.T) {
 			},
 		},
 		{
-			Name: "CEL Optional OldSelf",
+			Name:       "CEL Optional OldSelf",
+			SkipStatus: true, // oldSelf can never be null for a status update.
 			Operations: []ratchetingTestOperation{
 				updateMyCRDV1Beta1Schema{&apiextensionsv1.JSONSchemaProps{
 					Type: "object",
