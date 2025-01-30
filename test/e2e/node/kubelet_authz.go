@@ -14,17 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package node
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
-	"net/http"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -34,34 +31,39 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("Kubelet Authz", feature.KubeletFineGrainedAuthz, func() {
+var _ = SIGDescribe(feature.KubeletFineGrainedAuthz, func() {
 	f := framework.NewDefaultFramework("kubelet-authz-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+
 	ginkgo.Context("when calling kubelet API", func() {
 		ginkgo.It("check /healthz enpoint is accessible via nodes/healthz RBAC", func(ctx context.Context) {
 			sc := runKubeletAuthzTest(ctx, f, "healthz", "healthz")
-			gomega.Expect(sc).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(sc).To(gomega.Equal("200"))
 		})
 		ginkgo.It("check /healthz enpoint is accessible via nodes/proxy RBAC", func(ctx context.Context) {
 			sc := runKubeletAuthzTest(ctx, f, "healthz", "proxy")
-			gomega.Expect(sc).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(sc).To(gomega.Equal("200"))
 		})
 		ginkgo.It("check /healthz enpoint is not accessible via nodes/configz RBAC", func(ctx context.Context) {
 			sc := runKubeletAuthzTest(ctx, f, "healthz", "configz")
-			gomega.Expect(sc).To(gomega.Equal(http.StatusUnauthorized))
+			gomega.Expect(sc).To(gomega.Equal("403"))
 		})
 	})
 })
 
-func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, authzSubresource string) int {
+func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, authzSubresource string) string {
 	ns := f.Namespace.Name
 	saName := authzSubresource
 	crName := authzSubresource
 	verb := "get"
 	resource := "nodes"
 
-	ginkgo.By(fmt.Sprintf("Creating Service Account:%s/%s", ns, saName))
+	ginkgo.By(fmt.Sprintf("Creating Service Account %s/%s", ns, saName))
 
 	_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -112,27 +114,41 @@ func runKubeletAuthzTest(ctx context.Context, f *framework.Framework, endpoint, 
 	)
 	framework.ExpectNoError(err)
 
-	ginkgo.By(fmt.Sprintf("Getting token for ServiceAccount %s/%s.", ns, saName))
-
-	tr, err := f.ClientSet.CoreV1().ServiceAccounts(ns).CreateToken(ctx, saName, &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-
-	resp, err := healthCheck(fmt.Sprintf("https://127.0.0.1:%d/%s", ports.KubeletPort, endpoint), tr.Status.Token)
-	framework.ExpectNoError(err)
-	return resp.StatusCode
-}
-
-func healthCheck(url, token string) (*http.Response, error) {
-	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
-	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	insecureHTTPClient := &http.Client{
-		Transport: insecureTransport,
+	pod := e2epod.NewAgnhostPod(ns, fmt.Sprintf("agnhost-pod-%s", authzSubresource), nil, nil, nil)
+	pod.Spec.ServiceAccountName = saName
+	pod.Spec.Containers[0].Env = []v1.EnvVar{
+		{
+			Name: "NODE_IP",
+			ValueFrom: &v1.EnvVarSource{
+				FieldRef: &v1.ObjectFieldSelector{
+					FieldPath: "status.hostIP",
+				},
+			},
+		},
 	}
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	ginkgo.By(fmt.Sprintf("Creating Pod %s in namespace %s with serviceaccount %s", pod.Name, pod.Namespace, pod.Spec.ServiceAccountName))
+
+	_ = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+	ginkgo.By("Running command in Pod")
+
+	var hostWarpStart, hostWarpEnd string
+	// IPv6 host must be wrapped within [] if you specify a port.
+	if framework.TestContext.ClusterIsIPv6() {
+		hostWarpStart = "["
+		hostWarpEnd = "]"
 	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	return insecureHTTPClient.Do(req)
+
+	result := e2eoutput.RunHostCmdOrDie(ns,
+		pod.Name,
+		fmt.Sprintf("curl -XGET -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s$NODE_IP%s:%d/%s",
+			"%{http_code}",
+			"cat /var/run/secrets/kubernetes.io/serviceaccount/token",
+			hostWarpStart,
+			hostWarpEnd,
+			ports.KubeletPort,
+			endpoint))
+
+	return result
 }
