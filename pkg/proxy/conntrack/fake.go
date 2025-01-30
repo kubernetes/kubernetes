@@ -34,9 +34,12 @@ type fakeHandler struct {
 
 	entries         []*netlink.ConntrackFlow
 	tableListErrors []error
+	deleteErrors    []error
 
 	// callsConntrackTableList is a counter that gets incremented each time ConntrackTableList is called
 	callsConntrackTableList int
+	// callsConntrackDeleteFilters is a counter that gets incremented each time ConntrackDeleteFilters is called
+	callsConntrackDeleteFilters int
 }
 
 // ConntrackTableList is part of netlinkHandler interface.
@@ -78,9 +81,45 @@ func (fake *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTable
 		fake.filters = append(fake.filters, netlinkFilter.(*conntrackFilter))
 	}
 
+	// flows is the total flows to be considered for deletion
 	var flows []*netlink.ConntrackFlow
-	before := len(fake.entries)
-	for _, flow := range fake.entries {
+	// remainingFlows is the total flows remaining after simulating the deletion
+	var remainingFlows []*netlink.ConntrackFlow
+
+	var err error
+
+	calls := fake.callsConntrackDeleteFilters
+	fake.callsConntrackDeleteFilters++
+
+	// we ignore the cases when deleteErrors is not configured at all, this will happen when called
+	// from outside the current package (fake-proxiers), we don't simulate any error in this case.
+	if len(fake.deleteErrors) > 0 {
+		// we panic when ConntrackDeleteFilters() is called more times than the length of configured
+		// deleteErrors. This indicates improper configuration of fakeHandler for the test.
+		if calls > len(fake.deleteErrors)-1 {
+			panic("exceeded the allowed number of ConntrackDeleteFilters calls")
+		} else {
+			err = fake.deleteErrors[calls]
+		}
+	}
+
+	// the actual implementation netlink.ConntrackDeleteFilters does a dump call internally
+	// before deleting the flow entries, which can return a partial list of entries. We simulate
+	// the same behaviour here in our fake implementation.
+	if errors.Is(err, unix.EINTR) {
+		randInt := rand.IntN(len(fake.entries))
+		// simulate deletion on partial list in case of interrupt
+		flows = fake.entries[:randInt]
+		remainingFlows = fake.entries[randInt:]
+	} else if err != nil {
+		remainingFlows = fake.entries
+	} else {
+		// simulate deletion on complete list of flows
+		flows = fake.entries
+	}
+
+	before := len(flows)
+	for _, flow := range flows {
 		var matched bool
 		for _, filter := range fake.filters {
 			matched = filter.MatchConntrackFlow(flow)
@@ -89,11 +128,11 @@ func (fake *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTable
 			}
 		}
 		if !matched {
-			flows = append(flows, flow)
+			remainingFlows = append(remainingFlows, flow)
 		}
 	}
-	fake.entries = flows
-	return uint(before - len(fake.entries)), nil
+	fake.entries = remainingFlows
+	return uint(before - len(fake.entries)), err
 }
 
 var _ netlinkHandler = (*fakeHandler)(nil)

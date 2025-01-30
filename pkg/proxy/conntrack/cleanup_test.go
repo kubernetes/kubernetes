@@ -281,6 +281,10 @@ func TestCleanStaleEntries(t *testing.T) {
 	// 2. Full result - second list call - not retried
 	// 3. Full result - for the subsequent list call
 	fake.tableListErrors = []error{unix.EINTR, nil, nil}
+	// we will simulate 2 calls to ConntrackDeleteFilters:
+	// 1. Delete on partial result + EINTR - first delete call - retried
+	// 2. Delete on full result - second delete call - not retried
+	fake.deleteErrors = []error{unix.EINTR, nil}
 
 	ct := newConntracker(fake)
 	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
