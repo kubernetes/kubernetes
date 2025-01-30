@@ -55,8 +55,6 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
 	}
-
-	klog.V(2).InfoS("State checkpoint: restored pod resource allocation state from checkpoint")
 	return stateCheckpoint, nil
 }
 
@@ -73,6 +71,7 @@ func restoreState(checkpointManager checkpointmanager.CheckpointManager, checkpo
 		}
 		return nil, err
 	}
+	klog.V(2).InfoS("State checkpoint: restored pod resource allocation state from checkpoint")
 	praInfo, err := checkpoint.GetPodResourceAllocationInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pod resource allocation info: %w", err)
