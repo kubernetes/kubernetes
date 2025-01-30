@@ -20,7 +20,11 @@ limitations under the License.
 package conntrack
 
 import (
+	"errors"
+	"math/rand/v2"
+
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 type fakeHandler struct {
@@ -28,12 +32,41 @@ type fakeHandler struct {
 	ipFamily  netlink.InetFamily
 	filters   []*conntrackFilter
 
-	entries []*netlink.ConntrackFlow
+	entries         []*netlink.ConntrackFlow
+	tableListErrors []error
+
+	// callsConntrackTableList is a counter that gets incremented each time ConntrackTableList is called
+	callsConntrackTableList int
 }
 
 // ConntrackTableList is part of netlinkHandler interface.
 func (fake *fakeHandler) ConntrackTableList(_ netlink.ConntrackTableType, _ netlink.InetFamily) ([]*netlink.ConntrackFlow, error) {
-	return fake.entries, nil
+	// special case for consumers outside of this package (fake-proxiers) where cleanup is called
+	// on fakeHandler without any error mocking.
+	if len(fake.tableListErrors) == 0 {
+		return fake.entries, nil
+	}
+
+	calls := fake.callsConntrackTableList
+	fake.callsConntrackTableList++
+
+	// we panic when ConntrackTableList() is called more times than the length of configured
+	// tableListErrors. This indicates improper configuration of fakeHandler for the test.
+	if calls > len(fake.tableListErrors)-1 {
+		panic("exceeded the allowed number of ConntrackTableList calls")
+	}
+
+	var err = fake.tableListErrors[calls]
+	var flows []*netlink.ConntrackFlow
+
+	// return all flow entries if no error, a random subset if interrupted (EINTR), or no entries
+	// for any other error condition.
+	if errors.Is(err, unix.EINTR) {
+		flows = fake.entries[:rand.IntN(len(fake.entries))]
+	} else if err == nil {
+		flows = fake.entries
+	}
+	return flows, err
 }
 
 // ConntrackDeleteFilters is part of netlinkHandler interface.
