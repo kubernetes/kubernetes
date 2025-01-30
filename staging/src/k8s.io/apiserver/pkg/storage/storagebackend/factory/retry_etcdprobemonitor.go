@@ -26,14 +26,14 @@ func newRetryingETCD3ProberMonitor(c storagebackend.Config) (*etcd3RetryingProbe
 }
 
 func (t *etcd3RetryingProberMonitor) Probe(ctx context.Context) error {
-	return etcd3retry.OnError(ctx, etcd3retry.DefaultRetry, etcd3retry.IsRetriableEtcdError, func() error {
+	return etcd3retry.OnError(ctx, etcd3retry.DefaultRetry, etcd3retry.IsRetriableErrorOnRead, func() error {
 		return t.delegate.Probe(ctx)
 	})
 }
 
 func (t *etcd3RetryingProberMonitor) Monitor(ctx context.Context) (metrics.StorageMetrics, error) {
 	var ret metrics.StorageMetrics
-	err := etcd3retry.OnError(ctx, etcd3retry.DefaultRetry, etcd3retry.IsRetriableEtcdError, func() error {
+	err := etcd3retry.OnError(ctx, etcd3retry.DefaultRetry, etcd3retry.IsRetriableErrorOnRead, func() error {
 		var innerErr error
 		ret, innerErr = t.delegate.Monitor(ctx)
 		return innerErr
