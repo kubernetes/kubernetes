@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
@@ -297,11 +298,16 @@ func New(ctx context.Context,
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
 
 	var resourceClaimCache *assumecache.AssumeCache
+	var resourceSliceTracker *resourceslicetracker.Tracker
 	var draManager framework.SharedDRAManager
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
-		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, client, informerFactory)
+		resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, client, informerFactory)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't start resource slice tracker: %w", err)
+		}
+		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, resourceSliceTracker, client, informerFactory)
 	}
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
@@ -378,7 +384,7 @@ func New(ctx context.Context,
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
 
-	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, unionedGVKs(queueingHintsPerProfile)); err != nil {
+	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, unionedGVKs(queueingHintsPerProfile)); err != nil {
 		return nil, fmt.Errorf("adding event handlers: %w", err)
 	}
 

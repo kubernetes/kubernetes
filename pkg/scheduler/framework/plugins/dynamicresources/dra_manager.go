@@ -46,11 +46,8 @@ type DefaultDRAManager struct {
 	deviceClassLister    *deviceClassLister
 }
 
-func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
+func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, resourceSliceTracker *resourceslicetracker.Tracker, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
 	logger := klog.FromContext(ctx)
-
-	resourceSliceTracker, _ := resourceslicetracker.StartTracker(ctx, kubeClient, informerFactory)
-	// TODO: handle err   ^
 
 	manager := &DefaultDRAManager{
 		resourceClaimTracker: &claimTracker{
