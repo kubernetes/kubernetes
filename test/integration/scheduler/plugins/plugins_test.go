@@ -693,7 +693,7 @@ func TestPreFilterPlugin(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 			}
@@ -873,7 +873,7 @@ func TestPostFilterPlugin(t *testing.T) {
 					t.Errorf("Expected the score plugin to be called at least %v times, but got %v.", tt.expectScoreNumCalled, numScoreCalled)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 				if numFilterCalled := filterPlugin.deepCopy().numFilterCalled; numFilterCalled != tt.expectFilterNumCalled {
@@ -935,7 +935,7 @@ func TestScorePlugin(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				} else {
 					p, err := testutils.GetPod(testCtx.ClientSet, pod.Name, pod.Namespace)
@@ -971,7 +971,7 @@ func TestNormalizeScorePlugin(t *testing.T) {
 		t.Fatalf("Error while creating a test pod: %v", err)
 	}
 
-	if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+	if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 		t.Errorf("Expected the pod to be scheduled. error: %v", err)
 	}
 
@@ -1027,7 +1027,7 @@ func TestReservePluginReserve(t *testing.T) {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 			}
@@ -1147,7 +1147,7 @@ func TestPrebindPlugin(t *testing.T) {
 
 			if test.fail {
 				if test.succeedOnRetry {
-					if err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod, 10*time.Second); err != nil {
+					if err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
 						t.Errorf("Expected the pod to be schedulable on retry, but got an error: %v", err)
 					}
 				} else if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
@@ -1158,7 +1158,7 @@ func TestPrebindPlugin(t *testing.T) {
 				if err = testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be unschedulable")
 				}
-			} else if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+			} else if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 				t.Errorf("Expected the pod to be scheduled. error: %v", err)
 			}
 
@@ -1314,7 +1314,7 @@ func TestUnReserveReservePlugins(t *testing.T) {
 					}
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 
@@ -1396,7 +1396,7 @@ func TestUnReservePermitPlugins(t *testing.T) {
 					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 
@@ -1468,7 +1468,7 @@ func TestUnReservePreBindPlugins(t *testing.T) {
 					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 
@@ -1540,7 +1540,7 @@ func TestUnReserveBindPlugins(t *testing.T) {
 					t.Errorf("Reserve Plugin %s numUnreserveCalled = %d, want 1.", reservePlugin.name, reservePlugin.numUnreserveCalled)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 
@@ -1688,7 +1688,7 @@ func TestBindPlugin(t *testing.T) {
 
 			if test.expectBoundByScheduler || test.expectBoundByPlugin {
 				// bind plugins skipped to bind the pod
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Fatalf("Expected the pod to be scheduled. error: %v", err)
 				}
 				pod, err = testCtx.ClientSet.CoreV1().Pods(pod.Namespace).Get(testCtx.Ctx, pod.Name, metav1.GetOptions{})
@@ -1810,7 +1810,7 @@ func TestPostBindPlugin(t *testing.T) {
 					t.Errorf("Didn't expect the postbind plugin to be called %d times.", postBindPlugin.numPostBindCalled)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 				select {
@@ -1909,7 +1909,7 @@ func TestPermitPlugin(t *testing.T) {
 						t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 					}
 				} else {
-					if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+					if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 						t.Errorf("Expected the pod to be scheduled. error: %v", err)
 					}
 				}
@@ -1966,7 +1966,7 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	}
 
 	perPlugin2.allowAllPods()
-	if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+	if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 		t.Errorf("Expected the pod to be scheduled. error: %v", err)
 	}
 
@@ -2083,10 +2083,10 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 						permitPlugin.waitingPod, permitPlugin.rejectingPod)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, podA); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podA); err != nil {
 					t.Errorf("Expected the first pod to be scheduled. error: %v", err)
 				}
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, podB); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podB); err != nil {
 					t.Errorf("Expected the second pod to be scheduled. error: %v", err)
 				}
 				if !((permitPlugin.waitingPod == podA.Name && permitPlugin.allowingPod == podB.Name) ||
@@ -2150,7 +2150,7 @@ func TestFilterPlugin(t *testing.T) {
 					t.Errorf("Expected the filter plugin to be called at least 1 time, but got %v.", filterPlugin.numFilterCalled)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 				if filterPlugin.numFilterCalled != 1 {
@@ -2204,7 +2204,7 @@ func TestPreScorePlugin(t *testing.T) {
 					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 					t.Errorf("Expected the pod to be scheduled. error: %v", err)
 				}
 			}
@@ -2258,7 +2258,7 @@ func TestPreEnqueuePlugin(t *testing.T) {
 			}
 
 			if tt.admitEnqueue {
-				if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod, 10*time.Second); err != nil {
+				if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pod, 10*time.Second); err != nil {
 					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
 				}
 				// Also verify enqueuePlugin is called.
@@ -2396,7 +2396,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 					t.Fatalf("Error while creating the running pod: %v", err)
 				}
 				// Wait until the pod to be scheduled.
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, r); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, r); err != nil {
 					t.Fatalf("The running pod is expected to be scheduled: %v", err)
 				}
 			}
@@ -2425,7 +2425,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 						t.Fatalf("Error while deleting the waiting pod: %v", err)
 					}
 				}
-				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, p); err != nil {
+				if err = testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, p); err != nil {
 					t.Fatalf("Expected the preemptor pod to be scheduled. error: %v", err)
 				}
 			}
@@ -2592,7 +2592,7 @@ func TestActivatePods(t *testing.T) {
 
 	// Verify all pods to be scheduled.
 	for _, pod := range pods {
-		if err := testutils.WaitForPodToScheduleWithTimeout(cs, pod, wait.ForeverTestTimeout); err != nil {
+		if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, cs, pod, wait.ForeverTestTimeout); err != nil {
 			t.Fatalf("Failed to wait for Pod %v to be schedulable: %v", pod.Name, err)
 		}
 	}
@@ -2768,7 +2768,7 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 				}
 
 				// Wait for the pod schedulabled.
-				if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pausePod, 10*time.Second); err != nil {
+				if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, pausePod, 10*time.Second); err != nil {
 					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
 					return
 				}
@@ -2810,7 +2810,7 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 				}
 
 				if expectedScheduled {
-					if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
+					if err := testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, gatedPod, 10*time.Second); err != nil {
 						t.Errorf("Expected the pod to be schedulable, but got: %v", err)
 					}
 					return

@@ -2165,7 +2165,7 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 			if err := tt.update(testCtx.ClientSet, testCtx.NS.Name); err != nil {
 				t.Fatal(err)
 			}
-			if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+			if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 				t.Errorf("Pod %v was not scheduled: %v", pod.Name, err)
 			}
 			// Make sure pending queue is empty.
