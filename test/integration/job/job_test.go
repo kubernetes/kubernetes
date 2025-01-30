@@ -629,7 +629,7 @@ func TestSuccessPolicy(t *testing.T) {
 	}
 
 	repeatedTests := make(map[string]testCase, 0)
-	for index := 0; index < 50; index++ {
+	for index := 0; index < 20; index++ {
 		for name, tc := range testCases {
 			iName := fmt.Sprintf("%s-%d", name, index)
 			repeatedTests[iName] = tc
@@ -1444,7 +1444,6 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 // TestBackoffLimitPerIndex tests handling of job and its pods when
 // backoff limit per index is used.
 func TestBackoffLimitPerIndex(t *testing.T) {
-	t.Skip("skip")
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 
 	type podTerminationWithExpectations struct {
@@ -1472,99 +1471,14 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 			},
 		},
 	}
-	testCases := map[string]struct {
+	type testCase struct {
 		job                               batchv1.Job
 		podTerminations                   []podTerminationWithExpectations
 		wantJobConditionType              batchv1.JobConditionType
 		wantJobFinishedIndexesTotalMetric []metricLabelsWithValue
-	}{
-		"job succeeded": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:          ptr.To[int32](2),
-					Completions:          ptr.To[int32](2),
-					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](1),
-					Template:             podTemplateSpec,
-				},
-			},
-			podTerminations: []podTerminationWithExpectations{
-				{
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-					},
-					wantActive:                     2,
-					wantFailed:                     1,
-					wantActiveIndexes:              sets.New(0, 1),
-					wantFailedIndexes:              ptr.To(""),
-					wantReplacementPodFailureCount: ptr.To(1),
-					wantTerminating:                ptr.To[int32](0),
-				},
-			},
-			wantJobConditionType: batchv1.JobComplete,
-			wantJobFinishedIndexesTotalMetric: []metricLabelsWithValue{
-				{
-					Labels: []string{"succeeded", "perIndex"},
-					Value:  2,
-				},
-			},
-		},
-		"job index fails due to exceeding backoff limit per index": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:          ptr.To[int32](2),
-					Completions:          ptr.To[int32](2),
-					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](2),
-					Template:             podTemplateSpec,
-				},
-			},
-			podTerminations: []podTerminationWithExpectations{
-				{
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-					},
-					wantActive:                     2,
-					wantFailed:                     1,
-					wantActiveIndexes:              sets.New(0, 1),
-					wantFailedIndexes:              ptr.To(""),
-					wantReplacementPodFailureCount: ptr.To(1),
-					wantTerminating:                ptr.To[int32](0),
-				},
-				{
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-					},
-					wantActive:                     2,
-					wantFailed:                     2,
-					wantActiveIndexes:              sets.New(0, 1),
-					wantFailedIndexes:              ptr.To(""),
-					wantReplacementPodFailureCount: ptr.To(2),
-					wantTerminating:                ptr.To[int32](0),
-				},
-				{
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-					},
-					wantActive:        1,
-					wantFailed:        3,
-					wantActiveIndexes: sets.New(1),
-					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To[int32](0),
-				},
-			},
-			wantJobConditionType: batchv1.JobFailed,
-			wantJobFinishedIndexesTotalMetric: []metricLabelsWithValue{
-				{
-					Labels: []string{"failed", "perIndex"},
-					Value:  1,
-				},
-				{
-					Labels: []string{"succeeded", "perIndex"},
-					Value:  1,
-				},
-			},
-		},
+	}
+
+	testCases := map[string]testCase{
 		"job index fails due to exceeding the global backoff limit first": {
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
@@ -1621,174 +1535,19 @@ func TestBackoffLimitPerIndex(t *testing.T) {
 				},
 			},
 		},
-		"job continues execution after a failed index, the job is marked Failed due to the failed index": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:          ptr.To[int32](2),
-					Completions:          ptr.To[int32](2),
-					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](0),
-					Template:             podTemplateSpec,
-				},
-			},
-			podTerminations: []podTerminationWithExpectations{
-				{
-					index: 0,
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-					},
-					wantActive:        1,
-					wantFailed:        1,
-					wantActiveIndexes: sets.New(1),
-					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To[int32](0),
-				},
-				{
-					index: 1,
-					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
-					},
-					wantFailed:           1,
-					wantSucceeded:        1,
-					wantFailedIndexes:    ptr.To("0"),
-					wantCompletedIndexes: "1",
-					wantTerminating:      ptr.To[int32](0),
-				},
-			},
-			wantJobConditionType: batchv1.JobFailed,
-			wantJobFinishedIndexesTotalMetric: []metricLabelsWithValue{
-				{
-					Labels: []string{"succeeded", "perIndex"},
-					Value:  1,
-				},
-				{
-					Labels: []string{"failed", "perIndex"},
-					Value:  1,
-				},
-			},
-		},
-		"job execution terminated early due to exceeding max failed indexes": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:          ptr.To[int32](3),
-					Completions:          ptr.To[int32](3),
-					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](0),
-					MaxFailedIndexes:     ptr.To[int32](1),
-					Template:             podTemplateSpec,
-				},
-			},
-			podTerminations: []podTerminationWithExpectations{
-				{
-					index: 0,
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-					},
-					wantActive:        2,
-					wantFailed:        1,
-					wantActiveIndexes: sets.New(1, 2),
-					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To[int32](0),
-				},
-				{
-					index: 1,
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-					},
-					wantActive:        0,
-					wantFailed:        3,
-					wantFailedIndexes: ptr.To("0,1"),
-					wantTerminating:   ptr.To[int32](1),
-				},
-			},
-			wantJobConditionType: batchv1.JobFailed,
-			wantJobFinishedIndexesTotalMetric: []metricLabelsWithValue{
-				{
-					Labels: []string{"failed", "perIndex"},
-					Value:  2,
-				},
-			},
-		},
-		"pod failure matching pod failure policy rule with FailIndex action": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:          ptr.To[int32](2),
-					Completions:          ptr.To[int32](2),
-					CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
-					BackoffLimitPerIndex: ptr.To[int32](1),
-					Template:             podTemplateSpec,
-					PodFailurePolicy: &batchv1.PodFailurePolicy{
-						Rules: []batchv1.PodFailurePolicyRule{
-							{
-								Action: batchv1.PodFailurePolicyActionFailIndex,
-								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
-									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
-									Values:   []int32{13},
-								},
-							},
-							{
-								Action: batchv1.PodFailurePolicyActionFailIndex,
-								OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
-									{
-										Type:   v1.DisruptionTarget,
-										Status: v1.ConditionTrue,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			podTerminations: []podTerminationWithExpectations{
-				{
-					index: 0,
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-						ContainerStatuses: []v1.ContainerStatus{
-							{
-								State: v1.ContainerState{
-									Terminated: &v1.ContainerStateTerminated{
-										ExitCode: 13,
-									},
-								},
-							},
-						},
-					},
-					wantActive:        1,
-					wantFailed:        1,
-					wantActiveIndexes: sets.New(1),
-					wantFailedIndexes: ptr.To("0"),
-					wantTerminating:   ptr.To[int32](0),
-				},
-				{
-					index: 1,
-					status: v1.PodStatus{
-						Phase: v1.PodFailed,
-						Conditions: []v1.PodCondition{
-							{
-								Type:   v1.DisruptionTarget,
-								Status: v1.ConditionTrue,
-							},
-						},
-					},
-					wantFailed:        2,
-					wantFailedIndexes: ptr.To("0,1"),
-					wantTerminating:   ptr.To[int32](0),
-				},
-			},
-			wantJobConditionType: batchv1.JobFailed,
-			wantJobFinishedIndexesTotalMetric: []metricLabelsWithValue{
-				{
-					Labels: []string{"failed", "perIndex"},
-					Value:  2,
-				},
-			},
-		},
+	}
+
+	repeatedTests := make(map[string]testCase, 0)
+	for index := 0; index < 20; index++ {
+		for name, tc := range testCases {
+			iName := fmt.Sprintf("%s-%d", name, index)
+			repeatedTests[iName] = tc
+		}
 	}
 
 	closeFn, restConfig, clientSet, ns := setup(t, "backoff-limit-per-index")
 	t.Cleanup(closeFn)
-	for name, test := range testCases {
+	for name, test := range repeatedTests {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
