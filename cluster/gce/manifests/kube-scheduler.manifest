@@ -1,0 +1,79 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"kube-scheduler",
+  "namespace": "kube-system",
+  "labels": {
+    "tier": "control-plane",
+    "component": "kube-scheduler"
+  }
+},
+"spec":{
+"securityContext": {
+  "seccompProfile": {
+      "type": "RuntimeDefault"
+  },
+  "runAsUser": {{runAsUser}},
+  "runAsGroup": {{runAsGroup}}
+},
+"priorityClassName": "system-node-critical",
+"priority": 2000001000,
+"hostNetwork": true,
+"containers":[
+    {
+    "name": "kube-scheduler",
+    "securityContext": {
+      "allowPrivilegeEscalation": false,
+      "capabilities": {
+        "drop": [
+          "all"
+        ]
+      }
+    },
+    "image": "{{pillar['kube_docker_registry']}}/kube-scheduler-amd64:{{pillar['kube-scheduler_docker_tag']}}",
+    "resources": {
+      "requests": {
+        "cpu": "{{cpurequest}}"
+      }
+    },
+    "command": [
+                 "/go-runner", "--log-file=/var/log/kube-scheduler.log", "--also-stdout=false", "--redirect-stderr=true",
+                 "/usr/local/bin/kube-scheduler",
+                 {{params}}
+               ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": 10259,
+        "scheme": "HTTPS",
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
+    "volumeMounts": [
+        {
+          "name": "logfile",
+          "mountPath": "/var/log/kube-scheduler.log",
+          "readOnly": false
+        },
+        {
+          "name": "srvkube",
+          "mountPath": "/etc/srv/kubernetes",
+          "readOnly": true
+        }
+      ]
+    }
+],
+"volumes":[
+  {
+    "name": "srvkube",
+    "hostPath": {"path": "/etc/srv/kubernetes"}
+  },
+  {
+    "name": "logfile",
+    "hostPath": {"path": "/var/log/kube-scheduler.log", "type": "FileOrCreate"}
+  }
+]
+}}

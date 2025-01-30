@@ -1,0 +1,7 @@
+linux/amd64=nginx:1.15-alpine
+linux/arm=arm32v6/nginx:1.15-alpine
+linux/arm64=arm64v8/nginx:1.15-alpine
+linux/ppc64le=ppc64le/nginx:1.15-alpine
+linux/s390x=s390x/nginx:1.15-alpine
+windows/amd64/1809=REGISTRY/busybox:1.29-2-windows-amd64-1809
+windows/amd64/ltsc2022=REGISTRY/busybox:1.29-2-windows-amd64-ltsc2022

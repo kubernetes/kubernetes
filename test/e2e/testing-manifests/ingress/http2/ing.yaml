@@ -1,0 +1,12 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echomap
+spec:
+  # kubemci requires a default backend.
+  defaultBackend:
+    service:
+      name: echoheaders
+      port:
+        number: 443
+

@@ -1,0 +1,117 @@
+/*
+Copyright 2023 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
+
+syntax = "proto3";
+
+package v1alpha3;
+option go_package = "k8s.io/kubelet/pkg/apis/dra/v1alpha4";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.goproto_stringer_all) = false;
+option (gogoproto.stringer_all) =  true;
+option (gogoproto.goproto_getters_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_unrecognized_all) = false;
+
+service Node {
+  // NodePrepareResources prepares several ResourceClaims
+  // for use on the node. If an error is returned, the
+  // response is ignored. Failures for individual claims
+  // can be reported inside NodePrepareResourcesResponse.
+  rpc NodePrepareResources (NodePrepareResourcesRequest)
+    returns (NodePrepareResourcesResponse) {}
+
+  // NodeUnprepareResources is the opposite of NodePrepareResources.
+  // The same error handling rules apply,
+  rpc NodeUnprepareResources (NodeUnprepareResourcesRequest)
+    returns (NodeUnprepareResourcesResponse) {}
+}
+
+message NodePrepareResourcesRequest {
+     // The list of ResourceClaims that are to be prepared.
+     repeated Claim claims = 1;
+}
+
+message NodePrepareResourcesResponse {
+    // The ResourceClaims for which preparation was done
+    // or attempted, with claim_uid as key.
+    //
+    // It is an error if some claim listed in NodePrepareResourcesRequest
+    // does not get prepared. NodePrepareResources
+    // will be called again for those that are missing.
+    map<string, NodePrepareResourceResponse> claims = 1;
+}
+
+message NodePrepareResourceResponse {
+    // These are the additional devices that kubelet must
+    // make available via the container runtime. A claim
+    // may have zero or more requests and each request
+    // may have zero or more devices.
+    repeated Device devices = 1;
+    // If non-empty, preparing the ResourceClaim failed.
+    // Devices are ignored in that case.
+    string error = 2;
+}
+
+message Device {
+    // The requests in the claim that this device is associated with.
+    // Optional. If empty, the device is associated with all requests.
+    repeated string request_names = 1;
+
+    // The pool which contains the device. Required.
+    string pool_name = 2;
+
+    // The device itself. Required.
+    string device_name = 3;
+
+    // A single device instance may map to several CDI device IDs.
+    // None is also valid.
+    repeated string cdi_device_ids = 4 [(gogoproto.customname) = "CDIDeviceIDs"];
+}
+
+message NodeUnprepareResourcesRequest {
+    // The list of ResourceClaims that are to be unprepared.
+    repeated Claim claims = 1;
+}
+
+message NodeUnprepareResourcesResponse {
+    // The ResourceClaims for which preparation was reverted.
+    // The same rules as for NodePrepareResourcesResponse.claims
+    // apply.
+    map<string, NodeUnprepareResourceResponse> claims = 1;
+}
+
+message NodeUnprepareResourceResponse {
+    // If non-empty, unpreparing the ResourceClaim failed.
+    string error = 1;
+}
+
+message Claim {
+    // The ResourceClaim namespace (ResourceClaim.meta.Namespace).
+    // This field is REQUIRED.
+    string namespace = 1;
+    // The UID of the Resource claim (ResourceClaim.meta.UUID).
+    // This field is REQUIRED.
+    string uid = 2 [(gogoproto.customname) = "UID"];
+    // The name of the Resource claim (ResourceClaim.meta.Name)
+    // This field is REQUIRED.
+    string name = 3;
+}

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-
+spec:
+  terminationGracePeriodSeconds: 0
+  containers:
+  - image: registry.k8s.io/pause:3.10
+    name: pause
+    ports:
+    - containerPort: 80
+    resources:
+      limits:
+        cpu: 900m
+        memory: 500Mi
+      requests:
+        cpu: 900m
+        memory: 500Mi

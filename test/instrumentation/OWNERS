@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-instrumentation-approvers
+  - logicalhan
+reviewers:
+  - sig-instrumentation-reviewers
+emeritus_approvers:
+  - piosz
+labels:
+  - sig/instrumentation

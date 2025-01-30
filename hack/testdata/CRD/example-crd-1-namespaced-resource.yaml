@@ -1,0 +1,7 @@
+apiVersion: test.com/v1
+kind: Example
+metadata:
+  name: test
+  namespace: default
+spec:
+  test: test

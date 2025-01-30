@@ -1,0 +1,8 @@
+arch:
+  - amd64
+  - ppc64le
+language: go
+
+go:
+  - "1.15"
+  - "1.16"

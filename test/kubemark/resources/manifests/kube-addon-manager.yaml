@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-addon-manager
+  namespace: kube-system
+  labels:
+    component: kube-addon-manager
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-addon-manager
+    image: {{kube_docker_registry}}/addon-manager/kube-addon-manager:v9.1.7
+    command:
+    - /bin/bash
+    - -c
+    - /opt/kube-addons-main.sh 1>>/var/log/kube-addon-manager.log 2>&1
+    resources:
+      requests:
+        cpu: 5m
+        memory: 50Mi
+    volumeMounts:
+    - name: addons
+      mountPath: /etc/kubernetes/
+      readOnly: true
+    - name: varlog
+      mountPath: /var/log/kube-addon-manager.log
+    - mountPath: /etc/srv/kubernetes/addon-manager/
+      name: srvkube
+      readOnly: true
+    env:
+    - name: KUBECTL_OPTS
+      value: '--kubeconfig=/etc/srv/kubernetes/addon-manager/kubeconfig'
+  volumes:
+  - name: addons
+    hostPath:
+      path: /etc/kubernetes/
+  - name: varlog
+    hostPath:
+      path: /var/log/kube-addon-manager.log
+      type: FileOrCreate
+  - hostPath:
+      path: /etc/srv/kubernetes/addon-manager/
+    name: srvkube

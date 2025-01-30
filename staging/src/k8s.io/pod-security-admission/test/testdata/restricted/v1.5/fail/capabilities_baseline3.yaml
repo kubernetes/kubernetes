@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: capabilities_baseline3
+spec:
+  containers:
+  - image: registry.k8s.io/pause
+    name: container1
+    securityContext:
+      capabilities:
+        add:
+        - CAP_CHOWN
+  initContainers:
+  - image: registry.k8s.io/pause
+    name: initcontainer1
+    securityContext:
+      capabilities: {}
+  securityContext:
+    runAsNonRoot: true

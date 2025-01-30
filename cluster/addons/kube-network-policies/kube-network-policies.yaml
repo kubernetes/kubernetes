@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-network-policies
+  namespace: kube-system
+  labels:
+    tier: node
+    app: kube-network-policies
+    k8s-app: kube-network-policies
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  selector:
+    matchLabels:
+      app: kube-network-policies
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: kube-network-policies
+        k8s-app: kube-network-policies
+    spec:
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: kube-network-policies
+      containers:
+      - name: kube-network-policies
+        image: registry.k8s.io/networking/kube-network-policies:v0.7.0
+        command:
+        - /bin/netpol
+        - --v=4
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
+      volumes:
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules

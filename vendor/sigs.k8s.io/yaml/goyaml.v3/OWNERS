@@ -1,0 +1,24 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- dims
+- jpbetz
+- smarterclayton
+- deads2k
+- sttts
+- liggitt
+- natasha41575
+- knverey
+reviewers:
+- dims
+- thockin
+- jpbetz
+- smarterclayton
+- deads2k
+- derekwaynecarr
+- mikedanese
+- liggitt
+- sttts
+- tallclair
+labels:
+- sig/api-machinery

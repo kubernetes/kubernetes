@@ -1,0 +1,43 @@
+syntax = "proto3";
+package membershippb;
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+// RaftAttributes represents the raft related attributes of an etcd member.
+message RaftAttributes {
+  // peerURLs is the list of peers in the raft cluster.
+  repeated string peer_urls = 1;
+  // isLearner indicates if the member is raft learner.
+  bool is_learner = 2;
+}
+
+// Attributes represents all the non-raft related attributes of an etcd member.
+message Attributes {
+  string name = 1;
+  repeated string client_urls = 2;
+}
+
+message Member {
+  uint64 ID = 1;
+  RaftAttributes raft_attributes = 2;
+  Attributes member_attributes = 3;
+}
+
+message ClusterVersionSetRequest {
+  string ver = 1;
+}
+
+message ClusterMemberAttrSetRequest {
+  uint64 member_ID = 1;
+  Attributes member_attributes = 2;
+}
+
+message DowngradeInfoSetRequest {
+  bool enabled = 1;
+  string ver = 2;
+}

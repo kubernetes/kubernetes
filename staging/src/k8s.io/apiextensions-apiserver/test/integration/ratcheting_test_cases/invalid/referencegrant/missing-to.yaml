@@ -1,0 +1,9 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: missing-to
+spec:
+  from:
+  - group: ""
+    kind: "Service"
+    namespace: "example"

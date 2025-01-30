@@ -1,0 +1,41 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "autoscaling/v2",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "categories": [
+        "all"
+      ],
+      "kind": "HorizontalPodAutoscaler",
+      "name": "horizontalpodautoscalers",
+      "namespaced": true,
+      "shortNames": [
+        "hpa"
+      ],
+      "singularName": "horizontalpodautoscaler",
+      "storageVersionHash": "qwQve8ut294=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "HorizontalPodAutoscaler",
+      "name": "horizontalpodautoscalers/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

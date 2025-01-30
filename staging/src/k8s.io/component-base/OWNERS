@@ -1,0 +1,15 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - sig-architecture-approvers
+reviewers:
+  - sig-architecture-approvers
+emeritus_approvers:
+  - jbeda
+  - lavalamp
+  - luxas
+  - mtaufen
+  - stealthybox
+  - sttts
+labels:
+  - sig/architecture

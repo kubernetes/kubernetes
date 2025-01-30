@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - aojea
+  - liggitt
+  - seans3
+reviewers:
+  - aojea
+  - liggitt
+  - seans3

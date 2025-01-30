@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mock-kmsv2-provider
+  namespace: kube-system
+  labels:
+    tier: control-plane
+    component: mock-kmsv2-provider
+spec:
+  # hostNetwork: true is required because the plugin is run as a static pod
+  # on the control plane node and needs to run before the CNI plugins are initialized.
+  hostNetwork: true
+  initContainers:
+  - args:
+    - |
+      #!/bin/sh
+      set -e
+      set -x
+
+      # if token exists, skip initialization
+      if [ $(ls -1 /var/lib/softhsm/tokens | wc -l) -ge 1 ]; then
+        echo "Skipping initialization of softhsm"
+        exit 0
+      fi
+
+      mkdir -p /var/lib/softhsm/tokens
+      apk add --update --no-cache ca-certificates jq
+      apk add --no-cache ccid opensc softhsm
+      
+      TOKEN_LABEL=$(jq -r '.tokenLabel' /etc/softhsm-config.json)
+      PIN=$(jq -r '.pin' /etc/softhsm-config.json)
+      MODULE_PATH=$(jq -r '.path' /etc/softhsm-config.json)
+
+      softhsm2-util --init-token --free --label $TOKEN_LABEL --pin $PIN --so-pin $PIN
+      pkcs11-tool --module $MODULE_PATH --keygen --key-type aes:32 --pin $PIN --token-label $TOKEN_LABEL --label kms-test
+    command:
+    - /bin/sh
+    - -c
+    image: alpine:latest
+    imagePullPolicy: IfNotPresent
+    name: init-mock-kmsv2-provider
+    volumeMounts:
+    - mountPath: /var/lib/softhsm/tokens
+      name: softhsm-tokens
+    - mountPath: /etc/softhsm-config.json
+      name: softhsm-config
+  containers:
+    - name: mock-kmsv2-provider
+      image: localhost:5000/mock-kms-provider:e2e
+      imagePullPolicy: IfNotPresent
+      volumeMounts:
+        - name: sock
+          mountPath: /tmp
+        - name: softhsm-config
+          mountPath: /etc/softhsm-config.json
+        - name: softhsm-tokens
+          mountPath: /var/lib/softhsm/tokens
+  volumes:
+    - name: sock
+      hostPath:
+        path: /tmp
+    - name: softhsm-config
+      hostPath:
+        path: /etc/softhsm-config.json
+        type: File
+    - name: softhsm-tokens
+      hostPath:
+        path: /var/lib/softhsm/tokens
+        type: DirectoryOrCreate

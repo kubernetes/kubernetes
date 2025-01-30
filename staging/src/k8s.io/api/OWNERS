@@ -1,0 +1,15 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# Disable inheritance as this is an api owners file
+options:
+  no_parent_owners: true
+filters:
+  ".*":
+    approvers:
+      - api-approvers
+    reviewers:
+      - api-reviewers
+  # only auto-label go file changes as kind/api-change
+  "\\.go$":
+    labels:
+      - kind/api-change

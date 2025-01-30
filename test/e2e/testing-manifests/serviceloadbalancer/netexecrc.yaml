@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: netexec
+spec:
+  # Assumes you have 3 nodes in your cluster.
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: netexec
+    spec:
+      containers:
+      - name: netexec
+        image: registry.k8s.io/e2e-test-images/agnhost:2.32
+        command: ["/agnhost", "netexec"]
+        ports:
+        - containerPort: 8080
+          # This is to force these pods to land on different hosts.
+          # TODO: use the downward api and get podname instead.
+          hostPort: 81

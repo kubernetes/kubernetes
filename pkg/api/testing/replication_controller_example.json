@@ -1,0 +1,82 @@
+{
+    "kind": "ReplicationController",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "elasticsearch-logging-controller",
+        "namespace": "default",
+        "uid": "aa76f162-e8e5-11e4-8fde-42010af09327",
+        "resourceVersion": "98",
+        "creationTimestamp": "2015-04-22T11:49:43Z",
+        "labels": {
+            "kubernetes.io/cluster-service": "true",
+            "name": "elasticsearch-logging"
+        }
+    },
+    "spec": {
+        "replicas": 1,
+        "selector": {
+            "name": "elasticsearch-logging"
+        },
+        "template": {
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "kubernetes.io/cluster-service": "true",
+                    "name": "elasticsearch-logging"
+                }
+            },
+            "spec": {
+                "volumes": [
+                    {
+                        "name": "es-persistent-storage",
+                        "hostPath": null,
+                        "emptyDir": {
+                            "medium": ""
+                        },
+                        "gcePersistentDisk": null,
+                        "awsElasticBlockStore": null,
+                        "gitRepo": null,
+                        "secret": null,
+                        "nfs": null,
+                        "iscsi": null,
+                        "glusterfs": null,
+                        "quobyte": null
+                    }
+                ],
+                "containers": [
+                    {
+                        "name": "elasticsearch-logging",
+                        "image": "registry.k8s.io/elasticsearch:1.0",
+                        "ports": [
+                            {
+                                "name": "db",
+                                "containerPort": 9200,
+                                "protocol": "TCP"
+                            },
+                            {
+                                "name": "transport",
+                                "containerPort": 9300,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "volumeMounts": [
+                            {
+                                "name": "es-persistent-storage",
+                                "mountPath": "/data"
+                            }
+                        ],
+                        "terminationMessagePath": "/dev/termination-log",
+                        "imagePullPolicy": "IfNotPresent",
+                        "capabilities": {}
+                    }
+                ],
+                "restartPolicy": "Always",
+                "dnsPolicy": "ClusterFirst"
+            }
+        }
+    },
+    "status": {
+        "replicas": 1
+    }
+}

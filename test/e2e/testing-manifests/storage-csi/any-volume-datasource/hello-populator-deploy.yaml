@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hello-account
+  namespace: hello
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: hello-role
+rules:
+  - apiGroups: [""]
+    resources: [persistentvolumes]
+    verbs: [get, list, watch, patch]
+  - apiGroups: [""]
+    resources: [persistentvolumeclaims]
+    verbs: [get, list, watch, patch, create, delete]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses]
+    verbs: [get, list, watch]
+
+  - apiGroups: [hello.example.com]
+    resources: [hellos]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: hello-binding
+subjects:
+  - kind: ServiceAccount
+    name: hello-account
+    namespace: hello
+roleRef:
+  kind: ClusterRole
+  name: hello-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-populator
+  namespace: hello
+spec:
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      serviceAccount: hello-account
+      containers:
+        - name: hello
+          image: registry.k8s.io/sig-storage/hello-populator:v1.0.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --mode=controller
+            - --image-name=registry.k8s.io/sig-storage/hello-populator:v1.0.1
+            - --http-endpoint=:8080
+          ports:
+            - containerPort: 8080
+              name: http-endpoint
+              protocol: TCP

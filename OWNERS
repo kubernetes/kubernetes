@@ -1,0 +1,32 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+filters:
+  ".*":
+    reviewers:
+      - dep-reviewers
+      - sig-architecture-approvers
+    approvers:
+      - dep-approvers # for go.mod/go.sum
+      - sig-architecture-approvers # for OWNERS_ALIASES and other root files
+    emeritus_approvers:
+      - bgrant0607
+      - brendandburns
+      - dchen1107
+      - jbeda
+      - lavalamp
+      - liggitt
+      - smarterclayton
+      - thockin
+      - wojtek-t
+  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
+  # dep-approvers
+  "go\\.(mod|sum)$":
+    required_reviewers:
+      - kubernetes/dep-approvers
+    labels:
+      - area/dependency
+  # metrics.go files are sig-instrumentation related, and should be tagged
+  # and reviewed by sig-instrumentation
+  "metrics\\.go$":
+    labels:
+      - sig/instrumentation

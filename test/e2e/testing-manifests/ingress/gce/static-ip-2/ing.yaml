@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: static-ip
+  # This annotation is added by the test upon allocating a staticip.
+  # annotations:
+  #  kubernetes.io/ingress.global-static-ip-name: "staticip"
+spec:
+  rules:
+  - host: ingress.test.com
+    http:
+      paths:
+      - path: /foo
+        pathType: "ImplementationSpecific"
+        backend:
+          service:
+            name: echoheaders-https
+            port:
+              number: 80

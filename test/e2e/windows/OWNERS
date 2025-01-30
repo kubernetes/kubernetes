@@ -1,0 +1,22 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - marosset
+  - jayunit100
+  - jsturtevant
+  - ravisantoshgudimetla
+reviewers:
+  - feiskyer
+  - jayunit100
+  - jsturtevant
+  - yujuhong
+  - ravisantoshgudimetla
+emeritus_approvers:
+  - benmoss
+  - chewong
+  - michmike
+  - dchen1107
+  - patricklang
+  - ddebroy
+labels:
+  - sig/windows

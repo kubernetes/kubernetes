@@ -1,0 +1,85 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "annotations": {
+            "deployment.kubernetes.io/revision": "1"
+        },
+        "creationTimestamp": "2021-06-23T17:01:10Z",
+        "generation": 5,
+        "labels": {
+            "app": "nginx"
+        },
+        "name": "nginx",
+        "namespace": "edit-test",
+        "resourceVersion": "121107",
+        "uid": "a598ee47-9635-482b-bacb-16c9e3ade05c"
+    },
+    "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 3,
+        "revisionHistoryLimit": 10,
+        "selector": {
+            "matchLabels": {
+                "app": "nginx"
+            }
+        },
+        "strategy": {
+            "rollingUpdate": {
+                "maxSurge": "25%",
+                "maxUnavailable": "25%"
+            },
+            "type": "RollingUpdate"
+        },
+        "template": {
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "app": "nginx"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "gcr.io/kakaraparthy-devel/nginx:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "nginx",
+                        "resources": {},
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File"
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "terminationGracePeriodSeconds": 30
+            }
+        }
+    },
+    "status": {
+        "availableReplicas": 3,
+        "conditions": [
+            {
+                "lastTransitionTime": "2021-06-23T17:01:10Z",
+                "lastUpdateTime": "2021-06-23T17:01:18Z",
+                "message": "ReplicaSet \"nginx-6f5fdbd667\" has successfully progressed.",
+                "reason": "NewReplicaSetAvailable",
+                "status": "True",
+                "type": "Progressing"
+            },
+            {
+                "lastTransitionTime": "2021-06-23T17:59:01Z",
+                "lastUpdateTime": "2021-06-23T17:59:01Z",
+                "message": "Deployment has minimum availability.",
+                "reason": "MinimumReplicasAvailable",
+                "status": "True",
+                "type": "Available"
+            }
+        ],
+        "observedGeneration": 5,
+        "readyReplicas": 3,
+        "replicas": 4,
+        "updatedReplicas": 3
+    }
+}
