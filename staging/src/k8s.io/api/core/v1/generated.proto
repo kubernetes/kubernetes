@@ -2897,6 +2897,9 @@ message NodeSystemInfo {
 
   // The Architecture reported by the node
   optional string architecture = 10;
+
+  // Swap Info reported by the node.
+  optional SwapInfo swapInfo = 11;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -6213,6 +6216,12 @@ message StorageOSVolumeSource {
   // credentials.  If not specified, default values will be attempted.
   // +optional
   optional LocalObjectReference secretRef = 5;
+}
+
+message SwapInfo {
+  // Total amount of swap memory in bytes.
+  // +optional
+  optional uint64 capacity = 1;
 }
 
 // Sysctl defines a kernel parameter to be set
