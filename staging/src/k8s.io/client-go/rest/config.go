@@ -149,7 +149,8 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
-	// Dial specifies the dial function for creating unencrypted TCP connections.
+	// Dial function is only used for the connection to the apiserver; streaming
+	// connections like SPDY or websockets will ignore this dialer.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
 
 	// Proxy is the proxy func to be used for all requests made by this
