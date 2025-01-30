@@ -35,6 +35,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -651,15 +652,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			driver := NewDriver(f, nodes, perNode(-1, nodes), devicesPerNode...)
 			b := newBuilder(f, driver)
 
-			ginkgo.It("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
-				// When pod scheduling encounters CEL runtime errors for some nodes, but not all,
-				// it should still not schedule the pod because there is something wrong with it.
-				// Scheduling it would make it harder to detect that there is a problem.
-				//
-				// This matches the "CEL-runtime-error-for-subset-of-nodes" unit test, except that
-				// here we try it in combination with the actual scheduler and can extend it with
-				// other checks, like event handling (future extension).
-
+			ginkgo.BeforeEach(func(ctx context.Context) {
 				gomega.Eventually(ctx, framework.ListObjects(f.ClientSet.ResourceV1beta1().ResourceSlices().List,
 					metav1.ListOptions{
 						FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driver.Name,
@@ -680,6 +673,16 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 							},
 						}))),
 				)))
+			})
+
+			ginkgo.It("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
+				// When pod scheduling encounters CEL runtime errors for some nodes, but not all,
+				// it should still not schedule the pod because there is something wrong with it.
+				// Scheduling it would make it harder to detect that there is a problem.
+				//
+				// This matches the "CEL-runtime-error-for-subset-of-nodes" unit test, except that
+				// here we try it in combination with the actual scheduler and can extend it with
+				// other checks, like event handling (future extension).
 
 				pod, template := b.podInline()
 				template.Spec.Spec.Devices.Requests[0].Selectors = append(template.Spec.Spec.Devices.Requests[0].Selectors,
@@ -706,6 +709,65 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					}
 					return false, nil
 				}), "pod must not get scheduled because of a CEL runtime error")
+			})
+
+			f.It("uses ResourceSlicePatches to inform scheduling decisions", feature.DRAAdminControlledDeviceAttributes, framework.WithFeatureGate(features.DRAAdminControlledDeviceAttributes), framework.WithFeatureGate(features.DynamicResourceAllocation), func(ctx context.Context) {
+				existsAttrKey := resourcealphaapi.FullyQualifiedName(driver.Name + "/exists")
+				resourceSlicePatch := &resourcealphaapi.ResourceSlicePatch{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "add-exists-attr-",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Priority: ptr.To[int32](1000),
+							Filter: &resourcealphaapi.DevicePatchFilter{
+								Driver: ptr.To(driver.Name),
+								Device: ptr.To(secondDevice),
+							},
+							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
+								existsAttrKey: {
+									DeviceAttribute: resourcealphaapi.DeviceAttribute{
+										BoolValue: ptr.To(false),
+									},
+								},
+							},
+						},
+					},
+				}
+				b.create(ctx, resourceSlicePatch)
+
+				// The ResourceSlicePatch is not instantly observed by the scheduler, so this Pod may not hit
+				// a terminal Pending phase right away.
+				var testPod *v1.Pod
+				gomega.Eventually(ctx, func(g gomega.Gomega, ctx context.Context) {
+					pod, template := b.podInline()
+					template.Spec.Spec.Devices.Requests[0].Selectors = append(template.Spec.Spec.Devices.Requests[0].Selectors,
+						resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].exists`, driver.Name),
+							},
+						},
+					)
+					createdObjs := b.create(ctx, pod, template)
+					createdPod := createdObjs[0]
+
+					g.Consistently(ctx, func(ctx context.Context) error {
+						var err error
+						testPod, err = b.f.ClientSet.CoreV1().Pods(createdPod.GetNamespace()).Get(ctx, createdPod.GetName(), metav1.GetOptions{})
+						if err != nil {
+							return fmt.Errorf("expected the test pod %s to exist: %w", pod.Name, err)
+						}
+						if testPod.Status.Phase != v1.PodPending {
+							return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod.Name, testPod.Status.Phase, v1.PodPending)
+						}
+						return nil
+					}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+				}).Should(gomega.Succeed())
+
+				*resourceSlicePatch.Spec.Devices.Priority += 1000
+				resourceSlicePatch.Spec.Devices.Attributes[existsAttrKey] = resourcealphaapi.NullableDeviceAttribute{DeviceAttribute: resourcealphaapi.DeviceAttribute{BoolValue: ptr.To(true)}}
+				b.create(ctx, resourceSlicePatch)
+				b.testPod(ctx, f, testPod)
 			})
 		})
 
@@ -1600,6 +1662,12 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := b.f.ClientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete node resource slice")
+			})
+		case *resourcealphaapi.ResourceSlicePatch:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha3().ResourceSlicePatches().Create(ctx, obj, metav1.CreateOptions{})
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := b.f.ClientSet.ResourceV1alpha3().ResourceSlicePatches().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "delete resource slice patch")
 			})
 		case *appsv1.DaemonSet:
 			createdObj, err = b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
