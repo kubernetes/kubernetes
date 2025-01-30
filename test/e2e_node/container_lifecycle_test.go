@@ -880,7 +880,7 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 						gomega.Expect(err).To(gomega.HaveOccurred())
 					})
 
-					f.It("should continue running liveness probes for restartable init containers and restart them while in preStop", f.WithNodeConformance(), func(ctx context.Context) {
+					f.It("should not continue running liveness probes for restartable init containers and restart them while in preStop", f.WithNodeConformance(), func(ctx context.Context) {
 						client := e2epod.NewPodClient(f)
 						podSpec := testPod()
 						restartableInit1 := "restartable-init-1"
@@ -913,6 +913,8 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 							PreStop: &v1.LifecycleHandler{
 								Exec: &v1.ExecAction{
 									Command: ExecCommand(prefixedName(PreStopPrefix, regular1), execCommand{
+										// Delay 10 secs not to make a race condition.
+										StartDelay:    10,
 										Delay:         40,
 										ExitCode:      0,
 										ContainerName: regular1,
@@ -937,8 +939,9 @@ var _ = SIGDescribe(framework.WithNodeConformance(), "Containers Lifecycle", fun
 						ginkgo.By("Analyzing results")
 						// FIXME ExpectNoError: this will be implemented in KEP 4438
 						// liveness probes are called for restartable init containers during pod termination
-						err = results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), prefixedName(LivenessPrefix, restartableInit1))
-						gomega.Expect(err).To(gomega.HaveOccurred())
+						err = results.StartsBefore(prefixedName(PreStopPrefix, regular1), prefixedName(LivenessPrefix, restartableInit1))
+						gomega.Expect(err).To(gomega.HaveOccurred(),
+							"%s should not start before %s", prefixedName(PreStopPrefix, regular1), prefixedName(LivenessPrefix, restartableInit1))
 						// FIXME ExpectNoError: this will be implemented in KEP 4438
 						// restartable init containers are restarted during pod termination
 						err = results.RunTogetherLhsFirst(prefixedName(PreStopPrefix, regular1), restartableInit1)
