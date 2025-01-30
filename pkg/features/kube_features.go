@@ -865,7 +865,7 @@ const (
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)) //nolint:forbidigo // TODO(https://github.com/kubernetes/enhancements/tree/master/keps/sig-architecture/4330-compatibility-versions): Remove this once we complete the migration to versioned feature gates
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
 	runtime.Must(zpagesfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 
