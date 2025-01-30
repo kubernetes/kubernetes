@@ -354,6 +354,12 @@ func MachineInfo(nodeName string,
 				// node status.
 				node.Status.Capacity[v1.ResourceName(removedResource)] = *resource.NewQuantity(int64(0), resource.DecimalSI)
 			}
+
+			if info.SwapCapacity != 0 {
+				node.Status.NodeInfo.SwapInfo = &v1.SwapInfo{
+					Capacity: info.SwapCapacity,
+				}
+			}
 		}
 
 		// Set Allocatable.
