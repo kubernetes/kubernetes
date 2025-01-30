@@ -667,7 +667,7 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 				testCase.description, container.Name, st.assignments)
 		}
 
-		if !reflect.DeepEqual(cset, testCase.expCSet) {
+		if !cset.Equals(testCase.expCSet) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
 				testCase.description, testCase.expCSet, cset)
 		}
@@ -732,7 +732,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 			policy.Allocate(st, pod, &container)
 		}
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
+		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
 				testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)
 		}
@@ -740,7 +740,7 @@ func TestStaticPolicyReuseCPUs(t *testing.T) {
 		// remove
 		policy.RemoveContainer(st, string(pod.UID), testCase.containerName)
 
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterRemove) {
+		if !st.defaultCPUSet.Equals(testCase.expCSetAfterRemove) {
 			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",
 				testCase.description, testCase.expCSetAfterRemove, st.defaultCPUSet)
 		}
@@ -792,7 +792,7 @@ func TestStaticPolicyDoNotReuseCPUs(t *testing.T) {
 					testCase.description, err)
 			}
 		}
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSetAfterAlloc) {
+		if !st.defaultCPUSet.Equals(testCase.expCSetAfterAlloc) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected default cpuset %v but got %v",
 				testCase.description, testCase.expCSetAfterAlloc, st.defaultCPUSet)
 		}
@@ -870,7 +870,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 
 		policy.RemoveContainer(st, testCase.podUID, testCase.containerName)
 
-		if !reflect.DeepEqual(st.defaultCPUSet, testCase.expCSet) {
+		if !st.defaultCPUSet.Equals(testCase.expCSet) {
 			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected default cpuset %v but got %v",
 				testCase.description, testCase.expCSet, st.defaultCPUSet)
 		}
@@ -973,7 +973,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(tc.expCSet, cset) {
+		if !tc.expCSet.Equals(cset) {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v but got %v",
 				tc.description, tc.expCSet, cset)
 		}
@@ -1152,7 +1152,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 					testCase.description, container.Name, st.assignments)
 			}
 
-			if !reflect.DeepEqual(cset, testCase.expCSet) {
+			if !cset.Equals(testCase.expCSet) {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
 					testCase.description, testCase.expCSet, cset)
 			}
