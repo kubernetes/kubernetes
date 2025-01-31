@@ -141,7 +141,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11, non-functional in v1.16+", fieldPath.Child("spec", "volumes").Index(i).Child("photonPersistentDisk")))
 		}
 		if v.GitRepo != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11", fieldPath.Child("spec", "volumes").Index(i).Child("gitRepo")))
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11, non-functional in v1.33+", fieldPath.Child("spec", "volumes").Index(i).Child("gitRepo")))
 		}
 		if v.ScaleIO != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.16, non-functional in v1.22+", fieldPath.Child("spec", "volumes").Index(i).Child("scaleIO")))

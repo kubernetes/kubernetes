@@ -174,7 +174,7 @@ func TestWarnings(t *testing.T) {
 					{Name: "s", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
 				}},
 			},
-			expected: []string{`spec.volumes[0].gitRepo: deprecated in v1.11`},
+			expected: []string{`spec.volumes[0].gitRepo: deprecated in v1.11, non-functional in v1.33+`},
 		},
 		{
 			name: "scaleIO",
