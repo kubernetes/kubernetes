@@ -126,7 +126,7 @@ func Until(ctx context.Context, initialResourceVersion string, watcherClient cac
 // The most frequent usage would be a command that needs to watch the "state of the world" and should't fail, like:
 // waiting for object reaching a state, "small" controllers, ...
 func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition PreconditionFunc, conditions ...ConditionFunc) (*watch.Event, error) {
-	indexer, informer, watcher, done := NewIndexerInformerWatcherWithContext(ctx, lw, objType)
+	indexer, informer, watcher, done := NewIndexerInformerWatcherWithLogger(klog.FromContext(ctx), lw, objType)
 	// We need to wait for the internal informers to fully stop so it's easier to reason about
 	// and it works with non-thread safe clients.
 	defer func() { <-done }()

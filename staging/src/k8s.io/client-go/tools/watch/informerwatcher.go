@@ -17,7 +17,6 @@ limitations under the License.
 package watch
 
 import (
-	"context"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -107,18 +106,15 @@ func (e *eventProcessor) stop() {
 // so you can use it anywhere where you'd have used a regular Watcher returned from Watch method.
 // it also returns a channel you can use to wait for the informers to fully shutdown.
 //
-// Contextual logging: NewIndexerInformerWatcherWithContext should be used instead of NewIndexerInformerWatcher in code which supports contextual logging.
+// Contextual logging: NewIndexerInformerWatcherWithLogger should be used instead of NewIndexerInformerWatcher in code which supports contextual logging.
 func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
-	return NewIndexerInformerWatcherWithContext(context.Background(), lw, objType)
+	return NewIndexerInformerWatcherWithLogger(klog.Background(), lw, objType)
 }
 
-// NewIndexerInformerWatcher will create an IndexerInformer and wrap it into watch.Interface
+// NewIndexerInformerWatcherWithLogger will create an IndexerInformer and wrap it into watch.Interface
 // so you can use it anywhere where you'd have used a regular Watcher returned from Watch method.
 // it also returns a channel you can use to wait for the informers to fully shutdown.
-//
-// Cancellation of the context has the same effect as calling [watch.Interface.Stop]. One or
-// the other can be used.
-func NewIndexerInformerWatcherWithContext(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
+func NewIndexerInformerWatcherWithLogger(logger klog.Logger, lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
 	ch := make(chan watch.Event)
 	w := watch.NewProxyWatcher(ch)
 	e := newEventProcessor(ch)
@@ -155,24 +151,12 @@ func NewIndexerInformerWatcherWithContext(ctx context.Context, lw cache.ListerWa
 	// This will get stopped, but without waiting for it.
 	go e.run()
 
-	logger := klog.FromContext(ctx)
-	if ctx.Done() != nil {
-		go func() {
-			select {
-			case <-ctx.Done():
-				// Map cancellation to Stop. The informer below only waits for that.
-				w.Stop()
-			case <-w.StopChan():
-			}
-		}()
-	}
-
 	doneCh := make(chan struct{})
 	go func() {
 		defer close(doneCh)
 		defer e.stop()
 		// Waiting for w.StopChan() is the traditional behavior which gets
-		// preserved here. Context cancellation is handled above.
+		// preserved here, with the logger added to support contextual logging.
 		ctx := wait.ContextForChannel(w.StopChan())
 		ctx = klog.NewContext(ctx, logger)
 		informer.RunWithContext(ctx)
