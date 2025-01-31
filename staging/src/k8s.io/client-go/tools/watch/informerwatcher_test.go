@@ -490,6 +490,6 @@ func TestInformerContext(t *testing.T) {
 		},
 	}
 
-	_, _, _, done := NewIndexerInformerWatcherWithContext(ctx, lw, &corev1.Secret{})
+	_, _, _, done := NewIndexerInformerWatcherWithLogger(logger, lw, &corev1.Secret{})
 	<-done
 }
