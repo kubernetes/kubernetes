@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -285,10 +286,11 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	}()
 	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
 	expectSyncedInformers := map[reflect.Type]bool{
-		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-		reflect.TypeOf(&v1.Node{}):                   true,
+		reflect.TypeOf(&resourceapi.DeviceClass{}):             true,
+		reflect.TypeOf(&resourceapi.ResourceClaim{}):           true,
+		reflect.TypeOf(&resourceapi.ResourceSlice{}):           true,
+		reflect.TypeOf(&resourcealphaapi.ResourceSlicePatch{}): true,
+		reflect.TypeOf(&v1.Node{}):                             true,
 	}
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
 	celCache := cel.NewCache(10)
