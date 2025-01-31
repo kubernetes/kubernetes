@@ -311,7 +311,7 @@ func (c *containerLogManager) processContainer(ctx context.Context, worker int) 
 }
 
 func (c *containerLogManager) rotateLog(ctx context.Context, id, log string) error {
-	// pattern is used to match all rotated files.
+	// pattern is used to match all rotated or split files.
 	pattern := fmt.Sprintf("%s.*", log)
 	logs, err := filepath.Glob(pattern)
 	if err != nil {
@@ -321,6 +321,17 @@ func (c *containerLogManager) rotateLog(ctx context.Context, id, log string) err
 	logs, err = c.cleanupUnusedLogs(logs)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup logs: %v", err)
+	}
+
+	logs, err = c.splitAndRotateLatestLog(log)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup logs: %v", err)
+	}
+
+	// get the logs list again after split
+	logs, err = filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("failed to list all log files with pattern %q: %v", pattern, err)
 	}
 
 	logs, err = c.removeExcessLogs(logs)
@@ -469,4 +480,81 @@ func (c *containerLogManager) rotateLatestLog(ctx context.Context, id, log strin
 		return fmt.Errorf("failed to reopen container log %q: %v", id, err)
 	}
 	return nil
+}
+
+// splitAndRotateLatestLog splits a log file into multiple smaller files if it exceeds MaxSize
+func (c *containerLogManager) splitAndRotateLatestLog(log string) ([]string, error) {
+	// Open the log file for reading
+	r, err := c.osInterface.Open(log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log %q: %v", log, err)
+	}
+	defer r.Close()
+
+	var parts []string
+	var partIndex int
+	var currentPart []byte
+	buffer := make([]byte, 1024) // Read in chunks of 1 KB (you can adjust this)
+
+	for {
+		n, err := r.Read(buffer)
+		if err != nil && err.Error() != "EOF" {
+			return nil, fmt.Errorf("failed to read from log %q: %v", log, err)
+		}
+		if n == 0 {
+			break // End of file
+		}
+
+		currentPart = append(currentPart, buffer[:n]...)
+
+		// If the part exceeds MaxSize, write it out and start a new part
+		if len(currentPart) > int(c.policy.MaxSize) {
+			partName := fmt.Sprintf("%s.part%d", log, partIndex)
+			f, err := c.osInterface.OpenFile(partName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open split log file %q: %v", partName, err)
+			}
+			defer f.Close()
+
+			if _, err := f.Write(currentPart); err != nil {
+				return nil, fmt.Errorf("failed to write split log %q: %v", partName, err)
+			}
+
+			parts = append(parts, partName)
+			partIndex++
+			currentPart = nil
+		}
+	}
+
+	// If there's leftover data in currentPart, write it as the last part
+	if len(currentPart) > 0 {
+		partName := fmt.Sprintf("%s.part%d", log, partIndex)
+		f, err := c.osInterface.OpenFile(partName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open split log file %q: %v", partName, err)
+		}
+		defer f.Close()
+
+		if _, err := f.Write(currentPart); err != nil {
+			return nil, fmt.Errorf("failed to write split log %q: %v", partName, err)
+		}
+
+		parts = append(parts, partName)
+	}
+
+	if renameErr := c.osInterface.Rename(parts[len(parts)-1], log); renameErr != nil {
+		klog.ErrorS(renameErr, "Failed to rename split log", "splitLog", parts[len(parts)-1], "newLog", log)
+	}
+
+	timestamp := c.clock.Now().Format(timestampFormat)
+	if len(parts) > 1 {
+		for i := 0; i < len(parts)-1; i++ {
+			rotated := fmt.Sprintf("%s.%s", parts[i], timestamp)
+			if err := c.osInterface.Rename(parts[i], rotated); err != nil {
+				klog.ErrorS(err, "Failed to rename split log", "splitLog", parts[i], "newLog", rotated)
+			}
+			parts[i] = rotated
+		}
+	}
+	return parts, nil
 }
