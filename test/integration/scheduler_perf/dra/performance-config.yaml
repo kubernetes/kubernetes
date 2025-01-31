@@ -386,3 +386,89 @@
       measurePods: 2500
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
+
+# SchedulingWithResourceSlicePatch uses a ResourceClaimTemplate selecting only
+# devices with an attribute added by a ResourceSlicePatch specific to each Node.
+# Node, pod and device counts are chosen so that the cluster gets filled up
+# completely.
+- name: SchedulingWithResourceSlicePatch
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAAdminControlledDeviceAttributes: true
+    # SchedulerQueueingHints: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceslicepatch.yaml
+    countParam: $nodesWithDRA # This template assumes one ResourceSlicePatch per DRA-enabled node
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-for-patch.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-for-patch.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 20
+  - name: 2000pods_200nodes
+    params:
+      nodesWithDRA: 200
+      nodesWithoutDRA: 0
+      initPods: 1000
+      measurePods: 1000
+      maxClaimsPerNode: 10
+  - name: 5000pods_500nodes
+    params:
+      nodesWithDRA: 500
+      nodesWithoutDRA: 0
+      initPods: 2500
+      measurePods: 2500
+      maxClaimsPerNode: 10
