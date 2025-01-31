@@ -18,11 +18,11 @@
 package internal
 
 var (
-	// WithBufferPool is implemented by the grpc package and returns a dial
+	// WithRecvBufferPool is implemented by the grpc package and returns a dial
 	// option to configure a shared buffer pool for a grpc.ClientConn.
-	WithBufferPool any // func (grpc.SharedBufferPool) grpc.DialOption
+	WithRecvBufferPool any // func (grpc.SharedBufferPool) grpc.DialOption
 
-	// BufferPool is implemented by the grpc package and returns a server
+	// RecvBufferPool is implemented by the grpc package and returns a server
 	// option to configure a shared buffer pool for a grpc.Server.
-	BufferPool any // func (grpc.SharedBufferPool) grpc.ServerOption
+	RecvBufferPool any // func (grpc.SharedBufferPool) grpc.ServerOption
 )

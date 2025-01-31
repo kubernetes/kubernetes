@@ -94,7 +94,7 @@ type Codec interface {
 	Name() string
 }
 
-var registeredCodecs = make(map[string]any)
+var registeredCodecs = make(map[string]Codec)
 
 // RegisterCodec registers the provided Codec for use with all gRPC clients and
 // servers.
@@ -126,6 +126,5 @@ func RegisterCodec(codec Codec) {
 //
 // The content-subtype is expected to be lowercase.
 func GetCodec(contentSubtype string) Codec {
-	c, _ := registeredCodecs[contentSubtype].(Codec)
-	return c
+	return registeredCodecs[contentSubtype]
 }

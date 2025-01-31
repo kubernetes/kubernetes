@@ -20,7 +20,6 @@ package grpc
 
 import (
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/mem"
 	"google.golang.org/grpc/status"
 )
 
@@ -32,10 +31,9 @@ import (
 // later release.
 type PreparedMsg struct {
 	// Struct for preparing msg before sending them
-	encodedData mem.BufferSlice
+	encodedData []byte
 	hdr         []byte
-	payload     mem.BufferSlice
-	pf          payloadFormat
+	payload     []byte
 }
 
 // Encode marshalls and compresses the message using the codec and compressor for the stream.
@@ -59,27 +57,11 @@ func (p *PreparedMsg) Encode(s Stream, msg any) error {
 	if err != nil {
 		return err
 	}
-
-	materializedData := data.Materialize()
-	data.Free()
-	p.encodedData = mem.BufferSlice{mem.NewBuffer(&materializedData, nil)}
-
-	// TODO: it should be possible to grab the bufferPool from the underlying
-	//  stream implementation with a type cast to its actual type (such as
-	//  addrConnStream) and accessing the buffer pool directly.
-	var compData mem.BufferSlice
-	compData, p.pf, err = compress(p.encodedData, rpcInfo.preloaderInfo.cp, rpcInfo.preloaderInfo.comp, mem.DefaultBufferPool())
+	p.encodedData = data
+	compData, err := compress(data, rpcInfo.preloaderInfo.cp, rpcInfo.preloaderInfo.comp)
 	if err != nil {
 		return err
 	}
-
-	if p.pf.isCompressed() {
-		materializedCompData := compData.Materialize()
-		compData.Free()
-		compData = mem.BufferSlice{mem.NewBuffer(&materializedCompData, nil)}
-	}
-
-	p.hdr, p.payload = msgHeader(p.encodedData, compData, p.pf)
-
+	p.hdr, p.payload = msgHeader(data, compData)
 	return nil
 }

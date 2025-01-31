@@ -317,32 +317,28 @@ func newBufWriter(conn net.Conn, batchSize int, pool *sync.Pool) *bufWriter {
 	return w
 }
 
-func (w *bufWriter) Write(b []byte) (int, error) {
+func (w *bufWriter) Write(b []byte) (n int, err error) {
 	if w.err != nil {
 		return 0, w.err
 	}
 	if w.batchSize == 0 { // Buffer has been disabled.
-		n, err := w.conn.Write(b)
+		n, err = w.conn.Write(b)
 		return n, toIOError(err)
 	}
 	if w.buf == nil {
 		b := w.pool.Get().(*[]byte)
 		w.buf = *b
 	}
-	written := 0
 	for len(b) > 0 {
-		copied := copy(w.buf[w.offset:], b)
-		b = b[copied:]
-		written += copied
-		w.offset += copied
-		if w.offset < w.batchSize {
-			continue
-		}
-		if err := w.flushKeepBuffer(); err != nil {
-			return written, err
+		nn := copy(w.buf[w.offset:], b)
+		b = b[nn:]
+		w.offset += nn
+		n += nn
+		if w.offset >= w.batchSize {
+			err = w.flushKeepBuffer()
 		}
 	}
-	return written, nil
+	return n, err
 }
 
 func (w *bufWriter) Flush() error {
@@ -393,7 +389,7 @@ type framer struct {
 	fr     *http2.Framer
 }
 
-var writeBufferPoolMap = make(map[int]*sync.Pool)
+var writeBufferPoolMap map[int]*sync.Pool = make(map[int]*sync.Pool)
 var writeBufferMutex sync.Mutex
 
 func newFramer(conn net.Conn, writeBufferSize, readBufferSize int, sharedWriteBuffer bool, maxHeaderListSize uint32) *framer {
