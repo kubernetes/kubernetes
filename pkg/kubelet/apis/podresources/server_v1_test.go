@@ -17,7 +17,6 @@ limitations under the License.
 package podresources
 
 import (
-	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -34,11 +33,13 @@ import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestListPodResourcesV1(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
 
+	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -240,8 +241,8 @@ func TestListPodResourcesV1(t *testing.T) {
 				Memory:           mockMemoryProvider,
 				DynamicResources: mockDynamicResourcesProvider,
 			}
-			server := NewV1PodResourcesServer(providers)
-			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
+			server := NewV1PodResourcesServer(tCtx, providers)
+			resp, err := server.List(tCtx, &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
@@ -293,6 +294,7 @@ func collectNamespacedNamesFromPodResources(prs []*podresourcesapi.PodResources)
 }
 
 func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	numaID := int64(1)
 
 	// we abuse the fact that we don't care about the assignments,
@@ -391,8 +393,8 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 				Memory:           mockMemoryProvider,
 				DynamicResources: mockDynamicResourcesProvider,
 			}
-			server := NewV1PodResourcesServer(providers)
-			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
+			server := NewV1PodResourcesServer(tCtx, providers)
+			resp, err := server.List(tCtx, &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
@@ -407,7 +409,7 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 
 func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
-
+	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -589,8 +591,8 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				Memory:           mockMemoryProvider,
 				DynamicResources: mockDynamicResourcesProvider,
 			}
-			server := NewV1PodResourcesServer(providers)
-			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})
+			server := NewV1PodResourcesServer(tCtx, providers)
+			resp, err := server.List(tCtx, &podresourcesapi.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
@@ -602,6 +604,7 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 }
 
 func TestAllocatableResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	allDevs := []*podresourcesapi.ContainerDevices{
 		{
 			ResourceName: "resource",
@@ -878,9 +881,9 @@ func TestAllocatableResources(t *testing.T) {
 				Cpus:    mockCPUsProvider,
 				Memory:  mockMemoryProvider,
 			}
-			server := NewV1PodResourcesServer(providers)
+			server := NewV1PodResourcesServer(tCtx, providers)
 
-			resp, err := server.GetAllocatableResources(context.TODO(), &podresourcesapi.AllocatableResourcesRequest{})
+			resp, err := server.GetAllocatableResources(tCtx, &podresourcesapi.AllocatableResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}
@@ -896,6 +899,7 @@ func TestGetPodResourcesV1(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
 
+	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -1047,9 +1051,9 @@ func TestGetPodResourcesV1(t *testing.T) {
 				Memory:           mockMemoryProvider,
 				DynamicResources: mockDynamicResourcesProvider,
 			}
-			server := NewV1PodResourcesServer(providers)
+			server := NewV1PodResourcesServer(tCtx, providers)
 			podReq := &podresourcesapi.GetPodResourcesRequest{PodName: podName, PodNamespace: podNamespace}
-			resp, err := server.Get(context.TODO(), podReq)
+			resp, err := server.Get(tCtx, podReq)
 
 			if err != nil {
 				if err.Error() != tc.err.Error() {
@@ -1073,6 +1077,7 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesGet, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.KubeletPodResourcesDynamicResources, true)
 
+	tCtx := ktesting.Init(t)
 	podName := "pod-name"
 	podNamespace := "pod-namespace"
 	podUID := types.UID("pod-uid")
@@ -1245,9 +1250,9 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				Memory:           mockMemoryProvider,
 				DynamicResources: mockDynamicResourcesProvider,
 			}
-			server := NewV1PodResourcesServer(providers)
+			server := NewV1PodResourcesServer(tCtx, providers)
 			podReq := &podresourcesapi.GetPodResourcesRequest{PodName: podName, PodNamespace: podNamespace}
-			resp, err := server.Get(context.TODO(), podReq)
+			resp, err := server.Get(tCtx, podReq)
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)
 			}

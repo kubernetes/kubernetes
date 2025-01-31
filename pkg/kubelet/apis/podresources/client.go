@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"k8s.io/cri-client/pkg/util"
-	"k8s.io/kubelet/pkg/apis/podresources/v1"
+	v1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 )
 
@@ -39,7 +39,7 @@ func GetV1alpha1Client(socket string, connectionTimeout time.Duration, maxMsgSiz
 	if err != nil {
 		return nil, nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	ctx, cancel := context.WithTimeout(context.TODO(), connectionTimeout)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, addr,
@@ -58,7 +58,7 @@ func GetV1Client(socket string, connectionTimeout time.Duration, maxMsgSize int)
 	if err != nil {
 		return nil, nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	ctx, cancel := context.WithTimeout(context.TODO(), connectionTimeout)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, addr,
