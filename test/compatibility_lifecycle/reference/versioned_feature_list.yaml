@@ -1623,10 +1623,14 @@
     version: "1.32"
 - name: WindowsHostNetwork
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.26"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.33"
 - name: WinDSR
   versionedSpecs:
   - default: false
