@@ -769,11 +769,8 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		if err != nil {
 			return err
 		}
-		fileInfo, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-		mode := int32(fileInfo.Mode())
+		
+		mode := int32(info.Mode())
 
 		observedPayload[relativePath] = FileProjection{Data: content, Mode: mode}
 
