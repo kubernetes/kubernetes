@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"context"
 
 	api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -116,7 +117,7 @@ func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supp
 
 	if ctx.resizeStream != nil {
 		ctx.resizeChan = make(chan remotecommand.TerminalSize)
-		go handleResizeEvents(ctx.resizeStream, ctx.resizeChan)
+		go handleResizeEvents(req.Context(), ctx.resizeStream, ctx.resizeChan)
 	}
 
 	return ctx, true
@@ -409,7 +410,7 @@ WaitForStreams:
 // supportsTerminalResizing returns false because v1ProtocolHandler doesn't support it.
 func (*v1ProtocolHandler) supportsTerminalResizing() bool { return false }
 
-func handleResizeEvents(stream io.Reader, channel chan<- remotecommand.TerminalSize) {
+func handleResizeEvents(reqctx context.Context, stream io.Reader, channel chan<- remotecommand.TerminalSize) {
 	defer runtime.HandleCrash()
 	defer close(channel)
 
@@ -419,7 +420,12 @@ func handleResizeEvents(stream io.Reader, channel chan<- remotecommand.TerminalS
 		if err := decoder.Decode(&size); err != nil {
 			break
 		}
-		channel <- size
+		select {
+		case channel <- size:
+		case <-reqctx.Done():
+			// To prevent go routine leak. 
+			return
+		}
 	}
 }
 
