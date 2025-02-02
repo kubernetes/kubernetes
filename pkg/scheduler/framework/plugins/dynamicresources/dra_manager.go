@@ -47,6 +47,10 @@ type DefaultDRAManager struct {
 
 func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, informerFactory informers.SharedInformerFactory) *DefaultDRAManager {
 	logger := klog.FromContext(ctx)
+
+	resourceSliceTracker, _ := resourceslicetracker.StartTracker(ctx, informerFactory)
+	// TODO: handle err   ^
+
 	manager := &DefaultDRAManager{
 		resourceClaimTracker: &claimTracker{
 			cache:               claimsCache,
@@ -54,7 +58,7 @@ func NewDRAManager(ctx context.Context, claimsCache *assumecache.AssumeCache, in
 			allocatedDevices:    newAllocatedDevices(logger),
 			logger:              logger,
 		},
-		resourceSliceLister: &resourceSliceLister{tracker: resourceslicetracker.NewTracker(informerFactory)},
+		resourceSliceLister: &resourceSliceLister{tracker: resourceSliceTracker},
 		deviceClassLister:   &deviceClassLister{classLister: informerFactory.Resource().V1beta1().DeviceClasses().Lister()},
 	}
 
@@ -84,7 +88,7 @@ type resourceSliceLister struct {
 }
 
 func (l *resourceSliceLister) List() ([]*resourceapi.ResourceSlice, error) {
-	return l.tracker.ListPatchedResourceSlices(context.TODO())
+	return l.tracker.ListPatchedResourceSlices()
 }
 
 var _ framework.DeviceClassLister = &deviceClassLister{}

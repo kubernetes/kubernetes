@@ -17,11 +17,14 @@ limitations under the License.
 package tracker
 
 import (
+	"cmp"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
-	"github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -31,6 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/internal/workqueue"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -38,53 +42,101 @@ import (
 
 func TestListPatchedResourceSlices(t *testing.T) {
 	tests := map[string]struct {
-		adminAttrsDisabled   bool
-		resourceSlices       []*resourceapi.ResourceSlice
-		resourceSlicePatches []*resourcealphaapi.ResourceSlicePatch
-		deviceClasses        []*resourceapi.DeviceClass
-		expected             []*resourceapi.ResourceSlice
-		expectedErr          error
-		matchErr             gomega.OmegaMatcher
+		initialClasses        []*resourceapi.DeviceClass
+		initialSlices         []*resourceapi.ResourceSlice
+		initialPatches        []*resourcealphaapi.ResourceSlicePatch
+		initialCachedSlices   []*resourceapi.ResourceSlice
+		expectedPatchedSlices []*resourceapi.ResourceSlice
+		adminAttrsDisabled    bool
 	}{
-		"no slices": {
-			resourceSlices:       []*resourceapi.ResourceSlice{},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{},
-			expected:             []*resourceapi.ResourceSlice{},
+		"add-slices-no-patches": {
+			initialSlices: []*resourceapi.ResourceSlice{
+				{ObjectMeta: metav1.ObjectMeta{Name: "s1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "s2"}},
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{ObjectMeta: metav1.ObjectMeta{Name: "s1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "s2"}},
+			},
 		},
-		"no patches": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"update-slices-no-patches": {
+			initialCachedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
+						Name: "s1",
 					},
 					Spec: resourceapi.ResourceSliceSpec{
+						// no devices
+						Devices: nil,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "s2",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						// no devices
+						Devices: nil,
+					},
+				},
+			},
+			initialSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "s1",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						// devices!
 						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
+							{Basic: &resourceapi.BasicDevice{}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "s2",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						// devices!
+						Devices: []resourceapi.Device{
+							{Basic: &resourceapi.BasicDevice{}},
 						},
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
+						Name: "s1",
 					},
 					Spec: resourceapi.ResourceSliceSpec{
 						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
+							{Basic: &resourceapi.BasicDevice{}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "s2",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{Basic: &resourceapi.BasicDevice{}},
 						},
 					},
 				},
 			},
 		},
-		"admin attributes disabled": {
+		"delete-slices": {
+			initialCachedSlices: []*resourceapi.ResourceSlice{
+				{ObjectMeta: metav1.ObjectMeta{Name: "s1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "s2"}},
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
+		},
+		"admin-attributes-disabled": {
 			adminAttrsDisabled: true,
-			resourceSlices: []*resourceapi.ResourceSlice{
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -98,7 +150,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "all-slices",
@@ -122,7 +174,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -137,8 +189,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"add capacity and attribute to all slices": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"patch-all-slices": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -152,7 +204,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "all-slices",
@@ -176,7 +228,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -202,8 +254,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"remove attribute": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"merge-attributes": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -214,10 +266,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 							{
 								Basic: &resourceapi.BasicDevice{
 									Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-										"test.example.com/removeMe": {BoolValue: ptr.To(true)},
-										"removeMeToo":               {BoolValue: ptr.To(true)},
-										"test.example.com/keepMe":   {BoolValue: ptr.To(true)},
-										"keepMeToo":                 {BoolValue: ptr.To(true)},
+										"test.example.com/removeMe": {StringValue: ptr.To("slice")},
+										"removeMeToo":               {StringValue: ptr.To("slice")},
+										"test.example.com/keepMe":   {StringValue: ptr.To("slice")},
+										"keepMeToo":                 {StringValue: ptr.To("slice")},
 									},
 								},
 							},
@@ -225,7 +277,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "merge",
@@ -240,12 +292,18 @@ func TestListPatchedResourceSlices(t *testing.T) {
 								"test.example.com/removeMeToo": {
 									NullValue: &resourcealphaapi.NullValue{},
 								},
+								"test.example.com/keepMe": {
+									DeviceAttribute: resourcealphaapi.DeviceAttribute{StringValue: ptr.To("patch")},
+								},
+								"test.example.com/keepMeToo": {
+									DeviceAttribute: resourcealphaapi.DeviceAttribute{StringValue: ptr.To("patch")},
+								},
 							},
 						},
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -256,8 +314,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 							{
 								Basic: &resourceapi.BasicDevice{
 									Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-										"test.example.com/keepMe": {BoolValue: ptr.To(true)},
-										"keepMeToo":               {BoolValue: ptr.To(true)},
+										"test.example.com/keepMe":    {StringValue: ptr.To("patch")},
+										"test.example.com/keepMeToo": {StringValue: ptr.To("patch")},
 									},
 								},
 							},
@@ -266,8 +324,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"add attribute for driver": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"add-attribute-for-driver": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -295,7 +353,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "driver",
@@ -321,7 +379,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -361,8 +419,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"add attribute for pool": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"add-attribute-for-pool": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -394,7 +452,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "pool",
@@ -420,7 +478,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -464,8 +522,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"add attribute for device": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"add-attribute-for-device": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -487,7 +545,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "device",
@@ -513,7 +571,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -547,8 +605,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"add attribute for selector": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"add-attribute-for-selector": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -576,7 +634,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "selector",
@@ -608,7 +666,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -648,8 +706,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"no match when any selector does not match": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"selector-does-not-match": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -664,7 +722,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "selector",
@@ -706,7 +764,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -722,8 +780,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"runtime CEL errors skip devices": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+		"runtime-CEL-errors-skip-devices": {
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -745,7 +803,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "selector",
@@ -777,7 +835,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -808,45 +866,46 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"invalid CEL expression returns error": {
-			resourceSlices: []*resourceapi.ResourceSlice{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "slice",
-					},
-					Spec: resourceapi.ResourceSliceSpec{
-						Devices: []resourceapi.Device{
-							{
-								Basic: &resourceapi.BasicDevice{},
-							},
-						},
-					},
-				},
-			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "selector",
-					},
-					Spec: resourcealphaapi.ResourceSlicePatchSpec{
-						Devices: resourcealphaapi.DevicePatch{
-							Filter: &resourcealphaapi.DevicePatchFilter{
-								Selectors: []resourcealphaapi.DeviceSelector{
-									{
-										CEL: &resourcealphaapi.CELDeviceSelector{
-											Expression: `invalid`,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			matchErr: gomega.MatchError(gomega.ContainSubstring("CEL compile error")),
-		},
-		"add attribute for device class": {
-			deviceClasses: []*resourceapi.DeviceClass{
+		// TODO: how to check errors?
+		// "invalid-CEL-expression-returns-error": {
+		// 	initialSlices: []*resourceapi.ResourceSlice{
+		// 		{
+		// 			ObjectMeta: metav1.ObjectMeta{
+		// 				Name: "slice",
+		// 			},
+		// 			Spec: resourceapi.ResourceSliceSpec{
+		// 				Devices: []resourceapi.Device{
+		// 					{
+		// 						Basic: &resourceapi.BasicDevice{},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	initialPatches: []*resourcealphaapi.ResourceSlicePatch{
+		// 		{
+		// 			ObjectMeta: metav1.ObjectMeta{
+		// 				Name: "selector",
+		// 			},
+		// 			Spec: resourcealphaapi.ResourceSlicePatchSpec{
+		// 				Devices: resourcealphaapi.DevicePatch{
+		// 					Filter: &resourcealphaapi.DevicePatchFilter{
+		// 						Selectors: []resourcealphaapi.DeviceSelector{
+		// 							{
+		// 								CEL: &resourcealphaapi.CELDeviceSelector{
+		// 									Expression: `invalid`,
+		// 								},
+		// 							},
+		// 						},
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// 	matchErr: gomega.MatchError(gomega.ContainSubstring("CEL compile error")),
+		// },
+		"add-attribute-for-device-class": {
+			initialClasses: []*resourceapi.DeviceClass{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "class.example.com",
@@ -862,7 +921,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlices: []*resourceapi.ResourceSlice{
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -890,7 +949,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "device-class",
@@ -916,7 +975,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -956,8 +1015,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
-		"filter on all criteria": {
-			deviceClasses: []*resourceapi.DeviceClass{
+		"filter-all-criteria": {
+			initialClasses: []*resourceapi.DeviceClass{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "class.example.com",
@@ -973,7 +1032,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlices: []*resourceapi.ResourceSlice{
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -1005,7 +1064,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "all-criteria",
@@ -1041,7 +1100,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -1086,7 +1145,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"priority": {
-			resourceSlices: []*resourceapi.ResourceSlice{
+			initialSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -1100,7 +1159,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			resourceSlicePatches: []*resourcealphaapi.ResourceSlicePatch{
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "negative-priority",
@@ -1292,7 +1351,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
-			expected: []*resourceapi.ResourceSlice{
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "slice",
@@ -1347,33 +1406,32 @@ func TestListPatchedResourceSlices(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			g := gomega.NewWithT(t)
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminControlledDeviceAttributes, !test.adminAttrsDisabled)
 
-			objCount := len(test.resourceSlices) + len(test.deviceClasses)
-			objs := make([]runtime.Object, 0, objCount)
-			for _, resourceSlice := range test.resourceSlices {
-				objs = append(objs, resourceSlice)
+			inputObjects := make([]runtime.Object, 0, len(test.initialSlices)+len(test.initialClasses))
+			for _, obj := range test.initialSlices {
+				inputObjects = append(inputObjects, obj.DeepCopyObject())
 			}
-			for _, deviceClass := range test.deviceClasses {
-				objs = append(objs, deviceClass)
+			for _, obj := range test.initialClasses {
+				inputObjects = append(inputObjects, obj.DeepCopyObject())
 			}
+			// Passing ResourceSlicePatches directly through here doesn't work
+			// because that ultimately results in an incorrect guess at the
+			// resource name based on the kind (adding "s" instead of "es"). The
+			// same happens even for the Create workaround with the
+			// managedFields-tracking client from NewClientset().
+			kubeClient := fake.NewSimpleClientset(inputObjects...)
+			for _, resourceSlicePatch := range test.initialPatches {
+				_, err := kubeClient.ResourceV1alpha3().ResourceSlicePatches().Create(ctx, resourceSlicePatch, metav1.CreateOptions{})
+				require.NoError(t, err)
+			}
+			informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 
-			// Passing ResourceSlicePatches directly through here
-			// doesn't work because that ultimately results in an
-			// incorrect guess at the resource name based on the kind
-			// (adding "s" instead of "es"). The same happens even for
-			// the Create workaround with the managedFields-tracking
-			// client from NewClientset().
-			clientset := fake.NewSimpleClientset(objs...)
-			for _, resourceSlicePatch := range test.resourceSlicePatches {
-				_, err := clientset.ResourceV1alpha3().ResourceSlicePatches().Create(ctx, resourceSlicePatch, metav1.CreateOptions{})
-				g.Expect(err).NotTo(gomega.HaveOccurred())
-			}
-
-			informerFactory := informers.NewSharedInformerFactoryWithOptions(clientset, 10*time.Minute)
-			tracker := NewTracker(informerFactory)
+			var queue workqueue.Mock[string]
+			tracker, err := newTracker(ctx, informerFactory)
+			require.NoError(t, err, "unexpected tracker creation error")
+			tracker.queue = &queue
 
 			informerStop := make(chan struct{})
 			informerFactory.Start(informerStop)
@@ -1383,19 +1441,28 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					unsynced = append(unsynced, typ)
 				}
 			}
-			g.Expect(unsynced).To(gomega.BeEmpty())
+			require.Empty(t, unsynced, "informers failed to sync")
 			t.Cleanup(func() {
 				close(informerStop)
 				informerFactory.Shutdown()
 			})
 
-			patched, err := tracker.ListPatchedResourceSlices(ctx)
-			matchErr := test.matchErr
-			if matchErr == nil {
-				matchErr = gomega.Not(gomega.HaveOccurred())
+			// Process work items in the queue until the queue is empty.
+			// Processing races with informers adding new work items,
+			// but the desired state should already be reached in the
+			// first iteration, so all following iterations should be nops.
+			tracker.run(ctx)
+			t.Cleanup(tracker.Stop)
+
+			// Check ResourceSlices
+			patchedResourceSlices, err := tracker.ListPatchedResourceSlices()
+			require.NoError(t, err, "list patched resource slices")
+			sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
+				return cmp.Compare(s1.Name, s2.Name)
 			}
-			g.Expect(err).To(matchErr)
-			g.Expect(patched).To(gomega.ConsistOf(test.expected))
+			slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
+			slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
+			assert.Equal(t, test.expectedPatchedSlices, patchedResourceSlices)
 		})
 	}
 }
