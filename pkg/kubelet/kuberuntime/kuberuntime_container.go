@@ -929,6 +929,8 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 // index of next init container to start, or done if there are no further init containers.
 // Status is only returned if an init container is failed, in which case next will
 // point to the current container.
+// TODO: Remove this function as this is a subset of the
+// computeInitContainerActions.
 func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (status *kubecontainer.Status, next *v1.Container, done bool) {
 	if len(pod.Spec.InitContainers) == 0 {
 		return nil, nil, true
