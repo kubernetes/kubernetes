@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -42,12 +43,13 @@ import (
 
 func TestListPatchedResourceSlices(t *testing.T) {
 	tests := map[string]struct {
+		adminAttrsDisabled    bool
 		initialClasses        []*resourceapi.DeviceClass
 		initialSlices         []*resourceapi.ResourceSlice
 		initialPatches        []*resourcealphaapi.ResourceSlicePatch
 		initialCachedSlices   []*resourceapi.ResourceSlice
 		expectedPatchedSlices []*resourceapi.ResourceSlice
-		adminAttrsDisabled    bool
+		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 	}{
 		"add-slices-no-patches": {
 			initialSlices: []*resourceapi.ResourceSlice{
@@ -865,6 +867,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
+			expectEvents: func(t *assert.CollectT, events *v1.EventList) {
+				if !assert.Len(t, events.Items, 1) {
+					return
+				}
+				assert.Equal(t, "selector", events.Items[0].InvolvedObject.Name)
+				assert.Equal(t, "CELRuntimeError", events.Items[0].Reason)
+			},
 		},
 		// TODO: how to check errors?
 		// "invalid-CEL-expression-returns-error": {
@@ -1429,7 +1438,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 
 			var queue workqueue.Mock[string]
-			tracker, err := newTracker(ctx, informerFactory)
+			tracker, err := newTracker(ctx, kubeClient, informerFactory)
 			require.NoError(t, err, "unexpected tracker creation error")
 			tracker.queue = &queue
 
@@ -1463,6 +1472,25 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
 			slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
 			assert.Equal(t, test.expectedPatchedSlices, patchedResourceSlices)
+			expectEvents := test.expectEvents
+			if expectEvents == nil {
+				expectEvents = func(t *assert.CollectT, events *v1.EventList) {
+					assert.Empty(t, events)
+				}
+			}
+			// Events are generated asynchronously. While shutting down the event recorder will flush all
+			// pending events, it is not possible to determine when exactly that flush is complete.
+			assert.EventuallyWithT(
+				t,
+				func(t *assert.CollectT) {
+					events, err := kubeClient.CoreV1().Events("").List(ctx, metav1.ListOptions{})
+					require.NoError(t, err, "list events")
+					expectEvents(t, events)
+				},
+				1*time.Second,
+				10*time.Millisecond,
+				"did not observe expected events",
+			)
 		})
 	}
 }

@@ -28,15 +28,20 @@ import (
 
 	"github.com/google/go-cmp/cmp" //nolint:depguard
 
+	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
@@ -52,9 +57,10 @@ type Tracker struct {
 	queue                 workqueue.TypedRateLimitingInterface[string]
 	wg                    sync.WaitGroup
 	cancel                func(cause error)
+	recorder              record.EventRecorder
 }
 
-func newTracker(ctx context.Context, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
+func newTracker(ctx context.Context, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	t := &Tracker{
 		resourceSlices:        informerFactory.Resource().V1beta1().ResourceSlices().Informer(),
@@ -72,12 +78,18 @@ func newTracker(ctx context.Context, informerFactory informers.SharedInformerFac
 	if err != nil {
 		return nil, err
 	}
+	if kubeClient != nil {
+		eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+		eventBroadcaster.StartLogging(klog.Infof)
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+		t.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_slice_tracker"})
+	}
 	return t, nil
 }
 
-func StartTracker(ctx context.Context, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
+func StartTracker(ctx context.Context, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
 	logger := klog.FromContext(ctx)
-	t, err := newTracker(ctx, informerFactory)
+	t, err := newTracker(ctx, kubeClient, informerFactory)
 	if err != nil {
 		return nil, fmt.Errorf("create controller: %w", err)
 	}
@@ -390,7 +402,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) error {
 				}
 				match, _, err := expr.DeviceMatches(ctx, cel.Device{Driver: patchedSlice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
 				if err != nil {
-					// TODO: generate event for ResourceSlicePatch
+					t.recorder.Eventf(patch, v1.EventTypeWarning, "CELRuntimeError", "selector #%d: runtime error: %v", i, err)
 					continue devices
 				}
 				if !match {

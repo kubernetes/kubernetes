@@ -301,7 +301,7 @@ func New(ctx context.Context,
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 		resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
-		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, informerFactory)
+		draManager = dynamicresources.NewDRAManager(ctx, resourceClaimCache, client, informerFactory)
 	}
 
 	profiles, err := profile.NewMap(ctx, options.profiles, registry, recorderFactory,
