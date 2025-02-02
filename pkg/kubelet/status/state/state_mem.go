@@ -110,13 +110,3 @@ func (s *stateMemory) Delete(podUID string, containerName string) error {
 	s.deleteContainer(podUID, containerName)
 	return nil
 }
-
-func (s *stateMemory) ClearState() error {
-	s.Lock()
-	defer s.Unlock()
-
-	s.podAllocation = make(PodResourceAllocation)
-	s.podResizeStatus = make(PodResizeStatus)
-	klog.V(3).InfoS("Cleared state")
-	return nil
-}
