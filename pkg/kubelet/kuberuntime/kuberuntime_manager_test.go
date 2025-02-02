@@ -1268,16 +1268,6 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	t.Run("sidecar containers disabled", func(t *testing.T) {
-		testComputePodActionsWithInitContainers(t, false)
-	})
-	t.Run("sidecar containers enabled", func(t *testing.T) {
-		testComputePodActionsWithInitContainers(t, true)
-	})
-}
-
-func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnabled bool) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -1498,7 +1488,7 @@ func testComputePodActionsWithInitContainers(t *testing.T, sidecarContainersEnab
 		}
 		ctx := context.Background()
 		actions := m.computePodActions(ctx, pod, status)
-		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
+		handleRestartableInitContainers := kubelettypes.HasRestartableInitContainer(pod)
 		if !handleRestartableInitContainers {
 			// If sidecar containers are disabled or the pod does not have any
 			// restartable init container, we should not see any
@@ -1553,7 +1543,6 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 }
 
 func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -1973,16 +1962,6 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	TestComputePodActions(t)
 	TestComputePodActionsWithInitContainers(t)
 
-	t.Run("sidecar containers disabled", func(t *testing.T) {
-		testComputePodActionsWithInitAndEphemeralContainers(t, false)
-	})
-	t.Run("sidecar containers enabled", func(t *testing.T) {
-		testComputePodActionsWithInitAndEphemeralContainers(t, true)
-	})
-}
-
-func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarContainersEnabled bool) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, sidecarContainersEnabled)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
@@ -2121,7 +2100,7 @@ func testComputePodActionsWithInitAndEphemeralContainers(t *testing.T, sidecarCo
 		}
 		ctx := context.Background()
 		actions := m.computePodActions(ctx, pod, status)
-		handleRestartableInitContainers := sidecarContainersEnabled && kubelettypes.HasRestartableInitContainer(pod)
+		handleRestartableInitContainers := kubelettypes.HasRestartableInitContainer(pod)
 		if !handleRestartableInitContainers {
 			// If sidecar containers are disabled or the pod does not have any
 			// restartable init container, we should not see any

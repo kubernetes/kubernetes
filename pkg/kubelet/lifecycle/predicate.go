@@ -21,12 +21,9 @@ import (
 	"runtime"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -138,21 +135,6 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	pods := attrs.OtherPods
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-
-	// TODO: Remove this after the SidecarContainers feature gate graduates to GA.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for _, c := range admitPod.Spec.InitContainers {
-			if podutil.IsRestartableInitContainer(&c) {
-				message := fmt.Sprintf("Init container %q may not have a non-default restartPolicy", c.Name)
-				klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
-				return PodAdmitResult{
-					Admit:   false,
-					Reason:  InitContainerRestartPolicyForbidden,
-					Message: message,
-				}
-			}
-		}
-	}
 
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
