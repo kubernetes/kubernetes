@@ -496,6 +496,8 @@ type podActions struct {
 	Attempt uint32
 
 	// The next init container to start.
+	// TODO: Either this or InitContainersToStart will be used. Remove this
+	// field once it is not needed.
 	NextInitContainerToStart *v1.Container
 	// InitContainersToStart keeps a list of indexes for the init containers to
 	// start, where the index is the index of the specific init container in the
@@ -934,6 +936,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// is done and there is no container to start.
 		if len(containersToStart) == 0 {
 			hasInitialized := false
+			// TODO: Remove this code path as logically it is the subset of the next
+			// code path.
 			if !handleRestartableInitContainers {
 				_, _, hasInitialized = findNextInitContainerToRun(pod, podStatus)
 			} else {
@@ -952,6 +956,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// state.
 		if len(pod.Spec.InitContainers) != 0 {
 			// Pod has init containers, return the first one.
+			// TODO: Remove this code path as logically it is the subset of the next
+			// code path.
 			if !handleRestartableInitContainers {
 				changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
 			} else {
@@ -975,6 +981,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	}
 
 	// Check initialization progress.
+	// TODO: Remove this code path as logically it is the subset of the next
+	// code path.
 	if !handleRestartableInitContainers {
 		initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
 		if !done {
@@ -1095,6 +1103,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
 		changes.KillPod = true
+		// TODO: Remove this code path as logically it is the subset of the next
+		// code path.
 		if handleRestartableInitContainers {
 			// To prevent the restartable init containers to keep pod alive, we should
 			// not restart them.
@@ -1353,6 +1363,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 	}
 
+	// TODO: Remove this code path as logically it is the subset of the next
+	// code path.
 	if !types.HasRestartableInitContainer(pod) {
 		// Step 6: start the init container.
 		if container := podContainerChanges.NextInitContainerToStart; container != nil {
