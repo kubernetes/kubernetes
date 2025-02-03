@@ -88,12 +88,20 @@ var _ ActualStateOfWorld = &actualStateOfWorld{}
 
 // PluginInfo holds information of a plugin
 type PluginInfo struct {
+	// SocketPath is a path to a Unix domain socket that the plugin is listening on
+	// to handle kubelet gRPC registration requests.
+	// The plugin may also provide other services via the same socket.
+	// SocketPath and Endpoint may be identical.
 	SocketPath string
 	Timestamp  time.Time
 	UUID       types.UID
 	Handler    PluginHandler
 	Name       string
-	Endpoint   string
+	// Endpoint is the endpoint of the plugin provided by the plugin in the GetInfo response.
+	// If endpoint is not provided it will be set to the socket path by the operation generator
+	// when it processes GetInfo response.
+	Endpoint          string
+	SupportedVersions []string
 }
 
 func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
