@@ -98,7 +98,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 		}},
 	})
 
-	testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0,
+	testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0, true,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 	)
