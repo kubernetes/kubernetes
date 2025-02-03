@@ -69,6 +69,7 @@ type tmCtnAttribute struct {
 	deviceName    string
 	deviceRequest string
 	deviceLimit   string
+	restartPolicy *v1.ContainerRestartPolicy
 }
 
 func detectNUMANodes() int {
@@ -158,7 +159,8 @@ func makeContainers(ctnCmd string, ctnAttributes []tmCtnAttribute) (ctns []v1.Co
 					v1.ResourceName(v1.ResourceMemory): resource.MustParse("100Mi"),
 				},
 			},
-			Command: []string{"sh", "-c", ctnCmd},
+			Command:       []string{"sh", "-c", ctnCmd},
+			RestartPolicy: ctnAttr.restartPolicy,
 		}
 		if ctnAttr.deviceName != "" {
 			ctn.Resources.Requests[v1.ResourceName(ctnAttr.deviceName)] = resource.MustParse(ctnAttr.deviceRequest)
@@ -425,6 +427,9 @@ func runTopologyManagerPolicySuiteTests(ctx context.Context, f *framework.Framew
 
 	ginkgo.By("running multiple Gu pods")
 	runMultipleGuPods(ctx, f)
+
+	ginkgo.By("running a Gu pod with restartable init container requesting integer CPUs")
+	runRestartableInitContainerGuPod(ctx, f)
 }
 
 func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework, numPods int, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
@@ -728,6 +733,28 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 	}
 	runTopologyManagerPositiveTest(ctx, f, 2, ctnAttrs, initCtnAttrs, envInfo)
 
+	ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with restartable init container, 1 core and 1 %s device", sd.resourceName))
+	initCtnAttrs = []tmCtnAttribute{
+		{
+			ctnName:       "restartable-init-container",
+			cpuRequest:    "1000m",
+			cpuLimit:      "1000m",
+			deviceRequest: "1",
+			deviceLimit:   "1",
+			restartPolicy: &containerRestartPolicyAlways,
+		},
+	}
+	ctnAttrs = []tmCtnAttribute{
+		{
+			ctnName:       "gu-container",
+			cpuRequest:    "1000m",
+			cpuLimit:      "1000m",
+			deviceRequest: "1",
+			deviceLimit:   "1",
+		},
+	}
+	runTopologyManagerPositiveTest(ctx, f, 2, ctnAttrs, initCtnAttrs, envInfo)
+
 	teardownSRIOVConfigOrFail(ctx, f, sd)
 }
 
@@ -819,6 +846,30 @@ func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework
 			},
 		}
 		runTopologyManagerPositiveTest(ctx, f, 2, ctnAttrs, initCtnAttrs, envInfo)
+
+		ginkgo.By(fmt.Sprintf("Successfully admit one guaranteed pod with restartable init container - each with 1 core, 1 %s device", sd.resourceName))
+		initCtnAttrs = []tmCtnAttribute{
+			{
+				ctnName:       "init-container",
+				cpuRequest:    "1000m",
+				cpuLimit:      "1000m",
+				deviceName:    sd.resourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+				restartPolicy: &containerRestartPolicyAlways,
+			},
+		}
+		ctnAttrs = []tmCtnAttribute{
+			{
+				ctnName:       "gu-container",
+				cpuRequest:    "1000m",
+				cpuLimit:      "1000m",
+				deviceName:    sd.resourceName,
+				deviceRequest: "1",
+				deviceLimit:   "1",
+			},
+		}
+		runTopologyManagerPositiveTest(ctx, f, 1, ctnAttrs, initCtnAttrs, envInfo)
 
 		// testing more complex conditions require knowledge about the system cpu+bus topology
 	}
