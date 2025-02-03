@@ -293,6 +293,11 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		return err
 	}
 
+	if cfg.DryRun {
+		fmt.Println("[kubelet-wait] Would wait for the kubelet to be bootstrapped")
+		return nil
+	}
+
 	bootstrapKubeConfigFile := filepath.Join(data.KubeConfigDir(), kubeadmconstants.KubeletBootstrapKubeConfigFileName)
 	// Deletes the bootstrapKubeConfigFile, so the credential used for TLS bootstrap is removed from disk
 	defer func() {
