@@ -26,6 +26,7 @@ import (
 // FakeInterface implements Interface by just recording entries that have been cleared.
 type FakeInterface struct {
 	entries []*netlink.ConntrackFlow
+	error   error
 }
 
 var _ Interface = &FakeInterface{}
@@ -37,7 +38,7 @@ func NewFake() *FakeInterface {
 
 // ListEntries is part of Interface
 func (fake *FakeInterface) ListEntries(_ uint8) ([]*netlink.ConntrackFlow, error) {
-	return fake.entries, nil
+	return fake.entries, fake.error
 }
 
 // ClearEntries is part of Interface
