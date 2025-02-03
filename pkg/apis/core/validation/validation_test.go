@@ -25611,8 +25611,6 @@ func TestValidateSELinuxChangePolicy(t *testing.T) {
 }
 
 func TestValidatePodResize(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
-
 	mkPod := func(req, lim core.ResourceList, tweaks ...podtest.Tweak) *core.Pod {
 		return podtest.MakePod("pod", append(tweaks,
 			podtest.SetContainers(
