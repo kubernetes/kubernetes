@@ -348,6 +348,20 @@ func findSRIOVResource(node *v1.Node) (string, int64) {
 }
 
 func validatePodAlignment(ctx context.Context, f *framework.Framework, pod *v1.Pod, envInfo *testEnvInfo) {
+	for _, cnt := range pod.Spec.InitContainers {
+		ginkgo.By(fmt.Sprintf("validating the init container %s on Gu pod %s", cnt.Name, pod.Name))
+
+		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+		framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+		framework.Logf("got init container logs: %v", logs)
+		numaRes, err := checkNUMAAlignment(f, pod, &cnt, logs, envInfo)
+		framework.ExpectNoError(err, "NUMA Alignment check failed for init container [%s] of pod [%s]", cnt.Name, pod.Name)
+		if numaRes != nil {
+			framework.Logf("NUMA resources for init container %s/%s: %s", pod.Name, cnt.Name, numaRes.String())
+		}
+	}
+
 	for _, cnt := range pod.Spec.Containers {
 		ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
 
@@ -369,6 +383,21 @@ func validatePodAlignmentWithPodScope(ctx context.Context, f *framework.Framewor
 	podsNUMA := make(map[int]int)
 
 	ginkgo.By(fmt.Sprintf("validate pod scope alignment for %s pod", pod.Name))
+	for _, cnt := range pod.Spec.InitContainers {
+		// Only validate restartable init containers since they run for the entire pod lifecycle
+		if cnt.RestartPolicy != nil && *cnt.RestartPolicy == v1.ContainerRestartPolicyAlways {
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+			framework.ExpectNoError(err, "NUMA alignment failed for init container [%s] of pod [%s]", cnt.Name, pod.Name)
+			envMap, err := makeEnvMap(logs)
+			framework.ExpectNoError(err, "NUMA alignment failed for init container [%s] of pod [%s]", cnt.Name, pod.Name)
+			cpuToNUMA, err := getCPUToNUMANodeMapFromEnv(f, pod, &cnt, envMap, envInfo.numaNodes)
+			framework.ExpectNoError(err, "NUMA alignment failed for init container [%s] of pod [%s]", cnt.Name, pod.Name)
+			for cpuID, numaID := range cpuToNUMA {
+				podsNUMA[cpuID] = numaID
+			}
+		}
+	}
+
 	for _, cnt := range pod.Spec.Containers {
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
 		framework.ExpectNoError(err, "NUMA alignment failed for container [%s] of pod [%s]", cnt.Name, pod.Name)
@@ -445,7 +474,7 @@ func runTopologyManagerPositiveTest(ctx context.Context, f *framework.Framework,
 	}
 
 	// per https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/693-topology-manager/README.md#multi-numa-systems-tests
-	// we can do a menaingful validation only when using the single-numa node policy
+	// we can do a meaningful validation only when using the single-numa node policy
 	if envInfo.policy == topologymanager.PolicySingleNumaNode {
 		for _, pod := range podMap {
 			validatePodAlignment(ctx, f, pod, envInfo)
