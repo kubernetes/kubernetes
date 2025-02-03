@@ -79,7 +79,7 @@ func waitForUnregistration(
 	socketPath string,
 	dsw cache.DesiredStateOfWorld) {
 	err := retryWithExponentialBackOff(
-		time.Duration(1000*time.Millisecond),
+		time.Duration(2000*time.Millisecond),
 		func() (bool, error) {
 			if !dsw.PluginExists(socketPath) {
 				return true, nil
@@ -314,6 +314,51 @@ func TestPluginDisconnect(t *testing.T) {
 			waitForUnregistration(t, socketPath, dsw)
 		})
 	}
+}
+
+// TestPluginStuckThenUnstuck tests the following scenarios of plugin stuck:
+//  1. Plugin is stuck in GetInfo RPC.
+//     The PluginConnectionMonitor detects the stuck plugin and unregisters it.
+//  2. Plugin is unstuck.
+//     The PluginConnectionMonitor detects the unstuck plugin and registers it.
+func TestPluginStuckThenUnstuck(t *testing.T) {
+	socketDir := t.TempDir()
+
+	// Create new watcher
+	dsw := cache.NewDesiredStateOfWorld()
+	asw := cache.NewActualStateOfWorld()
+	newWatcher(t, socketDir, dsw, asw, wait.NeverStop)
+
+	// Create a plugin
+	socketPath := filepath.Join(socketDir, "p.sock")
+	plugin := NewTestExamplePlugin("test-stuck-unstuck", registerapi.DevicePlugin, socketPath, supportedVersions...)
+
+	// Run and register it
+	require.NoError(t, plugin.Serve(supportedVersions...))
+	defer func() {
+		require.NoError(t, plugin.Stop())
+	}()
+	pluginInfo := GetPluginInfo(plugin)
+	require.Equal(t, socketPath, pluginInfo.SocketPath)
+	waitForRegistration(t, socketPath, dsw)
+
+	// Add plugin to asw to simulate a registered plugin
+	require.NoError(t, asw.AddPlugin(pluginInfo))
+
+	// Stuck GetInfo RPC
+	plugin.StuckGetInfo()
+
+	// Wait for the plugin to be deregistered due to being stuck
+	waitForUnregistration(t, socketPath, dsw)
+
+	// Remove plugin from asw to simulate an unregistered plugin
+	asw.RemovePlugin(socketPath)
+
+	// Unstuck GetInfo RPC
+	plugin.UnstuckGetInfo()
+
+	// Wait for the plugin to be registered again
+	waitForRegistration(t, socketPath, dsw)
 }
 
 func newWatcher(t *testing.T, socketDir string, desiredStateOfWorldCache cache.DesiredStateOfWorld, actualStateOfWorldCache cache.ActualStateOfWorld, stopCh <-chan struct{}) *Watcher {
