@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,14 +35,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+)
+
+const (
+	// TODO: switch to /livez once all components support it
+	// and delete the endpointHealthz constant.
+	// https://github.com/kubernetes/kubernetes/issues/118158
+	endpointHealthz = "healthz"
+	endpointLivez   = "livez"
+
+	argPort        = "secure-port"
+	argBindAddress = "bind-address"
+	// By default, for kube-api-server, kubeadm does not apply a --bind-address flag.
+	// Check --advertise-address instead.
+	argAdvertiseAddress = "advertise-address"
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
 type Waiter interface {
 	// WaitForControlPlaneComponents waits for all control plane components to be ready.
-	WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiServerAddress string) error
+	WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiServerAddress string) error
 	// WaitForAPI waits for the API Server's /healthz endpoint to become "ok"
 	// TODO: remove WaitForAPI once WaitForAllControlPlaneComponents goes GA:
 	// https://github.com/kubernetes/kubeadm/issues/2907
@@ -77,80 +91,147 @@ func NewKubeWaiter(client clientset.Interface, timeout time.Duration, writer io.
 	}
 }
 
+// controlPlaneComponent holds a component name and an URL
+// on which to perform health checks.
 type controlPlaneComponent struct {
 	name string
 	url  string
 }
 
-const (
-	// TODO: switch to /livez once all components support it
-	// and delete the endpointHealthz constant.
-	// https://github.com/kubernetes/kubernetes/issues/118158
-	endpointHealthz = "healthz"
-	endpointLivez   = "livez"
-)
-
-// getControlPlaneComponents takes a ClusterConfiguration and returns a slice of
-// control plane components and their health check URLs.
-func getControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, defaultAddressAPIServer string) []controlPlaneComponent {
-	const (
-		portArg        = "secure-port"
-		bindAddressArg = "bind-address"
-		// By default, for kube-api-server, kubeadm does not apply a --bind-address flag.
-		// Check --advertise-address instead, which can override the defaultAddressAPIServer value.
-		advertiseAddressArg = "advertise-address"
-		// By default kubeadm deploys the kube-controller-manager and kube-scheduler
-		// with --bind-address=127.0.0.1. This should match get{Scheduler|ControllerManager}Command().
-		defaultAddressKCM       = "127.0.0.1"
-		defaultAddressScheduler = "127.0.0.1"
+// getControlPlaneComponentAddressAndPort parses the command in a static Pod
+// container and extracts the values of the given args.
+func getControlPlaneComponentAddressAndPort(pod *v1.Pod, name string, args []string) ([]string, error) {
+	var (
+		values    = make([]string, len(args))
+		container *v1.Container
 	)
 
-	portAPIServer, idx := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, portArg, -1)
-	if idx == -1 {
+	if pod == nil {
+		return values, errors.Errorf("got nil Pod for component %q", name)
+	}
+
+	for i, c := range pod.Spec.Containers {
+		if len(c.Command) == 0 {
+			continue
+		}
+		if c.Command[0] == name {
+			container = &pod.Spec.Containers[i]
+			break
+		}
+	}
+	if container == nil {
+		return values, errors.Errorf("the Pod has no container command starting with %q", name)
+	}
+
+	for _, line := range container.Command {
+		for i, arg := range args {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "--"+arg) && !strings.HasPrefix(line, "-"+arg) {
+				continue
+			}
+			_, value, found := strings.Cut(line, "=")
+			if !found {
+				_, value, _ = strings.Cut(line, " ")
+			}
+			values[i] = value
+		}
+	}
+	return values, nil
+}
+
+// getControlPlaneComponents reads the static Pods of control plane components
+// and returns a slice of 'controlPlaneComponent'.
+func getControlPlaneComponents(podMap map[string]*v1.Pod, addressAPIServer string) ([]controlPlaneComponent, error) {
+	var (
+		// By default kubeadm deploys the kube-controller-manager and kube-scheduler
+		// with --bind-address=127.0.0.1. This should match get{Scheduler|ControllerManager}Command().
+		addressKCM       = "127.0.0.1"
+		addressScheduler = "127.0.0.1"
+
 		portAPIServer = fmt.Sprintf("%d", constants.KubeAPIServerPort)
-	}
-	portKCM, idx := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, portArg, -1)
-	if idx == -1 {
-		portKCM = fmt.Sprintf("%d", constants.KubeControllerManagerPort)
-	}
-	portScheduler, idx := kubeadmapi.GetArgValue(cfg.Scheduler.ExtraArgs, portArg, -1)
-	if idx == -1 {
+		portKCM       = fmt.Sprintf("%d", constants.KubeControllerManagerPort)
 		portScheduler = fmt.Sprintf("%d", constants.KubeSchedulerPort)
+
+		errs   []error
+		result []controlPlaneComponent
+	)
+
+	type componentConfig struct {
+		name        string
+		podKey      string
+		args        []string
+		defaultAddr string
+		defaultPort string
+		endpoint    string
 	}
 
-	addressAPIServer, idx := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, advertiseAddressArg, -1)
-	if idx == -1 {
-		addressAPIServer = defaultAddressAPIServer
-	}
-	addressKCM, idx := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, bindAddressArg, -1)
-	if idx == -1 {
-		addressKCM = defaultAddressKCM
-	}
-	addressScheduler, idx := kubeadmapi.GetArgValue(cfg.Scheduler.ExtraArgs, bindAddressArg, -1)
-	if idx == -1 {
-		addressScheduler = defaultAddressScheduler
+	components := []componentConfig{
+		{
+			name:        "kube-apiserver",
+			podKey:      constants.KubeAPIServer,
+			args:        []string{argAdvertiseAddress, argPort},
+			defaultAddr: addressAPIServer,
+			defaultPort: portAPIServer,
+			endpoint:    endpointLivez,
+		},
+		{
+			name:        "kube-controller-manager",
+			podKey:      constants.KubeControllerManager,
+			args:        []string{argBindAddress, argPort},
+			defaultAddr: addressKCM,
+			defaultPort: portKCM,
+			endpoint:    endpointHealthz,
+		},
+		{
+			name:        "kube-scheduler",
+			podKey:      constants.KubeScheduler,
+			args:        []string{argBindAddress, argPort},
+			defaultAddr: addressScheduler,
+			defaultPort: portScheduler,
+			endpoint:    endpointLivez,
+		},
 	}
 
-	getURL := func(address, port, endpoint string) string {
-		return fmt.Sprintf(
-			"https://%s/%s",
-			net.JoinHostPort(address, port),
-			endpoint,
+	for _, component := range components {
+		address, port := component.defaultAddr, component.defaultPort
+
+		values, err := getControlPlaneComponentAddressAndPort(
+			podMap[component.podKey],
+			component.podKey,
+			component.args,
 		)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		if len(values[0]) != 0 {
+			address = values[0]
+		}
+		if len(values[1]) != 0 {
+			port = values[1]
+		}
+
+		result = append(result, controlPlaneComponent{
+			name: component.name,
+			url:  fmt.Sprintf("https://%s/%s", net.JoinHostPort(address, port), component.endpoint),
+		})
 	}
-	return []controlPlaneComponent{
-		{name: "kube-apiserver", url: getURL(addressAPIServer, portAPIServer, endpointLivez)},
-		{name: "kube-controller-manager", url: getURL(addressKCM, portKCM, endpointHealthz)},
-		{name: "kube-scheduler", url: getURL(addressScheduler, portScheduler, endpointLivez)},
+
+	if len(errs) > 0 {
+		return nil, utilerrors.NewAggregate(errs)
 	}
+	return result, nil
 }
 
 // WaitForControlPlaneComponents waits for all control plane components to report "ok".
-func (w *KubeWaiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiSeverAddress string) error {
+func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiSeverAddress string) error {
 	fmt.Printf("[control-plane-check] Waiting for healthy control plane components."+
 		" This can take up to %v\n", w.timeout)
 
-	components := getControlPlaneComponents(cfg, apiSeverAddress)
+	components, err := getControlPlaneComponents(podMap, apiSeverAddress)
+	if err != nil {
+		return errors.Wrap(err, "could not parse the address and port of all control plane components")
+	}
 
 	var errs []error
 	errChan := make(chan error, len(components))

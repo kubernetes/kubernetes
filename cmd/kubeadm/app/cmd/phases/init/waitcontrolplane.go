@@ -25,14 +25,17 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 var (
@@ -122,10 +125,15 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return handleError(err)
 	}
 
+	var podMap map[string]*v1.Pod
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
 	if features.Enabled(data.Cfg().ClusterConfiguration.FeatureGates, features.WaitForAllControlPlaneComponents) {
-		err = waiter.WaitForControlPlaneComponents(&data.Cfg().ClusterConfiguration,
-			data.Cfg().LocalAPIEndpoint.AdvertiseAddress)
+		podMap, err = staticpodutil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
+			constants.ControlPlaneComponents...)
+		if err == nil {
+			err = waiter.WaitForControlPlaneComponents(podMap,
+				data.Cfg().LocalAPIEndpoint.AdvertiseAddress)
+		}
 	} else {
 		err = waiter.WaitForAPI()
 	}
