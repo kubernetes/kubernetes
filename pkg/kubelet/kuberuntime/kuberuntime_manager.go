@@ -103,6 +103,9 @@ type kubeGenericRuntimeManager struct {
 	// machineInfo contains the machine information.
 	machineInfo *cadvisorapi.MachineInfo
 
+	// Function to get latest machine info from container manager
+	getMachineInfo func() *cadvisorapi.MachineInfo
+
 	// Container GC manager
 	containerGC *containerGC
 
@@ -219,6 +222,7 @@ func NewKubeGenericRuntimeManager(
 	memoryThrottlingFactor float64,
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
+	getMachineInfo func() *cadvisorapi.MachineInfo,
 ) (KubeGenericRuntime, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
@@ -234,6 +238,7 @@ func NewKubeGenericRuntimeManager(
 		readinessManager:       readinessManager,
 		startupManager:         startupManager,
 		machineInfo:            machineInfo,
+		getMachineInfo:         getMachineInfo,
 		osInterface:            osInterface,
 		runtimeHelper:          runtimeHelper,
 		runtimeService:         runtimeService,
@@ -336,7 +341,11 @@ func (m *kubeGenericRuntimeManager) Version(ctx context.Context) (kubecontainer.
 // runtime. Implementation is expected to update this cache periodically.
 // This may be different from the runtime engine's version.
 func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) {
-	versionObject, err := m.versionCache.Get(m.machineInfo.MachineID)
+	machineInfo := m.machineInfo
+	if m.getMachineInfo != nil {
+		machineInfo = m.getMachineInfo()
+	}
+	versionObject, err := m.versionCache.Get(machineInfo.MachineID)
 	if err != nil {
 		return nil, err
 	}
