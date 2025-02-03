@@ -79,6 +79,18 @@ func NameContains(name string) SelectFunction {
 	}
 }
 
+// NameContainsAll returns a function that selects specs whose name contains each of the provided contents strings
+func NameContainsAll(contents ...string) SelectFunction {
+	return func(spec *ExtensionTestSpec) bool {
+		for _, content := range contents {
+			if !strings.Contains(spec.Name, content) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 // HasLabel returns a function that selects specs with the provided label
 func HasLabel(label string) SelectFunction {
 	return func(spec *ExtensionTestSpec) bool {
@@ -319,7 +331,8 @@ func (specs ExtensionTestSpecs) FilterByEnvironment(envFlags flags.Environmental
 			decls.NewVar("upgrade", decls.String),
 			decls.NewVar("topology", decls.String),
 			decls.NewVar("architecture", decls.String),
-			decls.NewVar("installer", decls.String),
+			decls.NewVar("externalConnectivity", decls.String),
+			decls.NewVar("optionalCapabilities", decls.NewListType(decls.String)),
 			decls.NewVar("facts", decls.NewMapType(decls.String, decls.String)),
 			decls.NewVar("fact_keys", decls.NewListType(decls.String)),
 			decls.NewVar("version", decls.String),
@@ -333,16 +346,17 @@ func (specs ExtensionTestSpecs) FilterByEnvironment(envFlags flags.Environmental
 		factKeys = append(factKeys, k)
 	}
 	vars := map[string]interface{}{
-		"platform":     envFlags.Platform,
-		"network":      envFlags.Network,
-		"networkStack": envFlags.NetworkStack,
-		"upgrade":      envFlags.Upgrade,
-		"topology":     envFlags.Topology,
-		"architecture": envFlags.Architecture,
-		"installer":    envFlags.Installer,
-		"facts":        envFlags.Facts,
-		"fact_keys":    factKeys,
-		"version":      envFlags.Version,
+		"platform":             envFlags.Platform,
+		"network":              envFlags.Network,
+		"networkStack":         envFlags.NetworkStack,
+		"upgrade":              envFlags.Upgrade,
+		"topology":             envFlags.Topology,
+		"architecture":         envFlags.Architecture,
+		"externalConnectivity": envFlags.ExternalConnectivity,
+		"optionalCapabilities": envFlags.OptionalCapabilities,
+		"facts":                envFlags.Facts,
+		"fact_keys":            factKeys,
+		"version":              envFlags.Version,
 	}
 
 	for _, spec := range specs {

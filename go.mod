@@ -48,11 +48,11 @@ require (
 	github.com/moby/sys/userns v0.1.0
 	github.com/mrunalp/fileutils v0.5.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
-	github.com/onsi/ginkgo/v2 v2.20.2
+	github.com/onsi/ginkgo/v2 v2.21.0
 	github.com/onsi/gomega v1.35.1
 	github.com/opencontainers/runc v1.2.1
 	github.com/opencontainers/selinux v1.11.1
-	github.com/openshift-eng/openshift-tests-extension v0.0.0-20250128181728-a95ca461cacf
+	github.com/openshift-eng/openshift-tests-extension v0.0.0-20250205124614-2f0f92f05710
 	github.com/openshift/api v0.0.0-20250124212313-a770960d61e0
 	github.com/openshift/apiserver-library-go v0.0.0-20250127121756-dc9a973f14ce
 	github.com/openshift/client-go v0.0.0-20250125113824-8e1f0b8fa9a7

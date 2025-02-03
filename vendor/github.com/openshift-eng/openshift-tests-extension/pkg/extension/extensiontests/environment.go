@@ -29,6 +29,28 @@ func ArchitectureEquals(arch string) string {
 	return fmt.Sprintf(`architecture=="%s"`, arch)
 }
 
+func ExternalConnectivityEquals(externalConnectivity string) string {
+	return fmt.Sprintf(`externalConnectivity=="%s"`, externalConnectivity)
+}
+
+func OptionalCapabilitiesIncludeAny(optionalCapability ...string) string {
+	for i := range optionalCapability {
+		optionalCapability[i] = OptionalCapabilityExists(optionalCapability[i])
+	}
+	return fmt.Sprintf("(%s)", fmt.Sprint(strings.Join(optionalCapability, " || ")))
+}
+
+func OptionalCapabilitiesIncludeAll(optionalCapability ...string) string {
+	for i := range optionalCapability {
+		optionalCapability[i] = OptionalCapabilityExists(optionalCapability[i])
+	}
+	return fmt.Sprintf("(%s)", fmt.Sprint(strings.Join(optionalCapability, " && ")))
+}
+
+func OptionalCapabilityExists(optionalCapability string) string {
+	return fmt.Sprintf(`optionalCapabilities.exists(oc, oc=="%s")`, optionalCapability)
+}
+
 func InstallerEquals(installer string) string {
 	return fmt.Sprintf(`installer=="%s"`, installer)
 }
