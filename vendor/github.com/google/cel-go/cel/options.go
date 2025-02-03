@@ -65,6 +65,9 @@ const (
 	// Enable error generation when a presence test or optional field selection is
 	// performed on a primitive type.
 	featureEnableErrorOnBadPresenceTest
+
+	// Enable escape syntax for field identifiers (`).
+	featureIdentEscapeSyntax
 )
 
 // EnvOption is a functional interface for configuring the environment.
@@ -618,6 +621,12 @@ func EnableMacroCallTracking() EnvOption {
 	return features(featureEnableMacroCallTracking, true)
 }
 
+// EnableIdentifierEscapeSyntax enables identifier escaping (`) syntax for
+// fields.
+func EnableIdentifierEscapeSyntax() EnvOption {
+	return features(featureIdentEscapeSyntax, true)
+}
+
 // CrossTypeNumericComparisons makes it possible to compare across numeric types, e.g. double < int
 func CrossTypeNumericComparisons(enabled bool) EnvOption {
 	return features(featureCrossTypeNumericComparisons, enabled)
@@ -651,6 +660,15 @@ func ParserRecursionLimit(limit int) EnvOption {
 func ParserExpressionSizeLimit(limit int) EnvOption {
 	return func(e *Env) (*Env, error) {
 		e.prsrOpts = append(e.prsrOpts, parser.ExpressionSizeCodePointLimit(limit))
+		return e, nil
+	}
+}
+
+// EnableHiddenAccumulatorName sets the parser to use the identifier '@result' for accumulators
+// which is not normally accessible from CEL source.
+func EnableHiddenAccumulatorName(enabled bool) EnvOption {
+	return func(e *Env) (*Env, error) {
+		e.prsrOpts = append(e.prsrOpts, parser.EnableHiddenAccumulatorName(enabled))
 		return e, nil
 	}
 }

@@ -88,7 +88,7 @@ func PruneAst(expr ast.Expr, macroCalls map[int64]ast.Expr, state EvalState) *as
 
 func (p *astPruner) maybeCreateLiteral(id int64, val ref.Val) (ast.Expr, bool) {
 	switch v := val.(type) {
-	case types.Bool, types.Bytes, types.Double, types.Int, types.Null, types.String, types.Uint:
+	case types.Bool, types.Bytes, types.Double, types.Int, types.Null, types.String, types.Uint, *types.Optional:
 		p.state.SetValue(id, val)
 		return p.NewLiteral(id, val), true
 	case types.Duration:
@@ -281,13 +281,29 @@ func (p *astPruner) prune(node ast.Expr) (ast.Expr, bool) {
 	}
 	if macro, found := p.macroCalls[node.ID()]; found {
 		// Ensure that intermediate values for the comprehension are cleared during pruning
+		pruneMacroCall := node.Kind() != ast.UnspecifiedExprKind
 		if node.Kind() == ast.ComprehensionKind {
-			compre := node.AsComprehension()
-			visit(macro, clearIterVarVisitor(compre.IterVar(), p.state))
+			// Only prune cel.bind() calls since the variables of the comprehension are all
+			// visible to the user, so there's no chance of an incorrect value being observed
+			// as a result of looking at intermediate computations within a comprehension.
+			pruneMacroCall = isCelBindMacro(macro)
 		}
-		// prune the expression in terms of the macro call instead of the expanded form.
-		if newMacro, pruned := p.prune(macro); pruned {
-			p.macroCalls[node.ID()] = newMacro
+		if pruneMacroCall {
+			// prune the expression in terms of the macro call instead of the expanded form when
+			// dealing with macro call tracking references.
+			if newMacro, pruned := p.prune(macro); pruned {
+				p.macroCalls[node.ID()] = newMacro
+			}
+		} else {
+			// Otherwise just prune the macro target in keeping with the pruning behavior of the
+			// comprehensions later in the call graph.
+			macroCall := macro.AsCall()
+			if macroCall.Target() != nil {
+				if newTarget, pruned := p.prune(macroCall.Target()); pruned {
+					macro = p.NewMemberCall(macro.ID(), macroCall.FunctionName(), newTarget, macroCall.Args()...)
+					p.macroCalls[node.ID()] = macro
+				}
+			}
 		}
 	}
 
@@ -421,6 +437,19 @@ func (p *astPruner) prune(node ast.Expr) (ast.Expr, bool) {
 		// the last iteration of the comprehension and not each step in the evaluation which
 		// means that the any residuals computed in between might be inaccurate.
 		if newRange, pruned := p.maybePrune(compre.IterRange()); pruned {
+			if compre.HasIterVar2() {
+				return p.NewComprehensionTwoVar(
+					node.ID(),
+					newRange,
+					compre.IterVar(),
+					compre.IterVar2(),
+					compre.AccuVar(),
+					compre.AccuInit(),
+					compre.LoopCondition(),
+					compre.LoopStep(),
+					compre.Result(),
+				), true
+			}
 			return p.NewComprehension(
 				node.ID(),
 				newRange,
@@ -466,16 +495,6 @@ func getMaxID(expr ast.Expr) int64 {
 	maxID := int64(1)
 	visit(expr, maxIDVisitor(&maxID))
 	return maxID
-}
-
-func clearIterVarVisitor(varName string, state EvalState) astVisitor {
-	return astVisitor{
-		visitExpr: func(e ast.Expr) {
-			if e.Kind() == ast.IdentKind && e.AsIdent() == varName {
-				state.SetValue(e.ID(), nil)
-			}
-		},
-	}
 }
 
 func maxIDVisitor(maxID *int64) astVisitor {
@@ -540,4 +559,16 @@ func visit(expr ast.Expr, visitor astVisitor) {
 			}
 		}
 	}
+}
+
+func isCelBindMacro(macro ast.Expr) bool {
+	if macro.Kind() != ast.CallKind {
+		return false
+	}
+	macroCall := macro.AsCall()
+	target := macroCall.Target()
+	return macroCall.FunctionName() == "bind" &&
+		macroCall.IsMemberFunction() &&
+		target.Kind() == ast.IdentKind &&
+		target.AsIdent() == "cel"
 }
