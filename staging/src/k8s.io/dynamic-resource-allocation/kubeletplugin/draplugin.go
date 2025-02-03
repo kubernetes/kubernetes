@@ -20,12 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 	"sync"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -71,6 +73,12 @@ type DRAPlugin interface {
 	// without causing an API break of the package
 	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
 	internal()
+}
+
+type DRADriverService interface {
+	CheckDeviceAllocation(ctx context.Context, claims []*resourceapi.ResourceClaim) error
+	NodePrepareResources(context.Context, []*resourceapi.ResourceClaim) (*drapbv1beta1.NodePrepareResourcesResponse, error)
+	NodeUnprepareResources(context.Context, []*resourceapi.ResourceClaim) (*drapbv1beta1.NodeUnprepareResourcesResponse, error)
 }
 
 // Option implements the functional options pattern for Start.
@@ -277,7 +285,7 @@ type draPlugin struct {
 // is required. Implementing drapbv1beta1.DRAPluginServer is recommended for
 // DRA driver targeting Kubernetes >= 1.32. To be compatible with Kubernetes 1.31,
 // DRA drivers must implement only [drapbv1alpha4.NodeServer].
-func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
+func Start(ctx context.Context, nodeServers []DRADriverService, opts ...Option) (result DRAPlugin, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
 		logger:        klog.Background(),
@@ -339,14 +347,14 @@ func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (resu
 	var supportedServices []string
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		for _, nodeServer := range nodeServers {
-			if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
+			if o.nodeV1alpha4 {
 				logger.V(5).Info("registering v1alpha4.Node gGRPC service")
-				drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
+				drapbv1alpha4.RegisterNodeServer(grpcServer, d.NodeServerWrap(nodeServer))
 				supportedServices = append(supportedServices, drapbv1alpha4.NodeService)
 			}
-			if nodeServer, ok := nodeServer.(drapbv1beta1.DRAPluginServer); ok && o.nodeV1beta1 {
+			if o.nodeV1beta1 {
 				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-				drapbv1beta1.RegisterDRAPluginServer(grpcServer, nodeServer)
+				drapbv1beta1.RegisterDRAPluginServer(grpcServer, d.DRAPluginServerWrap(nodeServer))
 				supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 			}
 		}
@@ -454,6 +462,123 @@ func (d *draPlugin) PublishResources(_ context.Context, resources resourceslice.
 	d.resourceSliceController.Update(driverResources)
 
 	return nil
+}
+
+type ServerWrapper struct {
+	kubeClient kubernetes.Interface
+}
+
+func (w *ServerWrapper) GetResourceClaims(ctx context.Context, claims []*drapbv1beta1.Claim) ([]*resourceapi.ResourceClaim, error) {
+	var resourceClaims []*resourceapi.ResourceClaim
+	for _, claimReq := range claims {
+		claim, err := w.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
+		if err != nil {
+			return resourceClaims, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
+		}
+		if claim.Status.Allocation == nil {
+			return resourceClaims, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
+		}
+		if claim.UID != types.UID(claimReq.UID) {
+			return resourceClaims, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
+		}
+		resourceClaims = append(resourceClaims, claim)
+	}
+	return resourceClaims, nil
+}
+
+// NodeServerWrapper implements the [v1alpha4.NodeServer] interface by wrapping a [DRADriverService].
+type NodeServerWrapper struct {
+	ServerWrapper
+	DRADriverService
+}
+
+func (w *NodeServerWrapper) NodePrepareResources(ctx context.Context, req *drapbv1alpha4.NodePrepareResourcesRequest) (*drapbv1alpha4.NodePrepareResourcesResponse, error) {
+	var convertedReq drapbv1beta1.NodePrepareResourcesRequest
+	if err := drapbv1alpha4.Convert_v1alpha4_NodePrepareResourcesRequest_To_v1beta1_NodePrepareResourcesRequest(req, &convertedReq, nil); err != nil {
+		return nil, fmt.Errorf("internal error converting NodePrepareResourcesRequest from v1alpha4 to v1beta1: %w", err)
+	}
+	resourceClaims, err := w.GetResourceClaims(ctx, convertedReq.Claims)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.DRADriverService.CheckDeviceAllocation(ctx, resourceClaims); err != nil {
+		return nil, err
+	}
+	resp, err := w.DRADriverService.NodePrepareResources(ctx, resourceClaims)
+	if err != nil {
+		return nil, err
+	}
+	var convertedResp drapbv1alpha4.NodePrepareResourcesResponse
+	if err := drapbv1alpha4.Convert_v1beta1_NodePrepareResourcesResponse_To_v1alpha4_NodePrepareResourcesResponse(resp, &convertedResp, nil); err != nil {
+		return nil, fmt.Errorf("internal error converting NodePrepareResourcesResponse from v1beta1 to v1alpha4: %w", err)
+	}
+	return &convertedResp, nil
+}
+
+func (w *NodeServerWrapper) NodeUnprepareResources(ctx context.Context, req *drapbv1alpha4.NodeUnprepareResourcesRequest) (*drapbv1alpha4.NodeUnprepareResourcesResponse, error) {
+	var convertedReq drapbv1beta1.NodeUnprepareResourcesRequest
+	if err := drapbv1alpha4.Convert_v1alpha4_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(req, &convertedReq, nil); err != nil {
+		return nil, fmt.Errorf("internal error converting NodeUnprepareResourcesRequest from v1alpha4 to v1beta1: %w", err)
+	}
+	resourceClaims, err := w.GetResourceClaims(ctx, convertedReq.Claims)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := w.DRADriverService.NodeUnprepareResources(ctx, resourceClaims)
+	if err != nil {
+		return nil, err
+	}
+	var convertedResp drapbv1alpha4.NodeUnprepareResourcesResponse
+	if err := drapbv1alpha4.Convert_v1beta1_NodeUnprepareResourcesResponse_To_v1alpha4_NodeUnprepareResourcesResponse(resp, &convertedResp, nil); err != nil {
+		return nil, fmt.Errorf("internal error converting NodeUnprepareResourcesResponse from v1beta1 to v1alpha4: %w", err)
+	}
+	return &convertedResp, nil
+}
+
+func (d *draPlugin) NodeServerWrap(service DRADriverService) drapbv1alpha4.NodeServer {
+	return &NodeServerWrapper{
+		ServerWrapper: ServerWrapper{
+			kubeClient: d.kubeClient,
+		},
+		DRADriverService: service,
+	}
+}
+
+// DRAPluginServerWrapper implements the [v1beta1.DRAPluginServer] interface by wrapping a [DRADriverService].
+type DRAPluginServerWrapper struct {
+	ServerWrapper
+	DRADriverService
+}
+
+func (w *DRAPluginServerWrapper) NodePrepareResources(ctx context.Context, req *drapbv1beta1.NodePrepareResourcesRequest) (*drapbv1beta1.NodePrepareResourcesResponse, error) {
+	resourceClaims, err := w.GetResourceClaims(ctx, req.Claims)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.DRADriverService.CheckDeviceAllocation(ctx, resourceClaims); err != nil {
+		return nil, err
+	}
+	return w.DRADriverService.NodePrepareResources(ctx, resourceClaims)
+}
+
+func (w *DRAPluginServerWrapper) NodeUnprepareResources(ctx context.Context, req *drapbv1beta1.NodeUnprepareResourcesRequest) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
+	resourceClaims, err := w.GetResourceClaims(ctx, req.Claims)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.DRADriverService.CheckDeviceAllocation(ctx, resourceClaims); err != nil {
+		return nil, err
+	}
+	return w.DRADriverService.NodeUnprepareResources(ctx, resourceClaims)
+}
+
+func (d *draPlugin) DRAPluginServerWrap(service DRADriverService) drapbv1beta1.DRAPluginServer {
+	return &DRAPluginServerWrapper{
+		ServerWrapper: ServerWrapper{
+			kubeClient: d.kubeClient,
+		},
+		DRADriverService: service,
+	}
 }
 
 // RegistrationStatus implements [DRAPlugin.RegistrationStatus].
