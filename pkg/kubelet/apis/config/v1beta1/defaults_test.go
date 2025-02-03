@@ -103,6 +103,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SerializeImagePulls:                       ptr.To(true),
 				MaxParallelImagePulls:                     nil,
 				EvictionHard:                              nil,
+				MergeDefaultEvictionSettings:              true,
 				EvictionPressureTransitionPeriod:          metav1.Duration{Duration: 5 * time.Minute},
 				EnableControllerAttachDetach:              ptr.To(true),
 				MakeIPTablesUtilChains:                    ptr.To(true),
@@ -472,6 +473,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EvictionMinimumReclaim: map[string]string{
 					"imagefs.available": "1Gi",
 				},
+				MergeDefaultEvictionSettings:              true,
 				PodsPerCore:                               1,
 				EnableControllerAttachDetach:              ptr.To(true),
 				ProtectKernelDefaults:                     true,
@@ -630,6 +632,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodsPerCore:                               1,
 				EnableControllerAttachDetach:              ptr.To(true),
 				ProtectKernelDefaults:                     true,
+				MergeDefaultEvictionSettings:              true,
 				MakeIPTablesUtilChains:                    ptr.To(true),
 				IPTablesMasqueradeBit:                     ptr.To[int32](1),
 				IPTablesDropBit:                           ptr.To[int32](1),
