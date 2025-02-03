@@ -104,12 +104,16 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			// being [Serial], we can also assume noone else but us is running pods.
 			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with no pods running")
 
+			idFn := makeCustomPairID("scope", "boundary")
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_cpu_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
 				}),
 				"kubelet_cpu_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
+				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(0),
 				}),
 			})
 
@@ -127,12 +131,16 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			// being [Serial], we can also assume noone else but us is running pods.
 			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with pod failed to admit")
 
+			idFn := makeCustomPairID("scope", "boundary")
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_cpu_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(1),
 				}),
 				"kubelet_cpu_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(1),
+				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(1),
 				}),
 			})
 
@@ -150,12 +158,16 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			// being [Serial], we can also assume noone else but us is running pods.
 			ginkgo.By("Checking the cpumanager metrics right after the kubelet restart, with pod should be admitted")
 
+			idFn := makeCustomPairID("scope", "boundary")
 			matchResourceMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_cpu_manager_pinning_requests_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(1),
 				}),
 				"kubelet_cpu_manager_pinning_errors_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": timelessSample(0),
+				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(0),
 				}),
 			})
 
@@ -177,6 +189,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			matchAlignmentMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
 				"kubelet_container_aligned_compute_resources_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
 					"container::physical_cpu": timelessSample(1),
+				}),
+				"kubelet_container_aligned_compute_resources_failure_count": gstruct.MatchElements(idFn, gstruct.IgnoreExtras, gstruct.Elements{
+					"container::physical_cpu": timelessSample(0),
 				}),
 			})
 
