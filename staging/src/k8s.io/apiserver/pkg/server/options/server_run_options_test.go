@@ -31,18 +31,12 @@ import (
 )
 
 func TestServerRunOptionsValidate(t *testing.T) {
-	defaultComponentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
-	testRegistry := basecompatibility.NewComponentGlobalsRegistry()
-	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
-	effectiveVersion := basecompatibility.NewEffectiveVersionFromString("1.35", "1.32", "1.32")
-	effectiveVersion.SetEmulationVersion(version.MajorMinor(1, 31))
 	testComponent := "test"
-	utilruntime.Must(testRegistry.Register(testComponent, effectiveVersion, featureGate))
-
 	testCases := []struct {
-		name        string
-		testOptions *ServerRunOptions
-		expectErr   string
+		name             string
+		testOptions      *ServerRunOptions
+		emulationVersion string
+		expectErr        string
 	}{
 		{
 			name: "Test when MaxRequestsInFlight is negative value",
@@ -55,7 +49,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "--max-requests-inflight can not be negative value",
 		},
@@ -70,7 +65,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "--max-mutating-requests-inflight can not be negative value",
 		},
@@ -85,7 +81,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "--request-timeout can not be negative value",
 		},
@@ -100,7 +97,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           -1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "--min-request-timeout can not be negative value",
 		},
@@ -115,7 +113,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       -10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "ServerRunOptions.JSONPatchMaxCopyBytes can not be negative value",
 		},
@@ -130,7 +129,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         -10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "ServerRunOptions.MaxRequestBodyBytes can not be negative value",
 		},
@@ -146,7 +146,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				LivezGracePeriod:            -time.Second,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "--livez-grace-period can not be a negative value",
 		},
@@ -162,7 +163,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				ShutdownDelayDuration:       -time.Second,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "--shutdown-delay-duration can not be negative value",
 		},
@@ -178,7 +180,8 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 			expectErr: "--strict-transport-security-directives invalid, allowed values: max-age=expireTime, includeSubDomains, preload. see https://tools.ietf.org/html/rfc6797#section-6.1 for more information",
 		},
@@ -195,9 +198,46 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
 				ComponentName:               testComponent,
-				ComponentGlobalsRegistry:    testRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
 			},
-			expectErr: "emulation version 1.31 is not between [1.32, 1.35.0]",
+			emulationVersion: "1.31",
+			expectErr:        "emulation version 1.31 is not between [1.32, 1.35.0]",
+		},
+		{
+			name: "Test EmulationForwardCompatible cannot be true if not in emulation mode",
+			testOptions: &ServerRunOptions{
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				CorsAllowedOriginList:       []string{"^10.10.10.100$", "^10.10.10.200$"},
+				HSTSDirectives:              []string{"max-age=31536000", "includeSubDomains", "preload"},
+				MaxRequestsInFlight:         400,
+				MaxMutatingRequestsInFlight: 200,
+				RequestTimeout:              time.Duration(2) * time.Minute,
+				MinRequestTimeout:           1800,
+				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
+				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
+				EmulationForwardCompatible:  true,
+			},
+			expectErr: "ServerRunOptions.EmulationForwardCompatible cannot be set to true if the emulation version is the same as the binary version",
+		},
+		{
+			name: "Test EmulationForwardCompatible can be true if in emulation mode",
+			testOptions: &ServerRunOptions{
+				AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
+				CorsAllowedOriginList:       []string{"^10.10.10.100$", "^10.10.10.200$"},
+				HSTSDirectives:              []string{"max-age=31536000", "includeSubDomains", "preload"},
+				MaxRequestsInFlight:         400,
+				MaxMutatingRequestsInFlight: 200,
+				RequestTimeout:              time.Duration(2) * time.Minute,
+				MinRequestTimeout:           1800,
+				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
+				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
+				EmulationForwardCompatible:  true,
+			},
+			emulationVersion: "1.34",
 		},
 		{
 			name: "Test when ServerRunOptions is valid",
@@ -211,13 +251,18 @@ func TestServerRunOptionsValidate(t *testing.T) {
 				MinRequestTimeout:           1800,
 				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
 				MaxRequestBodyBytes:         10 * 1024 * 1024,
-				ComponentGlobalsRegistry:    defaultComponentGlobalsRegistry,
+				ComponentGlobalsRegistry:    newTestRegistry(testComponent),
+				ComponentName:               testComponent,
 			},
 		},
 	}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
+			if testcase.emulationVersion != "" {
+				effectiveVersion := testcase.testOptions.ComponentGlobalsRegistry.EffectiveVersionFor(testcase.testOptions.ComponentName)
+				effectiveVersion.(basecompatibility.MutableEffectiveVersion).SetEmulationVersion(version.MustParse(testcase.emulationVersion))
+			}
 			errs := testcase.testOptions.Validate()
 			if len(testcase.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
 				t.Errorf("got err: %v, expected err: %s", errs, testcase.expectErr)
@@ -228,6 +273,14 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTestRegistry(componentName string) basecompatibility.ComponentGlobalsRegistry {
+	registry := basecompatibility.NewComponentGlobalsRegistry()
+	featureGate := utilfeature.DefaultFeatureGate.DeepCopy()
+	effectiveVersion := basecompatibility.NewEffectiveVersionFromString("1.35", "1.32", "1.32")
+	utilruntime.Must(registry.Register(componentName, effectiveVersion, featureGate))
+	return registry
 }
 
 func TestValidateCorsAllowedOriginList(t *testing.T) {
