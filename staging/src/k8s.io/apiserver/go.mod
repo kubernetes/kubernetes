@@ -17,7 +17,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/btree v1.1.3
-	github.com/google/cel-go v0.22.0
+	github.com/google/cel-go v0.23.2
 	github.com/google/gnostic-models v0.6.9
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0
@@ -66,7 +66,7 @@ require (
 )
 
 require (
-	cel.dev/expr v0.18.0 // indirect
+	cel.dev/expr v0.19.1 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

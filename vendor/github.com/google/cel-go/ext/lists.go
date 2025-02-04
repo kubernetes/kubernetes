@@ -145,13 +145,10 @@ var comparableTypes = []*cel.Type{
 //	== ["bar", "foo", "baz"]
 
 func Lists(options ...ListsOption) cel.EnvOption {
-	l := &listsLib{
-		version: math.MaxUint32,
-	}
+	l := &listsLib{version: math.MaxUint32}
 	for _, o := range options {
 		l = o(l)
 	}
-
 	return cel.Lib(l)
 }
 
@@ -211,9 +208,10 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 				cel.MemberOverload("list_flatten",
 					[]*cel.Type{listListType}, listType,
 					cel.UnaryBinding(func(arg ref.Val) ref.Val {
+						// double-check as type-guards disabled
 						list, ok := arg.(traits.Lister)
 						if !ok {
-							return types.MaybeNoSuchOverloadErr(arg)
+							return types.ValOrErr(arg, "no such overload: %v.flatten()", arg.Type())
 						}
 						flatList, err := flatten(list, 1)
 						if err != nil {
@@ -226,13 +224,14 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 				cel.MemberOverload("list_flatten_int",
 					[]*cel.Type{listDyn, types.IntType}, listDyn,
 					cel.BinaryBinding(func(arg1, arg2 ref.Val) ref.Val {
+						// double-check as type-guards disabled
 						list, ok := arg1.(traits.Lister)
 						if !ok {
-							return types.MaybeNoSuchOverloadErr(arg1)
+							return types.ValOrErr(arg1, "no such overload: %v.flatten(%v)", arg1.Type(), arg2.Type())
 						}
 						depth, ok := arg2.(types.Int)
 						if !ok {
-							return types.MaybeNoSuchOverloadErr(arg2)
+							return types.ValOrErr(arg1, "no such overload: %v.flatten(%v)", arg1.Type(), arg2.Type())
 						}
 						flatList, err := flatten(list, int64(depth))
 						if err != nil {
@@ -260,10 +259,8 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 				}),
 				cel.SingletonUnaryBinding(
 					func(arg ref.Val) ref.Val {
-						list, ok := arg.(traits.Lister)
-						if !ok {
-							return types.MaybeNoSuchOverloadErr(arg)
-						}
+						// validated by type-guards
+						list := arg.(traits.Lister)
 						sorted, err := sortList(list)
 						if err != nil {
 							return types.WrapErr(err)
@@ -287,15 +284,10 @@ func (lib listsLib) CompileOptions() []cel.EnvOption {
 					)
 				}),
 				cel.SingletonBinaryBinding(
-					func(arg1 ref.Val, arg2 ref.Val) ref.Val {
-						list, ok := arg1.(traits.Lister)
-						if !ok {
-							return types.MaybeNoSuchOverloadErr(arg1)
-						}
-						keys, ok := arg2.(traits.Lister)
-						if !ok {
-							return types.MaybeNoSuchOverloadErr(arg2)
-						}
+					func(arg1, arg2 ref.Val) ref.Val {
+						// validated by type-guards
+						list := arg1.(traits.Lister)
+						keys := arg2.(traits.Lister)
 						sorted, err := sortListByAssociatedKeys(list, keys)
 						if err != nil {
 							return types.WrapErr(err)
@@ -498,8 +490,9 @@ func sortByMacro(meh cel.MacroExprFactory, target ast.Expr, args []ast.Expr) (as
 	if targetKind != ast.ListKind &&
 		targetKind != ast.SelectKind &&
 		targetKind != ast.IdentKind &&
-		targetKind != ast.ComprehensionKind && targetKind != ast.CallKind {
-		return nil, meh.NewError(target.ID(), fmt.Sprintf("sortBy can only be applied to a list, identifier, comprehension, call or select expression"))
+		targetKind != ast.ComprehensionKind &&
+		targetKind != ast.CallKind {
+		return nil, meh.NewError(target.ID(), "sortBy can only be applied to a list, identifier, comprehension, call or select expression")
 	}
 
 	mapCompr, err := parser.MakeMap(meh, meh.Copy(varIdent), args)

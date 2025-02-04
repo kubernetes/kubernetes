@@ -217,7 +217,7 @@ func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
 	chk, err := e.initChecker()
 	if err != nil {
 		errs := common.NewErrors(ast.Source())
-		errs.ReportError(common.NoLocation, err.Error())
+		errs.ReportErrorString(common.NoLocation, err.Error())
 		return nil, NewIssuesWithSourceInfo(errs, ast.NativeRep().SourceInfo())
 	}
 
@@ -556,7 +556,8 @@ func (e *Env) PartialVars(vars any) (interpreter.PartialActivation, error) {
 // TODO: Consider adding an option to generate a Program.Residual to avoid round-tripping to an
 // Ast format and then Program again.
 func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
-	pruned := interpreter.PruneAst(a.impl.Expr(), a.impl.SourceInfo().MacroCalls(), details.State())
+	ast := a.NativeRep()
+	pruned := interpreter.PruneAst(ast.Expr(), ast.SourceInfo().MacroCalls(), details.State())
 	newAST := &Ast{source: a.Source(), impl: pruned}
 	expr, err := AstToString(newAST)
 	if err != nil {
@@ -582,7 +583,7 @@ func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator, opts ...ch
 	extendedOpts := make([]checker.CostOption, 0, len(e.costOptions))
 	extendedOpts = append(extendedOpts, opts...)
 	extendedOpts = append(extendedOpts, e.costOptions...)
-	return checker.Cost(ast.impl, estimator, extendedOpts...)
+	return checker.Cost(ast.NativeRep(), estimator, extendedOpts...)
 }
 
 // configure applies a series of EnvOptions to the current environment.
@@ -613,6 +614,9 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	}
 	if e.HasFeature(featureVariadicLogicalASTs) {
 		prsrOpts = append(prsrOpts, parser.EnableVariadicOperatorASTs(true))
+	}
+	if e.HasFeature(featureIdentEscapeSyntax) {
+		prsrOpts = append(prsrOpts, parser.EnableIdentEscapeSyntax(true))
 	}
 	e.prsr, err = parser.NewParser(prsrOpts...)
 	if err != nil {

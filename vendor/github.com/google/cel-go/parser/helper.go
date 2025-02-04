@@ -470,6 +470,11 @@ func (e *exprHelper) NewAccuIdent() ast.Expr {
 	return e.exprFactory.NewAccuIdent(e.nextMacroID())
 }
 
+// AccuIdentName implements the ExprHelper interface method.
+func (e *exprHelper) AccuIdentName() string {
+	return e.exprFactory.AccuIdentName()
+}
+
 // NewGlobalCall implements the ExprHelper interface method.
 func (e *exprHelper) NewCall(function string, args ...ast.Expr) ast.Expr {
 	return e.exprFactory.NewCall(e.nextMacroID(), function, args...)
