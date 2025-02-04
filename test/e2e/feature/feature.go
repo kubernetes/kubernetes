@@ -456,7 +456,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StackdriverMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMonitoring"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Tests marked with this feature require the kubelet to be running in standalone mode (--standalone-mode=true) like this:
+	// make test-e2e-node PARALLELISM=1 FOCUS="StandaloneMode" TEST_ARGS='--kubelet-flags="--fail-swap-on=false" --standalone-mode=true'
+	// Tests validating the behavior of kubelet when running without the API server.
 	StandaloneMode = framework.WithFeature(framework.ValidFeatures.Add("StandaloneMode"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
