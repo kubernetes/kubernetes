@@ -930,6 +930,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.DeviceRequest":                                                            schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult":                                            schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceSelector":                                                           schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceTaint":                                                              schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceToleration":                                                         schema_k8sio_api_resource_v1alpha3_DeviceToleration(ref),
 		"k8s.io/api/resource/v1alpha3.NetworkDeviceData":                                                        schema_k8sio_api_resource_v1alpha3_NetworkDeviceData(ref),
 		"k8s.io/api/resource/v1alpha3.NullValue":                                                                schema_k8sio_api_resource_v1alpha3_NullValue(ref),
 		"k8s.io/api/resource/v1alpha3.NullableDeviceAttribute":                                                  schema_k8sio_api_resource_v1alpha3_NullableDeviceAttribute(ref),
@@ -969,6 +971,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.DeviceRequest":                                                             schema_k8sio_api_resource_v1beta1_DeviceRequest(ref),
 		"k8s.io/api/resource/v1beta1.DeviceRequestAllocationResult":                                             schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.DeviceSelector":                                                            schema_k8sio_api_resource_v1beta1_DeviceSelector(ref),
+		"k8s.io/api/resource/v1beta1.DeviceTaint":                                                               schema_k8sio_api_resource_v1beta1_DeviceTaint(ref),
+		"k8s.io/api/resource/v1beta1.DeviceToleration":                                                          schema_k8sio_api_resource_v1beta1_DeviceToleration(ref),
 		"k8s.io/api/resource/v1beta1.NetworkDeviceData":                                                         schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref),
 		"k8s.io/api/resource/v1beta1.OpaqueDeviceConfiguration":                                                 schema_k8sio_api_resource_v1beta1_OpaqueDeviceConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.ResourceClaim":                                                             schema_k8sio_api_resource_v1beta1_ResourceClaim(ref),
@@ -46837,11 +46841,30 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the device's taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceTaint"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -47456,11 +47479,30 @@ func schema_k8sio_api_resource_v1alpha3_DevicePatch(ref common.ReferenceCallback
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the device's taints. Taints with unique key and effect get added to the set of taints of the device. When key and effect are used in multiple places, the same precedence rules as for attributes apply (see the priority field).\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceTaint"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceCapacity", "k8s.io/api/resource/v1alpha3.DevicePatchFilter", "k8s.io/api/resource/v1alpha3.NullableDeviceAttribute"},
+			"k8s.io/api/resource/v1alpha3.DeviceCapacity", "k8s.io/api/resource/v1alpha3.DevicePatchFilter", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/api/resource/v1alpha3.NullableDeviceAttribute"},
 	}
 }
 
@@ -47589,12 +47631,31 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 							Format:      "",
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceToleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceSelector"},
+			"k8s.io/api/resource/v1alpha3.DeviceSelector", "k8s.io/api/resource/v1alpha3.DeviceToleration"},
 	}
 }
 
@@ -47669,6 +47730,102 @@ func schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref common.ReferenceCallb
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1alpha3.CELDeviceSelector"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The device this DeviceTaint is attached to has the \"effect\" on any claim and, through the claim, to pods that do not tolerate the Taint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint key to be applied to a device. Must be a label name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint value corresponding to the taint key. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"timeAdded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+				},
+				Required: []string{"key", "effect"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceToleration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"operator": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a ResourceClaim can tolerate all taints of a particular category.\n\n\nPossible enum values:\n - `\"Equal\"`\n - `\"Exists\"`",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Equal", "Exists"},
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"tolerationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -48632,11 +48789,30 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the device's taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceTaint"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity"},
+			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity", "k8s.io/api/resource/v1beta1.DeviceTaint"},
 	}
 }
 
@@ -49264,12 +49440,31 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallbac
 							Format:      "",
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceToleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceSelector"},
+			"k8s.io/api/resource/v1beta1.DeviceSelector", "k8s.io/api/resource/v1beta1.DeviceToleration"},
 	}
 }
 
@@ -49344,6 +49539,102 @@ func schema_k8sio_api_resource_v1beta1_DeviceSelector(ref common.ReferenceCallba
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1beta1.CELDeviceSelector"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceTaint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The device this DeviceTaint is attached to has the \"effect\" on any claim and, through the claim, to pods that do not tolerate the Taint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint key to be applied to a device. Must be a label name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint value corresponding to the taint key. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"timeAdded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+				},
+				Required: []string{"key", "effect"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceToleration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"operator": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a ResourceClaim can tolerate all taints of a particular category.\n\n\nPossible enum values:\n - `\"Equal\"`\n - `\"Exists\"`",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Equal", "Exists"},
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"tolerationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 

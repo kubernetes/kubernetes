@@ -29,6 +29,7 @@ type DevicePatchApplyConfiguration struct {
 	Priority   *int32                                                                            `json:"priority,omitempty"`
 	Attributes map[resourcev1alpha3.FullyQualifiedName]NullableDeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
 	Capacity   map[resourcev1alpha3.FullyQualifiedName]DeviceCapacityApplyConfiguration          `json:"capacity,omitempty"`
+	Taints     []DeviceTaintApplyConfiguration                                                   `json:"taints,omitempty"`
 }
 
 // DevicePatchApplyConfiguration constructs a declarative configuration of the DevicePatch type for use with
@@ -77,6 +78,19 @@ func (b *DevicePatchApplyConfiguration) WithCapacity(entries map[resourcev1alpha
 	}
 	for k, v := range entries {
 		b.Capacity[k] = v
+	}
+	return b
+}
+
+// WithTaints adds the given value to the Taints field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Taints field.
+func (b *DevicePatchApplyConfiguration) WithTaints(values ...*DeviceTaintApplyConfiguration) *DevicePatchApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTaints")
+		}
+		b.Taints = append(b.Taints, *values[i])
 	}
 	return b
 }
