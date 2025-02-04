@@ -3340,9 +3340,9 @@ func TestAllowedEmulationVersions(t *testing.T) {
 }
 
 func TestEnableEmulationVersion(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
 		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
@@ -3368,15 +3368,77 @@ func TestEnableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas", // introduced at 1.20, removed at 1.26
-			expectedStatusCode: 404,
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta2/flowschemas", // introduced at 1.23, removed at 1.29
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
 			expectedStatusCode: 404,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.path, func(t *testing.T) {
+			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != tc.expectedStatusCode {
+				t.Errorf("expect status code: %d, got : %d\n", tc.expectedStatusCode, resp.StatusCode)
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+		})
+	}
+}
+
+func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	server := kubeapiservertesting.StartTestServerOrDie(t,
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
+		[]string{"--emulated-version=kube=1.31", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	rt, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcs := []struct {
+		path               string
+		expectedStatusCode int
+	}{
+		{
+			path:               "/",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/apps/v1/deployments",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
+			expectedStatusCode: 200,
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
 			expectedStatusCode: 200,
 		},
 	}
@@ -3428,14 +3490,6 @@ func TestDisableEmulationVersion(t *testing.T) {
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
 			expectedStatusCode: 200,
-		},
-		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas", // introduced at 1.20, removed at 1.26
-			expectedStatusCode: 404,
-		},
-		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta2/flowschemas", // introduced at 1.23, removed at 1.29
-			expectedStatusCode: 404,
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32

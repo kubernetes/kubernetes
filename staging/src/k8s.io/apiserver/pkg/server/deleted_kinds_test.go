@@ -65,7 +65,7 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, actualErr := NewResourceExpirationEvaluator(apimachineryversion.MustParse(tt.currentVersion))
+			actual, actualErr := NewResourceExpirationEvaluator(apimachineryversion.MustParse(tt.currentVersion), false)
 
 			checkErr(t, actualErr, tt.expectedErr)
 			if actualErr != nil {
@@ -78,29 +78,6 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 			}
 		})
 	}
-}
-
-func storageRemovedIn(major, minor int) *removedInStorage {
-	return &removedInStorage{major: major, minor: minor}
-}
-
-func storageNeverRemoved() *removedInStorage {
-	return &removedInStorage{neverRemoved: true}
-}
-
-type removedInStorage struct {
-	major, minor int
-	neverRemoved bool
-}
-
-func (r *removedInStorage) New() runtime.Object {
-	if r.neverRemoved {
-		return &defaultObj{}
-	}
-	return &removedInObj{major: r.major, minor: r.minor}
-}
-
-func (r *removedInStorage) Destroy() {
 }
 
 type defaultObj struct {
@@ -127,24 +104,6 @@ func (r *removedInObj) APILifecycleRemoved() (major, minor int) {
 	return r.major, r.minor
 }
 
-func storageIntroducedIn(major, minor int) *introducedInStorage {
-	return &introducedInStorage{major: major, minor: minor}
-}
-
-type introducedInStorage struct {
-	major, minor int
-}
-
-func (r *introducedInStorage) New() runtime.Object {
-	if r.major == 0 && r.minor == 0 {
-		return &defaultObj{}
-	}
-	return &IntroducedInObj{major: r.major, minor: r.minor}
-}
-
-func (r *introducedInStorage) Destroy() {
-}
-
 type IntroducedInObj struct {
 	major, minor int
 }
@@ -159,7 +118,61 @@ func (r *IntroducedInObj) APILifecycleIntroduced() (major, minor int) {
 	return r.major, r.minor
 }
 
-func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
+type introducedAndRemovedInObj struct {
+	majorIntroduced, minorIntroduced int
+	majorRemoved, minorRemoved       int
+}
+
+func (r *introducedAndRemovedInObj) GetObjectKind() schema.ObjectKind {
+	panic("don't do this")
+}
+func (r *introducedAndRemovedInObj) DeepCopyObject() runtime.Object {
+	panic("don't do this either")
+}
+func (r *introducedAndRemovedInObj) APILifecycleIntroduced() (major, minor int) {
+	return r.majorIntroduced, r.minorIntroduced
+}
+func (r *introducedAndRemovedInObj) APILifecycleRemoved() (major, minor int) {
+	return r.majorRemoved, r.minorRemoved
+}
+
+func storageRemovedIn(major, minor int) *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{majorRemoved: major, minorRemoved: minor}
+}
+
+func storageNeverRemoved() *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{}
+}
+
+func storageIntroducedIn(major, minor int) *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{majorIntroduced: major, minorIntroduced: minor}
+}
+
+func storageIntroducedAndRemovedIn(majorIntroduced, minorIntroduced, majorRemoved, minorRemoved int) *introducedAndRemovedInStorage {
+	return &introducedAndRemovedInStorage{majorIntroduced: majorIntroduced, minorIntroduced: minorIntroduced, majorRemoved: majorRemoved, minorRemoved: minorRemoved}
+}
+
+type introducedAndRemovedInStorage struct {
+	majorIntroduced, minorIntroduced int
+	majorRemoved, minorRemoved       int
+}
+
+func (r *introducedAndRemovedInStorage) New() runtime.Object {
+	if r.majorIntroduced == 0 && r.minorIntroduced == 0 && r.majorRemoved == 0 && r.minorRemoved == 0 {
+		return &defaultObj{}
+	}
+	if r.majorIntroduced == 0 && r.minorIntroduced == 0 {
+		return &removedInObj{major: r.majorRemoved, minor: r.minorRemoved}
+	}
+	if r.majorRemoved == 0 && r.minorRemoved == 0 {
+		return &IntroducedInObj{major: r.majorIntroduced, minor: r.minorIntroduced}
+	}
+	return &introducedAndRemovedInObj{majorIntroduced: r.majorIntroduced, minorIntroduced: r.minorIntroduced, majorRemoved: r.majorRemoved, minorRemoved: r.minorRemoved}
+}
+
+func (r *introducedAndRemovedInStorage) Destroy() {}
+
+func Test_resourceExpirationEvaluator_isNotRemoved(t *testing.T) {
 	tests := []struct {
 		name                        string
 		resourceExpirationEvaluator resourceExpirationEvaluator
@@ -247,45 +260,13 @@ func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
 			restStorage: storageNeverRemoved(),
 			expected:    true,
 		},
-		{
-			name: "introduced-in-curr",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(1, 20),
-			expected:    true,
-		},
-		{
-			name: "introduced-in-prev-major",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(1, 19),
-			expected:    true,
-		},
-		{
-			name: "introduced-in-future",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(1, 21),
-			expected:    false,
-		},
-		{
-			name: "missing-introduced",
-			resourceExpirationEvaluator: resourceExpirationEvaluator{
-				currentVersion: apimachineryversion.MajorMinor(1, 20),
-			},
-			restStorage: storageIntroducedIn(0, 0),
-			expected:    true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gv := schema.GroupVersion{Group: "mygroup", Version: "myversion"}
-			convertor := &dummyConvertor{}
-			if actual := tt.resourceExpirationEvaluator.shouldServe(gv, convertor, tt.restStorage); actual != tt.expected {
-				t.Errorf("shouldServe() = %v, want %v", actual, tt.expected)
+			convertor := &dummyConvertor{prioritizedVersions: []schema.GroupVersion{gv}}
+			if actual := tt.resourceExpirationEvaluator.isNotRemoved(gv, convertor, tt.restStorage); actual != tt.expected {
+				t.Errorf("isRemoved() = %v, want %v", actual, tt.expected)
 			}
 			if !reflect.DeepEqual(convertor.called, gv) {
 				t.Errorf("expected converter to be called with %#v, got %#v", gv, convertor.called)
@@ -295,12 +276,17 @@ func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
 }
 
 type dummyConvertor struct {
-	called runtime.GroupVersioner
+	called              runtime.GroupVersioner
+	prioritizedVersions []schema.GroupVersion
 }
 
 func (d *dummyConvertor) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
 	d.called = gv
 	return in, nil
+}
+
+func (d *dummyConvertor) PrioritizedVersionsForGroup(group string) []schema.GroupVersion {
+	return d.prioritizedVersions
 }
 
 func checkErr(t *testing.T, actual error, expected string) {
@@ -317,6 +303,7 @@ func checkErr(t *testing.T, actual error, expected string) {
 }
 
 func Test_removeDeletedKinds(t *testing.T) {
+	groupName := "group.name"
 	tests := []struct {
 		name                         string
 		resourceExpirationEvaluator  resourceExpirationEvaluator
@@ -381,8 +368,234 @@ func Test_removeDeletedKinds(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			convertor := &dummyConvertor{}
-			tt.resourceExpirationEvaluator.RemoveDeletedKinds("group.name", convertor, tt.versionedResourcesStorageMap)
+			convertor := &dummyConvertor{prioritizedVersions: []schema.GroupVersion{
+				{Group: groupName, Version: "v2"}, {Group: groupName, Version: "v1"}}}
+			tt.resourceExpirationEvaluator.RemoveDeletedKinds(groupName, convertor, tt.versionedResourcesStorageMap)
+			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
+				t.Fatal(dump.Pretty(tt.versionedResourcesStorageMap))
+			}
+		})
+	}
+}
+
+func Test_removeUnIntroducedKinds(t *testing.T) {
+	groupName := "group.name"
+	resource1 := "resource1"
+	resource2 := "resource2"
+	tests := []struct {
+		name                         string
+		resourceExpirationEvaluator  resourceExpirationEvaluator
+		versionedResourcesStorageMap map[string]map[string]rest.Storage
+		expectedStorage              map[string]map[string]rest.Storage
+	}{
+		{
+			name: "remove-future-version",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+			},
+		},
+		{
+			name: "missing-introduced-version",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion: apimachineryversion.MajorMinor(1, 20),
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageRemovedIn(1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageRemovedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-ga-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 19),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-alpha-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 18),
+				},
+				"v2alpha1": {
+					resource1: storageIntroducedAndRemovedIn(1, 20, 1, 21),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-beta1-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 21),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-new-resource",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 22),
+				emulationForwardCompatible: true,
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			convertor := &dummyConvertor{prioritizedVersions: []schema.GroupVersion{
+				{Group: groupName, Version: "v2"}, {Group: groupName, Version: "v1"},
+				{Group: groupName, Version: "v2beta2"}, {Group: groupName, Version: "v2beta1"},
+				{Group: groupName, Version: "v2alpha1"}}}
+			tt.resourceExpirationEvaluator.RemoveUnIntroducedKinds(groupName, convertor, tt.versionedResourcesStorageMap)
 			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
 				t.Fatal(dump.Pretty(tt.versionedResourcesStorageMap))
 			}

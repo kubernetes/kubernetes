@@ -259,6 +259,7 @@ type ObjectDefaulter interface {
 
 type ObjectVersioner interface {
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
+	PrioritizedVersionsForGroup(group string) []schema.GroupVersion
 }
 
 // ObjectConvertor converts an object to a different version.

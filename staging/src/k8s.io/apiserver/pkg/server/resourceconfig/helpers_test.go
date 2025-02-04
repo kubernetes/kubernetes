@@ -27,6 +27,7 @@ import (
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 )
 
@@ -547,6 +548,186 @@ func TestParseRuntimeConfig(t *testing.T) {
 	}
 }
 
+func TestEmulationForwardCompatibleResourceConfig(t *testing.T) {
+	scheme := newFakeScheme(t)
+	addTestGVs(t, scheme)
+	testGroup := "test"
+	v1 := schema.GroupVersion{Group: testGroup, Version: "v1"}
+	v2alpha1 := schema.GroupVersion{Group: "test", Version: "v2alpha1"}
+	v2beta1 := schema.GroupVersion{Group: testGroup, Version: "v2beta1"}
+	v2beta2 := schema.GroupVersion{Group: testGroup, Version: "v2beta2"}
+	v2 := schema.GroupVersion{Group: testGroup, Version: "v2"}
+
+	testCases := []struct {
+		name                    string
+		resourceConfig          func() *serverstore.ResourceConfig
+		resourceConfigOverrides map[string]string
+		expectedAPIConfig       func() *serverstore.ResourceConfig
+		err                     bool
+	}{
+		{
+			name: "emulation-forward-compatible-enabled-no-higher-priority",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2)
+				return config
+			},
+			resourceConfigOverrides: map[string]string{},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2)
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-alpha-version",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2alpha1)
+				return config
+			},
+			resourceConfigOverrides: map[string]string{},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2alpha1)
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-enabled-higher-priority-ga",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v1)
+				return config
+			},
+			resourceConfigOverrides: map[string]string{},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v1, v2)
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-enabled-higher-priority",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2beta1)
+				return config
+			},
+			resourceConfigOverrides: map[string]string{},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2beta1, v2beta2, v1, v2)
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-enabled-higher-priority-with-override",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2beta1)
+				return config
+			},
+			resourceConfigOverrides: map[string]string{
+				"test/v2beta2": "false",
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableVersions(v2beta1, v1, v2)
+				config.DisableVersions(v2beta2)
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-enabled-resource-no-higher-priority",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2.WithResource("testtype1"))
+				return config
+			},
+			resourceConfigOverrides: map[string]string{},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2.WithResource("testtype1"))
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-alpha-resource",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2alpha1.WithResource("testtype1"))
+				return config
+			},
+			resourceConfigOverrides: map[string]string{},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2alpha1.WithResource("testtype1"))
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-enabled-resource-higher-priority",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2beta1.WithResource("testtype1"))
+				return config
+			},
+			resourceConfigOverrides: map[string]string{},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2beta1.WithResource("testtype1"), v2beta2.WithResource("testtype1"), v1.WithResource("testtype1"), v2.WithResource("testtype1"))
+				return config
+			},
+			err: false,
+		},
+		{
+			name: "emulation-forward-compatible-enabled-resource-higher-priority-with-override",
+			resourceConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2beta1.WithResource("testtype1"))
+				return config
+			},
+			resourceConfigOverrides: map[string]string{
+				"test/v2beta2/testtype1": "false",
+			},
+			expectedAPIConfig: func() *serverstore.ResourceConfig {
+				config := serverstore.NewResourceConfig()
+				config.EnableResources(v2beta1.WithResource("testtype1"), v1.WithResource("testtype1"), v2.WithResource("testtype1"))
+				config.DisableResources(v2beta2.WithResource("testtype1"))
+				return config
+			},
+			err: false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			actualAPIConfig, err := EmulationForwardCompatibleResourceConfig(test.resourceConfig(), test.resourceConfigOverrides, scheme)
+			if err == nil && test.err {
+				t.Fatalf("expected error")
+			} else if err != nil && !test.err {
+				t.Fatalf("unexpected error: %s, for test: %v", err, test)
+			}
+			if err != nil {
+				return
+			}
+
+			expectedConfig := test.expectedAPIConfig()
+			if !reflect.DeepEqual(actualAPIConfig, expectedConfig) {
+				t.Fatalf("unexpected apiResourceConfig. Actual: %v\n expected: %v", actualAPIConfig, expectedConfig)
+			}
+		})
+	}
+}
+
 func newFakeAPIResourceConfigSource() *serverstore.ResourceConfig {
 	ret := serverstore.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
@@ -600,4 +781,21 @@ func newFakeScheme(t *testing.T) *runtime.Scheme {
 	require.NoError(t, ret.SetVersionPriority(extensionsapiv1beta1.SchemeGroupVersion))
 
 	return ret
+}
+
+func addTestGVs(t *testing.T, s *runtime.Scheme) {
+	v1 := schema.GroupVersion{Group: "test", Version: "v1"}
+	v2alpha1 := schema.GroupVersion{Group: "test", Version: "v2alpha1"}
+	v2beta1 := schema.GroupVersion{Group: "test", Version: "v2beta1"}
+	v2beta2 := schema.GroupVersion{Group: "test", Version: "v2beta2"}
+	v2 := schema.GroupVersion{Group: "test", Version: "v2"}
+
+	s.AddKnownTypes(v1, &runtimetesting.TestType1{})
+	s.AddKnownTypes(v2alpha1, &runtimetesting.TestType1{})
+	s.AddKnownTypes(v2beta1, &runtimetesting.TestType1{})
+	s.AddKnownTypes(v2beta2, &runtimetesting.TestType1{}, &runtimetesting.TestType2{})
+	s.AddKnownTypes(v2, &runtimetesting.TestType1{}, &runtimetesting.TestType2{})
+
+	require.NoError(t, runtimetesting.RegisterConversions(s))
+	require.NoError(t, s.SetVersionPriority(v2, v1, v2beta2, v2beta1))
 }

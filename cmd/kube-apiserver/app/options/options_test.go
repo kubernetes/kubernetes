@@ -128,6 +128,7 @@ func TestAddFlags(t *testing.T) {
 		"--service-cluster-ip-range=192.168.128.0/17",
 		"--lease-reuse-duration-seconds=100",
 		"--emulated-version=test=1.31",
+		"--emulation-forward-compatible=true",
 	}
 	fs.Parse(args)
 	utilruntime.Must(componentGlobalsRegistry.Set())
@@ -147,6 +148,7 @@ func TestAddFlags(t *testing.T) {
 				MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
 				ComponentGlobalsRegistry:     componentGlobalsRegistry,
 				ComponentName:                basecompatibility.DefaultKubeComponent,
+				EmulationForwardCompatible:   true,
 			},
 			Admission: &kubeoptions.AdmissionOptions{
 				GenericAdmission: &apiserveroptions.AdmissionOptions{

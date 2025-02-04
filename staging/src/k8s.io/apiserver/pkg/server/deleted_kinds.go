@@ -19,6 +19,7 @@ package server
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -31,10 +32,13 @@ import (
 	"k8s.io/klog/v2"
 )
 
+var alphaPattern = regexp.MustCompile(`^v\d+alpha\d+$`)
+
 // resourceExpirationEvaluator holds info for deciding if a particular rest.Storage needs to excluded from the API
 type resourceExpirationEvaluator struct {
-	currentVersion *apimachineryversion.Version
-	isAlpha        bool
+	currentVersion             *apimachineryversion.Version
+	emulationForwardCompatible bool
+	isAlpha                    bool
 	// Special flag checking for the existence of alpha.0
 	// alpha.0 is a special case where everything merged to master is auto propagated to the release-1.n branch
 	isAlphaZero bool
@@ -53,17 +57,21 @@ type ResourceExpirationEvaluator interface {
 	// RemoveDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 	// versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 	RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage)
+	// RemoveUnIntroducedKinds inspects the storage map and modifies it in place by removing storage for kinds that are introduced after the current version.
+	// versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
+	RemoveUnIntroducedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage)
 	// ShouldServeForVersion returns true if a particular version cut off is after the current version
 	ShouldServeForVersion(majorRemoved, minorRemoved int) bool
 }
 
-func NewResourceExpirationEvaluator(currentVersion *apimachineryversion.Version) (ResourceExpirationEvaluator, error) {
+func NewResourceExpirationEvaluator(currentVersion *apimachineryversion.Version, emulationForwardCompatible bool) (ResourceExpirationEvaluator, error) {
 	if currentVersion == nil {
 		return nil, fmt.Errorf("empty NewResourceExpirationEvaluator currentVersion")
 	}
 	klog.V(1).Infof("NewResourceExpirationEvaluator with currentVersion: %s.", currentVersion)
 	ret := &resourceExpirationEvaluator{
 		strictRemovedHandlingInAlpha: false,
+		emulationForwardCompatible:   emulationForwardCompatible,
 	}
 	// Only keeps the major and minor versions from input version.
 	ret.currentVersion = apimachineryversion.MajorMinor(currentVersion.Major(), currentVersion.Minor())
@@ -89,7 +97,7 @@ func NewResourceExpirationEvaluator(currentVersion *apimachineryversion.Version)
 	return ret, nil
 }
 
-func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versioner runtime.ObjectVersioner, resourceServingInfo rest.Storage) bool {
+func (e *resourceExpirationEvaluator) isNotRemoved(gv schema.GroupVersion, versioner runtime.ObjectVersioner, resourceServingInfo rest.Storage) bool {
 	internalPtr := resourceServingInfo.New()
 
 	target := gv
@@ -102,15 +110,6 @@ func (e *resourceExpirationEvaluator) shouldServe(gv schema.GroupVersion, versio
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
-	}
-
-	introduced, ok := versionedPtr.(introducedInterface)
-	if ok {
-		majorIntroduced, minorIntroduced := introduced.APILifecycleIntroduced()
-		verIntroduced := apimachineryversion.MajorMinor(uint(majorIntroduced), uint(minorIntroduced))
-		if e.currentVersion.LessThan(verIntroduced) {
-			return false
-		}
 	}
 
 	removed, ok := versionedPtr.(removedInterface)
@@ -153,7 +152,7 @@ type introducedInterface interface {
 	APILifecycleIntroduced() (major, minor int)
 }
 
-// removeDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
+// RemoveDeletedKinds inspects the storage map and modifies it in place by removing storage for kinds that have been deleted.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
 func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
 	versionsToRemove := sets.NewString()
@@ -161,7 +160,7 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 		versionToResource := versionedResourcesStorageMap[apiVersion]
 		resourcesToRemove := sets.NewString()
 		for resourceName, resourceServingInfo := range versionToResource {
-			if !e.shouldServe(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
+			if !e.isNotRemoved(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo) {
 				resourcesToRemove.Insert(resourceName)
 			}
 		}
@@ -187,6 +186,82 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 		klog.V(1).Infof("Removing version %v.%v because it is time to stop serving it because it has no resources per APILifecycle.", apiVersion, groupName)
 		delete(versionedResourcesStorageMap, apiVersion)
 	}
+}
+
+// RemoveUnIntroducedKinds inspects the storage map and modifies it in place by removing storage for kinds that are introduced after the current version.
+// versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
+func (e *resourceExpirationEvaluator) RemoveUnIntroducedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage) {
+	versionsToRemove := sets.NewString()
+	prioritizedVersions := versioner.PrioritizedVersionsForGroup(groupName)
+	enabledResources := sets.NewString()
+
+	// iterate from the end to the front, so that we remove the older versions first.
+	for i := len(prioritizedVersions) - 1; i >= 0; i-- {
+		apiVersion := prioritizedVersions[i].Version
+		versionToResource := versionedResourcesStorageMap[apiVersion]
+		resourcesToRemove := sets.NewString()
+		for resourceName, resourceServingInfo := range versionToResource {
+			// if an earlier version of the resource has been enabled, the same resource with higher priority
+			// should also be enabled if emulationForwardCompatible.
+			if e.emulationForwardCompatible && enabledResources.Has(resourceName) {
+				continue
+			}
+			verIntroduced := versionIntroduced(schema.GroupVersion{Group: groupName, Version: apiVersion}, versioner, resourceServingInfo)
+			if e.currentVersion.LessThan(verIntroduced) {
+				resourcesToRemove.Insert(resourceName)
+			} else {
+				// emulation forward compatibility is not applicable to alpha apis.
+				if !alphaPattern.MatchString(apiVersion) {
+					enabledResources.Insert(resourceName)
+				}
+			}
+		}
+
+		for resourceName := range versionedResourcesStorageMap[apiVersion] {
+			if !shouldRemoveResourceAndSubresources(resourcesToRemove, resourceName) {
+				continue
+			}
+
+			klog.V(1).Infof("Removing resource %v.%v.%v because it is introduced after the current version %s per APILifecycle.", resourceName, apiVersion, groupName, e.currentVersion.String())
+			storage := versionToResource[resourceName]
+			storage.Destroy()
+			delete(versionToResource, resourceName)
+		}
+		versionedResourcesStorageMap[apiVersion] = versionToResource
+
+		if len(versionedResourcesStorageMap[apiVersion]) == 0 {
+			versionsToRemove.Insert(apiVersion)
+		}
+	}
+
+	for _, apiVersion := range versionsToRemove.List() {
+		klog.V(1).Infof("Removing version %v.%v because it is introduced after the current version %s and because it has no resources per APILifecycle.", apiVersion, groupName, e.currentVersion.String())
+		delete(versionedResourcesStorageMap, apiVersion)
+	}
+}
+
+func versionIntroduced(gv schema.GroupVersion, versioner runtime.ObjectVersioner, resourceServingInfo rest.Storage) *apimachineryversion.Version {
+	defaultVer := apimachineryversion.MajorMinor(0, 0)
+	internalPtr := resourceServingInfo.New()
+
+	target := gv
+	// honor storage that overrides group version (used for things like scale subresources)
+	if versionProvider, ok := resourceServingInfo.(rest.GroupVersionKindProvider); ok {
+		target = versionProvider.GroupVersionKind(target).GroupVersion()
+	}
+
+	versionedPtr, err := versioner.ConvertToVersion(internalPtr, target)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return defaultVer
+	}
+
+	introduced, ok := versionedPtr.(introducedInterface)
+	if ok {
+		majorIntroduced, minorIntroduced := introduced.APILifecycleIntroduced()
+		return apimachineryversion.MajorMinor(uint(majorIntroduced), uint(minorIntroduced))
+	}
+	return defaultVer
 }
 
 func shouldRemoveResourceAndSubresources(resourcesToRemove sets.String, resourceName string) bool {
