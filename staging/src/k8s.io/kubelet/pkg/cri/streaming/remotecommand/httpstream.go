@@ -17,13 +17,13 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
-	"context"
 
 	api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -423,7 +423,7 @@ func handleResizeEvents(reqctx context.Context, stream io.Reader, channel chan<-
 		select {
 		case channel <- size:
 		case <-reqctx.Done():
-			// To prevent go routine leak. 
+			// To prevent go routine leak.
 			return
 		}
 	}
