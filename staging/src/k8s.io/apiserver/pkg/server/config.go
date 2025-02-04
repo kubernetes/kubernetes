@@ -154,6 +154,10 @@ type Config struct {
 	// EffectiveVersion determines which apis and features are available
 	// based on when the api/feature lifecyle.
 	EffectiveVersion basecompatibility.EffectiveVersion
+	// EmulationForwardCompatible indicates APIs introduced after the emulation version are installed.
+	// If true, APIs that have higher priority than the APIs of the same group resource enabled at the emulation version will be installed.
+	// This is useful if a controller has switched to use newer APIs in the binary version, and we want it still functional in an older emulation version.
+	EmulationForwardCompatible bool
 	// FeatureGate is a way to plumb feature gate through if you have them.
 	FeatureGate featuregate.FeatureGate
 	// AuditBackend is where audit events are sent to.
@@ -839,8 +843,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		StorageReadinessHook:  NewStorageReadinessHook(c.StorageInitializationTimeout),
 		StorageVersionManager: c.StorageVersionManager,
 
-		EffectiveVersion: c.EffectiveVersion,
-		FeatureGate:      c.FeatureGate,
+		EffectiveVersion:           c.EffectiveVersion,
+		EmulationForwardCompatible: c.EmulationForwardCompatible,
+		FeatureGate:                c.FeatureGate,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
