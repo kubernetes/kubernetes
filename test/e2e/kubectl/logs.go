@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
@@ -359,7 +360,7 @@ var _ = SIGDescribe("Kubectl logs", func() {
 	})
 })
 
-var _ = SIGDescribe("kubectl logs with specific stream", feature.PodLogsQuerySplitStreams, func() {
+var _ = SIGDescribe("kubectl logs with specific stream", feature.PodLogsQuerySplitStreams, framework.WithFeatureGate(features.PodLogsQuerySplitStreams), func() {
 	f := framework.NewDefaultFramework("kubectl-logs-stream")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	defer ginkgo.GinkgoRecover()
