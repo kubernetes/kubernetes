@@ -413,15 +413,15 @@ func (c *containerLogManager) removeExcessLogs(logs []string) ([]string, error) 
 
 // compressLog compresses a log to log.gz with gzip.
 func (c *containerLogManager) compressLog(log string) error {
+	logInfo, err := os.Stat(log)
+	if err != nil {
+		return fmt.Errorf("failed to stat log file: %w", err)
+	}
 	r, err := c.osInterface.Open(log)
 	if err != nil {
 		return fmt.Errorf("failed to open log %q: %w", log, err)
 	}
 	defer r.Close()
-	logInfo, err := os.Stat(log)
-	if err != nil {
-		return fmt.Errorf("failed to get log info %q: %w", log, err)
-	}
 	tmpLog := log + tmpSuffix
 	f, err := c.osInterface.OpenFile(tmpLog, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, logInfo.Mode())
 	if err != nil {
