@@ -440,7 +440,8 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 					klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
 					// Attempt new allocation ( reusing allocated CPUs ) according to the NUMA affinity contained in the hint
 					// Since NUMA affinity container in the hint is unmutable already allocated CPUs pass the criteria
-					newallocatedcpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], &cpusInUseByPodContainerToResize, nil)
+					mustKeepCPUsForResize := p.GetMustKeepCPUs(container,cpuset)
+					newallocatedcpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], &cpusInUseByPodContainerToResize, &mustKeepCPUsForResize)
 					if err != nil {
 						klog.ErrorS(err, "Static policy: Unable to allocate new CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
 						return err
@@ -489,6 +490,22 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	p.updateMetricsOnAllocate(cpuset)
 
 	return nil
+}
+
+func (p *staticPolicy) GetMustKeepCPUs(container *v1.Container, oldCpuset cpuset.CPUSet) (cpuset.CPUSet) {
+	//mustKeepCPUsInEnv := cpuset.New()
+	mustKeepCPUs := cpuset.New()
+	for _, envVar := range container.Env {
+		if envVar.Name == "mustKeepCPUs" {
+			mustKeepCPUsInEnv, err := cpuset.Parse(envVar.Value)
+			if err == nil && mustKeepCPUsInEnv.Size() != 0 {
+				mustKeepCPUs = oldCpuset.Intersection(mustKeepCPUsInEnv)
+			} 
+			break
+		}
+	}
+	klog.InfoS("mustKeepCPUs:", "is", mustKeepCPUs)
+	return mustKeepCPUs
 }
 
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
