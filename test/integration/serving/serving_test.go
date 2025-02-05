@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -382,8 +383,13 @@ users:
 			if want, got := tt.wantSecureCode != nil, secureInfo != nil; want != got {
 				t.Errorf("SecureServing enabled: expected=%v got=%v", want, got)
 			} else if want {
-				url := fmt.Sprintf("https://%s%s", secureInfo.Listener.Addr().String(), tt.path)
-				url = strings.ReplaceAll(url, "[::]", "127.0.0.1") // switch to IPv4 because the self-signed cert does not support [::]
+				// only interested on the port, because we are using always localhost
+				_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
+				if err != nil {
+					t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
+				}
+				// use IPv4 because the self-signed cert does not support [::]
+				url := fmt.Sprintf("https://127.0.0.1:%s%s", port, tt.path)
 
 				// read self-signed server cert disk
 				pool := x509.NewCertPool()
