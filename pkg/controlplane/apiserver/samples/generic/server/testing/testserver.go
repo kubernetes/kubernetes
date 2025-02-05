@@ -37,10 +37,13 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -126,6 +129,9 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	o := server.NewOptions()
 	var fss cliflag.NamedFlagSets
 	o.AddFlags(&fss)
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		o.Flagz = flagz.NamedFlagSetsReader{FlagSets: fss}
+	}
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 	for _, f := range fss.FlagSets {
@@ -164,7 +170,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	o.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
 	o.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 
-	completedOptions, err := o.Complete(tCtx, fss, nil, nil)
+	completedOptions, err := o.Complete(tCtx, nil, nil)
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %w", err)
 	}

@@ -49,6 +49,8 @@ import (
 	"k8s.io/component-base/term"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -124,7 +126,11 @@ cluster's shared state through which all other components interact.`,
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
-	s.ParsedFlags = &namedFlagSets
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		s.Flagz = flagz.NamedFlagSetsReader{
+			FlagSets: namedFlagSets,
+		}
+	}
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))

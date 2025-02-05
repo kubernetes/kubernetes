@@ -132,7 +132,8 @@ func TestLivezAndReadyz(t *testing.T) {
 
 func TestFlagz(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	testServerFlags := append(framework.DefaultTestServerFlags(), "--emulated-version=1.32")
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -157,6 +158,16 @@ Warning: This endpoint is not meant to be machine parseable, has no formatting c
 	}
 	if !bytes.HasPrefix(raw, []byte(expectedHeader)) {
 		t.Fatalf("Header mismatch!\nExpected:\n%s\n\nGot:\n%s", expectedHeader, string(raw))
+	}
+	found := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.Contains(line, "emulated-version") && strings.Contains(line, "1.32") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Expected flag --emulated-version=[1.32] to be reflected in /flagz output, got:\n%s", string(raw))
 	}
 }
 
