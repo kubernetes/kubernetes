@@ -408,6 +408,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 		}
 
+		azureFileCSIDriver = &storagev1.CSIDriver{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "file.csi.azure.com",
+			},
+			Spec: storagev1.CSIDriverSpec{
+				TokenRequests: []storagev1.TokenRequest{
+					{
+						Audience: "foo",
+					},
+				},
+			},
+		}
+
 		csiDriverIndex  = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 		csiDriverLister = storagelisters.NewCSIDriverLister(csiDriverIndex)
 
@@ -421,6 +434,16 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				VolumeName: "pvname",
+			},
+		}
+
+		pvcWithIntreeAzureFile = &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pvclaim-azurefile",
+				Namespace: "ns",
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				VolumeName: "pvname-azurefile",
 			},
 		}
 
@@ -451,6 +474,20 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 		}
 
+		pvWithIntreeAzureFile = &corev1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvname-azurefile",
+			},
+			Spec: corev1.PersistentVolumeSpec{
+				ClaimRef: &corev1.ObjectReference{
+					Namespace: "ns",
+				},
+				PersistentVolumeSource: corev1.PersistentVolumeSource{
+					AzureFile: &corev1.AzureFilePersistentVolumeSource{ShareName: "default", SecretName: "secret"},
+				},
+			},
+		}
+
 		pvIndex  = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 		pvLister = corev1lister.NewPersistentVolumeLister(pvIndex)
 
@@ -463,6 +500,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	projectedVolumeSource := &corev1.ProjectedVolumeSource{Sources: []corev1.VolumeProjection{{ServiceAccountToken: &corev1.ServiceAccountTokenProjection{Audience: "foo"}}}}
 	csiDriverVolumeSource := &corev1.CSIVolumeSource{Driver: "com.example.csi.mydriver"}
 	persistentVolumeClaimVolumeSource := &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvclaim"}
+	persistentVolumeClaimVolumeSourceAzureFile := &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "pvclaim-azurefile"}
 	ephemeralVolumeSource := &corev1.EphemeralVolumeSource{VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{}}
 
 	coremypodWithProjectedServiceAccountEmptyAudience, v1mypodWithProjectedServiceAccountEmptyAudience := makeTestPod("ns", "mysapod", "mynode", false)
@@ -483,10 +521,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	coremypodWithPVCAndCSI, v1mypodWithPVCAndCSI := makeTestPod("ns", "mypvcandcsipod", "mynode", false)
 	v1mypodWithPVCAndCSI.Spec.Volumes = []corev1.Volume{{VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: persistentVolumeClaimVolumeSource}}, {VolumeSource: corev1.VolumeSource{CSI: csiDriverVolumeSource}}}
 
+	coremypodIntreeInlineVolToCSI, v1mypodIntreeInlineVolToCSI := makeTestPod("ns", "myintreeinlinevoltocsipod", "mynode", false)
+	v1mypodIntreeInlineVolToCSI.Spec.Volumes = []corev1.Volume{{VolumeSource: corev1.VolumeSource{AzureFile: &corev1.AzureFileVolumeSource{ShareName: "default", SecretName: "secret"}}}}
+
+	coremypodIntreePVToCSI, v1mypodIntreePVToCSI := makeTestPod("ns", "myintreepvtocsipod", "mynode", false)
+	v1mypodIntreePVToCSI.Spec.Volumes = []corev1.Volume{{VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: persistentVolumeClaimVolumeSourceAzureFile}}}
+
 	checkNilError(t, csiDriverIndex.Add(csiDriverWithAudience))
+	checkNilError(t, csiDriverIndex.Add(azureFileCSIDriver))
 	checkNilError(t, pvcIndex.Add(pvcWithCSIDriver))
+	checkNilError(t, pvcIndex.Add(pvcWithIntreeAzureFile))
 	checkNilError(t, pvcIndex.Add(ephemeralVolumePVCWithCSIDriver))
 	checkNilError(t, pvIndex.Add(pvWithCSIDriver))
+	checkNilError(t, pvIndex.Add(pvWithIntreeAzureFile))
 
 	existingPodsIndex.Add(v1mymirrorpod)
 	existingPodsIndex.Add(v1othermirrorpod)
@@ -501,6 +548,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	checkNilError(t, existingPodsIndex.Add(v1mypodWithPVCRefCSI))
 	checkNilError(t, existingPodsIndex.Add(v1mypodWithEphemeralVolume))
 	checkNilError(t, existingPodsIndex.Add(v1mypodWithPVCAndCSI))
+	checkNilError(t, existingPodsIndex.Add(v1mypodIntreePVToCSI))
+	checkNilError(t, existingPodsIndex.Add(v1mypodIntreeInlineVolToCSI))
 
 	existingNodesIndex.Add(&corev1.Node{ObjectMeta: mynodeObjMeta})
 
@@ -1429,6 +1478,30 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, false)
 			},
 			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodWithCSI.Name, v1mypodWithCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
+		},
+		{
+			name:            "intree pv to csi, allow create of token when audience in pod --> csi --> driver --> tokenrequest with audience, ServiceAccountNodeAudienceRestriction=true",
+			podsGetter:      existingPods,
+			csiDriverGetter: csiDriverLister,
+			pvcGetter:       pvcLister,
+			pvGetter:        pvLister,
+			features:        feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
+			},
+			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodIntreePVToCSI.Name, v1mypodIntreePVToCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
+		},
+		{
+			name:            "intree inline vol to csi, allow create of token when audience in pod --> csi --> driver --> tokenrequest with audience, ServiceAccountNodeAudienceRestriction=true",
+			podsGetter:      existingPods,
+			csiDriverGetter: csiDriverLister,
+			features:        feature.DefaultFeatureGate,
+			setupFunc: func(t *testing.T) {
+				t.Helper()
+				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceAccountNodeAudienceRestriction, true)
+			},
+			attributes: admission.NewAttributesRecord(makeTokenRequest(coremypodIntreeInlineVolToCSI.Name, v1mypodIntreeInlineVolToCSI.UID, []string{"foo"}), nil, tokenrequestKind, coremypod.Namespace, "mysa", svcacctResource, "token", admission.Create, &metav1.CreateOptions{}, false, mynode),
 		},
 
 		// Unrelated objects
