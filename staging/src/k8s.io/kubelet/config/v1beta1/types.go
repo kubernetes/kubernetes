@@ -547,6 +547,13 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	EvictionMinimumReclaim map[string]string `json:"evictionMinimumReclaim,omitempty"`
+	// mergeDefaultEvictionSettings indicates that defaults for the evictionHard, evictionSoft, evictionSoftGracePeriod, and evictionMinimumReclaim
+	// fields should be merged into values specified for those fields in this configuration.
+	// Signals specified in this configuration take precedence.
+	// Signals not specified in this configuration inherit their defaults.
+	// Default: false
+	// +optional
+	MergeDefaultEvictionSettings *bool `json:"mergeDefaultEvictionSettings,omitempty"`
 	// podsPerCore is the maximum number of pods per core. Cannot exceed maxPods.
 	// The value must be a non-negative integer.
 	// If 0, there is no limit on the number of Pods.
