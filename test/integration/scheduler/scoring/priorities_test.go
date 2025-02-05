@@ -258,7 +258,6 @@ func TestNodeResourcesScoring(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 			testCtx := initTestSchedulerForNodeResourcesTest(t, tt.strategy)
 
 			for _, n := range tt.nodes {

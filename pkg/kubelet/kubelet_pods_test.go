@@ -2619,7 +2619,6 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 			"all regular containers succeeded and restartable init container succeeded with restart always, but the pod is terminal",
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
@@ -2711,7 +2710,6 @@ func TestPodPhaseWithRestartAlwaysAndPodHasRun(t *testing.T) {
 			"regular init container is succeeded, restartable init container and regular containers are both running",
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
@@ -3115,7 +3113,6 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 			"backoff crashloop with non-zero restartable init container, main containers succeeded",
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
