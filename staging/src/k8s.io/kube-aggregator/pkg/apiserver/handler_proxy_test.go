@@ -57,7 +57,6 @@ import (
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/client-go/transport"
-	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -134,10 +133,11 @@ func TestProxyHandler(t *testing.T) {
 		expectedCalled     bool
 		expectedHeaders    map[string][]string
 
-		enableFeatureGates []featuregate.Feature
+		remoteRequestHeaderUIDFeature bool
 	}{
 		"no target": {
-			expectedStatusCode: http.StatusNotFound,
+			expectedStatusCode:            http.StatusNotFound,
+			remoteRequestHeaderUIDFeature: true,
 		},
 		"no user": {
 			apiService: &apiregistration.APIService{
@@ -153,10 +153,11 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedStatusCode: http.StatusInternalServerError,
-			expectedBody:       "missing user",
+			expectedStatusCode:            http.StatusInternalServerError,
+			expectedBody:                  "missing user",
+			remoteRequestHeaderUIDFeature: true,
 		},
-		"proxy with user, insecure": {
+		"[-RemoteRequestHeaderUID] proxy with user, insecure": {
 			user: &user.DefaultInfo{
 				Name:   "username",
 				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
@@ -189,7 +190,7 @@ func TestProxyHandler(t *testing.T) {
 				"X-Remote-Group":    {"one", "two"},
 			},
 		},
-		"[RemoteRequestHeaderUID] proxy with user, insecure": {
+		" proxy with user, insecure": {
 			user: &user.DefaultInfo{
 				Name:   "username",
 				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
@@ -210,7 +211,41 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			enableFeatureGates: []featuregate.Feature{features.RemoteRequestHeaderUID},
+			remoteRequestHeaderUIDFeature: true,
+			expectedStatusCode:            http.StatusOK,
+			expectedCalled:                true,
+			expectedHeaders: map[string][]string{
+				"X-Forwarded-Proto": {"https"},
+				"X-Forwarded-Uri":   {"/request/path"},
+				"X-Forwarded-For":   {"127.0.0.1"},
+				"X-Remote-User":     {"username"},
+				"X-Remote-Uid":      {"6b60d791-1af9-4513-92e5-e4252a1e0a78"},
+				"User-Agent":        {"Go-http-client/1.1"},
+				"Accept-Encoding":   {"gzip"},
+				"X-Remote-Group":    {"one", "two"},
+			},
+		},
+		"[-RemoteRequestHeaderUID] proxy with user, cabundle": {
+			user: &user.DefaultInfo{
+				Name:   "username",
+				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
+				Groups: []string{"one", "two"},
+			},
+			path: "/request/path",
+			apiService: &apiregistration.APIService{
+				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+				Spec: apiregistration.APIServiceSpec{
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
+					Group:    "foo",
+					Version:  "v1",
+					CABundle: testCACrt,
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
 			expectedStatusCode: http.StatusOK,
 			expectedCalled:     true,
 			expectedHeaders: map[string][]string{
@@ -218,7 +253,6 @@ func TestProxyHandler(t *testing.T) {
 				"X-Forwarded-Uri":   {"/request/path"},
 				"X-Forwarded-For":   {"127.0.0.1"},
 				"X-Remote-User":     {"username"},
-				"X-Remote-Uid":      {"6b60d791-1af9-4513-92e5-e4252a1e0a78"},
 				"User-Agent":        {"Go-http-client/1.1"},
 				"Accept-Encoding":   {"gzip"},
 				"X-Remote-Group":    {"one", "two"},
@@ -245,42 +279,9 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedStatusCode: http.StatusOK,
-			expectedCalled:     true,
-			expectedHeaders: map[string][]string{
-				"X-Forwarded-Proto": {"https"},
-				"X-Forwarded-Uri":   {"/request/path"},
-				"X-Forwarded-For":   {"127.0.0.1"},
-				"X-Remote-User":     {"username"},
-				"User-Agent":        {"Go-http-client/1.1"},
-				"Accept-Encoding":   {"gzip"},
-				"X-Remote-Group":    {"one", "two"},
-			},
-		},
-		"[RemoteRequestHeaderUID] proxy with user, cabundle": {
-			user: &user.DefaultInfo{
-				Name:   "username",
-				UID:    "6b60d791-1af9-4513-92e5-e4252a1e0a78",
-				Groups: []string{"one", "two"},
-			},
-			path: "/request/path",
-			apiService: &apiregistration.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
-				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: ptr.To[int32](443)},
-					Group:    "foo",
-					Version:  "v1",
-					CABundle: testCACrt,
-				},
-				Status: apiregistration.APIServiceStatus{
-					Conditions: []apiregistration.APIServiceCondition{
-						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
-					},
-				},
-			},
-			enableFeatureGates: []featuregate.Feature{features.RemoteRequestHeaderUID},
-			expectedStatusCode: http.StatusOK,
-			expectedCalled:     true,
+			remoteRequestHeaderUIDFeature: true,
+			expectedStatusCode:            http.StatusOK,
+			expectedCalled:                true,
 			expectedHeaders: map[string][]string{
 				"X-Forwarded-Proto": {"https"},
 				"X-Forwarded-Uri":   {"/request/path"},
@@ -313,7 +314,8 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedStatusCode: http.StatusServiceUnavailable,
+			remoteRequestHeaderUIDFeature: true,
+			expectedStatusCode:            http.StatusServiceUnavailable,
 		},
 		"service unresolveable": {
 			user: &user.DefaultInfo{
@@ -337,7 +339,8 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedStatusCode: http.StatusServiceUnavailable,
+			remoteRequestHeaderUIDFeature: true,
+			expectedStatusCode:            http.StatusServiceUnavailable,
 		},
 		"fail on bad serving cert": {
 			user: &user.DefaultInfo{
@@ -359,7 +362,8 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			expectedStatusCode: http.StatusServiceUnavailable,
+			remoteRequestHeaderUIDFeature: true,
+			expectedStatusCode:            http.StatusServiceUnavailable,
 		},
 		"fail on bad serving cert w/o SAN and increase SAN error counter metrics": {
 			user: &user.DefaultInfo{
@@ -382,9 +386,10 @@ func TestProxyHandler(t *testing.T) {
 					},
 				},
 			},
-			serviceCertOverride:    svcCrtNoSAN,
-			increaseSANWarnCounter: true,
-			expectedStatusCode:     http.StatusServiceUnavailable,
+			serviceCertOverride:           svcCrtNoSAN,
+			increaseSANWarnCounter:        true,
+			remoteRequestHeaderUIDFeature: true,
+			expectedStatusCode:            http.StatusServiceUnavailable,
 		},
 	}
 
@@ -394,9 +399,7 @@ func TestProxyHandler(t *testing.T) {
 		legacyregistry.Reset()
 
 		t.Run(name, func(t *testing.T) {
-			for _, f := range tc.enableFeatureGates {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoteRequestHeaderUID, tc.remoteRequestHeaderUIDFeature)
 
 			targetServer := httptest.NewUnstartedServer(target)
 			serviceCert := tc.serviceCertOverride
