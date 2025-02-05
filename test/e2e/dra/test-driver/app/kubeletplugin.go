@@ -36,10 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
 
 type ExamplePlugin struct {
@@ -416,45 +416,37 @@ func extractParameters(parameters runtime.RawExtension, env *map[string]string, 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, claims []*resourceapi.ResourceClaim) (*drapb.NodePrepareResourcesResponse, error) {
-	resp := &drapb.NodePrepareResourcesResponse{
-		Claims: make(map[string]*drapb.NodePrepareResourceResponse),
-	}
-	allocatedClaims := ctx.Value("allocatedClaims").(map[string]*drapb.NodePrepareResourceResponse)
+func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, claim *resourceapi.ResourceClaim) ([]*draapi.AllocatedDevice, error) {
+	allocatedClaims := ctx.Value("allocatedClaims").(map[string][]*draapi.AllocatedDevice)
 
+	var allocatedDevices []*draapi.AllocatedDevice
 	if failure := ex.getPrepareResourcesFailure(); failure != nil {
-		return resp, failure
+		return allocatedDevices, failure
 	}
 
-	for _, claimReq := range claims {
-		if res, ok := allocatedClaims[string(claimReq.UID)]; ok {
-			resp.Claims[string(claimReq.UID)] = res
-			continue
-		}
-		devices, err := ex.nodePrepareResource(ctx, claimReq)
-		if err != nil {
-			resp.Claims[string(claimReq.UID)] = &drapb.NodePrepareResourceResponse{
-				Error: err.Error(),
-			}
-		} else {
-			r := &drapb.NodePrepareResourceResponse{}
-			for _, device := range devices {
-				pbDevice := &drapb.Device{
-					PoolName:     device.PoolName,
-					DeviceName:   device.DeviceName,
-					RequestNames: []string{device.RequestName},
-					CDIDeviceIDs: []string{device.CDIDeviceID},
-				}
-				r.Devices = append(r.Devices, pbDevice)
-			}
-			resp.Claims[string(claimReq.UID)] = r
-		}
+	if res, ok := allocatedClaims[string(claim.UID)]; ok {
+		return res, nil
 	}
-	return resp, nil
+	devices, err := ex.nodePrepareResource(ctx, claim)
+	if err != nil {
+		return allocatedDevices, err
+	}
+
+	for _, device := range devices {
+		apiDevice := &draapi.AllocatedDevice{
+			PoolName:     device.PoolName,
+			DeviceName:   device.DeviceName,
+			RequestNames: []string{device.RequestName},
+			CDIDeviceIDs: []string{device.CDIDeviceID},
+		}
+		allocatedDevices = append(allocatedDevices, apiDevice)
+	}
+
+	return allocatedDevices, nil
 }
 
 func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*resourceapi.ResourceClaim) error {
-	allocatedClaims := make(map[string]*drapb.NodePrepareResourceResponse)
+	allocatedClaims := make(map[string][]*draapi.AllocatedDevice)
 	for _, claimReq := range claims {
 		ex.mutex.Lock()
 		defer ex.mutex.Unlock()
@@ -464,15 +456,15 @@ func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*re
 		claimID := ClaimID{Name: claimReq.Name, UID: string(claimReq.UID)}
 		if devices, ok := ex.prepared[claimID]; ok {
 			// Idempotent call, nothing to do.
-			r := &drapb.NodePrepareResourceResponse{}
+			var r []*draapi.AllocatedDevice
 			for _, device := range devices {
-				pbDevice := &drapb.Device{
+				pbDevice := &draapi.AllocatedDevice{
 					PoolName:     device.PoolName,
 					DeviceName:   device.DeviceName,
 					RequestNames: []string{device.RequestName},
 					CDIDeviceIDs: []string{device.CDIDeviceID},
 				}
-				r.Devices = append(r.Devices, pbDevice)
+				r = append(r, pbDevice)
 			}
 			allocatedClaims[string(claimReq.UID)] = r
 		}
@@ -510,26 +502,12 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *re
 	return nil
 }
 
-func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, claims []*resourceapi.ResourceClaim) (*drapb.NodeUnprepareResourcesResponse, error) {
-	resp := &drapb.NodeUnprepareResourcesResponse{
-		Claims: make(map[string]*drapb.NodeUnprepareResourceResponse),
-	}
-
+func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, claim *resourceapi.ResourceClaim) error {
 	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
-		return resp, failure
+		return failure
 	}
 
-	for _, claimReq := range claims {
-		err := ex.nodeUnprepareResource(ctx, claimReq)
-		if err != nil {
-			resp.Claims[string(claimReq.UID)] = &drapb.NodeUnprepareResourceResponse{
-				Error: err.Error(),
-			}
-		} else {
-			resp.Claims[string(claimReq.UID)] = &drapb.NodeUnprepareResourceResponse{}
-		}
-	}
-	return resp, nil
+	return ex.nodeUnprepareResource(ctx, claim)
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {

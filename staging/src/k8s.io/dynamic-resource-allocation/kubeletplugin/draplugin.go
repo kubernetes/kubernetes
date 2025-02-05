@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 	"sync"
 
@@ -28,8 +27,10 @@ import (
 	"k8s.io/klog/v2"
 
 	resourceapi "k8s.io/api/resource/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -77,8 +78,8 @@ type DRAPlugin interface {
 
 type DRADriverService interface {
 	CheckDeviceAllocation(ctx context.Context, claims []*resourceapi.ResourceClaim) error
-	NodePrepareResources(context.Context, []*resourceapi.ResourceClaim) (*drapbv1beta1.NodePrepareResourcesResponse, error)
-	NodeUnprepareResources(context.Context, []*resourceapi.ResourceClaim) (*drapbv1beta1.NodeUnprepareResourcesResponse, error)
+	NodePrepareResources(context.Context, *resourceapi.ResourceClaim) ([]*draapi.AllocatedDevice, error)
+	NodeUnprepareResources(context.Context, *resourceapi.ResourceClaim) error
 }
 
 // Option implements the functional options pattern for Start.
@@ -504,15 +505,31 @@ func (w *NodeServerWrapper) NodePrepareResources(ctx context.Context, req *drapb
 	if err := w.DRADriverService.CheckDeviceAllocation(ctx, resourceClaims); err != nil {
 		return nil, err
 	}
-	resp, err := w.DRADriverService.NodePrepareResources(ctx, resourceClaims)
-	if err != nil {
-		return nil, err
+	resp := &drapbv1alpha4.NodePrepareResourcesResponse{Claims: map[string]*drapbv1alpha4.NodePrepareResourceResponse{}}
+	for _, claim := range resourceClaims {
+		results, err := w.DRADriverService.NodePrepareResources(ctx, claim)
+		if err != nil {
+			resp.Claims[string(claim.UID)] = &drapbv1alpha4.NodePrepareResourceResponse{
+				Error: fmt.Sprintf("failed to preparing devices for claim %v: %v", claim.UID, err),
+			}
+			continue
+		}
+		var devices []*drapbv1alpha4.Device
+		for _, result := range results {
+			device := &drapbv1alpha4.Device{
+				RequestNames: result.RequestNames,
+				PoolName:     result.PoolName,
+				DeviceName:   result.DeviceName,
+				CDIDeviceIDs: result.CDIDeviceIDs,
+			}
+			devices = append(devices, device)
+
+		}
+		resp.Claims[string(claim.UID)] = &drapbv1alpha4.NodePrepareResourceResponse{
+			Devices: devices,
+		}
 	}
-	var convertedResp drapbv1alpha4.NodePrepareResourcesResponse
-	if err := drapbv1alpha4.Convert_v1beta1_NodePrepareResourcesResponse_To_v1alpha4_NodePrepareResourcesResponse(resp, &convertedResp, nil); err != nil {
-		return nil, fmt.Errorf("internal error converting NodePrepareResourcesResponse from v1beta1 to v1alpha4: %w", err)
-	}
-	return &convertedResp, nil
+	return resp, nil
 }
 
 func (w *NodeServerWrapper) NodeUnprepareResources(ctx context.Context, req *drapbv1alpha4.NodeUnprepareResourcesRequest) (*drapbv1alpha4.NodeUnprepareResourcesResponse, error) {
@@ -520,19 +537,32 @@ func (w *NodeServerWrapper) NodeUnprepareResources(ctx context.Context, req *dra
 	if err := drapbv1alpha4.Convert_v1alpha4_NodeUnprepareResourcesRequest_To_v1beta1_NodeUnprepareResourcesRequest(req, &convertedReq, nil); err != nil {
 		return nil, fmt.Errorf("internal error converting NodeUnprepareResourcesRequest from v1alpha4 to v1beta1: %w", err)
 	}
+	var resourceClaims []*resourceapi.ResourceClaim
+	for _, claimReq := range req.Claims {
+		resourceClaims = append(resourceClaims, &resourceapi.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(claimReq.UID),
+				Namespace: claimReq.Namespace,
+				Name:      claimReq.Name,
+			},
+		})
+	}
 	resourceClaims, err := w.GetResourceClaims(ctx, convertedReq.Claims)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := w.DRADriverService.NodeUnprepareResources(ctx, resourceClaims)
-	if err != nil {
-		return nil, err
+	resp := &drapbv1alpha4.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1alpha4.NodeUnprepareResourceResponse{}}
+	for _, claim := range resourceClaims {
+		err := w.DRADriverService.NodeUnprepareResources(ctx, claim)
+		if err != nil {
+			resp.Claims[string(claim.UID)] = &drapbv1alpha4.NodeUnprepareResourceResponse{
+				Error: fmt.Sprintf("failed unpreparing devices for claim %v: %v", claim.UID, err),
+			}
+			continue
+		}
+		resp.Claims[string(claim.UID)] = &drapbv1alpha4.NodeUnprepareResourceResponse{}
 	}
-	var convertedResp drapbv1alpha4.NodeUnprepareResourcesResponse
-	if err := drapbv1alpha4.Convert_v1beta1_NodeUnprepareResourcesResponse_To_v1alpha4_NodeUnprepareResourcesResponse(resp, &convertedResp, nil); err != nil {
-		return nil, fmt.Errorf("internal error converting NodeUnprepareResourcesResponse from v1beta1 to v1alpha4: %w", err)
-	}
-	return &convertedResp, nil
+	return resp, nil
 }
 
 func (d *draPlugin) NodeServerWrap(service DRADriverService) drapbv1alpha4.NodeServer {
@@ -558,18 +588,56 @@ func (w *DRAPluginServerWrapper) NodePrepareResources(ctx context.Context, req *
 	if err := w.DRADriverService.CheckDeviceAllocation(ctx, resourceClaims); err != nil {
 		return nil, err
 	}
-	return w.DRADriverService.NodePrepareResources(ctx, resourceClaims)
+	resp := &drapbv1beta1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1beta1.NodePrepareResourceResponse{}}
+	for _, claim := range resourceClaims {
+		results, err := w.DRADriverService.NodePrepareResources(ctx, claim)
+		if err != nil {
+			resp.Claims[string(claim.UID)] = &drapbv1beta1.NodePrepareResourceResponse{
+				Error: fmt.Sprintf("failed to preparing devices for claim %v: %v", claim.UID, err),
+			}
+			continue
+		}
+		var devices []*drapbv1beta1.Device
+		for _, result := range results {
+			device := &drapbv1beta1.Device{
+				RequestNames: result.RequestNames,
+				PoolName:     result.PoolName,
+				DeviceName:   result.DeviceName,
+				CDIDeviceIDs: result.CDIDeviceIDs,
+			}
+			devices = append(devices, device)
+
+		}
+		resp.Claims[string(claim.UID)] = &drapbv1beta1.NodePrepareResourceResponse{
+			Devices: devices,
+		}
+	}
+	return resp, nil
 }
 
 func (w *DRAPluginServerWrapper) NodeUnprepareResources(ctx context.Context, req *drapbv1beta1.NodeUnprepareResourcesRequest) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
-	resourceClaims, err := w.GetResourceClaims(ctx, req.Claims)
-	if err != nil {
-		return nil, err
+	var resourceClaims []*resourceapi.ResourceClaim
+	for _, claimReq := range req.Claims {
+		resourceClaims = append(resourceClaims, &resourceapi.ResourceClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       types.UID(claimReq.UID),
+				Namespace: claimReq.Namespace,
+				Name:      claimReq.Name,
+			},
+		})
 	}
-	if err := w.DRADriverService.CheckDeviceAllocation(ctx, resourceClaims); err != nil {
-		return nil, err
+	resp := &drapbv1beta1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1beta1.NodeUnprepareResourceResponse{}}
+	for _, claim := range resourceClaims {
+		err := w.DRADriverService.NodeUnprepareResources(ctx, claim)
+		if err != nil {
+			resp.Claims[string(claim.UID)] = &drapbv1beta1.NodeUnprepareResourceResponse{
+				Error: fmt.Sprintf("failed unpreparing devices for claim %v: %v", claim.UID, err),
+			}
+			continue
+		}
+		resp.Claims[string(claim.UID)] = &drapbv1beta1.NodeUnprepareResourceResponse{}
 	}
-	return w.DRADriverService.NodeUnprepareResources(ctx, resourceClaims)
+	return resp, nil
 }
 
 func (d *draPlugin) DRAPluginServerWrap(service DRADriverService) drapbv1beta1.DRAPluginServer {
