@@ -908,6 +908,27 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 	}, metav1.CreateOptions{})
 	checkNilError(t, err)
 
+	_, err = superuserClient.CoreV1().PersistentVolumeClaims("ns").Create(context.TODO(), &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "mypvc-azurefile"},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
+			Resources:   corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1")}},
+			VolumeName:  "mypv-azurefile",
+		},
+	}, metav1.CreateOptions{})
+	checkNilError(t, err)
+
+	_, err = superuserClient.CoreV1().PersistentVolumes().Create(context.TODO(), &corev1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "mypv-azurefile"},
+		Spec: corev1.PersistentVolumeSpec{
+			AccessModes:            []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
+			Capacity:               corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1")},
+			ClaimRef:               &corev1.ObjectReference{Namespace: "ns", Name: "mypvc-azurefile"},
+			PersistentVolumeSource: corev1.PersistentVolumeSource{AzureFile: &corev1.AzureFilePersistentVolumeSource{ShareName: "share", SecretName: "secret"}},
+		},
+	}, metav1.CreateOptions{})
+	checkNilError(t, err)
+
 	node1Client, _ := clientsetForToken(tokenNode1, clientConfig)
 	createNode(t, node1Client, "node1")
 	createDefaultServiceAccount(t, superuserClient)
@@ -934,12 +955,12 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 	})
 
 	t.Run("pod --> csi --> driver --> tokenrequest with audience works", func(t *testing.T) {
-		createCSIDriver(t, superuserClient, "csidriver-audience")
+		createCSIDriver(t, superuserClient, "csidriver-audience", "com.example.csi.mydriver")
 		csiDriverVolumeSource := &corev1.CSIVolumeSource{Driver: "com.example.csi.mydriver"}
 		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{CSI: csiDriverVolumeSource}}})
 		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "csidriver-audience"))
 		deletePod(t, superuserClient, "pod1")
-		deleteCSIDriver(t, superuserClient)
+		deleteCSIDriver(t, superuserClient, "com.example.csi.mydriver")
 	})
 
 	t.Run("pod --> pvc --> pv --> csi --> driver --> tokenrequest with audience forbidden - CSI driver not found", func(t *testing.T) {
@@ -950,21 +971,21 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 	})
 
 	t.Run("pod --> pvc --> pv --> csi --> driver --> tokenrequest with audience forbidden - pvc not found", func(t *testing.T) {
-		createCSIDriver(t, superuserClient, "pvcnotfound-audience")
+		createCSIDriver(t, superuserClient, "pvcnotfound-audience", "com.example.csi.mydriver")
 		persistentVolumeClaimVolumeSource := &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc1"}
 		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: persistentVolumeClaimVolumeSource}}})
 		expectedForbiddenMessage(t, createTokenRequest(node1Client, pod.UID, "pvcnotfound-audience"), `error validating audience "pvcnotfound-audience": persistentvolumeclaim "mypvc1" not found`)
 		deletePod(t, superuserClient, "pod1")
-		deleteCSIDriver(t, superuserClient)
+		deleteCSIDriver(t, superuserClient, "com.example.csi.mydriver")
 	})
 
 	t.Run("pod --> pvc --> pv --> csi --> driver --> tokenrequest with audience works", func(t *testing.T) {
-		createCSIDriver(t, superuserClient, "pvccsidriver-audience")
+		createCSIDriver(t, superuserClient, "pvccsidriver-audience", "com.example.csi.mydriver")
 		persistentVolumeClaimVolumeSource := &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc"}
 		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: persistentVolumeClaimVolumeSource}}})
 		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "pvccsidriver-audience"))
 		deletePod(t, superuserClient, "pod1")
-		deleteCSIDriver(t, superuserClient)
+		deleteCSIDriver(t, superuserClient, "com.example.csi.mydriver")
 	})
 
 	t.Run("pod --> ephemeral --> pvc --> pv --> csi --> driver --> tokenrequest with audience forbidden - CSI driver not found", func(t *testing.T) {
@@ -980,7 +1001,7 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 	})
 
 	t.Run("pod --> ephemeral --> pvc --> pv --> csi --> driver --> tokenrequest with audience works", func(t *testing.T) {
-		createCSIDriver(t, superuserClient, "ephemeralcsidriver-audience")
+		createCSIDriver(t, superuserClient, "ephemeralcsidriver-audience", "com.example.csi.mydriver")
 		ephemeralVolumeSource := &corev1.EphemeralVolumeSource{VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
@@ -990,28 +1011,28 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{Ephemeral: ephemeralVolumeSource}}})
 		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "ephemeralcsidriver-audience"))
 		deletePod(t, superuserClient, "pod1")
-		deleteCSIDriver(t, superuserClient)
+		deleteCSIDriver(t, superuserClient, "com.example.csi.mydriver")
 	})
 
 	t.Run("csidriver exists but tokenrequest audience not found should be forbidden", func(t *testing.T) {
-		createCSIDriver(t, superuserClient, "csidriver-audience")
+		createCSIDriver(t, superuserClient, "csidriver-audience", "com.example.csi.mydriver")
 		pod := createPod(t, superuserClient, nil)
 		expectedForbiddenMessage(t, createTokenRequest(node1Client, pod.UID, "csidriver-audience-not-found"), `audience "csidriver-audience-not-found" not found in pod spec volume`)
 		deletePod(t, superuserClient, "pod1")
-		deleteCSIDriver(t, superuserClient)
+		deleteCSIDriver(t, superuserClient, "com.example.csi.mydriver")
 	})
 
 	t.Run("pvc and csidriver exists but tokenrequest audience not found should be forbidden", func(t *testing.T) {
-		createCSIDriver(t, superuserClient, "csidriver-audience")
+		createCSIDriver(t, superuserClient, "csidriver-audience", "com.example.csi.mydriver")
 		persistentVolumeClaimVolumeSource := &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc"}
 		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: persistentVolumeClaimVolumeSource}}})
 		expectedForbiddenMessage(t, createTokenRequest(node1Client, pod.UID, "csidriver-audience-not-found"), `audience "csidriver-audience-not-found" not found in pod spec volume`)
 		deletePod(t, superuserClient, "pod1")
-		deleteCSIDriver(t, superuserClient)
+		deleteCSIDriver(t, superuserClient, "com.example.csi.mydriver")
 	})
 
 	t.Run("ephemeral volume source with audience not found should be forbidden", func(t *testing.T) {
-		createCSIDriver(t, superuserClient, "csidriver-audience")
+		createCSIDriver(t, superuserClient, "csidriver-audience", "com.example.csi.mydriver")
 		ephemeralVolumeSource := &corev1.EphemeralVolumeSource{VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadOnlyMany},
@@ -1021,7 +1042,23 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{Ephemeral: ephemeralVolumeSource}}})
 		expectedForbiddenMessage(t, createTokenRequest(node1Client, pod.UID, "csidriver-audience-not-found"), `audience "csidriver-audience-not-found" not found in pod spec volume`)
 		deletePod(t, superuserClient, "pod1")
-		deleteCSIDriver(t, superuserClient)
+		deleteCSIDriver(t, superuserClient, "com.example.csi.mydriver")
+	})
+
+	t.Run("intree pv to csi migration, pod --> csi --> driver --> tokenrequest with audience works", func(t *testing.T) {
+		createCSIDriver(t, superuserClient, "csidriver-audience", "file.csi.azure.com")
+		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "mypvc-azurefile"}}}})
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "csidriver-audience"))
+		deletePod(t, superuserClient, "pod1")
+		deleteCSIDriver(t, superuserClient, "file.csi.azure.com")
+	})
+
+	t.Run("intree inline volume to csi migration, pod --> csi --> driver --> tokenrequest with audience works", func(t *testing.T) {
+		createCSIDriver(t, superuserClient, "csidriver-audience", "file.csi.azure.com")
+		pod := createPod(t, superuserClient, []corev1.Volume{{Name: "foo", VolumeSource: corev1.VolumeSource{AzureFile: &corev1.AzureFileVolumeSource{ShareName: "default", SecretName: "mypvsecret"}}}})
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "csidriver-audience"))
+		deletePod(t, superuserClient, "pod1")
+		deleteCSIDriver(t, superuserClient, "file.csi.azure.com")
 	})
 
 	t.Run("token request with multiple audiences should be forbidden", func(t *testing.T) {
@@ -1090,11 +1127,11 @@ func createTokenRequest(client clientset.Interface, uid types.UID, audiences ...
 	}
 }
 
-func createCSIDriver(t *testing.T, client clientset.Interface, audience string) {
+func createCSIDriver(t *testing.T, client clientset.Interface, audience, driverName string) {
 	t.Helper()
 
 	_, err := client.StorageV1().CSIDrivers().Create(context.TODO(), &storagev1.CSIDriver{
-		ObjectMeta: metav1.ObjectMeta{Name: "com.example.csi.mydriver"},
+		ObjectMeta: metav1.ObjectMeta{Name: driverName},
 		Spec: storagev1.CSIDriverSpec{
 			TokenRequests: []storagev1.TokenRequest{{Audience: audience}},
 		},
@@ -1102,10 +1139,10 @@ func createCSIDriver(t *testing.T, client clientset.Interface, audience string) 
 	checkNilError(t, err)
 }
 
-func deleteCSIDriver(t *testing.T, client clientset.Interface) {
+func deleteCSIDriver(t *testing.T, client clientset.Interface, driverName string) {
 	t.Helper()
 
-	checkNilError(t, client.StorageV1().CSIDrivers().Delete(context.TODO(), "com.example.csi.mydriver", metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)}))
+	checkNilError(t, client.StorageV1().CSIDrivers().Delete(context.TODO(), driverName, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)}))
 }
 
 func createDefaultServiceAccount(t *testing.T, client clientset.Interface) {
