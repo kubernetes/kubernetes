@@ -23,15 +23,16 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
-const taintEvictionControllerSubsystem = "taint_eviction_controller"
+// controllerSubsystem must be kept in sync with the controller name in cmd/kube-controller-manager/names.
+const controllerSubsystem = "device_taint_eviction_controller"
 
 var (
 	// PodDeletionsTotal counts the number of Pods deleted by TaintEvictionController since its start.
 	PodDeletionsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
-			Subsystem:      taintEvictionControllerSubsystem,
+			Subsystem:      controllerSubsystem,
 			Name:           "pod_deletions_total",
-			Help:           "Total number of Pods deleted by TaintEvictionController since its start.",
+			Help:           "Total number of Pods deleted by DeviceTaintEvictionController since its start.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -40,9 +41,9 @@ var (
 	// for the Pod and its deletion.
 	PodDeletionsLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      taintEvictionControllerSubsystem,
+			Subsystem:      controllerSubsystem,
 			Name:           "pod_deletion_duration_seconds",
-			Help:           "Latency, in seconds, between the time when a taint effect has been activated for the Pod and its deletion via TaintEvictionController.",
+			Help:           "Latency, in seconds, between the time when a device taint effect has been activated and a Pod's deletion via DeviceTaintEvictionController.",
 			Buckets:        []float64{0.005, 0.025, 0.1, 0.5, 1, 2.5, 10, 30, 60, 120, 180, 240}, // 5ms to 4m
 			StabilityLevel: metrics.ALPHA,
 		},

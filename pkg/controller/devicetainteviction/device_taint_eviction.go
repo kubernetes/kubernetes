@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tainteviction
+package devicetainteviction
 
 import (
 	"context"
@@ -42,6 +42,7 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/pkg/controller/tainteviction/metrics"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
@@ -92,7 +93,7 @@ type Controller struct {
 	nodeListerSynced      cache.InformerSynced
 	getPodsAssignedToNode GetPodsByNodeNameFunc
 
-	taintEvictionQueue *TimedWorkerQueue
+	taintEvictionQueue *tainteviction.TimedWorkerQueue
 	// keeps a map from nodeName to all noExecute taints on that Node
 	taintedNodesLock sync.Mutex
 	taintedNodes     map[string][]v1.Taint
@@ -104,11 +105,11 @@ type Controller struct {
 	podUpdateQueue  workqueue.TypedInterface[podUpdateItem]
 }
 
-func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), controllerName string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
-	return func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), controllerName string) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
+	return func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
-		klog.FromContext(ctx).Info("Deleting pod", "controller", controllerName, "pod", args.NamespacedName)
+		klog.FromContext(ctx).Info("Deleting pod", "pod", args.NamespacedName)
 		if emitEventFunc != nil {
 			emitEventFunc(args.NamespacedName)
 		}
@@ -135,8 +136,8 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, 
 	updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
 		Type:    v1.DisruptionTarget,
 		Status:  v1.ConditionTrue,
-		Reason:  "DeletionByTaintManager",
-		Message: "Taint manager: deleting due to NoExecute taint",
+		Reason:  "DeletionByDeviceTaintManager",
+		Message: "Device Taint manager: deleting due to NoExecute taint",
 	})
 	if updated {
 		if _, _, _, err := utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
@@ -183,7 +184,7 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 func New(ctx context.Context, c clientset.Interface, podInformer corev1informers.PodInformer, nodeInformer corev1informers.NodeInformer, controllerName string) (*Controller, error) {
 	logger := klog.FromContext(ctx)
-	metrics.Register()
+	metrics.Register() // It would be nicer to pass the controller name here, but that probably would break generating https://kubernetes.io/docs/reference/instrumentation/metrics.
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
@@ -219,7 +220,7 @@ func New(ctx context.Context, c clientset.Interface, podInformer corev1informers
 		nodeUpdateQueue: workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[nodeUpdateItem]{Name: "noexec_taint_node"}),
 		podUpdateQueue:  workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[podUpdateItem]{Name: "noexec_taint_pod"}),
 	}
-	tm.taintEvictionQueue = CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
+	tm.taintEvictionQueue = tainteviction.CreateWorkerQueue(deletePodHandler(c, tm.emitPodDeletionEvent, tm.name))
 
 	_, err := podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -465,7 +466,7 @@ func (tc *Controller) processPodOnNode(
 		logger.V(2).Info("Not all taints are tolerated after update for pod on node", "pod", podNamespacedName.String(), "node", klog.KRef("", nodeName))
 		// We're canceling scheduled work (if any), as we're going to delete the Pod right away.
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
-		tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), now, now)
+		tc.taintEvictionQueue.AddWork(ctx, tainteviction.NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), now, now)
 		return
 	}
 	minTolerationTime := getMinTolerationTime(usedTolerations)
@@ -486,7 +487,7 @@ func (tc *Controller) processPodOnNode(
 		}
 		tc.cancelWorkWithEvent(logger, podNamespacedName)
 	}
-	tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
+	tc.taintEvictionQueue.AddWork(ctx, tainteviction.NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
 }
 
 func (tc *Controller) handlePodUpdate(ctx context.Context, podUpdate podUpdateItem) {
