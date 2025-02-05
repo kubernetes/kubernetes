@@ -39,6 +39,8 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/storage/ephemeral"
+	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/klog/v2"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
@@ -80,6 +82,7 @@ type Plugin struct {
 	csiDriverGetter storagelisters.CSIDriverLister
 	pvcGetter       corev1lister.PersistentVolumeClaimLister
 	pvGetter        corev1lister.PersistentVolumeLister
+	csiTranslator   csitrans.CSITranslator
 
 	expansionRecoveryEnabled                       bool
 	dynamicResourceAllocationEnabled               bool
@@ -109,6 +112,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 		p.csiDriverGetter = f.Storage().V1().CSIDrivers().Lister()
 		p.pvcGetter = f.Core().V1().PersistentVolumeClaims().Lister()
 		p.pvGetter = f.Core().V1().PersistentVolumes().Lister()
+		p.csiTranslator = csitrans.New()
 	}
 }
 
@@ -189,7 +193,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		}
 
 	case svcacctResource:
-		return p.admitServiceAccount(nodeName, a)
+		return p.admitServiceAccount(ctx, nodeName, a)
 
 	case leaseResource:
 		return p.admitLease(nodeName, a)
@@ -581,7 +585,7 @@ func (p *Plugin) getForbiddenLabels(modifiedLabels sets.String) sets.String {
 	return forbiddenLabels
 }
 
-func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) error {
+func (p *Plugin) admitServiceAccount(ctx context.Context, nodeName string, a admission.Attributes) error {
 	if a.GetOperation() != admission.Create {
 		return nil
 	}
@@ -620,7 +624,7 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	}
 
 	if p.serviceAccountNodeAudienceRestriction {
-		if err := p.validateNodeServiceAccountAudience(tr, pod); err != nil {
+		if err := p.validateNodeServiceAccountAudience(ctx, tr, pod); err != nil {
 			return admission.NewForbidden(a, err)
 		}
 	}
@@ -634,7 +638,7 @@ func (p *Plugin) admitServiceAccount(nodeName string, a admission.Attributes) er
 	return nil
 }
 
-func (p *Plugin) validateNodeServiceAccountAudience(tr *authenticationapi.TokenRequest, pod *v1.Pod) error {
+func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *authenticationapi.TokenRequest, pod *v1.Pod) error {
 	// ensure all items in tr.Spec.Audiences are present in a volume mount in the pod
 	requestedAudience := ""
 	switch len(tr.Spec.Audiences) {
@@ -646,7 +650,7 @@ func (p *Plugin) validateNodeServiceAccountAudience(tr *authenticationapi.TokenR
 		return fmt.Errorf("node may only request 0 or 1 audiences")
 	}
 
-	foundAudiencesInPodSpec, err := p.podReferencesAudience(pod, requestedAudience)
+	foundAudiencesInPodSpec, err := p.podReferencesAudience(ctx, pod, requestedAudience)
 	if err != nil {
 		return fmt.Errorf("error validating audience %q: %w", requestedAudience, err)
 	}
@@ -656,7 +660,7 @@ func (p *Plugin) validateNodeServiceAccountAudience(tr *authenticationapi.TokenR
 	return nil
 }
 
-func (p *Plugin) podReferencesAudience(pod *v1.Pod, audience string) (bool, error) {
+func (p *Plugin) podReferencesAudience(ctx context.Context, pod *v1.Pod, audience string) (bool, error) {
 	var errs []error
 
 	for _, v := range pod.Spec.Volumes {
@@ -677,11 +681,20 @@ func (p *Plugin) podReferencesAudience(pod *v1.Pod, audience string) (bool, erro
 		switch {
 		case v.Ephemeral != nil && v.Ephemeral.VolumeClaimTemplate != nil:
 			pvcName := ephemeral.VolumeClaimName(pod, &v)
-			driverName, err = p.getCSIFromPVC(pod.Namespace, pvcName)
+			driverName, err = p.getCSIFromPVC(ctx, pod.Namespace, pvcName)
 		case v.PersistentVolumeClaim != nil:
-			driverName, err = p.getCSIFromPVC(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+			driverName, err = p.getCSIFromPVC(ctx, pod.Namespace, v.PersistentVolumeClaim.ClaimName)
 		case v.CSI != nil:
 			driverName = v.CSI.Driver
+		case p.csiTranslator.IsInlineMigratable(&v):
+			pv, translateErr := p.csiTranslator.TranslateInTreeInlineVolumeToCSI(klog.FromContext(ctx), &v, pod.Namespace)
+			if translateErr != nil {
+				err = translateErr
+				break
+			}
+			if pv != nil && pv.Spec.CSI != nil {
+				driverName = pv.Spec.CSI.Driver
+			}
 		}
 
 		if err != nil {
@@ -705,7 +718,7 @@ func (p *Plugin) podReferencesAudience(pod *v1.Pod, audience string) (bool, erro
 }
 
 // getCSIFromPVC returns the CSI driver name from the PVC->PV->CSI->Driver chain
-func (p *Plugin) getCSIFromPVC(namespace, claimName string) (string, error) {
+func (p *Plugin) getCSIFromPVC(ctx context.Context, namespace, claimName string) (string, error) {
 	pvc, err := p.pvcGetter.PersistentVolumeClaims(namespace).Get(claimName)
 	if err != nil {
 		return "", err
@@ -717,6 +730,18 @@ func (p *Plugin) getCSIFromPVC(namespace, claimName string) (string, error) {
 	if pv.Spec.CSI != nil {
 		return pv.Spec.CSI.Driver, nil
 	}
+
+	if p.csiTranslator.IsPVMigratable(pv) {
+		// For in-tree PV, we need to convert ("translate") the PV to CSI before checking the driver name.
+		translatedPV, err := p.csiTranslator.TranslateInTreePVToCSI(klog.FromContext(ctx), pv)
+		if err != nil {
+			return "", err
+		}
+		if translatedPV != nil && translatedPV.Spec.CSI != nil {
+			return translatedPV.Spec.CSI.Driver, nil
+		}
+	}
+
 	return "", nil
 }
 
