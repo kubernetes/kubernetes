@@ -205,7 +205,7 @@ func TestReScheduling(t *testing.T) {
 			// Create a plugin registry for testing. Register only a permit plugin.
 			registry, prof := InitRegistryAndConfig(t, nil, test.plugins...)
 
-			testCtx, teardown := InitTestSchedulerForFrameworkTest(t, testContext, 2,
+			testCtx, teardown := InitTestSchedulerForFrameworkTest(t, testContext, 2, true,
 				scheduler.WithProfiles(prof),
 				scheduler.WithFrameworkOutOfTreeRegistry(registry))
 			defer teardown()

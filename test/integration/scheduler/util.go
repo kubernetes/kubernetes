@@ -31,6 +31,7 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -44,10 +45,12 @@ import (
 // This should only be called when you want to kill the scheduler alone, away from apiserver.
 // For example, in scheduler integration tests, recreating apiserver is performance consuming,
 // then shutdown the scheduler and recreate it between each test case is a better approach.
-func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, opts ...scheduler.Option) (*testutils.TestContext, testutils.ShutdownFunc) {
+func InitTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, runScheduler bool, opts ...scheduler.Option) (*testutils.TestContext, testutils.ShutdownFunc) {
 	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, opts...)
 	testutils.SyncSchedulerInformerFactory(testCtx)
-	go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+	if runScheduler {
+		go testCtx.Scheduler.Run(testCtx.SchedulerCtx)
+	}
 
 	if nodeCount > 0 {
 		if _, err := testutils.CreateAndWaitForNodesInCache(testCtx, "test-node", st.MakeNode(), nodeCount); err != nil {
@@ -105,6 +108,10 @@ func InitRegistryAndConfig(t *testing.T, factory func(plugin framework.Plugin) f
 		plugin := configv1.Plugin{Name: p.Name()}
 
 		switch p.(type) {
+		case framework.QueueSortPlugin:
+			pls.QueueSort.Enabled = append(pls.QueueSort.Enabled, plugin)
+			// It's intentional to disable the PrioritySort plugin.
+			pls.QueueSort.Disabled = []configv1.Plugin{{Name: queuesort.Name}}
 		case framework.PreEnqueuePlugin:
 			pls.PreEnqueue.Enabled = append(pls.PreEnqueue.Enabled, plugin)
 		case framework.PreFilterPlugin:
