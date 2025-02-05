@@ -434,10 +434,11 @@ type DeviceRequest struct {
 	//   count field.
 	//
 	// - All: This request is for all of the matching devices in a pool.
+	//   At least one device must exist on the node for the allocation to succeed.
 	//   Allocation will fail if some devices are already allocated,
 	//   unless adminAccess is requested.
 	//
-	// If AlloctionMode is not specified, the default mode is ExactCount. If
+	// If AllocationMode is not specified, the default mode is ExactCount. If
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other requests must specify this field.
 	//
