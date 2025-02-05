@@ -81,6 +81,12 @@ const (
 	// Allows us to enable anonymous auth for only certain apiserver endpoints.
 	AnonymousAuthConfigurableEndpoints featuregate.Feature = "AnonymousAuthConfigurableEndpoints"
 
+	// owner: @everettraven
+	//
+	// Enables validation of client provided audit-id values.
+	// See https://github.com/kubernetes/kubernetes/issues/127801
+	AuditIDValidation = "AuditIDValidation"
+
 	// owner: @deads2k
 	// kep: https://kep.k8s.io/4601
 	//
@@ -334,6 +340,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
+
+	AuditIDValidation: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.GA},
 	},
 
 	AuthorizeWithSelectors: {
