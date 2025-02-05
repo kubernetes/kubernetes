@@ -17,9 +17,10 @@ limitations under the License.
 package tracker
 
 import (
-	"cmp"
+	stdcmp "cmp"
 	"reflect"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,12 +35,26 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/dynamic-resource-allocation/internal/workqueue"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
+
+type handlerEventType string
+
+const (
+	handlerEventAdd    handlerEventType = "add"
+	handlerEventUpdate handlerEventType = "update"
+	handlerEventDelete handlerEventType = "delete"
+)
+
+type handlerEvent struct {
+	event  handlerEventType
+	oldObj any
+	newObj any
+}
 
 func TestListPatchedResourceSlices(t *testing.T) {
 	tests := map[string]struct {
@@ -49,6 +64,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		initialPatches        []*resourcealphaapi.ResourceSlicePatch
 		initialCachedSlices   []*resourceapi.ResourceSlice
 		expectedPatchedSlices []*resourceapi.ResourceSlice
+		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 	}{
 		"add-slices-no-patches": {
@@ -59,6 +75,14 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				{ObjectMeta: metav1.ObjectMeta{Name: "s1"}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "s2"}},
+			},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if assert.Len(t, events, 2) {
+					assert.Equal(t, handlerEventAdd, events[0].event)
+					assert.Equal(t, "s1", events[0].newObj.(*resourceapi.ResourceSlice).Name)
+					assert.Equal(t, handlerEventAdd, events[1].event)
+					assert.Equal(t, "s2", events[1].newObj.(*resourceapi.ResourceSlice).Name)
+				}
 			},
 		},
 		"update-slices-no-patches": {
@@ -128,6 +152,18 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					},
 				},
 			},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if assert.Len(t, events, 4) {
+					assert.Equal(t, handlerEventAdd, events[0].event)
+					assert.Equal(t, "s1", events[0].newObj.(*resourceapi.ResourceSlice).Name)
+					assert.Equal(t, handlerEventAdd, events[1].event)
+					assert.Equal(t, "s2", events[1].newObj.(*resourceapi.ResourceSlice).Name)
+					assert.Equal(t, handlerEventUpdate, events[2].event)
+					assert.Equal(t, "s1", events[2].newObj.(*resourceapi.ResourceSlice).Name)
+					assert.Equal(t, handlerEventUpdate, events[3].event)
+					assert.Equal(t, "s2", events[3].newObj.(*resourceapi.ResourceSlice).Name)
+				}
+			},
 		},
 		"delete-slices": {
 			initialCachedSlices: []*resourceapi.ResourceSlice{
@@ -135,6 +171,18 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "s2"}},
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if assert.Len(t, events, 4) {
+					assert.Equal(t, handlerEventAdd, events[0].event)
+					assert.Equal(t, "s1", events[0].newObj.(*resourceapi.ResourceSlice).Name)
+					assert.Equal(t, handlerEventAdd, events[1].event)
+					assert.Equal(t, "s2", events[1].newObj.(*resourceapi.ResourceSlice).Name)
+					assert.Equal(t, handlerEventDelete, events[2].event)
+					assert.Equal(t, "s1", events[2].newObj.(*resourceapi.ResourceSlice).Name)
+					assert.Equal(t, handlerEventDelete, events[3].event)
+					assert.Equal(t, "s2", events[3].newObj.(*resourceapi.ResourceSlice).Name)
+				}
+			},
 		},
 		"admin-attributes-disabled": {
 			adminAttrsDisabled: true,
@@ -1437,10 +1485,36 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			}
 			informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 
-			var queue workqueue.Mock[string]
-			tracker, err := newTracker(ctx, kubeClient, informerFactory)
-			require.NoError(t, err, "unexpected tracker creation error")
-			tracker.queue = &queue
+			var handlerEventsMutex sync.Mutex
+			var handlerEvents []handlerEvent
+			handler := cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					handlerEventsMutex.Lock()
+					defer handlerEventsMutex.Unlock()
+					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj})
+				},
+				UpdateFunc: func(oldObj, newObj interface{}) {
+					handlerEventsMutex.Lock()
+					defer handlerEventsMutex.Unlock()
+					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj, newObj: newObj})
+				},
+				DeleteFunc: func(obj interface{}) {
+					handlerEventsMutex.Lock()
+					defer handlerEventsMutex.Unlock()
+					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj})
+				},
+			}
+
+			tracker := newTracker(informerFactory)
+			initialObjs := make([]any, 0, len(test.initialCachedSlices))
+			for _, obj := range test.initialCachedSlices {
+				initialObjs = append(initialObjs, obj)
+			}
+			tracker.patchedResourceSlices.Replace(initialObjs, "")
+			err := tracker.start(ctx, kubeClient)
+			require.NoError(t, err, "unexpected tracker start error")
+
+			handlerReg := tracker.AddEventHandler(handler)
 
 			informerStop := make(chan struct{})
 			informerFactory.Start(informerStop)
@@ -1455,19 +1529,23 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				close(informerStop)
 				informerFactory.Shutdown()
 			})
+			assert.True(t, handlerReg.HasSynced())
 
-			// Process work items in the queue until the queue is empty.
-			// Processing races with informers adding new work items,
-			// but the desired state should already be reached in the
-			// first iteration, so all following iterations should be nops.
-			tracker.run(ctx)
-			t.Cleanup(tracker.Stop)
+			expectHandlerEvents := test.expectHandlerEvents
+			if expectHandlerEvents == nil {
+				expectHandlerEvents = func(t *testing.T, events []handlerEvent) {
+					// assert.Empty(t, events)
+				}
+			}
+			handlerEventsMutex.Lock()
+			expectHandlerEvents(t, handlerEvents)
+			handlerEventsMutex.Unlock()
 
 			// Check ResourceSlices
 			patchedResourceSlices, err := tracker.ListPatchedResourceSlices()
 			require.NoError(t, err, "list patched resource slices")
 			sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
-				return cmp.Compare(s1.Name, s2.Name)
+				return stdcmp.Compare(s1.Name, s2.Name)
 			}
 			slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
 			slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)

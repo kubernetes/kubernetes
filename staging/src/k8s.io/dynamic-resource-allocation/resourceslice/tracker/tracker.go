@@ -18,7 +18,6 @@ package tracker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -38,11 +37,11 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/util/queue"
 	"k8s.io/utils/ptr"
 )
 
@@ -54,29 +53,34 @@ type Tracker struct {
 	deviceClasses         cache.SharedIndexInformer
 	celCache              *cel.Cache
 	patchedResourceSlices cache.Store
-	queue                 workqueue.TypedRateLimitingInterface[string]
-	wg                    sync.WaitGroup
-	cancel                func(cause error)
 	recorder              record.EventRecorder
+
+	rwMutex             sync.RWMutex
+	eventHandlers       []cache.ResourceEventHandler
+	handlerRegistration cache.ResourceEventHandlerRegistration
+	eventQueue          queue.FIFO[func()]
 }
 
-func newTracker(ctx context.Context, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
-	ctx, cancel := context.WithCancelCause(ctx)
+func StartTracker(ctx context.Context, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
+	t := newTracker(informerFactory)
+	return t, t.start(ctx, kubeClient)
+}
+
+func newTracker(informerFactory informers.SharedInformerFactory) *Tracker {
 	t := &Tracker{
 		resourceSlices:        informerFactory.Resource().V1beta1().ResourceSlices().Informer(),
 		resourceSlicePatches:  informerFactory.Resource().V1alpha3().ResourceSlicePatches().Informer(),
 		deviceClasses:         informerFactory.Resource().V1beta1().DeviceClasses().Informer(),
 		celCache:              cel.NewCache(10), // TODO: share cache with scheduler
 		patchedResourceSlices: cache.NewStore(cache.MetaNamespaceKeyFunc),
-		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "resource_slice_tracker"},
-		),
-		cancel: cancel,
 	}
-	err := t.addeventHandlers(ctx)
+	return t
+}
+
+func (t *Tracker) start(ctx context.Context, kubeClient kubernetes.Interface) error {
+	err := t.initInformers(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if kubeClient != nil {
 		eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
@@ -84,40 +88,67 @@ func newTracker(ctx context.Context, kubeClient kubernetes.Interface, informerFa
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 		t.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_slice_tracker"})
 	}
-	return t, nil
-}
-
-func StartTracker(ctx context.Context, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
-	logger := klog.FromContext(ctx)
-	t, err := newTracker(ctx, kubeClient, informerFactory)
-	if err != nil {
-		return nil, fmt.Errorf("create controller: %w", err)
-	}
-
-	logger.V(3).Info("Starting")
-	t.wg.Add(1)
-	go func() {
-		defer t.wg.Done()
-		defer logger.V(3).Info("Stopping")
-		t.run(ctx)
-	}()
-	return t, nil
-}
-
-// Stop cancels all background activity and blocks until the tracker has stopped.
-func (t *Tracker) Stop() {
-	if t == nil {
-		return
-	}
-	t.cancel(errors.New("ResourceSlice tracker was asked to stop"))
-	t.wg.Wait()
+	return nil
 }
 
 func (t *Tracker) ListPatchedResourceSlices() ([]*resourceapi.ResourceSlice, error) {
 	return typedSlice[*resourceapi.ResourceSlice](t.patchedResourceSlices.List()), nil
 }
 
-func (t *Tracker) addeventHandlers(ctx context.Context) error {
+func (t *Tracker) AddEventHandler(handler cache.ResourceEventHandler) cache.ResourceEventHandlerRegistration {
+	defer t.emitEvents()
+	t.rwMutex.Lock()
+	defer t.rwMutex.Unlock()
+
+	t.eventHandlers = append(t.eventHandlers, handler)
+	allObjs, _ := t.ListPatchedResourceSlices()
+	for _, obj := range allObjs {
+		t.eventQueue.Push(func() {
+			handler.OnAdd(obj, true)
+		})
+	}
+
+	return t.handlerRegistration
+}
+
+func (t *Tracker) emitEvents() {
+	for {
+		t.rwMutex.Lock()
+		deliver, ok := t.eventQueue.Pop()
+		t.rwMutex.Unlock()
+
+		if !ok {
+			return
+		}
+		func() {
+			defer utilruntime.HandleCrash()
+			deliver()
+		}()
+	}
+}
+
+func (t *Tracker) pushEvent(oldObj, newObj interface{}) {
+	t.rwMutex.Lock()
+	defer t.rwMutex.Unlock()
+	for _, handler := range t.eventHandlers {
+		handler := handler
+		if oldObj == nil {
+			t.eventQueue.Push(func() {
+				handler.OnAdd(newObj, false)
+			})
+		} else if newObj == nil {
+			t.eventQueue.Push(func() {
+				handler.OnDelete(oldObj)
+			})
+		} else {
+			t.eventQueue.Push(func() {
+				handler.OnUpdate(oldObj, newObj)
+			})
+		}
+	}
+}
+
+func (t *Tracker) initInformers(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 
 	sliceHandler := cache.ResourceEventHandlerFuncs{
@@ -127,7 +158,7 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
-			t.queue.Add(slice.Name)
+			t.syncSlice(ctx, slice.Name)
 		},
 		UpdateFunc: func(old, new any) {
 			oldSlice, ok := old.(*resourceapi.ResourceSlice)
@@ -143,7 +174,7 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 			} else {
 				logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 			}
-			t.queue.Add(newSlice.Name)
+			t.syncSlice(ctx, newSlice.Name)
 		},
 		DeleteFunc: func(obj any) {
 			if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
@@ -154,10 +185,10 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 				return
 			}
 			logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
-			t.queue.Add(slice.Name)
+			t.syncSlice(ctx, slice.Name)
 		},
 	}
-	_, err := t.resourceSlices.AddEventHandler(sliceHandler)
+	sliceHandlerReg, err := t.resourceSlices.AddEventHandler(sliceHandler)
 	if err != nil {
 		return fmt.Errorf("failed to add event handler for ResourceSlices: %w", err)
 	}
@@ -170,7 +201,7 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 			}
 			logger.V(5).Info("ResourceSlicePatch add", "patch", klog.KObj(patch))
 			for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-				t.queue.Add(sliceName)
+				t.syncSlice(ctx, sliceName)
 			}
 		},
 		UpdateFunc: func(old, new any) {
@@ -188,7 +219,7 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 				logger.V(5).Info("ResourceSlicePatch update", "patch", klog.KObj(newPatch))
 			}
 			for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-				t.queue.Add(sliceName)
+				t.syncSlice(ctx, sliceName)
 			}
 		},
 		DeleteFunc: func(obj any) {
@@ -201,11 +232,11 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 			}
 			logger.V(5).Info("ResourceSlicePatch delete", "patch", klog.KObj(patch))
 			for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-				t.queue.Add(sliceName)
+				t.syncSlice(ctx, sliceName)
 			}
 		},
 	}
-	_, err = t.resourceSlicePatches.AddEventHandler(patchHandler)
+	patchHandlerReg, err := t.resourceSlicePatches.AddEventHandler(patchHandler)
 	if err != nil {
 		return fmt.Errorf("failed to add event handler for ResourceSlicePatches: %w", err)
 	}
@@ -218,7 +249,7 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 			}
 			logger.V(5).Info("DeviceClass add", "class", klog.KObj(class))
 			for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-				t.queue.Add(sliceName)
+				t.syncSlice(ctx, sliceName)
 			}
 		},
 		UpdateFunc: func(old, new any) {
@@ -236,7 +267,7 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 				logger.V(5).Info("DeviceClass update", "class", klog.KObj(newClass))
 			}
 			for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-				t.queue.Add(sliceName)
+				t.syncSlice(ctx, sliceName)
 			}
 		},
 		DeleteFunc: func(obj any) {
@@ -249,64 +280,46 @@ func (t *Tracker) addeventHandlers(ctx context.Context) error {
 			}
 			logger.V(5).Info("DeviceClass delete", "class", klog.KObj(class))
 			for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-				t.queue.Add(sliceName)
+				t.syncSlice(ctx, sliceName)
 			}
 		},
 	}
-	_, err = t.deviceClasses.AddEventHandler(classHandler)
+	classHandlerReg, err := t.deviceClasses.AddEventHandler(classHandler)
 	if err != nil {
 		return fmt.Errorf("failed to add event handler for DeviceClasses: %w", err)
 	}
 
+	t.handlerRegistration = handlerRegistrationFunc(func() bool {
+		return sliceHandlerReg.HasSynced() &&
+			patchHandlerReg.HasSynced() &&
+			classHandlerReg.HasSynced()
+	})
+
 	return nil
 }
 
-// run is running in the background.
-func (t *Tracker) run(ctx context.Context) {
-	for t.processNextWorkItem(ctx) {
-	}
-}
-
-func (t *Tracker) processNextWorkItem(ctx context.Context) bool {
-	sliceName, shutdown := t.queue.Get()
-	if shutdown {
-		return false
-	}
-	logger := klog.FromContext(ctx)
-	defer t.queue.Done(sliceName)
-
-	// Panics are caught and treated like errors.
-	var err error
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("internal error: %v", r)
-			}
-		}()
-		err = t.syncSlice(klog.NewContext(ctx, klog.LoggerWithValues(logger, "sliceName", sliceName)), sliceName)
-	}()
-
-	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "processing ResourceSlice objects")
-		t.queue.AddRateLimited(sliceName)
-
-		// Return without removing the work item from the queue.
-		// It will be retried.
-		return true
-	}
-
-	t.queue.Forget(sliceName)
-	return true
-}
-
 func (t *Tracker) syncSlice(ctx context.Context, name string) error {
+	defer t.emitEvents()
+	// TODO: handle errors
+
 	logger := klog.FromContext(ctx)
-	obj, exists, err := t.resourceSlices.GetIndexer().GetByKey(name)
+	logger = klog.LoggerWithValues(logger, "sliceName", name)
+
+	obj, sliceExists, err := t.resourceSlices.GetIndexer().GetByKey(name)
 	if err != nil {
 		return err
 	}
-	if !exists {
-		return t.patchedResourceSlices.Delete(obj)
+	oldPatchedSlice, _, err := t.patchedResourceSlices.GetByKey(name)
+	if err != nil {
+		return err
+	}
+	if !sliceExists {
+		err := t.patchedResourceSlices.Delete(oldPatchedSlice)
+		if err != nil {
+			return fmt.Errorf("delete slice %s: %w", name, err)
+		}
+		t.pushEvent(oldPatchedSlice, nil)
+		return nil
 	}
 	slice, ok := obj.(*resourceapi.ResourceSlice)
 	if !ok {
@@ -452,7 +465,12 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) error {
 		}
 	}
 
-	return t.patchedResourceSlices.Add(patchedSlice)
+	err = t.patchedResourceSlices.Add(patchedSlice)
+	if err != nil {
+		return err
+	}
+	t.pushEvent(oldPatchedSlice, patchedSlice)
+	return nil
 }
 
 func typedSlice[T any](objs []any) []T {
@@ -461,4 +479,10 @@ func typedSlice[T any](objs []any) []T {
 		typed = append(typed, obj.(T))
 	}
 	return typed
+}
+
+type handlerRegistrationFunc func() bool
+
+func (f handlerRegistrationFunc) HasSynced() bool {
+	return f()
 }
