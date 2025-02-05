@@ -57,7 +57,7 @@ func (s *ServerRunOptions) Complete(ctx context.Context) (CompletedOptions, erro
 	if err != nil {
 		return CompletedOptions{}, err
 	}
-	controlplane, err := s.Options.Complete(ctx, *s.ParsedFlags, []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
+	controlplane, err := s.Options.Complete(ctx, []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
 	if err != nil {
 		return CompletedOptions{}, err
 	}

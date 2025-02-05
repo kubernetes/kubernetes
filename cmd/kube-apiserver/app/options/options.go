@@ -41,8 +41,6 @@ type ServerRunOptions struct {
 	CloudProvider                  *kubeoptions.CloudProviderOptions
 
 	Extra
-	// ParsedFlags hold the parsed CLI flags.
-	ParsedFlags *cliflag.NamedFlagSets
 }
 
 type Extra struct {
@@ -102,9 +100,6 @@ func NewServerRunOptions() *ServerRunOptions {
 
 // Flags returns flags for a specific APIServer by section name
 func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
-	if s.ParsedFlags != nil {
-		return *s.ParsedFlags
-	}
 	s.Options.AddFlags(&fss)
 	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
 
@@ -161,6 +156,5 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"The number of apiservers running in the cluster, must be a positive number. (In use when --endpoint-reconciler-type=master-count is enabled.)")
 	fs.MarkDeprecated("apiserver-count", "apiserver-count is deprecated and will be removed in a future version.")
 
-	s.ParsedFlags = &fss
 	return fss
 }
