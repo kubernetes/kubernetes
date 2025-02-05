@@ -203,7 +203,7 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 		"Path to socket where a external JWT signer is listening. This flag is mutually exclusive with --service-account-signing-key-file and --service-account-key-file. Requires enabling feature gate (ExternalServiceAccountTokenSigner)")
 }
 
-func (o *Options) Complete(ctx context.Context, fss cliflag.NamedFlagSets, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
+func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
 	if o == nil {
 		return CompletedOptions{completedOptions: &completedOptions{}}, nil
 	}
@@ -258,8 +258,6 @@ func (o *Options) Complete(ctx context.Context, fss cliflag.NamedFlagSets, alter
 			delete(completed.APIEnablement.RuntimeConfig, key)
 		}
 	}
-
-	completed.Flagz = flagz.NamedFlagSetsReader{FlagSets: fss}
 
 	return CompletedOptions{
 		completedOptions: &completed,

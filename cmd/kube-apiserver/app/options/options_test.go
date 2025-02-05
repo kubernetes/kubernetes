@@ -334,7 +334,6 @@ func TestAddFlags(t *testing.T) {
 			CloudConfigFile: "/cloud-config",
 			CloudProvider:   "azure",
 		},
-		ParsedFlags: s.ParsedFlags,
 	}
 
 	expected.Authentication.OIDC.UsernameClaim = "sub"
