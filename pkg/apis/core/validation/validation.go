@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/utils/cpuset"
 )
 
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
@@ -5575,6 +5576,16 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 	return allErrs
 }
 
+func removeEnvVar(envs []core.EnvVar, nameToRemove string) []core.EnvVar {
+    var newEnvs []core.EnvVar
+    for _, env := range envs {
+        if env.Name != nameToRemove {
+            newEnvs = append(newEnvs, env)
+        }
+    }
+    return newEnvs
+}
+
 // ValidatePodResize tests that a user update to pod container resources is valid.
 // newPod and oldPod must only differ in their Containers[*].Resources and
 // Containers[*].ResizePolicy field.
@@ -5666,6 +5677,35 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
 		container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
 		container.ResizePolicy = oldPod.Spec.Containers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
+		// the element named "mustKeepCPUs" in env can be update or add
+		var existNewMustKeepCPUs bool = false
+		var existOldMustKeepCPUs bool = false
+		for jx, newEnv := range container.Env {
+			if newEnv.Name == "mustKeepCPUs" {
+				existNewMustKeepCPUs = true
+				_, err := cpuset.Parse(newEnv.Value)
+				if err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath, newEnv, "Check mustKeepCPUs format, only number \",\" and \"-\" are allowed"))
+				}
+				//change mustKeepCPUs
+				for _, oldEnv := range oldPod.Spec.Containers[ix].Env {
+					if oldEnv.Name == "mustKeepCPUs" {
+						existOldMustKeepCPUs = true
+						container.Env[jx] = oldEnv
+						break
+					}
+				}
+				//add mustKeepCPUs
+				if existOldMustKeepCPUs == false && (len(container.Env)-len(oldPod.Spec.Containers[ix].Env)) == 1 {
+					container.Env = removeEnvVar(container.Env, "mustKeepCPUs") //delete "mustKeepCPUs" in newPod to make newPod equal to oldPod
+				}
+				break
+			}
+		}
+		//delete mustKeepCPUs
+		if existNewMustKeepCPUs == false && (len(oldPod.Spec.Containers[ix].Env)-len(container.Env)) == 1 {
+			oldPod.Spec.Containers[ix].Env = removeEnvVar(oldPod.Spec.Containers[ix].Env, "mustKeepCPUs")
+		}
 		newContainers = append(newContainers, container)
 	}
 	originalCPUMemPodSpec.Containers = newContainers
