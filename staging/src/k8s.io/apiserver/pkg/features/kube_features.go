@@ -88,6 +88,12 @@ const (
 	// Enables serving watch requests in separate goroutines.
 	APIServingWithRoutine featuregate.Feature = "APIServingWithRoutine"
 
+	// owner: @everettraven
+	//
+	// Enables validation of client provided audit-id values.
+	// See https://github.com/kubernetes/kubernetes/issues/127801
+	AuditIDValidation = "AuditIDValidation"
+
 	// owner: @deads2k
 	// kep: https://kep.k8s.io/4601
 	//
@@ -301,14 +307,18 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	BtreeWatchCache: {
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	AuditIDValidation: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA},
 	},
 
 	AuthorizeWithSelectors: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	BtreeWatchCache: {
+		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	CBORServingAndStorage: {
