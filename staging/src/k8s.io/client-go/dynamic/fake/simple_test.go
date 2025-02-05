@@ -463,6 +463,21 @@ func TestDelete(t *testing.T) {
 		subresources  []string
 		wantActions   []clientgotesting.Action
 	}{
+		"resource deletion with namespace and no options": {
+			name: "name-foo",
+			ns:   "ns-foo",
+			wantActions: []clientgotesting.Action{
+				clientgotesting.DeleteActionImpl{
+					Name: "name-foo",
+					ActionImpl: clientgotesting.ActionImpl{
+						Namespace: "ns-foo",
+						Verb:      "delete",
+						Resource: schema.GroupVersionResource{
+							Group: "group", Version: "version", Resource: "thekinds"},
+					},
+				},
+			},
+		},
 		"resource deletion with namespace": {
 			name: "name-foo",
 			ns:   "ns-foo",
@@ -579,6 +594,24 @@ func TestCreate(t *testing.T) {
 		subresources  []string
 		wantActions   []clientgotesting.Action
 	}{
+		"resource creation with namespace and no options": {
+			resource: newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+			ns:       "ns-foo",
+			wantActions: []clientgotesting.Action{
+				clientgotesting.CreateActionImpl{
+					ActionImpl: clientgotesting.ActionImpl{
+						Namespace: "ns-foo",
+						Verb:      "create",
+						Resource: schema.GroupVersionResource{
+							Group:    "group",
+							Version:  "version",
+							Resource: "thekinds",
+						},
+					},
+					Object: newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+				},
+			},
+		},
 		"resource creation with namespace": {
 			resource: newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 			ns:       "ns-foo",
@@ -720,6 +753,24 @@ func TestUpdate(t *testing.T) {
 		subresources  []string
 		wantActions   []clientgotesting.Action
 	}{
+		"resource update with namespace and no options": {
+			resource: newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+			ns:       "ns-foo",
+			wantActions: []clientgotesting.Action{
+				clientgotesting.UpdateActionImpl{
+					ActionImpl: clientgotesting.ActionImpl{
+						Namespace: "ns-foo",
+						Verb:      "update",
+						Resource: schema.GroupVersionResource{
+							Group:    "group",
+							Version:  "version",
+							Resource: "thekinds",
+						},
+					},
+					Object: newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+				},
+			},
+		},
 		"resource update with namespace": {
 			resource: newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 			ns:       "ns-foo",
