@@ -220,6 +220,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NoSNAT = framework.WithFeature(framework.ValidFeatures.Add("NoSNAT"))
 
+	// Owner: sig-api-machinery
+	// Marks tests that enforce ordered namespace deletion.
+	OrderedNamespaceDeletion = framework.WithFeature(framework.ValidFeatures.Add("OrderedNamespaceDeletion"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PersistentVolumeLastPhaseTransitionTime = framework.WithFeature(framework.ValidFeatures.Add("PersistentVolumeLastPhaseTransitionTime"))
 
