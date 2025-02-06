@@ -56,9 +56,11 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	*/
 	framework.ConformanceIt("should reject a Pod requesting a non-existent RuntimeClass", f.WithNodeConformance(), func(ctx context.Context) {
 		rcName := f.Namespace.Name + "-nonexistent"
-		expectPodRejection(ctx, f, e2eruntimeclass.NewRuntimeClassPod(rcName))
+		err := expectPodRejection(ctx, f, rcName)
+		// We are expecting a pod rejection above.
+		// We will fail the test if we get an error other than rejected.
+		framework.ExpectNoError(err, "unexpected error for pod rejection")
 	})
-
 	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler not being installed.
 	f.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", feature.RuntimeHandler, func(ctx context.Context) {
 		handler := f.Namespace.Name + "-handler"
@@ -160,8 +162,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		rcClient := f.ClientSet.NodeV1().RuntimeClasses()
 
 		ginkgo.By("Deleting RuntimeClass "+rcName, func() {
-			err := rcClient.Delete(ctx, rcName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
+			deleteRuntimeClass(ctx, f, rcName)
 
 			ginkgo.By("Waiting for the RuntimeClass to disappear")
 			framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, framework.Poll, time.Minute, true, func(ctx context.Context) (bool, error) {
@@ -176,7 +177,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			}))
 		})
 
-		expectPodRejection(ctx, f, e2eruntimeclass.NewRuntimeClassPod(rcName))
+		gomega.Eventually(ctx, func() error {
+			return expectPodRejection(ctx, f, rcName)
+		}, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Succeed())
 	})
 
 	/*
@@ -375,12 +378,19 @@ func createRuntimeClass(ctx context.Context, f *framework.Framework, name, handl
 	return rc.GetName()
 }
 
-func expectPodRejection(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
-	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.HaveOccurred(), "should be forbidden")
-	if !apierrors.IsForbidden(err) {
-		framework.Failf("expected forbidden error, got %#v", err)
+// expectPodRejection is testing that kubelet cannot admit a runtime class pod
+// rejections happen in the admission and we expect a forbidden error for these cases.
+func expectPodRejection(ctx context.Context, f *framework.Framework, rcName string) error {
+	pod := e2eruntimeclass.NewRuntimeClassPod(rcName)
+	_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err == nil {
+		return fmt.Errorf("should get forbidden error")
 	}
+	if !apierrors.IsForbidden(err) {
+		return err
+	}
+	// in this case means we got the forbidden error
+	return nil
 }
 
 // expectPodSuccess waits for the given pod to terminate successfully.
