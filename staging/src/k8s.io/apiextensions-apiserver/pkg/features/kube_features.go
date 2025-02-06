@@ -56,6 +56,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	CRDValidationRatcheting: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.33"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 	},
 	CustomResourceFieldSelectors: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
