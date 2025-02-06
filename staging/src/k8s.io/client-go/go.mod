@@ -6,8 +6,6 @@ go 1.23.0
 
 godebug default=go1.23
 
-godebug winsymlink=0
-
 require (
 	github.com/go-logr/logr v1.4.2
 	github.com/gogo/protobuf v1.3.2

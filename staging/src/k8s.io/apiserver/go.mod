@@ -6,8 +6,6 @@ go 1.23.0
 
 godebug default=go1.23
 
-godebug winsymlink=0
-
 require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/coreos/go-oidc v2.3.0+incompatible
