@@ -220,6 +220,13 @@ const (
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
 
+	// owner: @pohly
+	// kep: http://kep.k8s.io/5055
+	//
+	// Marking devices as tainted can prevent using them for new pods and/or
+	// cause pods using them to stop. Users can decide to tolerate taints.
+	DRADeviceTaints featuregate.Feature = "DRADeviceTaints"
+
 	// owner: @mortent
 	// kep: http://kep.k8s.io/4816
 	//
@@ -228,6 +235,13 @@ const (
 	// be selected.
 	DRAPrioritizedList featuregate.Feature = "DRAPrioritizedList"
 
+	// owner: @LionelJouin
+	// kep: http://kep.k8s.io/4817
+	//
+	// Enables support the ResourceClaim.status.devices field and for setting this
+	// status from DRA drivers.
+	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
@@ -235,13 +249,6 @@ const (
 	// that is independent of a Pod. Resource allocation is done by the scheduler
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
-
-	// owner: @LionelJouin
-	// kep: http://kep.k8s.io/4817
-	//
-	// Enables support the ResourceClaim.status.devices field and for setting this
-	// status from DRA drivers.
-	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
 
 	// owner: @lauralorenz
 	// kep: https://kep.k8s.io/4603
