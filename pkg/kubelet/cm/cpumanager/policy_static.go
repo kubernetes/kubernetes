@@ -479,7 +479,7 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	}
 	cpuValue := cpuQuantity.Value()
 	if cpuValue*1000 != cpuQuantity.MilliValue() {
-		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod is not requesting integral CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpu", cpuValue)
+		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod requested non-integral CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpu", cpuValue)
 		return 0
 	}
 	// Safe downcast to do for all systems with < 2.1 billion CPUs.
