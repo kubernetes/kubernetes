@@ -322,6 +322,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.33"
 - name: CronJobsScheduledAnnotation
   versionedSpecs:
   - default: true
