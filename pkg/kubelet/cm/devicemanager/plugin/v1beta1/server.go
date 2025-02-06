@@ -128,7 +128,7 @@ func (s *server) Start() error {
 func (s *server) Stop() error {
 	s.visitClients(func(r string, c Client) {
 		if err := s.disconnectClient(r, c); err != nil {
-			klog.ErrorS(err, "Error disconnecting device plugin client", "resourceName", r)
+			klog.ErrorS(err, "Failed to disconnect device plugin client", "resourceName", r)
 		}
 	})
 
