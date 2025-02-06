@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
-	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
@@ -416,10 +415,14 @@ func extractParameters(parameters runtime.RawExtension, env *map[string]string, 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, claim *resourceapi.ResourceClaim) ([]*draapi.AllocatedDevice, error) {
-	allocatedClaims := ctx.Value("allocatedClaims").(map[string][]*draapi.AllocatedDevice)
+func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, claim *resourceapi.ResourceClaim) ([]*kubeletplugin.AllocatedDevice, error) {
+	allocatedClaims := ctx.Value("allocatedClaims").(map[string][]*kubeletplugin.AllocatedDevice)
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+	ex.blockPrepareResourcesMutex.Lock()
+	defer ex.blockPrepareResourcesMutex.Unlock()
 
-	var allocatedDevices []*draapi.AllocatedDevice
+	var allocatedDevices []*kubeletplugin.AllocatedDevice
 	if failure := ex.getPrepareResourcesFailure(); failure != nil {
 		return allocatedDevices, failure
 	}
@@ -433,7 +436,7 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, claim *resour
 	}
 
 	for _, device := range devices {
-		apiDevice := &draapi.AllocatedDevice{
+		apiDevice := &kubeletplugin.AllocatedDevice{
 			PoolName:     device.PoolName,
 			DeviceName:   device.DeviceName,
 			RequestNames: []string{device.RequestName},
@@ -446,19 +449,17 @@ func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, claim *resour
 }
 
 func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*resourceapi.ResourceClaim) error {
-	allocatedClaims := make(map[string][]*draapi.AllocatedDevice)
-	for _, claimReq := range claims {
-		ex.mutex.Lock()
-		defer ex.mutex.Unlock()
-		ex.blockPrepareResourcesMutex.Lock()
-		defer ex.blockPrepareResourcesMutex.Unlock()
+	allocatedClaims := make(map[string][]*kubeletplugin.AllocatedDevice)
 
+	ex.blockPrepareResourcesMutex.Lock()
+	defer ex.blockPrepareResourcesMutex.Unlock()
+	for _, claimReq := range claims {
 		claimID := ClaimID{Name: claimReq.Name, UID: string(claimReq.UID)}
 		if devices, ok := ex.prepared[claimID]; ok {
 			// Idempotent call, nothing to do.
-			var r []*draapi.AllocatedDevice
+			var r []*kubeletplugin.AllocatedDevice
 			for _, device := range devices {
-				pbDevice := &draapi.AllocatedDevice{
+				pbDevice := &kubeletplugin.AllocatedDevice{
 					PoolName:     device.PoolName,
 					DeviceName:   device.DeviceName,
 					RequestNames: []string{device.RequestName},
@@ -476,13 +477,13 @@ func (ex *ExamplePlugin) CheckDeviceAllocation(ctx context.Context, claims []*re
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *resourceapi.ResourceClaim) error {
+func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, uid string, name string, _ string) error {
 	ex.blockUnprepareResourcesMutex.Lock()
 	defer ex.blockUnprepareResourcesMutex.Unlock()
 
 	logger := klog.FromContext(ctx)
 
-	claimID := ClaimID{Name: claimReq.Name, UID: string(claimReq.UID)}
+	claimID := ClaimID{Name: name, UID: uid}
 	devices, ok := ex.prepared[claimID]
 	if !ok {
 		// Idempotent call, nothing to do.
@@ -490,7 +491,7 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *re
 	}
 
 	for _, device := range devices {
-		filePath := ex.getJSONFilePath(string(claimReq.UID), device.RequestName)
+		filePath := ex.getJSONFilePath(uid, device.RequestName)
 		if err := ex.fileOps.Remove(filePath); err != nil {
 			return fmt.Errorf("error removing CDI file: %w", err)
 		}
@@ -502,12 +503,12 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *re
 	return nil
 }
 
-func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, claim *resourceapi.ResourceClaim) error {
+func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, uid string, name string, namespace string) error {
 	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
 		return failure
 	}
 
-	return ex.nodeUnprepareResource(ctx, claim)
+	return ex.nodeUnprepareResource(ctx, uid, name, namespace)
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
