@@ -379,10 +379,12 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) error {
 
 			var deviceAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
 			var deviceCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+			var deviceTaints []resourceapi.DeviceTaint
 			switch {
 			case device.Basic != nil:
 				deviceAttributes = device.Basic.Attributes
 				deviceCapacity = device.Basic.Capacity
+				deviceTaints = device.Basic.Taints
 			}
 
 			for i, expr := range filterDeviceClassExprs {
@@ -460,6 +462,32 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) error {
 				case device.Basic != nil:
 					patchedSlice.Spec.Devices[dIndex].Basic.Attributes = newAttrs
 					patchedSlice.Spec.Devices[dIndex].Basic.Capacity = newCaps
+				}
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
+				newTaints := slices.Clone(deviceTaints)
+				for _, taint := range patch.Spec.Devices.Taints {
+					// TODO: remove conversion once taint is already in the right API package.
+					taint := resourceapi.DeviceTaint{
+						Key:       taint.Key,
+						Value:     taint.Value,
+						Effect:    resourceapi.DeviceTaintEffect(taint.Effect),
+						TimeAdded: taint.TimeAdded,
+					}
+					i := slices.IndexFunc(newTaints, func(t resourceapi.DeviceTaint) bool {
+						return t.Key == taint.Key && t.Effect == taint.Effect
+					})
+					if i >= 0 {
+						// Replace existing taint with same key and effect.
+						newTaints[i] = taint
+						continue
+					}
+					// Add a new taint.
+					newTaints = append(newTaints, taint)
+				}
+				switch {
+				case device.Basic != nil:
+					patchedSlice.Spec.Devices[dIndex].Basic.Taints = newTaints
 				}
 			}
 		}

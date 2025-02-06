@@ -57,8 +57,11 @@ type handlerEvent struct {
 }
 
 func TestListPatchedResourceSlices(t *testing.T) {
+	now, _ := time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
+
 	tests := map[string]struct {
 		adminAttrsDisabled    bool
+		deviceTaintsDisabled  bool
 		initialClasses        []*resourceapi.DeviceClass
 		initialSlices         []*resourceapi.ResourceSlice
 		initialPatches        []*resourcealphaapi.ResourceSlicePatch
@@ -239,6 +242,117 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				},
 			},
 		},
+		"device-taints-disabled": {
+			deviceTaintsDisabled: true,
+			initialSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				},
+			},
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "all-slices",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Filter: nil,
+							Taints: []resourcealphaapi.DeviceTaint{
+								{
+									Key:       "example.com/taint",
+									Value:     "tainted",
+									Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+									TimeAdded: &metav1.Time{Time: now},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				},
+			},
+		},
+		"device-taints-enabled": {
+			initialSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				},
+			},
+			initialPatches: []*resourcealphaapi.ResourceSlicePatch{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "all-slices",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Filter: nil,
+							Taints: []resourcealphaapi.DeviceTaint{
+								{
+									Key:       "example.com/taint",
+									Value:     "tainted",
+									Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+									TimeAdded: &metav1.Time{Time: now},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{
+									Taints: []resourceapi.DeviceTaint{
+										{
+											Key:       "example.com/taint",
+											Value:     "tainted",
+											Effect:    resourceapi.DeviceTaintEffectNoExecute,
+											TimeAdded: &metav1.Time{Time: now},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		// TODO: multiple taints, replacing a taint
 		"patch-all-slices": {
 			initialSlices: []*resourceapi.ResourceSlice{
 				{
@@ -1465,6 +1579,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminControlledDeviceAttributes, !test.adminAttrsDisabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, !test.deviceTaintsDisabled)
 
 			inputObjects := make([]runtime.Object, 0, len(test.initialSlices)+len(test.initialClasses))
 			for _, obj := range test.initialSlices {
