@@ -1162,7 +1162,7 @@
     version: "1.29"
 - name: ServiceAccountNodeAudienceRestriction
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
