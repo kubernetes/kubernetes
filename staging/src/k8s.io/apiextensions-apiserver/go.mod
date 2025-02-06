@@ -6,8 +6,6 @@ go 1.23.0
 
 godebug default=go1.23
 
-godebug winsymlink=0
-
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/fxamacker/cbor/v2 v2.7.0

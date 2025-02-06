@@ -6,8 +6,6 @@ go 1.23.0
 
 godebug default=go1.23
 
-godebug winsymlink=0
-
 require (
 	github.com/google/gnostic-models v0.6.9
 	github.com/google/go-cmp v0.6.0
