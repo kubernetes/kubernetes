@@ -62,7 +62,7 @@ func (s *server) ValidatePlugin(pluginName string, endpoint string, versions []s
 		return fmt.Errorf("invalid name of device plugin socket: %s", fmt.Sprintf(errInvalidResourceName, pluginName))
 	}
 
-	klog.V(2).InfoS("plugin validated", "plugin", pluginName, "endpoint", endpoint, "versions", versions)
+	klog.V(2).InfoS("Device plugin validated", "plugin", pluginName, "endpoint", endpoint, "versions", versions)
 	return nil
 }
 

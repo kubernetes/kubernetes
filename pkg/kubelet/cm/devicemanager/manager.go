@@ -468,7 +468,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 		eI, ok := m.endpoints[resourceName]
 		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
 			if !ok {
-				klog.InfoS("Unexpected: unhealthyDevices and endpoints are out of sync")
+				klog.InfoS("Unexpected: unhealthyDevices and endpoints became out of sync")
 			}
 			delete(m.endpoints, resourceName)
 			delete(m.unhealthyDevices, resourceName)
@@ -484,7 +484,7 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	m.mutex.Unlock()
 	if needsUpdateCheckpoint {
 		if err := m.writeCheckpoint(); err != nil {
-			klog.ErrorS(err, "Error on writing checkpoint")
+			klog.ErrorS(err, "Failed to write checkpoint file")
 		}
 	}
 	return capacity, allocatable, deletedResources.UnsortedList()
@@ -506,7 +506,7 @@ func (m *ManagerImpl) writeCheckpoint() error {
 		klog.ErrorS(err, "Failed to write checkpoint file")
 		return err2
 	}
-	klog.V(4).InfoS("checkpoint file written", "checkpoint", kubeletDeviceManagerCheckpoint)
+	klog.V(4).InfoS("Checkpoint file written", "checkpoint", kubeletDeviceManagerCheckpoint)
 	return nil
 }
 
@@ -536,7 +536,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
 	}
 
-	klog.V(4).InfoS("read data from checkpoint file", "checkpoint", kubeletDeviceManagerCheckpoint)
+	klog.V(4).InfoS("Read data from checkpoint file", "checkpoint", kubeletDeviceManagerCheckpoint)
 	return nil
 }
 
@@ -599,7 +599,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// running, then it can only be a kubelet restart. On node reboot the runtime and the containers were also shut down. Then, if the container was running, it can only be
 	// because it already has access to all the required devices, so we got nothing to do and we can bail out.
 	if !m.sourcesReady.AllReady() && m.isContainerAlreadyRunning(podUID, contName) {
-		klog.V(3).InfoS("container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+		klog.V(3).InfoS("Container detected running, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
 		return nil, nil
 	}
 
@@ -630,7 +630,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	// We handled the known error paths in scenario 3 (node reboot), so from now on we can fall back in a common path.
 	// We cover container restart on kubelet steady state with the same flow.
 	if needed == 0 {
-		klog.V(3).InfoS("no devices needed, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
+		klog.V(3).InfoS("No devices needed, nothing to do", "deviceNumber", needed, "resourceName", resource, "podUID", podUID, "containerName", contName)
 		// No change, no work.
 		return nil, nil
 	}
@@ -955,7 +955,7 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 		}
 
 		if !m.checkPodActive(pod) {
-			klog.V(5).InfoS("pod deleted from activePods, skip to reAllocate", "pod", klog.KObj(pod), "podUID", podUID, "containerName", container.Name)
+			klog.V(5).InfoS("Pod deleted from activePods, skip to reAllocate", "pod", klog.KObj(pod), "podUID", podUID, "containerName", container.Name)
 			continue
 		}
 
@@ -1170,7 +1170,7 @@ func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
 	cntID, err := m.containerMap.GetContainerID(podUID, cntName)
 	if err != nil {
-		klog.ErrorS(err, "container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
+		klog.ErrorS(err, "Container not found in the initial map, assumed NOT running", "podUID", podUID, "containerName", cntName)
 		return false
 	}
 
@@ -1178,11 +1178,11 @@ func (m *ManagerImpl) isContainerAlreadyRunning(podUID, cntName string) bool {
 	// so on kubelet restart containers will again fail admission, hitting https://github.com/kubernetes/kubernetes/issues/118559 again.
 	// This scenario should however be rare enough.
 	if !m.containerRunningSet.Has(cntID) {
-		klog.V(4).InfoS("container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+		klog.V(4).InfoS("Container not present in the initial running set", "podUID", podUID, "containerName", cntName, "containerID", cntID)
 		return false
 	}
 
 	// Once we make it here we know we have a running container.
-	klog.V(4).InfoS("container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
+	klog.V(4).InfoS("Container found in the initial set, assumed running", "podUID", podUID, "containerName", cntName, "containerID", cntID)
 	return true
 }
