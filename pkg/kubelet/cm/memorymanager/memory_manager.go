@@ -249,7 +249,7 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 	}
 
 	if numaNodes.Len() == 0 {
-		klog.V(5).InfoS("No allocation is available", "pod", klog.KObj(pod), "containerName", container.Name)
+		klog.V(5).InfoS("NUMA nodes not available for allocation", "pod", klog.KObj(pod), "containerName", container.Name)
 		return nil
 	}
 
