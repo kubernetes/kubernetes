@@ -393,11 +393,7 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 			return true, nil
 		},
 		stopCh)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // `*sharedIndexInformer` implements SharedIndexInformer and has three
