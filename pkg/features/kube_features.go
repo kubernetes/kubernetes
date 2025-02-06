@@ -230,6 +230,13 @@ const (
 	DRAAdminControlledDeviceAttributes featuregate.Feature = "DRAAdminControlledDeviceAttributes"
 
 	// owner: @pohly
+	// kep: http://kep.k8s.io/5055
+	//
+	// Marking devices as tainted can prevent using them for new pods and/or
+	// cause pods using them to stop. Users can decide to tolerate taints.
+	DRADeviceTaints featuregate.Feature = "DRADeviceTaints"
+
+	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
 	// Enables support for resources with custom parameters and a lifecycle
