@@ -57,6 +57,7 @@ const (
 // potential changes to resolved ResourceSlices asynchronously.
 type Tracker struct {
 	enableAdminControlledAttributes bool
+	enableDeviceTaints              bool
 
 	resourceSlices        cache.SharedIndexInformer
 	resourceSlicePatches  cache.SharedIndexInformer
@@ -101,6 +102,9 @@ type Options struct {
 	// attributes and capacities will be reflected in patched
 	// ResourceSlices.
 	EnableAdminControlledAttributes bool
+	// EnableDeviceTaints controls whether device taints
+	// will be reflected in patched ResourceSlices.
+	EnableDeviceTaints bool
 	// KubeClient is used to generate Events when CEL expressions in
 	// ResourceSlicePatches encounter runtime errors.
 	KubeClient kubernetes.Interface
@@ -122,6 +126,7 @@ func StartTracker(ctx context.Context, informerFactory informers.SharedInformerF
 func newTracker(ctx context.Context, informerFactory informers.SharedInformerFactory, opts Options) (*Tracker, error) {
 	t := &Tracker{
 		enableAdminControlledAttributes: opts.EnableAdminControlledAttributes,
+		enableDeviceTaints:              opts.EnableDeviceTaints,
 		resourceSlices:                  informerFactory.Resource().V1beta1().ResourceSlices().Informer(),
 		resourceSlicePatches:            informerFactory.Resource().V1alpha3().ResourceSlicePatches().Informer(),
 		deviceClasses:                   informerFactory.Resource().V1beta1().DeviceClasses().Informer(),
@@ -701,6 +706,34 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 				setAttributes(&patchedSlice.Spec.Devices[dIndex], newAttrs)
 				setCapacity(&patchedSlice.Spec.Devices[dIndex], newCaps)
 			}
+			if t.enableDeviceTaints {
+				taints := slices.Clone(getTaints(device))
+				for _, taint := range patch.Spec.Devices.Taints {
+					// TODO: remove conversion once taint is already in the right API package.
+					taint := resourceapi.DeviceTaint{
+						Key:       taint.Key,
+						Value:     taint.Value,
+						Effect:    resourceapi.DeviceTaintEffect(taint.Effect),
+						TimeAdded: taint.TimeAdded,
+					}
+					i := slices.IndexFunc(taints, func(t resourceapi.DeviceTaint) bool {
+						return t.Key == taint.Key && t.Effect == taint.Effect
+					})
+					if i >= 0 {
+						// Replace existing taint with same key and effect.
+						taints[i] = taint
+						continue
+					}
+					// Add a new taint.
+					taints = append(taints, taint)
+				}
+
+				if patchedSlice == slice {
+					patchedSlice = slice.DeepCopy()
+				}
+
+				setTaints(&patchedSlice.Spec.Devices[dIndex], taints)
+			}
 		}
 	}
 
@@ -731,6 +764,20 @@ func getCapacity(device resourceapi.Device) map[resourceapi.QualifiedName]resour
 func setCapacity(device *resourceapi.Device, caps map[resourceapi.QualifiedName]resourceapi.DeviceCapacity) {
 	if device.Basic != nil {
 		device.Basic.Capacity = caps
+		return
+	}
+}
+
+func getTaints(device resourceapi.Device) []resourceapi.DeviceTaint {
+	if device.Basic != nil {
+		return device.Basic.Taints
+	}
+	return nil
+}
+
+func setTaints(device *resourceapi.Device, taints []resourceapi.DeviceTaint) {
+	if device.Basic != nil {
+		device.Basic.Taints = taints
 		return
 	}
 }

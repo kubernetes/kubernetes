@@ -127,8 +127,11 @@ func inputEventGeneratorForTest(ctx context.Context, t *testing.T, tracker *Trac
 }
 
 func TestListPatchedResourceSlices(t *testing.T) {
+	now, _ := time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
+
 	tests := map[string]struct {
 		adminAttrsDisabled    bool
+		deviceTaintsDisabled  bool
 		inputEvents           func(event inputEventGenerator)
 		expectedPatchedSlices []*resourceapi.ResourceSlice
 		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
@@ -322,6 +325,128 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				assert.Equal(t, "slice", events[0].newObj.Name)
 			},
 		},
+		"device-taints-disabled": {
+			deviceTaintsDisabled: true,
+			inputEvents: func(event inputEventGenerator) {
+				event.addResourceSlice(&resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				})
+				event.addResourceSlicePatch(&resourcealphaapi.ResourceSlicePatch{
+
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "all-slices",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Filter: nil,
+							Taints: []resourcealphaapi.DeviceTaint{
+								{
+									Key:       "example.com/taint",
+									Value:     "tainted",
+									Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+									TimeAdded: &metav1.Time{Time: now},
+								},
+							},
+						},
+					},
+				})
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				},
+			},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if !assert.Len(t, events, 1) {
+					return
+				}
+				assert.Equal(t, handlerEventAdd, events[0].event)
+				assert.Equal(t, "slice", events[0].newObj.Name)
+			},
+		},
+		"device-taints-enabled": {
+			inputEvents: func(event inputEventGenerator) {
+				event.addResourceSlice(&resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				})
+				event.addResourceSlicePatch(&resourcealphaapi.ResourceSlicePatch{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "all-slices",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Filter: nil,
+							Taints: []resourcealphaapi.DeviceTaint{
+								{
+									Key:       "example.com/taint",
+									Value:     "tainted",
+									Effect:    resourcealphaapi.DeviceTaintEffectNoExecute,
+									TimeAdded: &metav1.Time{Time: now},
+								},
+							},
+						},
+					},
+				})
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{
+									Taints: []resourceapi.DeviceTaint{
+										{
+											Key:       "example.com/taint",
+											Value:     "tainted",
+											Effect:    resourceapi.DeviceTaintEffectNoExecute,
+											TimeAdded: &metav1.Time{Time: now},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if !assert.Len(t, events, 1) {
+					return
+				}
+				assert.Equal(t, handlerEventAdd, events[0].event)
+				assert.Equal(t, "slice", events[0].newObj.Name)
+			},
+		},
+		// TODO: multiple taints, replacing a taint
 		"patch-all-slices": {
 			inputEvents: func(event inputEventGenerator) {
 				event.addResourceSlice(&resourceapi.ResourceSlice{
@@ -1970,6 +2095,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 
 			opts := Options{
 				EnableAdminControlledAttributes: !test.adminAttrsDisabled,
+				EnableDeviceTaints:              !test.deviceTaintsDisabled,
 				KubeClient:                      kubeClient,
 			}
 			tracker, err := newTracker(ctx, informerFactory, opts)
