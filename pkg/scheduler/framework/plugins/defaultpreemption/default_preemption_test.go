@@ -1500,7 +1500,9 @@ func TestCustomSelection(t *testing.T) {
 	}
 
 	orderByOldestStart := func(eligible []*framework.PodInfo) {
-		sort.Slice(eligible, func(i, j int) bool { return util.GetPodStartTime(eligible[i].Pod).Before(util.GetPodStartTime(eligible[j].Pod)) })
+		sort.Slice(eligible, func(i, j int) bool {
+			return util.GetPodStartTime(eligible[i].Pod).Before(util.GetPodStartTime(eligible[j].Pod))
+		})
 	}
 	orderByPodName := func(eligible []*framework.PodInfo) {
 		sort.Slice(eligible, func(i, j int) bool { return eligible[i].Pod.Name < eligible[j].Pod.Name })
@@ -1509,7 +1511,7 @@ func TestCustomSelection(t *testing.T) {
 	tests := []struct {
 		name         string
 		eligiblePods EligiblePodsFunc
-		orderPods  OrderPodsFunc
+		orderPods    OrderPodsFunc
 		nodeNames    []string
 		pod          *v1.Pod
 		pods         []*v1.Pod
