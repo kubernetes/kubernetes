@@ -216,8 +216,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			// a "root" role which can do absolutely anything
 			ObjectMeta: metav1.ObjectMeta{Name: "cluster-admin"},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
-				rbacv1helpers.NewRule("*").URLs("*").RuleOrDie(),
+				rbacv1helpers.NewRule(rbacv1.VerbAll).Groups(rbacv1.APIGroupAll).Resources(rbacv1.ResourceAll).RuleOrDie(),
+				rbacv1helpers.NewRule(rbacv1.VerbAll).URLs(rbacv1.NonResourceAll).RuleOrDie(),
 			},
 		},
 		{
@@ -442,7 +442,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 				// Needed for all shared informers
-				rbacv1helpers.NewRule("list", "watch").Groups("*").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "watch").Groups(rbacv1.APIGroupAll).Resources(rbacv1.ResourceAll).RuleOrDie(),
 				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 			},
 		},
@@ -536,11 +536,11 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 		// Allow all API calls to the nodes
 		rbacv1helpers.NewRule("proxy").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-		rbacv1helpers.NewRule("*").Groups(legacyGroup).Resources("nodes/proxy", "nodes/metrics", "nodes/stats", "nodes/log").RuleOrDie(),
+		rbacv1helpers.NewRule(rbacv1.VerbAll).Groups(legacyGroup).Resources("nodes/proxy", "nodes/metrics", "nodes/stats", "nodes/log").RuleOrDie(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletFineGrainedAuthz) {
-		kubeletAPIAdminRules = append(kubeletAPIAdminRules, rbacv1helpers.NewRule("*").Groups(legacyGroup).Resources("nodes/pods", "nodes/healthz", "nodes/configz").RuleOrDie())
+		kubeletAPIAdminRules = append(kubeletAPIAdminRules, rbacv1helpers.NewRule(rbacv1.VerbAll).Groups(legacyGroup).Resources("nodes/pods", "nodes/healthz", "nodes/configz").RuleOrDie())
 	}
 
 	roles = append(roles, rbacv1.ClusterRole{

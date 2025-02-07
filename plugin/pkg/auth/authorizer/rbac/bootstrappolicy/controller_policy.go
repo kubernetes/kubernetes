@@ -136,7 +136,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				rbacv1helpers.NewRule("get", "list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(policyGroup).Resources("poddisruptionbudgets/status").RuleOrDie(),
 				rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
-				rbacv1helpers.NewRule("get").Groups("*").Resources("*/scale").RuleOrDie(),
+				rbacv1helpers.NewRule("get").Groups(rbacv1.APIGroupAll).Resources("*/scale").RuleOrDie(),
 				eventsRule(),
 			},
 		}
@@ -221,7 +221,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "generic-garbage-collector"},
 		Rules: []rbacv1.PolicyRule{
 			// the GC controller needs to run list/watches, selective gets, and updates against any resource
-			rbacv1helpers.NewRule("get", "list", "watch", "patch", "update", "delete").Groups("*").Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "patch", "update", "delete").Groups(rbacv1.APIGroupAll).Resources(rbacv1.ResourceAll).RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -230,12 +230,12 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(autoscalingGroup).Resources("horizontalpodautoscalers/status").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "update").Groups("*").Resources("*/scale").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "update").Groups(rbacv1.APIGroupAll).Resources("*/scale").RuleOrDie(),
 			rbacv1helpers.NewRule("list").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			// allow listing resource, custom, and external metrics
 			rbacv1helpers.NewRule("list").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list").Groups(externalMetricsGroup).Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list").Groups(customMetricsGroup).Resources(rbacv1.ResourceAll).RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list").Groups(externalMetricsGroup).Resources(rbacv1.ResourceAll).RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -254,7 +254,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("namespaces/finalize", "namespaces/status").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "watch", "delete", "deletecollection").Groups("*").Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "delete", "deletecollection").Groups(rbacv1.APIGroupAll).Resources(rbacv1.ResourceAll).RuleOrDie(),
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
@@ -326,7 +326,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "resourcequota-controller"},
 		Rules: []rbacv1.PolicyRule{
 			// quota can count quota on anything for reconciliation, so it needs full viewing powers
-			rbacv1helpers.NewRule("list", "watch").Groups("*").Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "watch").Groups(rbacv1.APIGroupAll).Resources(rbacv1.ResourceAll).RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("resourcequotas/status").RuleOrDie(),
 			eventsRule(),
 		},
@@ -507,7 +507,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				// need list to get current RV for any resource
 				// need patch for SSA of any resource
 				// need create because SSA of a deleted resource will be interpreted as a create request, these always fail with a conflict error because UID is set
-				rbacv1helpers.NewRule("list", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "create", "patch").Groups(rbacv1.APIGroupAll).Resources(rbacv1.ResourceAll).RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(storageVersionMigrationGroup).Resources("storageversionmigrations/status").RuleOrDie(),
 			},
 		})
