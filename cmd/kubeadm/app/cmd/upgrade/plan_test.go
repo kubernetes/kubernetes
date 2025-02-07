@@ -570,7 +570,7 @@ _____________________________________________________________________
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			plan := genUpgradePlan(rt.upgrades, rt.versionStates)
+			plan := genUpgradePlan(rt.upgrades, rt.versionStates, true)
 			if err := printer.PrintObj(plan, rt.buf); err != nil {
 				t.Errorf("unexpected error when print object: %v", err)
 			}
@@ -814,7 +814,7 @@ _____________________________________________________________________
 				t.Errorf("failed ToPrinter, err: %+v", err)
 			}
 
-			plan := genUpgradePlan(upgrades, versionStates)
+			plan := genUpgradePlan(upgrades, versionStates, true)
 			if err := printer.PrintObj(plan, rt.buf); err != nil {
 				t.Errorf("unexpected error when print object: %v", err)
 			}
