@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	baseversion "k8s.io/component-base/version"
 )
 
@@ -42,6 +43,9 @@ type EffectiveVersion interface {
 	// AllowedMinCompatibilityVersionRange returns the string of the allowed range of min compatibility version.
 	// Used only for docs/help.
 	AllowedMinCompatibilityVersionRange() string
+
+	// Info returns the version information of a component.
+	Info() *apimachineryversion.Info
 }
 
 type MutableEffectiveVersion interface {
@@ -171,6 +175,29 @@ func (m *effectiveVersion) Validate() []error {
 		errs = append(errs, fmt.Errorf("minCompatibilityVersion version %s is not between [%s, %s]", minCompatibilityVersion.String(), m.minCompatibilityVersionFloor.String(), emulationVersion.String()))
 	}
 	return errs
+}
+
+// Info returns the version information of a component.
+// If the binary version is nil, it returns nil.
+func (m *effectiveVersion) Info() *apimachineryversion.Info {
+	binVer := m.BinaryVersion()
+	if binVer == nil {
+		return nil
+	}
+
+	info := binVer.Info()
+
+	if ev := m.EmulationVersion(); ev != nil {
+		info.EmulationMajor = version.Itoa(ev.Major())
+		info.EmulationMinor = version.Itoa(ev.Minor())
+	}
+
+	if mcv := m.MinCompatibilityVersion(); mcv != nil {
+		info.MinCompatibilityMajor = version.Itoa(mcv.Major())
+		info.MinCompatibilityMinor = version.Itoa(mcv.Minor())
+	}
+
+	return info
 }
 
 // NewEffectiveVersion creates a MutableEffectiveVersion from the binaryVersion.

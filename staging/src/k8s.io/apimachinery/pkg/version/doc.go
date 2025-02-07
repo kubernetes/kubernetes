@@ -16,5 +16,5 @@ limitations under the License.
 
 // +k8s:openapi-gen=true
 
-// Package version supplies the type for version information collected at build time.
+// Package version supplies the type for version information.
 package version
