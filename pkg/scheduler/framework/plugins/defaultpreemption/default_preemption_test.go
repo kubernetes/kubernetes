@@ -1509,7 +1509,7 @@ func TestCustomSelection(t *testing.T) {
 	tests := []struct {
 		name         string
 		eligiblePods EligiblePodsFunc
-		orderedPods  OrderedPodsFunc
+		orderPods  OrderPodsFunc
 		nodeNames    []string
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -1620,10 +1620,10 @@ func TestCustomSelection(t *testing.T) {
 			expected: map[string][]string{"node3": {"v3"}},
 		},
 		{
-			name:        "select newest pods",
-			orderedPods: orderByOldestStart,
-			nodeNames:   []string{"node1"},
-			pod:         st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
+			name:      "select newest pods",
+			orderPods: orderByOldestStart,
+			nodeNames: []string{"node1"},
+			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
 			// size victims to require at least two to be preempted
 			pods: []*v1.Pod{
 				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime2).Obj(),
@@ -1634,10 +1634,10 @@ func TestCustomSelection(t *testing.T) {
 			expected: map[string][]string{"node1": {"v3", "v1"}},
 		},
 		{
-			name:        "select alphabetically-last pods",
-			orderedPods: orderByPodName,
-			nodeNames:   []string{"node1"},
-			pod:         st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
+			name:      "select alphabetically-last pods",
+			orderPods: orderByPodName,
+			nodeNames: []string{"node1"},
+			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
 			// size victims to require at least two to be preempted
 			pods: []*v1.Pod{
 				st.MakePod().Name("foo").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
@@ -1702,8 +1702,8 @@ func TestCustomSelection(t *testing.T) {
 			if tt.eligiblePods != nil {
 				pl.EligiblePods = tt.eligiblePods
 			}
-			if tt.orderedPods != nil {
-				pl.OrderedPods = tt.orderedPods
+			if tt.orderPods != nil {
+				pl.OrderPods = tt.orderPods
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)

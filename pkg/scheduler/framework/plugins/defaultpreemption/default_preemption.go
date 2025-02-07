@@ -52,10 +52,10 @@ const Name = names.DefaultPreemption
 // in order to fit the provided preemptor.
 type EligiblePodsFunc func(nodeInfo *framework.NodeInfo, preemptor *v1.Pod) []*framework.PodInfo
 
-// OrderedPodsFunc is a function which may be assigned to the DefaultPreemption plugin.
+// OrderPodsFunc is a function which may be assigned to the DefaultPreemption plugin.
 // This function orders the provided eligible pods in-place in descending order of highest
 // to lowest priority, where pods at the start of the slice are less likely to be preempted.
-type OrderedPodsFunc func(eligible []*framework.PodInfo)
+type OrderPodsFunc func(eligible []*framework.PodInfo)
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
@@ -70,9 +70,9 @@ type DefaultPreemption struct {
 	// The default behavior is to allow any pods of lower priority to be preempted by any pods of higher priority.
 	EligiblePods EligiblePodsFunc
 
-	// OrderedPods sorts eligible victims in-place in descending order of highest to lowest priority.
+	// OrderPods sorts eligible victims in-place in descending order of highest to lowest priority.
 	// Pods at the start of the slice are less likely to be preempted.
-	OrderedPods OrderedPodsFunc
+	OrderPods OrderPodsFunc
 }
 
 var _ framework.PostFilterPlugin = &DefaultPreemption{}
@@ -125,7 +125,7 @@ func NewDefaultPreemption(_ context.Context, dpArgs runtime.Object, fh framework
 	}
 
 	// Default behavior: Sort by descending priority, then by descending runtime duration as secondary ordering.
-	pl.OrderedPods = func(eligible []*framework.PodInfo) {
+	pl.OrderPods = func(eligible []*framework.PodInfo) {
 		sort.Slice(eligible, func(i, j int) bool { return util.MoreImportantPod(eligible[i].Pod, eligible[j].Pod) })
 	}
 
@@ -253,7 +253,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	numViolatingVictim := 0
 	// Sort potentialVictims by descending importance, which ensures reprieve of
 	// higher importance pods first.
-	pl.OrderedPods(potentialVictims)
+	pl.OrderPods(potentialVictims)
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
@@ -289,7 +289,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of priority from high to low.
 	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
-		pl.OrderedPods(victims)
+		pl.OrderPods(victims)
 	}
 	var victimPods []*v1.Pod
 	for _, pi := range victims {
