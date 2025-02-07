@@ -106,6 +106,8 @@ func (c *client) Disconnect() error {
 	}
 	c.mutex.Unlock()
 	c.handler.PluginDisconnected(c.resource)
+
+	klog.V(2).InfoS("Device plugin disconnected", "resource", c.resource)
 	return nil
 }
 
