@@ -383,6 +383,8 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
 	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
 	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+	debugCmd := debug.NewCmdDebug(f, o.IOStreams)
+	debugCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
 
 	groups := templates.CommandGroups{
 		{
@@ -434,7 +436,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 				proxyCmd,
 				cp.NewCmdCp(f, o.IOStreams),
 				auth.NewCmdAuth(f, o.IOStreams),
-				debug.NewCmdDebug(f, o.IOStreams),
+				debugCmd,
 				events.NewCmdEvents(f, o.IOStreams),
 			},
 		},
