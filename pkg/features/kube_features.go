@@ -37,20 +37,17 @@ const (
 	// across the file.
 
 	// owner: @aojea
-	// Deprecated: v1.31
 	//
 	// Allow kubelet to request a certificate without any Node IP available, only
 	// with DNS names.
 	AllowDNSOnlyNodeCSR featuregate.Feature = "AllowDNSOnlyNodeCSR"
 
 	// owner: @HirazawaUi
-	// Deprecated: v1.32
 	//
 	// Allow spec.terminationGracePeriodSeconds to be overridden by MaxPodGracePeriodSeconds in soft evictions.
 	AllowOverwriteTerminationGracePeriodSeconds featuregate.Feature = "AllowOverwriteTerminationGracePeriodSeconds"
 
 	// owner: @thockin
-	// Deprecated: v1.29
 	//
 	// Enables Service.status.ingress.loadBanace to be set on
 	// services of types other than LoadBalancer.
@@ -189,23 +186,18 @@ const (
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
 
 	// owner: @micahhausler
-	// Deprecated: v1.31
 	//
 	// Setting AllowInsecureKubeletCertificateSigningRequests to true disables node admission validation of CSRs
 	// for kubelet signers where CN=system:node:$nodeName.
-	// Remove in v1.33
 	AllowInsecureKubeletCertificateSigningRequests featuregate.Feature = "AllowInsecureKubeletCertificateSigningRequests"
 
 	// owner: @hoskeri
-	// Deprecated: v1.32
 	//
 	// Restores previous behavior where Kubelet fails self registration if node create returns 403 Forbidden.
-	// Remove in v1.34
 	KubeletRegistrationGetOnExistsOnly featuregate.Feature = "KubeletRegistrationGetOnExistsOnly"
 
 	// owner: @HirazawaUi
 	// kep: http://kep.k8s.io/4004
-	// Deprecated: v1.31 (default off)
 	//
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
@@ -232,14 +224,11 @@ const (
 
 	// owner: @LionelJouin
 	// kep: http://kep.k8s.io/4817
-	// alpha: v1.32
 	//
 	// Enables support the ResourceClaim.status.devices field and for setting this
 	// status from DRA drivers.
 	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
 
-	// owner: @lauralorenz
-	// kep: https://kep.k8s.io/4603
 	// owner: @lauralorenz
 	// kep: https://kep.k8s.io/4603
 	//
@@ -295,7 +284,6 @@ const (
 	InPlacePodVerticalScalingAllocatedStatus featuregate.Feature = "InPlacePodVerticalScalingAllocatedStatus"
 
 	// owner: @tallclair @esotsal
-	// alpha: v1.32
 	//
 	// Allow resource resize for containers in Guaranteed pods with integer CPU requests ( default false ).
 	// Applies only in nodes with InPlacePodVerticalScaling and CPU Manager features enabled, and
@@ -315,8 +303,6 @@ const (
 
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
-	// alpha: v1.30
-	// beta: v1.32
 	//
 	// Allows to delegate reconciliation of a Job object to an external controller.
 	JobManagedBy featuregate.Feature = "JobManagedBy"
@@ -488,7 +474,6 @@ const (
 
 	// owner: @knight42
 	// kep: https://kep.k8s.io/3288
-	// alpha: v1.32
 	//
 	// Enables only stdout or stderr of the container to be retrievd.
 	PodLogsQuerySplitStreams featuregate.Feature = "PodLogsQuerySplitStreams"
@@ -536,7 +521,6 @@ const (
 
 	// owner: @gnufied
 	// kep: https://kep.k8s.io/1790
-	// beta - v1.32
 	//
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
@@ -602,7 +586,6 @@ const (
 
 	// owner: @sanposhiho
 	// kep: http://kep.k8s.io/4832
-	// alpha: v1.32
 	//
 	// Running some expensive operation within the scheduler's preemption asynchronously,
 	// which improves the scheduling latency when the preemption involves in.
@@ -754,7 +737,6 @@ const (
 
 	// owner: @zylxjtu
 	// kep: https://kep.k8s.io/4802
-	// alpha: v1.32
 	//
 	// Enables support for graceful shutdown windows node.
 	WindowsGracefulNodeShutdown featuregate.Feature = "WindowsGracefulNodeShutdown"
@@ -831,7 +813,6 @@ const (
 	ImageVolume featuregate.Feature = "ImageVolume"
 
 	// owner: @zhifei92
-	// beta: v1.32
 	//
 	// Enables the systemd watchdog for the kubelet. When enabled, the kubelet will
 	// periodically notify the systemd watchdog to indicate that it is still alive.
@@ -842,7 +823,6 @@ const (
 
 	// owner: @jsafrane
 	// kep: https://kep.k8s.io/1710
-	// alpha: v1.32
 	//
 	// Speed up container startup by mounting volumes with the correct SELinux label
 	// instead of changing each file on the volumes recursively.
@@ -850,7 +830,6 @@ const (
 	SELinuxChangePolicy featuregate.Feature = "SELinuxChangePolicy"
 
 	// owner: @HarshalNeelkamal
-	// alpha: v1.32
 	//
 	// Enables external service account JWT signing and key management.
 	// If enabled, it allows passing --service-account-signing-endpoint flag to configure external signer.
@@ -858,7 +837,6 @@ const (
 
 	// owner: @ndixita
 	// key: https://kep.k8s.io/2837
-	// alpha: 1.32
 	//
 	// Enables specifying resources at pod-level.
 	PodLevelResources featuregate.Feature = "PodLevelResources"
