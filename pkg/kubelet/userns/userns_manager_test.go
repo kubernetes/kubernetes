@@ -34,14 +34,16 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (
+	testUserNsLength = kubeletconfigv1beta1.DefaultUserNamespacesIDsPerPod
 	// skip the first block
-	minimumMappingUID = userNsLength
+	minimumMappingUID = testUserNsLength
 	// allocate enough space for 2000 user namespaces
-	mappingLen  = userNsLength * 2000
+	mappingLen  = testUserNsLength * 2000
 	testMaxPods = 110
 )
 
@@ -52,6 +54,7 @@ type testUserNsPodsManager struct {
 	maxPods        int
 	mappingFirstID uint32
 	mappingLen     uint32
+	userNsLength   uint32
 }
 
 func (m *testUserNsPodsManager) GetPodDir(podUID types.UID) string {
@@ -90,6 +93,13 @@ func (m *testUserNsPodsManager) GetMaxPods() int {
 	return testMaxPods
 }
 
+func (m *testUserNsPodsManager) GetUserNamespacesIDsPerPod() uint32 {
+	if m.userNsLength != 0 {
+		return m.userNsLength
+	}
+	return testUserNsLength
+}
+
 func TestUserNsManagerAllocate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
@@ -99,7 +109,7 @@ func TestUserNsManagerAllocate(t *testing.T) {
 
 	allocated, length, err := m.allocateOne("one")
 	assert.NoError(t, err)
-	assert.Equal(t, userNsLength, int(length), "m.isSet(%d).length=%v", allocated, length)
+	assert.Equal(t, testUserNsLength, int(length), "m.isSet(%d).length=%v", allocated, length)
 	assert.True(t, m.isSet(allocated), "m.isSet(%d)", allocated)
 
 	allocated2, length2, err := m.allocateOne("two")
@@ -122,11 +132,11 @@ func TestUserNsManagerAllocate(t *testing.T) {
 	var allocs []uint32
 	for i := 0; i < 1000; i++ {
 		allocated, length, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
-		assert.Equal(t, userNsLength, int(length), "length is not the expected. iter: %v", i)
+		assert.Equal(t, testUserNsLength, int(length), "length is not the expected. iter: %v", i)
 		assert.NoError(t, err)
 		assert.GreaterOrEqual(t, allocated, uint32(minimumMappingUID))
 		// The last ID of the userns range (allocated+userNsLength) should be within bounds.
-		assert.LessOrEqual(t, allocated, uint32(minimumMappingUID+mappingLen-userNsLength))
+		assert.LessOrEqual(t, allocated, uint32(minimumMappingUID+mappingLen-testUserNsLength))
 		allocs = append(allocs, allocated)
 	}
 	for i, v := range allocs {
@@ -134,7 +144,7 @@ func TestUserNsManagerAllocate(t *testing.T) {
 		m.Release(types.UID(fmt.Sprintf("%d", i)))
 		assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
 
-		err = m.record(types.UID(fmt.Sprintf("%d", i)), v, userNsLength)
+		err = m.record(types.UID(fmt.Sprintf("%d", i)), v, testUserNsLength)
 		assert.NoError(t, err)
 		m.Release(types.UID(fmt.Sprintf("%d", i)))
 		assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)

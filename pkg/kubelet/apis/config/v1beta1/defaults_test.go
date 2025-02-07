@@ -132,6 +132,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
+				UserNamespaces:                &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](65536)},
 			},
 		},
 		{
@@ -265,6 +266,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				LocalStorageCapacityIsolation:   ptr.To(false),
 				PodLogsDir:                      "",
 				SingleProcessOOMKill:            ptr.To(false),
+				UserNamespaces:                  &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](0)},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       ptr.To(false),
@@ -370,6 +372,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          ptr.To(false),
 				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
+				UserNamespaces:                &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](65536)},
 			},
 		},
 		{
@@ -529,6 +532,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: 55 * time.Second},
 				},
+				UserNamespaces: &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](131072)},
 			},
 			&v1beta1.KubeletConfiguration{
 				FeatureGates:       map[string]bool{"KubeletCrashLoopBackOffMax": true},
@@ -685,6 +689,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: 55 * time.Second},
 				},
+				UserNamespaces: &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](131072)},
 			},
 		},
 		{
@@ -781,6 +786,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
+				UserNamespaces:                &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](65536)},
 			},
 		},
 		{
@@ -877,6 +883,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				PodLogsDir:                    DefaultPodLogsDir,
 				SingleProcessOOMKill:          nil,
 				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
+				UserNamespaces:                &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](65536)},
 			},
 		},
 		{
@@ -972,6 +979,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				LocalStorageCapacityIsolation: ptr.To(true),
 				PodLogsDir:                    DefaultPodLogsDir,
 				CrashLoopBackOff:              v1beta1.CrashLoopBackOffConfig{},
+				UserNamespaces:                &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](65536)},
 			},
 		},
 		{
@@ -1071,6 +1079,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				CrashLoopBackOff: v1beta1.CrashLoopBackOffConfig{
 					MaxContainerRestartPeriod: &metav1.Duration{Duration: MaxContainerBackOff},
 				},
+				UserNamespaces: &v1beta1.UserNamespaces{IDsPerPod: ptr.To[uint32](65536)},
 			},
 		},
 	}
