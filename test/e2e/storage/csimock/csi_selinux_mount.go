@@ -63,6 +63,16 @@ import (
 //   - The test requires SELinuxMountReadWriteOncePod, Feature:SELinuxChangePolicy and SELinuxMount enabled.
 //
 // All other feature gate combinations should be invalid.
+
+var (
+	defaultSELinuxLabels = map[string]struct{ defaultProcessLabel, defaultFileLabel string }{
+		"debian": {"svirt_lxc_net_t", "svirt_lxc_file_t"},
+		"ubuntu": {"svirt_lxc_net_t", "svirt_lxc_file_t"},
+		// Assume "custom" means Fedora and derivates. `e2e.test --node-os-distro=` does not have "fedora" or "rhel".
+		"custom": {"container_t", "container_file_t"},
+	}
+)
+
 var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	f := framework.NewDefaultFramework("csi-mock-volumes-selinux")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -71,21 +81,22 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 	mount := v1.SELinuxChangePolicyMountOption
 
 	f.Context("SELinuxMount [LinuxOnly]", feature.SELinux, func() {
+		processLabel, fileLabel := getDefaultContainerSELinuxLabels()
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
 			Role:  "system_r",
-			Type:  "container_t",
+			Type:  processLabel,
 			Level: "s0:c0,c1",
 		}
-		seLinuxMountOption1 := "context=\"system_u:object_r:container_file_t:s0:c0,c1\""
+		seLinuxMountOption1 := fmt.Sprintf("context=\"system_u:object_r:%s:s0:c0,c1\"", fileLabel)
 		seLinuxOpts2 := v1.SELinuxOptions{
 			User:  "system_u",
 			Role:  "system_r",
-			Type:  "container_t",
+			Type:  processLabel,
 			Level: "s0:c98,c99",
 		}
-		seLinuxMountOption2 := "context=\"system_u:object_r:container_file_t:s0:c98,c99\""
+		seLinuxMountOption2 := fmt.Sprintf("context=\"system_u:object_r:%s:s0:c98,c99\"", fileLabel)
 
 		tests := []struct {
 			name                       string
@@ -259,8 +270,8 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 		for _, t := range tests {
 			t := t
 			testFunc := func(ctx context.Context) {
-				if framework.NodeOSDistroIs("windows") {
-					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
+				if processLabel == "" {
+					e2eskipper.Skipf("SELinux tests are supported only on %+v", getSupportedSELinuxDistros())
 				}
 				var nodeStageMountOpts, nodePublishMountOpts []string
 				var unstageCalls, stageCalls, unpublishCalls, publishCalls atomic.Int32
@@ -406,17 +417,18 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 
 	// [Serial]: the tests read global kube-controller-manager metrics, so no other test changes them in parallel.
 	f.Context("SELinuxMount metrics [LinuxOnly]", feature.SELinux, f.WithSerial(), func() {
+		processLabel, _ := getDefaultContainerSELinuxLabels()
 		// Make sure all options are set so system specific defaults are not used.
 		seLinuxOpts1 := v1.SELinuxOptions{
 			User:  "system_u",
 			Role:  "system_r",
-			Type:  "container_t",
+			Type:  processLabel,
 			Level: "s0:c0,c1",
 		}
 		seLinuxOpts2 := v1.SELinuxOptions{
 			User:  "system_u",
 			Role:  "system_r",
-			Type:  "container_t",
+			Type:  processLabel,
 			Level: "s0:c98,c99",
 		}
 		recursive := v1.SELinuxChangePolicyRecursive
@@ -614,12 +626,13 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics", func() {
 		for _, t := range tests {
 			t := t
 			testFunc := func(ctx context.Context) {
+				if processLabel == "" {
+					e2eskipper.Skipf("SELinux tests are supported only on %+v", getSupportedSELinuxDistros())
+				}
+
 				// Some metrics use CSI driver name as a label, which is "csi-mock-" + the namespace name.
 				volumePluginLabel := "volume_plugin=\"kubernetes.io/csi/csi-mock-" + f.Namespace.Name + "\""
 
-				if framework.NodeOSDistroIs("windows") {
-					e2eskipper.Skipf("SELinuxMount is only applied on linux nodes -- skipping")
-				}
 				grabber, err := e2emetrics.NewMetricsGrabber(ctx, f.ClientSet, nil, f.ClientConfig(), true, false, false, false, false, false)
 				framework.ExpectNoError(err, "creating the metrics grabber")
 
@@ -783,4 +796,19 @@ func addLabels(metricNames sets.Set[string], volumePluginLabel string, accessMod
 	}
 
 	return ret
+}
+
+func getDefaultContainerSELinuxLabels() (processLabel string, fileLabel string) {
+	defaultLabels := defaultSELinuxLabels[framework.TestContext.NodeOSDistro]
+	// This function can return "" for unknown distros!
+	// SELinux tests should be skipped on those in their ginkgo.It().
+	return defaultLabels.defaultProcessLabel, defaultLabels.defaultFileLabel
+}
+
+func getSupportedSELinuxDistros() []string {
+	distros := make([]string, 0, len(defaultSELinuxLabels))
+	for distro := range defaultSELinuxLabels {
+		distros = append(distros, distro)
+	}
+	return distros
 }
