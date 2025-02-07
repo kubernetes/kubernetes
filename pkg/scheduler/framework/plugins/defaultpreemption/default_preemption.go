@@ -39,12 +39,23 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // Name of the plugin used in the plugin registry and configurations.
 const Name = names.DefaultPreemption
+
+// EligiblePodsFunc is a function which may be assigned to the DefaultPreemption plugin.
+// This function selects pods from the provided nodeInfo which are eligible to be preempted
+// in order to fit the provided preemptor.
+type EligiblePodsFunc func(nodeInfo *framework.NodeInfo, preemptor *v1.Pod) []*framework.PodInfo
+
+// OrderedPodsFunc is a function which may be assigned to the DefaultPreemption plugin.
+// This function orders the provided eligible pods in-place in descending order of highest
+// to lowest priority, where pods at the start of the slice are less likely to be preempted.
+type OrderedPodsFunc func(eligible []*framework.PodInfo)
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
@@ -57,11 +68,11 @@ type DefaultPreemption struct {
 
 	// EligiblePods returns victim pods which are allowed to be preempted by the provided preemptor.
 	// The default behavior is to allow any pods of lower priority to be preempted by any pods of higher priority.
-	EligiblePods func(nodeInfo *framework.NodeInfo, preemptor *v1.Pod) []*framework.PodInfo
+	EligiblePods EligiblePodsFunc
 
 	// OrderedPods sorts eligible victims in-place in descending order of highest to lowest priority.
 	// Pods at the start of the slice are less likely to be preempted.
-	OrderedPods func(eligible []*framework.PodInfo)
+	OrderedPods OrderedPodsFunc
 }
 
 var _ framework.PostFilterPlugin = &DefaultPreemption{}
@@ -73,7 +84,14 @@ func (pl *DefaultPreemption) Name() string {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+func New(ctx context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+	return NewDefaultPreemption(ctx, dpArgs, fh, fts)
+}
+
+var _ frameworkruntime.PluginFactoryWithFts = New
+
+// NewDefaultPreemption initializes a new plugin and returns it. The plugin type is retained to allow modification.
+func NewDefaultPreemption(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (*DefaultPreemption, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
