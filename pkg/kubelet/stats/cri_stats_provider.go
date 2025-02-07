@@ -905,11 +905,6 @@ func (p *criStatsProvider) addCadvisorContainerStats(
 	if memory != nil {
 		cs.Memory = memory
 	}
-
-	swap := cadvisorInfoToSwapStats(caPodStats)
-	if swap != nil {
-		cs.Swap = swap
-	}
 }
 
 func (p *criStatsProvider) addCadvisorContainerCPUAndMemoryStats(

@@ -155,7 +155,6 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 	cpu, memory := cadvisorInfoToCPUandMemoryStats(info)
 	result.CPU = cpu
 	result.Memory = memory
-	result.Swap = cadvisorInfoToSwapStats(info)
 
 	return result
 }
