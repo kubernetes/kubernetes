@@ -63,6 +63,9 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 		},
 		{
@@ -72,6 +75,9 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					CertificateRenewal: ptr.To(false),
 				},
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
 					EtcdUpgrade: ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
@@ -91,6 +97,9 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},
@@ -180,6 +189,9 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 			wantErr: false,
 		},
@@ -236,6 +248,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 		},
 		{
@@ -250,6 +265,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:     ptr.To(false),
 					ImagePullPolicy: v1.PullAlways,
 					ImagePullSerial: ptr.To(false),
+				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -268,6 +286,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullAlways,
 					ImagePullSerial:    ptr.To(false),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},
@@ -312,6 +333,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
 					EtcdUpgrade: ptr.To(false),
 				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.UpgradeConfigurationKind,
@@ -329,6 +353,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},
@@ -348,6 +375,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullNever,
 					ImagePullSerial:    ptr.To(false),
 				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.UpgradeConfigurationKind,
@@ -365,6 +395,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullNever,
 					ImagePullSerial:    ptr.To(false),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},

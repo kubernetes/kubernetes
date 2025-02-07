@@ -120,6 +120,7 @@ func TestNewApplyData(t *testing.T) {
 				allowExperimentalUpgrades: false,
 				allowRCUpgrades:           false,
 				printConfig:               false,
+				etcdUpgrade:               true,
 				out:                       os.Stdout,
 			}
 
@@ -132,7 +133,6 @@ func TestNewApplyData(t *testing.T) {
 
 			flags := &applyFlags{
 				applyPlanFlags: apf,
-				etcdUpgrade:    true,
 				renewCerts:     true,
 			}
 
