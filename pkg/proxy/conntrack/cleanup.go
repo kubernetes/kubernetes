@@ -139,7 +139,7 @@ var protocolMap = map[v1.Protocol]uint8{
 // filterForNAT returns *conntrackFilter to delete the conntrack entries for connections
 // specified by the destination IP (original direction) and source IP (reply direction).
 func filterForNAT(origin, dest string, protocol v1.Protocol) *conntrackFilter {
-	klog.V(4).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "reply-src", dest, "protocol", protocol)
+	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "reply-src", dest, "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{
@@ -154,7 +154,7 @@ func filterForNAT(origin, dest string, protocol v1.Protocol) *conntrackFilter {
 // filterForPortNAT returns *conntrackFilter to delete the conntrack entries for connections
 // specified by the destination Port (original direction) and source IP (reply direction).
 func filterForPortNAT(dest string, port int, protocol v1.Protocol) *conntrackFilter {
-	klog.V(4).InfoS("Adding conntrack filter for cleanup", "org-port-dst", port, "reply-src", dest, "protocol", protocol)
+	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-port-dst", port, "reply-src", dest, "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{
