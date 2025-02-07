@@ -1108,7 +1108,7 @@ func installAPI(name string, s *GenericAPIServer, c *Config) {
 		}
 	}
 
-	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)
+	routes.Version{Version: c.EffectiveVersion.Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
 		if c.FeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {

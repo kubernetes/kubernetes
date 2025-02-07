@@ -372,7 +372,7 @@ func TestServerRunWithSNI(t *testing.T) {
 				t.Fatalf("failed to connect with loopback client: %v", err)
 			}
 			if expected := &v; !reflect.DeepEqual(got, expected) {
-				t.Errorf("loopback client didn't get correct version info: expected=%v got=%v", expected, got)
+				t.Errorf("loopback client didn't get correct version info: expected=%v got=%v", *expected, *got)
 			}
 
 			select {
@@ -463,9 +463,13 @@ func certSignature(cert tls.Certificate) (string, error) {
 
 func fakeVersion() version.Info {
 	return version.Info{
-		Major:      "42",
-		Minor:      "42",
-		GitVersion: "42.42",
+		Major:                 "42",
+		Minor:                 "42",
+		EmulationMajor:        "42",
+		EmulationMinor:        "42",
+		MinCompatibilityMajor: "42",
+		MinCompatibilityMinor: "41",
+		GitVersion:            "42.42",
 	}
 }
 

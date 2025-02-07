@@ -19474,6 +19474,14 @@
         "compiler": {
           "type": "string"
         },
+        "emulationMajor": {
+          "description": "EmulationMajor is the major version of the emulation version",
+          "type": "string"
+        },
+        "emulationMinor": {
+          "description": "EmulationMinor is the minor version of the emulation version",
+          "type": "string"
+        },
         "gitCommit": {
           "type": "string"
         },
@@ -19487,9 +19495,19 @@
           "type": "string"
         },
         "major": {
+          "description": "Major is the major version of the binary version",
+          "type": "string"
+        },
+        "minCompatibilityMajor": {
+          "description": "MinCompatibilityMajor is the major version of the minimum compatibility version",
+          "type": "string"
+        },
+        "minCompatibilityMinor": {
+          "description": "MinCompatibilityMinor is the minor version of the minimum compatibility version",
           "type": "string"
         },
         "minor": {
+          "description": "Minor is the minor version of the binary version",
           "type": "string"
         },
         "platform": {
@@ -85995,8 +86013,8 @@
         "consumes": [
           "application/json"
         ],
-        "description": "get the code version",
-        "operationId": "getCodeVersion",
+        "description": "get the version information for this server",
+        "operationId": "getVersion",
         "produces": [
           "application/json"
         ],
