@@ -64,36 +64,6 @@ func (m *mockPodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride 
 	return nil
 }
 
-// While for running pods only one pod is killed per eviction interval,
-// when there is disk pressure, all terminated pods are killed in the same cycle
-// mockPodsKiller is used to test which pods are killed
-type mockPodsKiller struct {
-	pods                []*v1.Pod
-	evict               bool
-	statusFn            func(*v1.PodStatus)
-	gracePeriodOverride *int64
-}
-
-// killPodsNow records the pods that were killed
-func (m *mockPodsKiller) killPodsNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, statusFn func(*v1.PodStatus)) error {
-	m.pods = append(m.pods, pod)
-	m.statusFn = statusFn
-	m.evict = evict
-	m.gracePeriodOverride = gracePeriodOverride
-	return nil
-}
-
-func setDiskStatsBasedOnFs(whichFs string, diskPressure string, diskStat diskStats) diskStats {
-	if whichFs == "nodefs" {
-		diskStat.rootFsAvailableBytes = diskPressure
-	} else if whichFs == "imagefs" {
-		diskStat.imageFsAvailableBytes = diskPressure
-	} else if whichFs == "containerfs" {
-		diskStat.containerFsAvailableBytes = diskPressure
-	}
-	return diskStat
-}
-
 // mockDiskInfoProvider is used to simulate testing.
 type mockDiskInfoProvider struct {
 	dedicatedImageFs     *bool
@@ -316,10 +286,6 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 		return pods
 	}
 
-	terminatedPodsFunc := func() []*v1.Pod {
-		return []*v1.Pod{}
-	}
-
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
@@ -353,7 +319,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 	}
 
 	// synchronize to detect the memory pressure
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -417,10 +383,6 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 			return pods
 		}
 
-		terminatedPodsFunc := func() []*v1.Pod {
-			return []*v1.Pod{}
-		}
-
 		fakeClock := testingclock.NewFakeClock(time.Now())
 		podKiller := &mockPodKiller{}
 		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false), dedicatedContainerFs: ptr.To(false)}
@@ -454,7 +416,7 @@ func TestPIDPressure_VerifyPodStatus(t *testing.T) {
 		}
 
 		// synchronize to detect the PID pressure
-		_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+		_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 		if err != nil {
 			t.Fatalf("Manager expects no error but got %v", err)
@@ -599,10 +561,6 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 			return pods
 		}
 
-		terminatedPodsFunc := func() []*v1.Pod {
-			return []*v1.Pod{}
-		}
-
 		fakeClock := testingclock.NewFakeClock(time.Now())
 		podKiller := &mockPodKiller{}
 		diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
@@ -634,7 +592,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 		}
 
 		// synchronize
-		pods, synchErr := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+		pods, synchErr := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 		if synchErr == nil && tc.expectErr != "" {
 			t.Fatalf("Manager should report error but did not")
@@ -692,10 +650,6 @@ func TestMemoryPressure(t *testing.T) {
 		return pods
 	}
 
-	terminatedPodsFunc := func() []*v1.Pod {
-		return []*v1.Pod{}
-	}
-
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
@@ -742,7 +696,7 @@ func TestMemoryPressure(t *testing.T) {
 	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", ""), "0Gi")
 
 	// synchronize
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -764,7 +718,7 @@ func TestMemoryPressure(t *testing.T) {
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -783,7 +737,7 @@ func TestMemoryPressure(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -812,7 +766,7 @@ func TestMemoryPressure(t *testing.T) {
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Gi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -826,7 +780,7 @@ func TestMemoryPressure(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -858,7 +812,7 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -886,7 +840,7 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager expects no error but got %v", err)
@@ -966,10 +920,6 @@ func TestPIDPressure(t *testing.T) {
 			podToEvict := pods[tc.evictPodIndex]
 			activePodsFunc := func() []*v1.Pod { return pods }
 
-			terminatedPodsFunc := func() []*v1.Pod {
-				return []*v1.Pod{}
-			}
-
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
 			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
@@ -1016,7 +966,7 @@ func TestPIDPressure(t *testing.T) {
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, 50)
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1035,7 +985,7 @@ func TestPIDPressure(t *testing.T) {
 			// induce soft threshold for PID pressure
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.pressurePIDUsageWithGracePeriod, podStats)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1054,7 +1004,7 @@ func TestPIDPressure(t *testing.T) {
 			// step forward in time past the grace period
 			fakeClock.Step(3 * time.Minute)
 			// no change in PID stats to simulate continued pressure
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1084,7 +1034,7 @@ func TestPIDPressure(t *testing.T) {
 			// remove PID pressure by simulating increased PID availability
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats) // Simulate increased PID availability
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1098,7 +1048,7 @@ func TestPIDPressure(t *testing.T) {
 			// re-induce PID pressure
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.pressurePIDUsageWithoutGracePeriod, podStats)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1130,7 +1080,7 @@ func TestPIDPressure(t *testing.T) {
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1154,7 +1104,7 @@ func TestPIDPressure(t *testing.T) {
 			// move the clock past the transition period
 			fakeClock.Step(5 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(tc.totalPID, tc.noPressurePIDUsage, podStats)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1228,7 +1178,6 @@ func TestDiskPressureNodeFs(t *testing.T) {
 		writeableSeparateFromReadOnly bool
 		thresholdToMonitor            []evictionapi.Threshold
 		podToMakes                    []podToMake
-		terminatedPodToMakes          []podToMake
 		dedicatedImageFs              *bool
 		expectErr                     string
 		inducePressureOnWhichFs       string
@@ -1357,10 +1306,6 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				return pods
 			}
 
-			terminatedPodsFunc := func() []*v1.Pod {
-				return []*v1.Pod{}
-			}
-
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
 			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
@@ -1398,7 +1343,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0Gi", "0Gi", "0Gi", nil)
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1425,7 +1370,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				diskStatStart.containerFsAvailableBytes = tc.softDiskPressure
 			}
 			summaryProvider.result = summaryStatsMaker(diskStatStart)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1444,7 +1389,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			// step forward in time pass the grace period
 			fakeClock.Step(3 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatStart)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1473,7 +1418,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			// remove disk pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1494,7 +1439,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 				diskStatStart.containerFsAvailableBytes = tc.hardDiskPressure
 			}
 			summaryProvider.result = summaryStatsMaker(diskStatStart)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
@@ -1524,7 +1469,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1548,7 +1493,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			fakeClock.Step(5 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -1567,259 +1512,6 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			// try to admit our pod (should succeed)
 			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
-			}
-		})
-	}
-}
-
-// Test terminated pods eviction on disk pressure works as expected
-func TestTerminatedPodsEvictionOnDiskPressure(t *testing.T) {
-	testCases := map[string]struct {
-		nodeFsStats                   string
-		imageFsStats                  string
-		containerFsStats              string
-		kubeletSeparateDiskFeature    bool
-		writeableSeparateFromReadOnly bool
-		thresholdToMonitor            evictionapi.Threshold
-		podToMakes                    []podToMake
-		terminatedPodToMakes          []podToMake
-		dedicatedImageFs              *bool
-		inducePressureOnWhichFs       string
-		softDiskPressure              string
-		hardDiskPressure              string
-		expectContainerGcCall         bool
-		expectImageGcCall             bool
-	}{
-		"eviction due to disk pressure; terminated pods": {
-			dedicatedImageFs:        ptr.To(false),
-			nodeFsStats:             "16Gi",
-			imageFsStats:            "16Gi",
-			containerFsStats:        "16Gi",
-			inducePressureOnWhichFs: "nodefs",
-			softDiskPressure:        "1.5Gi",
-			hardDiskPressure:        "750Mi",
-			expectImageGcCall:       true,
-			expectContainerGcCall:   true,
-			thresholdToMonitor: evictionapi.Threshold{
-				Signal:   evictionapi.SignalNodeFsAvailable,
-				Operator: evictionapi.OpLessThan,
-				Value: evictionapi.ThresholdValue{
-					Quantity: quantityMustParse("1Gi"),
-				},
-			},
-			podToMakes: []podToMake{
-				{name: "low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), rootFsUsed: "900Mi"},
-				{name: "below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi", ""), limits: newResourceList("200m", "1Gi", ""), logsFsUsed: "50Mi"},
-				{name: "above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi", ""), limits: newResourceList("200m", "1Gi", ""), rootFsUsed: "400Mi"},
-				{name: "high-priority-high-usage", priority: highPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), perLocalVolumeUsed: "400Mi"},
-				{name: "low-priority-low-usage", priority: lowPriority, requests: newResourceList("", "", ""), limits: newResourceList("", "", ""), rootFsUsed: "100Mi"},
-			},
-			terminatedPodToMakes: []podToMake{
-				{name: "terminated-pod-1", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), rootFsUsed: "500Mi"},
-				{name: "terminated-pod-2", priority: lowPriority, requests: newResourceList("100m", "1Gi", ""), limits: newResourceList("100m", "1Gi", ""), rootFsUsed: "500Mi"},
-			},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletSeparateDiskGC, tc.kubeletSeparateDiskFeature)
-
-			podMaker := makePodWithDiskStats
-			summaryStatsMaker := makeDiskStats
-			podsToMake := tc.podToMakes
-			pods := []*v1.Pod{}
-			podStats := map[*v1.Pod]statsapi.PodStats{}
-			for _, podToMake := range podsToMake {
-				pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed, nil)
-				pods = append(pods, pod)
-				podStats[pod] = podStat
-			}
-			activePodsFunc := func() []*v1.Pod {
-				return pods
-			}
-
-			terminatedPodsToMake := tc.terminatedPodToMakes
-			terminatedPods := []*v1.Pod{}
-			for _, terminatedPodToMake := range terminatedPodsToMake {
-				terminatedPod, _ := podMaker(terminatedPodToMake.name, terminatedPodToMake.priority, terminatedPodToMake.requests, terminatedPodToMake.limits, terminatedPodToMake.rootFsUsed, terminatedPodToMake.logsFsUsed, terminatedPodToMake.perLocalVolumeUsed, nil)
-				terminatedPods = append(terminatedPods, terminatedPod)
-			}
-			terminatedPodsFunc := func() []*v1.Pod {
-				return terminatedPods
-			}
-
-			fakeClock := testingclock.NewFakeClock(time.Now())
-			podKiller := &mockPodsKiller{}
-			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
-			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-
-			config := Config{
-				MaxPodGracePeriodSeconds: 5,
-				PressureTransitionPeriod: time.Minute * 5,
-				Thresholds:               []evictionapi.Threshold{tc.thresholdToMonitor},
-			}
-			diskStatStart := diskStats{
-				rootFsAvailableBytes:      tc.nodeFsStats,
-				imageFsAvailableBytes:     tc.imageFsStats,
-				containerFsAvailableBytes: tc.containerFsStats,
-				podStats:                  podStats,
-			}
-			// This is a constant that we use to test that disk pressure is over. Don't change!
-			diskStatConst := diskStatStart
-			summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker(diskStatStart)}
-			diskGC := &mockDiskGC{fakeSummaryProvider: summaryProvider, err: nil}
-			manager := &managerImpl{
-				clock:                        fakeClock,
-				killPodFunc:                  podKiller.killPodsNow,
-				imageGC:                      diskGC,
-				containerGC:                  diskGC,
-				config:                       config,
-				recorder:                     &record.FakeRecorder{},
-				summaryProvider:              summaryProvider,
-				nodeRef:                      nodeRef,
-				nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
-				thresholdsFirstObservedAt:    thresholdsObservedAt{},
-			}
-
-			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
-
-			if err != nil {
-				t.Fatalf("Manager should not have an error %v", err)
-			}
-
-			// we should not have disk pressure
-			if manager.IsUnderDiskPressure() {
-				t.Errorf("Manager should not report disk pressure")
-			}
-
-			// induce hard threshold
-			fakeClock.Step(1 * time.Minute)
-
-			newDiskAfterHardEviction := setDiskStatsBasedOnFs(tc.inducePressureOnWhichFs, tc.hardDiskPressure, diskStatStart)
-			summaryProvider.result = summaryStatsMaker(newDiskAfterHardEviction)
-			// make GC successfully return disk usage to previous levels
-			diskGC.summaryAfterGC = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
-
-			if err != nil {
-				t.Fatalf("Manager should not have an error %v", err)
-			}
-
-			// we should have disk pressure
-			if !manager.IsUnderDiskPressure() {
-				t.Fatalf("Manager should report disk pressure since soft threshold was met")
-			}
-
-			// verify image, container or both gc were called.
-			// split filesystem can have container gc called without image.
-			// same filesystem should have both.
-			if diskGC.imageGCInvoked != tc.expectImageGcCall && diskGC.containerGCInvoked != tc.expectContainerGcCall {
-				t.Fatalf("Manager should have invoked image gc")
-			}
-
-			// compare expected killed pods with actual killed pods
-			checkIfSamePods := func(expectedPods, actualPods []*v1.Pod) bool {
-				expected := make(map[*v1.Pod]bool)
-				for _, pod := range expectedPods {
-					expected[pod] = true
-				}
-
-				for _, pod := range actualPods {
-					if !expected[pod] {
-						return false
-					}
-				}
-
-				return true
-			}
-
-			// verify terminated pods were killed
-			if podKiller.pods == nil {
-				t.Fatalf("Manager should have killed terminated pods")
-			}
-
-			// verify only terminated pods were killed because image gc was sufficient
-			if !checkIfSamePods(terminatedPods, podKiller.pods) {
-				t.Fatalf("Manager killed running pods")
-			}
-
-			// reset state
-			diskGC.imageGCInvoked = false
-			diskGC.containerGCInvoked = false
-			podKiller.pods = nil
-
-			// remove disk pressure
-			fakeClock.Step(20 * time.Minute)
-			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
-
-			if err != nil {
-				t.Fatalf("Manager should not have an error %v", err)
-			}
-
-			// we should not have disk pressure
-			if manager.IsUnderDiskPressure() {
-				t.Fatalf("Manager should not report disk pressure")
-			}
-
-			// induce disk pressure!
-			fakeClock.Step(1 * time.Minute)
-			softDiskPressure := setDiskStatsBasedOnFs(tc.inducePressureOnWhichFs, tc.hardDiskPressure, diskStatStart)
-			summaryProvider.result = summaryStatsMaker(softDiskPressure)
-			// Don't reclaim any disk
-			diskGC.summaryAfterGC = summaryStatsMaker(softDiskPressure)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
-
-			if err != nil {
-				t.Fatalf("Manager should not have an error %v", err)
-			}
-
-			// we should have disk pressure
-			if !manager.IsUnderDiskPressure() {
-				t.Fatalf("Manager should report disk pressure")
-			}
-
-			// verify image, container or both gc were called.
-			// split filesystem can have container gc called without image.
-			// same filesystem should have both.
-			if diskGC.imageGCInvoked != tc.expectImageGcCall && diskGC.containerGCInvoked != tc.expectContainerGcCall {
-				t.Fatalf("Manager should have invoked image gc")
-			}
-
-			// Make array with only the pods names
-			podsNames := func(pods []*v1.Pod) []string {
-				var podsNames []string
-				for _, pod := range pods {
-					podsNames = append(podsNames, pod.Name)
-				}
-				return podsNames
-			}
-
-			expectedKilledPods := append(terminatedPods, pods[0])
-			// verify only terminated pods were killed because image gc was sufficient
-			if !checkIfSamePods(expectedKilledPods, podKiller.pods) {
-				t.Fatalf("Manager killed running pods. Expected: %v, actual: %v", podsNames(expectedKilledPods), podsNames(podKiller.pods))
-			}
-
-			// reset state
-			diskGC.imageGCInvoked = false
-			diskGC.containerGCInvoked = false
-			podKiller.pods = nil
-
-			// remove disk pressure
-			fakeClock.Step(20 * time.Minute)
-			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
-
-			if err != nil {
-				t.Fatalf("Manager should not have an error %v", err)
-			}
-
-			// we should not have disk pressure
-			if manager.IsUnderDiskPressure() {
-				t.Fatalf("Manager should not report disk pressure")
 			}
 		})
 	}
@@ -1846,10 +1538,6 @@ func TestMinReclaim(t *testing.T) {
 	podToEvict := pods[4]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
-	}
-
-	terminatedPodsFunc := func() []*v1.Pod {
-		return []*v1.Pod{}
 	}
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
@@ -1889,7 +1577,7 @@ func TestMinReclaim(t *testing.T) {
 	}
 
 	// synchronize
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 	if err != nil {
 		t.Errorf("Manager should not report any errors")
 	}
@@ -1901,7 +1589,7 @@ func TestMinReclaim(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -1925,7 +1613,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1.2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -1949,7 +1637,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -1969,7 +1657,7 @@ func TestMinReclaim(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2140,10 +1828,6 @@ func TestNodeReclaimFuncs(t *testing.T) {
 				return pods
 			}
 
-			terminatedPodsFunc := func() []*v1.Pod {
-				return []*v1.Pod{}
-			}
-
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
 			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
@@ -2178,7 +1862,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			}
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2192,11 +1876,21 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// induce hard threshold
 			fakeClock.Step(1 * time.Minute)
 
+			setDiskStatsBasedOnFs := func(whichFs string, diskPressure string, diskStat diskStats) diskStats {
+				if whichFs == "nodefs" {
+					diskStat.rootFsAvailableBytes = diskPressure
+				} else if whichFs == "imagefs" {
+					diskStat.imageFsAvailableBytes = diskPressure
+				} else if whichFs == "containerfs" {
+					diskStat.containerFsAvailableBytes = diskPressure
+				}
+				return diskStat
+			}
 			newDiskAfterHardEviction := setDiskStatsBasedOnFs(tc.inducePressureOnWhichFs, tc.hardDiskPressure, diskStatStart)
 			summaryProvider.result = summaryStatsMaker(newDiskAfterHardEviction)
 			// make GC successfully return disk usage to previous levels
 			diskGC.summaryAfterGC = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2226,7 +1920,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// remove disk pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2238,7 +1932,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			}
 
 			// synchronize
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2256,7 +1950,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// make GC return disk usage bellow the threshold, but not satisfying minReclaim
 			gcBelowThreshold := setDiskStatsBasedOnFs(tc.inducePressureOnWhichFs, "1.1G", newDiskAfterHardEviction)
 			diskGC.summaryAfterGC = summaryStatsMaker(gcBelowThreshold)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2287,7 +1981,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			// remove disk pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = summaryStatsMaker(diskStatConst)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2304,7 +1998,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			summaryProvider.result = summaryStatsMaker(softDiskPressure)
 			// Don't reclaim any disk
 			diskGC.summaryAfterGC = summaryStatsMaker(softDiskPressure)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2337,7 +2031,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			diskGC.imageGCInvoked = false     // reset state
 			diskGC.containerGCInvoked = false // reset state
 			podKiller.pod = nil               // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2363,7 +2057,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			diskGC.imageGCInvoked = false     // reset state
 			diskGC.containerGCInvoked = false // reset state
 			podKiller.pod = nil               // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2597,10 +2291,6 @@ func TestInodePressureFsInodes(t *testing.T) {
 				return pods
 			}
 
-			terminatedPodsFunc := func() []*v1.Pod {
-				return []*v1.Pod{}
-			}
-
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
 			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: tc.dedicatedImageFs, dedicatedContainerFs: &tc.writeableSeparateFromReadOnly}
@@ -2632,7 +2322,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", "", ""), newResourceList("", "", ""), "0", "0", "0")
 
 			// synchronize
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2651,7 +2341,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			// induce soft threshold
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = setINodesFreeBasedOnFs(tc.inducePressureOnWhichFs, tc.softINodePressure, startingStatsModified)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2670,7 +2360,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			// step forward in time pass the grace period
 			fakeClock.Step(3 * time.Minute)
 			summaryProvider.result = setINodesFreeBasedOnFs(tc.inducePressureOnWhichFs, tc.softINodePressure, startingStatsModified)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2699,7 +2389,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			// remove inode pressure
 			fakeClock.Step(20 * time.Minute)
 			summaryProvider.result = startingStatsConst
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2713,7 +2403,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			// induce inode pressure!
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = setINodesFreeBasedOnFs(tc.inducePressureOnWhichFs, tc.hardINodePressure, startingStatsModified)
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2742,7 +2432,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			fakeClock.Step(1 * time.Minute)
 			summaryProvider.result = startingStatsConst
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2767,7 +2457,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			fakeClock.Step(5 * time.Minute)
 			summaryProvider.result = startingStatsConst
 			podKiller.pod = nil // reset state
-			_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 			if err != nil {
 				t.Fatalf("Manager should not have an error %v", err)
@@ -2819,10 +2509,6 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 		return pods
 	}
 
-	terminatedPodsFunc := func() []*v1.Pod {
-		return []*v1.Pod{}
-	}
-
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
@@ -2868,7 +2554,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2887,7 +2573,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	// step forward in time pass the grace period
 	fakeClock.Step(3 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2909,7 +2595,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	// remove memory pressure
 	fakeClock.Step(20 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("3Gi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2929,7 +2615,7 @@ func TestStaticCriticalPodsAreNotEvicted(t *testing.T) {
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -2986,10 +2672,6 @@ func TestStorageLimitEvictions(t *testing.T) {
 				return pods
 			}
 
-			terminatedPodsFunc := func() []*v1.Pod {
-				return []*v1.Pod{}
-			}
-
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			podKiller := &mockPodKiller{}
 			diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
@@ -3032,7 +2714,7 @@ func TestStorageLimitEvictions(t *testing.T) {
 				localStorageCapacityIsolation: true,
 			}
 
-			_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+			_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 			if err != nil {
 				t.Fatalf("Manager expects no error but got %v", err)
 			}
@@ -3073,10 +2755,6 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 		return pods
 	}
 
-	terminatedPodsFunc := func() []*v1.Pod {
-		return []*v1.Pod{}
-	}
-
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: ptr.To(false)}
@@ -3115,7 +2793,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", ""), "0Gi")
 
 	// synchronize
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3139,7 +2817,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	pod, podStat := podMaker("guaranteed-high-2", defaultPriority, newResourceList("100m", "1Gi", ""), newResourceList("100m", "1Gi", ""), "1Gi")
 	podStats[pod] = podStat
 	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3179,7 +2857,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	}
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3207,7 +2885,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	fakeClock.Step(5 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
 	podKiller.pod = nil // reset state
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3234,10 +2912,6 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 func TestUpdateMemcgThreshold(t *testing.T) {
 	activePodsFunc := func() []*v1.Pod {
-		return []*v1.Pod{}
-	}
-
-	terminatedPodsFunc := func() []*v1.Pod {
 		return []*v1.Pod{}
 	}
 
@@ -3281,14 +2955,14 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	}
 
 	// The UpdateThreshold method should have been called once, since this is the first run.
-	_, err := manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err := manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
 	}
 
 	// The UpdateThreshold method should not have been called again, since not enough time has passed
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3296,7 +2970,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 
 	// The UpdateThreshold method should be called again since enough time has passed
 	fakeClock.Step(2 * notifierRefreshInterval)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3311,7 +2985,7 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	// The UpdateThreshold method should be called because at least notifierRefreshInterval time has passed.
 	// The Description method should be called because UpdateThreshold returned an error
 	fakeClock.Step(2 * notifierRefreshInterval)
-	_, err = manager.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	_, err = manager.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have an error %v", err)
@@ -3379,11 +3053,7 @@ func TestManagerWithLocalStorageCapacityIsolationOpen(t *testing.T) {
 		return pods
 	}
 
-	terminatedPodsFunc := func() []*v1.Pod {
-		return []*v1.Pod{}
-	}
-
-	evictedPods, err := mgr.synchronize(diskInfoProvider, activePodsFunc, terminatedPodsFunc)
+	evictedPods, err := mgr.synchronize(diskInfoProvider, activePodsFunc)
 
 	if err != nil {
 		t.Fatalf("Manager should not have error but got %v", err)
