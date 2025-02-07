@@ -40,7 +40,10 @@ import (
 func TestWatchBasedManager(t *testing.T) {
 	testNamespace := "test-watch-based-manager"
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
-	defer server.TearDownFn()
+	t.Cleanup(server.TearDownFn)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
 
 	const n = 10
 	server.ClientConfig.QPS = 10000
@@ -49,15 +52,15 @@ func TestWatchBasedManager(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(ctx, (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	listObj := func(namespace string, options metav1.ListOptions) (runtime.Object, error) {
-		return client.CoreV1().Secrets(namespace).List(context.TODO(), options)
+		return client.CoreV1().Secrets(namespace).List(ctx, options)
 	}
 	watchObj := func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
-		return client.CoreV1().Secrets(namespace).Watch(context.TODO(), options)
+		return client.CoreV1().Secrets(namespace).Watch(ctx, options)
 	}
 	newObj := func() runtime.Object { return &v1.Secret{} }
 	// We want all watches to be up and running to stress test it.
@@ -66,7 +69,8 @@ func TestWatchBasedManager(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	stopCh := make(chan struct{})
-	defer close(stopCh)
+	t.Cleanup(func() { close(stopCh) })
+
 	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
 
 	// create 1000 secrets in parallel
@@ -79,7 +83,7 @@ func TestWatchBasedManager(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
 				name := fmt.Sprintf("s%d", i*100+j)
-				if _, err := client.CoreV1().Secrets(testNamespace).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
+				if _, err := client.CoreV1().Secrets(testNamespace).Create(ctx, &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
 					select {
 					case errCh <- err:
 					default:
