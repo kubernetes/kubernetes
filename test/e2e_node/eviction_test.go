@@ -66,7 +66,7 @@ const (
 	lotsOfFiles       = 1000000000 // 1 billion
 	resourceInodes    = v1.ResourceName("inodes")
 	noStarvedResource = v1.ResourceName("none")
-	waitPodSufix       = "wait-pod"
+	waitPodSufix      = "wait-pod"
 )
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
@@ -139,12 +139,13 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 	})
 })
 
-// ImageGCTerminatedPodsEviction tests that the node responds to disk pressure
-// by only evicting terminated pods, when reclaiming their resources freed
-// enough space to eliminate the disk pressure
+// ImageGCTerminatedPodsContainersCleanup tests that the node responds to disk
+// pressure by cleaning up containers from terminated pods without evicting
+// running pods, when reclaiming their resources freed enough space to eliminate
+// the disk pressure
 // Disk pressure is induced by pulling large images
-var _ = SIGDescribe("ImageGCTerminatedPodsEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	f := framework.NewDefaultFramework("image-gc-terminated-pods-eviction-test")
+var _ = SIGDescribe("ImageGCTerminatedPodsContainersCleanup", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
+	f := framework.NewDefaultFramework("image-gc-terminated-pods-containers-cleanup-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -178,7 +179,7 @@ var _ = SIGDescribe("ImageGCTerminatedPodsEviction", framework.WithSlow(), frame
 			// Setting the volume as nil, will make the file to be written to the
 			// container writable layer, which defaults to using the node's root fs.
 			{
-				evictionPriority: 1,
+				evictionPriority: 0,
 				pod:              inodeConsumingPod(makeWaitPodName("disk-hog"), 30000, nil, false),
 			},
 			{
@@ -753,37 +754,39 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			time.Sleep(30 * time.Second)
 			ginkgo.By("setting up pods to be used by tests")
 			pods := []*v1.Pod{}
+			podsToSucceed := []*v1.Pod{}
 			for _, spec := range testSpecs {
 				if spec.prePodCreationModificationFunc != nil {
 					spec.prePodCreationModificationFunc(ctx, spec.pod)
 				}
-				pods = append(pods, spec.pod)
-			}
-			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
-
-			// Wait for the expected terminated pod to get to terminated state
-			for _, spec := range testSpecs {
-				if !isPodExpectedToSucceed(spec.pod) {
+				if isPodExpectedToSucceed(spec.pod) {
+					podsToSucceed = append(podsToSucceed, spec.pod)
 					continue
 				}
+				pods = append(pods, spec.pod)
+			}
+			e2ePodClient := e2epod.NewPodClient(f)
+			e2ePodClient.CreateBatch(ctx, podsToSucceed)
 
-				ginkgo.By(fmt.Sprintf("Waiting for the %s pod to complete", spec.pod.Name))
-				podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
+			// Wait for the expected succeeded pods to get to that state
+			for _, podToSucceed := range podsToSucceed {
+				ginkgo.By(fmt.Sprintf("Waiting for the %s pod to complete", podToSucceed.Name))
 				gomega.Eventually(ctx, func() error {
-					pod, err := podClient.Get(ctx, spec.pod.Name, metav1.GetOptions{})
+					pod, err := e2ePodClient.PodInterface.Get(ctx, podToSucceed.Name, metav1.GetOptions{})
 					if err != nil {
-						return fmt.Errorf("failed to retrieve %s: %v", spec.pod.Name, err)
+						return fmt.Errorf("failed to retrieve %s: %w", podToSucceed.Name, err)
 					}
 
 					if pod.Status.Phase != v1.PodSucceeded {
-						return fmt.Errorf("%s pod not yet completed or failed: %v", spec.pod.Name, pod.Status.Phase)
+						return fmt.Errorf("%s pod not yet completed or failed: %v", pod.Name, pod.Status.Phase)
 					}
 
 					return nil
 				}, pressureTimeout, evictionPollInterval).Should(gomega.BeNil())
-
-				break
 			}
+
+			// Create all other pods after expected to succeed pods terminated
+			e2ePodClient.CreateBatch(ctx, pods)
 		})
 
 		ginkgo.It("should eventually evict all of the correct pods", func(ctx context.Context) {
@@ -954,7 +957,7 @@ func verifyEvictionOrdering(ctx context.Context, f *framework.Framework, testSpe
 		}
 
 		// If a pod that is not evictionPriority 0 has not been evicted, we are not done
-		if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed && !isPodExpectedToSucceed(&priorityPod) {
+		if priorityPodSpec.evictionPriority != 0 && priorityPod.Status.Phase != v1.PodFailed {
 			pendingPods = append(pendingPods, priorityPod.ObjectMeta.Name)
 			done = false
 		}
@@ -1018,12 +1021,6 @@ func verifyEvictionEvents(ctx context.Context, f *framework.Framework, testSpecs
 			event := podEvictEvents.Items[0]
 
 			if expectedStarvedResource != noStarvedResource {
-				// Terminated pods are not considered for stats collections,
-				// so they do not have annotations to be verified
-				if isPodExpectedToSucceed(pod) {
-					return
-				}
-
 				// Check the eviction.StarvedResourceKey
 				starved, found := event.Annotations[eviction.StarvedResourceKey]
 				if !found {
