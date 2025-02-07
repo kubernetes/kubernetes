@@ -1957,6 +1957,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		podStatus.IPs = []string{apiPodStatus.PodIP}
 	}
 
+	// Emit ContainerTerminated Event
+	for _, cs := range podStatus.ContainerStatuses {
+		if cs.State == kubecontainer.ContainerStateExited {
+			kl.recordContainerTerminatedEvent(pod, cs.Name, cs.RestartCount, "Container will be restarted if in restart policy")
+		}
+	}
+
 	// If the pod is terminal, we don't need to continue to setup the pod
 	if apiPodStatus.Phase == v1.PodSucceeded || apiPodStatus.Phase == v1.PodFailed {
 		kl.statusManager.SetPodStatus(logger, pod, apiPodStatus)
@@ -2752,6 +2759,12 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			StartTime:  start,
 		})
 	}
+}
+
+// recordContainerTerinatedEvent records event if any container has terminated
+func (kl *Kubelet) recordContainerTerminatedEvent(pod *v1.Pod, containerName string, restartCount int, message string) {
+	kl.recorder.Eventf(pod, v1.EventTypeNormal, events.TerminatedContainer,
+		"Container %s terminated. Restart count: %d. %s", containerName, restartCount, message)
 }
 
 // recordContainerResizeOperations records if any of the pod's containers needs to be resized, and returns
