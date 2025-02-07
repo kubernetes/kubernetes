@@ -437,17 +437,6 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Handle(proberMetricsPath,
 		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
-
-	// Only enable checkpoint API if the feature is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
-		s.addMetricsBucketMatcher("checkpoint")
-		ws = &restful.WebService{}
-		ws.Path(checkpointPath).Produces(restful.MIME_JSON)
-		ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
-			To(s.checkpoint).
-			Operation("checkpoint"))
-		s.restfulCont.Add(ws)
-	}
 }
 
 // InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
@@ -542,6 +531,17 @@ func (s *Server) InstallDebuggingHandlers() {
 		To(s.getRunningPods).
 		Operation("getRunningPods"))
 	s.restfulCont.Add(ws)
+
+	// Only enable checkpoint API if the feature is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
+		s.addMetricsBucketMatcher("checkpoint")
+		ws = &restful.WebService{}
+		ws.Path(checkpointPath).Produces(restful.MIME_JSON)
+		ws.Route(ws.POST("/{podNamespace}/{podID}/{containerName}").
+			To(s.checkpoint).
+			Operation("checkpoint"))
+		s.restfulCont.Add(ws)
+	}
 }
 
 // InstallDebuggingDisabledHandlers registers the HTTP request patterns that provide better error message
