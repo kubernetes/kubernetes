@@ -116,7 +116,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.24rc1
+    version: 1.24rc2
     refPaths:
     - path: .go-version
     - path: build/build-image/cross/VERSION
@@ -143,7 +143,7 @@ dependencies:
   #     match: golang:([0-9]+\.[0-9]+).0-bullseye
 
   - name: "registry.k8s.io/kube-cross: dependents"
-    version: v1.33.0-go1.24rc1-bullseye.0
+    version: v1.33.0-go1.24rc2-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -181,7 +181,7 @@ dependencies:
       match: registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "registry.k8s.io/distroless-iptables: dependents"
-    version: v0.7.0
+    version: v0.7.1
     refPaths:
     - path: build/common.sh
       match: __default_distroless_iptables_version=
@@ -189,7 +189,7 @@ dependencies:
       match: configs\[DistrolessIptables\] = Config{list\.BuildImageRegistry, "distroless-iptables", "v([0-9]+)\.([0-9]+)\.([0-9]+)"}
 
   - name: "registry.k8s.io/go-runner: dependents"
-    version: v2.4.0-go1.24rc1-bookworm.0
+    version: v2.4.0-go1.24rc2-bookworm.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
