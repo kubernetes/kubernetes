@@ -471,7 +471,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
-			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoT(), func(req *http.Request) bool {
+			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoTB(), func(req *http.Request) bool {
 				fmt.Fprintf(&proxyLogs, "Accepting %s to %s\n", req.Method, req.Host)
 				return true
 			}))
