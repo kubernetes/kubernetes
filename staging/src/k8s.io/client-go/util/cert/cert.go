@@ -90,11 +90,37 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 	return x509.ParseCertificate(certDERBytes)
 }
 
+// SelfSignedCertKeyOptions contains configuration parameters for generating self-signed certificates.
+type SelfSignedCertKeyOptions struct {
+	// Host is required, and identifies the host of the serving certificate. Can be a DNS name or IP address.
+	Host string
+	// AlternateIPs is optional, and identifies additional IPs the serving certificate should be valid for.
+	AlternateIPs []net.IP
+	// AlternateDNS is optional, and identifies additional DNS names the serving certificate should be valid for.
+	AlternateDNS []string
+
+	// MaxAge controls the duration of the issued certificate.
+	// Defaults to 1 year if unset.
+	// Ignored if FixtureDirectory is set.
+	MaxAge time.Duration
+
+	// FixtureDirectory is intended for use in tests.
+	// If non-empty, it is a directory path which can contain pre-generated certs. The format is:
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.crt
+	// <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.key
+	// Certs/keys not existing in that directory are created with a duration of 100 years.
+	FixtureDirectory string
+}
+
 // GenerateSelfSignedCertKey creates a self-signed certificate and key for the given host.
 // Host may be an IP or a DNS name
 // You may also specify additional subject alt names (either ip or dns names) for the certificate.
 func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS []string) ([]byte, []byte, error) {
-	return GenerateSelfSignedCertKeyWithFixtures(host, alternateIPs, alternateDNS, "")
+	return GenerateSelfSignedCertKeyWithOptions(SelfSignedCertKeyOptions{
+		Host:         host,
+		AlternateIPs: alternateIPs,
+		AlternateDNS: alternateDNS,
+	})
 }
 
 // GenerateSelfSignedCertKeyWithFixtures creates a self-signed certificate and key for the given host.
@@ -106,8 +132,26 @@ func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 // <host>_<ip>-<ip>_<alternateDNS>-<alternateDNS>.key
 // Certs/keys not existing in that directory are created.
 func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, alternateDNS []string, fixtureDirectory string) ([]byte, []byte, error) {
+	return GenerateSelfSignedCertKeyWithOptions(SelfSignedCertKeyOptions{
+		Host:             host,
+		AlternateIPs:     alternateIPs,
+		AlternateDNS:     alternateDNS,
+		FixtureDirectory: fixtureDirectory,
+	})
+}
+
+// GenerateSelfSignedCertKeyWithOptions generates a self-signed certificate and key based on the provided options.
+func GenerateSelfSignedCertKeyWithOptions(opts SelfSignedCertKeyOptions) ([]byte, []byte, error) {
+	host := opts.Host
+	alternateIPs := opts.AlternateIPs
+	alternateDNS := opts.AlternateDNS
+	fixtureDirectory := opts.FixtureDirectory
+	maxAge := opts.MaxAge
+	if maxAge == 0 {
+		maxAge = 365 * 24 * time.Hour
+	}
+
 	validFrom := time.Now().Add(-time.Hour) // valid an hour earlier to avoid flakes due to clock skew
-	maxAge := time.Hour * 24 * 365          // one year self-signed certs
 
 	baseName := fmt.Sprintf("%s_%s_%s", host, strings.Join(ipsToStrings(alternateIPs), "-"), strings.Join(alternateDNS, "-"))
 	certFixturePath := filepath.Join(fixtureDirectory, baseName+".crt")
