@@ -26,25 +26,14 @@ import (
 	"net/http/httputil"
 	"sync"
 	"testing"
-
-	"github.com/onsi/ginkgo/v2"
 )
-
-type TB interface {
-	Logf(format string, args ...any)
-}
 
 // NewHTTPProxyHandler returns a new HTTPProxyHandler. It accepts an optional
 // hook which is called early in the handler to export request state. If the
 // hook returns false, the handler returns immediately with a server error.
-func NewHTTPProxyHandler(t TB, hook func(req *http.Request) bool) *HTTPProxyHandler {
-	// Ensure that this is only used in tests. This code has not been security
-	// reviewed.
-	switch t.(type) {
-	case testing.TB, ginkgo.GinkgoTInterface:
-	default:
-		panic("t is not a known test interface")
-	}
+// Ensure that this is only used in tests. This code has not been security
+// reviewed.
+func NewHTTPProxyHandler(t testing.TB, hook func(req *http.Request) bool) *HTTPProxyHandler {
 	h := &HTTPProxyHandler{
 		hook: hook,
 		httpProxy: httputil.ReverseProxy{
@@ -65,7 +54,7 @@ type HTTPProxyHandler struct {
 	hook        func(r *http.Request) bool
 	// httpProxy is the reverse proxy we use for standard http proxy requests.
 	httpProxy httputil.ReverseProxy
-	t         TB
+	t         testing.TB
 }
 
 // ServeHTTP handles an HTTP proxy request.
