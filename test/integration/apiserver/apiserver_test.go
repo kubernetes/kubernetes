@@ -260,7 +260,7 @@ func TestCacheControl(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -306,7 +306,7 @@ func TestHSTS(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3320,7 +3320,7 @@ func TestAllowedEmulationVersions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+"/", nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3383,7 +3383,7 @@ func TestEnableEmulationVersion(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3405,7 +3405,7 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
 		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
-		[]string{"--emulated-version=kube=1.31", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
+		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3445,7 +3445,69 @@ func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != tc.expectedStatusCode {
+				t.Errorf("expect status code: %d, got : %d\n", tc.expectedStatusCode, resp.StatusCode)
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+		})
+	}
+}
+
+func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	server := kubeapiservertesting.StartTestServerOrDie(t,
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
+		[]string{"--emulated-version=kube=1.31", "--runtime-config-emulation-forward-compatible=true", "--runtime-config=api/beta=true,networking.k8s.io/v1=true"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	rt, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcs := []struct {
+		path               string
+		expectedStatusCode int
+	}{
+		{
+			path:               "/",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/apps/v1/deployments",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
+			expectedStatusCode: 200,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.path, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3499,7 +3561,7 @@ func TestDisableEmulationVersion(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

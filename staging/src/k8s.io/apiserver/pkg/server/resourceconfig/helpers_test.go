@@ -51,7 +51,9 @@ func TestParseRuntimeConfig(t *testing.T) {
 				return newFakeAPIResourceConfigSource()
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
-				return newFakeAPIResourceConfigSource()
+				config := newFakeAPIResourceConfigSource()
+				config.ExplicitlyEnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				return config
 			},
 			expectedEnabledAPIs: defaultFakeEnabledResources(),
 			err:                 true,
@@ -102,6 +104,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
+				config.ExplicitlyEnableVersions(appsv1.SchemeGroupVersion)
 				return config
 			},
 			expectedEnabledAPIs: defaultFakeEnabledResources(),
@@ -117,7 +120,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableVersions(apiv1GroupVersion)
+				config.ExplicitlyDisableVersions(apiv1GroupVersion)
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -178,6 +181,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
+				config.ExplicitlyEnableVersions(apiv1GroupVersion)
 				config.DisableVersions(appsv1.SchemeGroupVersion)
 				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
@@ -202,7 +206,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.EnableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyEnableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -224,7 +228,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"))
+				config.ExplicitlyDisableResources(extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -246,7 +250,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
+				config.ExplicitlyDisableVersions(extensionsapiv1beta1.SchemeGroupVersion)
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -268,7 +272,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyDisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -315,7 +319,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyEnableVersions(appsv1.SchemeGroupVersion)
+				config.ExplicitlyDisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -339,8 +344,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableVersions(appsv1.SchemeGroupVersion)
-				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyDisableVersions(appsv1.SchemeGroupVersion)
+				config.ExplicitlyEnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -365,7 +370,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyDisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -391,7 +396,7 @@ func TestParseRuntimeConfig(t *testing.T) {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(apiv1.SchemeGroupVersion)
 				config.DisableVersions(appsv1.SchemeGroupVersion)
-				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyEnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -417,8 +422,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(apiv1.SchemeGroupVersion)
-				config.EnableVersions(appsv1.SchemeGroupVersion)
-				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyEnableVersions(appsv1.SchemeGroupVersion)
+				config.ExplicitlyDisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -445,8 +450,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
 				config.DisableVersions(apiv1.SchemeGroupVersion)
-				config.DisableVersions(appsv1.SchemeGroupVersion)
-				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyDisableVersions(appsv1.SchemeGroupVersion)
+				config.ExplicitlyEnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -471,8 +476,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.EnableVersions(appsv1.SchemeGroupVersion)
-				config.DisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyEnableVersions(appsv1.SchemeGroupVersion)
+				config.ExplicitlyDisableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -497,8 +502,8 @@ func TestParseRuntimeConfig(t *testing.T) {
 			},
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := newFakeAPIResourceConfigSource()
-				config.DisableVersions(appsv1.SchemeGroupVersion)
-				config.EnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
+				config.ExplicitlyDisableVersions(appsv1.SchemeGroupVersion)
+				config.ExplicitlyEnableResources(appsv1.SchemeGroupVersion.WithResource("deployments"))
 				return config
 			},
 			expectedEnabledAPIs: map[schema.GroupVersionResource]bool{
@@ -638,7 +643,7 @@ func TestEmulationForwardCompatibleResourceConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := serverstore.NewResourceConfig()
 				config.EnableVersions(v2beta1, v1, v2)
-				config.DisableVersions(v2beta2)
+				config.ExplicitlyDisableVersions(v2beta2)
 				return config
 			},
 			err: false,
@@ -701,7 +706,7 @@ func TestEmulationForwardCompatibleResourceConfig(t *testing.T) {
 			expectedAPIConfig: func() *serverstore.ResourceConfig {
 				config := serverstore.NewResourceConfig()
 				config.EnableResources(v2beta1.WithResource("testtype1"), v1.WithResource("testtype1"), v2.WithResource("testtype1"))
-				config.DisableResources(v2beta2.WithResource("testtype1"))
+				config.ExplicitlyDisableResources(v2beta2.WithResource("testtype1"))
 				return config
 			},
 			err: false,

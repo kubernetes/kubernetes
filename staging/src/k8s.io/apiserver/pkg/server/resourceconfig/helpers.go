@@ -182,11 +182,11 @@ func applyVersionAndResourcePreferences(
 	for _, versionPreference := range versionPreferences {
 		if versionPreference.enabled {
 			// enable the groupVersion for "group/version=true"
-			resourceConfig.EnableVersions(versionPreference.groupVersion)
+			resourceConfig.ExplicitlyEnableVersions(versionPreference.groupVersion)
 
 		} else {
 			// disable the groupVersion only for "group/version=false"
-			resourceConfig.DisableVersions(versionPreference.groupVersion)
+			resourceConfig.ExplicitlyDisableVersions(versionPreference.groupVersion)
 		}
 	}
 
@@ -194,9 +194,9 @@ func applyVersionAndResourcePreferences(
 	for _, resourcePreference := range resourcePreferences {
 		if resourcePreference.enabled {
 			// enable the resource for "group/version/resource=true"
-			resourceConfig.EnableResources(resourcePreference.groupVersionResource)
+			resourceConfig.ExplicitlyEnableResources(resourcePreference.groupVersionResource)
 		} else {
-			resourceConfig.DisableResources(resourcePreference.groupVersionResource)
+			resourceConfig.ExplicitlyDisableResources(resourcePreference.groupVersionResource)
 		}
 	}
 	return nil
@@ -253,10 +253,11 @@ func EmulationForwardCompatibleResourceConfig(
 		if !enabled {
 			continue
 		}
-		// EmulationForwardCompatibility is not applicable to alpha apis.
+		// emulation forward compatibility is not applicable to alpha apis.
 		if alphaPattern.MatchString(gv.Version) {
 			continue
 		}
+		// if a gv is enabled, all the versions with higher priority (all the versions before gv in PrioritizedVersionsForGroup) are also implicitly enabled for emulation forward compatibility.
 		for _, pgv := range registry.PrioritizedVersionsForGroup(gv.Group) {
 			if pgv.Version == gv.Version {
 				break
@@ -269,10 +270,11 @@ func EmulationForwardCompatibleResourceConfig(
 		if !enabled {
 			continue
 		}
-		// EmulationForwardCompatibility is not applicable to alpha apis.
+		// emulation forward compatibility is not applicable to alpha apis.
 		if alphaPattern.MatchString(gvr.Version) {
 			continue
 		}
+		// if a gvr is enabled, all the versions with the same resource name and higher priority (all the versions before gv in PrioritizedVersionsForGroup) are also implicitly enabled for emulation forward compatibility.
 		for _, pgv := range registry.PrioritizedVersionsForGroup(gvr.Group) {
 			if pgv.Version == gvr.Version {
 				break
