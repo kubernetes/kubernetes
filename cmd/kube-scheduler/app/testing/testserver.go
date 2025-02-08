@@ -59,7 +59,7 @@ type TestServer struct {
 // StartTestServer starts a kube-scheduler. A rest client config and a tear-down func,
 // and location of the tmpdir are returned.
 //
-// Note: we return a tear-down func instead of a stop channel because the later will leak temporary
+// Note: we return a tear-down func instead of a stop channel because the latter will leak temporary
 //
 //	files that because Golang testing's call to os.Exit will not give a stop channel go routine
 //	enough time to remove temporary files.

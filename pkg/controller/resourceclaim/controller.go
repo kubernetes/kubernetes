@@ -237,7 +237,7 @@ func (ec *Controller) enqueuePod(logger klog.Logger, obj interface{}, deleted bo
 			switch {
 			case err != nil:
 				// Either the claim was not created (nothing to do here) or
-				// the API changed. The later will also get reported elsewhere,
+				// the API changed. The latter will also get reported elsewhere,
 				// so here it's just a debug message.
 				logger.V(6).Info("Nothing to do for claim during pod change", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "err", err, "reason", reason)
 			case claimName != nil:

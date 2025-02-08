@@ -628,7 +628,7 @@ func CanUseIPVSProxier(ctx context.Context, ipvs utilipvs.Interface, ipsetver IP
 	// this address for a VS anyway we *will* mess up, but that would be an invalid configuration.
 	// If the user have configured the address to an interface on the node (but not a VS)
 	// then traffic will temporary be routed to ipvs during the probe and dropped.
-	// The later case is also and invalid configuration, but the traffic impact will be minor.
+	// The latter case is also an invalid configuration, but the traffic impact will be minor.
 	// This should not be a problem if users honors reserved addresses, but cut/paste
 	// from documentation is not unheard of, so the restriction to not use the TEST-NET-2 range
 	// must be documented.

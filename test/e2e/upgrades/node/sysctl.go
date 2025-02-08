@@ -45,7 +45,7 @@ type SysctlUpgradeTest struct {
 }
 
 // Setup creates two pods: one with safe sysctls, one with unsafe sysctls. It checks that the former
-// launched and the later is rejected.
+// launched and the latter is rejected.
 func (t *SysctlUpgradeTest) Setup(ctx context.Context, f *framework.Framework) {
 	t.validPod = t.verifySafeSysctlWork(ctx, f)
 	t.invalidPod = t.verifyUnsafeSysctlsAreRejected(ctx, f)
