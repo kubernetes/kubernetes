@@ -22,6 +22,7 @@ package preflight
 import (
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
+	utilsexec "k8s.io/utils/exec"
 )
 
 // Check validates if a user has elevated (administrator) privileges.
@@ -37,4 +38,11 @@ func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
 // No-op for Windows.
 func (mc MemCheck) Check() (warnings, errorList []error) {
 	return nil, nil
+}
+
+// addExecChecks adds checks that verify if certain binaries are in PATH.
+func addExecChecks(checks []Checker, execer utilsexec.Interface, _ string) []Checker {
+	// kubeadm requires xcopy to be present in PATH for copying etcd directories.
+	checks = append(checks, InPathCheck{executable: "xcopy", mandatory: true, exec: execer})
+	return checks
 }
