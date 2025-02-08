@@ -274,16 +274,18 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			IntroducedVersion: "1.7",
 		},
 		gvr("networking.k8s.io", "v1", "ipaddresses"): {
-			Stub:              `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
-			ExpectedEtcdPath:  "/registry/ipaddresses/192.168.2.3",
-			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
-			IntroducedVersion: "1.33",
+			Stub:                 `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath:     "/registry/ipaddresses/192.168.2.3",
+			ExpectedGVK:          gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
+			IntroducedVersion:    "1.33",
+			RequiredForEmulation: true,
 		},
 		gvr("networking.k8s.io", "v1", "servicecidrs"): {
-			Stub:              `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
-			ExpectedEtcdPath:  "/registry/servicecidrs/range-b2",
-			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
-			IntroducedVersion: "1.33",
+			Stub:                 `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
+			ExpectedEtcdPath:     "/registry/servicecidrs/range-b2",
+			ExpectedGVK:          gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
+			IntroducedVersion:    "1.33",
+			RequiredForEmulation: true,
 		},
 		// --
 
@@ -623,7 +625,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 
 	// Delete types no longer served or not yet added at a particular emulated version.
 	for key, data := range etcdStorageData {
-		if data.IntroducedVersion != "" && version.MustParse(data.IntroducedVersion).GreaterThan(version.MustParse(v)) {
+		if !data.RequiredForEmulation && data.IntroducedVersion != "" && version.MustParse(data.IntroducedVersion).GreaterThan(version.MustParse(v)) {
 			delete(etcdStorageData, key)
 		}
 
@@ -673,6 +675,10 @@ type StorageData struct {
 	ExpectedGVK       *schema.GroupVersionKind // The GVK that we expect this object to be stored as - leave this nil to use the default
 	IntroducedVersion string                   // The version that this type is introduced
 	RemovedVersion    string                   // The version that this type is removed. May be empty for stable resources
+	// RequiredForEmulation indicates if the api is required to start the api server when emulating an older version while all Beta features are enabled.
+	// If true, it would not be deleted even if the IntroducedVersion is later than the emulation version.
+	// This is needed when a feature is Beta at the emulation version, and GA at the binary version while the binary has started using the GA api.
+	RequiredForEmulation bool
 }
 
 // Prerequisite contains information required to create a resource (but not verify it)

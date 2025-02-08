@@ -182,11 +182,11 @@ func applyVersionAndResourcePreferences(
 	for _, versionPreference := range versionPreferences {
 		if versionPreference.enabled {
 			// enable the groupVersion for "group/version=true"
-			resourceConfig.EnableVersions(versionPreference.groupVersion)
+			resourceConfig.ExplicitlyEnableVersions(versionPreference.groupVersion)
 
 		} else {
 			// disable the groupVersion only for "group/version=false"
-			resourceConfig.DisableVersions(versionPreference.groupVersion)
+			resourceConfig.ExplicitlyDisableVersions(versionPreference.groupVersion)
 		}
 	}
 
@@ -194,9 +194,9 @@ func applyVersionAndResourcePreferences(
 	for _, resourcePreference := range resourcePreferences {
 		if resourcePreference.enabled {
 			// enable the resource for "group/version/resource=true"
-			resourceConfig.EnableResources(resourcePreference.groupVersionResource)
+			resourceConfig.ExplicitlyEnableResources(resourcePreference.groupVersionResource)
 		} else {
-			resourceConfig.DisableResources(resourcePreference.groupVersionResource)
+			resourceConfig.ExplicitlyDisableResources(resourcePreference.groupVersionResource)
 		}
 	}
 	return nil
