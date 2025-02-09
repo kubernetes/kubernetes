@@ -102,7 +102,9 @@ func (a *APIServer) Start(ctx context.Context) error {
 	go func() {
 		defer close(errCh)
 		defer cancel(errors.New("shutting down")) // Calling Stop is optional, but cancel always should be invoked.
-		completedOptions, err := o.Complete(ctx)
+		// Build flag sets and store them
+		namedFlagSets := o.Flags()
+		completedOptions, err := o.Complete(ctx, &namedFlagSets)
 		if err != nil {
 			errCh <- fmt.Errorf("set apiserver default options error: %w", err)
 			return

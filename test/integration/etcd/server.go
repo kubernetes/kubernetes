@@ -135,7 +135,9 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	}
 	feature.DefaultMutableFeatureGate.AddMetrics()
 
-	completedOptions, err := opts.Complete(tCtx)
+	// Build flag sets and store them
+	namedFlagSets := opts.Flags()
+	completedOptions, err := opts.Complete(tCtx, &namedFlagSets)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -185,7 +185,9 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	}
 	utilfeature.DefaultMutableFeatureGate.AddMetrics()
 
-	completedOptions, err := opts.Complete(ctx)
+	// Build flag sets and store them
+	namedFlagSets := opts.Flags()
+	completedOptions, err := opts.Complete(ctx, &namedFlagSets)
 	if err != nil {
 		t.Fatal(err)
 	}

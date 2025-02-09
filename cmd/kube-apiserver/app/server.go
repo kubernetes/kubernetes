@@ -97,8 +97,10 @@ cluster's shared state through which all other components interact.`,
 			}
 			cliflag.PrintFlags(fs)
 
+			// Build flag sets and store them
+			namedFlagSets := s.Flags()
 			// set default options
-			completedOptions, err := s.Complete(ctx)
+			completedOptions, err := s.Complete(ctx, &namedFlagSets)
 			if err != nil {
 				return err
 			}
@@ -122,11 +124,14 @@ cluster's shared state through which all other components interact.`,
 	}
 	cmd.SetContext(ctx)
 
+	// Build our one, final NamedFlagSets
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	options.AddCustomGlobalFlags(namedFlagSets.FlagSet("generic"))
+
+	// Attach these namedFlagSets to our command's FlagSet
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}

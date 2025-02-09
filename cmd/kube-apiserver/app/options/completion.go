@@ -23,7 +23,9 @@ import (
 	"strings"
 
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	cliflag "k8s.io/component-base/cli/flag"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
+	"k8s.io/component-base/zpages/flagz"
 	netutils "k8s.io/utils/net"
 
 	cp "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
@@ -46,7 +48,7 @@ type CompletedOptions struct {
 
 // Complete set default ServerRunOptions.
 // Should be called after kube-apiserver flags parsed.
-func (s *ServerRunOptions) Complete(ctx context.Context) (CompletedOptions, error) {
+func (s *ServerRunOptions) Complete(ctx context.Context, namedFlagSets *cliflag.NamedFlagSets) (CompletedOptions, error) {
 	if s == nil {
 		return CompletedOptions{completedOptions: &completedOptions{}}, nil
 	}
@@ -57,7 +59,12 @@ func (s *ServerRunOptions) Complete(ctx context.Context) (CompletedOptions, erro
 	if err != nil {
 		return CompletedOptions{}, err
 	}
-	controlplane, err := s.Options.Complete(ctx, s.Flags(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
+
+	// Store the parsed flag values in Options.Flagz using the proper reader type
+	s.Options.Flagz = flagz.NamedFlagSetsReader{FlagSets: *namedFlagSets}
+
+	// Pass the pointer directly to s.Options.Complete
+	controlplane, err := s.Options.Complete(ctx, *namedFlagSets, []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP})
 	if err != nil {
 		return CompletedOptions{}, err
 	}
