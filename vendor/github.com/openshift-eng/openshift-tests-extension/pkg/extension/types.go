@@ -17,6 +17,8 @@ type Extension struct {
 	// Suites that the extension wants to advertise/participate in.
 	Suites []Suite `json:"suites"`
 
+	Images []Image `json:"images"`
+
 	// Private data
 	specs         extensiontests.ExtensionTestSpecs
 	obsoleteTests sets.Set[string]
@@ -52,4 +54,11 @@ type Suite struct {
 	Parents []string `json:"parents,omitempty"`
 	// Qualifiers are CEL expressions that are OR'd together for test selection that are members of the suite.
 	Qualifiers []string `json:"qualifiers,omitempty"`
+}
+
+type Image struct {
+	Index    int    `json:"index"`
+	Registry string `json:"registry"`
+	Name     string `json:"name"`
+	Version  string `json:"version"`
 }

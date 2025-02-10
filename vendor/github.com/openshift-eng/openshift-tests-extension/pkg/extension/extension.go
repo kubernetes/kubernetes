@@ -125,6 +125,11 @@ func (e *Extension) AddSuite(suite Suite) *Extension {
 	return e
 }
 
+func (e *Extension) RegisterImage(image Image) *Extension {
+	e.Images = append(e.Images, image)
+	return e
+}
+
 func (e *Extension) FindSpecsByName(names ...string) (et.ExtensionTestSpecs, error) {
 	var specs et.ExtensionTestSpecs
 	var notFound []string
