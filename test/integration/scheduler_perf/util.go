@@ -303,8 +303,8 @@ func dataFilename(destFile string) (string, error) {
 }
 
 type labelValues struct {
-	label  string
-	values []string
+	Label  string
+	Values []string
 }
 
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
@@ -380,13 +380,13 @@ func uniqueLVCombos(lvs []*labelValues) []map[string]string {
 	results := make([]map[string]string, 0)
 
 	current := lvs[0]
-	for _, value := range current.values {
+	for _, value := range current.Values {
 		for _, combo := range remainingCombos {
 			newCombo := make(map[string]string, len(combo)+1)
 			for k, v := range combo {
 				newCombo[k] = v
 			}
-			newCombo[current.label] = value
+			newCombo[current.Label] = value
 			results = append(results, newCombo)
 		}
 	}
