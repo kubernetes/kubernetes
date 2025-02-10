@@ -24,6 +24,11 @@ limitations under the License.
 //
 // A list of changes since v1beta3:
 //
+// v1.33:
+//   - Add an `EtcdUpgrade` field into `UpgradeConfiguration.Plan` that can be used to control whether the etcd upgrade plan
+//     should be displayed.
+//
+// v1.31:
 //   - Support custom environment variables in control plane components under `ClusterConfiguration`.
 //     Use `APIServer.ExtraEnvs`, `ControllerManager.ExtraEnvs`, `Scheduler.ExtraEnvs`, `Etcd.Local.ExtraEnvs`.
 //   - The `ResetConfiguration` API type is now supported in v1beta4. Users are able to reset a node by passing
