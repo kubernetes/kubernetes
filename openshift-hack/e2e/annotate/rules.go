@@ -185,9 +185,6 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-45359
 			`\[Feature:RecoverVolumeExpansionFailure\]`,
-
-			// https://issues.redhat.com/browse/OCPBUGS-46477
-			`\[sig-storage\] In-tree Volumes \[Driver: azure-file\]`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
