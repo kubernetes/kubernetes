@@ -132,6 +132,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.NodeAllocatableUpdatePeriodSeconds != nil {
+		in, out := &in.NodeAllocatableUpdatePeriodSeconds, &out.NodeAllocatableUpdatePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
