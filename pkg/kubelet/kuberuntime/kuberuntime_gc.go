@@ -25,12 +25,13 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
+	"k8s.io/klog/v2"
+
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -366,14 +367,10 @@ func (cgc *containerGC) evictPodLogsDirectories(ctx context.Context, allSourcesR
 	return nil
 }
 
-// GarbageCollect removes dead containers using the specified container gc policy.
-// Note that gc policy is not applied to sandboxes. Sandboxes are only removed when they are
-// not ready and containing no containers.
+// GarbageCollect removes dead containers and sandboxes.
 //
 // GarbageCollect consists of the following steps:
-// * gets evictable containers which are not active and created more than gcPolicy.MinAge ago.
-// * removes oldest dead containers for each pod by enforcing gcPolicy.MaxPerPodContainer.
-// * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
+// * gets evictable containers which are not active(only the most recent container is kept per evictUnit).
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
 func (cgc *containerGC) GarbageCollect(ctx context.Context, allSourcesReady bool, evictNonDeletedPods bool) error {
