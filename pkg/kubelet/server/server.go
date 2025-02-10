@@ -419,13 +419,6 @@ func (s *Server) InstallDefaultHandlers() {
 	checkers = append(checkers, s.extendedCheckers...)
 	healthz.InstallHandler(s.restfulCont, checkers...)
 
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
-		if s.flagz != nil {
-			s.addMetricsBucketMatcher("flagz")
-			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
-		}
-	}
-
 	slis.SLIMetricsWithReset{}.Install(s.restfulCont)
 
 	s.addMetricsBucketMatcher("pods")
@@ -590,6 +583,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 		s.addMetricsBucketMatcher("statusz")
 		statusz.Install(s.restfulCont, ComponentKubelet, statusz.NewRegistry())
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+		if s.flagz != nil {
+			s.addMetricsBucketMatcher("flagz")
+			flagz.Install(s.restfulCont, ComponentKubelet, s.flagz)
+		}
 	}
 
 	// The /runningpods endpoint is used for testing only.
