@@ -595,6 +595,12 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 
 	// We need to find suitable devices.
 	for _, pool := range alloc.pools {
+		// If the pool is not valid, then fail now. It's okay when pools of one driver
+		// are invalid if we allocate from some other pool, but it's not safe to
+		// allocated from an invalid pool.
+		if pool.IsInvalid {
+			return false, fmt.Errorf("pool %s is invalid: %s", pool.Pool, pool.InvalidReason)
+		}
 		for _, slice := range pool.Slices {
 			for deviceIndex := range slice.Spec.Devices {
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
@@ -613,13 +619,6 @@ func (alloc *allocator) allocateOne(r deviceIndices) (bool, error) {
 				if !selectable {
 					alloc.logger.V(7).Info("Device not selectable", "device", deviceID)
 					continue
-				}
-
-				// If the pool is not valid, then fail now. It's okay when pools of one driver
-				// are invalid if we allocate from some other pool, but it's not safe to
-				// allocated from an invalid pool.
-				if pool.IsInvalid {
-					return false, fmt.Errorf("pool %s is invalid: %s", pool.Pool, pool.InvalidReason)
 				}
 
 				// Finally treat as allocated and move on to the next device.
