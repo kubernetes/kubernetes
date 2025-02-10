@@ -347,7 +347,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 	successCase := []struct {
 		name        string
 		containers  []v1.Container
-		accumulator *sets.String
+		accumulator *sets.Set[string]
 		fldPath     *field.Path
 	}{{
 		name: "HostPort is not allocated while containers use the same port with different protocol",
@@ -362,7 +362,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 				Protocol: v1.ProtocolTCP,
 			}},
 		}},
-		accumulator: &sets.String{},
+		accumulator: &sets.Set[string]{},
 		fldPath:     field.NewPath("spec", "containers"),
 	}, {
 		name: "HostPort is not allocated while containers use different ports",
@@ -377,7 +377,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 				Protocol: v1.ProtocolUDP,
 			}},
 		}},
-		accumulator: &sets.String{},
+		accumulator: &sets.Set[string]{},
 		fldPath:     field.NewPath("spec", "containers"),
 	}}
 	for _, tc := range successCase {
@@ -390,7 +390,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 	errorCase := []struct {
 		name        string
 		containers  []v1.Container
-		accumulator *sets.String
+		accumulator *sets.Set[string]
 		fldPath     *field.Path
 	}{{
 		name: "HostPort is already allocated while containers use the same port with UDP",
@@ -405,7 +405,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 				Protocol: v1.ProtocolUDP,
 			}},
 		}},
-		accumulator: &sets.String{},
+		accumulator: &sets.Set[string]{},
 		fldPath:     field.NewPath("spec", "containers"),
 	}, {
 		name: "HostPort is already allocated",
@@ -420,7 +420,7 @@ func TestAccumulateUniqueHostPorts(t *testing.T) {
 				Protocol: v1.ProtocolUDP,
 			}},
 		}},
-		accumulator: &sets.String{"8080/UDP": sets.Empty{}},
+		accumulator: &sets.Set[string]{"8080/UDP": sets.Empty{}},
 		fldPath:     field.NewPath("spec", "containers"),
 	}}
 	for _, tc := range errorCase {
