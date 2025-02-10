@@ -140,25 +140,25 @@ var (
 		Metrics: map[string][]*labelValues{
 			"scheduler_framework_extension_point_duration_seconds": {
 				{
-					label:  extensionPointsLabelName,
-					values: metrics.ExtentionPoints,
+					Label:  extensionPointsLabelName,
+					Values: metrics.ExtentionPoints,
 				},
 			},
 			"scheduler_scheduling_attempt_duration_seconds": {
 				{
-					label:  resultLabelName,
-					values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
+					Label:  resultLabelName,
+					Values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
 				},
 			},
 			"scheduler_pod_scheduling_duration_seconds": nil,
 			"scheduler_plugin_execution_duration_seconds": {
 				{
-					label:  pluginLabelName,
-					values: PluginNames,
+					Label:  pluginLabelName,
+					Values: PluginNames,
 				},
 				{
-					label:  extensionPointsLabelName,
-					values: metrics.ExtentionPoints,
+					Label:  extensionPointsLabelName,
+					Values: metrics.ExtentionPoints,
 				},
 			},
 		},
@@ -167,18 +167,18 @@ var (
 	qHintMetrics = map[string][]*labelValues{
 		"scheduler_queueing_hint_execution_duration_seconds": {
 			{
-				label:  pluginLabelName,
-				values: PluginNames,
+				Label:  pluginLabelName,
+				Values: PluginNames,
 			},
 			{
-				label:  eventLabelName,
-				values: schedframework.AllClusterEventLabels(),
+				Label:  eventLabelName,
+				Values: schedframework.AllClusterEventLabels(),
 			},
 		},
 		"scheduler_event_handling_duration_seconds": {
 			{
-				label:  eventLabelName,
-				values: schedframework.AllClusterEventLabels(),
+				Label:  eventLabelName,
+				Values: schedframework.AllClusterEventLabels(),
 			},
 		},
 	}
