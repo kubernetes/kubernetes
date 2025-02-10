@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"math/rand"
 	"net"
 	"strconv"
@@ -655,23 +657,25 @@ func (j *TestJig) waitForCondition(ctx context.Context, timeout time.Duration, m
 	return service, nil
 }
 
-// newRCTemplate returns the default v1.ReplicationController object for
-// this j, but does not actually create the RC.  The default RC has the same
+// newDeploymentTemplate returns the default appsv1.Deployment object for
+// this j, but does not actually create the Deployment. The default Deployment has the same
 // name as the j and runs the "netexec" container.
-func (j *TestJig) newRCTemplate() *v1.ReplicationController {
+func (j *TestJig) newDeploymentTemplate() *appsv1.Deployment {
 	var replicas int32 = 1
 	var grace int64 = 3 // so we don't race with kube-proxy when scaling up/down
 
-	rc := &v1.ReplicationController{
+	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: j.Namespace,
 			Name:      j.Name,
 			Labels:    j.Labels,
 		},
-		Spec: v1.ReplicationControllerSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
-			Selector: j.Labels,
-			Template: &v1.PodTemplateSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: j.Labels,
+			},
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: j.Labels,
 				},
@@ -697,22 +701,22 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 			},
 		},
 	}
-	return rc
+	return deployment
 }
 
-// AddRCAntiAffinity adds AntiAffinity to the given ReplicationController.
-func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
+// AddDeploymentAntiAffinity adds AntiAffinity to the given Deployment.
+func (j *TestJig) AddDeploymentAntiAffinity(deployment *appsv1.Deployment) {
 	var replicas int32 = 2
 
-	rc.Spec.Replicas = &replicas
-	if rc.Spec.Template.Spec.Affinity == nil {
-		rc.Spec.Template.Spec.Affinity = &v1.Affinity{}
+	deployment.Spec.Replicas = &replicas
+	if deployment.Spec.Template.Spec.Affinity == nil {
+		deployment.Spec.Template.Spec.Affinity = &v1.Affinity{}
 	}
-	if rc.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
-		rc.Spec.Template.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
+	if deployment.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
+		deployment.Spec.Template.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
 	}
-	rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-		rc.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+	deployment.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+		deployment.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 		v1.PodAffinityTerm{
 			LabelSelector: &metav1.LabelSelector{MatchLabels: j.Labels},
 			Namespaces:    nil,
@@ -720,9 +724,9 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 		})
 }
 
-// CreatePDB returns a PodDisruptionBudget for the given ReplicationController, or returns an error if a PodDisruptionBudget isn't ready
-func (j *TestJig) CreatePDB(ctx context.Context, rc *v1.ReplicationController) (*policyv1.PodDisruptionBudget, error) {
-	pdb := j.newPDBTemplate(rc)
+// CreatePDB returns a PodDisruptionBudget for the given Deployment, or returns an error if a PodDisruptionBudget isn't ready
+func (j *TestJig) CreatePDB(ctx context.Context, deployment *appsv1.Deployment) (*policyv1.PodDisruptionBudget, error) {
+	pdb := j.newPDBTemplate(deployment)
 	newPdb, err := j.Client.PolicyV1().PodDisruptionBudgets(j.Namespace).Create(ctx, pdb, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
@@ -736,8 +740,8 @@ func (j *TestJig) CreatePDB(ctx context.Context, rc *v1.ReplicationController) (
 
 // newPDBTemplate returns the default policyv1.PodDisruptionBudget object for
 // this j, but does not actually create the PDB.  The default PDB specifies a
-// MinAvailable of N-1 and matches the pods created by the RC.
-func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisruptionBudget {
+// MinAvailable of N-1 and matches the pods created by the Deployment.
+func (j *TestJig) newPDBTemplate(rc *appsv1.Deployment) *policyv1.PodDisruptionBudget {
 	minAvailable := intstr.FromInt32(*rc.Spec.Replicas - 1)
 
 	pdb := &policyv1.PodDisruptionBudget{
@@ -755,25 +759,25 @@ func (j *TestJig) newPDBTemplate(rc *v1.ReplicationController) *policyv1.PodDisr
 	return pdb
 }
 
-// Run creates a ReplicationController and Pod(s) and waits for the
-// Pod(s) to be running. Callers can provide a function to tweak the RC object
+// Run creates a Deployment and Pod(s) and waits for the
+// Pod(s) to be running. Callers can provide a function to tweak the Deployment object
 // before it is created.
-func (j *TestJig) Run(ctx context.Context, tweak func(rc *v1.ReplicationController)) (*v1.ReplicationController, error) {
-	rc := j.newRCTemplate()
+func (j *TestJig) Run(ctx context.Context, tweak func(rc *appsv1.Deployment)) (*appsv1.Deployment, error) {
+	deployment := j.newDeploymentTemplate()
 	if tweak != nil {
-		tweak(rc)
+		tweak(deployment)
 	}
-	result, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).Create(ctx, rc, metav1.CreateOptions{})
+
+	result, err := j.Client.AppsV1().Deployments(j.Namespace).Create(ctx, deployment, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create RC %q: %w", rc.Name, err)
+		return nil, fmt.Errorf("failed to create Deployment %q: %w", deployment.Name, err)
 	}
-	pods, err := j.waitForPodsCreated(ctx, int(*(rc.Spec.Replicas)))
+
+	err = e2edeployment.WaitForDeploymentComplete(j.Client, result)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create pods: %w", err)
+		return nil, fmt.Errorf("failed waiting for Deployment %q: %w", deployment.Name, err)
 	}
-	if err := j.waitForPodsReady(ctx, pods); err != nil {
-		return nil, fmt.Errorf("failed waiting for pods to be running: %w", err)
-	}
+
 	return result, nil
 }
 
