@@ -44,8 +44,6 @@ import (
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -1025,18 +1023,20 @@ func (j *TestJig) CheckServiceReachability(ctx context.Context, svc *v1.Service,
 
 // CreateServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
 func (j *TestJig) CreateServicePods(ctx context.Context, replica int) error {
-	config := testutils.RCConfig{
-		Client:       j.Client,
-		Name:         j.Name,
-		Image:        imageutils.GetE2EImage(imageutils.Agnhost),
-		Command:      []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"},
-		Namespace:    j.Namespace,
-		Labels:       j.Labels,
-		PollInterval: 3 * time.Second,
-		Timeout:      framework.PodReadyBeforeTimeout,
-		Replicas:     replica,
+	deploymentConfig := e2edeployment.NewDeployment(j.Name,
+		int32(replica),
+		j.Labels,
+		j.Name,
+		imageutils.GetE2EImage(imageutils.Agnhost),
+		appsv1.RecreateDeploymentStrategyType)
+	deploymentConfig.Spec.Template.Spec.Containers[0].Command = []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"}
+
+	deployment, err := j.Client.AppsV1().Deployments(j.Namespace).Create(ctx, deploymentConfig, metav1.CreateOptions{})
+	if err != nil {
+		return err
 	}
-	return e2erc.RunRC(ctx, config)
+
+	return e2edeployment.WaitForDeploymentComplete(j.Client, deployment)
 }
 
 // CreateSCTPServiceWithPort creates a new SCTP Service with given port based on the
