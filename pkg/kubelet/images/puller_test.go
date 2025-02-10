@@ -76,7 +76,7 @@ func (f *FakeImageService) GetImageSize(ctx context.Context, image container.Ima
 	return 0, nil
 }
 
-func Test_newParallelImagePuller(t *testing.T) {
+func TestNewParallelImagePuller(t *testing.T) {
 	maxImagePullRequests := int32(2)
 	totalImages := 10
 	var counter atomic.Int32
