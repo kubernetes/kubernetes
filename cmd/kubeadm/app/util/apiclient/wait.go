@@ -24,8 +24,10 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"text/template"
 	"time"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -50,6 +52,27 @@ const (
 	// By default, for kube-api-server, kubeadm does not apply a --bind-address flag.
 	// Check --advertise-address instead.
 	argAdvertiseAddress = "advertise-address"
+)
+
+var (
+	controlPlaneFailTempl = template.Must(template.New("init").Parse(dedent.Dedent(`
+	A control plane component may have crashed or exited when started by the container runtime.
+	To troubleshoot, list all containers using your preferred container runtimes CLI.
+	Here is one example how you may list all running Kubernetes containers by using crictl:
+		- 'crictl --runtime-endpoint {{ .Socket }} ps -a | grep kube | grep -v pause'
+		Once you have found the failing container, you can inspect its logs with:
+		- 'crictl --runtime-endpoint {{ .Socket }} logs CONTAINERID'
+`)))
+
+	kubeletFailMsg = dedent.Dedent(`
+	Unfortunately, an error has occurred, likely caused by:
+		- The kubelet is not running
+		- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
+
+	If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
+		- 'systemctl status kubelet'
+		- 'journalctl -xeu kubelet'
+`)
 )
 
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
@@ -495,4 +518,20 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 
 	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
 	return staticPodHash, nil
+}
+
+// PrintControlPlaneErrorHelpScreen prints help text on wait ControlPlane components errors.
+func PrintControlPlaneErrorHelpScreen(outputWriter io.Writer, criSocket string) {
+	context := struct {
+		Socket string
+	}{
+		Socket: criSocket,
+	}
+	_ = controlPlaneFailTempl.Execute(outputWriter, context)
+	fmt.Println("")
+}
+
+// PrintKubeletErrorHelpScreen prints help text on kubelet errors.
+func PrintKubeletErrorHelpScreen(outputWriter io.Writer) {
+	fmt.Fprintln(outputWriter, kubeletFailMsg)
 }

@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -48,21 +47,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-)
-
-var (
-	kubeadmJoinFailMsg = dedent.Dedent(`
-		Unfortunately, an error has occurred:
-			%v
-
-		This error is likely caused by:
-			- The kubelet is not running
-			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-
-		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
-			- 'systemctl status kubelet'
-			- 'journalctl -xeu kubelet'
-		`)
 )
 
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
@@ -328,13 +312,13 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 			return errors.New("could not convert the KubeletConfiguration to a typed object")
 		}
 		if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
-			fmt.Printf(kubeadmJoinFailMsg, err)
-			return err
+			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
+			return errors.Wrap(err, "failed while waiting for the kubelet to start")
 		}
 
 		if err := waitForTLSBootstrappedClient(cfg.Timeouts.TLSBootstrap.Duration); err != nil {
-			fmt.Printf(kubeadmJoinFailMsg, err)
-			return err
+			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
+			return errors.Wrap(err, "failed while waiting for TLS bootstrap")
 		}
 
 		// When we know the /etc/kubernetes/kubelet.conf file is available, get the client

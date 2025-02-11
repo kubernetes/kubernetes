@@ -80,7 +80,8 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 	if err = waiter.WaitForControlPlaneComponents(pods,
 		data.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
-		return err
+		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)
+		return errors.Wrap(err, "failed while waiting for the control plane to start")
 	}
 
 	return nil
