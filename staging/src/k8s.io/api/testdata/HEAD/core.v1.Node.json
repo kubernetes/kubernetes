@@ -108,7 +108,10 @@
       "kubeletVersion": "kubeletVersionValue",
       "kubeProxyVersion": "kubeProxyVersionValue",
       "operatingSystem": "operatingSystemValue",
-      "architecture": "architectureValue"
+      "architecture": "architectureValue",
+      "swap": {
+        "capacity": 1
+      }
     },
     "images": [
       {
