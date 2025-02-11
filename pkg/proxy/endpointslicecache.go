@@ -25,7 +25,9 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -210,17 +212,25 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		serving := endpoint.Conditions.Serving == nil || *endpoint.Conditions.Serving
 		terminating := endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating
 
-		var zoneHints sets.Set[string]
-		if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
-			zoneHints = sets.New[string]()
-			for _, zone := range endpoint.Hints.ForZones {
-				zoneHints.Insert(zone.Name)
+		var zoneHints, nodeHints sets.Set[string]
+		if endpoint.Hints != nil {
+			if len(endpoint.Hints.ForZones) > 0 {
+				zoneHints = sets.New[string]()
+				for _, zone := range endpoint.Hints.ForZones {
+					zoneHints.Insert(zone.Name)
+				}
+			}
+			if len(endpoint.Hints.ForNodes) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+				nodeHints = sets.New[string]()
+				for _, node := range endpoint.Hints.ForNodes {
+					nodeHints.Insert(node.Name)
+				}
 			}
 		}
 
 		endpointIP := utilnet.ParseIPSloppy(endpoint.Addresses[0]).String()
 		endpointInfo := newBaseEndpointInfo(endpointIP, portNum, isLocal,
-			ready, serving, terminating, zoneHints)
+			ready, serving, terminating, zoneHints, nodeHints)
 
 		// This logic ensures we're deduplicating potential overlapping endpoints
 		// isLocal should not vary between matching endpoints, but if it does, we

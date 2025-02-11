@@ -358,6 +358,11 @@ func (info *endpointInfo) ZoneHints() sets.Set[string] {
 	return sets.Set[string]{}
 }
 
+// NodeHints returns the node hints for the endpoint.
+func (info *endpointInfo) NodeHints() sets.Set[string] {
+	return sets.Set[string]{}
+}
+
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
 func (info *endpointInfo) IP() string {
 	return info.ip

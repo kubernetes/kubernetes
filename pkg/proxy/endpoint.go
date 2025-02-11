@@ -46,8 +46,11 @@ type Endpoint interface {
 	IsTerminating() bool
 
 	// ZoneHints returns the zone hint for the endpoint. This is based on
-	// endpoint.hints.forZones[0].name in the EndpointSlice API.
+	// endpoint.hints.forZones[*].name in the EndpointSlice API.
 	ZoneHints() sets.Set[string]
+	// NodeHints returns the node hint for the endpoint. This is based on
+	// endpoint.hints.forNodes[*].name in the EndpointSlice API.
+	NodeHints() sets.Set[string]
 }
 
 // BaseEndpointInfo contains base information that defines an endpoint.
@@ -78,6 +81,9 @@ type BaseEndpointInfo struct {
 	// zoneHints represent the zone hints for the endpoint. This is based on
 	// endpoint.hints.forZones[*].name in the EndpointSlice API.
 	zoneHints sets.Set[string]
+	// nodeHints represent the node hints for the endpoint. This is based on
+	// endpoint.hints.forNodes[*].name in the EndpointSlice API.
+	nodeHints sets.Set[string]
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
@@ -119,12 +125,17 @@ func (info *BaseEndpointInfo) IsTerminating() bool {
 	return info.terminating
 }
 
-// ZoneHints returns the zone hint for the endpoint.
+// ZoneHints returns the zone hints for the endpoint.
 func (info *BaseEndpointInfo) ZoneHints() sets.Set[string] {
 	return info.zoneHints
 }
 
-func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating bool, zoneHints sets.Set[string]) *BaseEndpointInfo {
+// NodeHints returns the node hints for the endpoint.
+func (info *BaseEndpointInfo) NodeHints() sets.Set[string] {
+	return info.nodeHints
+}
+
+func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating bool, zoneHints, nodeHints sets.Set[string]) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		ip:          ip,
 		port:        port,
@@ -134,5 +145,6 @@ func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminati
 		serving:     serving,
 		terminating: terminating,
 		zoneHints:   zoneHints,
+		nodeHints:   nodeHints,
 	}
 }
