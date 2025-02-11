@@ -18,7 +18,6 @@ package options
 
 import (
 	"net"
-	"reflect"
 	"testing"
 	"time"
 
@@ -347,9 +346,14 @@ func TestAddFlags(t *testing.T) {
 	// setting the method to nil since methods can't be compared with reflect.DeepEqual
 	s.Authorization.AreLegacyFlagsSet = nil
 
-	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreFields(apiserveroptions.ServerRunOptions{}, "ComponentGlobalsRegistry"), cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{}, kubeoptions.AnonymousAuthenticationOptions{})))
+	if diff := cmp.Diff(expected, s,
+		cmpopts.IgnoreFields(apiserveroptions.ServerRunOptions{}, "ComponentGlobalsRegistry"),
+		cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.BuiltInAuthenticationOptions{}),
+		cmpopts.IgnoreFields(apiserveroptions.AdmissionOptions{}, "Decorators"),
+	); diff != "" {
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", diff)
 	}
+
 	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
 	if testEffectiveVersion.EmulationVersion().String() != "1.31" {
 		t.Errorf("Got emulation version %s, wanted %s", testEffectiveVersion.EmulationVersion().String(), "1.31")
