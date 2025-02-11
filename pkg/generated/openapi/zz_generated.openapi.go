@@ -64652,14 +64652,14 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"serializeImagePulls": {
 						SchemaProps: spec.SchemaProps{
-							Description: "serializeImagePulls when enabled, tells the Kubelet to pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version  < 1.9 or an Aufs storage backend. Issue #10959 has more details. Default: true",
+							Description: "serializeImagePulls when enabled, tells the Kubelet to pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version  < 1.9 or an Aufs storage backend. Issue #10959 has more details. Default: false",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
 					},
 					"maxParallelImagePulls": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MaxParallelImagePulls sets the maximum number of image pulls in parallel. This field cannot be set if SerializeImagePulls is true. Setting it to nil means no limit. Default: nil",
+							Description: "MaxParallelImagePulls sets the maximum number of image pulls in parallel. This field cannot be set if SerializeImagePulls is true. Setting it to nil means no limit. Default: 5",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},

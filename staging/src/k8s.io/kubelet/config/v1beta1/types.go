@@ -499,13 +499,13 @@ type KubeletConfiguration struct {
 	// at a time. We recommend *not* changing the default value on nodes that
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
-	// Default: true
+	// Default: false
 	// +optional
 	SerializeImagePulls *bool `json:"serializeImagePulls,omitempty"`
 	// MaxParallelImagePulls sets the maximum number of image pulls in parallel.
 	// This field cannot be set if SerializeImagePulls is true.
 	// Setting it to nil means no limit.
-	// Default: nil
+	// Default: 5
 	// +optional
 	MaxParallelImagePulls *int32 `json:"maxParallelImagePulls,omitempty"`
 	// evictionHard is a map of signal names to quantities that defines hard eviction

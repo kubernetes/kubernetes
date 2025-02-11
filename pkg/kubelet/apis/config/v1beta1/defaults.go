@@ -223,6 +223,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.KubeAPIBurst == 0 {
 		obj.KubeAPIBurst = 100
 	}
+	// maxParallelImagePulls is defaulted to 5 if not set
+	if obj.MaxParallelImagePulls == nil {
+		obj.MaxParallelImagePulls = ptr.To[int32](5)
+	}
 	if obj.SerializeImagePulls == nil {
 		// SerializeImagePulls is default to true when MaxParallelImagePulls
 		// is not set, and false when MaxParallelImagePulls is set.
