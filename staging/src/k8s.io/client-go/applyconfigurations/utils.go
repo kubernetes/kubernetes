@@ -1062,6 +1062,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsdiscoveryv1.EndpointPortApplyConfiguration{}
 	case discoveryv1.SchemeGroupVersion.WithKind("EndpointSlice"):
 		return &applyconfigurationsdiscoveryv1.EndpointSliceApplyConfiguration{}
+	case discoveryv1.SchemeGroupVersion.WithKind("ForNode"):
+		return &applyconfigurationsdiscoveryv1.ForNodeApplyConfiguration{}
 	case discoveryv1.SchemeGroupVersion.WithKind("ForZone"):
 		return &applyconfigurationsdiscoveryv1.ForZoneApplyConfiguration{}
 
@@ -1076,6 +1078,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsdiscoveryv1beta1.EndpointPortApplyConfiguration{}
 	case discoveryv1beta1.SchemeGroupVersion.WithKind("EndpointSlice"):
 		return &applyconfigurationsdiscoveryv1beta1.EndpointSliceApplyConfiguration{}
+	case discoveryv1beta1.SchemeGroupVersion.WithKind("ForNode"):
+		return &applyconfigurationsdiscoveryv1beta1.ForNodeApplyConfiguration{}
 	case discoveryv1beta1.SchemeGroupVersion.WithKind("ForZone"):
 		return &applyconfigurationsdiscoveryv1beta1.ForZoneApplyConfiguration{}
 

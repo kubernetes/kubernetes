@@ -12365,8 +12365,16 @@
     "io.k8s.api.discovery.v1.EndpointHints": {
       "description": "EndpointHints provides hints describing how an endpoint should be consumed.",
       "properties": {
+        "forNodes": {
+          "description": "forNodes indicates the node(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries. This is an Alpha feature and is only used when the PreferSameTrafficDistribution feature gate is enabled.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.discovery.v1.ForNode"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
         "forZones": {
-          "description": "forZones indicates the zone(s) this endpoint should be consumed by to enable topology aware routing.",
+          "description": "forZones indicates the zone(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.discovery.v1.ForZone"
           },
@@ -12483,6 +12491,19 @@
           "version": "v1"
         }
       ]
+    },
+    "io.k8s.api.discovery.v1.ForNode": {
+      "description": "ForNode provides information about which nodes should consume this endpoint.",
+      "properties": {
+        "name": {
+          "description": "name represents the name of the node.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
     },
     "io.k8s.api.discovery.v1.ForZone": {
       "description": "ForZone provides information about which zones should consume this endpoint.",

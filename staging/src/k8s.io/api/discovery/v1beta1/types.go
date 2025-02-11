@@ -167,12 +167,18 @@ type EndpointHints struct {
 	// This is an Alpha feature and is only used when the PreferSameTrafficDistribution
 	// feature gate is enabled.
 	// +listType=atomic
-	ForNodes []string `json:"forNodes,omitempty" protobuf:"bytes,2,name=forNodes"`
+	ForNodes []ForNode `json:"forNodes,omitempty" protobuf:"bytes,2,name=forNodes"`
 }
 
 // ForZone provides information about which zones should consume this endpoint.
 type ForZone struct {
 	// name represents the name of the zone.
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+}
+
+// ForNode provides information about which nodes should consume this endpoint.
+type ForNode struct {
+	// name represents the name of the node.
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
