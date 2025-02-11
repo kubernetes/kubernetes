@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 )
 
 const (
@@ -51,7 +52,8 @@ type VolumeCache interface {
 // VolumeCache stores all volumes used by Pods and their properties that the controller needs to track,
 // like SELinux labels and SELinuxChangePolicies.
 type volumeCache struct {
-	mutex sync.RWMutex
+	mutex             sync.RWMutex
+	seLinuxTranslator *translator.ControllerSELinuxTranslator
 	// All volumes of all existing Pods.
 	volumes map[v1.UniqueVolumeName]usedVolume
 }
@@ -59,9 +61,10 @@ type volumeCache struct {
 var _ VolumeCache = &volumeCache{}
 
 // NewVolumeLabelCache creates a new VolumeCache.
-func NewVolumeLabelCache() VolumeCache {
+func NewVolumeLabelCache(seLinuxTranslator *translator.ControllerSELinuxTranslator) VolumeCache {
 	return &volumeCache{
-		volumes: make(map[v1.UniqueVolumeName]usedVolume),
+		seLinuxTranslator: seLinuxTranslator,
+		volumes:           make(map[v1.UniqueVolumeName]usedVolume),
 	}
 }
 
@@ -137,7 +140,7 @@ func (c *volumeCache) AddVolume(logger klog.Logger, volumeName v1.UniqueVolumeNa
 				OtherPropertyValue: string(changePolicy),
 			})
 		}
-		if otherPodInfo.seLinuxLabel != label {
+		if c.seLinuxTranslator.Conflicts(otherPodInfo.seLinuxLabel, label) {
 			// Send conflict to both pods
 			conflicts = append(conflicts, Conflict{
 				PropertyName:       "SELinuxLabel",
@@ -248,7 +251,7 @@ func (c *volumeCache) SendConflicts(logger klog.Logger, ch chan<- Conflict) {
 						OtherPropertyValue: string(otherPodInfo.changePolicy),
 					}
 				}
-				if podInfo.seLinuxLabel != otherPodInfo.seLinuxLabel {
+				if c.seLinuxTranslator.Conflicts(podInfo.seLinuxLabel, otherPodInfo.seLinuxLabel) {
 					ch <- Conflict{
 						PropertyName:       "SELinuxLabel",
 						EventReason:        "SELinuxLabelConflict",

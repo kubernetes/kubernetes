@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 )
 
 func getTestLoggers(t *testing.T) (klog.Logger, klog.Logger) {
@@ -47,7 +48,8 @@ func sortConflicts(conflicts []Conflict) {
 // Delete all items in a bigger cache and check it's empty
 func TestVolumeCache_DeleteAll(t *testing.T) {
 	var podsToDelete []cache.ObjectName
-	c := NewVolumeLabelCache().(*volumeCache)
+	seLinuxTranslator := &translator.ControllerSELinuxTranslator{}
+	c := NewVolumeLabelCache(seLinuxTranslator).(*volumeCache)
 	logger, dumpLogger := getTestLoggers(t)
 
 	// Arrange: add a lot of volumes to the cache
@@ -110,42 +112,70 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			podNamespace: "ns1",
 			podName:      "pod1-mountOption",
 			volumeName:   "vol1",
-			label:        "label1",
+			label:        "system_u:system_r:label1",
 			changePolicy: v1.SELinuxChangePolicyMountOption,
 		},
 		{
 			podNamespace: "ns2",
 			podName:      "pod2-recursive",
 			volumeName:   "vol2",
-			label:        "label2",
+			label:        "system_u:system_r:label2",
 			changePolicy: v1.SELinuxChangePolicyRecursive,
 		},
 		{
 			podNamespace: "ns3",
 			podName:      "pod3-1",
 			volumeName:   "vol3", // vol3 is used by 2 pods with the same label + recursive policy
-			label:        "label3",
+			label:        "system_u:system_r:label3",
 			changePolicy: v1.SELinuxChangePolicyRecursive,
 		},
 		{
 			podNamespace: "ns3",
 			podName:      "pod3-2",
 			volumeName:   "vol3", // vol3 is used by 2 pods with the same label + recursive policy
-			label:        "label3",
+			label:        "system_u:system_r:label3",
 			changePolicy: v1.SELinuxChangePolicyRecursive,
 		},
 		{
 			podNamespace: "ns4",
 			podName:      "pod4-1",
 			volumeName:   "vol4", // vol4 is used by 2 pods with the same label + mount policy
-			label:        "label4",
+			label:        "system_u:system_r:label4",
 			changePolicy: v1.SELinuxChangePolicyMountOption,
 		},
 		{
 			podNamespace: "ns4",
 			podName:      "pod4-2",
 			volumeName:   "vol4", // vol4 is used by 2 pods with the same label + mount policy
-			label:        "label4",
+			label:        "system_u:system_r:label4",
+			changePolicy: v1.SELinuxChangePolicyMountOption,
+		},
+		{
+			podNamespace: "ns5",
+			podName:      "pod5",
+			volumeName:   "vol5", // vol5 has no user and role
+			label:        "::label5",
+			changePolicy: v1.SELinuxChangePolicyMountOption,
+		},
+		{
+			podNamespace: "ns6",
+			podName:      "pod6",
+			volumeName:   "vol6", // vol6 has no user
+			label:        ":system_r:label6",
+			changePolicy: v1.SELinuxChangePolicyMountOption,
+		},
+		{
+			podNamespace: "ns7",
+			podName:      "pod7",
+			volumeName:   "vol7", // vol7 has no user and role, but has categories
+			label:        "::label7:c0,c1",
+			changePolicy: v1.SELinuxChangePolicyMountOption,
+		},
+		{
+			podNamespace: "ns8",
+			podName:      "pod8",
+			volumeName:   "vol8", // vol has no label
+			label:        "",
 			changePolicy: v1.SELinuxChangePolicyMountOption,
 		},
 	}
@@ -163,7 +193,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "testns",
 				podName:      "testpod",
 				volumeName:   "vol-new",
-				label:        "label-new",
+				label:        "system_u:system_r:label-new",
 				changePolicy: v1.SELinuxChangePolicyMountOption,
 			},
 			expectedConflicts: nil,
@@ -175,7 +205,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "testns",
 				podName:      "testpod",
 				volumeName:   "vol-new",
-				label:        "label-new",
+				label:        "system_u:system_r:label-new",
 				changePolicy: v1.SELinuxChangePolicyMountOption,
 			},
 			expectedConflicts: nil,
@@ -187,7 +217,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "testns",
 				podName:      "testpod",
 				volumeName:   "vol1",
-				label:        "label1",
+				label:        "system_u:system_r:label1",
 				changePolicy: v1.SELinuxChangePolicyMountOption,
 			},
 			expectedConflicts: nil,
@@ -199,7 +229,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "testns",
 				podName:      "testpod",
 				volumeName:   "vol1",
-				label:        "label-new",
+				label:        "system_u:system_r:label-new",
 				changePolicy: v1.SELinuxChangePolicyMountOption,
 			},
 			expectedConflicts: []Conflict{
@@ -207,9 +237,9 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
-					PropertyValue:      "label-new",
+					PropertyValue:      "system_u:system_r:label-new",
 					OtherPod:           cache.ObjectName{Namespace: "ns1", Name: "pod1-mountOption"},
-					OtherPropertyValue: "label1",
+					OtherPropertyValue: "system_u:system_r:label1",
 				},
 			},
 		},
@@ -220,7 +250,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "testns",
 				podName:      "testpod",
 				volumeName:   "vol1",
-				label:        "label1",
+				label:        "system_u:system_r:label1",
 				changePolicy: v1.SELinuxChangePolicyRecursive,
 			},
 			expectedConflicts: []Conflict{
@@ -241,7 +271,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "testns",
 				podName:      "testpod",
 				volumeName:   "vol1",
-				label:        "label-new",
+				label:        "system_u:system_r:label-new",
 				changePolicy: v1.SELinuxChangePolicyRecursive,
 			},
 			expectedConflicts: []Conflict{
@@ -257,9 +287,9 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
-					PropertyValue:      "label-new",
+					PropertyValue:      "system_u:system_r:label-new",
 					OtherPod:           cache.ObjectName{Namespace: "ns1", Name: "pod1-mountOption"},
-					OtherPropertyValue: "label1",
+					OtherPropertyValue: "system_u:system_r:label1",
 				},
 			},
 		},
@@ -271,7 +301,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "ns2",
 				podName:      "pod2-recursive",
 				volumeName:   "vol2",                            // there is no other pod that uses vol2 -> change of policy and label is possible
-				label:        "label-new",                       // was label2 in the original pod2
+				label:        "system_u:system_r:label-new",     // was label2 in the original pod2
 				changePolicy: v1.SELinuxChangePolicyMountOption, // was Recursive in the original pod2
 			},
 			expectedConflicts: nil,
@@ -284,7 +314,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 				podNamespace: "ns3",
 				podName:      "pod3-1",
 				volumeName:   "vol3",                            // vol3 is used by pod3-2 with label3 and Recursive policy
-				label:        "label-new",                       // Technically, it's not possible to change a label of an existing pod, but we still check for conflicts
+				label:        "system_u:system_r:label-new",     // Technically, it's not possible to change a label of an existing pod, but we still check for conflicts
 				changePolicy: v1.SELinuxChangePolicyMountOption, // ChangePolicy change can happen when CSIDriver is updated from SELinuxMount: false to SELinuxMount: true
 			},
 			expectedConflicts: []Conflict{
@@ -300,18 +330,88 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: "ns3", Name: "pod3-1"},
-					PropertyValue:      "label-new",
+					PropertyValue:      "system_u:system_r:label-new",
 					OtherPod:           cache.ObjectName{Namespace: "ns3", Name: "pod3-2"},
-					OtherPropertyValue: "label3",
+					OtherPropertyValue: "system_u:system_r:label3",
 				},
 			},
+		},
+		{
+			name:        "existing volume in a new pod with existing policy and new incomparable label (missing user and role)",
+			initialPods: existingPods,
+			podToAdd: podWithVolume{
+				podNamespace: "testns",
+				podName:      "testpod",
+				volumeName:   "vol5",
+				label:        "system_u:system_r:label5",
+				changePolicy: v1.SELinuxChangePolicyMountOption,
+			},
+			expectedConflicts: []Conflict{},
+		},
+		{
+			name:        "existing volume in a new pod with conflicting policy with incomparable parts",
+			initialPods: existingPods,
+			podToAdd: podWithVolume{
+				podNamespace: "testns",
+				podName:      "testpod",
+				volumeName:   "vol5",
+				label:        "::label6",
+				changePolicy: v1.SELinuxChangePolicyMountOption,
+			},
+			expectedConflicts: []Conflict{
+				{
+					PropertyName:       "SELinuxLabel",
+					EventReason:        "SELinuxLabelConflict",
+					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
+					PropertyValue:      "::label6",
+					OtherPod:           cache.ObjectName{Namespace: "ns5", Name: "pod5"},
+					OtherPropertyValue: "::label5",
+				},
+			},
+		},
+		{
+			name:        "existing volume in a new pod with existing policy and new incomparable label (missing user)",
+			initialPods: existingPods,
+			podToAdd: podWithVolume{
+				podNamespace: "testns",
+				podName:      "testpod",
+				volumeName:   "vol6",
+				label:        "system_u::label6",
+				changePolicy: v1.SELinuxChangePolicyMountOption,
+			},
+			expectedConflicts: []Conflict{},
+		},
+		{
+			name:        "existing volume in a new pod with existing policy and new incomparable label (missing categories)",
+			initialPods: existingPods,
+			podToAdd: podWithVolume{
+				podNamespace: "testns",
+				podName:      "testpod",
+				volumeName:   "vol7",
+				label:        "system_u:system_r:label7",
+				changePolicy: v1.SELinuxChangePolicyMountOption,
+			},
+			expectedConflicts: []Conflict{},
+		},
+		{
+			name:        "existing volume in a new pod with existing policy and new incomparable label (missing everything)",
+			initialPods: existingPods,
+			podToAdd: podWithVolume{
+				podNamespace: "testns",
+				podName:      "testpod",
+				volumeName:   "vol8",
+				label:        "system_u:system_r:label8",
+				changePolicy: v1.SELinuxChangePolicyMountOption,
+			},
+			expectedConflicts: []Conflict{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, dumpLogger := getTestLoggers(t)
 			// Arrange: add initial pods to the cache
-			c := NewVolumeLabelCache().(*volumeCache)
+			seLinuxTranslator := &translator.ControllerSELinuxTranslator{}
+			c := NewVolumeLabelCache(seLinuxTranslator).(*volumeCache)
 			for _, podToAdd := range tt.initialPods {
 				conflicts := c.AddVolume(logger, podToAdd.volumeName, cache.ObjectName{Namespace: podToAdd.podNamespace, Name: podToAdd.podName}, podToAdd.label, podToAdd.changePolicy, "csiDriver1")
 				if len(conflicts) != 0 {
@@ -328,6 +428,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			sortConflicts(expectedConflicts)
 			if !reflect.DeepEqual(conflicts, expectedConflicts) {
 				t.Errorf("AddVolume returned unexpected conflicts: %+v", conflicts)
+				t.Logf("Expected conflicts: %+v", expectedConflicts)
 				c.dump(dumpLogger)
 			}
 			// Expect the pod + volume to be present in the cache
@@ -370,7 +471,8 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 }
 
 func TestVolumeCache_GetPodsForCSIDriver(t *testing.T) {
-	c := NewVolumeLabelCache().(*volumeCache)
+	seLinuxTranslator := &translator.ControllerSELinuxTranslator{}
+	c := NewVolumeLabelCache(seLinuxTranslator).(*volumeCache)
 	logger, dumpLogger := getTestLoggers(t)
 
 	existingPods := map[string][]podWithVolume{
