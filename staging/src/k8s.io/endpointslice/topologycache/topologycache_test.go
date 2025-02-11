@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestAddHints(t *testing.T) {
@@ -66,8 +66,8 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}},
 			}},
 		},
@@ -75,8 +75,8 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       pointer.String("zone-a"),
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Zone:       ptr.To("zone-a"),
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{},
@@ -100,12 +100,12 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       pointer.String("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}},
 			}},
 		},
@@ -113,12 +113,12 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       pointer.String("zone-a"),
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Zone:       ptr.To("zone-a"),
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       pointer.String("zone-b"),
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Zone:       ptr.To("zone-b"),
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{},
@@ -141,12 +141,12 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       pointer.String("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}},
 			}},
 		},
@@ -159,14 +159,14 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       pointer.String("zone-a"),
+				Zone:       ptr.To("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       pointer.String("zone-b"),
+				Zone:       ptr.To("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{},
@@ -189,19 +189,19 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       pointer.String("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.1.2.5"},
-					Zone:       pointer.String("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+					Zone:       ptr.To("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 				}, {
 					Addresses: []string{"10.1.2.6"},
-					Zone:      pointer.String("zone-b"),
+					Zone:      ptr.To("zone-b"),
 				}},
 			}},
 		},
@@ -214,22 +214,22 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       pointer.String("zone-a"),
+				Zone:       ptr.To("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       pointer.String("zone-b"),
+				Zone:       ptr.To("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.2.5"},
-				Zone:       pointer.String("zone-b"),
+				Zone:       ptr.To("zone-b"),
 				Hints:      nil,
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(false)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
 			}, {
 				Addresses: []string{"10.1.2.6"},
-				Zone:      pointer.String("zone-b"),
+				Zone:      ptr.To("zone-b"),
 				Hints:     nil,
 			}},
 		}},
@@ -254,51 +254,51 @@ func TestAddHints(t *testing.T) {
 			ToCreate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.2.3"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.1.2.4"},
-					Zone:       pointer.String("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}},
 			}, {
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.1.3.3"},
-					Zone:       pointer.String("zone-c"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-c"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.1.3.4"},
-					Zone:       pointer.String("zone-c"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-c"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.1.3.4"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}},
 			}},
 			ToUpdate: []*discovery.EndpointSlice{{
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.2.2.3"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.2.2.4"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}},
 			}, {
 				Endpoints: []discovery.Endpoint{{
 					Addresses:  []string{"10.2.3.3"},
-					Zone:       pointer.String("zone-b"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-b"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.2.3.4"},
-					Zone:       pointer.String("zone-c"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-c"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}, {
 					Addresses:  []string{"10.2.3.4"},
-					Zone:       pointer.String("zone-a"),
-					Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+					Zone:       ptr.To("zone-a"),
+					Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 				}},
 			}},
 		},
@@ -312,61 +312,61 @@ func TestAddHints(t *testing.T) {
 		expectedSlicesToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       pointer.String("zone-a"),
+				Zone:       ptr.To("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       pointer.String("zone-b"),
+				Zone:       ptr.To("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}, {
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.3.3"},
-				Zone:       pointer.String("zone-c"),
+				Zone:       ptr.To("zone-c"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-c"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.3.4"},
-				Zone:       pointer.String("zone-c"),
+				Zone:       ptr.To("zone-c"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-c"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.3.4"},
-				Zone:       pointer.String("zone-a"),
+				Zone:       ptr.To("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}},
 		expectedSlicesToUpdate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.2.2.3"},
-				Zone:       pointer.String("zone-a"),
+				Zone:       ptr.To("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.2.2.4"},
-				Zone:       pointer.String("zone-a"),
+				Zone:       ptr.To("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}, {
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.2.3.3"},
-				Zone:       pointer.String("zone-b"),
+				Zone:       ptr.To("zone-b"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.2.3.4"},
-				Zone:       pointer.String("zone-c"),
+				Zone:       ptr.To("zone-c"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-c"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.2.3.4"},
-				Zone:       pointer.String("zone-a"),
+				Zone:       ptr.To("zone-a"),
 				Hints:      &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}},
 		expectedEvents: []*EventBuilder{
@@ -635,12 +635,12 @@ func TestTopologyCacheRace(t *testing.T) {
 		ToCreate: []*discovery.EndpointSlice{{
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.1.2.3"},
-				Zone:       pointer.String("zone-a"),
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Zone:       ptr.To("zone-a"),
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}, {
 				Addresses:  []string{"10.1.2.4"},
-				Zone:       pointer.String("zone-b"),
-				Conditions: discovery.EndpointConditions{Ready: pointer.Bool(true)},
+				Zone:       ptr.To("zone-b"),
+				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 			}},
 		}}}
 	type nodeInfo struct {
