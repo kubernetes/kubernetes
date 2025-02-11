@@ -189,6 +189,328 @@ func TestReconcileHints(t *testing.T) {
 			},
 		},
 		{
+			name: "should set zone hints with PreferSameZone",
+
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
+			slicesToCreate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.1"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-1"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.2"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-2"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.3"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-3"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.4"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-4"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			},
+			slicesToUpdate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.5"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-5"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.6"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-6"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.7"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-7"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.8"},
+							Zone:       ptr.To("zone-c"),
+							NodeName:   ptr.To("node-8"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			},
+			wantSlicesToCreate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.1"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-1"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-a"}}},
+						},
+						{
+							Addresses:  []string{"10.0.0.2"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-2"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-b"}}},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.3"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-3"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-a"}}},
+						},
+						{
+							Addresses:  []string{"10.0.0.4"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-4"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-b"}}},
+						},
+					},
+				},
+			},
+			wantSlicesToUpdate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.5"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-5"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-a"}}},
+						},
+						{
+							Addresses:  []string{"10.0.0.6"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-6"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-a"}}},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.7"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-7"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-b"}}},
+						},
+						{
+							Addresses:  []string{"10.0.0.8"},
+							Zone:       ptr.To("zone-c"),
+							NodeName:   ptr.To("node-8"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints:      &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: "zone-c"}}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "should set zone and node hints with PreferSameNode",
+
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
+			slicesToCreate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.1"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-1"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.2"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-2"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.3"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-3"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.4"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-4"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			},
+			slicesToUpdate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.5"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-5"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.6"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-6"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.7"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-7"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.8"},
+							Zone:       ptr.To("zone-c"),
+							NodeName:   ptr.To("node-8"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			},
+			wantSlicesToCreate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.1"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-1"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-a"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-1"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.2"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-2"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-b"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-2"}},
+							},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.3"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-3"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-a"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-3"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.4"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-4"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-b"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-4"}},
+							},
+						},
+					},
+				},
+			},
+			wantSlicesToUpdate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.5"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-5"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-a"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-5"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.6"},
+							Zone:       ptr.To("zone-a"),
+							NodeName:   ptr.To("node-6"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-a"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-6"}},
+							},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.7"},
+							Zone:       ptr.To("zone-b"),
+							NodeName:   ptr.To("node-7"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-b"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-7"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.8"},
+							Zone:       ptr.To("zone-c"),
+							NodeName:   ptr.To("node-8"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForZones: []discoveryv1.ForZone{{Name: "zone-c"}},
+								ForNodes: []discoveryv1.ForNode{{Name: "node-8"}},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "should correct incorrect hints with PreferClose",
 
 			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
@@ -265,7 +587,7 @@ func TestReconcileHints(t *testing.T) {
 			},
 		},
 		{
-			name: "should not create zone hints if there are no zones",
+			name: "should not create hints with PreferClose if there are no zones",
 
 			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
 			slicesToCreate: []*discoveryv1.EndpointSlice{
@@ -384,6 +706,155 @@ func TestReconcileHints(t *testing.T) {
 							Addresses:  []string{"10.0.0.8"},
 							NodeName:   ptr.To("node-8"),
 							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "should create only node hints with PreferSameNode if there are no zones",
+
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
+			slicesToCreate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.1"},
+							NodeName:   ptr.To("node-1"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.2"},
+							NodeName:   ptr.To("node-2"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.3"},
+							NodeName:   ptr.To("node-3"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.4"},
+							NodeName:   ptr.To("node-4"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			},
+			slicesToUpdate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.5"},
+							NodeName:   ptr.To("node-5"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.6"},
+							NodeName:   ptr.To("node-6"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.7"},
+							NodeName:   ptr.To("node-7"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+						{
+							Addresses:  []string{"10.0.0.8"},
+							NodeName:   ptr.To("node-8"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+						},
+					},
+				},
+			},
+			wantSlicesToCreate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.1"},
+							NodeName:   ptr.To("node-1"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-1"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.2"},
+							NodeName:   ptr.To("node-2"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-2"}},
+							},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.3"},
+							NodeName:   ptr.To("node-3"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-3"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.4"},
+							NodeName:   ptr.To("node-4"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-4"}},
+							},
+						},
+					},
+				},
+			},
+			wantSlicesToUpdate: []*discoveryv1.EndpointSlice{
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.5"},
+							NodeName:   ptr.To("node-5"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-5"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.6"},
+							NodeName:   ptr.To("node-6"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-6"}},
+							},
+						},
+					},
+				},
+				{
+					Endpoints: []discoveryv1.Endpoint{
+						{
+							Addresses:  []string{"10.0.0.7"},
+							NodeName:   ptr.To("node-7"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-7"}},
+							},
+						},
+						{
+							Addresses:  []string{"10.0.0.8"},
+							NodeName:   ptr.To("node-8"),
+							Conditions: discoveryv1.EndpointConditions{Ready: ptr.To(true)},
+							Hints: &discoveryv1.EndpointHints{
+								ForNodes: []discoveryv1.ForNode{{Name: "node-8"}},
+							},
 						},
 					},
 				},

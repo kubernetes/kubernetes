@@ -20,6 +20,14 @@ package trafficdist
 import (
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
+// TrafficDistribution values supported by preferCloseHeuristic
+var closeTrafficDistribution = sets.New(
+	corev1.ServiceTrafficDistributionPreferClose,
+	corev1.ServiceTrafficDistributionPreferSameZone,
+	corev1.ServiceTrafficDistributionPreferSameNode,
 )
 
 // ReconcileHints will reconcile hints for the given EndpointSlices.
@@ -28,12 +36,12 @@ import (
 func ReconcileHints(trafficDistribution *string, slicesToCreate, slicesToUpdate, slicesUnchanged []*discoveryv1.EndpointSlice) ([]*discoveryv1.EndpointSlice, []*discoveryv1.EndpointSlice, []*discoveryv1.EndpointSlice) {
 	var h heuristic = &defaultHeuristic{}
 
-	if trafficDistribution != nil && *trafficDistribution == corev1.ServiceTrafficDistributionPreferClose {
-		h = &preferCloseHeuristic{}
+	if trafficDistribution != nil && closeTrafficDistribution.Has(*trafficDistribution) {
+		h = &preferCloseHeuristic{*trafficDistribution == corev1.ServiceTrafficDistributionPreferSameNode}
 	}
 
 	// Identify the Unchanged slices that need an update because of missing or
-	// incorrect zone hint.
+	// incorrect hints.
 	//
 	// Uses filtering in place to remove any endpoints that are no longer
 	// unchanged and need to be moved to slicesToUpdate
@@ -101,13 +109,14 @@ func (defaultHeuristic) update(slice *discoveryv1.EndpointSlice) {
 	}
 }
 
-// preferCloseHeuristic adds
+// preferCloseHeuristic implements PreferSameZone/PreferClose and PreferSameNode
 type preferCloseHeuristic struct {
+	generateNodeHints bool
 }
 
 // needsUpdate returns true if any ready endpoint in the slice has a
 // missing or incorrect hint.
-func (preferCloseHeuristic) needsUpdate(slice *discoveryv1.EndpointSlice) bool {
+func (h preferCloseHeuristic) needsUpdate(slice *discoveryv1.EndpointSlice) bool {
 	if slice == nil {
 		return false
 	}
@@ -129,25 +138,44 @@ func (preferCloseHeuristic) needsUpdate(slice *discoveryv1.EndpointSlice) bool {
 				return true
 			}
 		}
+
+		if endpoint.NodeName != nil && h.generateNodeHints {
+			// We want a node hint.
+			if endpoint.Hints == nil || len(endpoint.Hints.ForNodes) != 1 || endpoint.Hints.ForNodes[0].Name != *endpoint.NodeName {
+				// ...but it's either missing or incorrect
+				return true
+			}
+		} else {
+			// We don't want a node hint.
+			if endpoint.Hints != nil && len(endpoint.Hints.ForNodes) > 0 {
+				// ... but we have a stale hint.
+				return true
+			}
+		}
 	}
 	return false
 }
 
 // update adds a same zone topology hint for all ready endpoints
-func (preferCloseHeuristic) update(slice *discoveryv1.EndpointSlice) {
+func (h preferCloseHeuristic) update(slice *discoveryv1.EndpointSlice) {
 	for i, endpoint := range slice.Endpoints {
 		if !endpointReady(endpoint) {
 			continue
 		}
 
 		var forZones []discoveryv1.ForZone
+		var forNodes []discoveryv1.ForNode
 		if endpoint.Zone != nil {
 			forZones = []discoveryv1.ForZone{{Name: *endpoint.Zone}}
 		}
+		if endpoint.NodeName != nil && h.generateNodeHints {
+			forNodes = []discoveryv1.ForNode{{Name: *endpoint.NodeName}}
+		}
 
-		if forZones != nil {
+		if forZones != nil || forNodes != nil {
 			slice.Endpoints[i].Hints = &discoveryv1.EndpointHints{
 				ForZones: forZones,
+				ForNodes: forNodes,
 			}
 		} else {
 			slice.Endpoints[i].Hints = nil
