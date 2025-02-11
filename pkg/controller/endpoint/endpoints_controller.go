@@ -217,10 +217,12 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 
 	wantIPv6 := svc.Spec.IPFamilies[0] == v1.IPv6Protocol
 
-	// find an ip that matches the family
+	// Find an IP that matches the family. We parse and restringify the IP in case the
+	// value on the Pod is in an irregular format.
 	for _, podIP := range pod.Status.PodIPs {
-		if wantIPv6 == utilnet.IsIPv6String(podIP.IP) {
-			endpointIP = podIP.IP
+		ip := utilnet.ParseIPSloppy(podIP.IP)
+		if wantIPv6 == utilnet.IsIPv6(ip) {
+			endpointIP = ip.String()
 			break
 		}
 	}
