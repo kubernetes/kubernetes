@@ -1,3 +1,7 @@
+# 3.10.1
+
+* Updating base image for Windows pause container to `mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.4.1` to pick up security fixes in the nanoserver base image. ([#130102](https://github.com/kubernetes/kubernetes/pull/130102), [@marosset](https://github.com/marosset))
+
 # 3.10
 
 * Add support for the -v flag on Windows. It prints the version similarly to Linux. ([#125067](https://github.com/kubernetes/kubernetes/pull/125067), [@neolit123](https://github.com/neolit123))
