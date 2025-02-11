@@ -169,5 +169,7 @@ func fuzzUpgradeConfiguration(obj *kubeadm.UpgradeConfiguration, c fuzz.Continue
 	obj.Apply.ImagePullPolicy = corev1.PullIfNotPresent
 	obj.Apply.ImagePullSerial = ptr.To(true)
 
+	obj.Plan.EtcdUpgrade = ptr.To(true)
+
 	kubeadm.SetDefaultTimeouts(&obj.Timeouts)
 }
