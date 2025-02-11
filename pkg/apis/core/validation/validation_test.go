@@ -16414,9 +16414,35 @@ func TestValidateServiceCreate(t *testing.T) {
 			},
 			numErrs: 0,
 		}, {
+			name: "valid: trafficDistribution field set to PreferSameZone with feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
+			},
+			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
+			numErrs:      0,
+		}, {
+			name: "valid: trafficDistribution field set to PreferSameNode with feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
+			},
+			featureGates: []featuregate.Feature{features.PreferSameTrafficDistribution},
+			numErrs:      0,
+		}, {
 			name: "invalid: trafficDistribution field set to Random",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.TrafficDistribution = ptr.To("Random")
+			},
+			numErrs: 1,
+		}, {
+			name: "invalid: trafficDistribution field set to PreferSameZone without feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameZone")
+			},
+			numErrs: 1,
+		}, {
+			name: "invalid: trafficDistribution field set to PreferSameNode without feature gate",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
 			numErrs: 1,
 		},

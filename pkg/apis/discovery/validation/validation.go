@@ -49,6 +49,7 @@ var (
 	maxPorts          = 20000
 	maxEndpoints      = 1000
 	maxZoneHints      = 8
+	maxNodeHints      = 8
 )
 
 // ValidateEndpointSliceName can be used to check whether the given endpoint
@@ -237,6 +238,26 @@ func validateHints(endpointHints *discovery.EndpointHints, fldPath *field.Path) 
 
 		for _, msg := range validation.IsValidLabelValue(forZone.Name) {
 			allErrs = append(allErrs, field.Invalid(zonePath, forZone.Name, msg))
+		}
+	}
+
+	fnPath := fldPath.Child("forNodes")
+	if len(endpointHints.ForNodes) > maxNodeHints {
+		allErrs = append(allErrs, field.TooMany(fnPath, len(endpointHints.ForNodes), maxNodeHints))
+		return allErrs
+	}
+
+	nodeNames := make([]string, 0, len(endpointHints.ForNodes))
+	for i, forNode := range endpointHints.ForNodes {
+		nodePath := fnPath.Index(i).Child("name")
+		if slices.Contains(nodeNames, forNode.Name) {
+			allErrs = append(allErrs, field.Duplicate(nodePath, forNode.Name))
+		} else {
+			nodeNames = append(nodeNames, forNode.Name)
+		}
+
+		for _, msg := range apivalidation.ValidateNodeName(forNode.Name, false) {
+			allErrs = append(allErrs, field.Invalid(nodePath, forNode.Name, msg))
 		}
 	}
 
