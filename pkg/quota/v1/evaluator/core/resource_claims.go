@@ -153,7 +153,7 @@ func toExternalResourceClaimOrError(obj runtime.Object) (*resourceapi.ResourceCl
 			return nil, err
 		}
 	default:
-		return nil, fmt.Errorf("expect *resource.ResourceClaim or *v1alpha2.ResourceClaim, got %v", t)
+		return nil, fmt.Errorf("expect *resource.ResourceClaim or *v1beta1.ResourceClaim, got %v", t)
 	}
 	return claim, nil
 }
