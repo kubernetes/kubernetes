@@ -124,53 +124,50 @@ func TestCache_ServicesByTrafficDistribution(t *testing.T) {
 		corev1.ServiceTrafficDistributionPreferClose: {service1: true, service2: true}, // Delta
 	}, desc)
 
-	desc = "service3 starts using trafficDistribution=InvalidValue"
-	cache.UpdateTrafficDistributionForService(service3, ptr.To("InvalidValue"))
+	desc = "service3 starts using trafficDistribution=FutureValue"
+	cache.UpdateTrafficDistributionForService(service3, ptr.To("FutureValue"))
 	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
 		corev1.ServiceTrafficDistributionPreferClose: {service1: true, service2: true},
-		trafficDistributionImplementationSpecific:    {service3: true}, // Delta
+		"FutureValue": {service3: true}, // Delta
 	}, desc)
 
 	desc = "service4 starts using trafficDistribution=nil"
 	cache.UpdateTrafficDistributionForService(service4, nil)
 	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{ // No delta
 		corev1.ServiceTrafficDistributionPreferClose: {service1: true, service2: true},
-		trafficDistributionImplementationSpecific:    {service3: true},
+		"FutureValue": {service3: true},
 	}, desc)
 
-	desc = "service2 transitions trafficDistribution: PreferClose -> InvalidValue"
-	cache.UpdateTrafficDistributionForService(service2, ptr.To("InvalidValue"))
+	desc = "service2 transitions trafficDistribution: PreferClose -> AnotherFutureValue"
+	cache.UpdateTrafficDistributionForService(service2, ptr.To("AnotherFutureValue"))
 	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
-		corev1.ServiceTrafficDistributionPreferClose: {service1: true},                 // Delta
-		trafficDistributionImplementationSpecific:    {service3: true, service2: true}, // Delta
+		corev1.ServiceTrafficDistributionPreferClose: {service1: true}, // Delta
+		"FutureValue":        {service3: true},
+		"AnotherFutureValue": {service2: true}, // Delta
 	}, desc)
 
 	desc = "service3 gets deleted"
 	cache.DeleteService(service3)
 	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
 		corev1.ServiceTrafficDistributionPreferClose: {service1: true},
-		trafficDistributionImplementationSpecific:    {service2: true}, // Delta
+		"FutureValue":        {}, // Delta
+		"AnotherFutureValue": {service2: true},
 	}, desc)
 
-	desc = "service1 transitions trafficDistribution: PreferClose -> empty"
-	cache.UpdateTrafficDistributionForService(service1, ptr.To(""))
-	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
-		corev1.ServiceTrafficDistributionPreferClose: {},                               // Delta
-		trafficDistributionImplementationSpecific:    {service1: true, service2: true}, // Delta
-	}, desc)
-
-	desc = "service1 transitions trafficDistribution: InvalidValue -> nil"
+	desc = "service1 transitions trafficDistribution: PreferClose -> nil"
 	cache.UpdateTrafficDistributionForService(service1, nil)
 	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
-		corev1.ServiceTrafficDistributionPreferClose: {},
-		trafficDistributionImplementationSpecific:    {service2: true}, // Delta
+		corev1.ServiceTrafficDistributionPreferClose: {}, // Delta
+		"FutureValue":        {},
+		"AnotherFutureValue": {service2: true},
 	}, desc)
 
-	desc = "service2 transitions trafficDistribution: InvalidValue -> nil"
+	desc = "service2 transitions trafficDistribution: AnotherFutureValue -> nil"
 	cache.UpdateTrafficDistributionForService(service2, nil)
 	mustHaveServicesByTrafficDistribution(map[string]map[types.NamespacedName]bool{
 		corev1.ServiceTrafficDistributionPreferClose: {},
-		trafficDistributionImplementationSpecific:    {}, // Delta
+		"FutureValue":        {},
+		"AnotherFutureValue": {}, // Delta
 	}, desc)
 
 }
