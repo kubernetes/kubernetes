@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/translator"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -74,7 +75,7 @@ type Controller struct {
 	vpm               *volume.VolumePluginMgr
 	cmpm              csimigration.PluginManager
 	csiTranslator     csimigration.InTreeToCSITranslator
-	seLinuxTranslator volumeutil.SELinuxLabelTranslator
+	seLinuxTranslator *translator.ControllerSELinuxTranslator
 	eventBroadcaster  record.EventBroadcaster
 	eventRecorder     record.EventRecorder
 	queue             workqueue.TypedRateLimitingInterface[cache.ObjectName]
@@ -95,6 +96,8 @@ func NewController(
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "selinux_warning"})
+	seLinuxTranslator := &translator.ControllerSELinuxTranslator{}
+
 	c := &Controller{
 		kubeClient:        kubeClient,
 		podLister:         podInformer.Lister(),
@@ -107,7 +110,7 @@ func NewController(
 		csiDriverLister:   csiDriverInformer.Lister(),
 		csiDriversSynced:  csiDriverInformer.Informer().HasSynced,
 		vpm:               &volume.VolumePluginMgr{},
-		seLinuxTranslator: volumeutil.NewSELinuxLabelTranslator(),
+		seLinuxTranslator: seLinuxTranslator,
 
 		eventBroadcaster: eventBroadcaster,
 		eventRecorder:    recorder,
@@ -117,7 +120,7 @@ func NewController(
 				Name: "selinux_warning",
 			},
 		),
-		labelCache: volumecache.NewVolumeLabelCache(),
+		labelCache: volumecache.NewVolumeLabelCache(seLinuxTranslator),
 	}
 
 	err := c.vpm.InitPlugins(plugins, prober, c)
