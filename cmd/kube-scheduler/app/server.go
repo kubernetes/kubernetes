@@ -208,7 +208,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			return nil
 		default:
 		}
-		return fmt.Errorf("waiting for handlers to sync")
+		return fmt.Errorf("handlers are not fully synchronized")
 	})
 	readyzChecks = append(readyzChecks, handlerSyncCheck)
 
@@ -266,7 +266,7 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 		// Wait for all handlers to sync (all items in the initial list delivered) before scheduling.
 		if err := sched.WaitForHandlersSync(ctx); err != nil {
-			logger.Error(err, "waiting for handlers to sync")
+			logger.Error(err, "handlers are not fully synchronized")
 		}
 
 		close(handlerSyncReadyCh)
