@@ -21,6 +21,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,14 +98,24 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 
 			// This detects if there are any new fields in Status that were dropped by the pod rejection.
 			// These new fields either should be kept by kubelet's admission or added explicitly in the list of fields that are having a different value or must be cleared.
-			expectedStatus := pod.Status.DeepCopy()
-			expectedStatus.Phase = gotPod.Status.Phase
-			expectedStatus.Conditions = nil
-			expectedStatus.Message = gotPod.Status.Message
-			expectedStatus.Reason = gotPod.Status.Reason
-			expectedStatus.StartTime = gotPod.Status.StartTime
-			// expectedStatus.QOSClass keep it as is
-			gomega.Expect(gotPod.Status).To(gomega.Equal(*expectedStatus))
+			gomega.Expect(gotPod.Status).To(gstruct.MatchAllFields(gstruct.Fields{
+				"Phase":                      gstruct.Ignore(),
+				"Conditions":                 gstruct.Ignore(),
+				"Message":                    gstruct.Ignore(),
+				"Reason":                     gstruct.Ignore(),
+				"NominatedNodeName":          gstruct.Ignore(),
+				"HostIP":                     gstruct.Ignore(),
+				"HostIPs":                    gstruct.Ignore(),
+				"PodIP":                      gstruct.Ignore(),
+				"PodIPs":                     gstruct.Ignore(),
+				"StartTime":                  gstruct.Ignore(),
+				"InitContainerStatuses":      gstruct.Ignore(),
+				"ContainerStatuses":          gstruct.Ignore(),
+				"QOSClass":                   gomega.Equal(pod.Status.QOSClass), // QOSClass should be kept
+				"EphemeralContainerStatuses": gstruct.Ignore(),
+				"Resize":                     gstruct.Ignore(),
+				"ResourceClaimStatuses":      gstruct.Ignore(),
+			}))
 		})
 	})
 })
