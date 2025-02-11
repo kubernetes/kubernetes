@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,9 +93,12 @@ func testPod(namespace string, id int, nPorts int, isReady bool, ipFamilies []v1
 	for _, family := range ipFamilies {
 		var ip string
 		if family == v1.IPv4Protocol {
-			ip = fmt.Sprintf("1.2.3.%d", 4+id)
+			// if id=1, ip=1.2.3.4
+			// if id=2, ip=1.2.3.5
+			// if id=999, ip=1.2.6.235
+			ip = fmt.Sprintf("1.2.%d.%d", 3+((4+id)/256), (4+id)%256)
 		} else {
-			ip = fmt.Sprintf("2000::%d", 4+id)
+			ip = fmt.Sprintf("2000::%x", 4+id)
 		}
 		p.Status.PodIPs = append(p.Status.PodIPs, v1.PodIP{IP: ip})
 	}
@@ -109,6 +113,13 @@ func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotRea
 		pod := testPod(namespace, i, nPorts, isReady, ipFamilies)
 		store.Add(pod)
 	}
+}
+
+func addBadIPPod(store cache.Store, namespace string, ipFamilies []v1.IPFamily) {
+	pod := testPod(namespace, 0, 1, true, ipFamilies)
+	pod.Status.PodIPs[0].IP = "0" + pod.Status.PodIPs[0].IP
+	pod.Status.PodIP = pod.Status.PodIPs[0].IP
+	store.Add(pod)
 }
 
 func addNotReadyPodsWithSpecifiedRestartPolicyAndPhase(store cache.Store, namespace string, nPods int, nPorts int, restartPolicy v1.RestartPolicy, podPhase v1.PodPhase) {
@@ -1476,7 +1487,9 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 			ns := "test"
-			addPods(podStore, ns, 1, 1, 0, tc.ipFamilies)
+			// We use addBadIPPod to test that podToEndpointAddressForService
+			// fixes up the bad IP.
+			addBadIPPod(podStore, ns, tc.ipFamilies)
 			pods := podStore.List()
 			if len(pods) != 1 {
 				t.Fatalf("podStore size: expected: %d, got: %d", 1, len(pods))
@@ -1498,6 +1511,9 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 			if utilnet.IsIPv6String(epa.IP) != (tc.expectedEndpointFamily == ipv6) {
 				t.Fatalf("IP: expected %s, got: %s", tc.expectedEndpointFamily, epa.IP)
+			}
+			if strings.HasPrefix(epa.IP, "0") {
+				t.Fatalf("IP: expected valid, got: %s", epa.IP)
 			}
 			if *(epa.NodeName) != pod.Spec.NodeName {
 				t.Fatalf("NodeName: expected: %s, got: %s", pod.Spec.NodeName, *(epa.NodeName))
