@@ -17,7 +17,7 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG ?= 3.10
+TAG ?= 3.10.1
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
@@ -69,7 +69,7 @@ TRIPLE.linux-s390x := s390x-linux-gnu
 TRIPLE := ${TRIPLE.${OS}-${ARCH}}
 BASE.linux := scratch
 # Source for windows pause image base is located at https://github.com/microsoft/windows-pause-image-base
-BASE.windows := mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.2
+BASE.windows := mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.4.1
 BASE := ${BASE.${OS}}
 
 # If you want to build AND push all containers, see the 'all-push' rule.
