@@ -35,7 +35,6 @@ import (
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -62,7 +61,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 		{
 			name: "existing pod with no volumes",
 			existingPods: []*v1.Pod{
-				pod("pod1", "label1", nil),
+				pod("pod1", "s0:c1,c2", nil),
 			},
 			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents:       nil,
@@ -71,7 +70,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 		{
 			name: "existing pod with unbound PVC",
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "label1", nil, "non-existing-pvc", "vol1"),
+				podWithPVC("pod1", "s0:c1,c2", nil, "non-existing-pvc", "vol1"),
 			},
 			pod:                  cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectError:          true, // PVC is missing, add back to queue with exp. backoff
@@ -87,7 +86,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "label1", nil, "pvc1", "vol1"),
+				podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1"),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -95,7 +94,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				{
 					volumeName:   "fake-plugin/pv1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        "system_u:object_r:container_file_t:label1",
+					label:        ":::s0:c1,c2",
 					changePolicy: v1.SELinuxChangePolicyMountOption,
 					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
 				},
@@ -110,7 +109,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "label1", ptr.To(v1.SELinuxChangePolicyRecursive), "pvc1", "vol1"),
+				podWithPVC("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive), "pvc1", "vol1"),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -118,7 +117,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				{
 					volumeName:   "fake-plugin/pv1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        "system_u:object_r:container_file_t:label1",
+					label:        ":::s0:c1,c2",
 					changePolicy: v1.SELinuxChangePolicyRecursive,
 					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
 				},
@@ -133,7 +132,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				addInlineVolume(pod("pod1", "label1", nil)),
+				addInlineVolume(pod("pod1", "s0:c1,c2", nil)),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -141,7 +140,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				{
 					volumeName:   "fake-plugin/ebs.csi.aws.com-inlinevol1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        "system_u:object_r:container_file_t:label1",
+					label:        ":::s0:c1,c2",
 					changePolicy: v1.SELinuxChangePolicyMountOption,
 					csiDriver:    "ebs.csi.aws.com", // The inline volume is AWS EBS
 				},
@@ -156,7 +155,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				addInlineVolume(podWithPVC("pod1", "label1", nil, "pvc1", "vol1")),
+				addInlineVolume(podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1")),
 			},
 			pod:            cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			expectedEvents: nil,
@@ -164,14 +163,14 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				{
 					volumeName:   "fake-plugin/pv1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        "system_u:object_r:container_file_t:label1",
+					label:        ":::s0:c1,c2",
 					changePolicy: v1.SELinuxChangePolicyMountOption,
 					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
 				},
 				{
 					volumeName:   "fake-plugin/ebs.csi.aws.com-inlinevol1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        "system_u:object_r:container_file_t:label1",
+					label:        ":::s0:c1,c2",
 					changePolicy: v1.SELinuxChangePolicyMountOption,
 					csiDriver:    "ebs.csi.aws.com", // The inline volume is AWS EBS
 				},
@@ -186,8 +185,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "label1", nil, "pvc1", "vol1"),
-				pod("pod2", "label2", nil),
+				podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1"),
+				pod("pod2", "s0:c98,c99", nil),
 			},
 			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
 			conflicts: []volumecache.Conflict{
@@ -195,31 +194,31 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					PropertyValue:      "label1",
+					PropertyValue:      ":::s0:c1,c2",
 					OtherPod:           cache.ObjectName{Namespace: namespace, Name: "pod2"},
-					OtherPropertyValue: "label2",
+					OtherPropertyValue: ":::s0:c98,c99",
 				},
 				{
 					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod2"},
-					PropertyValue:      "label2",
+					PropertyValue:      ":::s0:c98,c99",
 					OtherPod:           cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					OtherPropertyValue: "label1",
+					OtherPropertyValue: ":::s0:c1,c2",
 				},
 			},
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        "system_u:object_r:container_file_t:label1",
+					label:        ":::s0:c1,c2",
 					changePolicy: v1.SELinuxChangePolicyMountOption,
 					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
 				},
 			},
 			expectedEvents: []string{
-				`Normal SELinuxLabelConflict SELinuxLabel "label1" conflicts with pod pod2 that uses the same volume as this pod with SELinuxLabel "label2". If both pods land on the same node, only one of them may access the volume.`,
-				`Normal SELinuxLabelConflict SELinuxLabel "label2" conflicts with pod pod1 that uses the same volume as this pod with SELinuxLabel "label1". If both pods land on the same node, only one of them may access the volume.`,
+				`Normal SELinuxLabelConflict SELinuxLabel ":::s0:c1,c2" conflicts with pod pod2 that uses the same volume as this pod with SELinuxLabel ":::s0:c98,c99". If both pods land on the same node, only one of them may access the volume.`,
+				`Normal SELinuxLabelConflict SELinuxLabel ":::s0:c98,c99" conflicts with pod pod1 that uses the same volume as this pod with SELinuxLabel ":::s0:c1,c2". If both pods land on the same node, only one of them may access the volume.`,
 			},
 		},
 		{
@@ -231,7 +230,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				pvBoundToPVC("pv1", "pvc1"),
 			},
 			existingPods: []*v1.Pod{
-				podWithPVC("pod1", "label1", nil, "pvc1", "vol1"),
+				podWithPVC("pod1", "s0:c1,c2", nil, "pvc1", "vol1"),
 				// "pod2" does not exist
 			},
 			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
@@ -240,31 +239,31 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					PropertyValue:      "label1",
+					PropertyValue:      ":::s0:c1,c2",
 					OtherPod:           cache.ObjectName{Namespace: namespace, Name: "pod2"},
-					OtherPropertyValue: "label2",
+					OtherPropertyValue: ":::s0:c98,c99",
 				},
 				{
 					PropertyName:       "SELinuxLabel",
 					EventReason:        "SELinuxLabelConflict",
 					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod2"},
-					PropertyValue:      "label2",
+					PropertyValue:      ":::s0:c98,c99",
 					OtherPod:           cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					OtherPropertyValue: "label1",
+					OtherPropertyValue: ":::s0:c1,c2",
 				},
 			},
 			expectedAddedVolumes: []addedVolume{
 				{
 					volumeName:   "fake-plugin/pv1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        "system_u:object_r:container_file_t:label1",
+					label:        ":::s0:c1,c2",
 					changePolicy: v1.SELinuxChangePolicyMountOption,
 					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
 				},
 			},
 			expectedEvents: []string{
 				// Event for the missing pod is not sent
-				`Normal SELinuxLabelConflict SELinuxLabel "label1" conflicts with pod pod2 that uses the same volume as this pod with SELinuxLabel "label2". If both pods land on the same node, only one of them may access the volume.`,
+				`Normal SELinuxLabelConflict SELinuxLabel ":::s0:c1,c2" conflicts with pod pod2 that uses the same volume as this pod with SELinuxLabel ":::s0:c98,c99". If both pods land on the same node, only one of them may access the volume.`,
 			},
 		},
 		{
@@ -283,7 +282,6 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 			_, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			plugin.SupportsSELinux = true
 
@@ -307,8 +305,6 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create controller: %v", err)
 			}
-			// Use the fake translator, it pretends to support SELinux on non-selinux systems
-			c.seLinuxTranslator = seLinuxTranslator
 			// Use a fake volume cache
 			labelCache := &fakeVolumeCache{
 				conflictsToSend: map[cache.ObjectName][]volumecache.Conflict{
@@ -420,11 +416,11 @@ func pvcBoundToPV(pvName, pvcName string) *v1.PersistentVolumeClaim {
 	return pvc
 }
 
-func pod(podName, label string, changePolicy *v1.PodSELinuxChangePolicy) *v1.Pod {
+func pod(podName, level string, changePolicy *v1.PodSELinuxChangePolicy) *v1.Pod {
 	var opts *v1.SELinuxOptions
-	if label != "" {
+	if level != "" {
 		opts = &v1.SELinuxOptions{
-			Level: label,
+			Level: level,
 		}
 	}
 	return &v1.Pod{
