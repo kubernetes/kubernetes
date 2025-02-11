@@ -712,13 +712,13 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		})
 	}
 
-	// flush containers
-	proxier.clusterIPs.reset(tx)
-	proxier.serviceIPs.reset(tx)
-	proxier.firewallIPs.reset(tx)
-	proxier.noEndpointServices.reset(tx)
-	proxier.noEndpointNodePorts.reset(tx)
-	proxier.serviceNodePorts.reset(tx)
+	// read or flush containers
+	proxier.clusterIPs.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.serviceIPs.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.firewallIPs.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.noEndpointServices.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.noEndpointNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
+	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 }
 
 // CleanupLeftovers removes all nftables rules and chains created by the Proxier
@@ -1082,19 +1082,30 @@ func newNFTElementStorage(containerType, containerName string) *nftElementStorag
 	return c
 }
 
-// reset clears the internal state and flushes the nftables map/set.
-func (s *nftElementStorage) reset(tx *knftables.Transaction) {
+// readOrReset updates the existing elements from the nftables map/set.
+// If reading fails, it clears the internal state and flushes the nftables map/set.
+func (s *nftElementStorage) readOrReset(tx *knftables.Transaction, nftables knftables.Interface, logger klog.Logger) {
 	clear(s.elements)
-	if s.containerType == "set" {
-		tx.Flush(&knftables.Set{
-			Name: s.containerName,
-		})
-	} else {
-		tx.Flush(&knftables.Map{
-			Name: s.containerName,
-		})
+	defer s.resetLeftoverKeys()
+	elems, err := nftables.ListElements(context.TODO(), s.containerType, s.containerName)
+	if err != nil && !knftables.IsNotFound(err) {
+		if s.containerType == "set" {
+			tx.Flush(&knftables.Set{
+				Name: s.containerName,
+			})
+		} else {
+			tx.Flush(&knftables.Map{
+				Name: s.containerName,
+			})
+		}
+		logger.Error(err, "Failed to list nftables elements", "containerName", s.containerName, "containerType", s.containerType)
+		return
 	}
-	s.resetLeftoverKeys()
+	for _, elem := range elems {
+		newKey := joinNFTSlice(elem.Key)
+		newValue := joinNFTSlice(elem.Value)
+		s.elements[newKey] = newValue
+	}
 }
 
 // resetLeftoverKeys is only called internally by nftElementStorage methods.
