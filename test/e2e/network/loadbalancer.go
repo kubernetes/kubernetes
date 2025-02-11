@@ -235,14 +235,14 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		ginkgo.By("Scaling the pods to 0")
-		err = tcpJig.Scale(ctx, 0)
+		err = tcpJig.Scale(0)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer with no backends, no answer expected")
 		testNotReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
-		err = tcpJig.Scale(ctx, 1)
+		err = tcpJig.Scale(1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
@@ -383,14 +383,14 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 0")
-		err = udpJig.Scale(ctx, 0)
+		err = udpJig.Scale(0)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking that the UDP service's LoadBalancer is not reachable")
 		testNotReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
-		err = udpJig.Scale(ctx, 1)
+		err = udpJig.Scale(1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's NodePort")

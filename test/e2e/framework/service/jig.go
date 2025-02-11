@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	appsv1 "k8s.io/api/apps/v1"
-	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	"math/rand"
 	"net"
 	"strconv"
@@ -30,12 +28,12 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,13 +41,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 // NodePortRange should match whatever the default/configured range is
@@ -782,26 +781,20 @@ func (j *TestJig) Run(ctx context.Context, tweak func(rc *appsv1.Deployment)) (*
 }
 
 // Scale scales pods to the given replicas
-func (j *TestJig) Scale(ctx context.Context, replicas int) error {
-	rc := j.Name
-	scale, err := j.Client.CoreV1().ReplicationControllers(j.Namespace).GetScale(ctx, rc, metav1.GetOptions{})
+func (j *TestJig) Scale(replicas int) error {
+	deployment, err := e2edeployment.UpdateDeploymentWithRetries(j.Client, j.Namespace, j.Name, func(deployment *appsv1.Deployment) {
+		deployment.Spec.Replicas = ptr.To(int32(replicas))
+	})
 	if err != nil {
-		return fmt.Errorf("failed to get scale for RC %q: %w", rc, err)
+		return fmt.Errorf("failed to scale Deployment %q: %w", j.Name, err)
 	}
 
-	scale.ResourceVersion = "" // indicate the scale update should be unconditional
-	scale.Spec.Replicas = int32(replicas)
-	_, err = j.Client.CoreV1().ReplicationControllers(j.Namespace).UpdateScale(ctx, rc, scale, metav1.UpdateOptions{})
+	err = e2edeployment.WaitForDeploymentComplete(j.Client, deployment)
+
 	if err != nil {
-		return fmt.Errorf("failed to scale RC %q: %w", rc, err)
+		return fmt.Errorf("failed waiting for Deployment %q: %w", j.Name, err)
 	}
-	pods, err := j.waitForPodsCreated(ctx, replicas)
-	if err != nil {
-		return fmt.Errorf("failed waiting for pods: %w", err)
-	}
-	if err := j.waitForPodsReady(ctx, pods); err != nil {
-		return fmt.Errorf("failed waiting for pods to be running: %w", err)
-	}
+
 	return nil
 }
 
@@ -818,43 +811,6 @@ func (j *TestJig) waitForPdbReady(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("timeout waiting for PDB %q to be ready", j.Name)
-}
-
-func (j *TestJig) waitForPodsCreated(ctx context.Context, replicas int) ([]string, error) {
-	// TODO (pohly): replace with gomega.Eventually
-	timeout := 2 * time.Minute
-	// List the pods, making sure we observe all the replicas.
-	label := labels.SelectorFromSet(labels.Set(j.Labels))
-	framework.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
-	for start := time.Now(); time.Since(start) < timeout && ctx.Err() == nil; time.Sleep(2 * time.Second) {
-		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := j.Client.CoreV1().Pods(j.Namespace).List(ctx, options)
-		if err != nil {
-			return nil, err
-		}
-
-		found := []string{}
-		for _, pod := range pods.Items {
-			if pod.DeletionTimestamp != nil {
-				continue
-			}
-			found = append(found, pod.Name)
-		}
-		if len(found) == replicas {
-			framework.Logf("Found all %d pods", replicas)
-			return found, nil
-		}
-		framework.Logf("Found %d/%d pods - will retry", len(found), replicas)
-	}
-	return nil, fmt.Errorf("timeout waiting for %d pods to be created", replicas)
-}
-
-func (j *TestJig) waitForPodsReady(ctx context.Context, pods []string) error {
-	timeout := 2 * time.Minute
-	if !e2epod.CheckPodsRunningReady(ctx, j.Client, j.Namespace, pods, timeout) {
-		return fmt.Errorf("timeout waiting for %d pods to be ready", len(pods))
-	}
-	return nil
 }
 
 func testReachabilityOverServiceName(ctx context.Context, serviceName string, sp v1.ServicePort, execPod *v1.Pod) error {
