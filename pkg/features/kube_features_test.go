@@ -28,7 +28,7 @@ import (
 func TestKubeFeaturesRegistered(t *testing.T) {
 	registeredFeatures := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
 
-	for featureName := range defaultKubernetesFeatureGates {
+	for featureName := range defaultVersionedKubernetesFeatureGates {
 		if _, ok := registeredFeatures[featureName]; !ok {
 			t.Errorf("The feature gate %q is not registered in the DefaultFeatureGate", featureName)
 		}
@@ -59,9 +59,6 @@ func TestAllRegisteredFeaturesExpected(t *testing.T) {
 	if err := clientfeatures.AddFeaturesToExistingFeatureGates(&clientAdapter{knownFeatureGates}); err != nil {
 		t.Fatal(err)
 	}
-	if err := knownFeatureGates.Add(defaultKubernetesFeatureGates); err != nil {
-		t.Fatal(err)
-	}
 	if err := knownFeatureGates.AddVersioned(defaultVersionedKubernetesFeatureGates); err != nil {
 		t.Fatal(err)
 	}
@@ -88,9 +85,6 @@ func TestEnsureAlphaGatesAreNotSwitchedOnByDefault(t *testing.T) {
 		}
 	}
 
-	for feature, spec := range defaultKubernetesFeatureGates {
-		checkAlphaGates(feature, spec)
-	}
 	for feature, specs := range defaultVersionedKubernetesFeatureGates {
 		for _, spec := range specs {
 			checkAlphaGates(feature, spec)
