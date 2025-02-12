@@ -477,3 +477,96 @@ __EOF__
   set +o nounset
   set +o errexit
 }
+
+run_explain_crd_with_depth_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing explain with --recursive and --depth flag on custom CRD"
+
+  kubectl create -f - << __EOF__
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mock-resources.test.com
+spec:
+  group: test.com
+  scope: Namespaced
+  names:
+    plural: mock-resources
+    singular: mock-resource
+    kind: MockResource
+    listKind: MockResources
+  versions:
+    - name: v1
+      storage: true
+      served: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                test:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+__EOF__
+
+  kube::test::wait_object_assert customresourcedefinitions "{{range.items}}{{if eq ${id_field:?} \"mock-resources.test.com\"}}{{$id_field}}:{{end}}{{end}}" 'mock-resources.test.com:'
+
+  retries=0
+  max_retries=5
+
+  # Disable exit-on-error for retry logic
+  set +o errexit
+
+  # Loop until `kubectl explain` succeeds or max retries are reached
+  until output_message=$(kubectl explain mock-resource) > /dev/null || [ $retries -eq $max_retries ]; do
+    kube::log::status "Retrying kubectl explain..."
+    ((retries++))
+    sleep 1
+  done
+
+  set -o errexit
+
+  # Test invalid depth value (--depth -1)
+  output_message=$(kubectl explain mock-resource --recursive --depth=-1 2>&1)
+  kube::test::if_has_string "${output_message}" 'error: Depth must be a non-negative number'
+
+  # Test missing --recursive flag when --depth is used
+  output_message=$(kubectl explain mock-resource --depth=2 2>&1)
+  kube::test::if_has_string "${output_message}" 'error: The --depth flag can only be used when --recursive is specified'
+  
+  # Test --depth 1: Should show only top-level metadata field
+  output_message=$(kubectl explain mock-resource --recursive --depth=1)
+  kube::test::if_has_string "${output_message}" 'metadata'
+  kube::test::if_has_not_string "${output_message}" 'ownerReferences'
+
+  # Test --depth 1, format - plaintext-openapiv2
+  output_message=$(kubectl explain mock-resource --recursive --depth=1 --output=plaintext-openapiv2)
+  kube::test::if_has_string "${output_message}" 'metadata'
+  kube::test::if_has_not_string "${output_message}" 'ownerReferences'
+
+  # Test --depth 2: Should show metadata subfields of first level
+  output_message=$(kubectl explain mock-resource --recursive --depth=2)
+  kube::test::if_has_string "${output_message}" 'metadata'
+  kube::test::if_has_string "${output_message}" 'ownerReferences'
+  kube::test::if_has_not_string "${output_message}" 'blockOwnerDeletion'
+
+  # Test --depth 2, format plaintext-openapiv2
+  output_message=$(kubectl explain mock-resource --recursive --depth=2 --output=plaintext-openapiv2)
+  kube::test::if_has_string "${output_message}" 'metadata'
+  kube::test::if_has_string "${output_message}" 'ownerReferences'
+  kube::test::if_has_not_string "${output_message}" 'blockOwnerDeletion'
+
+  # Cleanup
+  kubectl delete crd mock-resources.test.com
+
+  set +o nounset
+  set +o errexit
+}
