@@ -448,6 +448,7 @@ func (m *manager) run() {
 
 		// Don't enter rotateCerts and trigger backoff if we don't even have a template to request yet
 		if m.getTemplate() == nil {
+			logger.V(4).Info("No certificate template available")
 			return
 		}
 
@@ -470,6 +471,7 @@ func (m *manager) run() {
 	}()
 
 	if m.dynamicTemplate {
+		logger.V(4).Info("Using dynamic template")
 		template := func(ctx context.Context) {
 			// check if the current template matches what we last requested
 			lastRequestCancel, lastRequestTemplate := m.getLastRequest()
@@ -478,6 +480,7 @@ func (m *manager) run() {
 				// if the template is different, queue up an interrupt of the rotation deadline loop.
 				// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
 				if lastRequestCancel != nil {
+					logger.V(2).Info("Canceling old CSR that no longer matches the template")
 					// if we're currently waiting on a submitted request that no longer matches what we want, stop waiting
 					lastRequestCancel()
 				}
@@ -617,6 +620,7 @@ func (m *manager) rotateCerts(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
+	logger.V(4).Info("Storing the new cert/key pair")
 	cert, err := m.certStore.Update(crtPEM, keyPEM)
 	if err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Unable to store the new cert/key pair")
