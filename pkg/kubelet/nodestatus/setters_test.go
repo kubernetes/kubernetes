@@ -40,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/features"
@@ -912,6 +913,7 @@ func TestMachineInfo(t *testing.T) {
 		expectNode                           *v1.Node
 		expectEvents                         []testEvent
 		disableLocalStorageCapacityIsolation bool
+		featureGateDependencies              []featuregate.Feature
 	}{
 		{
 			desc:    "machine identifiers, basic capacity and allocatable",
@@ -1356,10 +1358,23 @@ func TestMachineInfo(t *testing.T) {
 					},
 				},
 			},
+			featureGateDependencies: []featuregate.Feature{features.NodeSwap},
 		},
 	}
 
 	for _, tc := range cases {
+		featureGatesMissing := false
+		for _, featureGateDependency := range tc.featureGateDependencies {
+			if !utilfeature.DefaultFeatureGate.Enabled(featureGateDependency) {
+				featureGatesMissing = true
+				break
+			}
+		}
+
+		if featureGatesMissing {
+			continue
+		}
+
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := context.Background()
 			machineInfoFunc := func() (*cadvisorapiv1.MachineInfo, error) {
