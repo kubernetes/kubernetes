@@ -1347,8 +1347,7 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 
 func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 	// Validate websocket proxy succeeds for each of the enumerated schemes.
-	// proxySchemes := []string{"http", "https"}
-	proxySchemes := []string{"http"}
+	proxySchemes := []string{"http", "https"}
 	for _, proxyScheme := range proxySchemes {
 		// Create the proxy handler, keeping track of how many times it was called.
 		var proxyCalled atomic.Int64
@@ -1372,6 +1371,7 @@ func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 		defer proxyServer.Close() //nolint:errcheck
 		proxyLocation, err := url.Parse(proxyServer.URL)
 		require.NoError(t, err)
+		t.Logf("Proxy URL: %s", proxyLocation.String())
 
 		// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
 		websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -1440,9 +1440,11 @@ func TestWebSocketClient_ProxySucceeds(t *testing.T) {
 			t.Fatalf("error reading the stream: %v", err)
 		}
 		// Check the random data sent on STDIN was the same returned on STDOUT.
-		t.Logf("Comparing %d random bytes sent data versus received", len(randomData))
+		t.Logf("comparing %d random bytes sent data versus received", len(randomData))
 		if !bytes.Equal(randomData, data) {
 			t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
+		} else {
+			t.Log("success--random bytes are the same")
 		}
 		// Ensure the proxy was called once
 		if e, a := int64(1), proxyCalled.Load(); e != a {
