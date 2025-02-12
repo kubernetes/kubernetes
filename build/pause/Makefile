@@ -69,7 +69,7 @@ TRIPLE.linux-s390x := s390x-linux-gnu
 TRIPLE := ${TRIPLE.${OS}-${ARCH}}
 BASE.linux := scratch
 # Source for windows pause image base is located at https://github.com/microsoft/windows-pause-image-base
-BASE.windows := mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.4.1
+BASE.windows := mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.4.1@sha256:37cc10768383b55611d724a05eb18564cb5184c89b0c2faa7d4eff63475092df
 BASE := ${BASE.${OS}}
 
 # If you want to build AND push all containers, see the 'all-push' rule.
