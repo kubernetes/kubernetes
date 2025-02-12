@@ -1551,7 +1551,6 @@ properties:
 			// wait for condition to appear with the given violations
 			var cond *apiextensionsv1.CustomResourceDefinitionCondition
 			err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				var err error
 				obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, betaCRD.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
