@@ -376,6 +376,14 @@ const (
 	// Add support for distributed tracing in the kubelet
 	KubeletTracing featuregate.Feature = "KubeletTracing"
 
+	// owner: @gjkim42
+	//
+	// Enable legacy code path in pkg/kubelet/kuberuntime that predates the
+	// SidecarContainers feature. This temporary feature gate is disabled by
+	// default and intended to safely remove the redundant code path. This is
+	// only available in v1.33 and will be removed in v1.34.
+	LegacySidecarContainers featuregate.Feature = "LegacySidecarContainers"
+
 	// owner: @RobertKrawitz
 	//
 	// Allow use of filesystems for ephemeral storage monitoring.
