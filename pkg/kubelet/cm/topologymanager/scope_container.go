@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -63,6 +63,7 @@ func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		}
 
 		if IsAlignmentGuaranteed(s.policy) {
+			klog.V(4).InfoS("Resource alignment at container scope guaranteed", "pod", klog.KObj(pod))
 			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Inc()
 		}
 	}
