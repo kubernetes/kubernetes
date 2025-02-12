@@ -3,17 +3,16 @@
 reviewers:
   - dims
   - spiffxp
-  - neolit123
   - bentheelder
   - johnSchnake
 approvers:
   - dims
   - spiffxp
-  - neolit123
   - bentheelder
 emeritus_approvers:
   - ixdy
   - timothysc
+  - neolit123
 labels:
   - sig/release
   - sig/testing
