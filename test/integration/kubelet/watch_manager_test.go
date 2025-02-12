@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -34,13 +33,16 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestWatchBasedManager(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testNamespace := "test-watch-based-manager"
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
+	defer tCtx.Cancel("test has completed")
 
 	const n = 10
 	server.ClientConfig.QPS = 10000
@@ -49,15 +51,15 @@ func TestWatchBasedManager(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(tCtx, (&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}), metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	listObj := func(namespace string, options metav1.ListOptions) (runtime.Object, error) {
-		return client.CoreV1().Secrets(namespace).List(context.TODO(), options)
+		return client.CoreV1().Secrets(namespace).List(tCtx, options)
 	}
 	watchObj := func(namespace string, options metav1.ListOptions) (watch.Interface, error) {
-		return client.CoreV1().Secrets(namespace).Watch(context.TODO(), options)
+		return client.CoreV1().Secrets(namespace).Watch(tCtx, options)
 	}
 	newObj := func() runtime.Object { return &v1.Secret{} }
 	// We want all watches to be up and running to stress test it.
@@ -65,9 +67,7 @@ func TestWatchBasedManager(t *testing.T) {
 	isImmutable := func(_ runtime.Object) bool { return false }
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
+	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, tCtx.Done())
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
@@ -79,7 +79,7 @@ func TestWatchBasedManager(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
 				name := fmt.Sprintf("s%d", i*100+j)
-				if _, err := client.CoreV1().Secrets(testNamespace).Create(context.TODO(), &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
+				if _, err := client.CoreV1().Secrets(testNamespace).Create(tCtx, &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{}); err != nil {
 					select {
 					case errCh <- err:
 					default:
