@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -75,14 +76,14 @@ func removeWorkerNodes(zone string) error {
 	return nil
 }
 
-func verifyRCs(ctx context.Context, c clientset.Interface, ns string, names []string) {
-	for _, name := range names {
-		framework.ExpectNoError(e2epod.VerifyPods(ctx, c, ns, name, true, 1))
+func verifyRCs(ctx context.Context, c clientset.Interface, ns string, labelSets []map[string]string) {
+	for _, rcLabels := range labelSets {
+		framework.ExpectNoError(e2epod.VerifyPods(ctx, c, ns, labels.FormatLabels(rcLabels), labels.SelectorFromSet(rcLabels), true, 1))
 	}
 }
 
-func createNewRC(c clientset.Interface, ns string, name string) {
-	_, err := common.NewRCByName(c, ns, name, 1, nil, nil)
+func createNewRC(c clientset.Interface, ns string, name string, rcLabels map[string]string) {
+	_, err := common.NewRCByName(c, ns, name, 1, nil, nil, rcLabels)
 	framework.ExpectNoError(err)
 }
 
@@ -168,7 +169,7 @@ var _ = SIGDescribe("HA-master", feature.HAMaster, func() {
 	var ns string
 	var additionalReplicaZones []string
 	var additionalNodesZones []string
-	var existingRCs []string
+	var existingRCLabelSets []map[string]string
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		e2eskipper.SkipUnlessProviderIs("gce")
@@ -176,7 +177,7 @@ var _ = SIGDescribe("HA-master", feature.HAMaster, func() {
 		ns = f.Namespace.Name
 		framework.ExpectNoError(waitForMasters(ctx, framework.TestContext.CloudConfig.MasterName, c, 1, 10*time.Minute))
 		additionalReplicaZones = make([]string, 0)
-		existingRCs = make([]string, 0)
+		existingRCLabelSets = make([]map[string]string, 0)
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
@@ -222,10 +223,13 @@ var _ = SIGDescribe("HA-master", feature.HAMaster, func() {
 		framework.ExpectNoError(e2enode.AllNodesReady(ctx, c, 5*time.Minute))
 
 		// Verify that API server works correctly with HA master.
-		rcName := "ha-master-" + strconv.Itoa(len(existingRCs))
-		createNewRC(c, ns, rcName)
-		existingRCs = append(existingRCs, rcName)
-		verifyRCs(ctx, c, ns, existingRCs)
+		rcName := "ha-master-" + strconv.Itoa(len(existingRCLabelSets))
+		rcLabels := map[string]string{"name": rcName}
+
+		createNewRC(c, ns, rcName, rcLabels)
+		existingRCLabelSets = append(existingRCLabelSets, rcLabels)
+
+		verifyRCs(ctx, c, ns, existingRCLabelSets)
 	}
 
 	f.It("survive addition/removal replicas same zone", f.WithSerial(), f.WithDisruptive(), func(ctx context.Context) {

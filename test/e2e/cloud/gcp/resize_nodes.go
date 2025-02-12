@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -97,11 +98,14 @@ var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
+			rcLabels := map[string]string{"name": name}
 			numNodes, err := e2enode.TotalRegistered(ctx, c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
-			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)
-			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount)
+			_, err = common.NewRCByName(c, ns, name, originalNodeCount, nil, nil, rcLabels)
+			framework.ExpectNoError(err)
+
+			err = e2epod.VerifyPods(ctx, c, ns, name, labels.SelectorFromSet(rcLabels), true, originalNodeCount)
 			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
@@ -118,7 +122,7 @@ var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 			time.Sleep(f.Timeouts.PodStartShort)
 
 			ginkgo.By("verifying whether the pods from the removed node are recreated")
-			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount)
+			err = e2epod.VerifyPods(ctx, c, ns, name, labels.SelectorFromSet(rcLabels), true, originalNodeCount)
 			framework.ExpectNoError(err)
 		})
 
@@ -127,12 +131,17 @@ var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
-			common.NewSVCByName(c, ns, name)
+			rcLabels := map[string]string{"name": name}
+			err := common.NewSVCByName(c, ns, name, rcLabels)
+			framework.ExpectNoError(err)
+
 			numNodes, err := e2enode.TotalRegistered(ctx, c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
-			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)
-			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount)
+			_, err = common.NewRCByName(c, ns, name, originalNodeCount, nil, nil, rcLabels)
+			framework.ExpectNoError(err)
+
+			err = e2epod.VerifyPods(ctx, c, ns, name, labels.SelectorFromSet(rcLabels), true, originalNodeCount)
 			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
@@ -147,7 +156,7 @@ var _ = SIGDescribe("Nodes", framework.WithDisruptive(), func() {
 			ginkgo.By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))
 			err = resizeRC(ctx, c, ns, name, originalNodeCount+1)
 			framework.ExpectNoError(err)
-			err = e2epod.VerifyPods(ctx, c, ns, name, true, originalNodeCount+1)
+			err = e2epod.VerifyPods(ctx, c, ns, name, labels.SelectorFromSet(rcLabels), true, originalNodeCount+1)
 			framework.ExpectNoError(err)
 		})
 	})
