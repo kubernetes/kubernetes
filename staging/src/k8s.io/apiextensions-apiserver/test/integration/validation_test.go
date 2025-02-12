@@ -779,8 +779,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 
 			// CR is now accepted
 			err = wait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-				var err error
-				_, err = noxuResourceClient.Create(ctx, instanceToCreate, metav1.CreateOptions{})
+				_, err := noxuResourceClient.Create(ctx, instanceToCreate, metav1.CreateOptions{})
 				var statusErr *apierrors.StatusError
 				if errors.As(err, &statusErr) {
 					if apierrors.IsInvalid(err) {
