@@ -64353,6 +64353,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							},
 						},
 					},
+					"mergeDefaultEvictionSettings": {
+						SchemaProps: spec.SchemaProps{
+							Description: "mergeDefaultEvictionSettings indicates that defaults for the evictionHard, evictionSoft, evictionSoftGracePeriod, and evictionMinimumReclaim fields should be merged into values specified for those fields in this configuration. Signals specified in this configuration take precedence. Signals not specified in this configuration inherit their defaults. Default: false",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"podsPerCore": {
 						SchemaProps: spec.SchemaProps{
 							Description: "podsPerCore is the maximum number of pods per core. Cannot exceed maxPods. The value must be a non-negative integer. If 0, there is no limit on the number of Pods. Default: 0",
