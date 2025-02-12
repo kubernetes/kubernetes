@@ -40,6 +40,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	core "k8s.io/client-go/testing"
 	"k8s.io/mount-utils"
 
@@ -3463,6 +3464,8 @@ func TestSyncPodSpans(t *testing.T) {
 		*kubeCfg.MemoryThrottlingFactor,
 		kubeletutil.NewPodStartupLatencyTracker(),
 		tp,
+		token.NewManager(kubelet.kubeClient),
+		kubelet.kubeClient,
 	)
 	assert.NoError(t, err)
 
