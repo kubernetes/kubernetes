@@ -30,24 +30,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+// Add this type definition before the test functions
+type InvalidCarpList struct {
+	metav1.TypeMeta  `json:",inline"`
+	metav1.ListMeta  `json:"metadata,omitempty"`
+	Items            []testapigroupv1.Carp `json:"items"`
+	ExtraInformation string                `json:"extra,omitempty"`
+}
+
 func TestStreamingCollectionsEncoding(t *testing.T) {
 	var streamingBuffer bytes.Buffer
 	var normalBuffer bytes.Buffer
 	normalSerializer := NewSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{StreamingCollectionsEncoding: false})
 	var remainingItems int64 = 1
 	for _, tc := range []struct {
-		name       string
-		in         runtime.Object
-		exactMatch bool
+		name           string
+		in             runtime.Object
+		expectFallback bool
 	}{
 		{
-			name:       "List empty",
-			exactMatch: true,
-			in:         &testapigroupv1.CarpList{},
+			name: "List empty",
+			in:   &testapigroupv1.CarpList{},
 		},
 		{
-			name:       "List just kind",
-			exactMatch: true,
+			name: "List just kind",
 			in: &testapigroupv1.CarpList{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "List",
@@ -55,8 +61,7 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			},
 		},
 		{
-			name:       "List just apiVersion",
-			exactMatch: true,
+			name: "List just apiVersion",
 			in: &testapigroupv1.CarpList{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "v1",
@@ -64,8 +69,7 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			},
 		},
 		{
-			name:       "List no elements",
-			exactMatch: true,
+			name: "List no elements",
 			in: &testapigroupv1.CarpList{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "List",
@@ -78,8 +82,7 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			},
 		},
 		{
-			name:       "List one element with continue",
-			exactMatch: true,
+			name: "List one element with continue",
 			in: &testapigroupv1.CarpList{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "List",
@@ -99,8 +102,7 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			},
 		},
 		{
-			name:       "List two elements",
-			exactMatch: true,
+			name: "List two elements",
 			in: &testapigroupv1.CarpList{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "List",
@@ -122,9 +124,8 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			},
 		},
 		{
-			name:       "UnstructuredList empty",
-			exactMatch: true,
-			in:         &unstructured.UnstructuredList{},
+			name: "UnstructuredList empty",
+			in:   &unstructured.UnstructuredList{},
 		},
 		{
 			name: "UnstructuredList just kind",
@@ -198,8 +199,7 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			},
 		},
 		{
-			name:       "UnstructuredList conflict on items",
-			exactMatch: true,
+			name: "UnstructuredList conflict on items",
 			in: &unstructured.UnstructuredList{
 				Object: map[string]interface{}{"items": []unstructured.Unstructured{
 					{
@@ -218,6 +218,43 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Invalid List with extra fields",
+			in: &InvalidCarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "2345",
+				},
+				Items: []testapigroupv1.Carp{
+					{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Carp"}, ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod",
+						Namespace: "default",
+					}},
+				},
+				ExtraInformation: "this field should be preserved",
+			},
+		},
+		{
+			name:           "Non-list object, fallback expected",
+			in:             &testapigroupv1.Carp{ObjectMeta: metav1.ObjectMeta{Name: "not-a-list"}},
+			expectFallback: true,
+		},
+		{
+			name: "List nil items",
+			in: &testapigroupv1.CarpList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
+				},
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "1234",
+				},
+				Items: nil, // explicitly nil
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			normalBuffer.Reset()
@@ -225,6 +262,12 @@ func TestStreamingCollectionsEncoding(t *testing.T) {
 			ok, err := streamingEncode(tc.in, &streamingBuffer)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
+			}
+			if tc.expectFallback {
+				if ok {
+					t.Fatalf("expected fallback, but got ok=true for %T", tc.in)
+				}
+				return
 			}
 			if !ok {
 				_, _, _, err := getListMeta(tc.in)
