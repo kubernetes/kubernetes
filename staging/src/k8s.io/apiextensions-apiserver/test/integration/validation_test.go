@@ -928,7 +928,6 @@ spec:
 	t.Log("Waiting for NonStructuralSchema condition")
 	var cond *apiextensionsv1.CustomResourceDefinitionCondition
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		var err error
 		obj, err := apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
