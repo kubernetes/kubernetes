@@ -84,6 +84,6 @@ func (s *podScope) accumulateProvidersHints(pod *v1.Pod) []map[string][]Topology
 func (s *podScope) calculateAffinity(pod *v1.Pod) (TopologyHint, bool) {
 	providersHints := s.accumulateProvidersHints(pod)
 	bestHint, admit := s.policy.Merge(providersHints)
-	klog.InfoS("PodTopologyHint", "bestHint", bestHint)
+	klog.InfoS("PodTopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	return bestHint, admit
 }
