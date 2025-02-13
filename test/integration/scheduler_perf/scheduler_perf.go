@@ -1502,14 +1502,10 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 
 	var dataItems []DataItem
 
-	// // numPodsScheduledPerNamespace has all namespaces created in workload and the number of pods they (will) have.
-	// // All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
-	// numPodsScheduledPerNamespace := make(map[string]int)
-
 	var collectors []testDataCollector
-	// // This needs a separate context and wait group because
-	// // the metrics collecting needs to be sure that the goroutines
-	// // are stopped.
+	// This needs a separate context and wait group because
+	// the metrics collecting needs to be sure that the goroutines
+	// are stopped.
 	var collectorCtx ktesting.TContext
 	var collectorWG sync.WaitGroup
 	defer collectorWG.Wait()
