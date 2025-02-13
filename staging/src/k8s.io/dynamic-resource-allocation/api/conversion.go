@@ -17,8 +17,10 @@ limitations under the License.
 package api
 
 import (
+	"errors"
 	"unique"
 
+	v1beta1 "k8s.io/api/resource/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -44,4 +46,20 @@ func Convert_string_To_api_UniqueString(in *string, out *UniqueString, s convers
 	}
 	*out = UniqueString(unique.Make(*in))
 	return nil
+}
+
+func Convert_v1beta1_Device_To_api_Device(in *v1beta1.Device, out *Device, s conversion.Scope) error {
+	return nil
+}
+
+func Convert_api_Device_To_v1beta1_Device(out *Device, in *v1beta1.Device, s conversion.Scope) error {
+	return errors.New("conversion to v1beta1.Device not supported")
+}
+
+func Convert_v1beta1_ResourceSliceSpec_To_api_ResourceSliceSpec(in *v1beta1.ResourceSliceSpec, out *ResourceSliceSpec, s conversion.Scope) error {
+	return nil
+}
+
+func Convert_api_ResourceSliceSpec_To_v1beta1_ResourceSliceSpec(out *ResourceSliceSpec, in *v1beta1.ResourceSliceSpec, s conversion.Scope) error {
+	return errors.New("conversion to v1beta1.ResourceSliceSpec not supported")
 }

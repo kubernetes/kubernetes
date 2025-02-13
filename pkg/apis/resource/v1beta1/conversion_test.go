@@ -23,6 +23,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	k8sresource "k8s.io/apimachinery/pkg/api/resource"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/resource"
 )
@@ -36,7 +38,7 @@ func TestConversion(t *testing.T) {
 		expectErr string
 	}{
 		{
-			name: "v1beta1 to internal without alternatives",
+			name: "ResourceClaim: v1beta1 to internal without alternatives",
 			in: &resourcev1beta1.ResourceClaim{
 				Spec: resourcev1beta1.ResourceClaimSpec{
 					Devices: resourcev1beta1.DeviceClaim{
@@ -84,7 +86,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "internal to v1beta1 without alternatives",
+			name: "ResourceClaim: internal to v1beta1 without alternatives",
 			in: &resource.ResourceClaim{
 				Spec: resource.ResourceClaimSpec{
 					Devices: resource.DeviceClaim{
@@ -133,7 +135,7 @@ func TestConversion(t *testing.T) {
 		},
 
 		{
-			name: "v1beta1 to internal with alternatives",
+			name: "ResourceClaim: v1beta1 to internal with alternatives",
 			in: &resourcev1beta1.ResourceClaim{
 				Spec: resourcev1beta1.ResourceClaimSpec{
 					Devices: resourcev1beta1.DeviceClaim{
@@ -215,7 +217,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "v1beta1 to internal with alternatives",
+			name: "ResourceClaim: internal to v1beta1 with alternatives",
 			in: &resource.ResourceClaim{
 				Spec: resource.ResourceClaimSpec{
 					Devices: resource.DeviceClaim{
@@ -288,6 +290,485 @@ func TestConversion(t *testing.T) {
 										},
 										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
 										Count:          1,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "ResourceSlice: v1beta1 to internal",
+			in: &resourcev1beta1.ResourceSlice{
+				Spec: resourcev1beta1.ResourceSliceSpec{
+					Driver: "",
+					Pool: resourcev1beta1.ResourcePool{
+						Name:               "pool-1",
+						Generation:         1,
+						ResourceSliceCount: 1,
+					},
+					NodeName: "node-1",
+					CapacityPools: []resourcev1beta1.CapacityPool{
+						{
+							Name: "capacity-pool",
+							Includes: []resourcev1beta1.CapacityPoolMixinRef{
+								{
+									Name: "capacity-pool-mixin",
+								},
+							},
+						},
+					},
+					Mixins: &resourcev1beta1.ResourceSliceMixins{
+						CapacityPool: []resourcev1beta1.CapacityPoolMixin{
+							{
+								Name: "capacity-pool-mixin",
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("memory"): {
+										Value: k8sresource.MustParse("40Gi"),
+									},
+								},
+							},
+						},
+						Device: []resourcev1beta1.DeviceMixin{
+							{
+								Name: "device-mixin",
+								Composite: &resourcev1beta1.CompositeDeviceMixin{
+									Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+										resourcev1beta1.QualifiedName("attr-1"): {
+											IntValue: func() *int64 {
+												val := int64(42)
+												return &val
+											}(),
+										},
+									},
+								},
+							},
+						},
+					},
+					Devices: []resourcev1beta1.Device{
+						{
+							Name: "device-1",
+							Basic: &resourcev1beta1.BasicDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									resourcev1beta1.QualifiedName("attr-2"): {
+										StringValue: func() *string {
+											val := "foo"
+											return &val
+										}(),
+									},
+								},
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("cpus"): {
+										Value: k8sresource.MustParse("42"),
+									},
+								},
+							},
+						},
+						{
+							Name: "device-2",
+							Composite: &resourcev1beta1.CompositeDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									resourcev1beta1.QualifiedName("attr-2"): {
+										StringValue: func() *string {
+											val := "foo"
+											return &val
+										}(),
+									},
+								},
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("cpus"): {
+										Value: k8sresource.MustParse("42"),
+									},
+								},
+								Includes: []resourcev1beta1.DeviceMixinRef{
+									{
+										Name: "device-mixin",
+									},
+								},
+								ConsumesCapacity: []resourcev1beta1.DeviceCapacityConsumption{
+									{
+										CapacityPool: "capacity-pool",
+										Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+											resourcev1beta1.QualifiedName("memory"): {
+												Value: k8sresource.MustParse("20Gi"),
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "device-3",
+							Composite: &resourcev1beta1.CompositeDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									resourcev1beta1.QualifiedName("attr-2"): {
+										StringValue: func() *string {
+											val := "foo"
+											return &val
+										}(),
+									},
+								},
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("cpus"): {
+										Value: k8sresource.MustParse("42"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			out: &resource.ResourceSlice{},
+			expectOut: &resource.ResourceSlice{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{
+						"resource.k8s.io/basic-device-names": "device-1",
+					},
+				},
+				Spec: resource.ResourceSliceSpec{
+					Driver: "",
+					Pool: resource.ResourcePool{
+						Name:               "pool-1",
+						Generation:         1,
+						ResourceSliceCount: 1,
+					},
+					NodeName: "node-1",
+					CapacityPools: []resource.CapacityPool{
+						{
+							Name: "capacity-pool",
+							Includes: []resource.CapacityPoolMixinRef{
+								{
+									Name: "capacity-pool-mixin",
+								},
+							},
+						},
+					},
+					Mixins: &resource.ResourceSliceMixins{
+						CapacityPool: []resource.CapacityPoolMixin{
+							{
+								Name: "capacity-pool-mixin",
+								Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+									resource.QualifiedName("memory"): {
+										Value: k8sresource.MustParse("40Gi"),
+									},
+								},
+							},
+						},
+						Device: []resource.DeviceMixin{
+							{
+								Name: "device-mixin",
+								Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+									resource.QualifiedName("attr-1"): {
+										IntValue: func() *int64 {
+											val := int64(42)
+											return &val
+										}(),
+									},
+								},
+							},
+						},
+					},
+					Devices: []resource.Device{
+						{
+							Name: "device-1",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								resource.QualifiedName("attr-2"): {
+									StringValue: func() *string {
+										val := "foo"
+										return &val
+									}(),
+								},
+							},
+							Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+								resource.QualifiedName("cpus"): {
+									Value: k8sresource.MustParse("42"),
+								},
+							},
+						},
+						{
+							Name: "device-2",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								resource.QualifiedName("attr-2"): {
+									StringValue: func() *string {
+										val := "foo"
+										return &val
+									}(),
+								},
+							},
+							Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+								resource.QualifiedName("cpus"): {
+									Value: k8sresource.MustParse("42"),
+								},
+							},
+							Includes: []resource.DeviceMixinRef{
+								{
+									Name: "device-mixin",
+								},
+							},
+							ConsumesCapacity: []resource.DeviceCapacityConsumption{
+								{
+									CapacityPool: "capacity-pool",
+									Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+										resource.QualifiedName("memory"): {
+											Value: k8sresource.MustParse("20Gi"),
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "device-3",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								resource.QualifiedName("attr-2"): {
+									StringValue: func() *string {
+										val := "foo"
+										return &val
+									}(),
+								},
+							},
+							Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+								resource.QualifiedName("cpus"): {
+									Value: k8sresource.MustParse("42"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{
+			name: "ResourceSlice: internal to v1beta",
+			in: &resource.ResourceSlice{
+				ObjectMeta: v1.ObjectMeta{
+					Annotations: map[string]string{
+						"resource.k8s.io/basic-device-names": "device-1",
+					},
+				},
+				Spec: resource.ResourceSliceSpec{
+					Driver: "",
+					Pool: resource.ResourcePool{
+						Name:               "pool-1",
+						Generation:         1,
+						ResourceSliceCount: 1,
+					},
+					NodeName: "node-1",
+					CapacityPools: []resource.CapacityPool{
+						{
+							Name: "capacity-pool",
+							Includes: []resource.CapacityPoolMixinRef{
+								{
+									Name: "capacity-pool-mixin",
+								},
+							},
+						},
+					},
+					Mixins: &resource.ResourceSliceMixins{
+						CapacityPool: []resource.CapacityPoolMixin{
+							{
+								Name: "capacity-pool-mixin",
+								Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+									resource.QualifiedName("memory"): {
+										Value: k8sresource.MustParse("40Gi"),
+									},
+								},
+							},
+						},
+						Device: []resource.DeviceMixin{
+							{
+								Name: "device-mixin",
+								Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+									resource.QualifiedName("attr-1"): {
+										IntValue: func() *int64 {
+											val := int64(42)
+											return &val
+										}(),
+									},
+								},
+							},
+						},
+					},
+					Devices: []resource.Device{
+						{
+							Name: "device-1",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								resource.QualifiedName("attr-2"): {
+									StringValue: func() *string {
+										val := "foo"
+										return &val
+									}(),
+								},
+							},
+							Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+								resource.QualifiedName("cpus"): {
+									Value: k8sresource.MustParse("42"),
+								},
+							},
+						},
+						{
+							Name: "device-2",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								resource.QualifiedName("attr-2"): {
+									StringValue: func() *string {
+										val := "foo"
+										return &val
+									}(),
+								},
+							},
+							Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+								resource.QualifiedName("cpus"): {
+									Value: k8sresource.MustParse("42"),
+								},
+							},
+							Includes: []resource.DeviceMixinRef{
+								{
+									Name: "device-mixin",
+								},
+							},
+							ConsumesCapacity: []resource.DeviceCapacityConsumption{
+								{
+									CapacityPool: "capacity-pool",
+									Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+										resource.QualifiedName("memory"): {
+											Value: k8sresource.MustParse("20Gi"),
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "device-3",
+							Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
+								resource.QualifiedName("attr-2"): {
+									StringValue: func() *string {
+										val := "foo"
+										return &val
+									}(),
+								},
+							},
+							Capacity: map[resource.QualifiedName]resource.DeviceCapacity{
+								resource.QualifiedName("cpus"): {
+									Value: k8sresource.MustParse("42"),
+								},
+							},
+						},
+					},
+				},
+			},
+			out: &resourcev1beta1.ResourceSlice{},
+			expectOut: &resourcev1beta1.ResourceSlice{
+				Spec: resourcev1beta1.ResourceSliceSpec{
+					Driver: "",
+					Pool: resourcev1beta1.ResourcePool{
+						Name:               "pool-1",
+						Generation:         1,
+						ResourceSliceCount: 1,
+					},
+					NodeName: "node-1",
+					CapacityPools: []resourcev1beta1.CapacityPool{
+						{
+							Name: "capacity-pool",
+							Includes: []resourcev1beta1.CapacityPoolMixinRef{
+								{
+									Name: "capacity-pool-mixin",
+								},
+							},
+						},
+					},
+					Mixins: &resourcev1beta1.ResourceSliceMixins{
+						CapacityPool: []resourcev1beta1.CapacityPoolMixin{
+							{
+								Name: "capacity-pool-mixin",
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("memory"): {
+										Value: k8sresource.MustParse("40Gi"),
+									},
+								},
+							},
+						},
+						Device: []resourcev1beta1.DeviceMixin{
+							{
+								Name: "device-mixin",
+								Composite: &resourcev1beta1.CompositeDeviceMixin{
+									Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+										resourcev1beta1.QualifiedName("attr-1"): {
+											IntValue: func() *int64 {
+												val := int64(42)
+												return &val
+											}(),
+										},
+									},
+								},
+							},
+						},
+					},
+					Devices: []resourcev1beta1.Device{
+						{
+							Name: "device-1",
+							Basic: &resourcev1beta1.BasicDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									resourcev1beta1.QualifiedName("attr-2"): {
+										StringValue: func() *string {
+											val := "foo"
+											return &val
+										}(),
+									},
+								},
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("cpus"): {
+										Value: k8sresource.MustParse("42"),
+									},
+								},
+							},
+						},
+						{
+							Name: "device-2",
+							Composite: &resourcev1beta1.CompositeDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									resourcev1beta1.QualifiedName("attr-2"): {
+										StringValue: func() *string {
+											val := "foo"
+											return &val
+										}(),
+									},
+								},
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("cpus"): {
+										Value: k8sresource.MustParse("42"),
+									},
+								},
+								Includes: []resourcev1beta1.DeviceMixinRef{
+									{
+										Name: "device-mixin",
+									},
+								},
+								ConsumesCapacity: []resourcev1beta1.DeviceCapacityConsumption{
+									{
+										CapacityPool: "capacity-pool",
+										Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+											resourcev1beta1.QualifiedName("memory"): {
+												Value: k8sresource.MustParse("20Gi"),
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "device-3",
+							Composite: &resourcev1beta1.CompositeDevice{
+								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
+									resourcev1beta1.QualifiedName("attr-2"): {
+										StringValue: func() *string {
+											val := "foo"
+											return &val
+										}(),
+									},
+								},
+								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
+									resourcev1beta1.QualifiedName("cpus"): {
+										Value: k8sresource.MustParse("42"),
 									},
 								},
 							},
