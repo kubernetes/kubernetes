@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -35,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 )
 
 func TestExternalPublicKeyGetter(t *testing.T) {
@@ -169,8 +170,7 @@ func TestExternalPublicKeyGetter(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := context.Background()
 
-			sockname := fmt.Sprintf("@test-external-public-key-getter-%d-%d.sock", time.Now().Nanosecond(), i)
-			t.Cleanup(func() { _ = os.Remove(sockname) })
+			sockname := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("test-external-public-key-getter-%d-%d.sock", time.Now().Nanosecond(), i))
 
 			addr := &net.UnixAddr{Name: sockname, Net: "unix"}
 			listener, err := net.ListenUnix(addr.Network(), addr)
@@ -240,8 +240,7 @@ func TestExternalPublicKeyGetter(t *testing.T) {
 func TestInitialFill(t *testing.T) {
 	ctx := context.Background()
 
-	sockname := fmt.Sprintf("@test-initial-fill-%d.sock", time.Now().Nanosecond())
-	t.Cleanup(func() { _ = os.Remove(sockname) })
+	sockname := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("test-initial-fill-%d.sock", time.Now().Nanosecond()))
 
 	addr := &net.UnixAddr{Name: sockname, Net: "unix"}
 	listener, err := net.ListenUnix(addr.Network(), addr)
@@ -306,8 +305,7 @@ func TestInitialFill(t *testing.T) {
 func TestReflectChanges(t *testing.T) {
 	ctx := context.Background()
 
-	sockname := fmt.Sprintf("@test-reflect-changes-%d.sock", time.Now().Nanosecond())
-	t.Cleanup(func() { _ = os.Remove(sockname) })
+	sockname := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("test-reflect-changes-%d.sock", time.Now().Nanosecond()))
 
 	addr := &net.UnixAddr{Name: sockname, Net: "unix"}
 	listener, err := net.ListenUnix(addr.Network(), addr)
