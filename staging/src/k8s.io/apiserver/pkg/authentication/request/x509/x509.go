@@ -103,7 +103,9 @@ func columnSeparatedHex(d []byte) string {
 
 func certificateIdentifier(c *x509.Certificate) string {
 	return fmt.Sprintf(
-		"SN=%d, SKID=%s, AKID=%s",
+		"CN=%s, Issuer=%s, SN=%d, SKID=%s, AKID=%s",
+		c.Subject.CommonName,
+		c.Issuer.CommonName,
 		c.SerialNumber,
 		columnSeparatedHex(c.SubjectKeyId),
 		columnSeparatedHex(c.AuthorityKeyId),
