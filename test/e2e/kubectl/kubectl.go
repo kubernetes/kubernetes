@@ -501,6 +501,16 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
+		// https://issues.k8s.io/128314
+		f.It(f.WithSlow(), "should support exec idle connections", func(ctx context.Context) {
+			ginkgo.By("executing a command in the container")
+
+			execOutput := e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "/bin/sh", "-c", "sleep 320 && echo running in container")
+			if expected, got := "running in container", strings.TrimSpace(execOutput); expected != got {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", expected, got)
+			}
+		})
+
 		ginkgo.It("should support exec through kubectl proxy", func(ctx context.Context) {
 			_ = getTestContextHost()
 
