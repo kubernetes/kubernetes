@@ -1654,9 +1654,8 @@ func (e *WorkloadExecutor) runStopCollectingMetrics(opIndex int) {
 func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) {
 	tCtx := *e.tCtx
 	collectorCtx := *e.tCtx
-	var namespace string
 	// define Pod's namespace automatically, and create that namespace.
-	namespace = fmt.Sprintf("namespace-%d", opIndex)
+	namespace := fmt.Sprintf("namespace-%d", opIndex)
 	if op.Namespace != nil {
 		namespace = *op.Namespace
 	}
