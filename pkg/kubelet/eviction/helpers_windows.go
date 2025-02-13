@@ -31,6 +31,7 @@ func makeMemoryAvailableSignalObservation(summary *statsapi.Summary) *signalObse
 	sysContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerWindowsGlobalCommitMemory)
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalMemoryAvailable)
+		return nil
 	}
 	if memory := sysContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.UsageBytes != nil {
 		klog.V(4).InfoS(
