@@ -18,6 +18,9 @@ package testing
 
 import (
 	"fmt"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionvalidation "k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"reflect"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"
 	"sigs.k8s.io/yaml"
@@ -41,6 +44,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 )
+
+var scheme = runtime.NewScheme()
+
+func init() {
+	utilruntime.Must(metainternalversion.AddToScheme(scheme))
+}
 
 // ObjectTracker keeps track of objects. It is intended to be used to
 // fake calls to a server by returning objects based on their kind,
@@ -315,24 +324,10 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	if err != nil {
 		return nil, err
 	}
-	// Heuristic for list kind: original kind + List suffix. Might
-	// not always be true but this tracker has a pretty limited
-	// understanding of the actual API model.
-	listGVK := gvk
-	listGVK.Kind = listGVK.Kind + "List"
-	// GVK does have the concept of "internal version". The scheme recognizes
-	// the runtime.APIVersionInternal, but not the empty string.
-	if listGVK.Version == "" {
-		listGVK.Version = runtime.APIVersionInternal
-	}
 
-	list, err := t.scheme.New(listGVK)
+	list, err := t.createEmptyListObjectFor(gvk)
 	if err != nil {
 		return nil, err
-	}
-
-	if !meta.IsListType(list) {
-		return nil, fmt.Errorf("%q is not a list type", listGVK.Kind)
 	}
 
 	t.lock.RLock()
@@ -353,8 +348,36 @@ func (t *tracker) List(gvr schema.GroupVersionResource, gvk schema.GroupVersionK
 	return list.DeepCopyObject(), nil
 }
 
+func (t *tracker) createEmptyListObjectFor(gvk schema.GroupVersionKind) (runtime.Object, error) {
+	// Heuristic for list kind: original kind + List suffix. Might
+	// not always be true but this tracker has a pretty limited
+	// understanding of the actual API model.
+	listGVK := gvk
+	listGVK.Kind = listGVK.Kind + "List"
+	// GVK does have the concept of "internal version". The scheme recognizes
+	// the runtime.APIVersionInternal, but not the empty string.
+	if listGVK.Version == "" {
+		listGVK.Version = runtime.APIVersionInternal
+	}
+
+	list, err := t.scheme.New(listGVK)
+	if err != nil {
+		return nil, err
+	}
+
+	if !meta.IsListType(list) {
+		return nil, fmt.Errorf("%q is not a list type", listGVK.Kind)
+	}
+	return list, nil
+}
+
 func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error) {
-	_, err := assertOptionalSingleArgument(opts)
+	listOptions, err := assertOptionalSingleArgument(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	watchListRequest, err := isWatchListRequest(listOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -363,6 +386,42 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 	defer t.lock.Unlock()
 
 	fakewatcher := watch.NewRaceFreeFake()
+	if watchListRequest {
+		// TODO: do we care about the passed RV ? (I don't think so)
+		objs, err := filterByNamespace(t.objects[gvr], ns)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: what if objs > fakewatcher.chann size ?
+		list, err := t.createEmptyListObjectFor(gvk)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range objs {
+			fakewatcher.Add(obj)
+		}
+
+		{
+			newObj, err := t.scheme.New(gvk)
+			if err != nil {
+				return nil, err
+			}
+
+			objMeta, err := meta.Accessor(newObj)
+			if err != nil {
+				return nil, err
+			}
+			objAnnotations := objMeta.GetAnnotations()
+			if objAnnotations == nil {
+				objAnnotations = map[string]string{}
+			}
+			objAnnotations[metav1.InitialEventsAnnotationKey] = "true"
+			objMeta.SetAnnotations(objAnnotations)
+
+			fakewatcher.Action(watch.Bookmark, newObj)
+
+		}
+	}
 
 	if _, exists := t.watchers[gvr]; !exists {
 		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
@@ -1003,4 +1062,18 @@ func friendlyName(name string) string {
 		nameParts[0] = strings.Join(parts, ".")
 	}
 	return strings.Join(nameParts, ".")
+}
+
+func isWatchListRequest(opts metav1.ListOptions) (bool, error) {
+	if opts.Watch == true && opts.SendInitialEvents != nil && *opts.SendInitialEvents {
+		internalListOptions := &metainternalversion.ListOptions{}
+		if err := scheme.Convert(&opts, internalListOptions, nil); err != nil {
+			return false, err
+		}
+		if errs := metainternalversionvalidation.ValidateListOptions(internalListOptions, true); len(errs) > 0 {
+			return false, errs.ToAggregate()
+		}
+		return true, nil
+	}
+	return false, nil
 }
