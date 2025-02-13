@@ -57,6 +57,8 @@ import (
 func TestAuthenticationValidate(t *testing.T) {
 	testCases := []struct {
 		name                              string
+		areOIDCFlagsConfigured            bool
+		areAnonymousFlagsConfigured       bool
 		testAnonymous                     *AnonymousAuthenticationOptions
 		testOIDC                          *OIDCAuthenticationOptions
 		testSA                            *ServiceAccountAuthenticationOptions
@@ -69,26 +71,25 @@ func TestAuthenticationValidate(t *testing.T) {
 			name: "test when OIDC and ServiceAccounts are nil",
 		},
 		{
-			name: "test when OIDC and ServiceAccounts are valid",
+			name:                   "test when OIDC and ServiceAccounts are valid",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers:  []string{"http://foo.bar.com"},
 				KeyFiles: []string{"testkeyfile1", "testkeyfile2"},
 			},
-		},
-		{
-			name: "test when OIDC is invalid",
+		}, {
+			name:                   "test when OIDC is invalid",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers:  []string{"http://foo.bar.com"},
@@ -97,13 +98,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "oidc-issuer-url and oidc-client-id must be specified together when any oidc-* flags are set",
 		},
 		{
-			name: "test when ServiceAccounts doesn't have key file",
+			name:                   "test when ServiceAccounts doesn't have key file",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{"http://foo.bar.com"},
@@ -111,13 +112,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "either `--service-account-key-file` or `--service-account-signing-endpoint` must be set",
 		},
 		{
-			name: "test when ServiceAccounts doesn't have issuer",
+			name:                   "test when ServiceAccounts doesn't have issuer",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{},
@@ -125,13 +126,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "service-account-issuer is a required flag",
 		},
 		{
-			name: "test when ServiceAccounts has empty string as issuer",
+			name:                   "test when ServiceAccounts has empty string as issuer",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{""},
@@ -139,13 +140,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "service-account-issuer should not be an empty string",
 		},
 		{
-			name: "test when ServiceAccounts has duplicate issuers",
+			name:                   "test when ServiceAccounts has duplicate issuers",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{"http://foo.bar.com", "http://foo.bar.com"},
@@ -153,13 +154,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "service-account-issuer \"http://foo.bar.com\" is already specified",
 		},
 		{
-			name: "test when ServiceAccount has bad issuer",
+			name:                   "test when ServiceAccount has bad issuer",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{"http://[::1]:namedport"},
@@ -167,13 +168,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "service-account-issuer \"http://[::1]:namedport\" contained a ':' but was not a valid URL",
 		},
 		{
-			name: "test when ServiceAccounts has invalid JWKSURI",
+			name:                   "test when ServiceAccounts has invalid JWKSURI",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				KeyFiles: []string{"cert", "key"},
@@ -183,13 +184,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "service-account-jwks-uri must be a valid URL: parse \"https://host:port\": invalid port \":port\" after host",
 		},
 		{
-			name: "test when ServiceAccounts has invalid JWKSURI (not https scheme)",
+			name:                   "test when ServiceAccounts has invalid JWKSURI (not https scheme)",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				KeyFiles: []string{"cert", "key"},
@@ -199,13 +200,13 @@ func TestAuthenticationValidate(t *testing.T) {
 			expectErr: "service-account-jwks-uri requires https scheme, parsed as: http://baz.com",
 		},
 		{
-			name: "test when WebHook has invalid retry attempts",
+			name:                   "test when WebHook has invalid retry attempts",
+			areOIDCFlagsConfigured: true,
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				KeyFiles: []string{"cert", "key"},
@@ -232,23 +233,23 @@ func TestAuthenticationValidate(t *testing.T) {
 		},
 		{
 			name:                         "test when authentication config file and oidc-* flags are set",
+			areOIDCFlagsConfigured:       true,
 			testAuthenticationConfigFile: "configfile",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
 			},
 			expectErr: "authentication-config file and oidc-* flags are mutually exclusive",
 		},
 		{
 			name:                         "test when authentication config file and anonymous-auth flags are set AnonymousAuthConfigurableEndpoints disabled",
+			areAnonymousFlagsConfigured:  true,
 			disabledFeatures:             []featuregate.Feature{features.AnonymousAuthConfigurableEndpoints},
 			testAuthenticationConfigFile: "configfile",
 			testAnonymous: &AnonymousAuthenticationOptions{
-				Allow:       true,
-				areFlagsSet: func() bool { return true },
+				Allow: true,
 			},
 		},
 	}
@@ -261,13 +262,22 @@ func TestAuthenticationValidate(t *testing.T) {
 			options.ServiceAccounts = testcase.testSA
 			options.WebHook = testcase.testWebHook
 			options.AuthenticationConfigFile = testcase.testAuthenticationConfigFile
+			pf, err := configureFlagSet(options, testcase.areOIDCFlagsConfigured, testcase.areAnonymousFlagsConfigured, testcase.testOIDC)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if pf != nil {
+				if err := pf.Parse([]string{}); err != nil {
+					t.Fatal(err)
+				}
+			}
 			for _, f := range testcase.enabledFeatures {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
 			}
 			for _, f := range testcase.disabledFeatures {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, false)
 			}
-			errs := options.Validate()
+			errs := options.Validate(pf)
 			if len(errs) > 0 && (!strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) || testcase.expectErr == "") {
 				t.Errorf("Got err: %v, Expected err: %s", errs, testcase.expectErr)
 			}
@@ -366,7 +376,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 	}
 	expectConfig.AuthenticationConfig.JWT[0].Issuer.CertificateAuthority = string(fileBytes)
 
-	resultConfig, err := testOptions.ToAuthenticationConfig()
+	resultConfig, err := testOptions.ToAuthenticationConfig(pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -470,18 +480,13 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !opts.OIDC.areFlagsConfigured() {
+	if !opts.OIDC.areFlagsConfigured(pf) {
 		t.Fatal("OIDC flags should be configured")
 	}
-	// nil these out because you cannot compare functions
-	opts.OIDC.areFlagsConfigured = nil
 
-	if !opts.Anonymous.areFlagsSet() {
+	if !opts.Anonymous.areFlagsSet(pf) {
 		t.Fatalf("Anonymous flags should be configured")
 	}
-
-	// nil these out because you cannot compare functions
-	opts.Anonymous.areFlagsSet = nil
 
 	if !reflect.DeepEqual(opts, expected) {
 		t.Error(cmp.Diff(opts, expected, cmp.AllowUnexported(OIDCAuthenticationOptions{}, AnonymousAuthenticationOptions{})))
@@ -499,7 +504,7 @@ func TestWithTokenGetterFunction(t *testing.T) {
 		}
 		opts := NewBuiltInAuthenticationOptions().WithServiceAccounts()
 		opts.ServiceAccounts.OptionalTokenGetter = f
-		err := opts.ApplyTo(context.Background(), &genericapiserver.AuthenticationInfo{}, nil, nil, &openapicommon.Config{}, nil, fakeClientset, versionedInformer, "")
+		err := opts.ApplyTo(context.Background(), nil, &genericapiserver.AuthenticationInfo{}, nil, nil, &openapicommon.Config{}, nil, fakeClientset, versionedInformer, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -510,7 +515,7 @@ func TestWithTokenGetterFunction(t *testing.T) {
 	}
 	{
 		opts := NewBuiltInAuthenticationOptions().WithServiceAccounts()
-		err := opts.ApplyTo(context.Background(), &genericapiserver.AuthenticationInfo{}, nil, nil, &openapicommon.Config{}, nil, fakeClientset, versionedInformer, "")
+		err := opts.ApplyTo(context.Background(), nil, &genericapiserver.AuthenticationInfo{}, nil, nil, &openapicommon.Config{}, nil, fakeClientset, versionedInformer, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -767,7 +772,7 @@ jwt:
 				t.Fatal(err)
 			}
 
-			resultConfig, err := opts.ToAuthenticationConfig()
+			resultConfig, err := opts.ToAuthenticationConfig(pf)
 
 			if testcase.expectErr != "" {
 				if err == nil {
@@ -1050,7 +1055,7 @@ jwt:
 				t.Fatal(err)
 			}
 
-			resultConfig, err := opts.ToAuthenticationConfig()
+			resultConfig, err := opts.ToAuthenticationConfig(pf)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1216,7 +1221,7 @@ func TestValidateOIDCOptions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			errs := opts.Validate()
+			errs := opts.Validate(pf)
 			if len(errs) > 0 && (!strings.Contains(utilerrors.NewAggregate(errs).Error(), tt.expectErr) || tt.expectErr == "") {
 				t.Errorf("Got err: %v, Expected err: %s", errs, tt.expectErr)
 			}
@@ -1639,7 +1644,7 @@ func TestToAuthenticationConfigForServiceAccount(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		resultConfig, err := tc.options.ToAuthenticationConfig()
+		resultConfig, err := tc.options.ToAuthenticationConfig(nil)
 		if tc.expectedErr != nil {
 			if err == nil || tc.expectedErr.Error() != err.Error() {
 				t.Fatalf("Expected error: %v and got: %v", tc.expectedErr, err)
@@ -1685,4 +1690,33 @@ func (d *dummyPublicKeyGetter) GetCacheAgeMaxSeconds() int {
 
 func (d *dummyPublicKeyGetter) GetPublicKeys(ctx context.Context, keyIDHint string) []serviceaccount.PublicKey {
 	return []serviceaccount.PublicKey{}
+}
+
+func configureFlagSet(options *BuiltInAuthenticationOptions, areOIDCFlagsConfigured, areAnonymousFlagsConfigured bool, testOIDC *OIDCAuthenticationOptions) (*pflag.FlagSet, error) {
+	if !areOIDCFlagsConfigured && !areAnonymousFlagsConfigured {
+		return nil, nil
+	}
+
+	pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
+	options.AddFlags(pf)
+
+	if areOIDCFlagsConfigured {
+		usernameClaim := "sub"
+		if testOIDC != nil && testOIDC.UsernameClaim != "" {
+			usernameClaim = testOIDC.UsernameClaim
+		}
+		err := pf.Set(oidcUsernameClaimFlag, usernameClaim)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if areAnonymousFlagsConfigured {
+		err := pf.Set("anonymous-auth", "true")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pf, nil
 }

@@ -127,6 +127,14 @@ func validateServiceAccountTokenSigningConfig(options *Options) []error {
 	return errors
 }
 
+func validateAuthentication(s *Options) []error {
+	if s.ParsedFlags != nil {
+		return s.Authentication.Validate(s.ParsedFlags.FlagSet("authentication"))
+	}
+
+	return nil
+}
+
 // Validate checks Options and return a slice of found errs.
 func (s *Options) Validate() []error {
 	var errs []error
@@ -135,7 +143,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, s.Etcd.Validate()...)
 	errs = append(errs, validateAPIPriorityAndFairness(s)...)
 	errs = append(errs, s.SecureServing.Validate()...)
-	errs = append(errs, s.Authentication.Validate()...)
+	errs = append(errs, validateAuthentication(s)...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Audit.Validate()...)
 	errs = append(errs, s.Admission.Validate()...)
