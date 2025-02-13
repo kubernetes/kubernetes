@@ -59,11 +59,11 @@ var _ = common.SIGDescribe("Metrics", func() {
 	ginkgo.It("should grab all metrics from kubelet /metrics/resource endpoint", func(ctx context.Context) {
 		ginkgo.By("Connecting to kubelet's /metrics/resource endpoint")
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		framework.ExpectNoError(err)
+		response, err := grabber.GrabResourceMetricsFromKubelet(ctx, node.Name)
 		if errors.Is(err, e2emetrics.MetricsGrabbingDisabledError) {
 			e2eskipper.Skipf("%v", err)
 		}
-		framework.ExpectNoError(err)
-		response, err := grabber.GrabResourceMetricsFromKubelet(ctx, node.Name)
 		framework.ExpectNoError(err)
 		gomega.Expect(response).NotTo(gomega.BeEmpty())
 	})
