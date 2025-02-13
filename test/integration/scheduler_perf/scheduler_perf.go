@@ -1537,33 +1537,33 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		}
 		switch concreteOp := realOp.(type) {
 		case *createNodesOp:
-			executor.doCreateNodesOp(opIndex, concreteOp)
+			executor.runCreateNodesOp(opIndex, concreteOp)
 
 		case *createNamespacesOp:
-			executor.doCreateNamespaceOp(opIndex, concreteOp)
+			executor.runCreateNamespaceOp(opIndex, concreteOp)
 		case *createPodsOp:
-			executor.doCreatePodsOp(opIndex, concreteOp)
+			executor.runCreatePodsOp(opIndex, concreteOp)
 			if *executor.collectorCtx != nil {
 				defer (*executor.collectorCtx).Cancel("cleaning up")
 			}
 		case *deletePodsOp:
-			executor.doDeletePodsOp(opIndex, concreteOp)
+			executor.runDeletePodsOp(opIndex, concreteOp)
 		case *churnOp:
-			executor.doChurnOp(opIndex, concreteOp)
+			executor.runChurnOp(opIndex, concreteOp)
 		case *barrierOp:
-			executor.doBarrierOp(opIndex, concreteOp)
+			executor.runBarrierOp(opIndex, concreteOp)
 		case *sleepOp:
 			select {
 			case <-tCtx.Done():
 			case <-time.After(concreteOp.Duration.Duration):
 			}
 		case *startCollectingMetricsOp:
-			executor.doStartCollectingMetricsOp(opIndex, concreteOp)
+			executor.runStartCollectingMetricsOp(opIndex, concreteOp)
 			defer (*executor.collectorCtx).Cancel("cleaning up")
 		case *stopCollectingMetricsOp:
-			executor.doStopCollectingMetrics(opIndex)
+			executor.runStopCollectingMetrics(opIndex)
 		default:
-			executor.doDefaultOp(opIndex, concreteOp)
+			executor.runDefaultOp(opIndex, concreteOp)
 		}
 	}
 
@@ -1578,21 +1578,21 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	return dataItems
 }
 
-func (e *WorkloadExecutor) doCreateNodesOp(opIndex int, concreteOp *createNodesOp) {
+func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) {
 	tCtx := *e.tCtx
-	nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), concreteOp, tCtx.Client())
+	nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), op, tCtx.Client())
 	if err != nil {
 		tCtx.Fatalf("op %d: %v", opIndex, err)
 	}
 	if err := nodePreparer.PrepareNodes((*e.tCtx), e.nextNodeIndex); err != nil {
 		tCtx.Fatalf("op %d: %v", opIndex, err)
 	}
-	e.nextNodeIndex += concreteOp.Count
+	e.nextNodeIndex += op.Count
 }
 
-func (e *WorkloadExecutor) doCreateNamespaceOp(opIndex int, concreteOp *createNamespacesOp) {
+func (e *WorkloadExecutor) runCreateNamespaceOp(opIndex int, op *createNamespacesOp) {
 	tCtx := *e.tCtx
-	nsPreparer, err := newNamespacePreparer(tCtx, concreteOp)
+	nsPreparer, err := newNamespacePreparer(tCtx, op)
 	if err != nil {
 		tCtx.Fatalf("op %d: %v", opIndex, err)
 	}
@@ -1612,38 +1612,38 @@ func (e *WorkloadExecutor) doCreateNamespaceOp(opIndex int, concreteOp *createNa
 	}
 }
 
-func (e *WorkloadExecutor) doBarrierOp(opIndex int, concreteOp *barrierOp) {
+func (e *WorkloadExecutor) runBarrierOp(opIndex int, op *barrierOp) {
 	tCtx := *e.tCtx
-	for _, namespace := range concreteOp.Namespaces {
+	for _, namespace := range op.Namespaces {
 		if _, ok := e.numPodsScheduledPerNamespace[namespace]; !ok {
 			tCtx.Fatalf("op %d: unknown namespace %s", opIndex, namespace)
 		}
 	}
-	switch concreteOp.StageRequirement {
+	switch op.StageRequirement {
 	case Attempted:
-		if err := waitUntilPodsAttempted(tCtx, e.podInformer, concreteOp.LabelSelector, concreteOp.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
+		if err := waitUntilPodsAttempted(tCtx, e.podInformer, op.LabelSelector, op.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
 			tCtx.Fatalf("op %d: %v", opIndex, err)
 		}
 	case Scheduled:
 		// Default should be treated like "Scheduled", so handling both in the same way.
 		fallthrough
 	default:
-		if err := waitUntilPodsScheduled(tCtx, e.podInformer, concreteOp.LabelSelector, concreteOp.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
+		if err := waitUntilPodsScheduled(tCtx, e.podInformer, op.LabelSelector, op.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
 			tCtx.Fatalf("op %d: %v", opIndex, err)
 		}
 		// At the end of the barrier, we can be sure that there are no pods
 		// pending scheduling in the namespaces that we just blocked on.
-		if len(concreteOp.Namespaces) == 0 {
+		if len(op.Namespaces) == 0 {
 			e.numPodsScheduledPerNamespace = make(map[string]int)
 		} else {
-			for _, namespace := range concreteOp.Namespaces {
+			for _, namespace := range op.Namespaces {
 				delete(e.numPodsScheduledPerNamespace, namespace)
 			}
 		}
 	}
 }
 
-func (e *WorkloadExecutor) doStopCollectingMetrics(opIndex int) {
+func (e *WorkloadExecutor) runStopCollectingMetrics(opIndex int) {
 	tCtx := *e.tCtx
 	collectorCtx := *e.collectorCtx
 	items := stopCollectingMetrics(tCtx, collectorCtx, e.collectorWG, e.workload.Threshold, *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
@@ -1651,44 +1651,44 @@ func (e *WorkloadExecutor) doStopCollectingMetrics(opIndex int) {
 	collectorCtx = nil
 }
 
-func (e *WorkloadExecutor) doCreatePodsOp(opIndex int, concreteOp *createPodsOp) {
+func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) {
 	tCtx := *e.tCtx
 	collectorCtx := *e.tCtx
 	var namespace string
 	// define Pod's namespace automatically, and create that namespace.
 	namespace = fmt.Sprintf("namespace-%d", opIndex)
-	if concreteOp.Namespace != nil {
-		namespace = *concreteOp.Namespace
+	if op.Namespace != nil {
+		namespace = *op.Namespace
 	}
 	createNamespaceIfNotPresent(tCtx, namespace, &e.numPodsScheduledPerNamespace)
-	if concreteOp.PodTemplatePath == nil {
-		concreteOp.PodTemplatePath = e.testCase.DefaultPodTemplatePath
+	if op.PodTemplatePath == nil {
+		op.PodTemplatePath = e.testCase.DefaultPodTemplatePath
 	}
 
-	if concreteOp.CollectMetrics {
+	if op.CollectMetrics {
 		if *e.collectorCtx != nil {
 			tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 		}
 		*e.collectorCtx, e.collectors = startCollectingMetrics(tCtx, e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
 	}
-	if err := createPodsRapidly(tCtx, namespace, concreteOp); err != nil {
+	if err := createPodsRapidly(tCtx, namespace, op); err != nil {
 		tCtx.Fatalf("op %d: %v", opIndex, err)
 	}
 	switch {
-	case concreteOp.SkipWaitToCompletion:
+	case op.SkipWaitToCompletion:
 		// Only record those namespaces that may potentially require barriers
 		// in the future.
-		e.numPodsScheduledPerNamespace[namespace] += concreteOp.Count
-	case concreteOp.SteadyState:
-		if err := createPodsSteadily(tCtx, namespace, e.podInformer, concreteOp); err != nil {
+		e.numPodsScheduledPerNamespace[namespace] += op.Count
+	case op.SteadyState:
+		if err := createPodsSteadily(tCtx, namespace, e.podInformer, op); err != nil {
 			tCtx.Fatalf("op %d: %v", opIndex, err)
 		}
 	default:
-		if err := waitUntilPodsScheduledInNamespace(tCtx, e.podInformer, nil, namespace, concreteOp.Count); err != nil {
+		if err := waitUntilPodsScheduledInNamespace(tCtx, e.podInformer, nil, namespace, op.Count); err != nil {
 			tCtx.Fatalf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
 		}
 	}
-	if concreteOp.CollectMetrics {
+	if op.CollectMetrics {
 		// CollectMetrics and SkipWaitToCompletion can never be true at the
 		// same time, so if we're here, it means that all pods have been
 		// scheduled.
@@ -1698,24 +1698,24 @@ func (e *WorkloadExecutor) doCreatePodsOp(opIndex int, concreteOp *createPodsOp)
 	}
 }
 
-func (e *WorkloadExecutor) doDeletePodsOp(opIndex int, concreteOp *deletePodsOp) {
+func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) {
 	tCtx := *e.tCtx
-	labelSelector := labels.ValidatedSetSelector(concreteOp.LabelSelector)
+	labelSelector := labels.ValidatedSetSelector(op.LabelSelector)
 
-	podsToDelete, err := e.podInformer.Lister().Pods(concreteOp.Namespace).List(labelSelector)
+	podsToDelete, err := e.podInformer.Lister().Pods(op.Namespace).List(labelSelector)
 	if err != nil {
-		tCtx.Fatalf("op %d: error in listing pods in the namespace %s: %v", opIndex, concreteOp.Namespace, err)
+		tCtx.Fatalf("op %d: error in listing pods in the namespace %s: %v", opIndex, op.Namespace, err)
 	}
 
 	deletePods := func(opIndex int) {
-		if concreteOp.DeletePodsPerSecond > 0 {
-			ticker := time.NewTicker(time.Second / time.Duration(concreteOp.DeletePodsPerSecond))
+		if op.DeletePodsPerSecond > 0 {
+			ticker := time.NewTicker(time.Second / time.Duration(op.DeletePodsPerSecond))
 			defer ticker.Stop()
 
 			for i := 0; i < len(podsToDelete); i++ {
 				select {
 				case <-ticker.C:
-					if err := tCtx.Client().CoreV1().Pods(concreteOp.Namespace).Delete(tCtx, podsToDelete[i].Name, metav1.DeleteOptions{}); err != nil {
+					if err := tCtx.Client().CoreV1().Pods(op.Namespace).Delete(tCtx, podsToDelete[i].Name, metav1.DeleteOptions{}); err != nil {
 						if errors.Is(err, context.Canceled) {
 							return
 						}
@@ -1730,15 +1730,15 @@ func (e *WorkloadExecutor) doDeletePodsOp(opIndex int, concreteOp *deletePodsOp)
 		listOpts := metav1.ListOptions{
 			LabelSelector: labelSelector.String(),
 		}
-		if err := tCtx.Client().CoreV1().Pods(concreteOp.Namespace).DeleteCollection(tCtx, metav1.DeleteOptions{}, listOpts); err != nil {
+		if err := tCtx.Client().CoreV1().Pods(op.Namespace).DeleteCollection(tCtx, metav1.DeleteOptions{}, listOpts); err != nil {
 			if errors.Is(err, context.Canceled) {
 				return
 			}
-			tCtx.Errorf("op %d: unable to delete pods in namespace %v: %v", opIndex, concreteOp.Namespace, err)
+			tCtx.Errorf("op %d: unable to delete pods in namespace %v: %v", opIndex, op.Namespace, err)
 		}
 	}
 
-	if concreteOp.SkipWaitToCompletion {
+	if op.SkipWaitToCompletion {
 		e.wg.Add(1)
 		go func(opIndex int) {
 			defer e.wg.Done()
@@ -1749,11 +1749,11 @@ func (e *WorkloadExecutor) doDeletePodsOp(opIndex int, concreteOp *deletePodsOp)
 	}
 }
 
-func (e *WorkloadExecutor) doChurnOp(opIndex int, concreteOp *churnOp) {
+func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) {
 	tCtx := *e.tCtx
 	var namespace string
-	if concreteOp.Namespace != nil {
-		namespace = *concreteOp.Namespace
+	if op.Namespace != nil {
+		namespace = *op.Namespace
 	} else {
 		namespace = fmt.Sprintf("namespace-%d", opIndex)
 	}
@@ -1766,7 +1766,7 @@ func (e *WorkloadExecutor) doChurnOp(opIndex int, concreteOp *churnOp) {
 
 	var churnFns []func(name string) string
 
-	for i, path := range concreteOp.TemplatePaths {
+	for i, path := range op.TemplatePaths {
 		unstructuredObj, gvk, err := getUnstructuredFromFile(path)
 		if err != nil {
 			tCtx.Fatalf("op %d: unable to parse the %v-th template path: %v", opIndex, i, err)
@@ -1802,18 +1802,18 @@ func (e *WorkloadExecutor) doChurnOp(opIndex int, concreteOp *churnOp) {
 	}
 
 	var interval int64 = 500
-	if concreteOp.IntervalMilliseconds != 0 {
-		interval = concreteOp.IntervalMilliseconds
+	if op.IntervalMilliseconds != 0 {
+		interval = op.IntervalMilliseconds
 	}
 	ticker := time.NewTicker(time.Duration(interval) * time.Millisecond)
 
-	switch concreteOp.Mode {
+	switch op.Mode {
 	case Create:
 		e.wg.Add(1)
 		go func() {
 			defer e.wg.Done()
 			defer ticker.Stop()
-			count, threshold := 0, concreteOp.Number
+			count, threshold := 0, op.Number
 			if threshold == 0 {
 				threshold = math.MaxInt32
 			}
@@ -1835,9 +1835,9 @@ func (e *WorkloadExecutor) doChurnOp(opIndex int, concreteOp *churnOp) {
 			defer e.wg.Done()
 			defer ticker.Stop()
 			retVals := make([][]string, len(churnFns))
-			// For each churn function, instantiate a slice of strings with length "concreteOp.Number".
+			// For each churn function, instantiate a slice of strings with length "op.Number".
 			for i := range retVals {
-				retVals[i] = make([]string, concreteOp.Number)
+				retVals[i] = make([]string, op.Number)
 			}
 
 			count := 0
@@ -1845,7 +1845,7 @@ func (e *WorkloadExecutor) doChurnOp(opIndex int, concreteOp *churnOp) {
 				select {
 				case <-ticker.C:
 					for i := range churnFns {
-						retVals[i][count%concreteOp.Number] = churnFns[i](retVals[i][count%concreteOp.Number])
+						retVals[i][count%op.Number] = churnFns[i](retVals[i][count%op.Number])
 					}
 					count++
 				case <-tCtx.Done():
@@ -1856,11 +1856,11 @@ func (e *WorkloadExecutor) doChurnOp(opIndex int, concreteOp *churnOp) {
 	}
 }
 
-func (e *WorkloadExecutor) doDefaultOp(opIndex int, concreteOp realOp) {
+func (e *WorkloadExecutor) runDefaultOp(opIndex int, op realOp) {
 	tCtx := *e.tCtx
-	runable, ok := concreteOp.(runnableOp)
+	runable, ok := op.(runnableOp)
 	if !ok {
-		tCtx.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
+		tCtx.Fatalf("op %d: invalid op %v", opIndex, op)
 	}
 	for _, namespace := range runable.requiredNamespaces() {
 		createNamespaceIfNotPresent(tCtx, namespace, &e.numPodsScheduledPerNamespace)
@@ -1868,11 +1868,11 @@ func (e *WorkloadExecutor) doDefaultOp(opIndex int, concreteOp realOp) {
 	runable.run(tCtx)
 }
 
-func (e *WorkloadExecutor) doStartCollectingMetricsOp(opIndex int, concreteOp *startCollectingMetricsOp) {
+func (e *WorkloadExecutor) runStartCollectingMetricsOp(opIndex int, op *startCollectingMetricsOp) {
 	if *e.collectorCtx != nil {
 		(*e.tCtx).Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 	}
-	*e.collectorCtx, e.collectors = startCollectingMetrics((*e.tCtx), e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, concreteOp.Name, concreteOp.Namespaces, concreteOp.LabelSelector)
+	*e.collectorCtx, e.collectors = startCollectingMetrics((*e.tCtx), e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, op.Name, op.Namespaces, op.LabelSelector)
 }
 
 func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsPerNamespace *map[string]int) {
