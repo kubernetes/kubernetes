@@ -415,6 +415,215 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 	})
 
+	ginkgo.Describe("Pod Generation", func() {
+		var podClient *e2epod.PodClient
+		ginkgo.BeforeEach(func() {
+			podClient = e2epod.NewPodClient(f)
+		})
+
+		ginkgo.It("pod generation should start at 1 and increment per update", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+			pod.ObjectMeta.Labels = map[string]string{
+				"time": value,
+			}
+			pod.Spec.InitContainers = []v1.Container{{
+				Name:    "init-container",
+				Image:   "busybox:1.28",
+				Command: []string{"sh", "-c", "exit 0"},
+			}}
+
+			ginkgo.By("setting up selector")
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+			options := metav1.ListOptions{LabelSelector: selector.String()}
+			pods, err := podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.BeEmpty())
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(ctx, pod)
+
+			ginkgo.By("verifying the new pod's generation is 1")
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(1))
+
+			ginkgo.By("updating Tolerations to trigger generation bump")
+			labelFooName := "foo-" + string(uuid.NewUUID())
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.Spec.Tolerations = []v1.Toleration{
+					{
+						Key:      labelFooName,
+						Operator: v1.TolerationOpEqual,
+						Value:    "bar",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}
+			})
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(2))
+
+			ginkgo.By("updating ActiveDeadlineSeconds to trigger generation bump")
+			int5000 := int64(5000)
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.Spec.ActiveDeadlineSeconds = &int5000
+			})
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(3))
+
+			ginkgo.By("updating container image and initContainer image to trigger generation bumps")
+			currentContainerImage := pod.Spec.Containers[0].Image
+			currentInitContainerImage := pod.Spec.InitContainers[0].Image
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Image = "fake-image-name"
+			})
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.Spec.InitContainers[0].Image = "fake-image-name"
+			})
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Image = currentContainerImage
+			})
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.Spec.InitContainers[0].Image = currentInitContainerImage
+			})
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(7))
+
+			ginkgo.By("updates to pod metadata should not trigger a generation bump")
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.SetAnnotations(map[string]string{"key": "value"})
+			})
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(7))
+
+			ginkgo.By("pod generation updated by client should be ignored")
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.SetGeneration(5)
+			})
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(7))
+
+			ginkgo.By("issue a graceful delete to trigger generation bump")
+			// We need to wait for the pod to be running, otherwise the deletion
+			// may be carried out immediately rather than gracefully.
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to GET scheduled pod")
+
+			var lastPod v1.Pod
+			var statusCode int
+			// Set gracePeriodSeconds to 60 to give us time to verify the generation bump.
+			err = f.ClientSet.CoreV1().RESTClient().Delete().AbsPath("/api/v1/namespaces", pod.Namespace, "pods", pod.Name).Param("gracePeriodSeconds", "60").Do(ctx).StatusCode(&statusCode).Into(&lastPod)
+			framework.ExpectNoError(err, "failed to use http client to send delete")
+			gomega.Expect(statusCode).To(gomega.Equal(http.StatusOK), "failed to delete gracefully by client request")
+
+			ginkgo.By("verifying the pod generation was bumped")
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(8))
+		})
+
+		ginkgo.It("custom-set generation on new pods should be overwritten to 1", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+			pod.ObjectMeta.Labels = map[string]string{
+				"time": value,
+			}
+			pod.SetGeneration(100)
+
+			ginkgo.By("setting up selector")
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+			options := metav1.ListOptions{LabelSelector: selector.String()}
+			pods, err := podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.BeEmpty())
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(ctx, pod)
+
+			ginkgo.By("verifying the new pod's generation is 1")
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(1))
+
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+		})
+
+		ginkgo.It("mirror pods should not have generation populated", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+			pod.ObjectMeta.Labels = map[string]string{
+				"time": value,
+			}
+			pod.ObjectMeta.Annotations = map[string]string{
+				// Manually set mirror pod annotation on this pod.
+				v1.MirrorPodAnnotationKey: "some-value",
+			}
+			// spec.NodeName must be specified when mirror pod annotation is set.
+			pod.Spec.NodeName = "some-value"
+
+			ginkgo.By("setting up selector")
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+			options := metav1.ListOptions{LabelSelector: selector.String()}
+			pods, err := podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.BeEmpty())
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(ctx, pod)
+
+			ginkgo.By("verifying the new pod's generation is unset")
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(0))
+
+			ginkgo.By("updating pod tolerations and manually attempt to set generation")
+			labelFooName := "foo-" + string(uuid.NewUUID())
+			podClient.Update(ctx, name, func(pod *v1.Pod) {
+				pod.ObjectMeta.Generation = 5
+				pod.Spec.Tolerations = []v1.Toleration{
+					{
+						Key:      labelFooName,
+						Operator: v1.TolerationOpEqual,
+						Value:    "bar",
+						Effect:   v1.TaintEffectNoSchedule,
+					},
+				}
+			})
+			pods, err = podClient.List(ctx, options)
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pods.Items).To(gomega.HaveLen(1))
+			gomega.Expect(pods.Items[0].Generation).To(gomega.BeEquivalentTo(0))
+
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+		})
+	})
 })
 
 func createAndTestPodRepeatedly(ctx context.Context, workers, iterations int, scenario podScenario, podClient v1core.PodInterface) {
