@@ -40,8 +40,6 @@ func ByNameContainer(name string, replicas int32, labels map[string]string, c v1
 
 	zeroGracePeriod := int64(0)
 
-	// Add "name": name to the labels, overwriting if it exists.
-	labels["name"] = name
 	if gracePeriod == nil {
 		gracePeriod = &zeroGracePeriod
 	}
@@ -55,9 +53,7 @@ func ByNameContainer(name string, replicas int32, labels map[string]string, c v1
 		},
 		Spec: v1.ReplicationControllerSpec{
 			Replicas: pointer.Int32(replicas),
-			Selector: map[string]string{
-				"name": name,
-			},
+			Selector: labels,
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
