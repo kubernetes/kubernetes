@@ -24808,7 +24808,7 @@ func TestValidateSleepAction(t *testing.T) {
 	}
 }
 
-// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to Beta
+// TODO: merge these test to TestValidatePodSpec after AllowRelaxedDNSSearchValidation feature graduates to GA
 func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	testCases := []struct {
 		name           string
