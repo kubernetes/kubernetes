@@ -1460,8 +1460,8 @@ type WorkloadExecutor struct {
 	numPodsScheduledPerNamespace map[string]int
 	podInformer                  coreinformers.PodInformer
 	throughputErrorMargin        float64
-	tc                           *testCase
-	w                            *workload
+	testCase                     *testCase
+	workload                     *workload
 	nextNodeIndex                int
 }
 
@@ -1519,8 +1519,8 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
 		throughputErrorMargin:        throughputErrorMargin,
-		tc:                           tc,
-		w:                            w,
+		testCase:                     tc,
+		workload:                     w,
 		nextNodeIndex:                0,
 		dataItems:                    dataItems,
 	}
@@ -1646,7 +1646,7 @@ func (e *WorkloadExecutor) doBarrierOp(opIndex int, concreteOp *barrierOp) {
 func (e *WorkloadExecutor) doStopCollectingMetrics(opIndex int) {
 	tCtx := *e.tCtx
 	collectorCtx := *e.collectorCtx
-	items := stopCollectingMetrics(tCtx, collectorCtx, e.collectorWG, e.w.Threshold, *e.w.ThresholdMetricSelector, opIndex, e.collectors)
+	items := stopCollectingMetrics(tCtx, collectorCtx, e.collectorWG, e.workload.Threshold, *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
 	e.dataItems = append(e.dataItems, items...)
 	collectorCtx = nil
 }
@@ -1662,14 +1662,14 @@ func (e *WorkloadExecutor) doCreatePodsOp(opIndex int, concreteOp *createPodsOp)
 	}
 	createNamespaceIfNotPresent(tCtx, namespace, &e.numPodsScheduledPerNamespace)
 	if concreteOp.PodTemplatePath == nil {
-		concreteOp.PodTemplatePath = e.tc.DefaultPodTemplatePath
+		concreteOp.PodTemplatePath = e.testCase.DefaultPodTemplatePath
 	}
 
 	if concreteOp.CollectMetrics {
 		if *e.collectorCtx != nil {
 			tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 		}
-		*e.collectorCtx, e.collectors = startCollectingMetrics(tCtx, e.collectorWG, e.podInformer, e.tc.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
+		*e.collectorCtx, e.collectors = startCollectingMetrics(tCtx, e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
 	}
 	if err := createPodsRapidly(tCtx, namespace, concreteOp); err != nil {
 		tCtx.Fatalf("op %d: %v", opIndex, err)
@@ -1692,7 +1692,7 @@ func (e *WorkloadExecutor) doCreatePodsOp(opIndex int, concreteOp *createPodsOp)
 		// CollectMetrics and SkipWaitToCompletion can never be true at the
 		// same time, so if we're here, it means that all pods have been
 		// scheduled.
-		items := stopCollectingMetrics(tCtx, collectorCtx, e.collectorWG, e.w.Threshold, *e.w.ThresholdMetricSelector, opIndex, e.collectors)
+		items := stopCollectingMetrics(tCtx, collectorCtx, e.collectorWG, e.workload.Threshold, *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
 		e.dataItems = append(e.dataItems, items...)
 		*e.collectorCtx = nil
 	}
@@ -1872,7 +1872,7 @@ func (e *WorkloadExecutor) doStartCollectingMetricsOp(opIndex int, concreteOp *s
 	if *e.collectorCtx != nil {
 		(*e.tCtx).Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 	}
-	*e.collectorCtx, e.collectors = startCollectingMetrics((*e.tCtx), e.collectorWG, e.podInformer, e.tc.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, concreteOp.Name, concreteOp.Namespaces, concreteOp.LabelSelector)
+	*e.collectorCtx, e.collectors = startCollectingMetrics((*e.tCtx), e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, concreteOp.Name, concreteOp.Namespaces, concreteOp.LabelSelector)
 }
 
 func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsPerNamespace *map[string]int) {
