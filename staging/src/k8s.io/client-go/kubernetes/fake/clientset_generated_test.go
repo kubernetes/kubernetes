@@ -18,13 +18,21 @@ package fake
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	clientfeatures "k8s.io/client-go/features"
+	clientfeaturestesting "k8s.io/client-go/features/testing"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 )
 
 func TestNewSimpleClientset(t *testing.T) {
@@ -141,4 +149,64 @@ func TestManagedFieldClientset(t *testing.T) {
 		t.Errorf("Failed to update pod: %v", err)
 	}
 	assert.Equal(t, map[string]string{"k99": "v99"}, cm.Data)
+}
+
+func TestWatchList(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+	makePod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name:      name,
+				Namespace: "ns",
+			},
+		}
+	}
+	pod1 := makePod("pod-1")
+	fakeClient := NewClientset(pod1)
+
+	opts := meta_v1.ListOptions{ResourceVersionMatch: meta_v1.ResourceVersionMatchNotOlderThan, ResourceVersion: "0", AllowWatchBookmarks: true, SendInitialEvents: ptr.To(true), Watch: true}
+	w, err := fakeClient.CoreV1().Pods("ns").Watch(context.Background(), opts)
+	require.NoError(t, err)
+
+	fmt.Println(fmt.Sprintf("%v", <-w.ResultChan()))
+
+	/*go func() {
+		pod2 := makePod("pod-2")
+		_, err := fakeClient.CoreV1().Pods("ns").Create(context.Background(), pod2, meta_v1.CreateOptions{})
+		require.NoError(t, err)
+	}()*/
+
+	fmt.Println(fmt.Sprintf("%v", <-w.ResultChan()))
+}
+
+func TestInformerWatchList(t *testing.T) {
+	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
+
+	makePod := func(name string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: meta_v1.ObjectMeta{
+				Name:      name,
+				Namespace: "ns",
+			},
+		}
+	}
+	pod1 := makePod("pod-1")
+	fakeClient := NewClientset(pod1)
+
+	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0)
+
+	podInformer := informerFactory.Core().V1().Pods().Informer()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informerFactory.Start(stopCh)
+
+	// Wait for cache sync
+	if !cache.WaitForCacheSync(stopCh, podInformer.HasSynced) {
+		fmt.Println("Failed to sync cache")
+		return
+	}
+
+	fmt.Println("OK")
 }
