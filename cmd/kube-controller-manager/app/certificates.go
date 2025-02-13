@@ -25,6 +25,7 @@ import (
 
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -291,6 +292,9 @@ func newKubeAPIServerSignerClusterTrustBundledPublisherController(ctx context.Co
 
 func clusterTrustBundlesAvailable(client kubernetes.Interface, schemaVersion schema.GroupVersion) (bool, error) {
 	resList, err := client.Discovery().ServerResourcesForGroupVersion(schemaVersion.String())
+	if errors.IsNotFound(err) {
+		return false, nil
+	}
 
 	if resList != nil {
 		// even in case of an error above there might be a partial list for APIs that
