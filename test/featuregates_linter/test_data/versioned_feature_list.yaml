@@ -720,7 +720,7 @@
     version: "1.27"
 - name: LegacySidecarContainers
   versionedSpecs:
-  - default: true
+  - default: false
     lockToDefault: false
     preRelease: GA
     version: "1.0"
