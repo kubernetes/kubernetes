@@ -1597,7 +1597,7 @@ func (e *WorkloadExecutor) runCreateNamespaceOp(opIndex int, op *createNamespace
 	if err := nsPreparer.prepare(*e.tCtx); err != nil {
 		err2 := nsPreparer.cleanup(*e.tCtx)
 		if err2 != nil {
-			err = fmt.Errorf("prepare: %v; cleanup: %v", err, err2)
+			err = fmt.Errorf("prepare: %w; cleanup: %w", err, err2)
 		}
 		(*e.tCtx).Fatalf("op %d: %v", opIndex, err)
 	}
@@ -1641,10 +1641,9 @@ func (e *WorkloadExecutor) runBarrierOp(opIndex int, op *barrierOp) {
 }
 
 func (e *WorkloadExecutor) runStopCollectingMetrics(opIndex int) {
-	collectorCtx := *e.collectorCtx
-	items := stopCollectingMetrics(*e.tCtx, collectorCtx, e.collectorWG, e.workload.Threshold, *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
+	items := stopCollectingMetrics(*e.tCtx, *e.collectorCtx, e.collectorWG, e.workload.Threshold, *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
 	e.dataItems = append(e.dataItems, items...)
-	collectorCtx = nil
+	*e.collectorCtx = nil
 }
 
 func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) {
