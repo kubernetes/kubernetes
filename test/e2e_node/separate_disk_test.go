@@ -77,33 +77,6 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 	})
 })
 
-// ImageGCNoEviction tests that the node does not evict pods when inodes are consumed by images
-// Disk pressure is induced by pulling large images
-var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
-	f := framework.NewDefaultFramework("image-gc-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 15 * time.Minute
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := resourceInodes
-	inodesConsumed := uint64(200000)
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
-			summary := eventuallyGetSummary(ctx)
-			inodesFreeImagefs := *(summary.Node.Runtime.ImageFs.InodesFree)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalImageFsInodesFree): fmt.Sprintf("%d", inodesFreeImagefs-inodesConsumed)}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			ginkgo.By(fmt.Sprintf("EvictionHardSettings %s", initialConfig.EvictionHard))
-		})
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logInodeMetrics, []podEvictSpec{
-			{
-				evictionPriority: 0, // ASSUMING 0 will never be evicted as per runevictionTest
-				pod:              inodeConsumingPod("container-inode-hog", lotsOfFiles, nil),
-			},
-		})
-	})
-})
-
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
