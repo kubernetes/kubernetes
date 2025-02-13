@@ -550,6 +550,8 @@ type KubeletConfiguration struct {
 	// fields should be merged into values specified for those fields in this configuration.
 	// Signals specified in this configuration take precedence.
 	// Signals not specified in this configuration inherit their defaults.
+	// If false, and if any signal is specified in this configuration then other signals that
+	// are not specified in this configuration will be set to 0.
 	// Default: false
 	// +optional
 	MergeDefaultEvictionSettings *bool `json:"mergeDefaultEvictionSettings,omitempty"`
