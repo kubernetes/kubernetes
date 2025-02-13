@@ -4149,6 +4149,17 @@
         },
         "type": "object"
       },
+      "io.k8s.api.core.v1.NodeSwapStatus": {
+        "description": "NodeSwapStatus represents swap memory information.",
+        "properties": {
+          "capacity": {
+            "description": "Total amount of swap memory in bytes.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.NodeSystemInfo": {
         "description": "NodeSystemInfo is a set of ids/uuids to uniquely identify the node.",
         "properties": {
@@ -4196,6 +4207,14 @@
             "default": "",
             "description": "OS Image reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy)).",
             "type": "string"
+          },
+          "swap": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSwapStatus"
+              }
+            ],
+            "description": "Swap Info reported by the node."
           },
           "systemUUID": {
             "default": "",
