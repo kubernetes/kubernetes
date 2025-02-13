@@ -657,7 +657,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	RestartContainerDuringTermination: {
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Alpha},
 	},
 
 	RotateKubeletServerCertificate: {
