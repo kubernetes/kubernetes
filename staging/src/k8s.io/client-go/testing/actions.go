@@ -475,17 +475,18 @@ func ExtractFromListOptions(opts interface{}) (labelSelector labels.Selector, fi
 	return labelSelector, fieldSelector, resourceVersion
 }
 
-func NewWatchAction(resource schema.GroupVersionResource, namespace string, opts interface{}) WatchActionImpl {
+func NewWatchAction(resource schema.GroupVersionResource, kind schema.GroupVersionKind, namespace string, opts interface{}) WatchActionImpl {
 	listOpts, _ := opts.(metav1.ListOptions)
-	return NewWatchActionWithOptions(resource, namespace, listOpts)
+	return NewWatchActionWithOptions(resource, kind, namespace, listOpts)
 }
 
-func NewWatchActionWithOptions(resource schema.GroupVersionResource, namespace string, opts metav1.ListOptions) WatchActionImpl {
+func NewWatchActionWithOptions(resource schema.GroupVersionResource, kind schema.GroupVersionKind, namespace string, opts metav1.ListOptions) WatchActionImpl {
 	action := WatchActionImpl{}
 	action.Verb = "watch"
 	action.Resource = resource
 	action.Namespace = namespace
 	action.ListOptions = opts
+	action.Kind = kind
 
 	labelSelector, fieldSelector, resourceVersion := ExtractFromListOptions(opts)
 	action.WatchRestrictions = WatchRestrictions{labelSelector, fieldSelector, resourceVersion}
@@ -832,6 +833,7 @@ func (a DeleteCollectionActionImpl) DeepCopy() Action {
 
 type WatchActionImpl struct {
 	ActionImpl
+	Kind              schema.GroupVersionKind
 	WatchRestrictions WatchRestrictions
 	ListOptions       metav1.ListOptions
 }
@@ -852,6 +854,7 @@ func (a WatchActionImpl) DeepCopy() Action {
 			Fields:          a.WatchRestrictions.Fields.DeepCopySelector(),
 			ResourceVersion: a.WatchRestrictions.ResourceVersion,
 		},
+		Kind:        a.Kind,
 		ListOptions: *a.ListOptions.DeepCopy(),
 	}
 }

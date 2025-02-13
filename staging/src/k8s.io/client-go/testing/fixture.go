@@ -85,7 +85,7 @@ type ObjectTracker interface {
 
 	// Watch watches objects from the tracker. Watch returns a channel
 	// which will push added / modified / deleted object.
-	Watch(gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error)
+	Watch(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, opts ...metav1.ListOptions) (watch.Interface, error)
 }
 
 // ObjectScheme abstracts the implementation of common operations on objects.
@@ -371,7 +371,7 @@ func (t *tracker) createEmptyListObjectFor(gvk schema.GroupVersionKind) (runtime
 	return list, nil
 }
 
-func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...metav1.ListOptions) (watch.Interface, error) {
+func (t *tracker) Watch(gvr schema.GroupVersionResource, gvk schema.GroupVersionKind, ns string, opts ...metav1.ListOptions) (watch.Interface, error) {
 	listOptions, err := assertOptionalSingleArgument(opts)
 	if err != nil {
 		return nil, err
@@ -397,6 +397,8 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string, opts ...meta
 		if err != nil {
 			return nil, err
 		}
+		_ = list
+
 		for _, obj := range objs {
 			fakewatcher.Add(obj)
 		}
