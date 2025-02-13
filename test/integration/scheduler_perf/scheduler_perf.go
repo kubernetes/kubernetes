@@ -1553,10 +1553,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		case *barrierOp:
 			executor.runBarrierOp(opIndex, concreteOp)
 		case *sleepOp:
-			select {
-			case <-tCtx.Done():
-			case <-time.After(concreteOp.Duration.Duration):
-			}
+			executor.runSleepOp(concreteOp)
 		case *startCollectingMetricsOp:
 			executor.runStartCollectingMetricsOp(opIndex, concreteOp)
 			defer (*executor.collectorCtx).Cancel("cleaning up")
@@ -1637,6 +1634,13 @@ func (e *WorkloadExecutor) runBarrierOp(opIndex int, op *barrierOp) {
 				delete(e.numPodsScheduledPerNamespace, namespace)
 			}
 		}
+	}
+}
+
+func (e *WorkloadExecutor) runSleepOp(op *sleepOp) {
+	select {
+	case <-(*e.tCtx).Done():
+	case <-time.After(op.Duration.Duration):
 	}
 }
 
