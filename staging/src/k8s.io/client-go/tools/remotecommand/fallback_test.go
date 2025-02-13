@@ -312,7 +312,7 @@ func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
-		defer conns.conn.Close()
+		defer conns.conn.Close() //nolint:errcheck
 		// Loopback the STDIN stream onto the STDOUT stream.
 		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
 		require.NoError(t, err)

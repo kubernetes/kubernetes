@@ -303,6 +303,12 @@ func (d *Dialer) DialContext(ctx context.Context, urlStr string, requestHeader h
 			return nil, nil, err
 		}
 		if proxyURL != nil {
+			if proxyURL.Scheme == "https" {
+				netDial = func(unused, addr string) (net.Conn, error) {
+					tlsConfig := cloneTLSConfig(d.TLSClientConfig)
+					return tls.Dial("tcp", addr, tlsConfig)
+				}
+			}
 			dialer, err := proxy_FromURL(proxyURL, netDialerFunc(netDial))
 			if err != nil {
 				return nil, nil, err
