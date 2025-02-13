@@ -157,7 +157,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			b.create(ctx, claim, pod)
 
-			b.testPod(ctx, f.ClientSet, pod)
+			b.testPod(ctx, f, pod)
 
 			ginkgo.By(fmt.Sprintf("force delete test pod %s", pod.Name))
 			err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero})
@@ -280,8 +280,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 			framework.ExpectNoError(err, "start pod")
 
-			testContainerEnv(ctx, f.ClientSet, pod, pod.Spec.Containers[0].Name, true, container0Env...)
-			testContainerEnv(ctx, f.ClientSet, pod, pod.Spec.Containers[1].Name, true, container1Env...)
+			testContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, true, container0Env...)
+			testContainerEnv(ctx, f, pod, pod.Spec.Containers[1].Name, true, container1Env...)
 		})
 	})
 
@@ -291,20 +291,20 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("supports simple pod referencing inline resource claim", func(ctx context.Context) {
 			pod, template := b.podInline()
 			b.create(ctx, pod, template)
-			b.testPod(ctx, f.ClientSet, pod)
+			b.testPod(ctx, f, pod)
 		})
 
 		ginkgo.It("supports inline claim referenced by multiple containers", func(ctx context.Context) {
 			pod, template := b.podInlineMultiple()
 			b.create(ctx, pod, template)
-			b.testPod(ctx, f.ClientSet, pod)
+			b.testPod(ctx, f, pod)
 		})
 
 		ginkgo.It("supports simple pod referencing external resource claim", func(ctx context.Context) {
 			pod := b.podExternal()
 			claim := b.externalClaim()
 			b.create(ctx, claim, pod)
-			b.testPod(ctx, f.ClientSet, pod)
+			b.testPod(ctx, f, pod)
 		})
 
 		ginkgo.It("supports external claim referenced by multiple pods", func(ctx context.Context) {
@@ -315,7 +315,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.create(ctx, claim, pod1, pod2, pod3)
 
 			for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-				b.testPod(ctx, f.ClientSet, pod)
+				b.testPod(ctx, f, pod)
 			}
 		})
 
@@ -327,7 +327,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.create(ctx, claim, pod1, pod2, pod3)
 
 			for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
-				b.testPod(ctx, f.ClientSet, pod)
+				b.testPod(ctx, f, pod)
 			}
 		})
 
@@ -339,7 +339,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			pod.Spec.InitContainers[0].Command = []string{"sh", "-c", "env | grep user_a=b"}
 			b.create(ctx, pod, template)
 
-			b.testPod(ctx, f.ClientSet, pod)
+			b.testPod(ctx, f, pod)
 		})
 
 		ginkgo.It("removes reservation from claim when pod is done", func(ctx context.Context) {
@@ -394,7 +394,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				return b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
 			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
 
-			b.testPod(ctx, f.ClientSet, pod)
+			b.testPod(ctx, f, pod)
 
 			ginkgo.By(fmt.Sprintf("deleting pod %s", klog.KObj(pod)))
 			framework.ExpectNoError(b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
@@ -496,7 +496,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		ginkgo.It("supports claim and class parameters", func(ctx context.Context) {
 			pod, template := b.podInline()
 			b.create(ctx, pod, template)
-			b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+			b.testPod(ctx, f, pod, expectedEnv...)
 		})
 
 		ginkgo.It("supports reusing resources", func(ctx context.Context) {
@@ -518,7 +518,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				go func() {
 					defer ginkgo.GinkgoRecover()
 					defer wg.Done()
-					b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+					b.testPod(ctx, f, pod, expectedEnv...)
 					err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "delete pod")
 					framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, time.Duration(numPods)*f.Timeouts.PodStartSlow))
@@ -548,7 +548,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				go func() {
 					defer ginkgo.GinkgoRecover()
 					defer wg.Done()
-					b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+					b.testPod(ctx, f, pod, expectedEnv...)
 				}()
 			}
 			wg.Wait()
@@ -572,7 +572,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			class.Name = deviceClassName
 			b.create(ctx, class)
 
-			b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+			b.testPod(ctx, f, pod, expectedEnv...)
 		})
 
 		ginkgo.It("retries pod scheduling after updating device class", func(ctx context.Context) {
@@ -603,7 +603,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			_, err = f.ClientSet.ResourceV1beta1().DeviceClasses().Update(ctx, class, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 
-			b.testPod(ctx, f.ClientSet, pod, expectedEnv...)
+			b.testPod(ctx, f, pod, expectedEnv...)
 		})
 
 		ginkgo.It("runs a pod without a generated resource claim", func(ctx context.Context) {
@@ -1037,7 +1037,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			pod.Spec.Containers[0].Resources.Claims[0].Name = pod.Spec.ResourceClaims[0].Name
 			b.create(ctx, template, pod)
 
-			b.testPod(ctx, f.ClientSet, pod)
+			b.testPod(ctx, f, pod)
 		})
 
 		ginkgo.It("supports count/resourceclaims.resource.k8s.io ResourceQuota", func(ctx context.Context) {
@@ -1360,7 +1360,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				)
 			}
 			b1.create(ctx, claim1, claim1b, claim2, claim2b, pod)
-			b1.testPod(ctx, f.ClientSet, pod)
+			b1.testPod(ctx, f, pod)
 		})
 	}
 	multipleDriversContext := func(prefix string, nodeV1alpha4, nodeV1beta1 bool) {
@@ -1391,7 +1391,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		driver.Run(nodes, perNode(1, nodes))
 
 		// Now it should run.
-		b.testPod(ctx, f.ClientSet, pod)
+		b.testPod(ctx, f, pod)
 
 		// We need to clean up explicitly because the normal
 		// cleanup doesn't work (driver shuts down first).
@@ -1494,7 +1494,7 @@ func (b *builder) parametersEnv() (string, []string) {
 // makePod returns a simple pod with no resource claims.
 // The pod prints its env and waits.
 func (b *builder) pod() *v1.Pod {
-	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, b.f.NamespacePodSecurityLevel, "env && sleep 100000")
+	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, b.f.NamespacePodSecurityLevel, "" /* no command = pause */)
 	pod.Labels = make(map[string]string)
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	// Let kubelet kill the pods quickly. Setting
@@ -1621,30 +1621,39 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 }
 
 // testPod runs pod and checks if container logs contain expected environment variables
-func (b *builder) testPod(ctx context.Context, clientSet kubernetes.Interface, pod *v1.Pod, env ...string) {
+func (b *builder) testPod(ctx context.Context, f *framework.Framework, pod *v1.Pod, env ...string) {
 	ginkgo.GinkgoHelper()
-	err := e2epod.WaitForPodRunningInNamespace(ctx, clientSet, pod)
+	err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
 	framework.ExpectNoError(err, "start pod")
 
 	if len(env) == 0 {
 		_, env = b.parametersEnv()
 	}
 	for _, container := range pod.Spec.Containers {
-		testContainerEnv(ctx, clientSet, pod, container.Name, false, env...)
+		testContainerEnv(ctx, f, pod, container.Name, false, env...)
 	}
 }
 
 // envLineRE matches env output with variables set by test/e2e/dra/test-driver.
 var envLineRE = regexp.MustCompile(`^(?:admin|user|claim)_[a-zA-Z0-9_]*=.*$`)
 
-func testContainerEnv(ctx context.Context, clientSet kubernetes.Interface, pod *v1.Pod, containerName string, fullMatch bool, env ...string) {
+func testContainerEnv(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, fullMatch bool, env ...string) {
 	ginkgo.GinkgoHelper()
-	log, err := e2epod.GetPodLogs(ctx, clientSet, pod.Namespace, pod.Name, containerName)
-	framework.ExpectNoError(err, fmt.Sprintf("get logs for container %s", containerName))
+	stdout, stderr, err := e2epod.ExecWithOptionsContext(ctx, f, e2epod.ExecOptions{
+		Command:       []string{"env"},
+		Namespace:     pod.Namespace,
+		PodName:       pod.Name,
+		ContainerName: containerName,
+		CaptureStdout: true,
+		CaptureStderr: true,
+		Quiet:         true,
+	})
+	framework.ExpectNoError(err, fmt.Sprintf("get env output for container %s", containerName))
+	gomega.Expect(stderr).To(gomega.BeEmpty(), fmt.Sprintf("env stderr for container %s", containerName))
 	if fullMatch {
 		// Find all env variables set by the test driver.
 		var actualEnv, expectEnv []string
-		for _, line := range strings.Split(log, "\n") {
+		for _, line := range strings.Split(stdout, "\n") {
 			if envLineRE.MatchString(line) {
 				actualEnv = append(actualEnv, line)
 			}
@@ -1654,11 +1663,11 @@ func testContainerEnv(ctx context.Context, clientSet kubernetes.Interface, pod *
 		}
 		sort.Strings(actualEnv)
 		sort.Strings(expectEnv)
-		gomega.Expect(actualEnv).To(gomega.Equal(expectEnv), fmt.Sprintf("container %s log output:\n%s", containerName, log))
+		gomega.Expect(actualEnv).To(gomega.Equal(expectEnv), fmt.Sprintf("container %s env output:\n%s", containerName, stdout))
 	} else {
 		for i := 0; i < len(env); i += 2 {
 			envStr := fmt.Sprintf("\n%s=%s\n", env[i], env[i+1])
-			gomega.Expect(log).To(gomega.ContainSubstring(envStr), fmt.Sprintf("container %s env variables", containerName))
+			gomega.Expect(stdout).To(gomega.ContainSubstring(envStr), fmt.Sprintf("container %s env variables", containerName))
 		}
 	}
 }
