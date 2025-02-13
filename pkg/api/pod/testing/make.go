@@ -202,6 +202,12 @@ func SetLabels(annos map[string]string) Tweak {
 	}
 }
 
+func SetGeneration(gen int64) Tweak {
+	return func(pod *api.Pod) {
+		pod.Generation = gen
+	}
+}
+
 func SetSchedulingGates(gates ...api.PodSchedulingGate) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.SchedulingGates = gates
