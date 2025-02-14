@@ -175,16 +175,6 @@ const (
 	// both allocators. This feature gate disables the dual write on the new Cluster IP allocators.
 	DisableAllocatorDualWrite featuregate.Feature = "DisableAllocatorDualWrite"
 
-	// owner: @andrewsykim
-	//
-	// Disable any functionality in kube-apiserver, kube-controller-manager and kubelet related to the `--cloud-provider` component flag.
-	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
-
-	// owner: @andrewsykim
-	//
-	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
-	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
-
 	// owner: @micahhausler
 	//
 	// Setting AllowInsecureKubeletCertificateSigningRequests to true disables node admission validation of CSRs
