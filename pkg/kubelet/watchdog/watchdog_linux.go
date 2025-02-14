@@ -20,6 +20,7 @@ limitations under the License.
 package watchdog
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -79,7 +80,7 @@ const minimalNotifyInterval = time.Second
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
-func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
+func NewHealthChecker(ctx context.Context, syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
 	hc := &healthChecker{
 		watchdog: &DefaultWatchdogClient{},
 	}
@@ -95,8 +96,9 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 		// for example, the time is not configured correctly.
 		return nil, fmt.Errorf("configure watchdog: %w", err)
 	}
+	logger := klog.FromContext(ctx)
 	if watchdogVal == 0 {
-		klog.InfoS("Systemd watchdog is not enabled")
+		logger.Info("Systemd watchdog is not enabled")
 		return &healthChecker{}, nil
 	}
 	if watchdogVal <= minimalNotifyInterval {
@@ -122,34 +124,35 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 	return hc, nil
 }
 
-func (hc *healthChecker) Start() {
+func (hc *healthChecker) Start(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	if hc.interval <= 0 {
-		klog.InfoS("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
+		logger.Info("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
 		return
 	}
-	klog.InfoS("Starting systemd watchdog with interval", "interval", hc.interval)
+	logger.Info("Starting systemd watchdog with interval", "interval", hc.interval)
 
 	go wait.Forever(func() {
 		if err := hc.doCheck(); err != nil {
-			klog.ErrorS(err, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
+			logger.Error(err, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
 			return
 		}
 
 		err := wait.ExponentialBackoff(hc.retryBackoff, func() (bool, error) {
 			ack, err := hc.watchdog.SdNotify(false)
 			if err != nil {
-				klog.V(5).InfoS("Failed to notify systemd watchdog, retrying", "error", err)
+				logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
 				return false, nil
 			}
 			if !ack {
 				return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
 			}
 
-			klog.V(5).InfoS("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
+			logger.V(5).Info("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
 			return true, nil
 		})
 		if err != nil {
-			klog.ErrorS(err, "Failed to notify watchdog")
+			logger.Error(err, "Failed to notify watchdog")
 		}
 	}, hc.interval)
 }

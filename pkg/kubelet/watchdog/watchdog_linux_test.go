@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Mock syncLoopHealthChecker
@@ -76,6 +77,7 @@ func TestNewHealthChecker(t *testing.T) {
 		{"Watchdog enabled with error", interval, errors.New("mock error"), true},
 		{"Watchdog timeout too small", intervalSmall, nil, true},
 	}
+	tCtx := ktesting.Init(t)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -84,7 +86,7 @@ func TestNewHealthChecker(t *testing.T) {
 				enabledErr: tt.mockErr,
 			}
 
-			_, err := NewHealthChecker(&mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
+			_, err := NewHealthChecker(tCtx, &mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -136,6 +138,7 @@ func TestHealthCheckerStart(t *testing.T) {
 			expectedLogs:   []string{"Starting systemd watchdog with interval", "Do not notify watchdog this iteration as the kubelet is reportedly not healthy"},
 		},
 	}
+	tCtx := ktesting.Init(t)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -150,13 +153,13 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Create a healthChecker
-			hc, err := NewHealthChecker(&mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, WithWatchdogClient(mockClient))
+			hc, err := NewHealthChecker(tCtx, &mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, WithWatchdogClient(mockClient))
 			if err != nil {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
 			}
 
 			// Start the health checker
-			hc.Start()
+			hc.Start(tCtx)
 
 			// Wait for a short period to allow the health check to run
 			time.Sleep(2 * interval)
