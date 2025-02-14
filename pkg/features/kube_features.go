@@ -54,6 +54,7 @@ const (
 	AllowServiceLBStatusOnNonLB featuregate.Feature = "AllowServiceLBStatusOnNonLB"
 
 	// owner: @bswartz
+	// kep: https://kep.k8s.io/3294
 	//
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
@@ -66,11 +67,13 @@ const (
 	AuthorizeNodeWithSelectors featuregate.Feature = "AuthorizeNodeWithSelectors"
 
 	// owner: @ahmedtd
+	// kep: https://kep.k8s.io/3257
 	//
 	// Enable ClusterTrustBundle objects and Kubelet integration.
 	ClusterTrustBundle featuregate.Feature = "ClusterTrustBundle"
 
 	// owner: @ahmedtd
+	// kep: https://kep.k8s.io/3257
 	//
 	// Enable ClusterTrustBundle Kubelet projected volumes.  Depends on ClusterTrustBundle.
 	ClusterTrustBundleProjection featuregate.Feature = "ClusterTrustBundleProjection"
@@ -122,12 +125,13 @@ const (
 	CoordinatedLeaderElection featuregate.Feature = "CoordinatedLeaderElection"
 
 	// owner: @trierra
-	// kep:  http://kep.k8s.io/2589
+	// kep: http://kep.k8s.io/2589
 	//
 	// Enables the Portworx in-tree driver to Portworx migration feature.
 	CSIMigrationPortworx featuregate.Feature = "CSIMigrationPortworx"
 
 	// owner: @fengzixu
+	// kep: http://kep.k8s.io/1432
 	//
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
@@ -185,6 +189,7 @@ const (
 	DevicePluginCDIDevices featuregate.Feature = "DevicePluginCDIDevices"
 
 	// owner: @aojea
+	// kep: https://kep.k8s.io/1880
 	//
 	// The apiservers with the MultiCIDRServiceAllocator feature enable, in order to support live migration from the old bitmap ClusterIP
 	// allocators to the new IPAddress allocators introduced by the MultiCIDRServiceAllocator feature, performs a dual-write on
@@ -258,6 +263,7 @@ const (
 	EventedPLEG featuregate.Feature = "EventedPLEG"
 
 	// owner: @andrewsykim @SergeyKanzhelev
+	// kep: https://kep.k8s.io/1972
 	//
 	// Ensure kubelet respects exec probe timeouts. Feature gate exists in-case existing workloads
 	// may depend on old behavior where exec probe timeouts were ignored.
@@ -272,14 +278,19 @@ const (
 	GitRepoVolumeDriver featuregate.Feature = "GitRepoVolumeDriver"
 
 	// owner: @bobbypage
+	// kep: https://kep.k8s.io/2000
+	//
 	// Adds support for kubelet to detect node shutdown and gracefully terminate pods prior to the node being shutdown.
 	GracefulNodeShutdown featuregate.Feature = "GracefulNodeShutdown"
 
 	// owner: @wzshiming
+	// kep: https://kep.k8s.io/2712
+	//
 	// Make the kubelet use shutdown configuration based on pod priority values for graceful shutdown.
 	GracefulNodeShutdownBasedOnPodPriority featuregate.Feature = "GracefulNodeShutdownBasedOnPodPriority"
 
 	// owner: @dxist
+	// kep: https://kep.k8s.io/2021
 	//
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
@@ -367,6 +378,7 @@ const (
 	KubeletFineGrainedAuthz featuregate.Feature = "KubeletFineGrainedAuthz"
 
 	// owner: @AkihiroSuda
+	// kep: https://kep.k8s.io/2033
 	//
 	// Enables support for running kubelet in a user namespace.
 	// The user namespace has to be created before running kubelet.
@@ -374,11 +386,13 @@ const (
 	KubeletInUserNamespace featuregate.Feature = "KubeletInUserNamespace"
 
 	// owner: @moshe010
+	// kep: https://kep.k8s.io/3695
 	//
 	// Enable POD resources API to return resources allocated by Dynamic Resource Allocation
 	KubeletPodResourcesDynamicResources featuregate.Feature = "KubeletPodResourcesDynamicResources"
 
 	// owner: @moshe010
+	// kep: https://kep.k8s.io/3695
 	//
 	// Enable POD resources API with Get method
 	KubeletPodResourcesGet featuregate.Feature = "KubeletPodResourcesGet"
@@ -413,6 +427,7 @@ const (
 	LegacySidecarContainers featuregate.Feature = "LegacySidecarContainers"
 
 	// owner: @RobertKrawitz
+	// kep: https://kep.k8s.io/1029
 	//
 	// Allow use of filesystems for ephemeral storage monitoring.
 	// Only applies if LocalStorageCapacityIsolation is set.
@@ -420,6 +435,7 @@ const (
 	LocalStorageCapacityIsolationFSQuotaMonitoring featuregate.Feature = "LocalStorageCapacityIsolationFSQuotaMonitoring"
 
 	// owner: @damemi
+	// kep: https://kep.k8s.io/2185
 	//
 	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
 	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
@@ -437,11 +453,13 @@ const (
 	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
 
 	// owner: @krmayankk
+	// kep: https://kep.k8s.io/961
 	//
 	// Enables maxUnavailable for StatefulSet
 	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
 
 	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk, @Tal-or (only for GA graduation)
+	// kep: https://kep.k8s.io/1769
 	//
 	// Allows setting memory affinity for a container based on NUMA topology
 	MemoryManager featuregate.Feature = "MemoryManager"
@@ -498,6 +516,7 @@ const (
 	PodAndContainerStatsFromCRI featuregate.Feature = "PodAndContainerStatsFromCRI"
 
 	// owner: @ahg-g
+	// kep: https://kep.k8s.io/2255
 	//
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
@@ -522,6 +541,7 @@ const (
 	PodLogsQuerySplitStreams featuregate.Feature = "PodLogsQuerySplitStreams"
 
 	// owner: @ddebroy, @kannon92
+	// kep: https://kep.k8s.io/3085
 	//
 	// Enables reporting of PodReadyToStartContainersCondition condition in pod status after pod
 	// sandbox creation and network configuration completes successfully
@@ -558,11 +578,13 @@ const (
 	PortForwardWebsockets featuregate.Feature = "PortForwardWebsockets"
 
 	// owner: @jessfraz
+	// kep: https://kep.k8s.io/4265
 	//
 	// Enables control over ProcMountType for containers.
 	ProcMountType featuregate.Feature = "ProcMountType"
 
 	// owner: @sjenning
+	// kep: https://kep.k8s.io/5046
 	//
 	// Allows resource reservations at the QoS level preventing pods at lower QoS levels from
 	// bursting into resources requested at higher QoS levels (memory only for now)
@@ -613,6 +635,7 @@ const (
 	ResourceHealthStatus featuregate.Feature = "ResourceHealthStatus"
 
 	// owner: @mikedanese
+	// kep: https://kep.k8s.io/267
 	//
 	// Gets a server certificate for the kubelet from the Certificate Signing
 	// Request API instead of generating one self signed and auto rotates the
@@ -715,6 +738,7 @@ const (
 	SidecarContainers featuregate.Feature = "SidecarContainers"
 
 	// owner: @derekwaynecarr
+	// kep: https://kep.k8s.io/1967
 	//
 	// Enables kubelet support to size memory backed volumes
 	// This is a kubelet only feature gate.
@@ -722,11 +746,13 @@ const (
 	SizeMemoryBackedVolumes featuregate.Feature = "SizeMemoryBackedVolumes"
 
 	// owner: @mattcary
+	// kep: https://kep.k8s.io/1847
 	//
 	// Enables policies controlling deletion of PVCs created by a StatefulSet.
 	StatefulSetAutoDeletePVC featuregate.Feature = "StatefulSetAutoDeletePVC"
 
 	// owner: @psch
+	// kep: https://kep.k8s.io/3335
 	//
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
@@ -796,6 +822,7 @@ const (
 	TranslateStreamCloseWebsocketRequests featuregate.Feature = "TranslateStreamCloseWebsocketRequests"
 
 	// owner: @richabanker
+	// kep: https://kep.k8s.io/4020
 	//
 	// Proxies client to an apiserver capable of serving the request in the event of version skew.
 	UnknownVersionInteroperabilityProxy featuregate.Feature = "UnknownVersionInteroperabilityProxy"
@@ -813,6 +840,7 @@ const (
 	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
 
 	// owner: @ksubrmnn
+	// kep: https://kep.k8s.io/5100
 	//
 	// Allows kube-proxy to create DSR loadbalancers for Windows
 	WinDSR featuregate.Feature = "WinDSR"
@@ -824,6 +852,7 @@ const (
 	WindowsGracefulNodeShutdown featuregate.Feature = "WindowsGracefulNodeShutdown"
 
 	// owner: @ksubrmnn
+	// kep: https://kep.k8s.io/5100
 	//
 	// Allows kube-proxy to run in Overlay mode for Windows
 	WinOverlay featuregate.Feature = "WinOverlay"
@@ -912,6 +941,7 @@ const (
 	SELinuxChangePolicy featuregate.Feature = "SELinuxChangePolicy"
 
 	// owner: @HarshalNeelkamal
+	// kep: https://kep.k8s.io/740
 	//
 	// Enables external service account JWT signing and key management.
 	// If enabled, it allows passing --service-account-signing-endpoint flag to configure external signer.
