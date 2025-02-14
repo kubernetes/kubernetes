@@ -631,7 +631,7 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		}
 		for _, policy := range container.ResizePolicy {
 			if policy.ResourceName == rName {
-				return true, policy.RestartPolicy == v1.RestartContainer
+				return true, policy.RestartPolicy == v1.ResizeRestartPolicyRestartContainer
 			}
 		}
 		// If a resource policy isn't set, the implicit default is NotRequired.

@@ -3375,7 +3375,7 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 }
 
 var supportedResizeResources = sets.New(core.ResourceCPU, core.ResourceMemory)
-var supportedResizePolicies = sets.New(core.NotRequired, core.RestartContainer)
+var supportedResizePolicies = sets.New(core.ResizeRestartPolicyNotRequired, core.ResizeRestartPolicyRestartContainer)
 
 func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *field.Path, podRestartPolicy *core.RestartPolicy) field.ErrorList {
 	allErrors := field.ErrorList{}
@@ -3395,14 +3395,14 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 			allErrors = append(allErrors, field.NotSupported(fldPath, p.ResourceName, sets.List(supportedResizeResources)))
 		}
 		switch p.RestartPolicy {
-		case core.NotRequired, core.RestartContainer:
+		case core.ResizeRestartPolicyNotRequired, core.ResizeRestartPolicyRestartContainer:
 		case "":
 			allErrors = append(allErrors, field.Required(fldPath, ""))
 		default:
 			allErrors = append(allErrors, field.NotSupported(fldPath, p.RestartPolicy, sets.List(supportedResizePolicies)))
 		}
 
-		if *podRestartPolicy == core.RestartPolicyNever && p.RestartPolicy != core.NotRequired {
+		if *podRestartPolicy == core.RestartPolicyNever && p.RestartPolicy != core.ResizeRestartPolicyNotRequired {
 			allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "must be 'NotRequired' when `restartPolicy` is 'Never'"))
 		}
 	}
@@ -5750,20 +5750,20 @@ func validateContainerResize(newRequirements, oldRequirements *core.ResourceRequ
 			break
 		}
 	}
-	if memRestartPolicy == core.NotRequired || memRestartPolicy == "" {
+	if memRestartPolicy == core.ResizeRestartPolicyNotRequired || memRestartPolicy == "" {
 		newLimit, hasNewLimit := newRequirements.Limits[core.ResourceMemory]
 		oldLimit, hasOldLimit := oldRequirements.Limits[core.ResourceMemory]
 		if hasNewLimit && hasOldLimit {
 			if newLimit.Cmp(oldLimit) < 0 {
 				allErrs = append(allErrs, field.Forbidden(
 					fldPath.Child("limits").Key(core.ResourceMemory.String()),
-					fmt.Sprintf("memory limits cannot be decreased unless resizePolicy is %s", core.RestartContainer)))
+					fmt.Sprintf("memory limits cannot be decreased unless resizePolicy is %s", core.ResizeRestartPolicyRestartContainer)))
 			}
 		} else if hasNewLimit && !hasOldLimit {
 			// Adding a memory limit is implicitly decreasing the memory limit (from 'max')
 			allErrs = append(allErrs, field.Forbidden(
 				fldPath.Child("limits").Key(core.ResourceMemory.String()),
-				fmt.Sprintf("memory limits cannot be added unless resizePolicy is %s", core.RestartContainer)))
+				fmt.Sprintf("memory limits cannot be added unless resizePolicy is %s", core.ResizeRestartPolicyRestartContainer)))
 		}
 	}
 

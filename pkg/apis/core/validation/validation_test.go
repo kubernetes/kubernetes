@@ -7699,7 +7699,7 @@ func TestValidatePullPolicy(t *testing.T) {
 func TestValidateResizePolicy(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	tSupportedResizeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
-	tSupportedResizePolicies := sets.NewString(string(core.NotRequired), string(core.RestartContainer))
+	tSupportedResizePolicies := sets.NewString(string(core.ResizeRestartPolicyNotRequired), string(core.ResizeRestartPolicyRestartContainer))
 	type T struct {
 		PolicyList       []core.ContainerResizePolicy
 		ExpectError      bool
@@ -25861,13 +25861,13 @@ func TestValidatePodResize(t *testing.T) {
 			err:  "memory limits cannot be decreased",
 		}, {
 			test: "restart NotRequired: memory limit decrease",
-			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.NotRequired)),
-			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.NotRequired)),
+			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.ResizeRestartPolicyNotRequired)),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.ResizeRestartPolicyNotRequired)),
 			err:  "memory limits cannot be decreased",
 		}, {
 			test: "RestartContainer: memory limit decrease",
-			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.RestartContainer)),
-			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.RestartContainer)),
+			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.ResizeRestartPolicyRestartContainer)),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.ResizeRestartPolicyRestartContainer)),
 			err:  "",
 		}, {
 			test: "storage limit change",
@@ -26088,13 +26088,13 @@ func TestValidatePodResize(t *testing.T) {
 			err:  "memory limits cannot be decreased",
 		}, {
 			test: "memory limit decrease for sidecar containers, resize policy NotRequired",
-			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
-			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.ResizeRestartPolicyNotRequired)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.ResizeRestartPolicyNotRequired)),
 			err:  "memory limits cannot be decreased",
 		}, {
 			test: "memory limit decrease for sidecar containers, resize policy RestartContainer",
-			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
-			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.ResizeRestartPolicyRestartContainer)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.ResizeRestartPolicyRestartContainer)),
 			err:  "",
 		}, {
 			test: "storage limit change for sidecar containers",
@@ -26118,13 +26118,13 @@ func TestValidatePodResize(t *testing.T) {
 			err:  "spec: Forbidden: only cpu and memory resources for sidecar containers are mutable",
 		}, {
 			test: "change resize restart policy",
-			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.NotRequired)),
-			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.RestartContainer)),
+			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.ResizeRestartPolicyNotRequired)),
+			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.ResizeRestartPolicyRestartContainer)),
 			err:  "spec: Forbidden: only cpu and memory resources are mutable",
 		}, {
 			test: "change sidecar container resize restart policy",
-			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
-			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.ResizeRestartPolicyRestartContainer)),
+			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.ResizeRestartPolicyNotRequired)),
 			err:  "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 	}
