@@ -33,7 +33,10 @@ message AllocatableResourcesResponse {
 }
 
 // ListPodResourcesRequest is the request made to the PodResourcesLister service
-message ListPodResourcesRequest {}
+message ListPodResourcesRequest {
+    // Determines whether to include all init containers.
+    bool include_init_containers = 1;
+}
 
 // ListPodResourcesResponse is the response returned by List function
 message ListPodResourcesResponse {
@@ -113,6 +116,8 @@ message CDIDevice {
 message GetPodResourcesRequest {
     string pod_name = 1;
     string pod_namespace = 2;
+    // Determines whether to include all init containers.
+    bool include_init_containers = 3;
 }
 
 // GetPodResourcesResponse contains information about the pod the devices
