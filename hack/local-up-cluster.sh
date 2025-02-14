@@ -411,7 +411,7 @@ cleanup()
   fi
 
   # Cleanup dmesg running in the background
-  [[ -n "${DMESG_PID-}" ]] && kill "$DMESG_PID"
+  [[ -n "${DMESG_PID-}" ]] && sudo kill "$DMESG_PID" 2>/dev/null
 
   exit 0
 }
@@ -812,8 +812,10 @@ function wait_coredns_available(){
     echo "6" | sudo tee /proc/sys/kernel/printk
 
     # loop through and grab all things in dmesg
-    dmesg > "${LOG_DIR}/dmesg.log"
-    dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
+    # shellcheck disable=SC2024
+    sudo dmesg > "${LOG_DIR}/dmesg.log"
+    # shellcheck disable=SC2024
+    sudo dmesg -w --human >> "${LOG_DIR}/dmesg.log" &
     DMESG_PID=$!
   fi
 }
