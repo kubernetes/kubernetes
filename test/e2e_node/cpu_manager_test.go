@@ -592,11 +592,13 @@ func runMultipleCPUContainersGuPod(ctx context.Context, f *framework.Framework) 
 	waitForContainerRemoval(ctx, pod.Spec.Containers[1].Name, pod.Name, pod.Namespace)
 }
 
-func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQuotaWithExclusiveCPUs bool) {
+func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQuotaWithExclusiveCPUs bool, cpuAlloc int64) {
 	var err error
 	var ctnAttrs []ctnAttribute
 	var pod1, pod2, pod3 *v1.Pod
 	podsToClean := make(map[string]*v1.Pod) // pod.UID -> pod
+
+	framework.Logf("runCfsQuotaGuPods: disableQuota=%v, CPU Allocatable=%v", disabledCPUQuotaWithExclusiveCPUs, cpuAlloc)
 
 	deleteTestPod := func(pod *v1.Pod) {
 		// waitForContainerRemoval takes "long" to complete; if we use the parent ctx we get a
@@ -619,6 +621,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 		deletePodsAsync(ctx2, f, podsToClean)
 	})
 
+	podCFSCheckCommand := []string{"sh", "-c", `cat $(find /sysfscgroup | grep "$(cat /podinfo/uid | sed 's/-/_/g').slice/cpu.max$") && sleep 1d`}
 	cfsCheckCommand := []string{"sh", "-c", "cat /sys/fs/cgroup/cpu.max && sleep 1d"}
 	defaultPeriod := "100000"
 
@@ -688,74 +691,76 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 		pod3.Spec.Containers[0].Name, pod3.Name)
 	deleteTestPod(pod3)
 
-	ctnAttrs = []ctnAttribute{
-		{
-			ctnName:    "gu-container-non-int-values",
-			cpuRequest: "500m",
-			cpuLimit:   "500m",
-		},
-		{
-			ctnName:    "gu-container-int-values",
-			cpuRequest: "1",
-			cpuLimit:   "1",
-		},
+	if cpuAlloc >= 2 {
+		ctnAttrs = []ctnAttribute{
+			{
+				ctnName:    "gu-container-non-int-values",
+				cpuRequest: "500m",
+				cpuLimit:   "500m",
+			},
+			{
+				ctnName:    "gu-container-int-values",
+				cpuRequest: "1",
+				cpuLimit:   "1",
+			},
+		}
+		pod4 := makeCPUManagerPod("gu-pod4", ctnAttrs)
+		pod4.Spec.Containers[0].Command = cfsCheckCommand
+		pod4.Spec.Containers[1].Command = cfsCheckCommand
+		pod4 = e2epod.NewPodClient(f).CreateSync(ctx, pod4)
+		podsToClean[string(pod4.UID)] = pod4
+
+		ginkgo.By("checking if the expected cfs quota was assigned (GU pod, container 0 exclusive CPUs unlimited, container 1 limited)")
+
+		expectedQuota = "50000"
+		expCFSQuotaRegex = fmt.Sprintf("^%s %s\n$", expectedQuota, defaultPeriod)
+		err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod4.Name, pod4.Spec.Containers[0].Name, expCFSQuotaRegex)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+			pod4.Spec.Containers[0].Name, pod4.Name)
+		expectedQuota = "100000"
+		if disabledCPUQuotaWithExclusiveCPUs {
+			expectedQuota = "max"
+		}
+		expCFSQuotaRegex = fmt.Sprintf("^%s %s\n$", expectedQuota, defaultPeriod)
+		err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod4.Name, pod4.Spec.Containers[1].Name, expCFSQuotaRegex)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
+			pod4.Spec.Containers[1].Name, pod4.Name)
+		deleteTestPod(pod4)
+
+		ctnAttrs = []ctnAttribute{
+			{
+				ctnName:    "gu-container-non-int-values",
+				cpuRequest: "500m",
+				cpuLimit:   "500m",
+			},
+			{
+				ctnName:    "gu-container-int-values",
+				cpuRequest: "1",
+				cpuLimit:   "1",
+			},
+		}
+
+		pod5 := makeCPUManagerPod("gu-pod5", ctnAttrs)
+		pod5.Spec.Containers[0].Command = podCFSCheckCommand
+		pod5 = e2epod.NewPodClient(f).CreateSync(ctx, pod5)
+		podsToClean[string(pod5.UID)] = pod5
+
+		ginkgo.By("checking if the expected cfs quota was assigned to pod (GU pod, unlimited)")
+
+		expectedQuota = "150000"
+
+		if disabledCPUQuotaWithExclusiveCPUs {
+			expectedQuota = "max"
+		}
+
+		expCFSQuotaRegex = fmt.Sprintf("^%s %s\n$", expectedQuota, defaultPeriod)
+
+		err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod5.Name, pod5.Spec.Containers[0].Name, expCFSQuotaRegex)
+		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", pod5.Spec.Containers[0].Name, pod5.Name)
+		deleteTestPod(pod5)
+	} else {
+		ginkgo.By(fmt.Sprintf("some cases SKIPPED - requests at least %d allocatable cores, got %d", 2, cpuAlloc))
 	}
-	pod4 := makeCPUManagerPod("gu-pod4", ctnAttrs)
-	pod4.Spec.Containers[0].Command = cfsCheckCommand
-	pod4.Spec.Containers[1].Command = cfsCheckCommand
-	pod4 = e2epod.NewPodClient(f).CreateSync(ctx, pod4)
-	podsToClean[string(pod4.UID)] = pod4
-
-	ginkgo.By("checking if the expected cfs quota was assigned (GU pod, container 0 exclusive CPUs unlimited, container 1 limited)")
-
-	expectedQuota = "50000"
-	expCFSQuotaRegex = fmt.Sprintf("^%s %s\n$", expectedQuota, defaultPeriod)
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod4.Name, pod4.Spec.Containers[0].Name, expCFSQuotaRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-		pod4.Spec.Containers[0].Name, pod4.Name)
-	expectedQuota = "100000"
-	if disabledCPUQuotaWithExclusiveCPUs {
-		expectedQuota = "max"
-	}
-	expCFSQuotaRegex = fmt.Sprintf("^%s %s\n$", expectedQuota, defaultPeriod)
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod4.Name, pod4.Spec.Containers[1].Name, expCFSQuotaRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
-		pod4.Spec.Containers[1].Name, pod4.Name)
-	deleteTestPod(pod4)
-
-	ctnAttrs = []ctnAttribute{
-		{
-			ctnName:    "gu-container-non-int-values",
-			cpuRequest: "500m",
-			cpuLimit:   "500m",
-		},
-		{
-			ctnName:    "gu-container-int-values",
-			cpuRequest: "1",
-			cpuLimit:   "1",
-		},
-	}
-
-	podCFSCheckCommand := []string{"sh", "-c", `cat $(find /sysfscgroup | grep "$(cat /podinfo/uid | sed 's/-/_/g').slice/cpu.max$") && sleep 1d`}
-
-	pod5 := makeCPUManagerPod("gu-pod5", ctnAttrs)
-	pod5.Spec.Containers[0].Command = podCFSCheckCommand
-	pod5 = e2epod.NewPodClient(f).CreateSync(ctx, pod5)
-	podsToClean[string(pod5.UID)] = pod5
-
-	ginkgo.By("checking if the expected cfs quota was assigned to pod (GU pod, unlimited)")
-
-	expectedQuota = "150000"
-
-	if disabledCPUQuotaWithExclusiveCPUs {
-		expectedQuota = "max"
-	}
-
-	expCFSQuotaRegex = fmt.Sprintf("^%s %s\n$", expectedQuota, defaultPeriod)
-
-	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod5.Name, pod5.Spec.Containers[0].Name, expCFSQuotaRegex)
-	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", pod5.Spec.Containers[0].Name, pod5.Name)
-	deleteTestPod(pod5)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -936,6 +941,10 @@ func runCPUManagerTests(f *framework.Framework) {
 		if !IsCgroup2UnifiedMode() {
 			e2eskipper.Skipf("Skipping since CgroupV2 not used")
 		}
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+		if cpuAlloc < 1 { // save expensive kubelet restart
+			e2eskipper.Skipf("Skipping since not enough allocatable CPU got %d required 1", cpuAlloc)
+		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
 				policyName:                       string(cpumanager.PolicyStatic),
@@ -944,12 +953,18 @@ func runCPUManagerTests(f *framework.Framework) {
 			},
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
-		runCfsQuotaGuPods(ctx, f, true)
+
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f) // check again after we reserved 1 full CPU. Some tests require > 1 exclusive CPU
+		runCfsQuotaGuPods(ctx, f, true, cpuAlloc)
 	})
 
 	ginkgo.It("should keep enforcing the CFS quota for containers with static CPUs assigned and feature gate disabled", func(ctx context.Context) {
 		if !IsCgroup2UnifiedMode() {
 			e2eskipper.Skipf("Skipping since CgroupV2 not used")
+		}
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+		if cpuAlloc < 1 { // save expensive kubelet restart
+			e2eskipper.Skipf("Skipping since not enough allocatable CPU got %d required 1", cpuAlloc)
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
@@ -960,7 +975,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		)
 
 		updateKubeletConfig(ctx, f, newCfg, true)
-		runCfsQuotaGuPods(ctx, f, false)
+
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f) // check again after we reserved 1 full CPU. Some tests require > 1 exclusive CPU
+		runCfsQuotaGuPods(ctx, f, false, cpuAlloc)
 	})
 
 	f.It("should not reuse CPUs of restartable init containers", feature.SidecarContainers, func(ctx context.Context) {
