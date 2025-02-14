@@ -77,7 +77,6 @@ func TestNewHealthChecker(t *testing.T) {
 		{"Watchdog enabled with error", interval, errors.New("mock error"), true},
 		{"Watchdog timeout too small", intervalSmall, nil, true},
 	}
-	tCtx := ktesting.Init(t)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -86,7 +85,7 @@ func TestNewHealthChecker(t *testing.T) {
 				enabledErr: tt.mockErr,
 			}
 
-			_, err := NewHealthChecker(tCtx, &mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
+			_, err := NewHealthChecker(klog.FromContext(ktesting.Init(t)), &mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -153,7 +152,7 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Create a healthChecker
-			hc, err := NewHealthChecker(tCtx, &mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, WithWatchdogClient(mockClient))
+			hc, err := NewHealthChecker(klog.FromContext(tCtx), &mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, WithWatchdogClient(mockClient))
 			if err != nil {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
 			}

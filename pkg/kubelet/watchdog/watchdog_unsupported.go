@@ -36,10 +36,10 @@ func WithExtendedCheckers(checkers []healthz.HealthChecker) Option {
 }
 
 // NewHealthChecker creates a fake one here
-func NewHealthChecker(_ context.Context, _ syncLoopHealthChecker, _ ...Option) (HealthChecker, error) {
+func NewHealthChecker(context.Context, syncLoopHealthChecker, ...Option) (HealthChecker, error) {
 	return &healthCheckerUnsupported{}, nil
 }
 
-func (ow *healthCheckerUnsupported) Start(ctx context.Context) {
+func (ow *healthCheckerUnsupported) Start(context.Context) {
 	return
 }

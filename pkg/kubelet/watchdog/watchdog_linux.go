@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
+	"github.com/go-logr/logr"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -80,7 +81,7 @@ const minimalNotifyInterval = time.Second
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
-func NewHealthChecker(ctx context.Context, syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
+func NewHealthChecker(logger logr.Logger, syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
 	hc := &healthChecker{
 		watchdog: &DefaultWatchdogClient{},
 	}
@@ -96,7 +97,6 @@ func NewHealthChecker(ctx context.Context, syncLoop syncLoopHealthChecker, opts 
 		// for example, the time is not configured correctly.
 		return nil, fmt.Errorf("configure watchdog: %w", err)
 	}
-	logger := klog.FromContext(ctx)
 	if watchdogVal == 0 {
 		logger.Info("Systemd watchdog is not enabled")
 		return &healthChecker{}, nil
