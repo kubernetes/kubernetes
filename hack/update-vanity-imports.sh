@@ -26,7 +26,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::verify_go_version
 
-go -C "${KUBE_ROOT}/hack/tools" install github.com/jcchavezs/porto/cmd/porto
+GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/jcchavezs/porto/cmd/porto
 
 porto --restrict-to-dirs="staging" --restrict-to-files="doc\\.go$" -w "${KUBE_ROOT}"
 
