@@ -5710,7 +5710,6 @@ func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecCo
 	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
 	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
 	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
-	container.ResizePolicy = oldPodSpecContainer.ResizePolicy // +k8s:verify-mutation:reason=clone
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
