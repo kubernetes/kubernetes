@@ -463,12 +463,17 @@ func deletePodsAsync(ctx context.Context, f *framework.Framework, podMap map[str
 		go func(podNS, podName string) {
 			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
-
-			deletePodSyncByName(ctx, f, podName)
-			waitForAllContainerRemoval(ctx, podName, podNS)
+			deletePodSyncAndWait(ctx, f, podNS, podName)
 		}(pod.Namespace, pod.Name)
 	}
 	wg.Wait()
+}
+
+func deletePodSyncAndWait(ctx context.Context, f *framework.Framework, podNS, podName string) {
+	framework.Logf("deleting pod: %s/%s", podNS, podName)
+	deletePodSyncByName(ctx, f, podName)
+	waitForAllContainerRemoval(ctx, podName, podNS)
+	framework.Logf("deleted pod: %s/%s", podNS, podName)
 }
 
 func runTopologyManagerNegativeTest(ctx context.Context, f *framework.Framework, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {

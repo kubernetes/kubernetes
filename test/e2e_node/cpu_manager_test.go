@@ -596,18 +596,27 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	var err error
 	var ctnAttrs []ctnAttribute
 	var pod1, pod2, pod3 *v1.Pod
-	var cleanupPods []*v1.Pod
-	ginkgo.DeferCleanup(func() {
+	podsToClean := make(map[string]*v1.Pod) // pod.UID -> pod
+
+	deleteTestPod := func(pod *v1.Pod) {
 		// waitForContainerRemoval takes "long" to complete; if we use the parent ctx we get a
 		// 'deadline expired' message and the cleanup aborts, which we don't want.
-		ctx2 := context.TODO()
+		// So let's use a separate and more generous timeout (determined by trial and error)
+		ctx2, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		deletePodSyncAndWait(ctx2, f, pod.Namespace, pod.Name)
+		delete(podsToClean, string(pod.UID))
+	}
+
+	// cleanup leftovers on test failure. The happy path is covered by `deleteTestPod` calls
+	ginkgo.DeferCleanup(func() {
 		ginkgo.By("by deleting the pods and waiting for container removal")
-		for _, cleanupPod := range cleanupPods {
-			framework.Logf("deleting pod: %s/%s", cleanupPod.Namespace, cleanupPod.Name)
-			deletePodSyncByName(ctx2, f, cleanupPod.Name)
-			waitForContainerRemoval(ctx2, cleanupPod.Spec.Containers[0].Name, cleanupPod.Name, cleanupPod.Namespace)
-			framework.Logf("deleted pod: %s/%s", cleanupPod.Namespace, cleanupPod.Name)
-		}
+		// waitForContainerRemoval takes "long" to complete; if we use the parent ctx we get a
+		// 'deadline expired' message and the cleanup aborts, which we don't want.
+		// So let's use a separate and more generous timeout (determined by trial and error)
+		ctx2, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		deletePodsAsync(ctx2, f, podsToClean)
 	})
 
 	cfsCheckCommand := []string{"sh", "-c", "cat /sys/fs/cgroup/cpu.max && sleep 1d"}
@@ -623,7 +632,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	pod1 = makeCPUManagerPod("gu-pod1", ctnAttrs)
 	pod1.Spec.Containers[0].Command = cfsCheckCommand
 	pod1 = e2epod.NewPodClient(f).CreateSync(ctx, pod1)
-	cleanupPods = append(cleanupPods, pod1)
+	podsToClean[string(pod1.UID)] = pod1
 
 	ginkgo.By("checking if the expected cfs quota was assigned (GU pod, exclusive CPUs, unlimited)")
 
@@ -635,6 +644,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod1.Name, pod1.Spec.Containers[0].Name, expCFSQuotaRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod1.Spec.Containers[0].Name, pod1.Name)
+	deleteTestPod(pod1)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -646,7 +656,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	pod2 = makeCPUManagerPod("gu-pod2", ctnAttrs)
 	pod2.Spec.Containers[0].Command = cfsCheckCommand
 	pod2 = e2epod.NewPodClient(f).CreateSync(ctx, pod2)
-	cleanupPods = append(cleanupPods, pod2)
+	podsToClean[string(pod2.UID)] = pod2
 
 	ginkgo.By("checking if the expected cfs quota was assigned (GU pod, limited)")
 
@@ -655,6 +665,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod2.Name, pod2.Spec.Containers[0].Name, expCFSQuotaRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod2.Spec.Containers[0].Name, pod2.Name)
+	deleteTestPod(pod2)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -666,7 +677,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	pod3 = makeCPUManagerPod("non-gu-pod3", ctnAttrs)
 	pod3.Spec.Containers[0].Command = cfsCheckCommand
 	pod3 = e2epod.NewPodClient(f).CreateSync(ctx, pod3)
-	cleanupPods = append(cleanupPods, pod3)
+	podsToClean[string(pod3.UID)] = pod3
 
 	ginkgo.By("checking if the expected cfs quota was assigned (BU pod, limited)")
 
@@ -675,6 +686,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod3.Name, pod3.Spec.Containers[0].Name, expCFSQuotaRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod3.Spec.Containers[0].Name, pod3.Name)
+	deleteTestPod(pod3)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -692,7 +704,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	pod4.Spec.Containers[0].Command = cfsCheckCommand
 	pod4.Spec.Containers[1].Command = cfsCheckCommand
 	pod4 = e2epod.NewPodClient(f).CreateSync(ctx, pod4)
-	cleanupPods = append(cleanupPods, pod4)
+	podsToClean[string(pod4.UID)] = pod4
 
 	ginkgo.By("checking if the expected cfs quota was assigned (GU pod, container 0 exclusive CPUs unlimited, container 1 limited)")
 
@@ -709,6 +721,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod4.Name, pod4.Spec.Containers[1].Name, expCFSQuotaRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod4.Spec.Containers[1].Name, pod4.Name)
+	deleteTestPod(pod4)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -728,7 +741,8 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	pod5 := makeCPUManagerPod("gu-pod5", ctnAttrs)
 	pod5.Spec.Containers[0].Command = podCFSCheckCommand
 	pod5 = e2epod.NewPodClient(f).CreateSync(ctx, pod5)
-	cleanupPods = append(cleanupPods, pod5)
+	podsToClean[string(pod5.UID)] = pod5
+
 	ginkgo.By("checking if the expected cfs quota was assigned to pod (GU pod, unlimited)")
 
 	expectedQuota = "150000"
@@ -741,6 +755,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod5.Name, pod5.Spec.Containers[0].Name, expCFSQuotaRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", pod5.Spec.Containers[0].Name, pod5.Name)
+	deleteTestPod(pod5)
 
 	ctnAttrs = []ctnAttribute{
 		{
@@ -753,7 +768,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	pod6 := makeCPUManagerPod("gu-pod6", ctnAttrs)
 	pod6.Spec.Containers[0].Command = podCFSCheckCommand
 	pod6 = e2epod.NewPodClient(f).CreateSync(ctx, pod6)
-	cleanupPods = append(cleanupPods, pod6)
+	podsToClean[string(pod6.UID)] = pod6
 
 	ginkgo.By("checking if the expected cfs quota was assigned to pod (GU pod, limited)")
 
@@ -761,7 +776,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 	expCFSQuotaRegex = fmt.Sprintf("^%s %s\n$", expectedQuota, defaultPeriod)
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod6.Name, pod6.Spec.Containers[0].Name, expCFSQuotaRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", pod6.Spec.Containers[0].Name, pod6.Name)
-
+	deleteTestPod(pod6)
 }
 
 func runMultipleGuPods(ctx context.Context, f *framework.Framework) {
