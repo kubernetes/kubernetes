@@ -28,7 +28,8 @@ import (
 )
 
 type fakeManager struct {
-	state state.State
+	state             state.State
+	podResizeStatuses map[types.UID]v1.PodResizeStatus
 }
 
 func (m *fakeManager) Start() {
@@ -72,7 +73,7 @@ func (m *fakeManager) GetContainerResourceAllocation(podUID string, containerNam
 }
 
 func (m *fakeManager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
-	return m.state.GetPodResizeStatus(string(podUID))
+	return m.podResizeStatuses[podUID]
 }
 
 func (m *fakeManager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
@@ -102,12 +103,13 @@ func (m *fakeManager) SetPodAllocation(pod *v1.Pod) error {
 }
 
 func (m *fakeManager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
-	m.state.SetPodResizeStatus(string(podUID), resizeStatus)
+	m.podResizeStatuses[podUID] = resizeStatus
 }
 
 // NewFakeManager creates empty/fake memory manager
 func NewFakeManager() Manager {
 	return &fakeManager{
-		state: state.NewStateMemory(state.PodResourceAllocation{}),
+		state:             state.NewStateMemory(state.PodResourceAllocation{}),
+		podResizeStatuses: make(map[types.UID]v1.PodResizeStatus),
 	}
 }
