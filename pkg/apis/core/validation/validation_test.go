@@ -25607,7 +25607,7 @@ func TestValidateSELinuxChangePolicy(t *testing.T) {
 
 func TestValidatePodResize(t *testing.T) {
 	mkPod := func(req, lim core.ResourceList, tweaks ...podtest.Tweak) *core.Pod {
-		return podtest.MakePod("pod", append(tweaks,
+		allTweaks := []podtest.Tweak{
 			podtest.SetContainers(
 				podtest.MakeContainer(
 					"container",
@@ -25619,11 +25619,14 @@ func TestValidatePodResize(t *testing.T) {
 					),
 				),
 			),
-		)...)
+		}
+		// Prepend the SetContainers call so TweakContainers can be used.
+		allTweaks = append(allTweaks, tweaks...)
+		return podtest.MakePod("pod", allTweaks...)
 	}
 
 	mkPodWithInitContainers := func(req, lim core.ResourceList, restartPolicy core.ContainerRestartPolicy, tweaks ...podtest.Tweak) *core.Pod {
-		return podtest.MakePod("pod", append(tweaks,
+		allTweaks := []podtest.Tweak{
 			podtest.SetInitContainers(
 				podtest.MakeContainer(
 					"container",
@@ -25636,7 +25639,18 @@ func TestValidatePodResize(t *testing.T) {
 					podtest.SetContainerRestartPolicy(restartPolicy),
 				),
 			),
-		)...)
+		}
+		// Prepend the SetInitContainers call so TweakContainers can be used.
+		allTweaks = append(allTweaks, tweaks...)
+		return podtest.MakePod("pod", allTweaks...)
+	}
+
+	resizePolicy := func(resource core.ResourceName, policy core.ResourceResizeRestartPolicy) podtest.Tweak {
+		return podtest.TweakContainers(podtest.SetContainerResizePolicy(
+			core.ContainerResizePolicy{
+				ResourceName:  resource,
+				RestartPolicy: policy,
+			}))
 	}
 
 	tests := []struct {
@@ -25667,14 +25681,14 @@ func TestValidatePodResize(t *testing.T) {
 			new: podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("100m", "100Mi", "", ""),
+						Limits: getResources("100m", "200Mi", "", ""),
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
 			old: podtest.MakePod("pod",
 				podtest.SetContainers(podtest.MakeContainer("container",
 					podtest.SetContainerResources(core.ResourceRequirements{
-						Limits: getResources("100m", "200Mi", "", ""),
+						Limits: getResources("100m", "100Mi", "", ""),
 					}))),
 				podtest.SetPodResources(&core.ResourceRequirements{Limits: getResources("100m", "200Mi", "", "")}),
 			),
@@ -25793,9 +25807,24 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPod(core.ResourceList{}, getResources("200m", "0", "1Gi", "")),
 			err:  "",
 		}, {
-			test: "memory limit change",
+			test: "memory limit increase",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
+			err:  "",
+		}, {
+			test: "no restart policy: memory limit decrease",
 			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", "")),
 			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", "")),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "restart NotRequired: memory limit decrease",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.NotRequired)),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.NotRequired)),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "RestartContainer: memory limit decrease",
+			old:  mkPod(core.ResourceList{}, getResources("100m", "200Mi", "", ""), resizePolicy("memory", core.RestartContainer)),
+			new:  mkPod(core.ResourceList{}, getResources("100m", "100Mi", "", ""), resizePolicy("memory", core.RestartContainer)),
 			err:  "",
 		}, {
 			test: "storage limit change",
@@ -25824,13 +25853,13 @@ func TestValidatePodResize(t *testing.T) {
 			err:  "",
 		}, {
 			test: "Pod QoS unchanged, burstable -> burstable",
-			old:  mkPod(getResources("200m", "200Mi", "1Gi", ""), getResources("400m", "400Mi", "2Gi", "")),
-			new:  mkPod(getResources("100m", "100Mi", "1Gi", ""), getResources("200m", "200Mi", "2Gi", "")),
+			old:  mkPod(getResources("200m", "100Mi", "1Gi", ""), getResources("400m", "200Mi", "2Gi", "")),
+			new:  mkPod(getResources("100m", "200Mi", "1Gi", ""), getResources("200m", "400Mi", "2Gi", "")),
 			err:  "",
 		}, {
 			test: "Pod QoS unchanged, burstable -> burstable, add limits",
 			old:  mkPod(getResources("100m", "100Mi", "", ""), core.ResourceList{}),
-			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "200Mi", "", "")),
+			new:  mkPod(getResources("100m", "100Mi", "", ""), getResources("200m", "", "", "")),
 			err:  "",
 		}, {
 			test: "Pod QoS unchanged, burstable -> burstable, add requests",
@@ -26005,9 +26034,24 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("200m", "0", "1Gi", ""), core.ContainerRestartPolicyAlways),
 			err:  "",
 		}, {
-			test: "memory limit change for sidecar containers",
+			test: "memory limit increase for sidecar containers",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways),
+			err:  "",
+		}, {
+			test: "memory limit decrease for sidecar containers, no resize policy",
 			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "memory limit decrease for sidecar containers, resize policy NotRequired",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			err:  "memory limits cannot be decreased",
+		}, {
+			test: "memory limit decrease for sidecar containers, resize policy RestartContainer",
+			old:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "200Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			new:  mkPodWithInitContainers(core.ResourceList{}, getResources("100m", "100Mi", "", ""), core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
 			err:  "",
 		}, {
 			test: "storage limit change for sidecar containers",
@@ -26033,42 +26077,44 @@ func TestValidatePodResize(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.new.ObjectMeta.ResourceVersion = "1"
-		test.old.ObjectMeta.ResourceVersion = "1"
+		t.Run(test.test, func(t *testing.T) {
+			test.new.ObjectMeta.ResourceVersion = "1"
+			test.old.ObjectMeta.ResourceVersion = "1"
 
-		// set required fields if old and new match and have no opinion on the value
-		if test.new.Name == "" && test.old.Name == "" {
-			test.new.Name = "name"
-			test.old.Name = "name"
-		}
-		if test.new.Namespace == "" && test.old.Namespace == "" {
-			test.new.Namespace = "namespace"
-			test.old.Namespace = "namespace"
-		}
-		if test.new.Spec.Containers == nil && test.old.Spec.Containers == nil {
-			test.new.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
-			test.old.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
-		}
-		if len(test.new.Spec.DNSPolicy) == 0 && len(test.old.Spec.DNSPolicy) == 0 {
-			test.new.Spec.DNSPolicy = core.DNSClusterFirst
-			test.old.Spec.DNSPolicy = core.DNSClusterFirst
-		}
-		if len(test.new.Spec.RestartPolicy) == 0 && len(test.old.Spec.RestartPolicy) == 0 {
-			test.new.Spec.RestartPolicy = "Always"
-			test.old.Spec.RestartPolicy = "Always"
-		}
+			// set required fields if old and new match and have no opinion on the value
+			if test.new.Name == "" && test.old.Name == "" {
+				test.new.Name = "name"
+				test.old.Name = "name"
+			}
+			if test.new.Namespace == "" && test.old.Namespace == "" {
+				test.new.Namespace = "namespace"
+				test.old.Namespace = "namespace"
+			}
+			if test.new.Spec.Containers == nil && test.old.Spec.Containers == nil {
+				test.new.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+				test.old.Spec.Containers = []core.Container{{Name: "autoadded", Image: "image", TerminationMessagePolicy: "File", ImagePullPolicy: "Always"}}
+			}
+			if len(test.new.Spec.DNSPolicy) == 0 && len(test.old.Spec.DNSPolicy) == 0 {
+				test.new.Spec.DNSPolicy = core.DNSClusterFirst
+				test.old.Spec.DNSPolicy = core.DNSClusterFirst
+			}
+			if len(test.new.Spec.RestartPolicy) == 0 && len(test.old.Spec.RestartPolicy) == 0 {
+				test.new.Spec.RestartPolicy = "Always"
+				test.old.Spec.RestartPolicy = "Always"
+			}
 
-		errs := ValidatePodResize(test.new, test.old, PodValidationOptions{})
-		if test.err == "" {
-			if len(errs) != 0 {
-				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+			errs := ValidatePodResize(test.new, test.old, PodValidationOptions{AllowSidecarResizePolicy: true})
+			if test.err == "" {
+				if len(errs) != 0 {
+					t.Errorf("unexpected invalid: (%+v)\nA: %+v\nB: %+v", errs, test.new, test.old)
+				}
+			} else {
+				if len(errs) == 0 {
+					t.Errorf("unexpected valid:\nA: %+v\nB: %+v", test.new, test.old)
+				} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
+					t.Errorf("unexpected error message:\nExpected error: %s\nActual error: %s", test.err, actualErr)
+				}
 			}
-		} else {
-			if len(errs) == 0 {
-				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
-			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
-				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
-			}
-		}
+		})
 	}
 }

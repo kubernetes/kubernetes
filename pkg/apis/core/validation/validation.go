@@ -5622,21 +5622,19 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 			if !isRestartableInitContainer(&ctr) {
 				continue
 			}
-			if resourcesRemoved(newPod.Spec.InitContainers[ix].Resources.Requests, ctr.Resources.Requests) {
-				allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(ix).Child("resources").Child("requests"), "resource requests cannot be removed"))
-			}
-			if resourcesRemoved(newPod.Spec.InitContainers[ix].Resources.Limits, ctr.Resources.Limits) {
-				allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(ix).Child("resources").Child("limits"), "resource limits cannot be removed"))
-			}
+			allErrs = append(allErrs, validateContainerResize(
+				&newPod.Spec.InitContainers[ix].Resources,
+				&oldPod.Spec.InitContainers[ix].Resources,
+				newPod.Spec.InitContainers[ix].ResizePolicy,
+				specPath.Child("initContainers").Index(ix).Child("resources"))...)
 		}
 	}
-	for ix, ctr := range oldPod.Spec.Containers {
-		if resourcesRemoved(newPod.Spec.Containers[ix].Resources.Requests, ctr.Resources.Requests) {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("containers").Index(ix).Child("resources").Child("requests"), "resource requests cannot be removed"))
-		}
-		if resourcesRemoved(newPod.Spec.Containers[ix].Resources.Limits, ctr.Resources.Limits) {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("containers").Index(ix).Child("resources").Child("limits"), "resource limits cannot be removed"))
-		}
+	for ix := range oldPod.Spec.Containers {
+		allErrs = append(allErrs, validateContainerResize(
+			&newPod.Spec.Containers[ix].Resources,
+			&oldPod.Spec.Containers[ix].Resources,
+			newPod.Spec.Containers[ix].ResizePolicy,
+			specPath.Child("containers").Index(ix).Child("resources"))...)
 	}
 
 	// Ensure that only CPU and memory resources are mutable for regular containers.
@@ -5730,6 +5728,49 @@ func isPodResizeRequestSupported(pod core.Pod) bool {
 	}
 	// No running containers. We cannot tell whether the node supports resize at this point, so we assume it does.
 	return true
+}
+
+// validateContainerResize validates the changes to the container's resource requirements for a pod resize request.
+// newRequriements and oldRequirements must be non-nil.
+func validateContainerResize(newRequirements, oldRequirements *core.ResourceRequirements, resizePolicies []core.ContainerResizePolicy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Removing resource requirements is not supported.
+	if resourcesRemoved(newRequirements.Requests, oldRequirements.Requests) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("requests"), "resource requests cannot be removed"))
+	}
+	if resourcesRemoved(newRequirements.Limits, oldRequirements.Limits) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("limits"), "resource limits cannot be removed"))
+	}
+
+	// Special case: memory limits may not be decreased if resize policy is NotRequired.
+	var memRestartPolicy core.ResourceResizeRestartPolicy
+	for _, policy := range resizePolicies {
+		if policy.ResourceName == core.ResourceMemory {
+			memRestartPolicy = policy.RestartPolicy
+			break
+		}
+	}
+	if memRestartPolicy == core.NotRequired || memRestartPolicy == "" {
+		newLimit, hasNewLimit := newRequirements.Limits[core.ResourceMemory]
+		oldLimit, hasOldLimit := oldRequirements.Limits[core.ResourceMemory]
+		if hasNewLimit && hasOldLimit {
+			if newLimit.Cmp(oldLimit) < 0 {
+				allErrs = append(allErrs, field.Forbidden(
+					fldPath.Child("limits").Key(core.ResourceMemory.String()),
+					fmt.Sprintf("memory limits cannot be decreased unless resizePolicy is %s", core.RestartContainer)))
+			}
+		} else if hasNewLimit && !hasOldLimit {
+			// Adding a memory limit is implicitly decreasing the memory limit (from 'max')
+			allErrs = append(allErrs, field.Forbidden(
+				fldPath.Child("limits").Key(core.ResourceMemory.String()),
+				fmt.Sprintf("memory limits cannot be added unless resizePolicy is %s", core.RestartContainer)))
+		}
+	}
+
+	// TODO(tallclair): Move resizable resource checks here.
+
+	return allErrs
 }
 
 func resourcesRemoved(resourceList, oldResourceList core.ResourceList) bool {
