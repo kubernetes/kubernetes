@@ -104,8 +104,6 @@ func TestAddFlags(t *testing.T) {
 		"--authorization-webhook-config-file=/webhook-config",
 		"--bind-address=192.168.10.20",
 		"--client-ca-file=/client-ca",
-		"--cloud-config=/cloud-config",
-		"--cloud-provider=azure",
 		"--cors-allowed-origins=10.10.10.100,10.10.10.200",
 		"--contention-profiling=true",
 		"--egress-selector-config-file=/var/run/kubernetes/egress-selector/connectivity.yaml",
