@@ -191,7 +191,7 @@ produceJUnitXMLReport() {
 
   if ! command -v gotestsum >/dev/null 2>&1; then
     kube::log::status "gotestsum not found; installing from ./hack/tools"
-    go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
+    GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install gotest.tools/gotestsum
   fi
   gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
