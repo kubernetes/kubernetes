@@ -2018,7 +2018,7 @@
           },
           "restartPolicy": {
             "default": "",
-            "description": "Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.",
+            "description": "Restart policy to apply when specified resource is resized. If not specified, the implicit default is NotRequired.",
             "type": "string"
           }
         },

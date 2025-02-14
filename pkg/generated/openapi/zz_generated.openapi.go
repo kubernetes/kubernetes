@@ -21648,7 +21648,7 @@ func schema_k8sio_api_core_v1_ContainerResizePolicy(ref common.ReferenceCallback
 					},
 					"restartPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Restart policy to apply when specified resource is resized. If not specified, it defaults to NotRequired.",
+							Description: "Restart policy to apply when specified resource is resized. If not specified, the implicit default is NotRequired.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",

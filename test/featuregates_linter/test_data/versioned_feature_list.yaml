@@ -544,6 +544,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: InPlacePodVerticalScalingPreferNoRestart
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: InTreePluginPortworxUnregister
   versionedSpecs:
   - default: false
