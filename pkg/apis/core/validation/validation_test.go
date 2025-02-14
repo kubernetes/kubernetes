@@ -26073,6 +26073,16 @@ func TestValidatePodResize(t *testing.T) {
 			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
 			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
 			err:  "spec: Forbidden: only cpu and memory resources for sidecar containers are mutable",
+		}, {
+			test: "change resize restart policy",
+			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.NotRequired)),
+			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.RestartContainer)),
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
+		}, {
+			test: "change sidecar container resize restart policy",
+			old:  mkPodWithInitContainers(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.RestartContainer)),
+			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways, resizePolicy(core.ResourceMemory, core.NotRequired)),
+			err:  "spec: Forbidden: only cpu and memory resources are mutable",
 		},
 	}
 
