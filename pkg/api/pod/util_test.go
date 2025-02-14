@@ -4457,7 +4457,7 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 						Name:  "c1-init",
 						Image: "image",
 						ResizePolicy: []api.ContainerResizePolicy{
-							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired},
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyPreferNoRestart},
 						},
 					},
 				},
@@ -4493,14 +4493,14 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 						Image:         "image",
 						RestartPolicy: &restartPolicyAlways,
 						ResizePolicy: []api.ContainerResizePolicy{
-							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired},
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyRestartContainer},
 						},
 					},
 					{
 						Name:  "c1-init",
 						Image: "image",
 						ResizePolicy: []api.ContainerResizePolicy{
-							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired},
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyPreferNoRestart},
 						},
 					},
 				},
@@ -4536,14 +4536,14 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 						Name:  "c1-init",
 						Image: "image",
 						ResizePolicy: []api.ContainerResizePolicy{
-							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired},
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyRestartContainer},
 						},
 					},
 					{
 						Name:  "c2-init",
 						Image: "image",
 						ResizePolicy: []api.ContainerResizePolicy{
-							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired},
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyPreferNoRestart},
 						},
 					},
 				},
@@ -4565,7 +4565,7 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 						Name:  "c2",
 						Image: "image",
 						ResizePolicy: []api.ContainerResizePolicy{
-							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired},
+							{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyRestartContainer},
 						},
 					},
 				},
@@ -4744,5 +4744,68 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.podSpec, nil, nil)
 			assert.Equal(t, tc.expectAllowPodLifecycleSleepActionZeroValue, gotOptions.AllowPodLifecycleSleepActionZeroValue, "AllowPodLifecycleSleepActionZeroValue")
 		})
+	}
+}
+
+func TestAllowResizeRestartPolicyPreferNoRestart(t *testing.T) {
+	testCases := []struct {
+		name     string
+		policies []api.ContainerResizePolicy
+		expect   bool
+	}{{
+		name:   "no policies",
+		expect: false,
+	}, {
+		name:     "policy NotRequired",
+		policies: []api.ContainerResizePolicy{{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired}},
+		expect:   false,
+	}, {
+		name:     "policy RestartContainer",
+		policies: []api.ContainerResizePolicy{{ResourceName: api.ResourceMemory, RestartPolicy: api.ResizeRestartPolicyRestartContainer}},
+		expect:   false,
+	}, {
+		name:     "policy NotRequired",
+		policies: []api.ContainerResizePolicy{{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyPreferNoRestart}},
+		expect:   true,
+	}, {
+		name:     "unsupported policy",
+		policies: []api.ContainerResizePolicy{{ResourceName: api.ResourceCPU, RestartPolicy: "foobar"}},
+		expect:   false,
+	}, {
+		name: "all supported policies",
+		policies: []api.ContainerResizePolicy{
+			{ResourceName: api.ResourceCPU, RestartPolicy: api.ResizeRestartPolicyNotRequired},
+			{ResourceName: api.ResourceMemory, RestartPolicy: api.ResizeRestartPolicyRestartContainer},
+			{ResourceName: api.ResourceEphemeralStorage, RestartPolicy: api.ResizeRestartPolicyPreferNoRestart},
+		},
+		expect: true,
+	}}
+
+	for _, test := range testCases {
+		for _, initContainer := range []bool{true, false} {
+			for _, fg := range []bool{true, false} {
+				t.Run(fmt.Sprintf("%s/initContainer=%t/featureGateEnabled=%t", test.name, initContainer, fg), func(t *testing.T) {
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingPreferNoRestart, fg)
+
+					ps := &api.PodSpec{
+						Containers: []api.Container{{
+							Name: "c",
+						}},
+					}
+					if initContainer {
+						ps.InitContainers = []api.Container{{
+							Name:         "i",
+							ResizePolicy: test.policies,
+						}}
+					} else {
+						ps.Containers[0].ResizePolicy = test.policies
+					}
+
+					opts := GetValidationOptionsFromPodSpecAndMeta(ps, ps, nil, nil)
+					expected := test.expect || fg
+					assert.Equal(t, expected, opts.AllowResizeRestartPolicyPreferNoRestart)
+				})
+			}
+		}
 	}
 }

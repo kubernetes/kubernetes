@@ -79,6 +79,7 @@ func doPodResizeTests() {
 		testRollback bool
 	}
 
+	// TODO(tallclair): Change to PreferNoRestart once InPlacePodVerticalScalingPreferNoRestart graduates to beta.j
 	noRestart := v1.ResizeRestartPolicyNotRequired
 	doRestart := v1.ResizeRestartPolicyRestartContainer
 	tests := []testCase{

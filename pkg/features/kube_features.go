@@ -277,6 +277,12 @@ const (
 	// CPU Manager Static Policy option set.
 	InPlacePodVerticalScalingExclusiveCPUs featuregate.Feature = "InPlacePodVerticalScalingExclusiveCPUs"
 
+	// owner: @tallclair
+	// kep: http://kep.k8s.io/1287
+	//
+	// Enables the "PreferNoRestart" resize restart policy and deprecates the "NotRequired" policy.
+	InPlacePodVerticalScalingPreferNoRestart featuregate.Feature = "InPlacePodVerticalScalingPreferNoRestart"
+
 	// owner: @trierra
 	//
 	// Disables the Portworx in-tree driver.
