@@ -3196,9 +3196,15 @@ func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
 		Ready:       ptr.To[int32](0),
 		Active:      int(podCount),
 	})
-	// Disable the controller and turn feature on again.
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, true)
 	cancel()
+	// Disable the controller and turn feature on again.
+	// However, before we re-enabling the feature gate we wait a little (1s to
+	// wait for the syncJob re-queue after update + 100ms for the syncJob
+	// execution itself) to make sure there is no pending syncJob which could
+	// panic if the trackTerminating returned false at the start of the sync,
+	// but onlyReplaceFailedPods returned true during that sync.
+	time.Sleep(time.Second + sleepDurationForControllerLatency)
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, true)
 	ctx, cancel = startJobControllerAndWaitForCaches(t, restConfig)
 	waitForPodsToBeActive(ctx, t, jobClient, 2, jobObj)
 	deletePods(ctx, t, clientSet, jobObj.Namespace)
