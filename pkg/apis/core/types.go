@@ -2416,10 +2416,18 @@ type ResourceResizeRestartPolicy string
 
 // These are the valid resource resize restart policy values:
 const (
+	// ResizeRestartPolicyPreferNoRestart means Kubernetes will try to resize the container without
+	// restarting it, if possible. This option does not guarantee that the container won't be
+	// restarted during the resize.
+	// This option is semantically equivalent to "NotRequired", and will replace that as the default in a future release.
+	// This option is currently in alpha.
+	// +featureGate=InPlacePodVerticalScalingPreferNoRestart
+	ResizeRestartPolicyPreferNoRestart ResourceResizeRestartPolicy = "PreferNoRestart"
 	// ResizeRestartPolicyNotRequired means Kubernetes will try to resize the container
 	// without restarting it, if possible. Kubernetes may however choose to
 	// restart the container if it is unable to actuate resize without a
 	// restart. For e.g. the runtime doesn't support restart-free resizing.
+	// This is the implicit default when no resource resize policy is specified.
 	ResizeRestartPolicyNotRequired ResourceResizeRestartPolicy = "NotRequired"
 	// ResizeRestartPolicyRestartContainer means Kubernetes will resize the container in-place
 	// by stopping and starting the container when new resources are applied.
@@ -2434,7 +2442,7 @@ type ContainerResizePolicy struct {
 	// Supported values: cpu, memory.
 	ResourceName ResourceName
 	// Restart policy to apply when specified resource is resized.
-	// If not specified, it defaults to NotRequired.
+	// If not specified, the implicit default is NotRequired.
 	RestartPolicy ResourceResizeRestartPolicy
 }
 
