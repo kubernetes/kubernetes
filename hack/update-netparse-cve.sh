@@ -40,7 +40,7 @@ export GO111MODULE=on
 # Install golangci-lint
 echo 'installing net parser converter'
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  go install github.com/aojea/sloppy-netparser
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go install github.com/aojea/sloppy-netparser
 popd >/dev/null
 
 cd "${KUBE_ROOT}"

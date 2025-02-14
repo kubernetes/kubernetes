@@ -32,7 +32,7 @@ PATH="${GOBIN}:${PATH}"
 
 # Install levee
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  GO111MODULE=on go install github.com/google/go-flow-levee/cmd/levee
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" GO111MODULE=on go install github.com/google/go-flow-levee/cmd/levee
 popd >/dev/null
 
 # Prefer full path for interaction with make vet

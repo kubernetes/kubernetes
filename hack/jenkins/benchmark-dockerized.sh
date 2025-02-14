@@ -49,8 +49,12 @@ export GO111MODULE=off
 
 # Install tools we need
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  GO111MODULE=on go install github.com/cespare/prettybench
-  GO111MODULE=on go install gotest.tools/gotestsum
+  hack_tools_gotoolchain="${GOTOOLCHAIN:-}"
+  if [ -n "${KUBE_HACK_TOOLS_GOTOOLCHAIN:-}" ]; then
+    hack_tools_gotoolchain="${KUBE_HACK_TOOLS_GOTOOLCHAIN}";
+  fi
+  GOTOOLCHAIN="${hack_tools_gotoolchain}" GO111MODULE=on go install github.com/cespare/prettybench
+  GOTOOLCHAIN="${hack_tools_gotoolchain}" GO111MODULE=on go install gotest.tools/gotestsum
 popd >/dev/null
 
 # Disable the Go race detector.
