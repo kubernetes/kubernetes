@@ -129,13 +129,15 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, node *co
 	return sc, pc, nil
 }
 
-func NewValidator(getter ServiceAccountTokenGetter) Validator[privateClaims] {
+func NewValidator(lookup bool, getter ServiceAccountTokenGetter) Validator[privateClaims] {
 	return &validator{
+		lookup: lookup,
 		getter: getter,
 	}
 }
 
 type validator struct {
+	lookup bool
 	getter ServiceAccountTokenGetter
 }
 
@@ -176,36 +178,38 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	podref := private.Kubernetes.Pod
 	noderef := private.Kubernetes.Node
 	secref := private.Kubernetes.Secret
-	// Make sure service account still exists (name and UID)
-	serviceAccount, err := v.getter.GetServiceAccount(namespace, saref.Name)
-	if err != nil {
-		klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, saref.Name, err)
-		return nil, err
-	}
-
-	if string(serviceAccount.UID) != saref.UID {
-		klog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, saref.Name, string(serviceAccount.UID), saref.UID)
-		return nil, fmt.Errorf("service account UID (%s) does not match claim (%s)", serviceAccount.UID, saref.UID)
-	}
-	if serviceAccount.DeletionTimestamp != nil && serviceAccount.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
-		klog.V(4).Infof("Service account has been deleted %s/%s", namespace, saref.Name)
-		return nil, fmt.Errorf("service account %s/%s has been deleted", namespace, saref.Name)
-	}
-
-	if secref != nil {
-		// Make sure token hasn't been invalidated by deletion of the secret
-		secret, err := v.getter.GetSecret(namespace, secref.Name)
+	if v.lookup {
+		// Make sure service account still exists (name and UID)
+		serviceAccount, err := v.getter.GetServiceAccount(namespace, saref.Name)
 		if err != nil {
-			klog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, secref.Name, namespace, saref.Name, err)
-			return nil, errors.New("service account token has been invalidated")
+			klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, saref.Name, err)
+			return nil, err
 		}
-		if secref.UID != string(secret.UID) {
-			klog.V(4).Infof("Secret UID no longer matches %s/%s: %q != %q", namespace, secref.Name, string(secret.UID), secref.UID)
-			return nil, fmt.Errorf("secret UID (%s) does not match service account secret ref claim (%s)", secret.UID, secref.UID)
+
+		if string(serviceAccount.UID) != saref.UID {
+			klog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, saref.Name, string(serviceAccount.UID), saref.UID)
+			return nil, fmt.Errorf("service account UID (%s) does not match claim (%s)", serviceAccount.UID, saref.UID)
 		}
-		if secret.DeletionTimestamp != nil && secret.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
-			klog.V(4).Infof("Bound secret is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secref.Name, namespace, saref.Name)
-			return nil, errors.New("service account token has been invalidated")
+		if serviceAccount.DeletionTimestamp != nil && serviceAccount.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
+			klog.V(4).Infof("Service account has been deleted %s/%s", namespace, saref.Name)
+			return nil, fmt.Errorf("service account %s/%s has been deleted", namespace, saref.Name)
+		}
+
+		if secref != nil {
+			// Make sure token hasn't been invalidated by deletion of the secret
+			secret, err := v.getter.GetSecret(namespace, secref.Name)
+			if err != nil {
+				klog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, secref.Name, namespace, saref.Name, err)
+				return nil, errors.New("service account token has been invalidated")
+			}
+			if secref.UID != string(secret.UID) {
+				klog.V(4).Infof("Secret UID no longer matches %s/%s: %q != %q", namespace, secref.Name, string(secret.UID), secref.UID)
+				return nil, fmt.Errorf("secret UID (%s) does not match service account secret ref claim (%s)", secret.UID, secref.UID)
+			}
+			if secret.DeletionTimestamp != nil && secret.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
+				klog.V(4).Infof("Bound secret is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secref.Name, namespace, saref.Name)
+				return nil, errors.New("service account token has been invalidated")
+			}
 		}
 	}
 
