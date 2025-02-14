@@ -212,9 +212,7 @@ func CreateKubeAPIServerConfig(
 	capabilities.Setup(opts.AllowPrivileged, opts.MaxConnectionBytesPerSec)
 
 	// additional admission initializers
-	kubeAdmissionConfig := &kubeapiserveradmission.Config{
-		CloudConfigFile: opts.CloudProvider.CloudConfigFile,
-	}
+	kubeAdmissionConfig := &kubeapiserveradmission.Config{}
 	kubeInitializers, err := kubeAdmissionConfig.New()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)

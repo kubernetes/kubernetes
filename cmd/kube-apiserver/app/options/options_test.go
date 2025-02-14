@@ -331,10 +331,6 @@ func TestAddFlags(t *testing.T) {
 			},
 			MasterCount: 5,
 		},
-		CloudProvider: &kubeoptions.CloudProviderOptions{
-			CloudConfigFile: "/cloud-config",
-			CloudProvider:   "azure",
-		},
 	}
 
 	expected.Authentication.OIDC.UsernameClaim = "sub"
