@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -483,7 +484,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			options := NewOptions()
 			if tc.externalSigner {
 				// create and start mock signer.
-				socketPath := fmt.Sprintf("@mock-external-jwt-signer-%d.sock", time.Now().Nanosecond())
+				socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
 				mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
 				defer mockSigner.CleanUp()
 
