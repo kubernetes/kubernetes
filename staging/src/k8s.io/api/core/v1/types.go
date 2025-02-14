@@ -2620,16 +2620,16 @@ type ResourceResizeRestartPolicy string
 
 // These are the valid resource resize restart policy values:
 const (
-	// 'NotRequired' means Kubernetes will try to resize the container
+	// ResizeRestartPolicyNotRequired means Kubernetes will try to resize the container
 	// without restarting it, if possible. Kubernetes may however choose to
 	// restart the container if it is unable to actuate resize without a
 	// restart. For e.g. the runtime doesn't support restart-free resizing.
-	NotRequired ResourceResizeRestartPolicy = "NotRequired"
-	// 'RestartContainer' means Kubernetes will resize the container in-place
+	ResizeRestartPolicyNotRequired ResourceResizeRestartPolicy = "NotRequired"
+	// ResizeRestartPolicyRestartContainer means Kubernetes will resize the container in-place
 	// by stopping and starting the container when new resources are applied.
 	// This is needed for legacy applications. For e.g. java apps using the
 	// -xmxN flag which are unable to use resized memory without restarting.
-	RestartContainer ResourceResizeRestartPolicy = "RestartContainer"
+	ResizeRestartPolicyRestartContainer ResourceResizeRestartPolicy = "RestartContainer"
 )
 
 // ContainerResizePolicy represents resource resize policy for the container.
