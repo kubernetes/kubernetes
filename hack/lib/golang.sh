@@ -607,12 +607,26 @@ kube::golang::setup_env() {
   kube::golang::internal::verify_go_version
 }
 
+# kube::golang::hack_tools_gotoolchain outputs the value to use for $GOTOOLCHAIN,
+# using $KUBE_HACK_TOOLS_GOTOOLCHAIN if set, falling back to $GOTOOLCHAIN if set,
+# or outputting the empty string.
+#
+# Use this when installing / building tools specified in the hack/tools module:
+# GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go install ...
+kube::golang::hack_tools_gotoolchain() {
+  local hack_tools_gotoolchain="${GOTOOLCHAIN:-}"
+  if [ -n "${KUBE_HACK_TOOLS_GOTOOLCHAIN:-}" ]; then
+     hack_tools_gotoolchain="${KUBE_HACK_TOOLS_GOTOOLCHAIN}";
+  fi
+  echo -n "${hack_tools_gotoolchain}"
+}
+
 kube::golang::setup_gomaxprocs() {
   # GOMAXPROCS by default does not reflect the number of cpu(s) available
   # when running in a container, please see https://github.com/golang/go/issues/33803
   if [[ -z "${GOMAXPROCS:-}" ]]; then
     if ! command -v ncpu >/dev/null 2>&1; then
-      go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
+      GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
     fi
     if command -v ncpu >/dev/null 2>&1; then
       GOMAXPROCS=$(ncpu)
