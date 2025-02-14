@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/google/go-cmp/cmp" //nolint:depguard
 
@@ -29,10 +30,12 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
@@ -85,6 +88,9 @@ type stateData struct {
 
 	// nodeAllocations caches the result of Filter for the nodes.
 	nodeAllocations map[string][]resourceapi.AllocationResult
+
+	// The key is the name of the claim, the value is the AllocatedDeviceStatus allocated for the claim.
+	nodeAllocatedDevices map[string][]resourceapi.AllocatedDeviceStatus
 }
 
 func (d *stateData) Clone() framework.StateData {
@@ -96,14 +102,16 @@ type informationForClaim struct {
 	availableOnNodes *nodeaffinity.NodeSelector
 
 	// Set by Reserved, published by PreBind.
-	allocation *resourceapi.AllocationResult
+	allocation       *resourceapi.AllocationResult
+	allocatedDevices []resourceapi.AllocatedDeviceStatus
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
 type DynamicResources struct {
-	enabled                   bool
-	enableAdminAccess         bool
-	enableSchedulingQueueHint bool
+	enabled                       bool
+	enableAdminAccess             bool
+	enableSchedulingQueueHint     bool
+	enableDeviceBindingConditions bool
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -119,9 +127,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	}
 
 	pl := &DynamicResources{
-		enabled:                   true,
-		enableAdminAccess:         fts.EnableDRAAdminAccess,
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+		enabled:                       true,
+		enableAdminAccess:             fts.EnableDRAAdminAccess,
+		enableSchedulingQueueHint:     fts.EnableSchedulingQueueHint,
+		enableDeviceBindingConditions: fts.EnableDRADeviceBindingConditions,
 
 		fh:        fh,
 		clientset: fh.ClientSet(),
@@ -453,6 +462,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		}
 		s.allocator = allocator
 		s.nodeAllocations = make(map[string][]resourceapi.AllocationResult)
+		if pl.enableDeviceBindingConditions {
+			s.nodeAllocatedDevices = make(map[string][]resourceapi.AllocatedDeviceStatus)
+		}
 	}
 
 	s.claims = claims
@@ -513,13 +525,14 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
+	var allocatedDeviceStatus []resourceapi.AllocatedDeviceStatus
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
 			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
 		}
 
-		a, err := state.allocator.Allocate(allocCtx, node)
+		a, ad, err := state.allocator.Allocate(allocCtx, node)
 		if err != nil {
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
@@ -539,6 +552,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		}
 		// Reserve uses this information.
 		allocations = a
+		if pl.enableDeviceBindingConditions {
+			allocatedDeviceStatus = ad
+		}
 	}
 
 	// Store information in state while holding the mutex.
@@ -563,6 +579,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 
 	if state.allocator != nil {
 		state.nodeAllocations[node.Name] = allocations
+		if pl.enableDeviceBindingConditions && allocatedDeviceStatus != nil {
+			state.nodeAllocatedDevices[node.Name] = allocatedDeviceStatus
+		}
 	}
 
 	return nil
@@ -676,6 +695,10 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
 			}
 			claim.Status.Allocation = allocation
+			if pl.enableDeviceBindingConditions && state.nodeAllocatedDevices != nil {
+				state.informationsForClaim[index].allocatedDevices = state.nodeAllocatedDevices[nodeName]
+				claim.Status.Devices = state.nodeAllocatedDevices[nodeName]
+			}
 			err := pl.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim)
 			if err != nil {
 				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s", claim.Name))
@@ -726,6 +749,27 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
 			}
 		}
+
+		// If the claim has a device that has binding conditions, we need to clear them.
+		if pl.enableDeviceBindingConditions && claim.Status.Allocation != nil {
+			updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+			if err != nil {
+				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
+			}
+			for _, device := range claim.Status.Devices {
+				if device.BindingConditions != nil {
+					updatedClaim.Status.Allocation = nil
+					updatedClaim.Status.ReservedFor = nil
+					updatedClaim.Status.Devices = nil
+					claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, updatedClaim, metav1.UpdateOptions{})
+					if err != nil {
+						logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
+					}
+					klog.InfoS("unreserve", "resourceclaim", klog.KObj(claim))
+					break
+				}
+			}
+		}
 	}
 }
 
@@ -760,6 +804,73 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 			state.claims[index] = claim
 		}
 	}
+
+	if !pl.enableDeviceBindingConditions {
+		// If we get here, we know that reserving the claim for
+		// the pod worked and we can proceed with binding it.
+		return nil
+	}
+
+	// We need to check if the device is attached to the node.
+	needWait := false
+	for _, claim := range state.claims {
+		for _, device := range claim.Status.Devices {
+			if device.BindingConditions != nil {
+				needWait = true
+				break
+			}
+		}
+	}
+
+	// If no device needs to be prepared, we can return early.
+	if !needWait {
+		return nil
+	}
+
+	// We need to decide how long we should wait for the device to be attached to the node.
+	timeout := 10 * time.Minute
+	for _, claim := range state.claims {
+		for _, device := range claim.Status.Devices {
+			if device.BindingTimeout != nil && timeout < device.BindingTimeout.Duration {
+				timeout = device.BindingTimeout.Duration
+			}
+		}
+	}
+
+	// We need to wait for the device to be attached to the node.
+	err = wait.PollUntilContextTimeout(ctx, 30*time.Second, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			for claimIndex, claim := range state.claims {
+				claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				state.claims[claimIndex] = claim
+				for _, device := range claim.Status.Devices {
+					for _, cond := range device.BindingFailureConditions {
+						if apimeta.IsStatusConditionTrue(device.Conditions, cond) {
+							// In this case, the device failed to bind, so we need to return an error.
+							klog.Infof("device %s failed to bind", device.Device)
+							return false, fmt.Errorf("device %s failed to bind", device.Device)
+						}
+					}
+					for _, cond := range device.BindingConditions {
+						if !apimeta.IsStatusConditionTrue(device.Conditions, cond) {
+							// In this case, the device is not bound yet, so we need to retry.
+							klog.Infof("device %s is not bound, retry", device.Device)
+							return false, nil
+						}
+
+					}
+				}
+			}
+			klog.Info("all devices are bound")
+			return true, nil
+		})
+	if err != nil {
+		return statusError(logger, err)
+	}
+
 	// If we get here, we know that reserving the claim for
 	// the pod worked and we can proceed with binding it.
 	return nil
@@ -772,6 +883,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	logger := klog.FromContext(ctx)
 	claim := state.claims[index].DeepCopy()
 	allocation := state.informationsForClaim[index].allocation
+	allocatedDevices := state.informationsForClaim[index].allocatedDevices
 	defer func() {
 		if allocation != nil {
 			// The scheduler was handling allocation. Now that has
@@ -827,6 +939,13 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 				claim = updatedClaim
 			}
 			claim.Status.Allocation = allocation
+		}
+
+		if allocatedDevices != nil {
+			if claim.Status.Devices != nil {
+				return fmt.Errorf("claim %s got devices allocated elsewhere in the meantime", klog.KObj(claim))
+			}
+			claim.Status.Devices = allocatedDevices
 		}
 
 		// We can simply try to add the pod here without checking

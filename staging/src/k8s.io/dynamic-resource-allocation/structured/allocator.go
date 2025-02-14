@@ -104,7 +104,7 @@ func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 // additional value. A name can also be useful because log messages do not
 // have a common prefix. V(5) is used for one-time log entries, V(6) for important
 // progress reports, and V(7) for detailed debug output.
-func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error) {
+func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalAllocatedDeviceStatus []resourceapi.AllocatedDeviceStatus, finalErr error) {
 	alloc := &allocator{
 		Allocator:            a,
 		ctx:                  ctx, // all methods share the same a and thus ctx
@@ -120,7 +120,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	// First determine all eligible pools.
 	pools, err := GatherPools(ctx, alloc.slices, node)
 	if err != nil {
-		return nil, fmt.Errorf("gather pool information: %w", err)
+		return nil, nil, fmt.Errorf("gather pool information: %w", err)
 	}
 	alloc.pools = pools
 	if loggerV := alloc.logger.V(7); loggerV.Enabled() {
@@ -164,21 +164,21 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			for i, selector := range request.Selectors {
 				if selector.CEL == nil {
 					// Unknown future selector type!
-					return nil, fmt.Errorf("claim %s, request %s, selector #%d: CEL expression empty (unsupported selector type?)", klog.KObj(claim), request.Name, i)
+					return nil, nil, fmt.Errorf("claim %s, request %s, selector #%d: CEL expression empty (unsupported selector type?)", klog.KObj(claim), request.Name, i)
 				}
 			}
 
 			if !a.adminAccessEnabled && request.AdminAccess != nil {
-				return nil, fmt.Errorf("claim %s, request %s: admin access is requested, but the feature is disabled", klog.KObj(claim), request.Name)
+				return nil, nil, fmt.Errorf("claim %s, request %s: admin access is requested, but the feature is disabled", klog.KObj(claim), request.Name)
 			}
 
 			// Should be set. If it isn't, something changed and we should refuse to proceed.
 			if request.DeviceClassName == "" {
-				return nil, fmt.Errorf("claim %s, request %s: missing device class name (unsupported request type?)", klog.KObj(claim), request.Name)
+				return nil, nil, fmt.Errorf("claim %s, request %s: missing device class name (unsupported request type?)", klog.KObj(claim), request.Name)
 			}
 			class, err := alloc.classLister.Get(request.DeviceClassName)
 			if err != nil {
-				return nil, fmt.Errorf("claim %s, request %s: could not retrieve device class %s: %w", klog.KObj(claim), request.Name, request.DeviceClassName, err)
+				return nil, nil, fmt.Errorf("claim %s, request %s: could not retrieve device class %s: %w", klog.KObj(claim), request.Name, request.DeviceClassName, err)
 			}
 
 			// Start collecting information about the request.
@@ -194,24 +194,24 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				numDevices := request.Count
 				if numDevices > math.MaxInt {
 					// Allowed by API validation, but doesn't make sense.
-					return nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, numDevices)
+					return nil, nil, fmt.Errorf("claim %s, request %s: exact count %d is too large", klog.KObj(claim), request.Name, numDevices)
 				}
 				requestData.numDevices = int(numDevices)
 			case resourceapi.DeviceAllocationModeAll:
 				requestData.allDevices = make([]deviceWithID, 0, resourceapi.AllocationResultsMaxSize)
 				for _, pool := range pools {
 					if pool.IsIncomplete {
-						return nil, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated", klog.KObj(claim), request.Name, pool.PoolID)
+						return nil, nil, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently being updated", klog.KObj(claim), request.Name, pool.PoolID)
 					}
 					if pool.IsInvalid {
-						return nil, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently invalid", klog.KObj(claim), request.Name, pool.PoolID)
+						return nil, nil, fmt.Errorf("claim %s, request %s: asks for all devices, but resource pool %s is currently invalid", klog.KObj(claim), request.Name, pool.PoolID)
 					}
 
 					for _, slice := range pool.Slices {
 						for deviceIndex := range slice.Spec.Devices {
 							selectable, err := alloc.isSelectable(requestKey, slice, deviceIndex)
 							if err != nil {
-								return nil, err
+								return nil, nil, err
 							}
 							if selectable {
 								device := deviceWithID{
@@ -227,12 +227,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				// At least one device is required for 'All' allocation mode.
 				if len(requestData.allDevices) == 0 {
 					alloc.logger.V(6).Info("Allocation for 'all' devices didn't succeed: no devices found", "claim", klog.KObj(claim), "request", request.Name)
-					return nil, nil
+					return nil, nil, nil
 				}
 				requestData.numDevices = len(requestData.allDevices)
 				alloc.logger.V(6).Info("Request for 'all' devices", "claim", klog.KObj(claim), "request", request.Name, "numDevicesPerRequest", requestData.numDevices)
 			default:
-				return nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.AllocationMode)
+				return nil, nil, fmt.Errorf("claim %s, request %s: unsupported count mode %s", klog.KObj(claim), request.Name, request.AllocationMode)
 			}
 			alloc.requestData[requestKey] = requestData
 			numDevicesPerClaim += requestData.numDevices
@@ -241,7 +241,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 
 		// Check that we don't end up with too many results.
 		if numDevicesPerClaim > resourceapi.AllocationResultsMaxSize {
-			return nil, fmt.Errorf("claim %s: number of requested devices %d exceeds the claim limit of %d", klog.KObj(claim), numDevicesPerClaim, resourceapi.AllocationResultsMaxSize)
+			return nil, nil, fmt.Errorf("claim %s: number of requested devices %d exceeds the claim limit of %d", klog.KObj(claim), numDevicesPerClaim, resourceapi.AllocationResultsMaxSize)
 		}
 
 		// If we don't, then we can pre-allocate the result slices for
@@ -269,7 +269,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				constraints[i] = m
 			default:
 				// Unknown constraint type!
-				return nil, fmt.Errorf("claim %s, constraint #%d: empty constraint (unsupported constraint type?)", klog.KObj(claim), i)
+				return nil, nil, fmt.Errorf("claim %s, constraint #%d: empty constraint (unsupported constraint type?)", klog.KObj(claim), i)
 			}
 		}
 		alloc.constraints[claimIndex] = constraints
@@ -303,16 +303,17 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	// without further wrapping.
 	done, err := alloc.allocateOne(deviceIndices{})
 	if errors.Is(err, errStop) {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !done {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	result := make([]resourceapi.AllocationResult, len(alloc.result))
+	resultAllocatedDeviceStatus := make([]resourceapi.AllocatedDeviceStatus, 0, numDevicesTotal)
 	for claimIndex, internalResult := range alloc.result {
 		claim := alloc.claimsToAllocate[claimIndex]
 		allocationResult := &result[claimIndex]
@@ -325,6 +326,20 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				Device:      internal.id.Device.String(),
 				AdminAccess: internal.adminAccess,
 			}
+			for _, device := range internal.slice.Spec.Devices {
+				if device.Name == internal.id.Device {
+					resultAllocatedDeviceStatus = append(resultAllocatedDeviceStatus, resourceapi.AllocatedDeviceStatus{
+						Driver:                   internal.id.Driver.String(),
+						Pool:                     internal.id.Pool.String(),
+						Device:                   internal.id.Device.String(),
+						UsageRestrictedToNode:    device.Basic.UsageRestrictedToNode,
+						BindingConditions:        device.Basic.BindingConditions,
+						BindingFailureConditions: device.Basic.BindingFailureConditions,
+						BindingTimeout:           device.Basic.BindingTimeout,
+					})
+				}
+			}
+
 		}
 
 		// Populate configs.
@@ -349,14 +364,14 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		}
 
 		// Determine node selector.
-		nodeSelector, err := alloc.createNodeSelector(internalResult.devices)
+		nodeSelector, err := alloc.createNodeSelector(internalResult.devices, node.Name)
 		if err != nil {
-			return nil, fmt.Errorf("create NodeSelector for claim %s: %w", claim.Name, err)
+			return nil, nil, fmt.Errorf("create NodeSelector for claim %s: %w", claim.Name, err)
 		}
 		allocationResult.NodeSelector = nodeSelector
 	}
 
-	return result, nil
+	return result, resultAllocatedDeviceStatus, nil
 }
 
 // errStop is a special error that gets returned by allocateOne if it detects
@@ -809,7 +824,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult, nodename string) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	nodeSelector := &v1.NodeSelector{
@@ -830,6 +845,19 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 					}},
 				}},
 			}, nil
+		}
+		for _, device := range slice.Spec.Devices {
+			if device.Basic.UsageRestrictedToNode {
+				return &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodename},
+						}},
+					}},
+				}, nil
+			}
 		}
 		if slice.Spec.NodeSelector != nil {
 			switch len(slice.Spec.NodeSelector.NodeSelectorTerms) {
