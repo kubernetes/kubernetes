@@ -2565,8 +2565,8 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	cpu200m := resource.MustParse("200m")
 	mem100M := resource.MustParse("100Mi")
 	mem200M := resource.MustParse("200Mi")
-	cpuPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.ResizeRestartPolicyNotRequired}
-	memPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.ResizeRestartPolicyNotRequired}
+	cpuPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.ResizeRestartPolicyPreferNoRestart}
+	memPolicyRestartNotRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.ResizeRestartPolicyPreferNoRestart}
 	cpuPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.ResizeRestartPolicyRestartContainer}
 	memPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.ResizeRestartPolicyRestartContainer}
 
