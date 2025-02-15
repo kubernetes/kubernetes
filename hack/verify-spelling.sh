@@ -31,7 +31,7 @@ PATH="${GOBIN}:${PATH}"
 
 # Install tools we need
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  GO111MODULE=on go install github.com/client9/misspell/cmd/misspell
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" GO111MODULE=on go install github.com/client9/misspell/cmd/misspell
 popd >/dev/null
 
 # Spell checking

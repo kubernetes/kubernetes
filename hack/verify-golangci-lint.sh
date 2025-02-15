@@ -148,10 +148,10 @@ export GO111MODULE=on
 # Install golangci-lint
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  go install github.com/golangci/golangci-lint/cmd/golangci-lint
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go install github.com/golangci/golangci-lint/cmd/golangci-lint
   if [ "${golangci_config}" ]; then
     # This cannot be used without a config.
-    go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+    GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
   fi
 popd >/dev/null
 

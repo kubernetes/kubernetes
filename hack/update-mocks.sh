@@ -31,7 +31,7 @@ kube::golang::setup_env
 
 echo 'installing mockgen'
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-  go install github.com/golang/mock/mockgen
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go install github.com/golang/mock/mockgen
 popd >/dev/null
 
 function git_find() {
