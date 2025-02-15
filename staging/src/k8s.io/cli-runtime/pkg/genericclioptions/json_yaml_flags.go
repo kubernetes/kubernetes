@@ -29,7 +29,7 @@ func (f *JSONYamlPrintFlags) AllowedFormats() []string {
 	if f == nil {
 		return []string{}
 	}
-	return []string{"json", "yaml"}
+	return []string{"json", "yaml", "kyaml"}
 }
 
 // JSONYamlPrintFlags provides default flags necessary for json/yaml printing.
@@ -52,6 +52,8 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePr
 		printer = &printers.JSONPrinter{}
 	case "yaml":
 		printer = &printers.YAMLPrinter{}
+	case "kyaml":
+		printer = &printers.KYAMLPrinter{}
 	default:
 		return nil, NoCompatiblePrinterError{OutputFormat: &outputFormat, AllowedFormats: f.AllowedFormats()}
 	}
