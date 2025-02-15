@@ -32,9 +32,10 @@ import (
 )
 
 const (
-	rwMask   = os.FileMode(0660)
-	roMask   = os.FileMode(0440)
-	execMask = os.FileMode(0110)
+	rwMask                       = os.FileMode(0660)
+	roMask                       = os.FileMode(0440)
+	execMask                     = os.FileMode(0110)
+	OwnershipChangeSlowThreshold = 30 * time.Second
 )
 
 // SetVolumeOwnership modifies the given volume to be owned by
@@ -45,7 +46,7 @@ func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChan
 		return nil
 	}
 
-	timer := time.AfterFunc(30*time.Second, func() {
+	timer := time.AfterFunc(OwnershipChangeSlowThreshold, func() {
 		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
 	})
 	defer timer.Stop()

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
@@ -335,7 +336,19 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
 
 		// fullPluginName helps to distinguish different driver from csi plugin
-		err := volume.SetVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
+		start := time.Now()
+		err := volume.SetVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, func(param volumetypes.CompleteFuncParam) {
+			util.FSGroupCompleteHook(c.plugin, c.spec)(param)
+			delay := time.Now().Sub(start)
+			if delay < volume.OwnershipChangeSlowThreshold {
+				return
+			}
+			policy := api.FSGroupChangeAlways
+			if mounterArgs.FSGroupChangePolicy != nil {
+				policy = *mounterArgs.FSGroupChangePolicy
+			}
+			c.plugin.host.GetEventRecorder().Eventf(c.pod, api.EventTypeWarning, "VolumeOwnershipChangeLatency", "Setting volume %s ownership with fsGroupChangePolicy:%s is slow %.2fs", c.spec.Name(), policy, delay.Seconds())
+		})
 		if err != nil {
 			// At this point mount operation is successful:
 			//   1. Since volume can not be used by the pod because of invalid permissions, we must return error
