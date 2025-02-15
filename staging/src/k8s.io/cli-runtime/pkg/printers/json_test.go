@@ -105,8 +105,9 @@ func TestPrintersSuccess(t *testing.T) {
 	om := func(name string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name} }
 
 	genericPrinters := map[string]ResourcePrinter{
-		"json": NewTypeSetter(scheme.Scheme).ToPrinter(&JSONPrinter{}),
-		"yaml": NewTypeSetter(scheme.Scheme).ToPrinter(&YAMLPrinter{}),
+		"json":  NewTypeSetter(scheme.Scheme).ToPrinter(&JSONPrinter{}),
+		"yaml":  NewTypeSetter(scheme.Scheme).ToPrinter(&YAMLPrinter{}),
+		"kyaml": NewTypeSetter(scheme.Scheme).ToPrinter(&KYAMLPrinter{}),
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &v1.Pod{ObjectMeta: om("pod")},
