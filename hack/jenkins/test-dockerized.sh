@@ -32,7 +32,11 @@ export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 export GO111MODULE=off
 
 # Install tools we need
-GO111MODULE=on go -C "./hack/tools" install gotest.tools/gotestsum
+hack_tools_gotoolchain="${GOTOOLCHAIN:-}"
+if [ -n "${KUBE_HACK_TOOLS_GOTOOLCHAIN:-}" ]; then
+  hack_tools_gotoolchain="${KUBE_HACK_TOOLS_GOTOOLCHAIN}";
+fi
+GOTOOLCHAIN="${hack_tools_gotoolchain}" GO111MODULE=on go -C "./hack/tools" install gotest.tools/gotestsum
 
 # Disable coverage report
 export KUBE_COVER="n"
