@@ -232,3 +232,5 @@ func TestResponseWriterDecorator(t *testing.T) {
 		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
+
+// Local fallback improvement: appended a small comment.
