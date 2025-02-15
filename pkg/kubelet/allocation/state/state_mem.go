@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 )
 
@@ -95,4 +96,15 @@ func (s *stateMemory) Delete(podUID string, containerName string) error {
 	}
 	s.deleteContainer(podUID, containerName)
 	return nil
+}
+
+func (s *stateMemory) RemoveOrphanedPods(remainingPods map[types.UID]bool) {
+	s.Lock()
+	defer s.Unlock()
+
+	for podUID := range s.podAllocation {
+		if _, ok := remainingPods[types.UID(podUID)]; !ok {
+			delete(s.podAllocation, podUID)
+		}
+	}
 }
