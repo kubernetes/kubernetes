@@ -68,7 +68,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 	hostnameOverridden bool, // was the hostname force set?
 	externalCloudProvider bool, // typically Kubelet.externalCloudProvider
 	cloud cloudprovider.Interface, // typically Kubelet.cloud
-	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
+	nodeAddressesFunc func(context.Context) ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
 	resolveAddressFunc func(net.IP) (net.IP, error), // typically k8s.io/apimachinery/pkg/util/net.ResolveBindAddress
 ) Setter {
 	var nodeIP, secondaryNodeIP net.IP
@@ -149,7 +149,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			}
 		}
 		if cloud != nil {
-			cloudNodeAddresses, err := nodeAddressesFunc()
+			cloudNodeAddresses, err := nodeAddressesFunc(ctx)
 			if err != nil {
 				return err
 			}

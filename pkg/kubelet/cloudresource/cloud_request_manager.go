@@ -32,8 +32,8 @@ import (
 
 // SyncManager is an interface for making requests to a cloud provider
 type SyncManager interface {
-	Run(stopCh <-chan struct{})
-	NodeAddresses() ([]v1.NodeAddress, error)
+	Run(ctx context.Context, stopCh <-chan struct{})
+	NodeAddresses(ctx context.Context) ([]v1.NodeAddress, error)
 }
 
 var _ SyncManager = &cloudResourceSyncManager{}
@@ -74,7 +74,8 @@ func NewSyncManager(cloud cloudprovider.Interface, nodeName types.NodeName, sync
 // have run, it will return the most recent error. If node addresses have been
 // synced successfully, it will return the list of node addresses from the most
 // recent successful sync.
-func (m *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, error) {
+func (m *cloudResourceSyncManager) NodeAddresses(ctx context.Context) ([]v1.NodeAddress, error) {
+	logger := klog.FromContext(ctx)
 	m.nodeAddressesMonitor.L.Lock()
 	defer m.nodeAddressesMonitor.L.Unlock()
 	// wait until there is something
@@ -82,13 +83,13 @@ func (m *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, error) {
 		if addrs, err := m.nodeAddresses, m.nodeAddressesErr; len(addrs) > 0 || err != nil {
 			return addrs, err
 		}
-		klog.V(5).InfoS("Waiting for cloud provider to provide node addresses")
+		logger.V(5).Info("Waiting for cloud provider to provide node addresses")
 		m.nodeAddressesMonitor.Wait()
 	}
 }
 
 // getNodeAddresses calls the cloud provider to get a current list of node addresses.
-func (m *cloudResourceSyncManager) getNodeAddresses() ([]v1.NodeAddress, error) {
+func (m *cloudResourceSyncManager) getNodeAddresses(ctx context.Context) ([]v1.NodeAddress, error) {
 	// TODO(roberthbailey): Can we do this without having credentials to talk to
 	// the cloud provider?
 	// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and
@@ -99,20 +100,21 @@ func (m *cloudResourceSyncManager) getNodeAddresses() ([]v1.NodeAddress, error) 
 	if !ok {
 		return nil, fmt.Errorf("failed to get instances from cloud provider")
 	}
-	return instances.NodeAddresses(context.TODO(), m.nodeName)
+	return instances.NodeAddresses(ctx, m.nodeName)
 }
 
-func (m *cloudResourceSyncManager) syncNodeAddresses() {
-	klog.V(5).InfoS("Requesting node addresses from cloud provider for node", "nodeName", m.nodeName)
+func (m *cloudResourceSyncManager) syncNodeAddresses(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	logger.V(5).Info("Requesting node addresses from cloud provider for node", "nodeName", m.nodeName)
 
-	addrs, err := m.getNodeAddresses()
+	addrs, err := m.getNodeAddresses(ctx)
 
 	m.nodeAddressesMonitor.L.Lock()
 	defer m.nodeAddressesMonitor.L.Unlock()
 	defer m.nodeAddressesMonitor.Broadcast()
 
 	if err != nil {
-		klog.V(2).InfoS("Node addresses from cloud provider for node not collected", "nodeName", m.nodeName, "err", err)
+		logger.V(2).Error(err, "Node addresses from cloud provider for node not collected", "nodeName", m.nodeName)
 
 		if len(m.nodeAddresses) > 0 {
 			// in the event that a sync loop fails when a previous sync had
@@ -124,12 +126,18 @@ func (m *cloudResourceSyncManager) syncNodeAddresses() {
 		return
 	}
 
-	klog.V(5).InfoS("Node addresses from cloud provider for node collected", "nodeName", m.nodeName)
+	logger.V(5).Info("Node addresses from cloud provider for node collected", "nodeName", m.nodeName)
 	m.nodeAddressesErr = nil
 	m.nodeAddresses = addrs
 }
 
 // Run starts the cloud resource sync manager's sync loop.
-func (m *cloudResourceSyncManager) Run(stopCh <-chan struct{}) {
-	wait.Until(m.syncNodeAddresses, m.syncPeriod, stopCh)
+func (m *cloudResourceSyncManager) Run(ctx context.Context, stopCh <-chan struct{}) {
+	// TODO(omerap12): This is a temporary solution. We should move to using wait.UntilWithContext
+	// instead of wait.Until and remove the stopCh parameter. This change requires careful
+	// testing to ensure that the manager reacts correctly when the context is cancelled
+	// or expires, maintaining the same behavior as with stopCh.
+	wait.Until(func() {
+		m.syncNodeAddresses(ctx)
+	}, m.syncPeriod, stopCh)
 }
