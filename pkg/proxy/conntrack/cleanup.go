@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	netutils "k8s.io/utils/net"
 )
 
@@ -120,6 +121,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 	} else {
 		klog.V(4).InfoS("Finished reconciling conntrack entries", "ipFamily", ipFamily, "entriesDeleted", n, "took", time.Since(start))
 	}
+	metrics.ReconcileConntrackFlowsLatency.WithLabelValues(string(ipFamily)).Observe(metrics.SinceInSeconds(start))
 }
 
 // ipFamilyMap maps v1.IPFamily to the corresponding unix constant.
