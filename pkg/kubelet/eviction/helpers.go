@@ -683,6 +683,10 @@ func (ms *multiSorter) Less(i, j int) bool {
 func priority(p1, p2 *v1.Pod) int {
 	priority1 := corev1helpers.PodPriority(p1)
 	priority2 := corev1helpers.PodPriority(p2)
+
+	klog.V(5).InfoS("eviction ranking by priority", "pod", p1.Name, "namespace", p1.Namespace, "priority", priority1)
+	klog.V(5).InfoS("eviction ranking by priority", "pod", p2.Name, "namespace", p2.Namespace, "priority", priority2)
+
 	if priority1 == priority2 {
 		return 0
 	}
@@ -765,6 +769,9 @@ func memory(stats statsFunc) cmpFunc {
 			p1Memory.Add(p1Swap)
 			p2Memory.Add(p2Swap)
 		}
+
+		klog.V(5).InfoS("eviction ranking by memory", "pod", p1.Name, "namespace", p1.Namespace, "mem-request", p1Memory.Value())
+		klog.V(5).InfoS("eviction ranking by memory", "pod", p2.Name, "namespace", p2.Namespace, "mem-request", p2Memory.Value())
 
 		// prioritize evicting the pod which has the larger consumption of memory
 		return p2Memory.Cmp(*p1Memory)
