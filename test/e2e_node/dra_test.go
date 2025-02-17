@@ -24,6 +24,8 @@ The test can be run locally on Linux this way:
 
 package e2enode
 
+// TODO: testing, ignore me...
+
 import (
 	"context"
 	"fmt"
