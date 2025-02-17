@@ -1025,7 +1025,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
 		// the kubelet will not be started.
 		checkers := klet.containerManager.GetHealthCheckers()
-		klet.healthChecker, err = watchdog.NewHealthChecker(klet, watchdog.WithExtendedCheckers(checkers))
+		klet.healthChecker, err = watchdog.NewHealthChecker(klog.FromContext(ctx), klet, watchdog.WithExtendedCheckers(checkers))
 		if err != nil {
 			return nil, fmt.Errorf("create health checker: %w", err)
 		}
@@ -1787,7 +1787,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
-		kl.healthChecker.Start()
+		kl.healthChecker.Start(ctx)
 	}
 
 	kl.syncLoop(ctx, updates, kl)
