@@ -46,12 +46,13 @@ type deviceClassLister interface {
 // available and the current state of the cluster (claims, classes, resource
 // slices).
 type Allocator struct {
-	adminAccessEnabled bool
-	claimsToAllocate   []*resourceapi.ResourceClaim
-	allocatedDevices   sets.Set[DeviceID]
-	classLister        deviceClassLister
-	slices             []*resourceapi.ResourceSlice
-	celCache           *cel.Cache
+	adminAccessEnabled   bool
+	deviceBindingEnabled bool
+	claimsToAllocate     []*resourceapi.ResourceClaim
+	allocatedDevices     sets.Set[DeviceID]
+	classLister          deviceClassLister
+	slices               []*resourceapi.ResourceSlice
+	celCache             *cel.Cache
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
@@ -60,6 +61,7 @@ type Allocator struct {
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	adminAccessEnabled bool,
+	deviceBindingEnabled bool,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister deviceClassLister,
@@ -67,12 +69,13 @@ func NewAllocator(ctx context.Context,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
-		adminAccessEnabled: adminAccessEnabled,
-		claimsToAllocate:   claimsToAllocate,
-		allocatedDevices:   allocatedDevices,
-		classLister:        classLister,
-		slices:             slices,
-		celCache:           celCache,
+		adminAccessEnabled:   adminAccessEnabled,
+		deviceBindingEnabled: deviceBindingEnabled,
+		claimsToAllocate:     claimsToAllocate,
+		allocatedDevices:     allocatedDevices,
+		classLister:          classLister,
+		slices:               slices,
+		celCache:             celCache,
 	}, nil
 }
 
@@ -326,20 +329,23 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				Device:      internal.id.Device.String(),
 				AdminAccess: internal.adminAccess,
 			}
-			for _, device := range internal.slice.Spec.Devices {
-				if device.Name == internal.id.Device {
-					resultAllocatedDeviceStatus = append(resultAllocatedDeviceStatus, resourceapi.AllocatedDeviceStatus{
-						Driver:                   internal.id.Driver.String(),
-						Pool:                     internal.id.Pool.String(),
-						Device:                   internal.id.Device.String(),
-						UsageRestrictedToNode:    device.Basic.UsageRestrictedToNode,
-						BindingConditions:        device.Basic.BindingConditions,
-						BindingFailureConditions: device.Basic.BindingFailureConditions,
-						BindingTimeout:           device.Basic.BindingTimeout,
-					})
+
+			// If deviceBindingConditions are enabled, we need to populate the AllocatedDeviceStatus.
+			if a.deviceBindingEnabled {
+				for _, device := range internal.slice.Spec.Devices {
+					if device.Name == internal.id.Device && device.Basic.BindingConditions != nil {
+						resultAllocatedDeviceStatus = append(resultAllocatedDeviceStatus, resourceapi.AllocatedDeviceStatus{
+							Driver:                   internal.id.Driver.String(),
+							Pool:                     internal.id.Pool.String(),
+							Device:                   internal.id.Device.String(),
+							UsageRestrictedToNode:    device.Basic.UsageRestrictedToNode,
+							BindingConditions:        device.Basic.BindingConditions,
+							BindingFailureConditions: device.Basic.BindingFailureConditions,
+							BindingTimeout:           device.Basic.BindingTimeout,
+						})
+					}
 				}
 			}
-
 		}
 
 		// Populate configs.
