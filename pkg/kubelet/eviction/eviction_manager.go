@@ -327,7 +327,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			klog.ErrorS(err, "eviction manager: found conflicting containerfs eviction. Ignoring.")
 		}
 		m.splitContainerImageFs = &splitContainerImageFs
-		m.signalToRankFunc = buildSignalToRankFunc(hasImageFs, splitContainerImageFs)
+		m.signalToRankFunc = buildSignalToRankFunc(hasImageFs, splitContainerImageFs, swapLimitCalculator)
 		m.signalToNodeReclaimFuncs = buildSignalToNodeReclaimFuncs(m.imageGC, m.containerGC, hasImageFs, splitContainerImageFs)
 	}
 
