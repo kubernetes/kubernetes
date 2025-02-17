@@ -409,7 +409,16 @@ func RunTestWatchError(ctx context.Context, t *testing.T, store InterfaceWithPre
 }
 
 func RunTestWatchWithUnsafeDelete(ctx context.Context, t *testing.T, store InterfaceWithCorruptTransformer) {
-	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
+	obj := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: "test-ns",
+			// this annotation causes the object to become corrupt
+			Annotations: map[string]string{
+				CorruptErrKey: "",
+			},
+		},
+	}
 	key := computePodKey(obj)
 
 	out := &example.Pod{}
