@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -64,6 +65,10 @@ type Helper struct {
 	Selector            string
 	PodSelector         string
 	ChunkSize           int64
+	// PriorityDescending indicates whether to sort pods by priority in descending order.
+	// If true, pods with higher priority come first.
+	// If false, the original order is preserved.
+	PriorityDescending bool
 
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool
@@ -240,11 +245,33 @@ func filterPods(podList *corev1.PodList, filters []PodFilter) *PodDeleteList {
 	return list
 }
 
+// sortByPriority to sort pods by priority if descending is true.
+// Otherwise, keep the original order.
+func sortByPriority(pods []corev1.Pod, descending bool) {
+	if !descending || len(pods) <= 1 {
+		return
+	}
+
+	sort.SliceStable(pods, func(i, j int) bool {
+		// If priority is not set, assume it as the lowest priority.
+		ipriority := int32(0)
+		jpriority := int32(0)
+		if pods[i].Spec.Priority != nil {
+			ipriority = *pods[i].Spec.Priority
+		}
+		if pods[j].Spec.Priority != nil {
+			jpriority = *pods[j].Spec.Priority
+		}
+		return ipriority > jpriority // descending == true, sort from high to low
+	})
+}
+
 // DeleteOrEvictPods deletes or evicts the pods on the api server
 func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 	if len(pods) == 0 {
 		return nil
 	}
+	sortByPriority(pods, d.PriorityDescending)
 
 	// TODO(justinsb): unnecessary?
 	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
