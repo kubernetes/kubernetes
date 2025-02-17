@@ -12513,12 +12513,99 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.resource.v1alpha3.CapacityPool
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.CapacityPoolMixinRef
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.CapacityPoolMixin
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.CapacityPoolMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.CompositeDevice
+  map:
+    fields:
+    - name: allNodes
+      type:
+        scalar: boolean
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: consumesCapacity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceCapacityConsumption
+          elementRelationship: atomic
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceMixinRef
+          elementRelationship: atomic
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1alpha3.CompositeDeviceMixin
+  map:
+    fields:
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1alpha3.Device
   map:
     fields:
     - name: basic
       type:
         namedType: io.k8s.api.resource.v1alpha3.BasicDevice
+    - name: composite
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.CompositeDevice
     - name: name
       type:
         scalar: string
@@ -12569,6 +12656,43 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: version
       type:
         scalar: string
+- name: io.k8s.api.resource.v1alpha3.DeviceCapacityConsumption
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: capacityPool
+      type:
+        scalar: string
+      default: ""
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceCapacityConsumptionMixinRef
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha3.DeviceCapacityConsumptionMixin
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.DeviceCapacityConsumptionMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha3.DeviceClaim
   map:
     fields:
@@ -12652,6 +12776,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha3.DeviceMixin
+  map:
+    fields:
+    - name: composite
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.CompositeDeviceMixin
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.DeviceMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha3.DeviceRequest
   map:
     fields:
@@ -12668,6 +12809,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: firstAvailable
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceSubRequest
+          elementRelationship: atomic
     - name: name
       type:
         scalar: string
@@ -12706,6 +12853,29 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: cel
       type:
         namedType: io.k8s.api.resource.v1alpha3.CELDeviceSelector
+- name: io.k8s.api.resource.v1alpha3.DeviceSubRequest
+  map:
+    fields:
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: count
+      type:
+        scalar: numeric
+    - name: deviceClassName
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.NetworkDeviceData
   map:
     fields:
@@ -12861,12 +13031,39 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.ResourceSliceSpec
       default: {}
+- name: io.k8s.api.resource.v1alpha3.ResourceSliceMixins
+  map:
+    fields:
+    - name: capacityPool
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.CapacityPoolMixin
+          elementRelationship: atomic
+    - name: device
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceMixin
+          elementRelationship: atomic
+    - name: deviceCapacityConsumption
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceCapacityConsumptionMixin
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.ResourceSliceSpec
   map:
     fields:
     - name: allNodes
       type:
         scalar: boolean
+    - name: capacityPools
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.CapacityPool
+          elementRelationship: atomic
     - name: devices
       type:
         list:
@@ -12877,12 +13074,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: mixins
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.ResourceSliceMixins
     - name: nodeName
       type:
         scalar: string
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perDeviceNodeSelection
+      type:
+        scalar: boolean
     - name: pool
       type:
         namedType: io.k8s.api.resource.v1alpha3.ResourcePool
@@ -12946,12 +13149,99 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.resource.v1beta1.CapacityPool
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.CapacityPoolMixinRef
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.CapacityPoolMixin
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.CapacityPoolMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.CompositeDevice
+  map:
+    fields:
+    - name: allNodes
+      type:
+        scalar: boolean
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: consumesCapacity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacityConsumption
+          elementRelationship: atomic
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceMixinRef
+          elementRelationship: atomic
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1beta1.CompositeDeviceMixin
+  map:
+    fields:
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
 - name: io.k8s.api.resource.v1beta1.Device
   map:
     fields:
     - name: basic
       type:
         namedType: io.k8s.api.resource.v1beta1.BasicDevice
+    - name: composite
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CompositeDevice
     - name: name
       type:
         scalar: string
@@ -13008,6 +13298,43 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: value
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1beta1.DeviceCapacityConsumption
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: capacityPool
+      type:
+        scalar: string
+      default: ""
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacityConsumptionMixinRef
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.DeviceCapacityConsumptionMixin
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.DeviceCapacityConsumptionMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta1.DeviceClaim
   map:
     fields:
@@ -13091,6 +13418,23 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.DeviceMixin
+  map:
+    fields:
+    - name: composite
+      type:
+        namedType: io.k8s.api.resource.v1beta1.CompositeDeviceMixin
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.DeviceMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta1.DeviceRequest
   map:
     fields:
@@ -13107,6 +13451,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: firstAvailable
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceSubRequest
+          elementRelationship: atomic
     - name: name
       type:
         scalar: string
@@ -13145,6 +13495,29 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: cel
       type:
         namedType: io.k8s.api.resource.v1beta1.CELDeviceSelector
+- name: io.k8s.api.resource.v1beta1.DeviceSubRequest
+  map:
+    fields:
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: count
+      type:
+        scalar: numeric
+    - name: deviceClassName
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceSelector
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.NetworkDeviceData
   map:
     fields:
@@ -13300,12 +13673,39 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1beta1.ResourceSliceSpec
       default: {}
+- name: io.k8s.api.resource.v1beta1.ResourceSliceMixins
+  map:
+    fields:
+    - name: capacityPool
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.CapacityPoolMixin
+          elementRelationship: atomic
+    - name: device
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceMixin
+          elementRelationship: atomic
+    - name: deviceCapacityConsumption
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacityConsumptionMixin
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.ResourceSliceSpec
   map:
     fields:
     - name: allNodes
       type:
         scalar: boolean
+    - name: capacityPools
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.CapacityPool
+          elementRelationship: atomic
     - name: devices
       type:
         list:
@@ -13316,16 +13716,642 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: mixins
+      type:
+        namedType: io.k8s.api.resource.v1beta1.ResourceSliceMixins
     - name: nodeName
       type:
         scalar: string
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perDeviceNodeSelection
+      type:
+        scalar: boolean
     - name: pool
       type:
         namedType: io.k8s.api.resource.v1beta1.ResourcePool
       default: {}
+- name: io.k8s.api.resource.v1beta2.AllocatedDeviceStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: data
+      type:
+        namedType: __untyped_atomic_
+    - name: device
+      type:
+        scalar: string
+      default: ""
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: networkData
+      type:
+        namedType: io.k8s.api.resource.v1beta2.NetworkDeviceData
+    - name: pool
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.AllocationResult
+  map:
+    fields:
+    - name: devices
+      type:
+        namedType: io.k8s.api.resource.v1beta2.DeviceAllocationResult
+      default: {}
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1beta2.CELDeviceSelector
+  map:
+    fields:
+    - name: expression
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.CapacityPool
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacity
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.CapacityPoolMixinRef
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.CapacityPoolMixin
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacity
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.CapacityPoolMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.Device
+  map:
+    fields:
+    - name: allNodes
+      type:
+        scalar: boolean
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacity
+    - name: consumesCapacity
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacityConsumption
+          elementRelationship: atomic
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceMixinRef
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.resource.v1beta2.DeviceAllocationConfiguration
+  map:
+    fields:
+    - name: opaque
+      type:
+        namedType: io.k8s.api.resource.v1beta2.OpaqueDeviceConfiguration
+    - name: requests
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: source
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceAllocationResult
+  map:
+    fields:
+    - name: config
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceAllocationConfiguration
+          elementRelationship: atomic
+    - name: results
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceRequestAllocationResult
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.DeviceAttribute
+  map:
+    fields:
+    - name: bool
+      type:
+        scalar: boolean
+    - name: int
+      type:
+        scalar: numeric
+    - name: string
+      type:
+        scalar: string
+    - name: version
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1beta2.DeviceCapacity
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1beta2.DeviceCapacityConsumption
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacity
+    - name: capacityPool
+      type:
+        scalar: string
+      default: ""
+    - name: includes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixinRef
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixin
+  map:
+    fields:
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacity
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceClaim
+  map:
+    fields:
+    - name: config
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceClaimConfiguration
+          elementRelationship: atomic
+    - name: constraints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceConstraint
+          elementRelationship: atomic
+    - name: requests
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceRequest
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.DeviceClaimConfiguration
+  map:
+    fields:
+    - name: opaque
+      type:
+        namedType: io.k8s.api.resource.v1beta2.OpaqueDeviceConfiguration
+    - name: requests
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.DeviceClass
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1beta2.DeviceClassSpec
+      default: {}
+- name: io.k8s.api.resource.v1beta2.DeviceClassConfiguration
+  map:
+    fields:
+    - name: opaque
+      type:
+        namedType: io.k8s.api.resource.v1beta2.OpaqueDeviceConfiguration
+- name: io.k8s.api.resource.v1beta2.DeviceClassSpec
+  map:
+    fields:
+    - name: config
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceClassConfiguration
+          elementRelationship: atomic
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceSelector
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.DeviceConstraint
+  map:
+    fields:
+    - name: matchAttribute
+      type:
+        scalar: string
+    - name: requests
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.DeviceMixin
+  map:
+    fields:
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacity
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceMixinRef
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceRequest
+  map:
+    fields:
+    - name: exactly
+      type:
+        namedType: io.k8s.api.resource.v1beta2.SpecificDeviceRequest
+    - name: firstAvailable
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceSubRequest
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceRequestAllocationResult
+  map:
+    fields:
+    - name: adminAccess
+      type:
+        scalar: boolean
+    - name: device
+      type:
+        scalar: string
+      default: ""
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: pool
+      type:
+        scalar: string
+      default: ""
+    - name: request
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceSelector
+  map:
+    fields:
+    - name: cel
+      type:
+        namedType: io.k8s.api.resource.v1beta2.CELDeviceSelector
+- name: io.k8s.api.resource.v1beta2.DeviceSubRequest
+  map:
+    fields:
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: count
+      type:
+        scalar: numeric
+    - name: deviceClassName
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceSelector
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.NetworkDeviceData
+  map:
+    fields:
+    - name: hardwareAddress
+      type:
+        scalar: string
+    - name: interfaceName
+      type:
+        scalar: string
+    - name: ips
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.OpaqueDeviceConfiguration
+  map:
+    fields:
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: parameters
+      type:
+        namedType: __untyped_atomic_
+- name: io.k8s.api.resource.v1beta2.ResourceClaim
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourceClaimSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourceClaimStatus
+      default: {}
+- name: io.k8s.api.resource.v1beta2.ResourceClaimConsumerReference
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resource
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.ResourceClaimSpec
+  map:
+    fields:
+    - name: devices
+      type:
+        namedType: io.k8s.api.resource.v1beta2.DeviceClaim
+      default: {}
+- name: io.k8s.api.resource.v1beta2.ResourceClaimStatus
+  map:
+    fields:
+    - name: allocation
+      type:
+        namedType: io.k8s.api.resource.v1beta2.AllocationResult
+    - name: devices
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.AllocatedDeviceStatus
+          elementRelationship: associative
+          keys:
+          - driver
+          - device
+          - pool
+    - name: reservedFor
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.ResourceClaimConsumerReference
+          elementRelationship: associative
+          keys:
+          - uid
+- name: io.k8s.api.resource.v1beta2.ResourceClaimTemplate
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourceClaimTemplateSpec
+      default: {}
+- name: io.k8s.api.resource.v1beta2.ResourceClaimTemplateSpec
+  map:
+    fields:
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourceClaimSpec
+      default: {}
+- name: io.k8s.api.resource.v1beta2.ResourcePool
+  map:
+    fields:
+    - name: generation
+      type:
+        scalar: numeric
+      default: 0
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resourceSliceCount
+      type:
+        scalar: numeric
+      default: 0
+- name: io.k8s.api.resource.v1beta2.ResourceSlice
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourceSliceSpec
+      default: {}
+- name: io.k8s.api.resource.v1beta2.ResourceSliceMixins
+  map:
+    fields:
+    - name: capacityPool
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.CapacityPoolMixin
+          elementRelationship: atomic
+    - name: device
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceMixin
+          elementRelationship: atomic
+    - name: deviceCapacityConsumption
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixin
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.ResourceSliceSpec
+  map:
+    fields:
+    - name: allNodes
+      type:
+        scalar: boolean
+    - name: capacityPools
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.CapacityPool
+          elementRelationship: atomic
+    - name: devices
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.Device
+          elementRelationship: atomic
+    - name: driver
+      type:
+        scalar: string
+      default: ""
+    - name: mixins
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourceSliceMixins
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perDeviceNodeSelection
+      type:
+        scalar: boolean
+    - name: pool
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourcePool
+      default: {}
+- name: io.k8s.api.resource.v1beta2.SpecificDeviceRequest
+  map:
+    fields:
+    - name: adminAccess
+      type:
+        scalar: boolean
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: count
+      type:
+        scalar: numeric
+    - name: deviceClassName
+      type:
+        scalar: string
+      default: ""
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceSelector
+          elementRelationship: atomic
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:

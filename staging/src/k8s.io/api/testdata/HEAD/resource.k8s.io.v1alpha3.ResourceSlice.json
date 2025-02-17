@@ -91,8 +91,115 @@
           "capacity": {
             "capacityKey": "0"
           }
+        },
+        "composite": {
+          "includes": [
+            {
+              "name": "nameValue"
+            }
+          ],
+          "attributes": {
+            "attributesKey": {
+              "int": 2,
+              "bool": true,
+              "string": "stringValue",
+              "version": "versionValue"
+            }
+          },
+          "capacity": {
+            "capacityKey": "0"
+          },
+          "consumesCapacity": [
+            {
+              "capacityPool": "capacityPoolValue",
+              "includes": [
+                {
+                  "name": "nameValue"
+                }
+              ],
+              "capacity": {
+                "capacityKey": "0"
+              }
+            }
+          ],
+          "nodeName": "nodeNameValue",
+          "nodeSelector": {
+            "nodeSelectorTerms": [
+              {
+                "matchExpressions": [
+                  {
+                    "key": "keyValue",
+                    "operator": "operatorValue",
+                    "values": [
+                      "valuesValue"
+                    ]
+                  }
+                ],
+                "matchFields": [
+                  {
+                    "key": "keyValue",
+                    "operator": "operatorValue",
+                    "values": [
+                      "valuesValue"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "allNodes": true
         }
       }
-    ]
+    ],
+    "perDeviceNodeSelection": true,
+    "capacityPools": [
+      {
+        "name": "nameValue",
+        "includes": [
+          {
+            "name": "nameValue"
+          }
+        ],
+        "capacity": {
+          "capacityKey": "0"
+        }
+      }
+    ],
+    "mixins": {
+      "device": [
+        {
+          "name": "nameValue",
+          "composite": {
+            "attributes": {
+              "attributesKey": {
+                "int": 2,
+                "bool": true,
+                "string": "stringValue",
+                "version": "versionValue"
+              }
+            },
+            "capacity": {
+              "capacityKey": "0"
+            }
+          }
+        }
+      ],
+      "deviceCapacityConsumption": [
+        {
+          "name": "nameValue",
+          "capacity": {
+            "capacityKey": "0"
+          }
+        }
+      ],
+      "capacityPool": [
+        {
+          "name": "nameValue",
+          "capacity": {
+            "capacityKey": "0"
+          }
+        }
+      ]
+    }
   }
 }
