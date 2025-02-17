@@ -1074,7 +1074,12 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
 	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
-	handler = genericapifilters.WithAuditInit(handler)
+
+	if c.FeatureGate.Enabled(genericfeatures.AuditIDValidation) {
+		handler = genericapifilters.WithValidatingAuditInit(handler, c.Serializer)
+	} else {
+		handler = genericapifilters.WithAuditInit(handler)
+	}
 	return handler
 }
 
@@ -1171,7 +1176,7 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	}
 
 	privilegedLoopbackToken := loopback.BearerToken
-	var uid = uuid.New().String()
+	uid := uuid.New().String()
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,
