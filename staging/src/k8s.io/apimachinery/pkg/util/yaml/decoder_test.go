@@ -19,7 +19,6 @@ package yaml
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -334,6 +333,21 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		{"foo: bar\n", 100, false, false, []generic{
 			{"foo": "bar"},
 		}},
+		// First document is JSON, second is YAML
+		{"{\"foo\": \"bar\"}\n---\n{baz: biz}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		// First document is JSON, then whitespace, then YAML
+		{"{\"foo\": \"bar\"}    \n---\n{baz: biz}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		// First document is YAML, second is JSON
+		{"{foo: bar}\n---\n{\"baz\": \"biz\"}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
 	}
 	for i, testCase := range testCases {
 		decoder := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(testCase.input)), testCase.buffer)
@@ -360,12 +374,12 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 				continue
 			}
 		}
-		switch decoder.decoder.(type) {
-		case *YAMLToJSONDecoder:
+		switch {
+		case decoder.yaml != nil:
 			if testCase.isJSON {
 				t.Errorf("%d: expected JSON decoder, got YAML", i)
 			}
-		case *json.Decoder:
+		case decoder.json != nil:
 			if !testCase.isJSON {
 				t.Errorf("%d: expected YAML decoder, got JSON", i)
 			}

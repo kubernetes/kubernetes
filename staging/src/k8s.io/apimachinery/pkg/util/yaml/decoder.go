@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -92,7 +93,7 @@ func UnmarshalStrict(data []byte, v interface{}) error {
 // YAML decoding path is not used (so that error messages are
 // JSON specific).
 func ToJSON(data []byte) ([]byte, error) {
-	if hasJSONPrefix(data) {
+	if IsJSONBuffer(data) {
 		return data, nil
 	}
 	return yaml.YAMLToJSON(data)
@@ -229,18 +230,15 @@ func splitYAMLDocument(data []byte, atEOF bool) (advance int, token []byte, err 
 	return 0, nil, nil
 }
 
-// decoder is a convenience interface for Decode.
-type decoder interface {
-	Decode(into interface{}) error
-}
-
-// YAMLOrJSONDecoder attempts to decode a stream of JSON documents or
-// YAML documents by sniffing for a leading { character.
+// YAMLOrJSONDecoder attempts to decode a stream of JSON or YAML documents.
+// While JSON is YAML, the way Go's JSON decode defines a multi-document stream
+// is a series of JSON objects (e.g. {}{}), but YAML defines a multi-document
+// stream as a series of documents separated by "---". This decoder will
+// attempt to decode the stream as JSON first, and if that fails, it will
+// switch to YAML.
 type YAMLOrJSONDecoder struct {
-	r          io.Reader
-	bufferSize int
-
-	decoder decoder
+	json *json.Decoder
+	yaml *YAMLToJSONDecoder
 }
 
 type JSONSyntaxError struct {
@@ -265,31 +263,83 @@ func (e YAMLSyntaxError) Error() string {
 // how far into the stream the decoder will look to figure out whether this
 // is a JSON stream (has whitespace followed by an open brace).
 func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder {
-	return &YAMLOrJSONDecoder{
-		r:          r,
-		bufferSize: bufferSize,
+	d := &YAMLOrJSONDecoder{}
+
+	buffer, _, mightBeJSON := GuessJSONStream(r, bufferSize)
+	if mightBeJSON {
+		d.json = json.NewDecoder(buffer)
+	} else {
+		d.yaml = NewYAMLToJSONDecoder(buffer)
 	}
+	return d
 }
 
 // Decode unmarshals the next object from the underlying stream into the
 // provide object, or returns an error.
 func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
-	if d.decoder == nil {
-		buffer, _, isJSON := GuessJSONStream(d.r, d.bufferSize)
-		if isJSON {
-			d.decoder = json.NewDecoder(buffer)
+	var firstErr error
+	if d.json != nil {
+		err := d.json.Decode(into)
+		if err == nil {
+			return nil
+		}
+		if errors.Is(err, io.EOF) {
+			return err
+		}
+		var syntax *json.SyntaxError
+		if ok := errors.As(err, &syntax); ok {
+			firstErr = JSONSyntaxError{
+				Offset: syntax.Offset,
+				Err:    syntax,
+			}
 		} else {
-			d.decoder = NewYAMLToJSONDecoder(buffer)
+			firstErr = err
+		}
+		// If JSON decoding hits the end of one object and then fails on the
+		// next, it leaves any leading whitespace in the buffer, which can
+		// confuse the YAML decoder. We just eat any whiyespace we find, up to
+		// and including the first newline.
+		if r, err := d.consumeWhitespace(d.json.Buffered()); err == nil {
+			d.yaml = NewYAMLToJSONDecoder(r)
+		}
+		d.json = nil
+	}
+	if d.yaml != nil {
+		err := d.yaml.Decode(into)
+		if err == nil {
+			return nil
+		}
+		if errors.Is(err, io.EOF) {
+			return err
+		}
+		if firstErr == nil {
+			firstErr = err
 		}
 	}
-	err := d.decoder.Decode(into)
-	if syntax, ok := err.(*json.SyntaxError); ok {
-		return JSONSyntaxError{
-			Offset: syntax.Offset,
-			Err:    syntax,
+	if firstErr != nil {
+		return firstErr
+	}
+	return fmt.Errorf("decoding failed as both JSON and YAML")
+}
+
+func (d *YAMLOrJSONDecoder) consumeWhitespace(r io.Reader) (io.Reader, error) {
+	// The JSON Decoder reads the whole document anyway, so this is no worse.
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	for i, b := range buf {
+		if !unicode.IsSpace(rune(b)) {
+			return bytes.NewReader(buf[i:]), nil
+		}
+		if b == '\n' {
+			if i+1 == len(buf) {
+				return nil, io.EOF
+			}
+			return bytes.NewReader(buf[i+1:]), nil
 		}
 	}
-	return err
+	return nil, io.EOF
 }
 
 type Reader interface {
@@ -372,22 +422,16 @@ func (r *LineReader) Read() ([]byte, error) {
 func GuessJSONStream(r io.Reader, size int) (io.Reader, []byte, bool) {
 	buffer := bufio.NewReaderSize(r, size)
 	b, _ := buffer.Peek(size)
-	return buffer, b, hasJSONPrefix(b)
+	return buffer, b, IsJSONBuffer(b)
 }
 
 // IsJSONBuffer scans the provided buffer, looking
 // for an open brace indicating this is JSON.
 func IsJSONBuffer(buf []byte) bool {
-	return hasJSONPrefix(buf)
+	return hasPrefix(buf, jsonPrefix)
 }
 
 var jsonPrefix = []byte("{")
-
-// hasJSONPrefix returns true if the provided buffer appears to start with
-// a JSON open brace.
-func hasJSONPrefix(buf []byte) bool {
-	return hasPrefix(buf, jsonPrefix)
-}
 
 // Return true if the first non-whitespace bytes in buf is
 // prefix.
