@@ -618,6 +618,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	QOSReserved: {
 		{Version: version.MustParse("1.11"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated}, // remove in 1.35
 	},
 
 	RecoverVolumeExpansionFailure: {
