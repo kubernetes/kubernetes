@@ -17,6 +17,7 @@ limitations under the License.
 package validation_test
 
 import (
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -81,7 +82,12 @@ var (
 		ContainerLogMaxWorkers:      1,
 		ContainerLogMaxFiles:        5,
 		ContainerLogMonitorInterval: metav1.Duration{Duration: 10 * time.Second},
-		SingleProcessOOMKill:        ptr.To(!kubeletutil.IsCgroup2UnifiedMode()),
+		SingleProcessOOMKill: func() *bool {
+			if goruntime.GOOS == "linux" {
+				return ptr.To(!kubeletutil.IsCgroup2UnifiedMode())
+			}
+			return nil
+		}(),
 		CrashLoopBackOff: kubeletconfig.CrashLoopBackOffConfig{
 			MaxContainerRestartPeriod: &metav1.Duration{Duration: 3 * time.Second},
 		},
