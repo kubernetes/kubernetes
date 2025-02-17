@@ -21,13 +21,17 @@ import (
 	"runtime"
 
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -48,6 +52,11 @@ const (
 	// rejected admission to the node because it uses a restart policy other
 	// than Always for some of its init containers.
 	InitContainerRestartPolicyForbidden = "InitContainerRestartPolicyForbidden"
+
+	// SupplementalGroupsPolicyNotSupported is used to denote that the pod was
+	// rejected admission to the node because the node does not support
+	// the pod's SupplementalGroupsPolicy.
+	SupplementalGroupsPolicyNotSupported = "SupplementalGroupsPolicyNotSupported"
 
 	// UnexpectedAdmissionError is used to denote that the pod was rejected
 	// admission to the node because of an error during admission that could not
@@ -129,6 +138,16 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   false,
 			Reason:  PodOSNotSupported,
 			Message: "Failed to admit pod as the OS field doesn't match node OS",
+		}
+	}
+
+	if rejectPodAdmissionBasedOnSupplementalGroupsPolicy(admitPod, node) {
+		message := fmt.Sprintf("SupplementalGroupsPolicy=%s is not supported in this node", v1.SupplementalGroupsPolicyStrict)
+		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  SupplementalGroupsPolicyNotSupported,
+			Message: message,
 		}
 	}
 
@@ -252,6 +271,45 @@ func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
 	}
 	// If the pod OS doesn't match runtime.GOOS return false
 	return string(pod.Spec.OS.Name) != runtime.GOOS
+}
+
+// rejectPodAdmissionBasedOnSupplementalGroupsPolicy rejects pod only if
+// - the feature is beta or above, and SupplementalPolicy=Strict is set in the pod
+// - but, the node does not support the feature
+//
+// Note: During the feature is alpha or before(not yet released) in emulated version,
+// it should admit for backward compatibility
+func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Node) bool {
+	admit, reject := false, true // just for readability
+
+	inUse := (pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SupplementalGroupsPolicy != nil)
+	if !inUse {
+		return admit
+	}
+
+	isBetaOrAbove := false
+	if featureSpec, ok := utilfeature.DefaultMutableFeatureGate.GetAll()[features.SupplementalGroupsPolicy]; ok {
+		isBetaOrAbove = (featureSpec.PreRelease == featuregate.Beta) || (featureSpec.PreRelease == featuregate.GA)
+	}
+
+	if !isBetaOrAbove {
+		return admit
+	}
+
+	featureSupportedOnNode := ptr.Deref(
+		ptr.Deref(node.Status.Features, v1.NodeFeatures{SupplementalGroupsPolicy: ptr.To(false)}).SupplementalGroupsPolicy,
+		false,
+	)
+	effectivePolicy := ptr.Deref(
+		pod.Spec.SecurityContext.SupplementalGroupsPolicy,
+		v1.SupplementalGroupsPolicyMerge,
+	)
+
+	if effectivePolicy == v1.SupplementalGroupsPolicyStrict && !featureSupportedOnNode {
+		return reject
+	}
+
+	return admit
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
