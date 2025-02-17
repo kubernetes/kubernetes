@@ -77,12 +77,15 @@ func getFilePerm(path string) (os.FileMode, error) {
 	// NOTE(claudiub): Symlinks have different permissions which might not match the target's.
 	// We want to evaluate the permissions of the target's not the symlink's.
 	info, err := os.Lstat(path)
-	if err == nil && info.Mode()&os.ModeSymlink != 0 {
-		evaluated, err := filepath.EvalSymlinks(path)
-		if err != nil {
-			return 0, err
+	if err == nil {
+		// go1.23 behavior change: https://github.com/golang/go/issues/63703#issuecomment-2535941458
+		if info.Mode()&os.ModeSymlink != 0 || info.Mode()&os.ModeIrregular != 0 {
+			evaluated, err := filepath.EvalSymlinks(path)
+			if err != nil {
+				return 0, err
+			}
+			path = evaluated
 		}
-		path = evaluated
 	}
 
 	cmd := exec.Command("powershell.exe", "-NonInteractive", "./filePermissions.ps1",
