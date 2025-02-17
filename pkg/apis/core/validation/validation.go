@@ -8624,10 +8624,10 @@ func validateContainerStatusUsers(containerStatuses []core.ContainerStatus, fldP
 		switch osName {
 		case core.Windows:
 			if containerUser.Linux != nil {
-				allErrors = append(allErrors, field.Forbidden(fldPath.Index(i).Child("linux"), "cannot be set for a windows pod"))
+				allErrors = append(allErrors, field.Forbidden(fldPath.Index(i).Child("user").Child("linux"), "cannot be set for a windows pod"))
 			}
 		case core.Linux:
-			allErrors = append(allErrors, validateLinuxContainerUser(containerUser.Linux, fldPath.Index(i).Child("linux"))...)
+			allErrors = append(allErrors, validateLinuxContainerUser(containerUser.Linux, fldPath.Index(i).Child("user").Child("linux"))...)
 		}
 	}
 	return allErrors

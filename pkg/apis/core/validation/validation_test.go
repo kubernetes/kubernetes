@@ -25707,9 +25707,9 @@ func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
 				},
 			}},
 			wantFieldErrors: field.ErrorList{
-				field.Invalid(field.NewPath("[0].linux.uid"), badUID, "must be between 0 and 2147483647, inclusive"),
-				field.Invalid(field.NewPath("[0].linux.gid"), badGID, "must be between 0 and 2147483647, inclusive"),
-				field.Invalid(field.NewPath("[0].linux.supplementalGroups[0]"), badGID, "must be between 0 and 2147483647, inclusive"),
+				field.Invalid(field.NewPath("[0].user.linux.uid"), badUID, "must be between 0 and 2147483647, inclusive"),
+				field.Invalid(field.NewPath("[0].user.linux.gid"), badGID, "must be between 0 and 2147483647, inclusive"),
+				field.Invalid(field.NewPath("[0].user.linux.supplementalGroups[0]"), badGID, "must be between 0 and 2147483647, inclusive"),
 			},
 		},
 		"user.linux must not be set in windows": {
@@ -25720,7 +25720,7 @@ func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
 				},
 			}},
 			wantFieldErrors: field.ErrorList{
-				field.Forbidden(field.NewPath("[0].linux"), "cannot be set for a windows pod"),
+				field.Forbidden(field.NewPath("[0].user.linux"), "cannot be set for a windows pod"),
 			},
 		},
 	}
