@@ -149,8 +149,6 @@ func (c *Controller) syncConfigMap() error {
 	} else if err != nil {
 		return err
 	}
-	// keep the original to diff against later before updating
-	authConfigMap := originalAuthConfigMap.DeepCopy()
 
 	existingAuthenticationInfo, err := getClusterAuthenticationInfoFor(originalAuthConfigMap.Data)
 	if err != nil {
@@ -160,10 +158,24 @@ func (c *Controller) syncConfigMap() error {
 	if err != nil {
 		return err
 	}
-	authConfigMap.Data, err = getConfigMapDataFor(combinedInfo)
+	authenticationConfigData, err := getConfigMapDataFor(combinedInfo)
 	if err != nil {
 		return err
 	}
+
+	// If there are keys in the original map that we failed to construct from our
+	// config, we re-add them to keep forward compatibility. This is to avoid dueling
+	// where an older kube-apiserver instance would otherwise attempt to delete
+	// a key from a newer-version kube-apiserver instance during an upgrade.
+	for k, v := range originalAuthConfigMap.Data {
+		if _, ok := authenticationConfigData[k]; !ok {
+			authenticationConfigData[k] = v
+		}
+	}
+
+	// keep the original to diff against later before updating
+	authConfigMap := originalAuthConfigMap.DeepCopy()
+	authConfigMap.Data = authenticationConfigData
 
 	if equality.Semantic.DeepEqual(authConfigMap, originalAuthConfigMap) {
 		klog.V(5).Info("no changes to configmap")
@@ -256,32 +268,28 @@ func getConfigMapDataFor(authenticationInfo ClusterAuthenticationInfo) (map[stri
 		return data, nil
 	}
 
-	if caBytes := authenticationInfo.RequestHeaderCA.CurrentCABundleContent(); len(caBytes) > 0 {
-		var err error
+	caBytes := authenticationInfo.RequestHeaderCA.CurrentCABundleContent()
+	if len(caBytes) == 0 {
+		return data, nil
+	}
+	data["requestheader-client-ca-file"] = string(caBytes)
 
+	sliceWritesMapping := map[string][]string{
+		"requestheader-username-headers":     authenticationInfo.RequestHeaderUsernameHeaders.Value(),
+		"requestheader-group-headers":        authenticationInfo.RequestHeaderGroupHeaders.Value(),
+		"requestheader-extra-headers-prefix": authenticationInfo.RequestHeaderExtraHeaderPrefixes.Value(),
+		"requestheader-allowed-names":        authenticationInfo.RequestHeaderAllowedNames.Value(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) {
+		sliceWritesMapping["requestheader-uid-headers"] = authenticationInfo.RequestHeaderUIDHeaders.Value()
+	}
+	var err error
+	for key, configData := range sliceWritesMapping {
+		if len(configData) == 0 {
+			continue
+		}
+		data[key], err = jsonSerializeStringSlice(configData)
 		// encoding errors aren't going to get better, so just fail on them.
-		data["requestheader-username-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderUsernameHeaders.Value())
-		if err != nil {
-			return nil, err
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) && len(authenticationInfo.RequestHeaderUIDHeaders.Value()) > 0 {
-			data["requestheader-uid-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderUIDHeaders.Value())
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		data["requestheader-group-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderGroupHeaders.Value())
-		if err != nil {
-			return nil, err
-		}
-		data["requestheader-extra-headers-prefix"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderExtraHeaderPrefixes.Value())
-		if err != nil {
-			return nil, err
-		}
-
-		data["requestheader-client-ca-file"] = string(caBytes)
-		data["requestheader-allowed-names"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderAllowedNames.Value())
 		if err != nil {
 			return nil, err
 		}
