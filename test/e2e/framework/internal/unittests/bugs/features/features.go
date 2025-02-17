@@ -18,6 +18,7 @@ package features
 
 import (
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 )
@@ -29,11 +30,20 @@ const (
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(testFeatureGates)) //nolint:forbidigo // Part of a unit test.
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(testFeatureGates))
 }
 
-var testFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	Alpha: {PreRelease: featuregate.Alpha},
-	Beta:  {PreRelease: featuregate.Beta},
-	GA:    {PreRelease: featuregate.GA},
+var testFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	Alpha: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+	Beta: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+	GA: {
+		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	},
 }
