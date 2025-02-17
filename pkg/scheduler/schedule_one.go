@@ -150,12 +150,13 @@ func (sched *Scheduler) schedulingCycle(
 		defer func() {
 			metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInSeconds(start))
 		}()
-		if err == ErrNoNodesAvailable {
+		if errors.Is(err, ErrNoNodesAvailable) {
 			status := framework.NewStatus(framework.UnschedulableAndUnresolvable).WithError(err)
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, status
 		}
 
-		fitError, ok := err.(*framework.FitError)
+		var fitError *framework.FitError
+		ok := errors.As(err, &fitError)
 		if !ok {
 			logger.Error(err, "Error selecting node for pod", "pod", klog.KObj(pod))
 			return ScheduleResult{nominatingInfo: clearNominatedNode}, podInfo, framework.AsStatus(err)
@@ -1047,9 +1048,10 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	err := status.AsError()
 	errMsg := status.Message()
 
-	if err == ErrNoNodesAvailable {
+	var fitError *framework.FitError
+	if errors.Is(err, ErrNoNodesAvailable) {
 		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
-	} else if fitError, ok := err.(*framework.FitError); ok { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
+	} else if errors.As(err, &fitError) { // Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 		podInfo.PendingPlugins = fitError.Diagnosis.PendingPlugins
 		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
