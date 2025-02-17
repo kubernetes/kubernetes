@@ -145,7 +145,7 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		return allErrs
 	}
 
-	portNames := sets.String{}
+	portNames := sets.New[string]()
 	for i, endpointPort := range endpointPorts {
 		idxPath := fldPath.Index(i)
 
@@ -194,7 +194,7 @@ func validateHints(endpointHints *discovery.EndpointHints, fldPath *field.Path) 
 		return allErrs
 	}
 
-	zoneNames := sets.String{}
+	zoneNames := sets.New[string]()
 	for i, forZone := range endpointHints.ForZones {
 		zonePath := fzPath.Index(i).Child("name")
 		if zoneNames.Has(forZone.Name) {
