@@ -48,6 +48,7 @@ import (
 // Options define the flags and validation for a generic controlplane. If the
 // structs are nil, the options are not added to the command line and not validated.
 type Options struct {
+	ParsedFlags             *cliflag.NamedFlagSets
 	Flagz                   flagz.Reader
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions

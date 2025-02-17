@@ -138,6 +138,8 @@ cluster's shared state through which all other components interact.`,
 		fs.AddFlagSet(f)
 	}
 
+	s.ParsedFlags = &namedFlagSets
+
 	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
 	cliflag.SetUsageAndHelpFunc(cmd, namedFlagSets, cols)
 

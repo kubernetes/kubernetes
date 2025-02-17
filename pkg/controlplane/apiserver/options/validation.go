@@ -135,7 +135,7 @@ func (s *Options) Validate() []error {
 	errs = append(errs, s.Etcd.Validate()...)
 	errs = append(errs, validateAPIPriorityAndFairness(s)...)
 	errs = append(errs, s.SecureServing.Validate()...)
-	errs = append(errs, s.Authentication.Validate()...)
+	errs = append(errs, s.Authentication.Validate(s.ParsedFlags.FlagSet("authentication"))...)
 	errs = append(errs, s.Authorization.Validate()...)
 	errs = append(errs, s.Audit.Validate()...)
 	errs = append(errs, s.Admission.Validate()...)
