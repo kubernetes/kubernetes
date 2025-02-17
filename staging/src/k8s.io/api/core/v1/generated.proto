@@ -1194,6 +1194,7 @@ message EmptyDirVolumeSource {
 }
 
 // EndpointAddress is a tuple that describes single IP address.
+// Deprecated: This API is deprecated in v1.33+.
 // +structType=atomic
 message EndpointAddress {
   // The IP of this endpoint.
@@ -1215,6 +1216,7 @@ message EndpointAddress {
 }
 
 // EndpointPort is a tuple that describes a single port.
+// Deprecated: This API is deprecated in v1.33+.
 // +structType=atomic
 message EndpointPort {
   // The name of this port.  This must match the 'name' field in the
@@ -1265,6 +1267,8 @@ message EndpointPort {
 //
 // 	a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
 // 	b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+//
+// Deprecated: This API is deprecated in v1.33+.
 message EndpointSubset {
   // IP addresses which offer the related ports that are marked as ready. These endpoints
   // should be considered safe for load balancers and clients to utilize.
@@ -1298,6 +1302,11 @@ message EndpointSubset {
 // 	     Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
 // 	   },
 // 	]
+//
+// Endpoints is a legacy API and does not contain information about all Service features.
+// Use discoveryv1.EndpointSlice for complete information about Service endpoints.
+//
+// Deprecated: This API is deprecated in v1.33+. Use discoveryv1.EndpointSlice.
 message Endpoints {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -1317,6 +1326,7 @@ message Endpoints {
 }
 
 // EndpointsList is a list of endpoints.
+// Deprecated: This API is deprecated in v1.33+.
 message EndpointsList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
