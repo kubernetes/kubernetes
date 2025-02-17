@@ -20,42 +20,124 @@ limitations under the License.
 package conntrack
 
 import (
+	"errors"
+	"math/rand/v2"
+
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
-// FakeInterface implements Interface by just recording entries that have been cleared.
-type FakeInterface struct {
-	entries []*netlink.ConntrackFlow
+type fakeHandler struct {
+	tableType netlink.ConntrackTableType
+	ipFamily  netlink.InetFamily
+	filters   []*conntrackFilter
+
+	entries         []*netlink.ConntrackFlow
+	tableListErrors []error
+	deleteErrors    []error
+
+	// callsConntrackTableList is a counter that gets incremented each time ConntrackTableList is called
+	callsConntrackTableList int
+	// callsConntrackDeleteFilters is a counter that gets incremented each time ConntrackDeleteFilters is called
+	callsConntrackDeleteFilters int
 }
 
-var _ Interface = &FakeInterface{}
+// ConntrackTableList is part of netlinkHandler interface.
+func (fake *fakeHandler) ConntrackTableList(_ netlink.ConntrackTableType, _ netlink.InetFamily) ([]*netlink.ConntrackFlow, error) {
+	// special case for consumers outside of this package (fake-proxiers) where cleanup is called
+	// on fakeHandler without any error mocking.
+	if len(fake.tableListErrors) == 0 {
+		return fake.entries, nil
+	}
 
-// NewFake creates a new FakeInterface
-func NewFake() *FakeInterface {
-	return &FakeInterface{entries: make([]*netlink.ConntrackFlow, 0)}
-}
+	calls := fake.callsConntrackTableList
+	fake.callsConntrackTableList++
 
-// ListEntries is part of Interface
-func (fake *FakeInterface) ListEntries(_ uint8) ([]*netlink.ConntrackFlow, error) {
-	return fake.entries, nil
-}
+	// we panic when ConntrackTableList() is called more times than the length of configured
+	// tableListErrors. This indicates improper configuration of fakeHandler for the test.
+	if calls > len(fake.tableListErrors)-1 {
+		panic("exceeded the allowed number of ConntrackTableList calls")
+	}
 
-// ClearEntries is part of Interface
-func (fake *FakeInterface) ClearEntries(_ uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
+	var err = fake.tableListErrors[calls]
 	var flows []*netlink.ConntrackFlow
-	before := len(fake.entries)
-	for _, flow := range fake.entries {
+
+	// return all flow entries if no error, a random subset if interrupted (EINTR), or no entries
+	// for any other error condition.
+	if errors.Is(err, unix.EINTR) {
+		flows = fake.entries[:rand.IntN(len(fake.entries))]
+	} else if err == nil {
+		flows = fake.entries
+	}
+	return flows, err
+}
+
+// ConntrackDeleteFilters is part of netlinkHandler interface.
+func (fake *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, netlinkFilters ...netlink.CustomConntrackFilter) (uint, error) {
+	fake.tableType = tableType
+	fake.ipFamily = family
+	fake.filters = make([]*conntrackFilter, 0, len(netlinkFilters))
+	for _, netlinkFilter := range netlinkFilters {
+		fake.filters = append(fake.filters, netlinkFilter.(*conntrackFilter))
+	}
+
+	// flows is the total flows to be considered for deletion
+	var flows []*netlink.ConntrackFlow
+	// remainingFlows is the total flows remaining after simulating the deletion
+	var remainingFlows []*netlink.ConntrackFlow
+
+	var err error
+
+	calls := fake.callsConntrackDeleteFilters
+	fake.callsConntrackDeleteFilters++
+
+	// we ignore the cases when deleteErrors is not configured at all, this will happen when called
+	// from outside the current package (fake-proxiers), we don't simulate any error in this case.
+	if len(fake.deleteErrors) > 0 {
+		// we panic when ConntrackDeleteFilters() is called more times than the length of configured
+		// deleteErrors. This indicates improper configuration of fakeHandler for the test.
+		if calls > len(fake.deleteErrors)-1 {
+			panic("exceeded the allowed number of ConntrackDeleteFilters calls")
+		} else {
+			err = fake.deleteErrors[calls]
+		}
+	}
+
+	// the actual implementation netlink.ConntrackDeleteFilters does a dump call internally
+	// before deleting the flow entries, which can return a partial list of entries. We simulate
+	// the same behaviour here in our fake implementation.
+	if errors.Is(err, unix.EINTR) {
+		randInt := rand.IntN(len(fake.entries))
+		// simulate deletion on partial list in case of interrupt
+		flows = fake.entries[:randInt]
+		remainingFlows = fake.entries[randInt:]
+	} else if err != nil {
+		remainingFlows = fake.entries
+	} else {
+		// simulate deletion on complete list of flows
+		flows = fake.entries
+	}
+
+	before := len(flows)
+	for _, flow := range flows {
 		var matched bool
-		for _, filter := range filters {
+		for _, filter := range fake.filters {
 			matched = filter.MatchConntrackFlow(flow)
 			if matched {
 				break
 			}
 		}
 		if !matched {
-			flows = append(flows, flow)
+			remainingFlows = append(remainingFlows, flow)
 		}
 	}
-	fake.entries = flows
-	return before - len(fake.entries), nil
+	fake.entries = remainingFlows
+	return uint(before - len(fake.entries)), err
+}
+
+var _ netlinkHandler = (*fakeHandler)(nil)
+
+// NewFake creates a new Interface
+func NewFake() Interface {
+	return &conntracker{handler: &fakeHandler{}}
 }

@@ -29,33 +29,12 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-type fakeHandler struct {
-	tableType netlink.ConntrackTableType
-	ipFamily  netlink.InetFamily
-	filters   []*conntrackFilter
-}
-
-func (f *fakeHandler) ConntrackTableList(_ netlink.ConntrackTableType, _ netlink.InetFamily) ([]*netlink.ConntrackFlow, error) {
-	return nil, nil
-}
-
-func (f *fakeHandler) ConntrackDeleteFilters(tableType netlink.ConntrackTableType, family netlink.InetFamily, netlinkFilters ...netlink.CustomConntrackFilter) (uint, error) {
-	f.tableType = tableType
-	f.ipFamily = family
-	f.filters = make([]*conntrackFilter, 0, len(netlinkFilters))
-	for _, netlinkFilter := range netlinkFilters {
-		f.filters = append(f.filters, netlinkFilter.(*conntrackFilter))
-	}
-	return uint(len(f.filters)), nil
-}
-
-var _ netlinkHandler = (*fakeHandler)(nil)
-
 func TestConntracker_ClearEntries(t *testing.T) {
 	testCases := []struct {
 		name     string
 		ipFamily uint8
 		filters  []netlink.CustomConntrackFilter
+		flows    []*netlink.ConntrackFlow
 	}{
 		{
 			name:     "single IPv6 filter",
@@ -65,6 +44,21 @@ func TestConntracker_ClearEntries(t *testing.T) {
 					protocol: 17,
 					original: &connectionTuple{dstPort: 8000},
 					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("2001:db8:1::2")},
+				},
+			},
+			flows: []*netlink.ConntrackFlow{
+				{
+					FamilyType: unix.AF_INET6,
+					Forward: netlink.IPTuple{
+						DstIP:    netutils.ParseIPSloppy("2001:db8:10::20"),
+						DstPort:  8000,
+						Protocol: unix.IPPROTO_UDP,
+					},
+					Reverse: netlink.IPTuple{
+						Protocol: unix.IPPROTO_UDP,
+						SrcIP:    netutils.ParseIPSloppy("2001:db8:1::2"),
+						SrcPort:  54321,
+					},
 				},
 			},
 		},
@@ -87,12 +81,55 @@ func TestConntracker_ClearEntries(t *testing.T) {
 					reply:    &connectionTuple{srcIP: netutils.ParseIPSloppy("10.244.0.3")},
 				},
 			},
+			flows: []*netlink.ConntrackFlow{
+				{
+					FamilyType: unix.AF_INET,
+					Forward: netlink.IPTuple{
+						DstPort:  3000,
+						DstIP:    netutils.ParseIPSloppy("10.96.0.1"),
+						Protocol: unix.IPPROTO_TCP,
+					},
+					Reverse: netlink.IPTuple{
+						Protocol: unix.IPPROTO_TCP,
+						SrcIP:    netutils.ParseIPSloppy("10.96.0.10"),
+						SrcPort:  54321,
+					},
+				},
+				{
+					FamilyType: unix.AF_INET,
+					Forward: netlink.IPTuple{
+						DstPort:  5000,
+						DstIP:    netutils.ParseIPSloppy("10.96.0.1"),
+						Protocol: unix.IPPROTO_UDP,
+					},
+					Reverse: netlink.IPTuple{
+						Protocol: unix.IPPROTO_UDP,
+						SrcIP:    netutils.ParseIPSloppy("10.244.0.3"),
+						SrcPort:  54321,
+					},
+				},
+				{
+					FamilyType: unix.AF_INET,
+					Forward: netlink.IPTuple{
+						DstIP:    netutils.ParseIPSloppy("10.96.0.10"),
+						DstPort:  5000,
+						Protocol: unix.IPPROTO_SCTP,
+					},
+					Reverse: netlink.IPTuple{
+						Protocol: unix.IPPROTO_SCTP,
+						SrcIP:    netutils.ParseIPSloppy("10.244.0.3"),
+						SrcPort:  54321,
+					},
+				},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			handler := &fakeHandler{}
+			handler.entries = tc.flows
+			handler.deleteErrors = []error{unix.EINTR, nil}
 			ct := newConntracker(handler)
 			_, err := ct.ClearEntries(tc.ipFamily, tc.filters...)
 			require.NoError(t, err)
@@ -102,6 +139,7 @@ func TestConntracker_ClearEntries(t *testing.T) {
 			for i := 0; i < len(tc.filters); i++ {
 				require.Equal(t, tc.filters[i], handler.filters[i])
 			}
+			require.Empty(t, len(handler.entries))
 		})
 	}
 }

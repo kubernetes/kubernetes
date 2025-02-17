@@ -274,11 +274,22 @@ func TestCleanStaleEntries(t *testing.T) {
 		mockEntries = append(mockEntries, entry)
 	}
 
-	fake := NewFake()
+	fake := &fakeHandler{}
 	fake.entries = mockEntries
-	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
+	// we will simulate 3 calls to ConntrackTableList:
+	// 1. Partial result + EINTR - first list call - retried
+	// 2. Full result - second list call - not retried
+	// 3. Full result - for the subsequent list call
+	fake.tableListErrors = []error{unix.EINTR, nil, nil}
+	// we will simulate 2 calls to ConntrackDeleteFilters:
+	// 1. Delete on partial result + EINTR - first delete call - retried
+	// 2. Delete on full result - second delete call - not retried
+	fake.deleteErrors = []error{unix.EINTR, nil}
 
-	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
+	ct := newConntracker(fake)
+	CleanStaleEntries(ct, testIPFamily, svcPortMap, endpointsMap)
+
+	actualEntries, _ := ct.ListEntries(ipFamilyMap[testIPFamily])
 	require.Equal(t, len(expectedEntries), len(actualEntries))
 
 	// sort the actual flows before comparison
