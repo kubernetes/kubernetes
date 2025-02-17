@@ -55,9 +55,6 @@ function configure-etcd-params {
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
 #
 # Assumed vars (which are calculated in function compute-master-manifest-variables)
-#   CLOUD_CONFIG_OPT
-#   CLOUD_CONFIG_VOLUME
-#   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 #   INSECURE_PORT_MAPPING
 function start-kube-apiserver {
@@ -66,9 +63,8 @@ function start-kube-apiserver {
   prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}" "${KUBE_API_SERVER_RUNASUSER:-0}"
 
   # Calculate variables and assemble the command line.
-  local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
+  local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-}"
   params+=" --allow-privileged=true"
-  params+=" --cloud-provider=${CLOUD_PROVIDER_FLAG:-external}"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
 
   # params is passed by reference, so no "$"
@@ -384,16 +380,12 @@ function start-kube-apiserver {
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
   sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{srv_sshproxy_path}}@/etc/srv/sshproxy@g" "${src_file}"
-  sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
-  sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${DOCKER_REGISTRY}@g" "${src_file}"
   sed -i -e "s@{{pillar\['kube-apiserver_docker_tag'\]}}@${kube_apiserver_docker_tag}@g" "${src_file}"
   sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
   sed -i -e "s@{{liveness_probe_initial_delay}}@${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${src_file}"
   sed -i -e "s@{{secure_port}}@443@g" "${src_file}"
   sed -i -e "s@{{insecure_port_mapping}}@${INSECURE_PORT_MAPPING}@g" "${src_file}"
-  sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
-  sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
   sed -i -e "s@{{webhook_authn_config_mount}}@${webhook_authn_config_mount}@g" "${src_file}"
   sed -i -e "s@{{webhook_authn_config_volume}}@${webhook_authn_config_volume}@g" "${src_file}"
   sed -i -e "s@{{webhook_config_mount}}@${webhook_config_mount}@g" "${src_file}"
