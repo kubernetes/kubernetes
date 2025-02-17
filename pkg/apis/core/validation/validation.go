@@ -5581,7 +5581,14 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
-	allErrs := ValidateImmutableField(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
+	// metadata.generation is the only metadata field allowed to change, since this is set by
+	// the system and expected to be incremented upon updates to container resources.
+	oldPodCopy := oldPod.DeepCopy()
+	oldPodCopy.Generation = newPod.Generation
+	allErrs := ValidateImmutableField(&newPod.ObjectMeta, &oldPodCopy.ObjectMeta, fldPath)
+	// ValidateObjectMetadataUpdate will ensure that the update to metadata.generation is
+	// valid (i.e. that it is not decreasing).
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)...)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
 
 	// pods with pod-level resources cannot be resized

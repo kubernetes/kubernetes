@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -91,7 +92,12 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		QOSClass: qos.GetPodQOS(pod),
 	}
 
-	podutil.DropDisabledPodFields(pod, nil)
+	// Mirror pods should not have Generation set.
+	if metav1.HasAnnotation(pod.ObjectMeta, v1.MirrorPodAnnotationKey) {
+		pod.Generation = 0
+	} else {
+		pod.Generation = 1
+	}
 
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
@@ -104,6 +110,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	setGenerationForPodSpecUpdate(newPod, oldPod)
 }
 
 // Validate validates a new pod.
@@ -260,6 +267,7 @@ func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 	*newPod = *dropNonEphemeralContainerUpdates(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	setGenerationForPodSpecUpdate(newPod, oldPod)
 }
 
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -334,6 +342,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
 	podutil.MarkPodProposedForResize(oldPod, newPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	setGenerationForPodSpecUpdate(newPod, oldPod)
 }
 
 func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -974,4 +983,19 @@ func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+// setGenerationForPodSpecUpdate bumps metadata.generation if needed for any updates
+// to the podspec.
+func setGenerationForPodSpecUpdate(newPod, oldPod *api.Pod) {
+	// Mirror pods should not have Generation set.
+	if metav1.HasAnnotation(newPod.ObjectMeta, v1.MirrorPodAnnotationKey) {
+		newPod.Generation = 0
+		return
+	}
+
+	// Spec updates bump the generation.
+	if newPod.Generation == 0 || !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
+		newPod.Generation = newPod.Generation + 1
+	}
 }
