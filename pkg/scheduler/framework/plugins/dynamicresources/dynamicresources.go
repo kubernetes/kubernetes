@@ -735,7 +735,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 // we also handle the allocation.
 //
 // If anything fails, we return an error and
-// the pod will have to go into the backoff queue. The scheduler will call
+// the pod will have to go into the errorBackoff queue. The scheduler will call
 // Unreserve as part of the error handling.
 func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if !pl.enabled {

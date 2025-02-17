@@ -194,7 +194,7 @@ const (
 	// Error is one of the failures, used for internal plugin errors, unexpected input, etc.
 	// Plugin shouldn't return this code for expected failures, like Unschedulable.
 	// Since it's the unexpected failure, the scheduling queue registers the pod without unschedulable plugins.
-	// Meaning, the Pod will be requeued to activeQ/backoffQ soon.
+	// Meaning, the Pod will be requeued to activeQ/errorBackoffQ soon.
 	Error
 	// Unschedulable is one of the failures, used when a plugin finds a pod unschedulable.
 	// If it's returned from PreFilter or Filter, the scheduler might attempt to
@@ -262,7 +262,7 @@ const (
 )
 
 // PodsToActivateKey is a reserved state key for stashing pods.
-// If the stashed pods are present in unschedulablePods or backoffQ，they will be
+// If the stashed pods are present in unschedulablePods or backoffQ or errorBackoffQ，they will be
 // activated (i.e., moved to activeQ) in two phases:
 // - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
 // - end of a binding cycle if it succeeds
@@ -544,7 +544,7 @@ type FilterPlugin interface {
 	// the given node fits the pod. If Filter doesn't return "Success",
 	// it will return "Unschedulable", "UnschedulableAndUnresolvable" or "Error".
 	//
-	// "Error" aborts pod scheduling and puts the pod into the backoff queue.
+	// "Error" aborts pod scheduling and puts the pod into the errorBackoff queue.
 	//
 	// For the node being evaluated, Filter plugins should look at the passed
 	// nodeInfo reference for this particular node's information (e.g., pods
@@ -903,9 +903,9 @@ func (ni *NominatingInfo) Mode() NominatingMode {
 // PodActivator abstracts operations in the scheduling queue.
 type PodActivator interface {
 	// Activate moves the given pods to activeQ.
-	// If a pod isn't found in unschedulablePods or backoffQ and it's in-flight,
+	// If a pod isn't found in unschedulablePods or backoffQ or errorBackoffQ and it's in-flight,
 	// the wildcard event is registered so that the pod will be requeued when it comes back.
-	// But, if a pod isn't found in unschedulablePods or backoffQ and it's not in-flight (i.e., completely unknown pod),
+	// But, if a pod isn't found in unschedulablePods or backoffQ or errorBackoffQ and it's not in-flight (i.e., completely unknown pod),
 	// Activate would ignore the pod.
 	Activate(logger klog.Logger, pods map[string]*v1.Pod)
 }

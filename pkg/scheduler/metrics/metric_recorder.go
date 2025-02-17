@@ -58,6 +58,13 @@ func NewBackoffPodsRecorder() *PendingPodsRecorder {
 	}
 }
 
+// NewErrorBackoffPodsRecorder returns ErrorBackoffPods in a Prometheus metric fashion
+func NewErrorBackoffPodsRecorder() *PendingPodsRecorder {
+	return &PendingPodsRecorder{
+		recorder: ErrorBackoffPods(),
+	}
+}
+
 // NewGatedPodsRecorder returns GatedPods in a Prometheus metric fashion
 func NewGatedPodsRecorder() *PendingPodsRecorder {
 	return &PendingPodsRecorder{

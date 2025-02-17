@@ -202,7 +202,7 @@ func InitMetrics() {
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pending_pods",
-			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
+			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'errorBackoff' means number of pods in errorBackoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
 	InFlightEvents = metrics.NewGaugeVec(
@@ -389,6 +389,11 @@ func ActivePods() metrics.GaugeMetric {
 // BackoffPods returns the pending pods metrics with the label backoff
 func BackoffPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "backoff"})
+}
+
+// ErrorBackoffPods returns the pending pods metrics with the label errorBackoff
+func ErrorBackoffPods() metrics.GaugeMetric {
+	return pendingPods.With(metrics.Labels{"queue": "errorBackoff"})
 }
 
 // UnschedulablePods returns the pending pods metrics with the label unschedulable
