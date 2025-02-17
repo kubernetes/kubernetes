@@ -60,6 +60,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ResourceClaimTemplateList{},
 		&ResourceSlice{},
 		&ResourceSliceList{},
+		&ResourceSlicePatch{},
+		&ResourceSlicePatchList{},
 	)
 
 	return nil
