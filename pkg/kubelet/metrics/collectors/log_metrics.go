@@ -63,6 +63,8 @@ func (c *logMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 
 // CollectWithStability implements the metrics.StableCollector interface.
 func (c *logMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
 	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
 	podStats, err := c.podStats(ctx)
