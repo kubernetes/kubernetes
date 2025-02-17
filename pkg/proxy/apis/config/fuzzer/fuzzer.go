@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/gofuzz"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -83,7 +84,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		func(obj *kubeproxyconfig.KubeProxyConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
-			obj.BindAddress = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
 			obj.ClientConnection.ContentType = c.RandString()
 			obj.DetectLocal.ClusterCIDRs = getRandomDualStackCIDR(c)
 			obj.Linux.Conntrack.MaxPerCore = ptr.To(c.Int31())
@@ -95,6 +95,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.IPTables.MasqueradeBit = ptr.To(c.Int31())
 			obj.IPTables.LocalhostNodePorts = ptr.To(c.RandBool())
 			obj.NFTables.MasqueradeBit = ptr.To(c.Int31())
+			obj.NodeIPOverride = []string{fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))}
 			obj.MetricsBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
 			obj.Linux.OOMScoreAdj = ptr.To(c.Int31())
 			obj.ClientConnection.ContentType = "bar"
@@ -102,6 +103,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.Logging.Format == "" {
 				obj.Logging.Format = "text"
 			}
+			obj.IPFamilyPolicy = v1.IPFamilyPolicyPreferDualStack
 		},
 	}
 }
