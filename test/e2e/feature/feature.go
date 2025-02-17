@@ -561,7 +561,8 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	WatchList = framework.WithFeature(framework.ValidFeatures.Add("WatchList"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-windows
+	// Indicates that these tests are intended to run exclusively on Windows nodes
 	Windows = framework.WithFeature(framework.ValidFeatures.Add("Windows"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
