@@ -36795,6 +36795,13 @@ func schema_k8sio_api_flowcontrol_v1_LimitedPriorityLevelConfiguration(ref commo
 							Format:      "int32",
 						},
 					},
+					"weight": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`weight` gives this priority level more or less priority in the borrowing of concurrency. The default configuration objects use values in the range 10--100. Must be in the range 1--1000. The default value is 30.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 			},
 		},
@@ -37824,6 +37831,13 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitedPriorityLevelConfiguration(ref 
 					"borrowingLimitPercent": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"weight": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`weight` gives this priority level more or less priority in the borrowing of concurrency. The default configuration objects use values in the range 10--100. Must be in the range 1--1000. The default value is 30.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -38859,6 +38873,13 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitedPriorityLevelConfiguration(ref 
 							Format:      "int32",
 						},
 					},
+					"weight": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`weight` gives this priority level more or less priority in the borrowing of concurrency. The default configuration objects use values in the range 10--100. Must be in the range 1--1000. The default value is 30.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 			},
 		},
@@ -39888,6 +39909,13 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitedPriorityLevelConfiguration(ref 
 					"borrowingLimitPercent": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`borrowingLimitPercent`, if present, configures a limit on how many seats this priority level can borrow from other priority levels. The limit is known as this level's BorrowingConcurrencyLimit (BorrowingCL) and is a limit on the total number of seats that this level may borrow at any one time. This field holds the ratio of that limit to the level's nominal concurrency limit. When this field is non-nil, it must hold a non-negative integer and the limit is calculated as follows.\n\nBorrowingCL(i) = round( NominalCL(i) * borrowingLimitPercent(i)/100.0 )\n\nThe value of this field can be more than 100, implying that this priority level can borrow a number of seats that is greater than its own nominal concurrency limit (NominalCL). When this field is left `nil`, the limit is effectively infinite.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"weight": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`weight` gives this priority level more or less priority in the borrowing of concurrency. The default configuration objects use values in the range 10--100. Must be in the range 1--1000. The default value is 30.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
