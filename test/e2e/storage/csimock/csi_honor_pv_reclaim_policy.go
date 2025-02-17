@@ -28,8 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -37,7 +35,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVReclaimPolicy, framework.WithFeatureGate(features.HonorPVReclaimPolicy), func() {
+var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", func() {
 	f := framework.NewDefaultFramework("csi-mock-honor-pv-reclaim-policy")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	m := newMockDriverSetup(f)
@@ -80,9 +78,8 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 
 		ginkgo.It("Dynamic provisioning should honor pv delete reclaim policy when deleting pv then pvc", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimDelete),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -119,9 +116,8 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 
 		ginkgo.It("Dynamic provisioning should honor pv retain reclaim policy when deleting pvc then pv", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimRetain),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -237,9 +233,8 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 
 		ginkgo.It("Static provisioning should honor pv delete reclaim policy when deleting pv then pvc", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimDelete),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -271,9 +266,8 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 
 		ginkgo.It("Static provisioning should honor pv retain reclaim policy when deleting pvc then pv", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimRetain),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -347,9 +341,8 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 	ginkgo.Context("CSI honor pv reclaim policy changes using mock driver", func() {
 		ginkgo.It("should honor pv reclaim policy after it is changed from retain to deleted", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimRetain),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimRetain),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
@@ -405,9 +398,8 @@ var _ = utils.SIGDescribe("CSI Mock honor pv reclaim policy", feature.HonorPVRec
 
 		ginkgo.It("should honor pv reclaim policy after it is changed from deleted to retain", func(ctx context.Context) {
 			m.init(ctx, testParameters{
-				registerDriver:             true,
-				enableHonorPVReclaimPolicy: true,
-				reclaimPolicy:              ptr.To(v1.PersistentVolumeReclaimDelete),
+				registerDriver: true,
+				reclaimPolicy:  ptr.To(v1.PersistentVolumeReclaimDelete),
 			})
 			ginkgo.DeferCleanup(m.cleanup)
 
