@@ -24,12 +24,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -425,6 +429,118 @@ func TestRejectPodAdmissionBasedOnOSField(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actualResult := rejectPodAdmissionBasedOnOSField(test.pod)
+			if test.expectRejection != actualResult {
+				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
+			}
+		})
+	}
+}
+
+func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
+	nodeSupportedTheFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+		Status: v1.NodeStatus{
+			Features: &v1.NodeFeatures{
+				SupplementalGroupsPolicy: ptr.To(true),
+			},
+		},
+	}
+	nodeNotSupportedTheFeature := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "test"},
+	}
+	podNotUsedTheFeature := &v1.Pod{}
+	podUsedTheFeature := &v1.Pod{Spec: v1.PodSpec{
+		SecurityContext: &v1.PodSecurityContext{
+			SupplementalGroupsPolicy: ptr.To(v1.SupplementalGroupsPolicyStrict),
+		},
+	}}
+	tests := []struct {
+		name             string
+		emulationVersion *utilversion.Version
+		node             *v1.Node
+		pod              *v1.Pod
+		expectRejection  bool
+	}{
+		// The feature is Beta in v1.33
+		{
+			name:             "feature=Beta, node=feature not supported, pod=in use: it should REJECT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeNotSupportedTheFeature,
+			pod:              podUsedTheFeature,
+			expectRejection:  true,
+		},
+		{
+			name:             "feature=Beta, node=feature supported, pod=in use: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeSupportedTheFeature,
+			pod:              podUsedTheFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Beta, node=feature not supported, pod=not in use: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeNotSupportedTheFeature,
+			pod:              podNotUsedTheFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Beta, node=feature supported, pod=not in use: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.33"),
+			node:             nodeSupportedTheFeature,
+			pod:              podNotUsedTheFeature,
+			expectRejection:  false,
+		},
+		// The feature is Alpha(v1.31, v1.32) in emulated version
+		// Note: When the feature is alpha in emulated version, it should always admit for backward compatibility
+		{
+			name:             "feature=Alpha, node=feature not supported, pod=feature used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeNotSupportedTheFeature,
+			pod:              podUsedTheFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Alpha, node=feature not supported, pod=feature not used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeNotSupportedTheFeature,
+			pod:              podNotUsedTheFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Alpha, node=feature supported, pod=feature used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeSupportedTheFeature,
+			pod:              podUsedTheFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=Alpha, node=feature supported, pod=feature not used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.32"),
+			node:             nodeSupportedTheFeature,
+			pod:              podNotUsedTheFeature,
+			expectRejection:  false,
+		},
+		// The feature is not yet released (< v1.31) in emulated version (this can happen when only kubelet downgraded).
+		// Note: When the feature is not yet released in emulated version, it should always admit for backward compatibility
+		{
+			name:             "feature=NotReleased, node=feature not supported, pod=feature used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.30"),
+			node:             nodeNotSupportedTheFeature,
+			pod:              podUsedTheFeature,
+			expectRejection:  false,
+		},
+		{
+			name:             "feature=NotReleased, node=feature not supported, pod=feature not used: it should ADMIT",
+			emulationVersion: utilversion.MustParse("1.30"),
+			node:             nodeNotSupportedTheFeature,
+			pod:              podNotUsedTheFeature,
+			expectRejection:  false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, test.emulationVersion)
+			actualResult := rejectPodAdmissionBasedOnSupplementalGroupsPolicy(test.pod, test.node)
 			if test.expectRejection != actualResult {
 				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
 			}
