@@ -4208,8 +4208,8 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		add rule ip kube-proxy endpoint-WAHRBT2B-ns4/svc4/tcp/p80__10.0.4.1/80 meta l4proto tcp dnat to 10.0.4.1:80
 		`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	// add+flush 3 chains for 1 service and 2 endpoints, add 2 rules in each = 12 operations
-	if nft.LastTransaction.NumOperations() != 12 {
+	// add+flush 2 chains for 1 service and 1 new endpoint, add 2 rules in each = 8 operations
+	if nft.LastTransaction.NumOperations() != 8 {
 		t.Errorf("Expected 12 trasaction operations, got %d", nft.LastTransaction.NumOperations())
 	}
 
