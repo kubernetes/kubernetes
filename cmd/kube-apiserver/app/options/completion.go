@@ -28,13 +28,11 @@ import (
 
 	cp "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
-	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 // completedOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.
 type completedOptions struct {
 	cp.CompletedOptions
-	CloudProvider *kubeoptions.CloudProviderOptions
 
 	Extra
 }
@@ -64,7 +62,6 @@ func (s *ServerRunOptions) Complete(ctx context.Context) (CompletedOptions, erro
 
 	completed := completedOptions{
 		CompletedOptions: controlplane,
-		CloudProvider:    s.CloudProvider,
 
 		Extra: s.Extra,
 	}
