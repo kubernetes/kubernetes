@@ -38,9 +38,10 @@ import (
 
 func TestDocMapToUpgradeConfiguration(t *testing.T) {
 	tests := []struct {
-		name        string
-		cfg         kubeadmapiv1.UpgradeConfiguration
-		expectedCfg kubeadmapi.UpgradeConfiguration
+		name          string
+		cfg           interface{}
+		expectedCfg   kubeadmapi.UpgradeConfiguration
+		expectedError bool
 	}{
 		{
 			name: "default config is set correctly",
@@ -103,6 +104,16 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "no UpgradeConfiguration found",
+			cfg: kubeadmapiv1.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.InitConfigurationKind,
+				},
+			},
+			expectedError: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -116,11 +127,13 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 				t.Fatalf("Unexpected error of SplitYAMLDocuments: %v", err)
 			}
 			cfg, err := DocMapToUpgradeConfiguration(docmap)
-			if err != nil {
-				t.Fatalf("unexpected error of DocMapToUpgradeConfiguration: %v\nconfig: %s", err, string(b))
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("failed DocMapToUpgradeConfiguration:\n\texpected error: %t\n\t  actual error: %v", tc.expectedError, err)
 			}
-			if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-				t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+			if err == nil {
+				if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
+					t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}
