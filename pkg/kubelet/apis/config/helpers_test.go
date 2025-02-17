@@ -303,5 +303,6 @@ var (
 		"LocalStorageCapacityIsolation",
 		"FailCgroupV1",
 		"CrashLoopBackOff.MaxContainerRestartPeriod",
+		"UserNamespaces.IDsPerPod",
 	)
 )
