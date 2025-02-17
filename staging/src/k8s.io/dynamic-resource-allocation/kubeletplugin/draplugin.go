@@ -26,6 +26,8 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
+	resourceapi "k8s.io/api/resource/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -71,6 +73,47 @@ type DRAPlugin interface {
 	// without causing an API break of the package
 	// (https://pkg.go.dev/golang.org/x/exp/apidiff#section-readme).
 	internal()
+}
+
+// AllocatedDevice is the devices allocated by dra driver for single ResourceClaim,
+// return by NodePrepareResources func of dra driver.
+type AllocatedDevice struct {
+	// RequestNames is request defined in the ResourceClaimTemplate that this device is associated with.
+	// Optional. If empty, the device is associated with all requests.
+	RequestNames []string
+	// PoolName is the pool that device belongs to.
+	PoolName string
+	// DeviceName is the name of device.
+	DeviceName string
+	// CDIDeviceIDs is  IDs of CDI device associated with device instance. None is also valid.
+	CDIDeviceIDs []string
+}
+
+// DRADriverService defines the interface that should be implemented by DRA driver,
+// different from the previous conventions(1.) that DRA driver implement gRPC
+// interfaces of [drapbv1alpha4.NodeServer] or [drapbv1beta1.DRAPluginServer],
+// instead implement [drapbv1beta1.DRAPluginServer] in this package with DRAPluginServerWrapper,
+// calling functions of DRADriverService interface in DRAPluginServerWrapper.
+type DRADriverService interface {
+	// CheckDeviceAllocation use to prevent from that same device to be assigned to different ResourceClaim.
+	// Demand comes from #128981.
+	CheckDeviceAllocation(ctx context.Context, claims []*resourceapi.ResourceClaim) error
+	// NodePrepareResources use to allocate for ResourceClaim, same as the NodePrepareResources gRPC
+	// interface implemented by dra driver.
+	// It called in NodePrepareResources function of DRAPluginServerWrapper.
+	NodePrepareResources(context.Context, *resourceapi.ResourceClaim) ([]*AllocatedDevice, error)
+	// NodeUnprepareResources use to device occupied by ResourceClaim. same as the NodeUnprepareResources gRPC
+	// interface implemented by dra driver.
+	// It called in NodeUnprepareResources function of DRAPluginServerWrapper.
+	//
+	// Arguments:
+	//
+	// uid - the UID of ResourceClaim resource
+	//
+	// name - the Name of ResourceClaim resource
+	//
+	// namespace - the Namespace of ResourceClaim resource
+	NodeUnprepareResources(ctx context.Context, uid string, name string, namespace string) error
 }
 
 // Option implements the functional options pattern for Start.
@@ -277,12 +320,12 @@ type draPlugin struct {
 // is required. Implementing drapbv1beta1.DRAPluginServer is recommended for
 // DRA driver targeting Kubernetes >= 1.32. To be compatible with Kubernetes 1.31,
 // DRA drivers must implement only [drapbv1alpha4.NodeServer].
-func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (result DRAPlugin, finalErr error) {
+func Start(ctx context.Context, nodeServers []DRADriverService, opts ...Option) (result DRAPlugin, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
 		logger:        klog.Background(),
 		grpcVerbosity: 6, // Logs requests and responses, which can be large.
-		nodeV1alpha4:  true,
+		nodeV1alpha4:  false,
 		nodeV1beta1:   true,
 	}
 	for _, option := range opts {
@@ -339,14 +382,9 @@ func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (resu
 	var supportedServices []string
 	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
 		for _, nodeServer := range nodeServers {
-			if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
-				logger.V(5).Info("registering v1alpha4.Node gGRPC service")
-				drapbv1alpha4.RegisterNodeServer(grpcServer, nodeServer)
-				supportedServices = append(supportedServices, drapbv1alpha4.NodeService)
-			}
-			if nodeServer, ok := nodeServer.(drapbv1beta1.DRAPluginServer); ok && o.nodeV1beta1 {
+			if o.nodeV1beta1 {
 				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-				drapbv1beta1.RegisterDRAPluginServer(grpcServer, nodeServer)
+				drapbv1beta1.RegisterDRAPluginServer(grpcServer, d.DRAPluginServerWrap(nodeServer))
 				supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 			}
 		}
@@ -454,6 +492,87 @@ func (d *draPlugin) PublishResources(_ context.Context, resources resourceslice.
 	d.resourceSliceController.Update(driverResources)
 
 	return nil
+}
+
+// DRAPluginServerWrapper implements the [v1beta1.DRAPluginServer] interfaces by wrapping a [DRADriverService].
+type DRAPluginServerWrapper struct {
+	kubeClient kubernetes.Interface
+	DRADriverService
+}
+
+func (w *DRAPluginServerWrapper) GetResourceClaims(ctx context.Context, claims []*drapbv1beta1.Claim) ([]*resourceapi.ResourceClaim, error) {
+	var resourceClaims []*resourceapi.ResourceClaim
+	for _, claimReq := range claims {
+		claim, err := w.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
+		if err != nil {
+			return resourceClaims, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
+		}
+		if claim.Status.Allocation == nil {
+			return resourceClaims, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
+		}
+		if claim.UID != types.UID(claimReq.UID) {
+			return resourceClaims, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
+		}
+		resourceClaims = append(resourceClaims, claim)
+	}
+	return resourceClaims, nil
+}
+
+func (w *DRAPluginServerWrapper) NodePrepareResources(ctx context.Context, req *drapbv1beta1.NodePrepareResourcesRequest) (*drapbv1beta1.NodePrepareResourcesResponse, error) {
+	resourceClaims, err := w.GetResourceClaims(ctx, req.Claims)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.DRADriverService.CheckDeviceAllocation(ctx, resourceClaims); err != nil {
+		return nil, err
+	}
+	resp := &drapbv1beta1.NodePrepareResourcesResponse{Claims: map[string]*drapbv1beta1.NodePrepareResourceResponse{}}
+	for _, claim := range resourceClaims {
+		results, err := w.DRADriverService.NodePrepareResources(ctx, claim)
+		if err != nil {
+			resp.Claims[string(claim.UID)] = &drapbv1beta1.NodePrepareResourceResponse{
+				Error: fmt.Sprintf("failed to preparing devices for claim %v: %v", claim.UID, err),
+			}
+			continue
+		}
+		var devices []*drapbv1beta1.Device
+		for _, result := range results {
+			device := &drapbv1beta1.Device{
+				RequestNames: result.RequestNames,
+				PoolName:     result.PoolName,
+				DeviceName:   result.DeviceName,
+				CDIDeviceIDs: result.CDIDeviceIDs,
+			}
+			devices = append(devices, device)
+
+		}
+		resp.Claims[string(claim.UID)] = &drapbv1beta1.NodePrepareResourceResponse{
+			Devices: devices,
+		}
+	}
+	return resp, nil
+}
+
+func (w *DRAPluginServerWrapper) NodeUnprepareResources(ctx context.Context, req *drapbv1beta1.NodeUnprepareResourcesRequest) (*drapbv1beta1.NodeUnprepareResourcesResponse, error) {
+	resp := &drapbv1beta1.NodeUnprepareResourcesResponse{Claims: map[string]*drapbv1beta1.NodeUnprepareResourceResponse{}}
+	for _, claim := range req.Claims {
+		err := w.DRADriverService.NodeUnprepareResources(ctx, claim.UID, claim.Name, claim.Namespace)
+		if err != nil {
+			resp.Claims[claim.UID] = &drapbv1beta1.NodeUnprepareResourceResponse{
+				Error: fmt.Sprintf("failed unpreparing devices for claim %v: %v", claim.UID, err),
+			}
+			continue
+		}
+		resp.Claims[claim.UID] = &drapbv1beta1.NodeUnprepareResourceResponse{}
+	}
+	return resp, nil
+}
+
+func (d *draPlugin) DRAPluginServerWrap(service DRADriverService) drapbv1beta1.DRAPluginServer {
+	return &DRAPluginServerWrapper{
+		kubeClient:       d.kubeClient,
+		DRADriverService: service,
+	}
 }
 
 // RegistrationStatus implements [DRAPlugin.RegistrationStatus].
