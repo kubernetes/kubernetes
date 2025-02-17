@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	"github.com/google/go-cmp/cmp"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
@@ -984,13 +985,6 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		}
 	}
 
-	calcSwapForBurstablePods := func(containerMemoryRequest int64) int64 {
-		swapSize, err := calcSwapForBurstablePods(containerMemoryRequest, int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
-		assert.NoError(t, err)
-
-		return swapSize
-	}
-
 	for _, tc := range []struct {
 		name                        string
 		cgroupVersion               CgroupVersion
@@ -1047,7 +1041,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		{
 			name:                       "Best-effort QoS, cgroups v2, LimitedSwap",
 			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSBurstable,
+			qosClass:                   v1.PodQOSBestEffort,
 			nodeSwapFeatureGateEnabled: true,
 			swapBehavior:               types.LimitedSwap,
 		},
@@ -1132,7 +1126,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			name:                       "Swap disabled on node, Best-effort QoS, cgroups v2, LimitedSwap",
 			swapDisabledOnNode:         true,
 			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSBurstable,
+			qosClass:                   v1.PodQOSBestEffort,
 			nodeSwapFeatureGateEnabled: true,
 			swapBehavior:               types.LimitedSwap,
 		},
@@ -1183,7 +1177,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		{
 			name:                       "Best-effort QoS, cgroups v2, LimitedSwap, critical pod",
 			cgroupVersion:              cgroupV2,
-			qosClass:                   v1.PodQOSBurstable,
+			qosClass:                   v1.PodQOSBestEffort,
 			nodeSwapFeatureGateEnabled: true,
 			swapBehavior:               types.LimitedSwap,
 			isCriticalPod:              true,
@@ -1247,10 +1241,14 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 				return
 			}
 
-			c1ExpectedSwap := calcSwapForBurstablePods(resourceReqsC1.Requests.Memory().Value())
+			swapLimitCalculator, err := swap.NewLimitCalculator(int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity), tc.cgroupVersion == cgroupV1, tc.swapBehavior)
+			assert.NoError(t, err)
+			c1ExpectedSwap, err := swapLimitCalculator.CalcContainerSwapLimit(*pod, pod.Spec.Containers[0])
+			assert.NoError(t, err)
 			c2ExpectedSwap := int64(0)
 			if !tc.addContainerWithoutRequests && !tc.addGuaranteedContainer {
-				c2ExpectedSwap = calcSwapForBurstablePods(resourceReqsC2.Requests.Memory().Value())
+				c2ExpectedSwap, err = swapLimitCalculator.CalcContainerSwapLimit(*pod, pod.Spec.Containers[1])
+				assert.NoError(t, err)
 			}
 
 			expectSwap(tc.cgroupVersion, c1ExpectedSwap, resourcesC1)
