@@ -33,6 +33,11 @@ type Error struct {
 	Field    string
 	BadValue interface{}
 	Detail   string
+
+	// Origin indicates the source of this error.  It is used in testing to
+	// ensure that the expected errors are returned without matching on detail
+	// strings.
+	Origin string
 }
 
 var _ error = &Error{}
@@ -169,32 +174,32 @@ func (t ErrorType) String() string {
 
 // TypeInvalid returns a *Error indicating "type is invalid"
 func TypeInvalid(field *Path, value interface{}, detail string) *Error {
-	return &Error{ErrorTypeTypeInvalid, field.String(), value, detail}
+	return &Error{ErrorTypeTypeInvalid, field.String(), value, detail, ""}
 }
 
 // NotFound returns a *Error indicating "value not found".  This is
 // used to report failure to find a requested value (e.g. looking up an ID).
 func NotFound(field *Path, value interface{}) *Error {
-	return &Error{ErrorTypeNotFound, field.String(), value, ""}
+	return &Error{ErrorTypeNotFound, field.String(), value, "", ""}
 }
 
 // Required returns a *Error indicating "value required".  This is used
 // to report required values that are not provided (e.g. empty strings, null
 // values, or empty arrays).
 func Required(field *Path, detail string) *Error {
-	return &Error{ErrorTypeRequired, field.String(), "", detail}
+	return &Error{ErrorTypeRequired, field.String(), "", detail, ""}
 }
 
 // Duplicate returns a *Error indicating "duplicate value".  This is
 // used to report collisions of values that must be unique (e.g. names or IDs).
 func Duplicate(field *Path, value interface{}) *Error {
-	return &Error{ErrorTypeDuplicate, field.String(), value, ""}
+	return &Error{ErrorTypeDuplicate, field.String(), value, "", ""}
 }
 
 // Invalid returns a *Error indicating "invalid value".  This is used
 // to report malformed values (e.g. failed regex match, too long, out of bounds).
 func Invalid(field *Path, value interface{}, detail string) *Error {
-	return &Error{ErrorTypeInvalid, field.String(), value, detail}
+	return &Error{ErrorTypeInvalid, field.String(), value, detail, ""}
 }
 
 // NotSupported returns a *Error indicating "unsupported value".
@@ -209,7 +214,7 @@ func NotSupported[T ~string](field *Path, value interface{}, validValues []T) *E
 		}
 		detail = "supported values: " + strings.Join(quotedValues, ", ")
 	}
-	return &Error{ErrorTypeNotSupported, field.String(), value, detail}
+	return &Error{ErrorTypeNotSupported, field.String(), value, detail, ""}
 }
 
 // Forbidden returns a *Error indicating "forbidden".  This is used to
@@ -217,7 +222,7 @@ func NotSupported[T ~string](field *Path, value interface{}, validValues []T) *E
 // some conditions, but which are not permitted by current conditions (e.g.
 // security policy).
 func Forbidden(field *Path, detail string) *Error {
-	return &Error{ErrorTypeForbidden, field.String(), "", detail}
+	return &Error{ErrorTypeForbidden, field.String(), "", detail, ""}
 }
 
 // TooLong returns a *Error indicating "too long".  This is used to report that
@@ -231,7 +236,7 @@ func TooLong(field *Path, value interface{}, maxLength int) *Error {
 	} else {
 		msg = "value is too long"
 	}
-	return &Error{ErrorTypeTooLong, field.String(), "<value omitted>", msg}
+	return &Error{ErrorTypeTooLong, field.String(), "<value omitted>", msg, ""}
 }
 
 // TooLongMaxLength returns a *Error indicating "too long".
@@ -259,20 +264,37 @@ func TooMany(field *Path, actualQuantity, maxQuantity int) *Error {
 		actual = omitValue
 	}
 
-	return &Error{ErrorTypeTooMany, field.String(), actual, msg}
+	return &Error{ErrorTypeTooMany, field.String(), actual, msg, ""}
 }
 
 // InternalError returns a *Error indicating "internal error".  This is used
 // to signal that an error was found that was not directly related to user
 // input.  The err argument must be non-nil.
 func InternalError(field *Path, err error) *Error {
-	return &Error{ErrorTypeInternal, field.String(), nil, err.Error()}
+	return &Error{ErrorTypeInternal, field.String(), nil, err.Error(), ""}
 }
 
 // ErrorList holds a set of Errors.  It is plausible that we might one day have
 // non-field errors in this same umbrella package, but for now we don't, so
 // we can keep it simple and leave ErrorList here.
 type ErrorList []*Error
+
+func (el *ErrorList) Append(errs ...*Error) {
+	*el = append(*el, errs...)
+}
+
+func (el *ErrorList) AppendWithOrigin(o string, errs ...*Error) {
+	for _, e := range errs {
+		e.Origin = o
+	}
+	*el = append(*el, errs...)
+}
+
+func (el *ErrorList) SetOrigin(o string) {
+	for _, e := range *el {
+		e.Origin = o
+	}
+}
 
 // NewErrorTypeMatcher returns an errors.Matcher that returns true
 // if the provided error is a Error and has the provided ErrorType.
