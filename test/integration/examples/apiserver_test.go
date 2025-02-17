@@ -263,6 +263,7 @@ func TestFrontProxyConfig(t *testing.T) {
 		testFrontProxyConfig(t, false)
 	})
 	t.Run("WithUID", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 33))
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoteRequestHeaderUID, true)
 		testFrontProxyConfig(t, true)
 	})
@@ -699,11 +700,12 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 		framework.SharedEtcd())
 	t.Cleanup(func() { testServer.TearDownFn() })
 
-	componentGlobalsRegistry := testServer.ServerOpts.Options.GenericServerRunOptions.ComponentGlobalsRegistry
+	// Create a new registry since the testServer's ComponentGlobalsRegistry is already Set(),
+	// and wardle server would try to Set() again in the test.
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
 	_, _ = componentGlobalsRegistry.ComponentGlobalsOrRegister(
 		apiserver.WardleComponentName, basecompatibility.NewEffectiveVersionFromString(wardleBinaryVersion, "", ""),
 		featuregate.NewVersionedFeatureGate(version.MustParse(wardleBinaryVersion)))
-
 	kubeClient := client.NewForConfigOrDie(getKubeConfig(testServer))
 
 	// create the bare minimum resources required to be able to get the API service into an available state

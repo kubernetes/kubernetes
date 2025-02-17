@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/configz"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
@@ -98,6 +99,8 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	opts := options.NewOptions()
+	// Create an independent registry to avoid sharing state between different tests.
+	opts.ComponentGlobalsRegistry = compatibility.NewComponentGlobalsRegistry()
 	nfs := opts.Flags
 	for _, f := range nfs.FlagSets {
 		fs.AddFlagSet(f)

@@ -34,6 +34,7 @@ import (
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	basecompatibility "k8s.io/component-base/compatibility"
 
 	componentbaseconfig "k8s.io/component-base/config"
@@ -1480,6 +1481,9 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 }
 
 func TestWatchListClientFlagChange(t *testing.T) {
+	// Reset the global registry before the test, as DefaultComponentGlobalsRegistry is used by multiple tests.
+	compatibility.DefaultComponentGlobalsRegistry.Reset()
+
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, err := NewKubeControllerManagerOptions()
 	if err != nil {
