@@ -19,6 +19,9 @@ package eviction
 import (
 	"errors"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"sort"
 	"strconv"
 	"strings"
@@ -511,6 +514,15 @@ func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 	return resource.NewQuantity(usage, resource.BinarySI)
 }
 
+// swapUsage converts swap usage bytes into a resource quantity.
+func swapUsage(swapStats *statsapi.SwapStats) *resource.Quantity {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) || swapStats == nil || swapStats.SwapUsageBytes == nil {
+		return &resource.Quantity{Format: resource.BinarySI}
+	}
+	usage := int64(*swapStats.SwapUsageBytes)
+	return resource.NewQuantity(usage, resource.BinarySI)
+}
+
 // processUsage converts working set into a process count.
 func processUsage(processStats *statsapi.ProcessStats) uint64 {
 	if processStats == nil || processStats.ProcessCount == nil {
@@ -671,6 +683,10 @@ func (ms *multiSorter) Less(i, j int) bool {
 func priority(p1, p2 *v1.Pod) int {
 	priority1 := corev1helpers.PodPriority(p1)
 	priority2 := corev1helpers.PodPriority(p2)
+
+	klog.V(5).InfoS("eviction ranking by priority", "pod", p1.Name, "namespace", p1.Namespace, "priority", priority1)
+	klog.V(5).InfoS("eviction ranking by priority", "pod", p2.Name, "namespace", p2.Namespace, "priority", priority2)
+
 	if priority1 == priority2 {
 		return 0
 	}
@@ -681,7 +697,7 @@ func priority(p1, p2 *v1.Pod) int {
 }
 
 // exceedMemoryRequests compares whether or not pods' memory usage exceeds their requests
-func exceedMemoryRequests(stats statsFunc) cmpFunc {
+func exceedMemoryRequests(stats statsFunc, swapLimitCalculator swap.LimitCalculator) cmpFunc {
 	return func(p1, p2 *v1.Pod) int {
 		p1Stats, p1Found := stats(p1)
 		p2Stats, p2Found := stats(p2)
@@ -692,8 +708,35 @@ func exceedMemoryRequests(stats statsFunc) cmpFunc {
 
 		p1Memory := memoryUsage(p1Stats.Memory)
 		p2Memory := memoryUsage(p2Stats.Memory)
-		p1ExceedsRequests := p1Memory.Cmp(v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)) == 1
-		p2ExceedsRequests := p2Memory.Cmp(v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)) == 1
+
+		p1MemoryRequest := v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
+		p2MemoryRequest := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+			// add swap usage to memory usage
+			p1Swap := *swapUsage(p1Stats.Swap)
+			p2Swap := *swapUsage(p2Stats.Swap)
+
+			p1Memory.Add(p1Swap)
+			p2Memory.Add(p2Swap)
+
+			// add accessible swap to memory request
+			p1AccessibleSwap, _ := swapLimitCalculator.CalcPodSwapLimit(*p1)
+			p2AccessibleSwap, _ := swapLimitCalculator.CalcPodSwapLimit(*p2)
+
+			p1MemoryRequest.Add(*resource.NewQuantity(p1AccessibleSwap, resource.BinarySI))
+			p2MemoryRequest.Add(*resource.NewQuantity(p2AccessibleSwap, resource.BinarySI))
+
+			klog.V(5).InfoS("eviction ranking by exceedMemoryRequests", "pod", p1.Name, "namespace", "swap usage", p1Swap.String(), "accessible swap", p1AccessibleSwap)
+			klog.V(5).InfoS("eviction ranking by exceedMemoryRequests", "pod", p2.Name, "namespace", "swap usage", p2Swap.String(), "accessible swap", p2AccessibleSwap)
+		}
+
+		p1ExceedsRequests := p1Memory.Cmp(p1MemoryRequest) == 1
+		p2ExceedsRequests := p2Memory.Cmp(p2MemoryRequest) == 1
+
+		klog.V(5).InfoS("eviction ranking by exceedMemoryRequests", "pod", p1.Name, "namespace", p1.Namespace, "memory usage", p1Memory.String(), "memory request", p1MemoryRequest.String(), "exceeds?", p1ExceedsRequests)
+		klog.V(5).InfoS("eviction ranking by exceedMemoryRequests", "pod", p2.Name, "namespace", p2.Namespace, "memory usage", p2Memory.String(), "memory request", p2MemoryRequest.String(), "exceeds?", p2ExceedsRequests)
+
 		// prioritize evicting the pod which exceeds its requests
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
@@ -717,6 +760,18 @@ func memory(stats statsFunc) cmpFunc {
 		p2Memory := memoryUsage(p2Stats.Memory)
 		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
 		p2Memory.Sub(p2Request)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+			// add swap usage to memory usage
+			p1Swap := *swapUsage(p1Stats.Swap)
+			p2Swap := *swapUsage(p2Stats.Swap)
+
+			p1Memory.Add(p1Swap)
+			p2Memory.Add(p2Swap)
+		}
+
+		klog.V(5).InfoS("eviction ranking by memory", "pod", p1.Name, "namespace", p1.Namespace, "mem-request", p1Memory.Value())
+		klog.V(5).InfoS("eviction ranking by memory", "pod", p2.Name, "namespace", p2.Namespace, "mem-request", p2Memory.Value())
 
 		// prioritize evicting the pod which has the larger consumption of memory
 		return p2Memory.Cmp(*p1Memory)
@@ -804,11 +859,13 @@ func cmpBool(a, b bool) int {
 	return 1
 }
 
-// rankMemoryPressure orders the input pods for eviction in response to memory pressure.
+// rankMemoryPressureFunc generates a rankFunc that orders the input pods for eviction in response to memory pressure.
 // It ranks by whether or not the pod's usage exceeds its requests, then by priority, and
 // finally by memory usage above requests.
-func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
-	orderedBy(exceedMemoryRequests(stats), priority, memory(stats)).Sort(pods)
+func rankMemoryPressureFunc(swapLimitCalculator swap.LimitCalculator) rankFunc {
+	return func(pods []*v1.Pod, stats statsFunc) {
+		orderedBy(exceedMemoryRequests(stats, swapLimitCalculator), priority, memory(stats)).Sort(pods)
+	}
 }
 
 // rankPIDPressure orders the input pods by priority in response to PID pressure.
@@ -836,13 +893,19 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summary *statsapi.Summary) (signalObservations, statsFunc) {
+func makeSignalObservations(summary *statsapi.Summary, accessibleSwap uint64) (signalObservations, statsFunc) {
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
 	result := signalObservations{}
 
-	memoryAvailableSignal := makeMemoryAvailableSignalObservation(summary)
+	swapUsageBytes := uint64(0)
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+		if summary.Node.Swap != nil && summary.Node.Swap.SwapUsageBytes != nil {
+			swapUsageBytes = *summary.Node.Swap.SwapUsageBytes
+		}
+	}
+	memoryAvailableSignal := makeMemoryAvailableSignalObservation(summary, accessibleSwap, swapUsageBytes)
 	if memoryAvailableSignal != nil {
 		result[evictionapi.SignalMemoryAvailable] = *memoryAvailableSignal
 	}
@@ -852,8 +915,8 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 	} else {
 		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
 			result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
-				available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
-				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+				available: resource.NewQuantity(int64(*memory.AvailableBytes)+int64(accessibleSwap)-int64(swapUsageBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes)+int64(accessibleSwap), resource.BinarySI),
 				time:      memory.Time,
 			}
 		}
@@ -952,6 +1015,9 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 		case evictionapi.OpLessThan:
 			thresholdMet = thresholdResult > 0
 		}
+		klog.InfoS("thresholds met", "signal", threshold.Signal, "is met?", thresholdMet,
+			"threshold quantity", quantity.String(), "available", observed.available.String(), "capacity", observed.capacity.String(),
+			"used", observed.capacity.Value()-observed.available.Value())
 		if thresholdMet {
 			results = append(results, threshold)
 		}
@@ -1141,10 +1207,10 @@ func isAllocatableEvictionThreshold(threshold evictionapi.Threshold) bool {
 }
 
 // buildSignalToRankFunc returns ranking functions associated with resources
-func buildSignalToRankFunc(withImageFs bool, imageContainerSplitFs bool) map[evictionapi.Signal]rankFunc {
+func buildSignalToRankFunc(withImageFs, imageContainerSplitFs bool, swapLimitCalculator swap.LimitCalculator) map[evictionapi.Signal]rankFunc {
 	signalToRankFunc := map[evictionapi.Signal]rankFunc{
-		evictionapi.SignalMemoryAvailable:            rankMemoryPressure,
-		evictionapi.SignalAllocatableMemoryAvailable: rankMemoryPressure,
+		evictionapi.SignalMemoryAvailable:            rankMemoryPressureFunc(swapLimitCalculator),
+		evictionapi.SignalAllocatableMemoryAvailable: rankMemoryPressureFunc(swapLimitCalculator),
 		evictionapi.SignalPIDAvailable:               rankPIDPressure,
 	}
 	// usage of an imagefs is optional
@@ -1264,6 +1330,11 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				case v1.ResourceMemory:
 					if containerStats.Memory != nil && containerStats.Memory.WorkingSetBytes != nil {
 						usage = resource.NewQuantity(int64(*containerStats.Memory.WorkingSetBytes), resource.BinarySI)
+					}
+					if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
+						if containerStats.Swap != nil && containerStats.Swap.SwapUsageBytes != nil {
+							usage.Add(*resource.NewQuantity(int64(*containerStats.Swap.SwapUsageBytes), resource.BinarySI))
+						}
 					}
 				}
 				if usage != nil && usage.Cmp(requests) > 0 {
