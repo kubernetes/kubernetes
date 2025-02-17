@@ -1245,7 +1245,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 	expectedEndpoints := map[string]addressInfo{}
 
 	for _, address := range epSubset.Addresses {
-		at := getAddressType(address.IP)
+		_, at := addressToEndpoint(address, true)
 		if at != nil && *at == addrType && len(expectedEndpoints) < maxEndpointsPerSubset {
 			expectedEndpoints[address.IP] = addressInfo{
 				ready:     true,
@@ -1255,7 +1255,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 	}
 
 	for _, address := range epSubset.NotReadyAddresses {
-		at := getAddressType(address.IP)
+		_, at := addressToEndpoint(address, true)
 		if at != nil && *at == addrType && len(expectedEndpoints) < maxEndpointsPerSubset {
 			expectedEndpoints[address.IP] = addressInfo{
 				ready:     false,

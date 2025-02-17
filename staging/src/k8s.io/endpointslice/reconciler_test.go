@@ -370,7 +370,7 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Addresses: []string{"1234::5678:0:0:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       pointer.Bool(true),
 							Serving:     pointer.Bool(true),
@@ -398,7 +398,7 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Addresses: []string{"1234::5678:0:0:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       pointer.Bool(true),
 							Serving:     pointer.Bool(true),
@@ -425,7 +425,7 @@ func TestReconcile1Pod(t *testing.T) {
 			expectedEndpointPerSlice: map[discovery.AddressType][]discovery.Endpoint{
 				discovery.AddressTypeIPv6: {
 					{
-						Addresses: []string{"1234::5678:0000:0000:9abc:def0"},
+						Addresses: []string{"1234::5678:0:0:9abc:def0"},
 						Conditions: discovery.EndpointConditions{
 							Ready:       pointer.Bool(true),
 							Serving:     pointer.Bool(true),
