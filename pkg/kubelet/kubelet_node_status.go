@@ -759,7 +759,7 @@ func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
 // setNodeStatus funcs
 func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) error {
 	// if cloud is not nil, we expect the cloud resource sync manager to exist
-	var nodeAddressesFunc func() ([]v1.NodeAddress, error)
+	var nodeAddressesFunc func(context.Context) ([]v1.NodeAddress, error)
 	if kl.cloud != nil {
 		nodeAddressesFunc = kl.cloudResourceSyncManager.NodeAddresses
 	}

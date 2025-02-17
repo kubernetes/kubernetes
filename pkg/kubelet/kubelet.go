@@ -1718,7 +1718,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	// Start the cloud provider sync manager
 	if kl.cloudResourceSyncManager != nil {
-		go kl.cloudResourceSyncManager.Run(wait.NeverStop)
+		go kl.cloudResourceSyncManager.Run(ctx, wait.NeverStop)
 	}
 
 	if err := kl.initializeModules(ctx); err != nil {
