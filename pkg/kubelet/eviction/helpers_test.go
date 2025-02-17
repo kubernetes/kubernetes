@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"k8s.io/utils/ptr"
 
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -842,7 +843,7 @@ func TestOrderedByExceedsRequestMemory(t *testing.T) {
 		return result, found
 	}
 	pods := []*v1.Pod{below, exceeds}
-	orderedBy(exceedMemoryRequests(statsFn)).Sort(pods)
+	orderedBy(exceedMemoryRequests(statsFn, swap.NewNoSwapCalculator())).Sort(pods)
 
 	expected := []*v1.Pod{exceeds, below}
 	for i := range expected {
@@ -1172,7 +1173,7 @@ func TestOrderedByMemory(t *testing.T) {
 		return result, found
 	}
 	pods := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(memory(statsFn)).Sort(pods)
+	orderedBy(memory(statsFn, swap.NewNoSwapCalculator())).Sort(pods)
 	expected := []*v1.Pod{pod3, pod1, pod2, pod4, pod5, pod6}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -1223,7 +1224,7 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 	}
 	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
 	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
-	orderedBy(exceedMemoryRequests(statsFn), priority, memory(statsFn)).Sort(pods)
+	orderedBy(exceedMemoryRequests(statsFn, swap.NewNoSwapCalculator()), priority, memory(statsFn, swap.NewNoSwapCalculator())).Sort(pods)
 	for i := range expected {
 		if pods[i] != expected[i] {
 			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
@@ -3396,11 +3397,11 @@ func TestStatsNotFoundForPod(t *testing.T) {
 		},
 		{
 			description: "memory",
-			compFunc:    memory,
+			compFunc:    func(stats statsFunc) cmpFunc { return memory(stats, swap.NewNoSwapCalculator()) },
 		},
 		{
 			description: "exceedMemoryRequests",
-			compFunc:    exceedMemoryRequests,
+			compFunc:    func(stats statsFunc) cmpFunc { return exceedMemoryRequests(stats, swap.NewNoSwapCalculator()) },
 		},
 		{
 			description: "exceedDiskRequests",
