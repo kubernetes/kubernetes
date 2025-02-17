@@ -191,16 +191,6 @@ const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a 
 const BindingConditionsMaxSize = 4
 const BindingFailureConditionsMaxSize = 4
 
-const (
-	// IsPrepared indicates the device ready state.
-	// If NeedToPreparing is True and IsPrepared is True, the scheduler proceeds to Bind.
-	IsPrepared = "dra.example.com/is-prepared"
-
-	// PreparingFailed indicates the device preparation failed state.
-	// If PreparingFailed is True, the scheduler will clear the allocation in the ResourceClaim and reschedule the Pod.
-	PreparingFailed = "dra.example.com/preparing-failed"
-)
-
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
