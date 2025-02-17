@@ -312,6 +312,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 		}
 		pod.Spec.Containers[idx].Resources = ctr.Resources
 		pod.Spec.Containers[idx].ResizePolicy = ctr.ResizePolicy
+		pod.Spec.Containers[idx].Env = ctr.Env
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
