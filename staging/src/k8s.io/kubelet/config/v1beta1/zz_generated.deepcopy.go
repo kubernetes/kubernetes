@@ -372,6 +372,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	if in.MergeDefaultEvictionSettings != nil {
+		in, out := &in.MergeDefaultEvictionSettings, &out.MergeDefaultEvictionSettings
+		*out = new(bool)
+		**out = **in
+	}
 	if in.EnableControllerAttachDetach != nil {
 		in, out := &in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach
 		*out = new(bool)
