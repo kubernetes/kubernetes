@@ -25,6 +25,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -38,9 +39,9 @@ import (
 	resourcehelper "k8s.io/component-helpers/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -146,7 +147,10 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 	lcr.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 
 	// Configure swap for the container
-	m.configureContainerSwapResources(lcr, pod, container)
+	err := m.configureContainerSwapResources(lcr, pod, container)
+	if err != nil {
+		klog.ErrorS(err, "failed to set swap resources for container", "pod", klog.KObj(pod), "container", container.Name)
+	}
 
 	// Set memory.min and memory.high to enforce MemoryQoS
 	if enforceMemoryQoS {
@@ -200,39 +204,33 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(pod *v1.Pod,
 
 // configureContainerSwapResources configures the swap resources for a specified (linux) container.
 // Swap is only configured if a swap cgroup controller is available and the NodeSwap feature gate is enabled.
-func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
+func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) error {
 	if !swapControllerAvailable() {
-		return
+		return fmt.Errorf("swap cgroup controller is not available")
 	}
 
-	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo)
-	if m.memorySwapBehavior == kubelettypes.LimitedSwap {
-		if !isCgroup2UnifiedMode() {
-			swapConfigurationHelper.ConfigureNoSwap(lcr)
-			return
-		}
+	swapBehavior := m.memorySwapBehavior
+	if !slices.Contains([]string{kubelettypes.NoSwap, kubelettypes.LimitedSwap}, swapBehavior) {
+		klog.V(4).InfoS("Invalid swap behavior, defaulting to NoSwap", "swapBehavior", swapBehavior)
+		swapBehavior = kubelettypes.NoSwap
+	}
+
+	swapConfigurationHelper, err := newSwapConfigurationHelper(*m.machineInfo, swapBehavior)
+	if err != nil {
+		return fmt.Errorf("failed to create swap configuration helper: %w", err)
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
-		return
+		return nil
 	}
 
-	if kubelettypes.IsCriticalPod(pod) {
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-		return
+	err = swapConfigurationHelper.ConfigureSwap(lcr, pod, container)
+	if err != nil {
+		return fmt.Errorf("failed to configure swap resources: %w", err)
 	}
 
-	// NOTE(ehashman): Behavior is defined in the opencontainers runtime spec:
-	// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
-	switch m.memorySwapBehavior {
-	case kubelettypes.NoSwap:
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-	case kubelettypes.LimitedSwap:
-		swapConfigurationHelper.ConfigureLimitedSwap(lcr, pod, container)
-	default:
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-	}
+	return nil
 }
 
 // generateContainerResources generates platform specific (linux) container resources config for runtime
@@ -420,32 +418,39 @@ var swapControllerAvailable = sync.OnceValue(func() bool {
 })
 
 type swapConfigurationHelper struct {
-	machineInfo cadvisorv1.MachineInfo
+	swapLimitCalculator swap.LimitCalculator
 }
 
-func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo) *swapConfigurationHelper {
-	return &swapConfigurationHelper{machineInfo: machineInfo}
-}
-
-func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) {
-	podQos := kubeapiqos.GetPodQOS(pod)
-	containerDoesNotRequestMemory := container.Resources.Requests.Memory().IsZero() && container.Resources.Limits.Memory().IsZero()
-	memoryRequestEqualsToLimit := container.Resources.Requests.Memory().Cmp(*container.Resources.Limits.Memory()) == 0
-
-	if podQos != v1.PodQOSBurstable || containerDoesNotRequestMemory || !isCgroup2UnifiedMode() || memoryRequestEqualsToLimit {
-		m.ConfigureNoSwap(lcr)
-		return
+func newSwapConfigurationHelper(machineInfo cadvisorv1.MachineInfo, swapBehavior string) (*swapConfigurationHelper, error) {
+	limitCalculator, err := swap.NewLimitCalculator(int64(machineInfo.MemoryCapacity), int64(machineInfo.SwapCapacity), !isCgroup2UnifiedMode(), swapBehavior)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create swap limit calculator: %w", err)
 	}
 
-	containerMemoryRequest := container.Resources.Requests.Memory()
-	swapLimit, err := calcSwapForBurstablePods(containerMemoryRequest.Value(), int64(m.machineInfo.MemoryCapacity), int64(m.machineInfo.SwapCapacity))
+	return &swapConfigurationHelper{
+		swapLimitCalculator: limitCalculator,
+	}, nil
+}
+
+func (m swapConfigurationHelper) ConfigureSwap(lcr *runtimeapi.LinuxContainerResources, pod *v1.Pod, container *v1.Container) error {
+	eligibleForSwap, err := m.swapLimitCalculator.IsContainerEligibleForSwap(*pod, *container)
+	if err != nil {
+		return fmt.Errorf("failed to determine if container is eligible for swap: %w", err)
+	}
+
+	if !eligibleForSwap {
+		m.ConfigureNoSwap(lcr)
+		return nil
+	}
+
+	swapLimit, err := m.swapLimitCalculator.CalcContainerSwapLimit(*pod, *container)
 	if err != nil {
 		klog.ErrorS(err, "cannot calculate swap allocation amount; disallowing swap")
 		m.ConfigureNoSwap(lcr)
-		return
 	}
 
 	m.configureSwap(lcr, swapLimit)
+	return nil
 }
 
 func (m swapConfigurationHelper) ConfigureNoSwap(lcr *runtimeapi.LinuxContainerResources) {
@@ -473,22 +478,6 @@ func (m swapConfigurationHelper) configureSwap(lcr *runtimeapi.LinuxContainerRes
 	}
 
 	lcr.Unified[cm.Cgroup2MaxSwapFilename] = fmt.Sprintf("%d", swapMemory)
-}
-
-// The swap limit is calculated as (<containerMemoryRequest>/<nodeTotalMemory>)*<totalPodsSwapAvailable>.
-// For more info, please look at the following KEP: https://kep.k8s.io/2400
-func calcSwapForBurstablePods(containerMemoryRequest, nodeTotalMemory, totalPodsSwapAvailable int64) (int64, error) {
-	if nodeTotalMemory <= 0 {
-		return 0, fmt.Errorf("total node memory is 0")
-	}
-	if containerMemoryRequest > nodeTotalMemory {
-		return 0, fmt.Errorf("container request %d is larger than total node memory %d", containerMemoryRequest, nodeTotalMemory)
-	}
-
-	containerMemoryProportion := float64(containerMemoryRequest) / float64(nodeTotalMemory)
-	swapAllocation := containerMemoryProportion * float64(totalPodsSwapAvailable)
-
-	return int64(swapAllocation), nil
 }
 
 func toKubeContainerUser(statusUser *runtimeapi.ContainerUser) *kubecontainer.ContainerUser {
