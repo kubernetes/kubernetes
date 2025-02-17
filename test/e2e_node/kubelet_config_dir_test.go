@@ -86,7 +86,6 @@ shutdownGracePeriodByPodPriority:
   - priority: 3
     shutdownGracePeriodSeconds: 30
 featureGates:
-  DisableKubeletCloudCredentialProviders: true
   PodAndContainerStatsFromCRI: true`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "10-kubelet.conf"), contents, 0755))
 			contents = []byte(`apiVersion: kubelet.config.k8s.io/v1beta1
@@ -164,7 +163,7 @@ featureGates:
 				},
 			}
 			// This covers the case where the fields within the map are overridden.
-			overrides := map[string]bool{"DisableKubeletCloudCredentialProviders": true, "PodAndContainerStatsFromCRI": false, "DynamicResourceAllocation": true}
+			overrides := map[string]bool{"PodAndContainerStatsFromCRI": false, "DynamicResourceAllocation": true}
 			// In some CI jobs, `NodeSwap` is explicitly disabled as the images are cgroupv1 based,
 			// so such flags should be picked up directly from the initial configuration
 			if _, ok := initialConfig.FeatureGates["NodeSwap"]; ok {
