@@ -159,7 +159,7 @@ func TestHealthCheckerStart(t *testing.T) {
 			time.Sleep(2 * interval)
 
 			// Check logs to verify the health check ran
-			logs := tCtx.Logger().GetSink().(ktesting.Underlier).GetBuffer().String()
+			logs := retrieveTestLoggerBuffer(tCtx)
 			for _, expectedLog := range tt.expectedLogs {
 				if !strings.Contains(logs, expectedLog) {
 					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
@@ -167,4 +167,19 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 		})
 	}
+}
+
+// retrieveTestLoggerBuffer extracts and returns the log buffer content as a string from the given test context.
+func retrieveTestLoggerBuffer(tCtx ktesting.TContext) string {
+	logger := tCtx.Logger()
+
+	// Retrieve the logger's output destination (sink)
+	sink := logger.GetSink()
+	underlyingSink, ok := sink.(ktesting.Underlier)
+	if !ok {
+		return ""
+	}
+
+	// grants access to the in-memory copy of the log entries.
+	return underlyingSink.GetBuffer().String()
 }
