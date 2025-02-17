@@ -4346,8 +4346,12 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
+
 		key := resourceName.String()
-		podSpecRequests := spec.Resources.Requests[core.ResourceName(key)]
+		podSpecRequests, exists := spec.Resources.Requests[core.ResourceName(key)]
+		if !exists {
+			continue
+		}
 
 		fldPath := reqPath.Key(key)
 		if ctrReqs.Cmp(podSpecRequests) > 0 {
