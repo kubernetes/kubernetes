@@ -419,7 +419,7 @@ var _ = SIGDescribe("Deployment", func() {
 					return found, nil
 				}
 			default:
-				framework.Logf("observed event type %v", event.Type)
+				framework.Logf("observed event type %#v", event)
 			}
 			return false, nil
 		})
