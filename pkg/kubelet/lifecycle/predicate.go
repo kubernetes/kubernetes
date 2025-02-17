@@ -136,6 +136,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
 
+	klog.InfoS("predicateAdmitHandler: INITIAL: %+#v", nodeInfo.Allocatable)
+
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
@@ -156,6 +158,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// not fail admission while it should. This issue will be addressed with
 	// the Resource Class API in the future.
 	podWithoutMissingExtendedResources := removeMissingExtendedResources(admitPod, nodeInfo)
+
+	klog.InfoS("predicateAdmitHandler: PROCESS: %+#v", nodeInfo.Allocatable)
 
 	reasons := generalFilter(podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0

@@ -942,7 +942,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			e2eskipper.Skipf("Skipping since CgroupV2 not used")
 		}
 		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-		if cpuAlloc < 1 {
+		if cpuAlloc < 1 { // save expensive kubelet restart
 			e2eskipper.Skipf("Skipping since not enough allocatable CPU got %d required 1", cpuAlloc)
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
@@ -954,6 +954,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f) // seems related to https://github.com/kubernetes/kubernetes/issues/129078
 		runCfsQuotaGuPods(ctx, f, true, cpuAlloc)
 	})
 
@@ -962,7 +963,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			e2eskipper.Skipf("Skipping since CgroupV2 not used")
 		}
 		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-		if cpuAlloc < 1 {
+		if cpuAlloc < 1 { // save expensive kubelet restart
 			e2eskipper.Skipf("Skipping since not enough allocatable CPU got %d required 1", cpuAlloc)
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
@@ -975,6 +976,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		updateKubeletConfig(ctx, f, newCfg, true)
 
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f) // seems related to https://github.com/kubernetes/kubernetes/issues/129078
 		runCfsQuotaGuPods(ctx, f, false, cpuAlloc)
 	})
 
