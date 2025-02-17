@@ -391,6 +391,10 @@ func autoConvert_v1beta1_AllocatedDeviceStatus_To_resource_AllocatedDeviceStatus
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resource.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 
@@ -406,6 +410,10 @@ func autoConvert_resource_AllocatedDeviceStatus_To_v1beta1_AllocatedDeviceStatus
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resourcev1beta1.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 
@@ -443,6 +451,10 @@ func Convert_resource_AllocationResult_To_v1beta1_AllocationResult(in *resource.
 func autoConvert_v1beta1_BasicDevice_To_resource_BasicDevice(in *resourcev1beta1.BasicDevice, out *resource.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[resource.QualifiedName]resource.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[resource.QualifiedName]resource.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 
@@ -454,6 +466,10 @@ func Convert_v1beta1_BasicDevice_To_resource_BasicDevice(in *resourcev1beta1.Bas
 func autoConvert_resource_BasicDevice_To_v1beta1_BasicDevice(in *resource.BasicDevice, out *resourcev1beta1.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 

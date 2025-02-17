@@ -19,6 +19,7 @@ package api
 import (
 	"unique"
 
+	v1beta1 "k8s.io/api/resource/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -43,5 +44,11 @@ func Convert_string_To_api_UniqueString(in *string, out *UniqueString, s convers
 		return nil
 	}
 	*out = UniqueString(unique.Make(*in))
+	return nil
+}
+
+func Convert_api_Device_To_v1beta1_Device(in *Device, out *v1beta1.Device, s conversion.Scope) error {
+	Convert_api_UniqueString_To_string(&in.Name, &out.Name, s)
+	autoConvert_api_BasicDevice_To_v1beta1_BasicDevice(in.Basic, out.Basic, s)
 	return nil
 }

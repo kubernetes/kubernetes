@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
@@ -26,12 +27,16 @@ import (
 // AllocatedDeviceStatusApplyConfiguration represents a declarative configuration of the AllocatedDeviceStatus type for use
 // with apply.
 type AllocatedDeviceStatusApplyConfiguration struct {
-	Driver      *string                              `json:"driver,omitempty"`
-	Pool        *string                              `json:"pool,omitempty"`
-	Device      *string                              `json:"device,omitempty"`
-	Conditions  []v1.ConditionApplyConfiguration     `json:"conditions,omitempty"`
-	Data        *runtime.RawExtension                `json:"data,omitempty"`
-	NetworkData *NetworkDeviceDataApplyConfiguration `json:"networkData,omitempty"`
+	Driver                   *string                              `json:"driver,omitempty"`
+	Pool                     *string                              `json:"pool,omitempty"`
+	Device                   *string                              `json:"device,omitempty"`
+	Conditions               []v1.ConditionApplyConfiguration     `json:"conditions,omitempty"`
+	Data                     *runtime.RawExtension                `json:"data,omitempty"`
+	NetworkData              *NetworkDeviceDataApplyConfiguration `json:"networkData,omitempty"`
+	UsageRestrictedToNode    *bool                                `json:"usageRestrictedToNode,omitempty"`
+	BindingConditions        []string                             `json:"bindingConditions,omitempty"`
+	BindingFailureConditions []string                             `json:"bindingFailureConditions,omitempty"`
+	BindingTimeout           *metav1.Duration                     `json:"bindingTimeout,omitempty"`
 }
 
 // AllocatedDeviceStatusApplyConfiguration constructs a declarative configuration of the AllocatedDeviceStatus type for use with
@@ -90,5 +95,41 @@ func (b *AllocatedDeviceStatusApplyConfiguration) WithData(value runtime.RawExte
 // If called multiple times, the NetworkData field is set to the value of the last call.
 func (b *AllocatedDeviceStatusApplyConfiguration) WithNetworkData(value *NetworkDeviceDataApplyConfiguration) *AllocatedDeviceStatusApplyConfiguration {
 	b.NetworkData = value
+	return b
+}
+
+// WithUsageRestrictedToNode sets the UsageRestrictedToNode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UsageRestrictedToNode field is set to the value of the last call.
+func (b *AllocatedDeviceStatusApplyConfiguration) WithUsageRestrictedToNode(value bool) *AllocatedDeviceStatusApplyConfiguration {
+	b.UsageRestrictedToNode = &value
+	return b
+}
+
+// WithBindingConditions adds the given value to the BindingConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingConditions field.
+func (b *AllocatedDeviceStatusApplyConfiguration) WithBindingConditions(values ...string) *AllocatedDeviceStatusApplyConfiguration {
+	for i := range values {
+		b.BindingConditions = append(b.BindingConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingFailureConditions adds the given value to the BindingFailureConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingFailureConditions field.
+func (b *AllocatedDeviceStatusApplyConfiguration) WithBindingFailureConditions(values ...string) *AllocatedDeviceStatusApplyConfiguration {
+	for i := range values {
+		b.BindingFailureConditions = append(b.BindingFailureConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingTimeout sets the BindingTimeout field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BindingTimeout field is set to the value of the last call.
+func (b *AllocatedDeviceStatusApplyConfiguration) WithBindingTimeout(value metav1.Duration) *AllocatedDeviceStatusApplyConfiguration {
+	b.BindingTimeout = &value
 	return b
 }

@@ -392,6 +392,10 @@ func autoConvert_v1alpha3_AllocatedDeviceStatus_To_resource_AllocatedDeviceStatu
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resource.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 
@@ -407,6 +411,10 @@ func autoConvert_resource_AllocatedDeviceStatus_To_v1alpha3_AllocatedDeviceStatu
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.Data = in.Data
 	out.NetworkData = (*resourcev1alpha3.NetworkDeviceData)(unsafe.Pointer(in.NetworkData))
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 
@@ -456,6 +464,10 @@ func autoConvert_v1alpha3_BasicDevice_To_resource_BasicDevice(in *resourcev1alph
 	} else {
 		out.Capacity = nil
 	}
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 
@@ -479,6 +491,10 @@ func autoConvert_resource_BasicDevice_To_v1alpha3_BasicDevice(in *resource.Basic
 	} else {
 		out.Capacity = nil
 	}
+	out.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeout = (*v1.Duration)(unsafe.Pointer(in.BindingTimeout))
 	return nil
 }
 

@@ -43,6 +43,21 @@ func (in *AllocatedDeviceStatus) DeepCopyInto(out *AllocatedDeviceStatus) {
 		*out = new(NetworkDeviceData)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.BindingConditions != nil {
+		in, out := &in.BindingConditions, &out.BindingConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingFailureConditions != nil {
+		in, out := &in.BindingFailureConditions, &out.BindingFailureConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingTimeout != nil {
+		in, out := &in.BindingTimeout, &out.BindingTimeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 
@@ -94,6 +109,21 @@ func (in *BasicDevice) DeepCopyInto(out *BasicDevice) {
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}
+	}
+	if in.BindingConditions != nil {
+		in, out := &in.BindingConditions, &out.BindingConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingFailureConditions != nil {
+		in, out := &in.BindingFailureConditions, &out.BindingFailureConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingTimeout != nil {
+		in, out := &in.BindingTimeout, &out.BindingTimeout
+		*out = new(v1.Duration)
+		**out = **in
 	}
 	return
 }

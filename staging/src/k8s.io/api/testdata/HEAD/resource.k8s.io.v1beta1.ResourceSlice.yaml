@@ -42,9 +42,15 @@ spec:
           int: 2
           string: stringValue
           version: versionValue
+      bindingConditions:
+      - bindingConditionsValue
+      bindingFailureConditions:
+      - bindingFailureConditionsValue
+      bindingTimeout: 1ns
       capacity:
         capacityKey:
           value: "0"
+      usageRestrictedToNode: true
     name: nameValue
   driver: driverValue
   nodeName: nodeNameValue

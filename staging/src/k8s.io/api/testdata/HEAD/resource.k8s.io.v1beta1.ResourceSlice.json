@@ -92,7 +92,15 @@
             "capacityKey": {
               "value": "0"
             }
-          }
+          },
+          "usageRestrictedToNode": true,
+          "bindingConditions": [
+            "bindingConditionsValue"
+          ],
+          "bindingFailureConditions": [
+            "bindingFailureConditionsValue"
+          ],
+          "bindingTimeout": "1ns"
         }
       }
     ]

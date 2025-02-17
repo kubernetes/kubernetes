@@ -229,6 +229,14 @@ const (
 	// status from DRA drivers.
 	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
 
+	// owner: @KobayashiD27
+	// kep: http://kep.k8s.io/5007
+	// alpha: v1.33
+	//
+	// Enables support for the ResourceClaim.status.devices.FabricAttached field and for setting this
+	// status from DRA drivers.
+	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
+
 	// owner: @lauralorenz
 	// kep: https://kep.k8s.io/4603
 	//
