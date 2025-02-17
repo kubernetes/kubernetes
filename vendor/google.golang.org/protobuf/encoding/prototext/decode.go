@@ -185,7 +185,7 @@ func (d decoder) unmarshalMessage(m protoreflect.Message, checkDelims bool) erro
 		} else if xtErr != nil && xtErr != protoregistry.NotFound {
 			return d.newError(tok.Pos(), "unable to resolve [%s]: %v", tok.RawString(), xtErr)
 		}
-		if flags.ProtoLegacy {
+		if flags.ProtoLegacyWeak {
 			if fd != nil && fd.IsWeak() && fd.Message().IsPlaceholder() {
 				fd = nil // reset since the weak reference is not linked in
 			}

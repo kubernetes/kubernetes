@@ -76,7 +76,7 @@ func fieldInfoForOneof(fd protoreflect.FieldDescriptor, fs reflect.StructField, 
 	isMessage := fd.Message() != nil
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		// NOTE: The logic below intentionally assumes that oneof fields are
 		// well-formatted. That is, the oneof interface never contains a
@@ -152,7 +152,7 @@ func fieldInfoForMap(fd protoreflect.FieldDescriptor, fs reflect.StructField, x 
 	conv := NewConverter(ft, fd)
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
@@ -205,7 +205,7 @@ func fieldInfoForList(fd protoreflect.FieldDescriptor, fs reflect.StructField, x
 	conv := NewConverter(reflect.PtrTo(ft), fd)
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
@@ -256,6 +256,7 @@ func fieldInfoForScalar(fd protoreflect.FieldDescriptor, fs reflect.StructField,
 	ft := fs.Type
 	nullable := fd.HasPresence()
 	isBytes := ft.Kind() == reflect.Slice && ft.Elem().Kind() == reflect.Uint8
+	var getter func(p pointer) protoreflect.Value
 	if nullable {
 		if ft.Kind() != reflect.Ptr && ft.Kind() != reflect.Slice {
 			// This never occurs for generated message types.
@@ -268,19 +269,25 @@ func fieldInfoForScalar(fd protoreflect.FieldDescriptor, fs reflect.StructField,
 		}
 	}
 	conv := NewConverter(ft, fd)
+	fieldOffset := offsetOf(fs)
 
-	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	// Generate specialized getter functions to avoid going through reflect.Value
+	if nullable {
+		getter = getterForNullableScalar(fd, fs, conv, fieldOffset)
+	} else {
+		getter = getterForDirectScalar(fd, fs, conv, fieldOffset)
+	}
+
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
 			if p.IsNil() {
 				return false
 			}
-			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
 			if nullable {
-				return !rv.IsNil()
+				return !p.Apply(fieldOffset).Elem().IsNil()
 			}
+			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
 			switch rv.Kind() {
 			case reflect.Bool:
 				return rv.Bool()
@@ -300,21 +307,8 @@ func fieldInfoForScalar(fd protoreflect.FieldDescriptor, fs reflect.StructField,
 			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
 			rv.Set(reflect.Zero(rv.Type()))
 		},
-		get: func(p pointer) protoreflect.Value {
-			if p.IsNil() {
-				return conv.Zero()
-			}
-			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
-			if nullable {
-				if rv.IsNil() {
-					return conv.Zero()
-				}
-				if rv.Kind() == reflect.Ptr {
-					rv = rv.Elem()
-				}
-			}
-			return conv.PBValueOf(rv)
-		},
+		get: getter,
+		// TODO: Implement unsafe fast path for set?
 		set: func(p pointer, v protoreflect.Value) {
 			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
 			if nullable && rv.Kind() == reflect.Ptr {
@@ -339,7 +333,7 @@ func fieldInfoForScalar(fd protoreflect.FieldDescriptor, fs reflect.StructField,
 }
 
 func fieldInfoForWeakMessage(fd protoreflect.FieldDescriptor, weakOffset offset) fieldInfo {
-	if !flags.ProtoLegacy {
+	if !flags.ProtoLegacyWeak {
 		panic("no support for proto1 weak fields")
 	}
 
@@ -416,7 +410,7 @@ func fieldInfoForMessage(fd protoreflect.FieldDescriptor, fs reflect.StructField
 	conv := NewConverter(ft, fd)
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
@@ -425,7 +419,7 @@ func fieldInfoForMessage(fd protoreflect.FieldDescriptor, fs reflect.StructField
 			}
 			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
 			if fs.Type.Kind() != reflect.Ptr {
-				return !isZero(rv)
+				return !rv.IsZero()
 			}
 			return !rv.IsNil()
 		},
@@ -472,7 +466,7 @@ func makeOneofInfo(od protoreflect.OneofDescriptor, si structInfo, x exporter) *
 	oi := &oneofInfo{oneofDesc: od}
 	if od.IsSynthetic() {
 		fs := si.fieldsByNumber[od.Fields().Get(0).Number()]
-		fieldOffset := offsetOf(fs, x)
+		fieldOffset := offsetOf(fs)
 		oi.which = func(p pointer) protoreflect.FieldNumber {
 			if p.IsNil() {
 				return 0
@@ -485,7 +479,7 @@ func makeOneofInfo(od protoreflect.OneofDescriptor, si structInfo, x exporter) *
 		}
 	} else {
 		fs := si.oneofsByName[od.Name()]
-		fieldOffset := offsetOf(fs, x)
+		fieldOffset := offsetOf(fs)
 		oi.which = func(p pointer) protoreflect.FieldNumber {
 			if p.IsNil() {
 				return 0
@@ -502,42 +496,4 @@ func makeOneofInfo(od protoreflect.OneofDescriptor, si structInfo, x exporter) *
 		}
 	}
 	return oi
-}
-
-// isZero is identical to reflect.Value.IsZero.
-// TODO: Remove this when Go1.13 is the minimally supported Go version.
-func isZero(v reflect.Value) bool {
-	switch v.Kind() {
-	case reflect.Bool:
-		return !v.Bool()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.Int() == 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return v.Uint() == 0
-	case reflect.Float32, reflect.Float64:
-		return math.Float64bits(v.Float()) == 0
-	case reflect.Complex64, reflect.Complex128:
-		c := v.Complex()
-		return math.Float64bits(real(c)) == 0 && math.Float64bits(imag(c)) == 0
-	case reflect.Array:
-		for i := 0; i < v.Len(); i++ {
-			if !isZero(v.Index(i)) {
-				return false
-			}
-		}
-		return true
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
-		return v.IsNil()
-	case reflect.String:
-		return v.Len() == 0
-	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			if !isZero(v.Field(i)) {
-				return false
-			}
-		}
-		return true
-	default:
-		panic(&reflect.ValueError{Method: "reflect.Value.IsZero", Kind: v.Kind()})
-	}
 }

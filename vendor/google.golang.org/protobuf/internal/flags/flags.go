@@ -22,3 +22,8 @@ const ProtoLegacy = protoLegacy
 // extension fields at unmarshal time, but defers creating the message
 // structure until the extension is first accessed.
 const LazyUnmarshalExtensions = ProtoLegacy
+
+// ProtoLegacyWeak specifies whether to enable support for weak fields.
+// This flag was split out of ProtoLegacy in preparation for removing
+// support for weak fields (independent of the other protolegacy features).
+const ProtoLegacyWeak = ProtoLegacy

@@ -15,10 +15,12 @@
       "enabled": true
     },
     {
-      "matchFileNames": ["internal/tools/**"],
-      "matchManagers": ["gomod"],
-      "matchDepTypes": ["indirect"],
-      "enabled": false
+      "matchPackageNames": ["google.golang.org/genproto/googleapis/**"],
+      "groupName": "googleapis"
+    },
+    {
+      "matchPackageNames": ["golang.org/x/**"],
+      "groupName": "golang.org/x"
     }
   ]
 }

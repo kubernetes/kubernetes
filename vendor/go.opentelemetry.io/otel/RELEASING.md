@@ -69,6 +69,7 @@ Update go.mod for submodules to depend on the new release which will happen in t
        ```
 
    - Move all the `Unreleased` changes into a new section following the title scheme (`[<new tag>] - <date of release>`).
+   - Make sure the new section is under the comment for released section, like `<!-- Released section -->`, so it is protected from being overwritten in the future.
    - Update all the appropriate links at the bottom.
 
 4. Push the changes to upstream and create a Pull Request on GitHub.
@@ -110,17 +111,6 @@ It is critical you make sure the version you push upstream is correct.
 Finally create a Release for the new `<new tag>` on GitHub.
 The release body should include all the release notes from the Changelog for this release.
 
-## Verify Examples
-
-After releasing verify that examples build outside of the repository.
-
-```
-./verify_examples.sh
-```
-
-The script copies examples into a different directory removes any `replace` declarations in `go.mod` and builds them.
-This ensures they build with the published release, not the local copy.
-
 ## Post-Release
 
 ### Contrib Repository
@@ -140,6 +130,6 @@ Importantly, bump any package versions referenced to be the latest one you just 
 
 Bump the dependencies in the following Go services:
 
-- [`accountingservice`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/accountingservice)
-- [`checkoutservice`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/checkoutservice)
-- [`productcatalogservice`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/productcatalogservice)
+- [`accounting`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/accounting)
+- [`checkoutservice`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/checkout)
+- [`productcatalogservice`](https://github.com/open-telemetry/opentelemetry-demo/tree/main/src/product-catalog)
