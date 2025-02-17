@@ -19,12 +19,17 @@ package options
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgofeaturegate "k8s.io/client-go/features"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
@@ -193,4 +198,70 @@ func TestValidateKubeletFlags(t *testing.T) {
 		})
 	}
 
+}
+
+func TestWatchListClientFlagUsage(t *testing.T) {
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	kubeletFlags := NewKubeletFlags()
+	kubeletFlags.AddFlags(fs)
+
+	kubeletConfig, err := NewKubeletConfiguration()
+	if err != nil {
+		t.Fatal(err)
+	}
+	AddKubeletConfigFlags(fs, kubeletConfig)
+
+	assertWatchListClientFeatureDefaultValue(t)
+	assertWatchListCommandLineDefaultValue(t, fs)
+}
+
+func TestWatchListClientFlagChange(t *testing.T) {
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	kubeletFlags := NewKubeletFlags()
+	kubeletFlags.AddFlags(fs)
+
+	kubeletConfig, err := NewKubeletConfiguration()
+	if err != nil {
+		t.Fatal(err)
+	}
+	AddKubeletConfigFlags(fs, kubeletConfig)
+
+	assertWatchListClientFeatureDefaultValue(t)
+	assertWatchListCommandLineDefaultValue(t, fs)
+
+	args := []string{fmt.Sprintf("--feature-gates=%v=false", clientgofeaturegate.WatchListClient)}
+	if err := fs.Parse(args); err != nil {
+		t.Fatal(fmt.Errorf("FlatSet.Parse failed with %w", err))
+	}
+
+	// this is needed so that the DefaultFeatureGate values can be set via the flag.
+	// in fact, this is how Kubelet sets the state of the FG.
+	for f, v := range kubeletConfig.FeatureGates {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(f), v)
+	}
+
+	watchListClientValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
+	if watchListClientValue {
+		t.Fatalf("expected %q feature gate to be disabled after setting the command line flag", clientgofeaturegate.WatchListClient)
+	}
+}
+
+func assertWatchListClientFeatureDefaultValue(t *testing.T) {
+	watchListClientDefaultValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
+	if !watchListClientDefaultValue {
+		t.Fatalf("expected %q feature gate to be enabled for kubelet", clientgofeaturegate.WatchListClient)
+	}
+}
+
+func assertWatchListCommandLineDefaultValue(t *testing.T, fs *pflag.FlagSet) {
+	fgFlagName := "feature-gates"
+	fg := fs.Lookup(fgFlagName)
+	if fg == nil {
+		t.Fatalf("didn't find %q flag", fgFlagName)
+	}
+
+	expectedWatchListClientString := "WatchListClient=true|false (BETA - default=true)"
+	if !strings.Contains(fg.Usage, expectedWatchListClientString) {
+		t.Fatalf("%q flag doesn't contain the expected usage for %v feature gate.\nExpected = %v\nUsage = %v", fgFlagName, clientgofeaturegate.WatchListClient, expectedWatchListClientString, fg.Usage)
+	}
 }
