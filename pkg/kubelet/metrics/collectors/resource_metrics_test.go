@@ -17,7 +17,6 @@ limitations under the License.
 package collectors
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	summaryprovidertest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestCollectResourceMetrics(t *testing.T) {
@@ -404,7 +404,7 @@ func TestCollectResourceMetrics(t *testing.T) {
 	for _, test := range tests {
 		tc := test
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			provider := summaryprovidertest.NewMockSummaryProvider(t)
 			provider.EXPECT().GetCPUAndMemoryStats(ctx).Return(tc.summary, tc.summaryErr).Maybe()
 			collector := NewResourceMetricsCollector(provider)
