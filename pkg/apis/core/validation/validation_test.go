@@ -8279,6 +8279,8 @@ func TestValidateEphemeralContainers(t *testing.T) {
 func TestValidateWindowsPodSecurityContext(t *testing.T) {
 	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: ptr.To("dummy")}}
 	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
+	invalidWindowsSC2 := &core.PodSecurityContext{SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyStrict)}
+
 	cases := map[string]struct {
 		podSec      *core.PodSpec
 		expectErr   bool
@@ -8289,8 +8291,14 @@ func TestValidateWindowsPodSecurityContext(t *testing.T) {
 			podSec:    &core.PodSpec{SecurityContext: validWindowsSC},
 			expectErr: false,
 		},
-		"invalid SC, windows, error": {
+		"invalid SC(by SELinuxOptions), windows, error": {
 			podSec:      &core.PodSpec{SecurityContext: invalidWindowsSC},
+			errorType:   "FieldValueForbidden",
+			errorDetail: "cannot be set for a windows pod",
+			expectErr:   true,
+		},
+		"invalid SC(by SupplementalGroupsPolicy), windows, error": {
+			podSec:      &core.PodSpec{SecurityContext: invalidWindowsSC2},
 			errorType:   "FieldValueForbidden",
 			errorDetail: "cannot be set for a windows pod",
 			expectErr:   true,
@@ -10097,6 +10105,9 @@ func TestValidatePodSpec(t *testing.T) {
 	goodfsGroupChangePolicy := core.FSGroupChangeAlways
 	badfsGroupChangePolicy1 := core.PodFSGroupChangePolicy("invalid")
 	badfsGroupChangePolicy2 := core.PodFSGroupChangePolicy("")
+	goodSupplementalGroupsPolicy := core.SupplementalGroupsPolicyStrict
+	badSupplementalGroupsPolicy1 := core.SupplementalGroupsPolicy("invalid")
+	badSupplementalGroupsPolicy2 := core.SupplementalGroupsPolicy("")
 
 	successCases := map[string]*core.Pod{
 		"populate basic fields, leave defaults for most": podtest.MakePod(""),
@@ -10204,6 +10215,11 @@ func TestValidatePodSpec(t *testing.T) {
 			podtest.SetContainers(podtest.MakeContainer("ctr", podtest.SetContainerResizePolicy(
 				core.ContainerResizePolicy{ResourceName: "cpu", RestartPolicy: "NotRequired"}),
 			)),
+		),
+		"populate SupplementalGroupsPolicy": podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SupplementalGroupsPolicy: &goodSupplementalGroupsPolicy,
+			}),
 		),
 	}
 	for k, v := range successCases {
@@ -10342,6 +10358,16 @@ func TestValidatePodSpec(t *testing.T) {
 		"bad invalid fsgroupchangepolicy": *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				FSGroupChangePolicy: &badfsGroupChangePolicy1,
+			}),
+		),
+		"bad empty SupplementalGroupsPolicy": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SupplementalGroupsPolicy: &badSupplementalGroupsPolicy2,
+			}),
+		),
+		"bad invalid SupplementalGroupsPolicy": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				SupplementalGroupsPolicy: &badSupplementalGroupsPolicy1,
 			}),
 		),
 	}
@@ -14745,6 +14771,253 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		"",
 		"qosClass no change",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"nil containerUser in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"empty containerUser in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                0,
+								GID:                0,
+								SupplementalGroups: []int64{0, 100},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"containerUser with valid ids in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                -1,
+								GID:                -1,
+								SupplementalGroups: []int64{-1},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		`status.containerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.containerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.containerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
+		"containerUser with invalid uids/gids/supplementalGroups in containerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+		),
+		`status.containerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		"containerUser cannot be set for windows pod in containerStatuses",
+	}, {
+
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"nil containerUser in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"empty containerUser in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                0,
+								GID:                0,
+								SupplementalGroups: []int64{0, 100},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"containerUser with valid ids in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                -1,
+								GID:                -1,
+								SupplementalGroups: []int64{-1},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		`status.initContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.initContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.initContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
+		"containerUser with invalid uids/gids/supplementalGroups in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetInitContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+		),
+		`status.initContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		"containerUser cannot be set for windows pod in initContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"nil containerUser in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"empty containerUser in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                0,
+								GID:                0,
+								SupplementalGroups: []int64{0, 100},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"containerUser with valid ids in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID:                -1,
+								GID:                -1,
+								SupplementalGroups: []int64{-1},
+							},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo"),
+		`status.ephemeralContainerStatuses[0].user.linux.uid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.ephemeralContainerStatuses[0].user.linux.gid: Invalid value: -1: must be between 0 and 2147483647, inclusive` +
+			`, status.ephemeralContainerStatuses[0].user.linux.supplementalGroups[0]: Invalid value: -1: must be between 0 and 2147483647, inclusive`,
+		"containerUser with invalid uids/gids/supplementalGroups in ephemeralContainerStatuses",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{},
+						},
+					}),
+				),
+			),
+		),
+		*podtest.MakePod("foo",
+			podtest.SetOS(core.Windows),
+		),
+		`status.ephemeralContainerStatuses[0].user.linux: Forbidden: cannot be set for a windows pod`,
+		"containerUser cannot be set for windows pod in ephemeralContainerStatuses",
 	},
 	}
 
@@ -25553,221 +25826,6 @@ func TestValidatePodDNSConfigWithRelaxedSearchDomain(t *testing.T) {
 	}
 }
 
-// TODO: merge these test to TestValidatePodSpec after SupplementalGroupsPolicy feature graduates to Beta
-func TestValidatePodSpecWithSupplementalGroupsPolicy(t *testing.T) {
-	fldPath := field.NewPath("spec")
-	badSupplementalGroupsPolicyEmpty := ptr.To(core.SupplementalGroupsPolicy(""))
-	badSupplementalGroupsPolicyNotSupported := ptr.To(core.SupplementalGroupsPolicy("not-supported"))
-
-	validatePodSpecTestCases := map[string]struct {
-		securityContext *core.PodSecurityContext
-		wantFieldErrors field.ErrorList
-	}{
-		"nil SecurityContext is valid": {
-			securityContext: nil,
-		},
-		"nil SupplementalGroupsPolicy is valid": {
-			securityContext: &core.PodSecurityContext{},
-		},
-		"SupplementalGroupsPolicyMerge is valid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
-			},
-		},
-		"SupplementalGroupsPolicyStrict is valid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyStrict),
-			},
-		},
-		"empty SupplementalGroupsPolicy is invalid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: badSupplementalGroupsPolicyEmpty,
-			},
-			wantFieldErrors: field.ErrorList{
-				field.NotSupported(
-					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
-					badSupplementalGroupsPolicyEmpty, sets.List(validSupplementalGroupsPolicies)),
-			},
-		},
-		"not-supported SupplementalGroupsPolicy is invalid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: badSupplementalGroupsPolicyNotSupported,
-			},
-			wantFieldErrors: field.ErrorList{
-				field.NotSupported(
-					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
-					badSupplementalGroupsPolicyNotSupported, sets.List(validSupplementalGroupsPolicies)),
-			},
-		},
-	}
-	for name, tt := range validatePodSpecTestCases {
-		t.Run(name, func(t *testing.T) {
-			podSpec := podtest.MakePodSpec(podtest.SetSecurityContext(tt.securityContext), podtest.SetContainers(podtest.MakeContainer("con")))
-
-			if tt.wantFieldErrors == nil {
-				tt.wantFieldErrors = field.ErrorList{}
-			}
-			errs := ValidatePodSpec(&podSpec, nil, fldPath, PodValidationOptions{})
-			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
-				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-// TODO: merge these testcases to TestValidateWindowsPodSecurityContext after SupplementalGroupsPolicy feature graduates to Beta
-func TestValidateWindowsPodSecurityContextSupplementalGroupsPolicy(t *testing.T) {
-	fldPath := field.NewPath("spec")
-
-	testCases := map[string]struct {
-		securityContext *core.PodSecurityContext
-		wantFieldErrors field.ErrorList
-	}{
-		"nil SecurityContext is valid": {
-			securityContext: nil,
-		},
-		"nil SupplementalGroupdPolicy is valid": {
-			securityContext: &core.PodSecurityContext{},
-		},
-		"non-empty SupplementalGroupdPolicy is invalid": {
-			securityContext: &core.PodSecurityContext{
-				SupplementalGroupsPolicy: ptr.To(core.SupplementalGroupsPolicyMerge),
-			},
-			wantFieldErrors: field.ErrorList{
-				field.Forbidden(
-					fldPath.Child("securityContext").Child("supplementalGroupsPolicy"),
-					"cannot be set for a windows pod"),
-			},
-		},
-	}
-
-	for name, tt := range testCases {
-		t.Run(name, func(t *testing.T) {
-			podSpec := podtest.MakePodSpec(podtest.SetSecurityContext(tt.securityContext), podtest.SetOS(core.Windows), podtest.SetContainers(podtest.MakeContainer("con")))
-			if tt.wantFieldErrors == nil {
-				tt.wantFieldErrors = field.ErrorList{}
-			}
-			errs := validateWindows(&podSpec, fldPath)
-			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
-				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-// TODO: merge these testcases to TestValidatePodStatusUpdate after SupplementalGroupsPolicy feature graduates to Beta
-func TestValidatePodStatusUpdateWithSupplementalGroupsPolicy(t *testing.T) {
-	badUID := int64(-1)
-	badGID := int64(-1)
-
-	containerTypes := map[string]func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus){
-		"container": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
-			podStatus.ContainerStatuses = containerStatus
-		},
-		"initContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
-			podStatus.InitContainerStatuses = containerStatus
-		},
-		"ephemeralContainer": func(podStatus *core.PodStatus, containerStatus []core.ContainerStatus) {
-			podStatus.EphemeralContainerStatuses = containerStatus
-		},
-	}
-
-	testCases := map[string]struct {
-		podOSes           []*core.PodOS
-		containerStatuses []core.ContainerStatus
-		wantFieldErrors   field.ErrorList
-	}{
-		"nil container user is valid": {
-			podOSes:           []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{},
-		},
-		"empty container user is valid": {
-			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{},
-			}},
-		},
-		"container user with valid ids": {
-			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{
-					Linux: &core.LinuxContainerUser{},
-				},
-			}},
-		},
-		"container user with invalid ids": {
-			podOSes: []*core.PodOS{nil, {Name: core.Linux}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{
-					Linux: &core.LinuxContainerUser{
-						UID:                badUID,
-						GID:                badGID,
-						SupplementalGroups: []int64{badGID},
-					},
-				},
-			}},
-			wantFieldErrors: field.ErrorList{
-				field.Invalid(field.NewPath("[0].user.linux.uid"), badUID, "must be between 0 and 2147483647, inclusive"),
-				field.Invalid(field.NewPath("[0].user.linux.gid"), badGID, "must be between 0 and 2147483647, inclusive"),
-				field.Invalid(field.NewPath("[0].user.linux.supplementalGroups[0]"), badGID, "must be between 0 and 2147483647, inclusive"),
-			},
-		},
-		"user.linux must not be set in windows": {
-			podOSes: []*core.PodOS{{Name: core.Windows}},
-			containerStatuses: []core.ContainerStatus{{
-				User: &core.ContainerUser{
-					Linux: &core.LinuxContainerUser{},
-				},
-			}},
-			wantFieldErrors: field.ErrorList{
-				field.Forbidden(field.NewPath("[0].user.linux"), "cannot be set for a windows pod"),
-			},
-		},
-	}
-
-	for name, tt := range testCases {
-		for _, podOS := range tt.podOSes {
-			for containerType, setContainerStatuses := range containerTypes {
-				t.Run(fmt.Sprintf("[podOS=%v][containerType=%s] %s", podOS, containerType, name), func(t *testing.T) {
-					oldPod := &core.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "foo",
-							ResourceVersion: "1",
-						},
-						Spec: core.PodSpec{
-							OS: podOS,
-						},
-						Status: core.PodStatus{},
-					}
-					newPod := &core.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "foo",
-							ResourceVersion: "1",
-						},
-						Spec: core.PodSpec{
-							OS: podOS,
-						},
-					}
-					setContainerStatuses(&newPod.Status, tt.containerStatuses)
-					var expectedFieldErrors field.ErrorList
-					for _, err := range tt.wantFieldErrors {
-						expectedField := fmt.Sprintf("%s%s", field.NewPath("status").Child(containerType+"Statuses"), err.Field)
-						expectedFieldErrors = append(expectedFieldErrors, &field.Error{
-							Type:     err.Type,
-							Field:    expectedField,
-							BadValue: err.BadValue,
-							Detail:   err.Detail,
-						})
-					}
-					errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
-					if diff := cmp.Diff(expectedFieldErrors, errs); diff != "" {
-						t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-					}
-				})
-			}
-		}
-	}
-}
 func TestValidateContainerStatusNoAllocatedResourcesStatus(t *testing.T) {
 	containerStatuses := []core.ContainerStatus{
 		{
