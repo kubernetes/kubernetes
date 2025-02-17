@@ -17,10 +17,8 @@ limitations under the License.
 package filesystem
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -85,15 +83,12 @@ func (fs *DefaultFs) MkdirAll(path string, perm os.FileMode) error {
 // (similar to symlink) and do not represent actual directory. Hence Directory existence
 // check for windows NTFS will NOT check for dir, but for symlink presence.
 func MkdirAllWithPathCheck(path string, perm os.FileMode) error {
-	if dir, err := os.Lstat(path); err == nil {
-		// If the path exists already,
-		// 1. for Unix/Linux OS, check if the path is directory.
-		// 2. for windows NTFS, check if the path is symlink instead of directory.
-		if dir.IsDir() ||
-			(runtime.GOOS == "windows" && (dir.Mode()&os.ModeSymlink != 0 || dir.Mode()&os.ModeIrregular != 0)) {
-			return nil
-		}
-		return fmt.Errorf("path %v exists but is not a directory", path)
+	valid, err := IsPathValidForMount(path)
+	if err != nil {
+		return err
+	}
+	if valid {
+		return nil
 	}
 	// If existence of path not known, attempt to create it.
 	if err := MkdirAll(path, perm); err != nil {
