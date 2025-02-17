@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -824,6 +825,10 @@ func TestSuccessPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
+			if !tc.enableBackoffLimitPerIndex {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableBackoffLimitPerIndex)
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -1023,89 +1028,6 @@ func TestBackoffLimitPerIndex_DelayedPodDeletion(t *testing.T) {
 		Terminating: ptr.To[int32](0),
 	})
 	validateJobComplete(ctx, t, clientSet, jobObj)
-}
-
-// TestBackoffLimitPerIndex_Reenabling tests handling of pod failures when
-// reenabling the BackoffLimitPerIndex feature.
-func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
-
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
-	closeFn, restConfig, clientSet, ns := setup(t, "backoff-limit-per-index-reenabled")
-	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
-	t.Cleanup(cancel)
-	resetMetrics()
-
-	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
-		Spec: batchv1.JobSpec{
-			Parallelism:          ptr.To[int32](3),
-			Completions:          ptr.To[int32](3),
-			BackoffLimitPerIndex: ptr.To[int32](0),
-			CompletionMode:       completionModePtr(batchv1.IndexedCompletion),
-		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to create Job: %v", err)
-	}
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      3,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 1, 2), "", ptr.To(""))
-
-	// First pod from index 0 failed
-	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, 0); err != nil {
-		t.Fatal("Failed trying to fail pod with index 0")
-	}
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      2,
-		Failed:      1,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(1, 2), "", ptr.To("0"))
-
-	// Disable the feature
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, false)
-
-	// First pod from index 1 failed
-	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, 1); err != nil {
-		t.Fatal("Failed trying to fail pod with index 1")
-	}
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      3,
-		Failed:      2,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 1, 2), "", nil)
-
-	// Reenable the feature
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
-
-	// First pod from index 2 failed
-	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
-		t.Fatal("Failed trying to fail pod with index 2")
-	}
-
-	// Verify the indexes 0 and 1 are active as the failed pods don't have
-	// finalizers at this point, so they are ignored.
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      2,
-		Failed:      3,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 1), "", ptr.To("2"))
-
-	// mark remaining pods are Succeeded and verify Job status
-	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
-		t.Fatalf("Failed setting phase %q on Job Pod: %v", v1.PodSucceeded, err)
-	}
-	validateJobFailed(ctx, t, clientSet, jobObj)
-	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 }
 
 // TestBackoffLimitPerIndex_JobPodsCreatedWithExponentialBackoff tests that the
@@ -3425,6 +3347,10 @@ func BenchmarkLargeIndexedJob(b *testing.B) {
 	for name, tc := range cases {
 		b.Run(name, func(b *testing.B) {
 			enableJobBackoffLimitPerIndex := tc.backoffLimitPerIndex != nil
+			if !enableJobBackoffLimitPerIndex {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(b, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(b, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
@@ -3512,6 +3438,10 @@ func BenchmarkLargeFailureHandling(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			enableJobBackoffLimitPerIndex := tc.backoffLimitPerIndex != nil
 			timeout := ptr.Deref(tc.customTimeout, wait.ForeverTestTimeout)
+			if !enableJobBackoffLimitPerIndex {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(b, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(b, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
