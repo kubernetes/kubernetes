@@ -70,7 +70,7 @@ func (c *criMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 // Collect implements the metrics.CollectWithStability interface.
 // TODO(haircommander): would it be better if these were processed async?
 func (c *criMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
 	podMetrics, err := c.listPodSandboxMetricsFn(ctx)
 	if err != nil {
