@@ -102,6 +102,9 @@ type ManagerImpl struct {
 	// init containers.
 	devicesToReuse PodReusableDevices
 
+	// devicesToReuseMutex is a mutex to protect the devicesToReuse map.
+	devicesToReuseMutex sync.Mutex
+
 	// containerMap provides a mapping from (pod, container) -> containerID
 	// for all containers in a pod. Used to detect pods running across a restart
 	containerMap containermap.ContainerMap
@@ -367,6 +370,8 @@ func (m *ManagerImpl) Stop() error {
 // Allocate is the call that you can use to allocate a set of devices
 // from the registered device plugins.
 func (m *ManagerImpl) Allocate(pod *v1.Pod, container *v1.Container) error {
+	m.devicesToReuseMutex.Lock()
+	defer m.devicesToReuseMutex.Unlock()
 	if _, ok := m.devicesToReuse[string(pod.UID)]; !ok {
 		m.devicesToReuse[string(pod.UID)] = make(map[string]sets.Set[string])
 	}
