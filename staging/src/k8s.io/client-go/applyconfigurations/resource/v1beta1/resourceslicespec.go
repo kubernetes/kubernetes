@@ -25,12 +25,15 @@ import (
 // ResourceSliceSpecApplyConfiguration represents a declarative configuration of the ResourceSliceSpec type for use
 // with apply.
 type ResourceSliceSpecApplyConfiguration struct {
-	Driver       *string                            `json:"driver,omitempty"`
-	Pool         *ResourcePoolApplyConfiguration    `json:"pool,omitempty"`
-	NodeName     *string                            `json:"nodeName,omitempty"`
-	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	AllNodes     *bool                              `json:"allNodes,omitempty"`
-	Devices      []DeviceApplyConfiguration         `json:"devices,omitempty"`
+	Driver                 *string                                `json:"driver,omitempty"`
+	Pool                   *ResourcePoolApplyConfiguration        `json:"pool,omitempty"`
+	NodeName               *string                                `json:"nodeName,omitempty"`
+	NodeSelector           *v1.NodeSelectorApplyConfiguration     `json:"nodeSelector,omitempty"`
+	AllNodes               *bool                                  `json:"allNodes,omitempty"`
+	Devices                []DeviceApplyConfiguration             `json:"devices,omitempty"`
+	PerDeviceNodeSelection *bool                                  `json:"perDeviceNodeSelection,omitempty"`
+	CapacityPools          []CapacityPoolApplyConfiguration       `json:"capacityPools,omitempty"`
+	Mixins                 *ResourceSliceMixinsApplyConfiguration `json:"mixins,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -89,5 +92,34 @@ func (b *ResourceSliceSpecApplyConfiguration) WithDevices(values ...*DeviceApply
 		}
 		b.Devices = append(b.Devices, *values[i])
 	}
+	return b
+}
+
+// WithPerDeviceNodeSelection sets the PerDeviceNodeSelection field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PerDeviceNodeSelection field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithPerDeviceNodeSelection(value bool) *ResourceSliceSpecApplyConfiguration {
+	b.PerDeviceNodeSelection = &value
+	return b
+}
+
+// WithCapacityPools adds the given value to the CapacityPools field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the CapacityPools field.
+func (b *ResourceSliceSpecApplyConfiguration) WithCapacityPools(values ...*CapacityPoolApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithCapacityPools")
+		}
+		b.CapacityPools = append(b.CapacityPools, *values[i])
+	}
+	return b
+}
+
+// WithMixins sets the Mixins field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Mixins field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithMixins(value *ResourceSliceMixinsApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
+	b.Mixins = value
 	return b
 }

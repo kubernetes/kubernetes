@@ -160,10 +160,150 @@ func (m *CELDeviceSelector) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_CELDeviceSelector proto.InternalMessageInfo
 
+func (m *CapacityPool) Reset()      { *m = CapacityPool{} }
+func (*CapacityPool) ProtoMessage() {}
+func (*CapacityPool) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{4}
+}
+func (m *CapacityPool) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CapacityPool) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *CapacityPool) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CapacityPool.Merge(m, src)
+}
+func (m *CapacityPool) XXX_Size() int {
+	return m.Size()
+}
+func (m *CapacityPool) XXX_DiscardUnknown() {
+	xxx_messageInfo_CapacityPool.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CapacityPool proto.InternalMessageInfo
+
+func (m *CapacityPoolMixin) Reset()      { *m = CapacityPoolMixin{} }
+func (*CapacityPoolMixin) ProtoMessage() {}
+func (*CapacityPoolMixin) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{5}
+}
+func (m *CapacityPoolMixin) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CapacityPoolMixin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *CapacityPoolMixin) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CapacityPoolMixin.Merge(m, src)
+}
+func (m *CapacityPoolMixin) XXX_Size() int {
+	return m.Size()
+}
+func (m *CapacityPoolMixin) XXX_DiscardUnknown() {
+	xxx_messageInfo_CapacityPoolMixin.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CapacityPoolMixin proto.InternalMessageInfo
+
+func (m *CapacityPoolMixinRef) Reset()      { *m = CapacityPoolMixinRef{} }
+func (*CapacityPoolMixinRef) ProtoMessage() {}
+func (*CapacityPoolMixinRef) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{6}
+}
+func (m *CapacityPoolMixinRef) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CapacityPoolMixinRef) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *CapacityPoolMixinRef) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CapacityPoolMixinRef.Merge(m, src)
+}
+func (m *CapacityPoolMixinRef) XXX_Size() int {
+	return m.Size()
+}
+func (m *CapacityPoolMixinRef) XXX_DiscardUnknown() {
+	xxx_messageInfo_CapacityPoolMixinRef.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CapacityPoolMixinRef proto.InternalMessageInfo
+
+func (m *CompositeDevice) Reset()      { *m = CompositeDevice{} }
+func (*CompositeDevice) ProtoMessage() {}
+func (*CompositeDevice) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{7}
+}
+func (m *CompositeDevice) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CompositeDevice) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *CompositeDevice) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompositeDevice.Merge(m, src)
+}
+func (m *CompositeDevice) XXX_Size() int {
+	return m.Size()
+}
+func (m *CompositeDevice) XXX_DiscardUnknown() {
+	xxx_messageInfo_CompositeDevice.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CompositeDevice proto.InternalMessageInfo
+
+func (m *CompositeDeviceMixin) Reset()      { *m = CompositeDeviceMixin{} }
+func (*CompositeDeviceMixin) ProtoMessage() {}
+func (*CompositeDeviceMixin) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{8}
+}
+func (m *CompositeDeviceMixin) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *CompositeDeviceMixin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *CompositeDeviceMixin) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompositeDeviceMixin.Merge(m, src)
+}
+func (m *CompositeDeviceMixin) XXX_Size() int {
+	return m.Size()
+}
+func (m *CompositeDeviceMixin) XXX_DiscardUnknown() {
+	xxx_messageInfo_CompositeDeviceMixin.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CompositeDeviceMixin proto.InternalMessageInfo
+
 func (m *Device) Reset()      { *m = Device{} }
 func (*Device) ProtoMessage() {}
 func (*Device) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{4}
+	return fileDescriptor_ba331e3ec6484c27, []int{9}
 }
 func (m *Device) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -191,7 +331,7 @@ var xxx_messageInfo_Device proto.InternalMessageInfo
 func (m *DeviceAllocationConfiguration) Reset()      { *m = DeviceAllocationConfiguration{} }
 func (*DeviceAllocationConfiguration) ProtoMessage() {}
 func (*DeviceAllocationConfiguration) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{5}
+	return fileDescriptor_ba331e3ec6484c27, []int{10}
 }
 func (m *DeviceAllocationConfiguration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -219,7 +359,7 @@ var xxx_messageInfo_DeviceAllocationConfiguration proto.InternalMessageInfo
 func (m *DeviceAllocationResult) Reset()      { *m = DeviceAllocationResult{} }
 func (*DeviceAllocationResult) ProtoMessage() {}
 func (*DeviceAllocationResult) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{6}
+	return fileDescriptor_ba331e3ec6484c27, []int{11}
 }
 func (m *DeviceAllocationResult) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -247,7 +387,7 @@ var xxx_messageInfo_DeviceAllocationResult proto.InternalMessageInfo
 func (m *DeviceAttribute) Reset()      { *m = DeviceAttribute{} }
 func (*DeviceAttribute) ProtoMessage() {}
 func (*DeviceAttribute) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{7}
+	return fileDescriptor_ba331e3ec6484c27, []int{12}
 }
 func (m *DeviceAttribute) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -275,7 +415,7 @@ var xxx_messageInfo_DeviceAttribute proto.InternalMessageInfo
 func (m *DeviceCapacity) Reset()      { *m = DeviceCapacity{} }
 func (*DeviceCapacity) ProtoMessage() {}
 func (*DeviceCapacity) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{8}
+	return fileDescriptor_ba331e3ec6484c27, []int{13}
 }
 func (m *DeviceCapacity) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -300,10 +440,94 @@ func (m *DeviceCapacity) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_DeviceCapacity proto.InternalMessageInfo
 
+func (m *DeviceCapacityConsumption) Reset()      { *m = DeviceCapacityConsumption{} }
+func (*DeviceCapacityConsumption) ProtoMessage() {}
+func (*DeviceCapacityConsumption) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{14}
+}
+func (m *DeviceCapacityConsumption) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeviceCapacityConsumption) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *DeviceCapacityConsumption) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeviceCapacityConsumption.Merge(m, src)
+}
+func (m *DeviceCapacityConsumption) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeviceCapacityConsumption) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeviceCapacityConsumption.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeviceCapacityConsumption proto.InternalMessageInfo
+
+func (m *DeviceCapacityConsumptionMixin) Reset()      { *m = DeviceCapacityConsumptionMixin{} }
+func (*DeviceCapacityConsumptionMixin) ProtoMessage() {}
+func (*DeviceCapacityConsumptionMixin) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{15}
+}
+func (m *DeviceCapacityConsumptionMixin) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeviceCapacityConsumptionMixin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *DeviceCapacityConsumptionMixin) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeviceCapacityConsumptionMixin.Merge(m, src)
+}
+func (m *DeviceCapacityConsumptionMixin) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeviceCapacityConsumptionMixin) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeviceCapacityConsumptionMixin.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeviceCapacityConsumptionMixin proto.InternalMessageInfo
+
+func (m *DeviceCapacityConsumptionMixinRef) Reset()      { *m = DeviceCapacityConsumptionMixinRef{} }
+func (*DeviceCapacityConsumptionMixinRef) ProtoMessage() {}
+func (*DeviceCapacityConsumptionMixinRef) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{16}
+}
+func (m *DeviceCapacityConsumptionMixinRef) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeviceCapacityConsumptionMixinRef) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *DeviceCapacityConsumptionMixinRef) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeviceCapacityConsumptionMixinRef.Merge(m, src)
+}
+func (m *DeviceCapacityConsumptionMixinRef) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeviceCapacityConsumptionMixinRef) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeviceCapacityConsumptionMixinRef.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeviceCapacityConsumptionMixinRef proto.InternalMessageInfo
+
 func (m *DeviceClaim) Reset()      { *m = DeviceClaim{} }
 func (*DeviceClaim) ProtoMessage() {}
 func (*DeviceClaim) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{9}
+	return fileDescriptor_ba331e3ec6484c27, []int{17}
 }
 func (m *DeviceClaim) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -331,7 +555,7 @@ var xxx_messageInfo_DeviceClaim proto.InternalMessageInfo
 func (m *DeviceClaimConfiguration) Reset()      { *m = DeviceClaimConfiguration{} }
 func (*DeviceClaimConfiguration) ProtoMessage() {}
 func (*DeviceClaimConfiguration) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{10}
+	return fileDescriptor_ba331e3ec6484c27, []int{18}
 }
 func (m *DeviceClaimConfiguration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -359,7 +583,7 @@ var xxx_messageInfo_DeviceClaimConfiguration proto.InternalMessageInfo
 func (m *DeviceClass) Reset()      { *m = DeviceClass{} }
 func (*DeviceClass) ProtoMessage() {}
 func (*DeviceClass) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{11}
+	return fileDescriptor_ba331e3ec6484c27, []int{19}
 }
 func (m *DeviceClass) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -387,7 +611,7 @@ var xxx_messageInfo_DeviceClass proto.InternalMessageInfo
 func (m *DeviceClassConfiguration) Reset()      { *m = DeviceClassConfiguration{} }
 func (*DeviceClassConfiguration) ProtoMessage() {}
 func (*DeviceClassConfiguration) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{12}
+	return fileDescriptor_ba331e3ec6484c27, []int{20}
 }
 func (m *DeviceClassConfiguration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -415,7 +639,7 @@ var xxx_messageInfo_DeviceClassConfiguration proto.InternalMessageInfo
 func (m *DeviceClassList) Reset()      { *m = DeviceClassList{} }
 func (*DeviceClassList) ProtoMessage() {}
 func (*DeviceClassList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{13}
+	return fileDescriptor_ba331e3ec6484c27, []int{21}
 }
 func (m *DeviceClassList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -443,7 +667,7 @@ var xxx_messageInfo_DeviceClassList proto.InternalMessageInfo
 func (m *DeviceClassSpec) Reset()      { *m = DeviceClassSpec{} }
 func (*DeviceClassSpec) ProtoMessage() {}
 func (*DeviceClassSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{14}
+	return fileDescriptor_ba331e3ec6484c27, []int{22}
 }
 func (m *DeviceClassSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -471,7 +695,7 @@ var xxx_messageInfo_DeviceClassSpec proto.InternalMessageInfo
 func (m *DeviceConfiguration) Reset()      { *m = DeviceConfiguration{} }
 func (*DeviceConfiguration) ProtoMessage() {}
 func (*DeviceConfiguration) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{15}
+	return fileDescriptor_ba331e3ec6484c27, []int{23}
 }
 func (m *DeviceConfiguration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -499,7 +723,7 @@ var xxx_messageInfo_DeviceConfiguration proto.InternalMessageInfo
 func (m *DeviceConstraint) Reset()      { *m = DeviceConstraint{} }
 func (*DeviceConstraint) ProtoMessage() {}
 func (*DeviceConstraint) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{16}
+	return fileDescriptor_ba331e3ec6484c27, []int{24}
 }
 func (m *DeviceConstraint) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -524,10 +748,66 @@ func (m *DeviceConstraint) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_DeviceConstraint proto.InternalMessageInfo
 
+func (m *DeviceMixin) Reset()      { *m = DeviceMixin{} }
+func (*DeviceMixin) ProtoMessage() {}
+func (*DeviceMixin) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{25}
+}
+func (m *DeviceMixin) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeviceMixin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *DeviceMixin) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeviceMixin.Merge(m, src)
+}
+func (m *DeviceMixin) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeviceMixin) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeviceMixin.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeviceMixin proto.InternalMessageInfo
+
+func (m *DeviceMixinRef) Reset()      { *m = DeviceMixinRef{} }
+func (*DeviceMixinRef) ProtoMessage() {}
+func (*DeviceMixinRef) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{26}
+}
+func (m *DeviceMixinRef) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *DeviceMixinRef) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *DeviceMixinRef) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeviceMixinRef.Merge(m, src)
+}
+func (m *DeviceMixinRef) XXX_Size() int {
+	return m.Size()
+}
+func (m *DeviceMixinRef) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeviceMixinRef.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeviceMixinRef proto.InternalMessageInfo
+
 func (m *DeviceRequest) Reset()      { *m = DeviceRequest{} }
 func (*DeviceRequest) ProtoMessage() {}
 func (*DeviceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{17}
+	return fileDescriptor_ba331e3ec6484c27, []int{27}
 }
 func (m *DeviceRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -555,7 +835,7 @@ var xxx_messageInfo_DeviceRequest proto.InternalMessageInfo
 func (m *DeviceRequestAllocationResult) Reset()      { *m = DeviceRequestAllocationResult{} }
 func (*DeviceRequestAllocationResult) ProtoMessage() {}
 func (*DeviceRequestAllocationResult) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{18}
+	return fileDescriptor_ba331e3ec6484c27, []int{28}
 }
 func (m *DeviceRequestAllocationResult) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -583,7 +863,7 @@ var xxx_messageInfo_DeviceRequestAllocationResult proto.InternalMessageInfo
 func (m *DeviceSelector) Reset()      { *m = DeviceSelector{} }
 func (*DeviceSelector) ProtoMessage() {}
 func (*DeviceSelector) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{19}
+	return fileDescriptor_ba331e3ec6484c27, []int{29}
 }
 func (m *DeviceSelector) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -611,7 +891,7 @@ var xxx_messageInfo_DeviceSelector proto.InternalMessageInfo
 func (m *DeviceSubRequest) Reset()      { *m = DeviceSubRequest{} }
 func (*DeviceSubRequest) ProtoMessage() {}
 func (*DeviceSubRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{20}
+	return fileDescriptor_ba331e3ec6484c27, []int{30}
 }
 func (m *DeviceSubRequest) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -639,7 +919,7 @@ var xxx_messageInfo_DeviceSubRequest proto.InternalMessageInfo
 func (m *NetworkDeviceData) Reset()      { *m = NetworkDeviceData{} }
 func (*NetworkDeviceData) ProtoMessage() {}
 func (*NetworkDeviceData) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{21}
+	return fileDescriptor_ba331e3ec6484c27, []int{31}
 }
 func (m *NetworkDeviceData) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -667,7 +947,7 @@ var xxx_messageInfo_NetworkDeviceData proto.InternalMessageInfo
 func (m *OpaqueDeviceConfiguration) Reset()      { *m = OpaqueDeviceConfiguration{} }
 func (*OpaqueDeviceConfiguration) ProtoMessage() {}
 func (*OpaqueDeviceConfiguration) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{22}
+	return fileDescriptor_ba331e3ec6484c27, []int{32}
 }
 func (m *OpaqueDeviceConfiguration) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -695,7 +975,7 @@ var xxx_messageInfo_OpaqueDeviceConfiguration proto.InternalMessageInfo
 func (m *ResourceClaim) Reset()      { *m = ResourceClaim{} }
 func (*ResourceClaim) ProtoMessage() {}
 func (*ResourceClaim) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{23}
+	return fileDescriptor_ba331e3ec6484c27, []int{33}
 }
 func (m *ResourceClaim) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -723,7 +1003,7 @@ var xxx_messageInfo_ResourceClaim proto.InternalMessageInfo
 func (m *ResourceClaimConsumerReference) Reset()      { *m = ResourceClaimConsumerReference{} }
 func (*ResourceClaimConsumerReference) ProtoMessage() {}
 func (*ResourceClaimConsumerReference) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{24}
+	return fileDescriptor_ba331e3ec6484c27, []int{34}
 }
 func (m *ResourceClaimConsumerReference) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -751,7 +1031,7 @@ var xxx_messageInfo_ResourceClaimConsumerReference proto.InternalMessageInfo
 func (m *ResourceClaimList) Reset()      { *m = ResourceClaimList{} }
 func (*ResourceClaimList) ProtoMessage() {}
 func (*ResourceClaimList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{25}
+	return fileDescriptor_ba331e3ec6484c27, []int{35}
 }
 func (m *ResourceClaimList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -779,7 +1059,7 @@ var xxx_messageInfo_ResourceClaimList proto.InternalMessageInfo
 func (m *ResourceClaimSpec) Reset()      { *m = ResourceClaimSpec{} }
 func (*ResourceClaimSpec) ProtoMessage() {}
 func (*ResourceClaimSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{26}
+	return fileDescriptor_ba331e3ec6484c27, []int{36}
 }
 func (m *ResourceClaimSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -807,7 +1087,7 @@ var xxx_messageInfo_ResourceClaimSpec proto.InternalMessageInfo
 func (m *ResourceClaimStatus) Reset()      { *m = ResourceClaimStatus{} }
 func (*ResourceClaimStatus) ProtoMessage() {}
 func (*ResourceClaimStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{27}
+	return fileDescriptor_ba331e3ec6484c27, []int{37}
 }
 func (m *ResourceClaimStatus) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -835,7 +1115,7 @@ var xxx_messageInfo_ResourceClaimStatus proto.InternalMessageInfo
 func (m *ResourceClaimTemplate) Reset()      { *m = ResourceClaimTemplate{} }
 func (*ResourceClaimTemplate) ProtoMessage() {}
 func (*ResourceClaimTemplate) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{28}
+	return fileDescriptor_ba331e3ec6484c27, []int{38}
 }
 func (m *ResourceClaimTemplate) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -863,7 +1143,7 @@ var xxx_messageInfo_ResourceClaimTemplate proto.InternalMessageInfo
 func (m *ResourceClaimTemplateList) Reset()      { *m = ResourceClaimTemplateList{} }
 func (*ResourceClaimTemplateList) ProtoMessage() {}
 func (*ResourceClaimTemplateList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{29}
+	return fileDescriptor_ba331e3ec6484c27, []int{39}
 }
 func (m *ResourceClaimTemplateList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -891,7 +1171,7 @@ var xxx_messageInfo_ResourceClaimTemplateList proto.InternalMessageInfo
 func (m *ResourceClaimTemplateSpec) Reset()      { *m = ResourceClaimTemplateSpec{} }
 func (*ResourceClaimTemplateSpec) ProtoMessage() {}
 func (*ResourceClaimTemplateSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{30}
+	return fileDescriptor_ba331e3ec6484c27, []int{40}
 }
 func (m *ResourceClaimTemplateSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -919,7 +1199,7 @@ var xxx_messageInfo_ResourceClaimTemplateSpec proto.InternalMessageInfo
 func (m *ResourcePool) Reset()      { *m = ResourcePool{} }
 func (*ResourcePool) ProtoMessage() {}
 func (*ResourcePool) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{31}
+	return fileDescriptor_ba331e3ec6484c27, []int{41}
 }
 func (m *ResourcePool) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -947,7 +1227,7 @@ var xxx_messageInfo_ResourcePool proto.InternalMessageInfo
 func (m *ResourceSlice) Reset()      { *m = ResourceSlice{} }
 func (*ResourceSlice) ProtoMessage() {}
 func (*ResourceSlice) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{32}
+	return fileDescriptor_ba331e3ec6484c27, []int{42}
 }
 func (m *ResourceSlice) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -975,7 +1255,7 @@ var xxx_messageInfo_ResourceSlice proto.InternalMessageInfo
 func (m *ResourceSliceList) Reset()      { *m = ResourceSliceList{} }
 func (*ResourceSliceList) ProtoMessage() {}
 func (*ResourceSliceList) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{33}
+	return fileDescriptor_ba331e3ec6484c27, []int{43}
 }
 func (m *ResourceSliceList) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1000,10 +1280,38 @@ func (m *ResourceSliceList) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ResourceSliceList proto.InternalMessageInfo
 
+func (m *ResourceSliceMixins) Reset()      { *m = ResourceSliceMixins{} }
+func (*ResourceSliceMixins) ProtoMessage() {}
+func (*ResourceSliceMixins) Descriptor() ([]byte, []int) {
+	return fileDescriptor_ba331e3ec6484c27, []int{44}
+}
+func (m *ResourceSliceMixins) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ResourceSliceMixins) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *ResourceSliceMixins) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ResourceSliceMixins.Merge(m, src)
+}
+func (m *ResourceSliceMixins) XXX_Size() int {
+	return m.Size()
+}
+func (m *ResourceSliceMixins) XXX_DiscardUnknown() {
+	xxx_messageInfo_ResourceSliceMixins.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ResourceSliceMixins proto.InternalMessageInfo
+
 func (m *ResourceSliceSpec) Reset()      { *m = ResourceSliceSpec{} }
 func (*ResourceSliceSpec) ProtoMessage() {}
 func (*ResourceSliceSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ba331e3ec6484c27, []int{34}
+	return fileDescriptor_ba331e3ec6484c27, []int{45}
 }
 func (m *ResourceSliceSpec) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -1035,11 +1343,27 @@ func init() {
 	proto.RegisterMapType((map[QualifiedName]DeviceAttribute)(nil), "k8s.io.api.resource.v1beta1.BasicDevice.AttributesEntry")
 	proto.RegisterMapType((map[QualifiedName]DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.BasicDevice.CapacityEntry")
 	proto.RegisterType((*CELDeviceSelector)(nil), "k8s.io.api.resource.v1beta1.CELDeviceSelector")
+	proto.RegisterType((*CapacityPool)(nil), "k8s.io.api.resource.v1beta1.CapacityPool")
+	proto.RegisterMapType((map[QualifiedName]DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.CapacityPool.CapacityEntry")
+	proto.RegisterType((*CapacityPoolMixin)(nil), "k8s.io.api.resource.v1beta1.CapacityPoolMixin")
+	proto.RegisterMapType((map[QualifiedName]DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.CapacityPoolMixin.CapacityEntry")
+	proto.RegisterType((*CapacityPoolMixinRef)(nil), "k8s.io.api.resource.v1beta1.CapacityPoolMixinRef")
+	proto.RegisterType((*CompositeDevice)(nil), "k8s.io.api.resource.v1beta1.CompositeDevice")
+	proto.RegisterMapType((map[QualifiedName]DeviceAttribute)(nil), "k8s.io.api.resource.v1beta1.CompositeDevice.AttributesEntry")
+	proto.RegisterMapType((map[QualifiedName]DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.CompositeDevice.CapacityEntry")
+	proto.RegisterType((*CompositeDeviceMixin)(nil), "k8s.io.api.resource.v1beta1.CompositeDeviceMixin")
+	proto.RegisterMapType((map[QualifiedName]DeviceAttribute)(nil), "k8s.io.api.resource.v1beta1.CompositeDeviceMixin.AttributesEntry")
+	proto.RegisterMapType((map[QualifiedName]DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.CompositeDeviceMixin.CapacityEntry")
 	proto.RegisterType((*Device)(nil), "k8s.io.api.resource.v1beta1.Device")
 	proto.RegisterType((*DeviceAllocationConfiguration)(nil), "k8s.io.api.resource.v1beta1.DeviceAllocationConfiguration")
 	proto.RegisterType((*DeviceAllocationResult)(nil), "k8s.io.api.resource.v1beta1.DeviceAllocationResult")
 	proto.RegisterType((*DeviceAttribute)(nil), "k8s.io.api.resource.v1beta1.DeviceAttribute")
 	proto.RegisterType((*DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.DeviceCapacity")
+	proto.RegisterType((*DeviceCapacityConsumption)(nil), "k8s.io.api.resource.v1beta1.DeviceCapacityConsumption")
+	proto.RegisterMapType((map[QualifiedName]DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.DeviceCapacityConsumption.CapacityEntry")
+	proto.RegisterType((*DeviceCapacityConsumptionMixin)(nil), "k8s.io.api.resource.v1beta1.DeviceCapacityConsumptionMixin")
+	proto.RegisterMapType((map[QualifiedName]DeviceCapacity)(nil), "k8s.io.api.resource.v1beta1.DeviceCapacityConsumptionMixin.CapacityEntry")
+	proto.RegisterType((*DeviceCapacityConsumptionMixinRef)(nil), "k8s.io.api.resource.v1beta1.DeviceCapacityConsumptionMixinRef")
 	proto.RegisterType((*DeviceClaim)(nil), "k8s.io.api.resource.v1beta1.DeviceClaim")
 	proto.RegisterType((*DeviceClaimConfiguration)(nil), "k8s.io.api.resource.v1beta1.DeviceClaimConfiguration")
 	proto.RegisterType((*DeviceClass)(nil), "k8s.io.api.resource.v1beta1.DeviceClass")
@@ -1048,6 +1372,8 @@ func init() {
 	proto.RegisterType((*DeviceClassSpec)(nil), "k8s.io.api.resource.v1beta1.DeviceClassSpec")
 	proto.RegisterType((*DeviceConfiguration)(nil), "k8s.io.api.resource.v1beta1.DeviceConfiguration")
 	proto.RegisterType((*DeviceConstraint)(nil), "k8s.io.api.resource.v1beta1.DeviceConstraint")
+	proto.RegisterType((*DeviceMixin)(nil), "k8s.io.api.resource.v1beta1.DeviceMixin")
+	proto.RegisterType((*DeviceMixinRef)(nil), "k8s.io.api.resource.v1beta1.DeviceMixinRef")
 	proto.RegisterType((*DeviceRequest)(nil), "k8s.io.api.resource.v1beta1.DeviceRequest")
 	proto.RegisterType((*DeviceRequestAllocationResult)(nil), "k8s.io.api.resource.v1beta1.DeviceRequestAllocationResult")
 	proto.RegisterType((*DeviceSelector)(nil), "k8s.io.api.resource.v1beta1.DeviceSelector")
@@ -1065,6 +1391,7 @@ func init() {
 	proto.RegisterType((*ResourcePool)(nil), "k8s.io.api.resource.v1beta1.ResourcePool")
 	proto.RegisterType((*ResourceSlice)(nil), "k8s.io.api.resource.v1beta1.ResourceSlice")
 	proto.RegisterType((*ResourceSliceList)(nil), "k8s.io.api.resource.v1beta1.ResourceSliceList")
+	proto.RegisterType((*ResourceSliceMixins)(nil), "k8s.io.api.resource.v1beta1.ResourceSliceMixins")
 	proto.RegisterType((*ResourceSliceSpec)(nil), "k8s.io.api.resource.v1beta1.ResourceSliceSpec")
 }
 
@@ -1073,139 +1400,169 @@ func init() {
 }
 
 var fileDescriptor_ba331e3ec6484c27 = []byte{
-	// 2103 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x1a, 0x4b, 0x6f, 0x1c, 0x49,
-	0xd9, 0x3d, 0x3d, 0x7e, 0x7d, 0xe3, 0x57, 0x2a, 0x24, 0x4c, 0x1c, 0x31, 0xe3, 0x74, 0x24, 0xf0,
-	0x66, 0xb3, 0x33, 0x9b, 0x01, 0xa2, 0x28, 0x7b, 0x61, 0xda, 0x76, 0x82, 0x21, 0x71, 0xbc, 0x65,
-	0x36, 0x44, 0xcb, 0x06, 0x51, 0xd3, 0x53, 0xb6, 0x1b, 0xf7, 0x74, 0x4f, 0xba, 0xab, 0x9d, 0xf5,
-	0x01, 0x81, 0x38, 0xaf, 0x10, 0x77, 0xc4, 0x85, 0x03, 0x12, 0x12, 0x42, 0xfc, 0x02, 0x90, 0x40,
-	0x88, 0x88, 0x03, 0xac, 0x96, 0xcb, 0x8a, 0xc3, 0x40, 0x66, 0x7f, 0x00, 0xe2, 0x9a, 0x13, 0xaa,
-	0xea, 0xea, 0xe7, 0x4c, 0xcf, 0xb6, 0x61, 0xb1, 0x82, 0xb4, 0x37, 0xf7, 0xf7, 0xae, 0xef, 0x5d,
-	0x35, 0x86, 0x57, 0x8f, 0x6e, 0x79, 0x0d, 0xd3, 0x69, 0x92, 0xbe, 0xd9, 0x74, 0xa9, 0xe7, 0xf8,
-	0xae, 0x41, 0x9b, 0xc7, 0x37, 0x3a, 0x94, 0x91, 0x1b, 0xcd, 0x03, 0x6a, 0x53, 0x97, 0x30, 0xda,
-	0x6d, 0xf4, 0x5d, 0x87, 0x39, 0xe8, 0x72, 0x40, 0xdc, 0x20, 0x7d, 0xb3, 0x11, 0x12, 0x37, 0x24,
-	0xf1, 0xea, 0x6b, 0x07, 0x26, 0x3b, 0xf4, 0x3b, 0x0d, 0xc3, 0xe9, 0x35, 0x0f, 0x9c, 0x03, 0xa7,
-	0x29, 0x78, 0x3a, 0xfe, 0xbe, 0xf8, 0x12, 0x1f, 0xe2, 0xaf, 0x40, 0xd6, 0xaa, 0x96, 0x50, 0x6c,
-	0x38, 0x2e, 0x57, 0x9a, 0xd5, 0xb7, 0xfa, 0xa5, 0x98, 0xa6, 0x47, 0x8c, 0x43, 0xd3, 0xa6, 0xee,
-	0x49, 0xb3, 0x7f, 0x74, 0x90, 0xb6, 0xf6, 0x34, 0x5c, 0x5e, 0xb3, 0x47, 0x19, 0x19, 0xa7, 0xab,
-	0x99, 0xc7, 0xe5, 0xfa, 0x36, 0x33, 0x7b, 0xa3, 0x6a, 0x6e, 0x7e, 0x1c, 0x83, 0x67, 0x1c, 0xd2,
-	0x1e, 0xc9, 0xf2, 0x69, 0x3f, 0x53, 0xe1, 0x42, 0xdb, 0xb2, 0x1c, 0x83, 0xc3, 0x36, 0xe9, 0xb1,
-	0x69, 0xd0, 0x3d, 0x46, 0x98, 0xef, 0xa1, 0xcf, 0xc3, 0x4c, 0xd7, 0x35, 0x8f, 0xa9, 0x5b, 0x55,
-	0xd6, 0x94, 0xf5, 0x79, 0x7d, 0xe9, 0xd9, 0xa0, 0x3e, 0x35, 0x1c, 0xd4, 0x67, 0x36, 0x05, 0x14,
-	0x4b, 0x2c, 0x5a, 0x83, 0x72, 0xdf, 0x71, 0xac, 0x6a, 0x49, 0x50, 0x2d, 0x48, 0xaa, 0xf2, 0xae,
-	0xe3, 0x58, 0x58, 0x60, 0x84, 0x24, 0x21, 0xb9, 0xaa, 0x66, 0x24, 0x09, 0x28, 0x96, 0x58, 0x64,
-	0x00, 0x18, 0x8e, 0xdd, 0x35, 0x99, 0xe9, 0xd8, 0x5e, 0xb5, 0xbc, 0xa6, 0xae, 0x57, 0x5a, 0xcd,
-	0x46, 0x1c, 0xe5, 0xe8, 0x60, 0x8d, 0xfe, 0xd1, 0x01, 0x07, 0x78, 0x0d, 0xee, 0xbf, 0xc6, 0xf1,
-	0x8d, 0xc6, 0x46, 0xc8, 0xa7, 0x23, 0x29, 0x1c, 0x22, 0x90, 0x87, 0x13, 0x62, 0xd1, 0x03, 0x28,
-	0x77, 0x09, 0x23, 0xd5, 0xe9, 0x35, 0x65, 0xbd, 0xd2, 0x7a, 0x2d, 0x57, 0xbc, 0xf4, 0x5b, 0x03,
-	0x93, 0xa7, 0x5b, 0xef, 0x32, 0x6a, 0x7b, 0x5c, 0x78, 0x74, 0xba, 0x4d, 0xc2, 0x08, 0x16, 0x82,
-	0x10, 0x81, 0x8a, 0x4d, 0xd9, 0x53, 0xc7, 0x3d, 0xe2, 0xc0, 0xea, 0x8c, 0x90, 0xdb, 0x68, 0x4c,
-	0x48, 0xce, 0xc6, 0x8e, 0xa4, 0x17, 0xc7, 0xe6, 0x5c, 0xfa, 0xf2, 0x70, 0x50, 0xaf, 0xec, 0xc4,
-	0x62, 0x70, 0x52, 0xa6, 0xf6, 0x27, 0x05, 0x56, 0x64, 0x90, 0x4c, 0xc7, 0xc6, 0xd4, 0xf3, 0x2d,
-	0x86, 0xbe, 0x0d, 0xb3, 0x81, 0xdf, 0x3c, 0x11, 0xa0, 0x4a, 0xeb, 0x8b, 0x13, 0x75, 0x06, 0xca,
-	0xb2, 0x52, 0xf4, 0x65, 0x79, 0xa2, 0xd9, 0x00, 0xef, 0xe1, 0x50, 0x28, 0x7a, 0x08, 0x0b, 0xb6,
-	0xd3, 0xa5, 0x7b, 0xd4, 0xa2, 0x06, 0x73, 0x5c, 0x11, 0xbb, 0x4a, 0x6b, 0x2d, 0xa9, 0x84, 0x57,
-	0x0a, 0xf7, 0xfe, 0x4e, 0x82, 0x4e, 0x5f, 0x19, 0x0e, 0xea, 0x0b, 0x49, 0x08, 0x4e, 0xc9, 0xd1,
-	0xfe, 0xa6, 0x42, 0x45, 0x27, 0x9e, 0x69, 0x04, 0x1a, 0xd1, 0xf7, 0x00, 0x08, 0x63, 0xae, 0xd9,
-	0xf1, 0x99, 0x38, 0x0a, 0x8f, 0xfa, 0xad, 0x89, 0x47, 0x49, 0x70, 0x37, 0xda, 0x11, 0xeb, 0x96,
-	0xcd, 0xdc, 0x13, 0xfd, 0x6a, 0x18, 0xfe, 0x18, 0xf1, 0xc3, 0xbf, 0xd7, 0x17, 0xdf, 0xf4, 0x89,
-	0x65, 0xee, 0x9b, 0xb4, 0xbb, 0x43, 0x7a, 0x14, 0x27, 0x14, 0x22, 0x1f, 0xe6, 0x0c, 0xd2, 0x27,
-	0x86, 0xc9, 0x4e, 0xaa, 0x25, 0xa1, 0xfc, 0x66, 0x61, 0xe5, 0x1b, 0x92, 0x31, 0x50, 0x7d, 0x45,
-	0xaa, 0x9e, 0x0b, 0xc1, 0xa3, 0x8a, 0x23, 0x55, 0xab, 0x47, 0xb0, 0x9c, 0x31, 0x1d, 0xad, 0x80,
-	0x7a, 0x44, 0x4f, 0x82, 0x6a, 0xc3, 0xfc, 0x4f, 0xa4, 0xc3, 0xf4, 0x31, 0xb1, 0x7c, 0x2a, 0x6a,
-	0xab, 0xd2, 0xba, 0x5e, 0x24, 0xc0, 0xa1, 0x50, 0x1c, 0xb0, 0xde, 0x2e, 0xdd, 0x52, 0x56, 0x0f,
-	0x61, 0x31, 0x65, 0xea, 0x18, 0x55, 0xed, 0xb4, 0xaa, 0x57, 0x0b, 0xa8, 0x0a, 0x45, 0x26, 0x34,
-	0x69, 0x77, 0xe1, 0xdc, 0xc6, 0xd6, 0x3d, 0xd9, 0x47, 0x64, 0xc4, 0x51, 0x0b, 0x80, 0xbe, 0xdb,
-	0x77, 0xa9, 0xc7, 0x6b, 0x48, 0x76, 0x93, 0xa8, 0x4c, 0xb7, 0x22, 0x0c, 0x4e, 0x50, 0x69, 0x3e,
-	0xc8, 0xee, 0xc0, 0xfb, 0x8b, 0x4d, 0x7a, 0x54, 0xf2, 0x45, 0x15, 0x28, 0xfc, 0x29, 0x30, 0x68,
-	0x1b, 0xa6, 0x3b, 0x3c, 0x2a, 0xd2, 0xf6, 0xf5, 0xa2, 0xf1, 0xd3, 0xe7, 0x87, 0x83, 0xfa, 0xb4,
-	0x00, 0xe0, 0x40, 0x82, 0xf6, 0x5e, 0x09, 0x3e, 0x97, 0xad, 0x94, 0x0d, 0xc7, 0xde, 0x37, 0x0f,
-	0x7c, 0x57, 0x7c, 0xa0, 0xaf, 0xc0, 0x4c, 0x20, 0x51, 0x1a, 0xb4, 0x1e, 0x36, 0xb3, 0x3d, 0x01,
-	0x7d, 0x31, 0xa8, 0x5f, 0xcc, 0xb2, 0x06, 0x18, 0x2c, 0xf9, 0xd0, 0x3a, 0xcc, 0xb9, 0xf4, 0x89,
-	0x4f, 0x3d, 0xe6, 0x89, 0x8c, 0x9b, 0xd7, 0x17, 0x78, 0xd6, 0x60, 0x09, 0xc3, 0x11, 0x16, 0x7d,
-	0x1f, 0xce, 0x07, 0xd5, 0x98, 0x32, 0x41, 0x56, 0xe2, 0xeb, 0x45, 0x42, 0x94, 0xe4, 0xd3, 0x2f,
-	0x4b, 0x53, 0xcf, 0x8f, 0x41, 0xe2, 0x71, 0x9a, 0xb4, 0x8f, 0x14, 0xb8, 0x38, 0xbe, 0x71, 0x20,
-	0x0a, 0xb3, 0xae, 0xf8, 0x2b, 0xac, 0xd9, 0xdb, 0x05, 0xec, 0x91, 0x67, 0xcc, 0xef, 0x42, 0xc1,
-	0xb7, 0x87, 0x43, 0xd9, 0xa8, 0x03, 0x33, 0x86, 0x30, 0x49, 0x16, 0xe7, 0xed, 0x53, 0x35, 0xb9,
-	0xf4, 0xf9, 0xa3, 0xb9, 0x13, 0x80, 0xb1, 0x94, 0xac, 0xfd, 0x42, 0x81, 0xe5, 0x4c, 0xf5, 0xa0,
-	0x1a, 0xa8, 0xa6, 0xcd, 0x44, 0x46, 0xa9, 0x41, 0x7c, 0xb6, 0x6d, 0xf6, 0x90, 0xe7, 0x39, 0xe6,
-	0x08, 0x74, 0x05, 0xca, 0x1d, 0x3e, 0xf5, 0x78, 0x2c, 0xe6, 0xf4, 0xc5, 0xe1, 0xa0, 0x3e, 0xaf,
-	0x3b, 0x8e, 0x15, 0x50, 0x08, 0x14, 0xfa, 0x02, 0xcc, 0x78, 0xcc, 0x35, 0xed, 0x83, 0x6a, 0x59,
-	0x64, 0x8a, 0xe8, 0xf1, 0x7b, 0x02, 0x12, 0x90, 0x49, 0x34, 0xba, 0x06, 0xb3, 0xc7, 0xd4, 0x15,
-	0xc5, 0x31, 0x2d, 0x28, 0x45, 0x0b, 0x7d, 0x18, 0x80, 0x02, 0xd2, 0x90, 0x40, 0xa3, 0xb0, 0x94,
-	0xae, 0x3e, 0xb4, 0x17, 0x56, 0xae, 0x32, 0x32, 0x79, 0x46, 0x06, 0x66, 0xec, 0xb1, 0x37, 0x7d,
-	0x62, 0x33, 0x93, 0x9d, 0xe8, 0x8b, 0xd2, 0x29, 0xd3, 0x81, 0xa2, 0x40, 0x96, 0xf6, 0xcb, 0x12,
-	0x54, 0xa4, 0x1e, 0x8b, 0x98, 0x3d, 0xf4, 0x28, 0x91, 0xb3, 0x41, 0xb8, 0xaf, 0x15, 0x0f, 0xb7,
-	0xbe, 0x12, 0x76, 0xc6, 0x31, 0x39, 0xde, 0x85, 0x8a, 0xe1, 0xd8, 0x1e, 0x73, 0x89, 0x69, 0xcb,
-	0x82, 0x48, 0x8f, 0xe5, 0x09, 0xb9, 0x2d, 0xb9, 0xf4, 0xf3, 0x52, 0x7e, 0x25, 0x86, 0x79, 0x38,
-	0x29, 0x16, 0x3d, 0x8e, 0xd2, 0x48, 0x15, 0x0a, 0xbe, 0x5c, 0x44, 0x01, 0x3f, 0x79, 0xb1, 0x0c,
-	0xfa, 0x83, 0x02, 0xd5, 0x3c, 0xa6, 0x54, 0xbd, 0x2b, 0xff, 0x49, 0xbd, 0x97, 0xce, 0xac, 0xde,
-	0x7f, 0xab, 0x24, 0xc2, 0xee, 0x79, 0xe8, 0x3b, 0x30, 0xc7, 0x37, 0x2c, 0xb1, 0x30, 0x29, 0x23,
-	0x56, 0x4c, 0xd8, 0xc7, 0x1e, 0x74, 0xbe, 0x4b, 0x0d, 0x76, 0x9f, 0x32, 0x12, 0x77, 0xfa, 0x18,
-	0x86, 0x23, 0xa9, 0x68, 0x07, 0xca, 0x5e, 0x9f, 0x1a, 0xa7, 0x98, 0x70, 0xc2, 0xb2, 0xbd, 0x3e,
-	0x35, 0xe2, 0x59, 0xc0, 0xbf, 0xb0, 0x90, 0xa3, 0xfd, 0x24, 0x19, 0x09, 0xcf, 0x4b, 0x47, 0x22,
-	0xc7, 0xbf, 0xca, 0x99, 0xf9, 0xf7, 0x37, 0x51, 0xa7, 0x11, 0xd6, 0xdd, 0x33, 0x3d, 0x86, 0xde,
-	0x19, 0xf1, 0x71, 0xa3, 0x98, 0x8f, 0x39, 0xb7, 0xf0, 0x70, 0x54, 0x5e, 0x21, 0x24, 0xe1, 0xdf,
-	0xfb, 0x30, 0x6d, 0x32, 0xda, 0x0b, 0x0b, 0x6b, 0xbd, 0xa8, 0x83, 0xe3, 0xbe, 0xb0, 0xcd, 0xd9,
-	0x71, 0x20, 0x45, 0xfb, 0x73, 0xfa, 0x00, 0xdc, 0xf1, 0xe8, 0x1d, 0x98, 0xf7, 0xe4, 0xa8, 0x0f,
-	0x9b, 0x43, 0x91, 0xf5, 0x21, 0x5a, 0x18, 0xcf, 0x49, 0x4d, 0xf3, 0x21, 0xc4, 0xc3, 0xb1, 0xc0,
-	0x44, 0xe5, 0x96, 0x4e, 0x53, 0xb9, 0x99, 0xd0, 0xe7, 0x56, 0xee, 0x13, 0x18, 0x17, 0x3d, 0xf4,
-	0x36, 0xcc, 0x38, 0x7d, 0xf2, 0x24, 0xea, 0xaa, 0x93, 0x77, 0xc2, 0x07, 0x82, 0x74, 0x5c, 0x8a,
-	0x00, 0x57, 0x19, 0xa0, 0xb1, 0x94, 0xa8, 0xfd, 0x48, 0x81, 0x95, 0x6c, 0x0b, 0x3b, 0x45, 0x93,
-	0xd8, 0x85, 0xa5, 0x1e, 0x61, 0xc6, 0x61, 0x34, 0xab, 0xe4, 0xcd, 0x6b, 0x7d, 0x38, 0xa8, 0x2f,
-	0xdd, 0x4f, 0x61, 0x5e, 0x0c, 0xea, 0xe8, 0x8e, 0x6f, 0x59, 0x27, 0xe9, 0x2d, 0x34, 0xc3, 0xaf,
-	0xfd, 0x4b, 0x85, 0xc5, 0x54, 0xc3, 0x2e, 0xb0, 0x73, 0xb5, 0x61, 0xb9, 0x1b, 0xfb, 0x9a, 0x23,
-	0xa4, 0x19, 0x9f, 0x95, 0xc4, 0xc9, 0x34, 0x11, 0x7c, 0x59, 0xfa, 0x74, 0xde, 0xa8, 0x9f, 0x74,
-	0xde, 0x3c, 0x84, 0x25, 0x12, 0xed, 0x01, 0xf7, 0x9d, 0x2e, 0x95, 0x53, 0xb8, 0x21, 0xb9, 0x96,
-	0xda, 0x29, 0xec, 0x8b, 0x41, 0xfd, 0x33, 0xd9, 0xed, 0x81, 0xc3, 0x71, 0x46, 0x0a, 0xba, 0x0a,
-	0xd3, 0x86, 0xe3, 0xdb, 0x4c, 0x8c, 0x6a, 0x35, 0x2e, 0x93, 0x0d, 0x0e, 0xc4, 0x01, 0x0e, 0xdd,
-	0x80, 0x0a, 0xe9, 0xf6, 0x4c, 0xbb, 0x6d, 0x18, 0xd4, 0xf3, 0xc4, 0x9d, 0x70, 0x2e, 0x98, 0xff,
-	0xed, 0x18, 0x8c, 0x93, 0x34, 0xa8, 0x07, 0x4b, 0xfb, 0xa6, 0xeb, 0xb1, 0xf6, 0x31, 0x31, 0x2d,
-	0xd2, 0xb1, 0x68, 0x75, 0xb6, 0xf0, 0x28, 0xdc, 0xf3, 0x3b, 0xe1, 0xa8, 0xbd, 0x18, 0x1e, 0xef,
-	0x4e, 0x4a, 0x18, 0xce, 0x08, 0xd7, 0xfe, 0xa9, 0x84, 0x8b, 0x6e, 0xce, 0x4e, 0x86, 0x5e, 0xe1,
-	0x0b, 0x9e, 0x40, 0xc9, 0x34, 0x48, 0x2c, 0x69, 0x02, 0x8c, 0x43, 0x7c, 0xe2, 0xa9, 0xa0, 0x54,
-	0xe8, 0xa9, 0x40, 0x2d, 0xf0, 0x54, 0x50, 0x9e, 0xf8, 0x54, 0x90, 0x71, 0xf0, 0xf4, 0xc7, 0x3b,
-	0x58, 0xfb, 0x56, 0xb8, 0x39, 0x45, 0xf7, 0x92, 0x6d, 0x50, 0x0d, 0x6a, 0x8d, 0x69, 0xba, 0xa3,
-	0x7e, 0x1e, 0xb9, 0xd4, 0xe8, 0xb3, 0xc3, 0x41, 0x5d, 0xdd, 0xd8, 0xba, 0x87, 0xb9, 0x0c, 0xed,
-	0x83, 0x52, 0x58, 0xd3, 0x71, 0x2c, 0x3e, 0xad, 0xa2, 0xff, 0xae, 0x8a, 0xb4, 0x5f, 0x29, 0x70,
-	0x6e, 0xe4, 0xa9, 0x04, 0xbd, 0x01, 0x8b, 0xa6, 0xcd, 0xa8, 0xbb, 0x4f, 0x0c, 0xba, 0x13, 0xbb,
-	0xf7, 0x82, 0x14, 0xb1, 0xb8, 0x9d, 0x44, 0xe2, 0x34, 0x2d, 0xba, 0x04, 0xaa, 0xd9, 0x0f, 0xaf,
-	0x5d, 0x22, 0x84, 0xdb, 0xbb, 0x1e, 0xe6, 0x30, 0x1e, 0x8b, 0x43, 0xe2, 0x76, 0x9f, 0x12, 0x97,
-	0xb6, 0xbb, 0x5d, 0x7e, 0x0f, 0x95, 0x79, 0x1a, 0xc5, 0xe2, 0xab, 0x69, 0x34, 0xce, 0xd2, 0x6b,
-	0x3f, 0x57, 0xe0, 0x52, 0xee, 0x2c, 0x28, 0xfc, 0xa0, 0x46, 0x00, 0xfa, 0xc4, 0x25, 0x3d, 0xca,
-	0xa8, 0xeb, 0xc9, 0xc5, 0xe8, 0x94, 0xef, 0x54, 0xd1, 0xce, 0xb5, 0x1b, 0x09, 0xc2, 0x09, 0xa1,
-	0xda, 0x4f, 0x4b, 0xb0, 0x88, 0x65, 0x62, 0x04, 0x0b, 0xfe, 0xff, 0x7e, 0xd3, 0xdb, 0x4d, 0x6d,
-	0x7a, 0x93, 0xcb, 0x2d, 0x65, 0x5b, 0xde, 0xae, 0x87, 0x1e, 0xf1, 0x0b, 0x16, 0x61, 0xbe, 0x57,
-	0xe8, 0x46, 0x9c, 0x96, 0x29, 0xf8, 0xe2, 0x10, 0x04, 0xdf, 0x58, 0xca, 0xd3, 0x86, 0x0a, 0xd4,
-	0x52, 0xf4, 0x7c, 0x52, 0xfb, 0x3d, 0xea, 0x62, 0xba, 0x4f, 0x5d, 0x6a, 0x1b, 0x14, 0x5d, 0x87,
-	0x39, 0xd2, 0x37, 0xef, 0xba, 0x8e, 0xdf, 0x97, 0xf1, 0x8c, 0xd6, 0xb0, 0xf6, 0xee, 0xb6, 0x80,
-	0xe3, 0x88, 0x82, 0x53, 0x87, 0x06, 0xc9, 0xac, 0x4a, 0xdc, 0x89, 0x02, 0x38, 0x8e, 0x28, 0xa2,
-	0xc6, 0x51, 0xce, 0x6d, 0x1c, 0x3a, 0xa8, 0xbe, 0xd9, 0x95, 0xd7, 0xc5, 0xd7, 0x25, 0x81, 0xfa,
-	0xd6, 0xf6, 0xe6, 0x8b, 0x41, 0xfd, 0x4a, 0xde, 0x53, 0x30, 0x3b, 0xe9, 0x53, 0xaf, 0xf1, 0xd6,
-	0xf6, 0x26, 0xe6, 0xcc, 0xda, 0xef, 0x14, 0x38, 0x97, 0x3a, 0xe4, 0x19, 0xac, 0xa3, 0x0f, 0xd2,
-	0xeb, 0xe8, 0xb5, 0xe2, 0x11, 0xcb, 0x59, 0x48, 0x0f, 0x33, 0x67, 0x10, 0x1b, 0xe9, 0x5e, 0xf6,
-	0x69, 0x74, 0xbd, 0xe8, 0x75, 0x2f, 0xff, 0x3d, 0x54, 0xfb, 0x63, 0x09, 0xce, 0x8f, 0xc9, 0x21,
-	0xf4, 0x18, 0x20, 0x6e, 0x6e, 0x52, 0xdf, 0xe4, 0xa1, 0x3d, 0xf2, 0xfc, 0xb1, 0x24, 0x1e, 0x2c,
-	0x63, 0x68, 0x42, 0x20, 0x72, 0xa1, 0xe2, 0x52, 0x8f, 0xba, 0xc7, 0xb4, 0x7b, 0xc7, 0x71, 0xa5,
-	0xdf, 0xde, 0x28, 0xee, 0xb7, 0x91, 0xcc, 0x8d, 0x6f, 0xcb, 0x38, 0x96, 0x8b, 0x93, 0x4a, 0xd0,
-	0xe3, 0xd8, 0x7f, 0xc1, 0x2b, 0x7c, 0xab, 0xc8, 0x79, 0xd2, 0xbf, 0x1f, 0x4c, 0xf0, 0xe4, 0x5f,
-	0x15, 0xb8, 0x90, 0xb2, 0xf1, 0x1b, 0xb4, 0xd7, 0xb7, 0x08, 0xa3, 0x67, 0xd0, 0x85, 0x1e, 0xa5,
-	0xba, 0xd0, 0xcd, 0xe2, 0x7e, 0x0c, 0x6d, 0xcc, 0xbd, 0x79, 0x7e, 0xa0, 0xc0, 0xa5, 0xb1, 0x1c,
-	0x67, 0x50, 0x56, 0xdf, 0x4c, 0x97, 0x55, 0xeb, 0xf4, 0xc7, 0xca, 0x29, 0xaf, 0xbf, 0xe4, 0x1d,
-	0x4a, 0xd4, 0xd9, 0xff, 0xe1, 0xd0, 0xd0, 0x7e, 0xad, 0xc0, 0x42, 0x48, 0xc9, 0x17, 0xcf, 0x02,
-	0x5b, 0x5a, 0x0b, 0x40, 0xfe, 0x6c, 0x16, 0xbe, 0xc6, 0xa8, 0xb1, 0xd9, 0x77, 0x23, 0x0c, 0x4e,
-	0x50, 0xa1, 0xaf, 0x01, 0x0a, 0x0d, 0xdc, 0xb3, 0xc4, 0x2a, 0xc0, 0xb7, 0x1d, 0x55, 0xf0, 0xae,
-	0x4a, 0x5e, 0x84, 0x47, 0x28, 0xf0, 0x18, 0x2e, 0xed, 0xf7, 0x4a, 0x3c, 0xad, 0x05, 0xf8, 0x25,
-	0x75, 0xbc, 0xb0, 0x2d, 0xd7, 0xf1, 0xc9, 0x71, 0x23, 0x28, 0x5f, 0xd6, 0x71, 0x23, 0x8c, 0xcb,
-	0xa9, 0x87, 0xf7, 0xd4, 0xcc, 0x21, 0x44, 0x1d, 0x14, 0xdd, 0xec, 0xbe, 0x9e, 0xf8, 0xa9, 0xb4,
-	0xd2, 0x7a, 0xa5, 0x90, 0x35, 0x3c, 0x47, 0xc7, 0x5e, 0x95, 0xae, 0xc3, 0x9c, 0xed, 0x74, 0x83,
-	0x15, 0x38, 0xb3, 0x52, 0xec, 0x48, 0x38, 0x8e, 0x28, 0x46, 0x7e, 0xcd, 0x2b, 0x7f, 0x32, 0xbf,
-	0xe6, 0x89, 0x35, 0xc8, 0xb2, 0x38, 0x41, 0x78, 0x0b, 0x8b, 0xd7, 0x20, 0x09, 0xc7, 0x11, 0x05,
-	0xda, 0x89, 0x07, 0xcb, 0x8c, 0x88, 0xc8, 0xd5, 0x02, 0x83, 0x39, 0x7f, 0x92, 0xe8, 0xed, 0x67,
-	0xcf, 0x6b, 0x53, 0xef, 0x3f, 0xaf, 0x4d, 0x7d, 0xf8, 0xbc, 0x36, 0xf5, 0x83, 0x61, 0x4d, 0x79,
-	0x36, 0xac, 0x29, 0xef, 0x0f, 0x6b, 0xca, 0x87, 0xc3, 0x9a, 0xf2, 0x8f, 0x61, 0x4d, 0xf9, 0xf1,
-	0x47, 0xb5, 0xa9, 0xb7, 0x2f, 0x4f, 0xf8, 0xaf, 0x82, 0x7f, 0x07, 0x00, 0x00, 0xff, 0xff, 0x1d,
-	0x6c, 0xd7, 0xc5, 0x73, 0x20, 0x00, 0x00,
+	// 2592 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xec, 0x1a, 0x5b, 0x6f, 0x1b, 0x59,
+	0xb9, 0xe3, 0x49, 0x9c, 0xe4, 0x73, 0x6e, 0x3d, 0xbd, 0xe0, 0xa6, 0xc2, 0x4e, 0xa7, 0x12, 0xa4,
+	0xdd, 0xd6, 0xd9, 0x18, 0x28, 0x55, 0x17, 0x01, 0x76, 0x92, 0x16, 0x43, 0x9b, 0x66, 0x4f, 0x76,
+	0x4b, 0x77, 0xd9, 0x2e, 0x4c, 0xc6, 0x27, 0xc9, 0x10, 0x7b, 0xc6, 0x9d, 0x33, 0x4e, 0x1b, 0x71,
+	0x07, 0x09, 0xf1, 0x80, 0x80, 0x77, 0x96, 0x97, 0x7d, 0x40, 0x42, 0x42, 0x08, 0x89, 0x07, 0xde,
+	0x40, 0x02, 0x21, 0x2a, 0x1e, 0xa0, 0x5a, 0x5e, 0x56, 0x3c, 0x18, 0xea, 0xfd, 0x01, 0x80, 0x40,
+	0x3c, 0xf4, 0x09, 0x9d, 0xcb, 0x5c, 0xed, 0x71, 0xc7, 0xed, 0x6e, 0xb4, 0x5d, 0xed, 0x9b, 0xfd,
+	0x9d, 0xef, 0x76, 0xbe, 0xcb, 0xf9, 0xbe, 0xef, 0xcc, 0x81, 0x67, 0x76, 0x2f, 0xd2, 0x92, 0x69,
+	0x2f, 0xea, 0x2d, 0x73, 0xd1, 0x21, 0xd4, 0x6e, 0x3b, 0x06, 0x59, 0xdc, 0x5b, 0xda, 0x24, 0xae,
+	0xbe, 0xb4, 0xb8, 0x4d, 0x2c, 0xe2, 0xe8, 0x2e, 0xa9, 0x97, 0x5a, 0x8e, 0xed, 0xda, 0xe8, 0xa4,
+	0x40, 0x2e, 0xe9, 0x2d, 0xb3, 0xe4, 0x21, 0x97, 0x24, 0xf2, 0xdc, 0xf9, 0x6d, 0xd3, 0xdd, 0x69,
+	0x6f, 0x96, 0x0c, 0xbb, 0xb9, 0xb8, 0x6d, 0x6f, 0xdb, 0x8b, 0x9c, 0x66, 0xb3, 0xbd, 0xc5, 0xff,
+	0xf1, 0x3f, 0xfc, 0x97, 0xe0, 0x35, 0xa7, 0x85, 0x04, 0x1b, 0xb6, 0xc3, 0x84, 0xc6, 0xe5, 0xcd,
+	0x7d, 0x34, 0xc0, 0x69, 0xea, 0xc6, 0x8e, 0x69, 0x11, 0x67, 0x7f, 0xb1, 0xb5, 0xbb, 0x1d, 0xd5,
+	0x76, 0x18, 0x2a, 0xba, 0xd8, 0x24, 0xae, 0xde, 0x4f, 0xd6, 0x62, 0x12, 0x95, 0xd3, 0xb6, 0x5c,
+	0xb3, 0xd9, 0x2b, 0xe6, 0xc2, 0xa3, 0x08, 0xa8, 0xb1, 0x43, 0x9a, 0x7a, 0x9c, 0x4e, 0x7b, 0x5d,
+	0x85, 0x63, 0x95, 0x46, 0xc3, 0x36, 0x18, 0x6c, 0x85, 0xec, 0x99, 0x06, 0xd9, 0x70, 0x75, 0xb7,
+	0x4d, 0xd1, 0x87, 0x20, 0x5b, 0x77, 0xcc, 0x3d, 0xe2, 0xe4, 0x95, 0x79, 0x65, 0x61, 0xa2, 0x3a,
+	0x7d, 0xaf, 0x53, 0x3c, 0xd4, 0xed, 0x14, 0xb3, 0x2b, 0x1c, 0x8a, 0xe5, 0x2a, 0x9a, 0x87, 0x91,
+	0x96, 0x6d, 0x37, 0xf2, 0x19, 0x8e, 0x35, 0x29, 0xb1, 0x46, 0xd6, 0x6d, 0xbb, 0x81, 0xf9, 0x0a,
+	0xe7, 0xc4, 0x39, 0xe7, 0xd5, 0x18, 0x27, 0x0e, 0xc5, 0x72, 0x15, 0x19, 0x00, 0x86, 0x6d, 0xd5,
+	0x4d, 0xd7, 0xb4, 0x2d, 0x9a, 0x1f, 0x99, 0x57, 0x17, 0x72, 0xe5, 0xc5, 0x52, 0xe0, 0x65, 0x7f,
+	0x63, 0xa5, 0xd6, 0xee, 0x36, 0x03, 0xd0, 0x12, 0xb3, 0x5f, 0x69, 0x6f, 0xa9, 0xb4, 0xec, 0xd1,
+	0x55, 0x91, 0x64, 0x0e, 0x3e, 0x88, 0xe2, 0x10, 0x5b, 0x74, 0x1d, 0x46, 0xea, 0xba, 0xab, 0xe7,
+	0x47, 0xe7, 0x95, 0x85, 0x5c, 0xf9, 0x7c, 0x22, 0x7b, 0x69, 0xb7, 0x12, 0xd6, 0xef, 0xac, 0xde,
+	0x75, 0x89, 0x45, 0x19, 0x73, 0x7f, 0x77, 0x2b, 0xba, 0xab, 0x63, 0xce, 0x08, 0xe9, 0x90, 0xb3,
+	0x88, 0x7b, 0xc7, 0x76, 0x76, 0x19, 0x30, 0x9f, 0xe5, 0x7c, 0x4b, 0xa5, 0x01, 0xc1, 0x59, 0x5a,
+	0x93, 0xf8, 0x7c, 0xdb, 0x8c, 0xaa, 0x3a, 0xd3, 0xed, 0x14, 0x73, 0x6b, 0x01, 0x1b, 0x1c, 0xe6,
+	0xa9, 0xfd, 0x49, 0x81, 0x59, 0xe9, 0x24, 0xd3, 0xb6, 0x30, 0xa1, 0xed, 0x86, 0x8b, 0x5e, 0x85,
+	0x31, 0x61, 0x37, 0xca, 0x1d, 0x94, 0x2b, 0x7f, 0x64, 0xa0, 0x4c, 0x21, 0x2c, 0xce, 0xa5, 0x3a,
+	0x23, 0x77, 0x34, 0x26, 0xd6, 0x29, 0xf6, 0x98, 0xa2, 0x1b, 0x30, 0x69, 0xd9, 0x75, 0xb2, 0x41,
+	0x1a, 0xc4, 0x70, 0x6d, 0x87, 0xfb, 0x2e, 0x57, 0x9e, 0x0f, 0x0b, 0x61, 0x99, 0xc2, 0xac, 0xbf,
+	0x16, 0xc2, 0xab, 0xce, 0x76, 0x3b, 0xc5, 0xc9, 0x30, 0x04, 0x47, 0xf8, 0x68, 0x7f, 0x53, 0x21,
+	0x57, 0xd5, 0xa9, 0x69, 0x08, 0x89, 0xe8, 0x6b, 0x00, 0xba, 0xeb, 0x3a, 0xe6, 0x66, 0xdb, 0xe5,
+	0x5b, 0x61, 0x5e, 0xbf, 0x38, 0x70, 0x2b, 0x21, 0xea, 0x52, 0xc5, 0x27, 0x5d, 0xb5, 0x5c, 0x67,
+	0xbf, 0x7a, 0xda, 0x73, 0x7f, 0xb0, 0xf0, 0xed, 0xbf, 0x17, 0xa7, 0x9e, 0x6f, 0xeb, 0x0d, 0x73,
+	0xcb, 0x24, 0xf5, 0x35, 0xbd, 0x49, 0x70, 0x48, 0x20, 0x6a, 0xc3, 0xb8, 0xa1, 0xb7, 0x74, 0xc3,
+	0x74, 0xf7, 0xf3, 0x19, 0x2e, 0xfc, 0x42, 0x6a, 0xe1, 0xcb, 0x92, 0x50, 0x88, 0x3e, 0x25, 0x45,
+	0x8f, 0x7b, 0xe0, 0x5e, 0xc1, 0xbe, 0xa8, 0xb9, 0x5d, 0x98, 0x89, 0xa9, 0x8e, 0x66, 0x41, 0xdd,
+	0x25, 0xfb, 0x22, 0xdb, 0x30, 0xfb, 0x89, 0xaa, 0x30, 0xba, 0xa7, 0x37, 0xda, 0x84, 0xe7, 0x56,
+	0xae, 0x7c, 0x2e, 0x8d, 0x83, 0x3d, 0xa6, 0x58, 0x90, 0x5e, 0xca, 0x5c, 0x54, 0xe6, 0x76, 0x60,
+	0x2a, 0xa2, 0x6a, 0x1f, 0x51, 0x95, 0xa8, 0xa8, 0x67, 0x52, 0x88, 0xf2, 0x58, 0x86, 0x24, 0x69,
+	0x57, 0xe0, 0xf0, 0xf2, 0xea, 0x55, 0x79, 0x8e, 0x48, 0x8f, 0xa3, 0x32, 0x00, 0xb9, 0xdb, 0x72,
+	0x08, 0x65, 0x39, 0x24, 0x4f, 0x13, 0x3f, 0x4d, 0x57, 0xfd, 0x15, 0x1c, 0xc2, 0xd2, 0xfe, 0x93,
+	0x81, 0x49, 0x4f, 0x00, 0x3b, 0x4a, 0xd8, 0x31, 0x63, 0xe9, 0x4d, 0x22, 0xc9, 0xfd, 0x44, 0xe4,
+	0x66, 0xe5, 0x2b, 0xe8, 0x8b, 0x30, 0x6e, 0x5a, 0x46, 0xa3, 0x5d, 0x27, 0x54, 0x7a, 0x72, 0x69,
+	0xe0, 0x2e, 0xc2, 0xec, 0xaf, 0x99, 0x77, 0x4d, 0x0b, 0x93, 0xad, 0xea, 0xac, 0xe7, 0xc4, 0x9a,
+	0x64, 0x85, 0x7d, 0xa6, 0x68, 0x2f, 0x14, 0x2a, 0x2a, 0x17, 0xf0, 0xf1, 0xd4, 0x02, 0x9e, 0x24,
+	0x56, 0x0e, 0xce, 0x7d, 0xaf, 0x65, 0xe0, 0x70, 0x8f, 0x59, 0x52, 0x98, 0xfe, 0x2b, 0x3d, 0x49,
+	0xf4, 0x89, 0xe1, 0x4c, 0xff, 0x74, 0x98, 0xe7, 0x22, 0x1c, 0xed, 0x17, 0x34, 0x8f, 0x36, 0x90,
+	0xf6, 0xdf, 0x2c, 0xcc, 0x2c, 0xdb, 0xcd, 0x96, 0x4d, 0x4d, 0x97, 0xc8, 0x83, 0xef, 0xa5, 0x50,
+	0xbc, 0x8a, 0x63, 0x2f, 0x8d, 0x5e, 0xa9, 0x22, 0xf5, 0x5b, 0x4a, 0xe4, 0x50, 0x4d, 0xe5, 0x92,
+	0xa8, 0x76, 0x4f, 0x7e, 0xb0, 0xee, 0xf7, 0x64, 0xcb, 0xa5, 0xa1, 0x14, 0x78, 0xfc, 0x88, 0x40,
+	0x5f, 0x85, 0x59, 0xc3, 0xb6, 0x68, 0xbb, 0x49, 0xa8, 0x87, 0x2e, 0xdb, 0x89, 0x0b, 0x43, 0x78,
+	0x7e, 0x99, 0xb3, 0x68, 0xf1, 0xae, 0x22, 0x2f, 0xc5, 0xcf, 0x2e, 0xc7, 0xf8, 0xe2, 0x1e, 0x49,
+	0xe8, 0x1c, 0x8c, 0xb3, 0x82, 0xc7, 0x74, 0xe2, 0x5d, 0xc6, 0x44, 0xe0, 0xaa, 0x35, 0x09, 0xc7,
+	0x3e, 0x46, 0x4f, 0x99, 0xcd, 0xbe, 0x3d, 0x65, 0x96, 0x69, 0xa1, 0x37, 0x1a, 0x0c, 0x81, 0xe6,
+	0xc7, 0xe6, 0x95, 0x85, 0xf1, 0x40, 0x8b, 0x8a, 0x84, 0x63, 0x1f, 0xe3, 0xbd, 0x5a, 0x8e, 0xfe,
+	0xa7, 0xc2, 0xd1, 0x58, 0x5c, 0x89, 0x23, 0xed, 0xbb, 0x4a, 0x9f, 0xae, 0xa3, 0x32, 0x4c, 0x7c,
+	0x8a, 0x63, 0xeb, 0x89, 0xb3, 0xe4, 0xeb, 0x3d, 0x27, 0xe7, 0xa7, 0x86, 0xd7, 0xe2, 0xfd, 0x3e,
+	0x24, 0xee, 0xf8, 0xfb, 0x0a, 0xc8, 0xe9, 0x22, 0x45, 0xf5, 0xaa, 0xc1, 0xe8, 0x26, 0xeb, 0xea,
+	0xa4, 0xcc, 0x85, 0xb4, 0xfd, 0x5f, 0x75, 0xa2, 0xdb, 0x29, 0x8e, 0x72, 0x00, 0x16, 0x1c, 0xd0,
+	0x4b, 0x30, 0x61, 0x78, 0x1e, 0x92, 0x1d, 0xf3, 0xb9, 0x61, 0xfc, 0x59, 0x9d, 0xea, 0x76, 0x8a,
+	0x13, 0x3e, 0x10, 0x07, 0xdc, 0xb4, 0xef, 0x67, 0xe0, 0x83, 0xf1, 0x26, 0x7e, 0xd9, 0xb6, 0xb6,
+	0xcc, 0xed, 0xb6, 0xc3, 0xff, 0xa0, 0x4f, 0x43, 0x56, 0x70, 0x97, 0x7b, 0x5d, 0xf0, 0xe6, 0xac,
+	0x0d, 0x0e, 0x7d, 0xd8, 0x29, 0x1e, 0x8f, 0x93, 0x8a, 0x15, 0x2c, 0xe9, 0xd0, 0x02, 0x8c, 0x3b,
+	0xe4, 0x76, 0x9b, 0x50, 0x57, 0x14, 0x8d, 0x89, 0xea, 0x24, 0x0b, 0x24, 0x2c, 0x61, 0xd8, 0x5f,
+	0x45, 0xdf, 0x80, 0x23, 0x62, 0x50, 0x88, 0xa8, 0x20, 0xb7, 0xfc, 0x6c, 0x1a, 0xaf, 0x85, 0xe9,
+	0xaa, 0x27, 0xa5, 0xaa, 0x47, 0xfa, 0x2c, 0xe2, 0x7e, 0x92, 0xb4, 0xb7, 0x14, 0x38, 0xde, 0x7f,
+	0xa6, 0x41, 0x04, 0xc6, 0x1c, 0xfe, 0xcb, 0x4b, 0xec, 0x4b, 0x29, 0xf4, 0x91, 0x7b, 0x4c, 0x1e,
+	0x90, 0xc4, 0x7f, 0x8a, 0x3d, 0xde, 0x68, 0x13, 0xb2, 0x06, 0x57, 0x49, 0x26, 0xee, 0xa5, 0xa1,
+	0xe6, 0xaf, 0xe8, 0xfe, 0xfd, 0x91, 0x58, 0x80, 0xb1, 0xe4, 0xac, 0xfd, 0x4c, 0x81, 0x99, 0x58,
+	0x42, 0xa1, 0x02, 0xa8, 0xa6, 0xe5, 0xf2, 0x60, 0x55, 0x85, 0x7f, 0x6a, 0x96, 0x7b, 0x83, 0x85,
+	0x3e, 0x66, 0x0b, 0xe8, 0x14, 0x8c, 0x6c, 0xb2, 0x81, 0x5c, 0xe5, 0xa7, 0x3e, 0x0f, 0xa8, 0xaa,
+	0x6d, 0x37, 0x04, 0x06, 0x5f, 0x42, 0x1f, 0x86, 0x2c, 0x75, 0x1d, 0xd3, 0xda, 0xce, 0x8f, 0xf0,
+	0x48, 0xe1, 0xe3, 0xe7, 0x06, 0x87, 0x08, 0x34, 0xb9, 0x8c, 0xce, 0xc2, 0xd8, 0x1e, 0x71, 0x78,
+	0xdf, 0x2e, 0x4b, 0x19, 0x2b, 0x3b, 0x37, 0x04, 0x48, 0xa0, 0x7a, 0x08, 0x1a, 0x81, 0xe9, 0x68,
+	0x42, 0xa2, 0x0d, 0x2f, 0x99, 0x95, 0x9e, 0xa1, 0xb8, 0x67, 0x96, 0x0f, 0x2c, 0xf6, 0x7c, 0x5b,
+	0xb7, 0x5c, 0xd3, 0xdd, 0xaf, 0x4e, 0x49, 0xa3, 0x8c, 0x0a, 0x41, 0x82, 0x97, 0xf6, 0x2b, 0x15,
+	0x4e, 0x24, 0x16, 0x6a, 0x74, 0x11, 0x26, 0x8d, 0x50, 0x8b, 0x26, 0x33, 0xe1, 0xa8, 0xe4, 0x14,
+	0x19, 0x29, 0x70, 0x04, 0x13, 0x35, 0x7a, 0xc6, 0x87, 0x4f, 0x3e, 0x5e, 0xb3, 0x90, 0xaa, 0x43,
+	0xfb, 0x8e, 0xd2, 0xd3, 0x1e, 0xad, 0x3c, 0x9e, 0xb8, 0xa7, 0xa3, 0x75, 0xfe, 0x75, 0x06, 0x0a,
+	0x83, 0x2d, 0x96, 0xe2, 0xa0, 0xfe, 0x9e, 0xd2, 0x53, 0x2d, 0x6b, 0x4f, 0xe0, 0xa3, 0xa7, 0xc3,
+	0x72, 0xab, 0x70, 0xea, 0x91, 0xa1, 0x96, 0x62, 0x02, 0xf9, 0x79, 0x06, 0x72, 0x92, 0x4f, 0x43,
+	0x37, 0x9b, 0xe8, 0x66, 0xe8, 0xa8, 0x17, 0xa7, 0xe4, 0xd9, 0xf4, 0xa7, 0x64, 0x10, 0xda, 0x7d,
+	0x4a, 0x43, 0x1d, 0x72, 0xac, 0x27, 0x76, 0x1d, 0xdd, 0xb4, 0x5c, 0x2f, 0x97, 0xce, 0xa7, 0x2b,
+	0x09, 0x92, 0xaa, 0x7a, 0x44, 0xf2, 0xcf, 0x05, 0x30, 0x8a, 0xc3, 0x6c, 0xd1, 0x2d, 0xff, 0xf4,
+	0x15, 0xd9, 0xf3, 0xb1, 0x34, 0x02, 0xd8, 0xce, 0xd3, 0x1d, 0xbc, 0x7f, 0x50, 0x20, 0x9f, 0x44,
+	0x14, 0x29, 0x93, 0xca, 0xe3, 0x94, 0xc9, 0xcc, 0x81, 0x95, 0xc9, 0xdf, 0x2a, 0x21, 0xb7, 0x53,
+	0x8a, 0xbe, 0x04, 0xe3, 0x4d, 0xe2, 0xea, 0xfc, 0x0a, 0x54, 0xe9, 0xd1, 0x62, 0xc0, 0x0d, 0xeb,
+	0xf5, 0xcd, 0x2f, 0x13, 0xc3, 0xbd, 0x46, 0x5c, 0x3d, 0xb8, 0xbb, 0x09, 0x60, 0xd8, 0xe7, 0x8a,
+	0xd6, 0x60, 0x84, 0xb6, 0x88, 0x31, 0x44, 0xaf, 0xc8, 0x35, 0xdb, 0x68, 0x11, 0x23, 0x08, 0x5c,
+	0xf6, 0x0f, 0x73, 0x3e, 0xda, 0x8f, 0xc3, 0x9e, 0xa0, 0x34, 0xea, 0x89, 0x04, 0xfb, 0x2a, 0x07,
+	0x66, 0xdf, 0xdf, 0xf8, 0x05, 0x9a, 0x6b, 0x77, 0xd5, 0xa4, 0x2e, 0x7a, 0xa5, 0xc7, 0xc6, 0xa5,
+	0x74, 0x36, 0x66, 0xd4, 0xdc, 0xc2, 0x7e, 0x7a, 0x79, 0x90, 0x90, 0x7d, 0xaf, 0xc1, 0xa8, 0xe9,
+	0x92, 0xa6, 0x97, 0x58, 0x0b, 0x69, 0x0d, 0x1c, 0x94, 0xd3, 0x1a, 0x23, 0xc7, 0x82, 0x8b, 0xf6,
+	0xe7, 0xe8, 0x06, 0x98, 0xe1, 0xd1, 0x2b, 0x30, 0x41, 0xe5, 0x1c, 0x39, 0xcc, 0xd5, 0x84, 0x3f,
+	0x9b, 0x1e, 0x96, 0x92, 0x26, 0x3c, 0x08, 0xc5, 0x01, 0xc3, 0x50, 0xe6, 0x66, 0x86, 0xc9, 0xdc,
+	0x98, 0xeb, 0x13, 0x33, 0xf7, 0x36, 0xf4, 0xf3, 0x1e, 0x7a, 0x19, 0xb2, 0x76, 0x4b, 0xbf, 0xed,
+	0x37, 0x23, 0x83, 0x6f, 0x02, 0xae, 0x73, 0xd4, 0x7e, 0x21, 0x02, 0x4c, 0xa4, 0x58, 0xc6, 0x92,
+	0xa3, 0xf6, 0x03, 0x05, 0x66, 0xe3, 0x47, 0xd8, 0x10, 0x87, 0xc4, 0x3a, 0x4c, 0x37, 0x75, 0xd7,
+	0xd8, 0xf1, 0x5b, 0x3c, 0xf9, 0x2d, 0x65, 0xa1, 0xdb, 0x29, 0x4e, 0x5f, 0x8b, 0xac, 0x3c, 0xec,
+	0x14, 0xd1, 0xe5, 0x76, 0xa3, 0xb1, 0x1f, 0xad, 0x4b, 0x31, 0x7a, 0xed, 0x87, 0x7e, 0xd6, 0xa7,
+	0x2d, 0xad, 0xaf, 0x86, 0x07, 0x17, 0x91, 0xba, 0x4b, 0x43, 0x0f, 0xa2, 0x03, 0xa6, 0x97, 0xb2,
+	0xd7, 0x1c, 0x0e, 0x51, 0xb2, 0xfe, 0xad, 0xc2, 0x54, 0xa4, 0xec, 0xa4, 0xd8, 0x47, 0x05, 0x66,
+	0xea, 0x41, 0xc4, 0xf0, 0x3b, 0x18, 0x61, 0xcc, 0x0f, 0x48, 0xe4, 0x70, 0xb0, 0x73, 0xba, 0x38,
+	0x7e, 0x34, 0xfa, 0xd5, 0xb7, 0x3b, 0xfa, 0x6f, 0xc0, 0xb4, 0xee, 0x0f, 0x01, 0xd7, 0xec, 0x3a,
+	0x91, 0x2d, 0x78, 0x49, 0x52, 0x4d, 0x57, 0x22, 0xab, 0x0f, 0x3b, 0xc5, 0xa3, 0xf1, 0xd1, 0x81,
+	0xc1, 0x71, 0x8c, 0x0b, 0x3a, 0x0d, 0xa3, 0x86, 0xdd, 0xb6, 0x5c, 0xde, 0xa7, 0xab, 0x41, 0xb2,
+	0x2f, 0x33, 0x20, 0x16, 0x6b, 0x68, 0x09, 0x72, 0x7a, 0xbd, 0x69, 0x5a, 0x15, 0xc3, 0x20, 0x94,
+	0xf2, 0xbb, 0xa6, 0x71, 0xd1, 0xfc, 0x57, 0x02, 0x30, 0x0e, 0xe3, 0xa0, 0x26, 0x4c, 0x6f, 0x99,
+	0x0e, 0x75, 0x2b, 0x7b, 0xba, 0xd9, 0xd0, 0x37, 0x1b, 0x24, 0x3f, 0x96, 0xba, 0xa0, 0x6f, 0xb4,
+	0x37, 0xbd, 0x86, 0xe1, 0xb8, 0xb7, 0xbd, 0xcb, 0x11, 0x66, 0x38, 0xc6, 0x5c, 0xfb, 0xa7, 0xe2,
+	0x4d, 0xb9, 0x09, 0x03, 0x19, 0x3a, 0xc3, 0xa6, 0x3b, 0xbe, 0x24, 0xc3, 0x20, 0x34, 0xa1, 0x71,
+	0x30, 0xf6, 0xd6, 0x43, 0x9f, 0x30, 0x33, 0xa9, 0x3e, 0x61, 0xaa, 0x29, 0x3e, 0x61, 0x8e, 0x0c,
+	0xfc, 0x84, 0x19, 0x33, 0xf0, 0xe8, 0xa3, 0x0d, 0xac, 0x7d, 0xc1, 0xcb, 0x0c, 0xff, 0xea, 0xae,
+	0x06, 0xaa, 0x41, 0x1a, 0x7d, 0x4a, 0x47, 0x9f, 0x2c, 0x8c, 0x7f, 0x6c, 0xa9, 0x8e, 0x75, 0x3b,
+	0x45, 0x75, 0x79, 0xf5, 0x2a, 0x66, 0x3c, 0xb4, 0x37, 0x32, 0xde, 0xc9, 0x14, 0xf8, 0xe2, 0xfd,
+	0x2c, 0x7a, 0xb2, 0x2c, 0xd2, 0x7e, 0xa1, 0xc0, 0xe1, 0x9e, 0x4f, 0xb8, 0xe8, 0x39, 0x98, 0x32,
+	0x2d, 0x97, 0x38, 0x5b, 0xba, 0x21, 0xee, 0x7e, 0x85, 0x79, 0x8f, 0x49, 0x16, 0x53, 0xb5, 0xf0,
+	0x22, 0x8e, 0xe2, 0xa2, 0x13, 0xa0, 0x9a, 0x2d, 0xef, 0xce, 0x85, 0xbb, 0xb0, 0xb6, 0x4e, 0x31,
+	0x83, 0x31, 0x5f, 0xec, 0xe8, 0x4e, 0xfd, 0x8e, 0xee, 0x90, 0x4a, 0xbd, 0xee, 0xb0, 0xb0, 0x52,
+	0xa3, 0xbe, 0xf8, 0x4c, 0x74, 0x19, 0xc7, 0xf1, 0xb5, 0x9f, 0x2a, 0x70, 0x22, 0xb1, 0xa2, 0xa5,
+	0xfe, 0xd0, 0xaf, 0x03, 0xb4, 0x74, 0x47, 0x6f, 0x12, 0x97, 0x38, 0x54, 0xd6, 0x88, 0x21, 0xbf,
+	0x9f, 0xfb, 0x9d, 0xe3, 0xba, 0xcf, 0x08, 0x87, 0x98, 0x6a, 0x3f, 0xc9, 0xc0, 0x14, 0x96, 0x81,
+	0x21, 0xc6, 0x94, 0x77, 0xbe, 0x5f, 0x5d, 0x8f, 0xf4, 0xab, 0x83, 0xd3, 0x2d, 0xa2, 0x5b, 0x52,
+	0xc7, 0x8a, 0x6e, 0x42, 0x96, 0xf2, 0x37, 0x14, 0xa9, 0xae, 0xc3, 0xa2, 0x3c, 0x39, 0x5d, 0xe0,
+	0x02, 0xf1, 0x1f, 0x4b, 0x7e, 0x5a, 0x57, 0x81, 0x42, 0x04, 0x5f, 0x7e, 0x8e, 0x70, 0x30, 0xd9,
+	0x22, 0x0e, 0xb1, 0x0c, 0xc2, 0xef, 0xfd, 0x5b, 0xe6, 0x15, 0xc7, 0x6e, 0xb7, 0xa4, 0x3f, 0x83,
+	0x7b, 0xff, 0xf5, 0x1a, 0x87, 0x63, 0x1f, 0x83, 0x61, 0x7b, 0x0a, 0xc9, 0xa8, 0x0a, 0x4d, 0x76,
+	0x02, 0x8e, 0x7d, 0x0c, 0xff, 0xe0, 0x18, 0x49, 0x3c, 0x38, 0xaa, 0xa0, 0xb6, 0xcd, 0xba, 0xbc,
+	0x2b, 0x7a, 0x56, 0x22, 0xa8, 0x2f, 0xd6, 0x56, 0x1e, 0x76, 0x8a, 0xa7, 0x92, 0x9e, 0xa8, 0xb8,
+	0xfb, 0x2d, 0x42, 0x4b, 0x2f, 0xd6, 0x56, 0x30, 0x23, 0xd6, 0x7e, 0xa7, 0xc0, 0xe1, 0xc8, 0x26,
+	0x0f, 0xa0, 0xa9, 0xbe, 0x1e, 0x6d, 0xaa, 0xcf, 0xa6, 0xf7, 0x58, 0x42, 0x5b, 0xbd, 0x13, 0xdb,
+	0x03, 0xef, 0xab, 0x37, 0xe2, 0x4f, 0x36, 0x16, 0xd2, 0x0e, 0xad, 0xc9, 0xef, 0x34, 0xb4, 0x3f,
+	0x66, 0xe0, 0x48, 0x9f, 0x18, 0x42, 0xb7, 0x00, 0x82, 0xc3, 0x4d, 0xca, 0x1b, 0x5c, 0xb4, 0x7b,
+	0xee, 0x3e, 0xa7, 0xf9, 0x97, 0x8c, 0x00, 0x1a, 0x62, 0x88, 0x1c, 0xc8, 0x39, 0x84, 0x12, 0x67,
+	0x8f, 0xd4, 0x2f, 0xdb, 0x8e, 0xb4, 0xdb, 0x73, 0xe9, 0xed, 0xd6, 0x13, 0xb9, 0xc1, 0xcc, 0x8f,
+	0x03, 0xbe, 0x38, 0x2c, 0x04, 0xdd, 0x0a, 0xec, 0x27, 0x3e, 0xe7, 0x95, 0xd3, 0xec, 0x27, 0xfa,
+	0xae, 0x69, 0x80, 0x25, 0xff, 0xaa, 0xc0, 0xb1, 0x88, 0x8e, 0x2f, 0x90, 0x66, 0xab, 0xa1, 0xbb,
+	0xe4, 0x00, 0x4e, 0xa1, 0x9b, 0x91, 0x53, 0xe8, 0x42, 0x7a, 0x3b, 0x7a, 0x3a, 0x26, 0xce, 0xcf,
+	0x6f, 0x28, 0x70, 0xa2, 0x2f, 0xc5, 0x01, 0xa4, 0xd5, 0xe7, 0xa3, 0x69, 0x55, 0x1e, 0x7e, 0x5b,
+	0x09, 0xe9, 0xf5, 0x97, 0xa4, 0x4d, 0xf1, 0x3c, 0x7b, 0x0a, 0x8b, 0x86, 0xf6, 0x4b, 0x05, 0x26,
+	0x3d, 0xcc, 0x94, 0x0f, 0x5e, 0xca, 0x00, 0xf2, 0x39, 0x9f, 0x77, 0xa7, 0xa4, 0x06, 0x6a, 0x5f,
+	0xf1, 0x57, 0x70, 0x08, 0x0b, 0x7d, 0x16, 0x90, 0xa7, 0xe0, 0x46, 0x83, 0xb7, 0x02, 0xac, 0xdb,
+	0x51, 0x39, 0xed, 0x9c, 0xa4, 0x45, 0xb8, 0x07, 0x03, 0xf7, 0xa1, 0xd2, 0x7e, 0xaf, 0x04, 0xd5,
+	0x9a, 0x83, 0xdf, 0xa5, 0x86, 0xe7, 0xba, 0x25, 0x1a, 0x3e, 0x5c, 0x6e, 0x38, 0xe6, 0xbb, 0xb5,
+	0xdc, 0x70, 0xe5, 0x12, 0xf2, 0xe1, 0x5f, 0xa1, 0x22, 0xc0, 0xf1, 0xf8, 0x98, 0x4d, 0xd1, 0xba,
+	0x3f, 0xb7, 0x28, 0xa9, 0x6f, 0x8b, 0xc4, 0x28, 0x9f, 0x34, 0xe1, 0xbc, 0xa6, 0xc0, 0x89, 0x7a,
+	0xd2, 0x7d, 0x74, 0xaa, 0x32, 0x30, 0xf8, 0x36, 0xdb, 0xbf, 0x86, 0x4f, 0xfe, 0xc8, 0x83, 0x93,
+	0x15, 0x40, 0x3b, 0xb1, 0xef, 0x3f, 0x62, 0xf2, 0x28, 0x0d, 0xf7, 0x1a, 0x29, 0xcd, 0xf7, 0x22,
+	0xed, 0xf5, 0xd1, 0x58, 0xdc, 0xf0, 0xa3, 0x27, 0x6d, 0x33, 0xfd, 0xb9, 0xd0, 0xab, 0xd9, 0x5c,
+	0xf9, 0x4c, 0xaa, 0x00, 0x60, 0x62, 0xfb, 0x4e, 0xa7, 0xe1, 0x17, 0x27, 0xea, 0xd0, 0x2f, 0x4e,
+	0x46, 0xde, 0x81, 0x17, 0x27, 0xa3, 0x8f, 0x7a, 0x71, 0x82, 0xd6, 0x82, 0x5a, 0x9e, 0xe5, 0x3e,
+	0x3a, 0x9d, 0x22, 0x68, 0x06, 0x3e, 0x57, 0x3d, 0xde, 0x22, 0x8e, 0x00, 0x07, 0x4a, 0xb2, 0x98,
+	0x14, 0xaf, 0x5f, 0x0a, 0x92, 0xf2, 0xf8, 0x7a, 0x5f, 0x2c, 0x9c, 0x40, 0x8d, 0xb6, 0x60, 0x2a,
+	0xec, 0x76, 0x9a, 0x1f, 0xe7, 0xda, 0x9e, 0x49, 0x1d, 0x51, 0xc1, 0x04, 0x18, 0x86, 0x52, 0x1c,
+	0x65, 0x8b, 0x5e, 0x80, 0x6c, 0x93, 0xe7, 0x6c, 0x7e, 0x62, 0x88, 0xa1, 0x21, 0x94, 0xeb, 0xe2,
+	0x66, 0x52, 0xfc, 0xc6, 0x92, 0x57, 0xb5, 0x72, 0xef, 0x41, 0xe1, 0xd0, 0xfd, 0x07, 0x85, 0x43,
+	0x6f, 0x3e, 0x28, 0x1c, 0xfa, 0x66, 0xb7, 0xa0, 0xdc, 0xeb, 0x16, 0x94, 0xfb, 0xdd, 0x82, 0xf2,
+	0x66, 0xb7, 0xa0, 0xfc, 0xa3, 0x5b, 0x50, 0x7e, 0xf4, 0x56, 0xe1, 0xd0, 0xcb, 0x27, 0x07, 0x3c,
+	0xbb, 0xff, 0x7f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x34, 0xb4, 0xa9, 0x78, 0x94, 0x2f, 0x00, 0x00,
 }
 
 func (m *AllocatedDeviceStatus) Marshal() (dAtA []byte, err error) {
@@ -1436,6 +1793,377 @@ func (m *CELDeviceSelector) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *CapacityPool) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CapacityPool) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CapacityPool) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Capacity) > 0 {
+		keysForCapacity := make([]string, 0, len(m.Capacity))
+		for k := range m.Capacity {
+			keysForCapacity = append(keysForCapacity, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		for iNdEx := len(keysForCapacity) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Capacity[QualifiedName(keysForCapacity[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCapacity[iNdEx])
+			copy(dAtA[i:], keysForCapacity[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCapacity[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	if len(m.Includes) > 0 {
+		for iNdEx := len(m.Includes) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Includes[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *CapacityPoolMixin) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CapacityPoolMixin) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CapacityPoolMixin) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Capacity) > 0 {
+		keysForCapacity := make([]string, 0, len(m.Capacity))
+		for k := range m.Capacity {
+			keysForCapacity = append(keysForCapacity, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		for iNdEx := len(keysForCapacity) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Capacity[QualifiedName(keysForCapacity[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCapacity[iNdEx])
+			copy(dAtA[i:], keysForCapacity[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCapacity[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *CapacityPoolMixinRef) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CapacityPoolMixinRef) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CapacityPoolMixinRef) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *CompositeDevice) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CompositeDevice) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CompositeDevice) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i--
+	if m.AllNodes {
+		dAtA[i] = 1
+	} else {
+		dAtA[i] = 0
+	}
+	i--
+	dAtA[i] = 0x38
+	if m.NodeSelector != nil {
+		{
+			size, err := m.NodeSelector.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x32
+	}
+	i -= len(m.NodeName)
+	copy(dAtA[i:], m.NodeName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.NodeName)))
+	i--
+	dAtA[i] = 0x2a
+	if len(m.ConsumesCapacity) > 0 {
+		for iNdEx := len(m.ConsumesCapacity) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ConsumesCapacity[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if len(m.Capacity) > 0 {
+		keysForCapacity := make([]string, 0, len(m.Capacity))
+		for k := range m.Capacity {
+			keysForCapacity = append(keysForCapacity, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		for iNdEx := len(keysForCapacity) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Capacity[QualifiedName(keysForCapacity[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCapacity[iNdEx])
+			copy(dAtA[i:], keysForCapacity[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCapacity[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	if len(m.Attributes) > 0 {
+		keysForAttributes := make([]string, 0, len(m.Attributes))
+		for k := range m.Attributes {
+			keysForAttributes = append(keysForAttributes, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForAttributes)
+		for iNdEx := len(keysForAttributes) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Attributes[QualifiedName(keysForAttributes[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForAttributes[iNdEx])
+			copy(dAtA[i:], keysForAttributes[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForAttributes[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.Includes) > 0 {
+		for iNdEx := len(m.Includes) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Includes[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *CompositeDeviceMixin) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *CompositeDeviceMixin) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *CompositeDeviceMixin) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Capacity) > 0 {
+		keysForCapacity := make([]string, 0, len(m.Capacity))
+		for k := range m.Capacity {
+			keysForCapacity = append(keysForCapacity, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		for iNdEx := len(keysForCapacity) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Capacity[QualifiedName(keysForCapacity[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCapacity[iNdEx])
+			copy(dAtA[i:], keysForCapacity[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCapacity[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.Attributes) > 0 {
+		keysForAttributes := make([]string, 0, len(m.Attributes))
+		for k := range m.Attributes {
+			keysForAttributes = append(keysForAttributes, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForAttributes)
+		for iNdEx := len(keysForAttributes) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Attributes[QualifiedName(keysForAttributes[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForAttributes[iNdEx])
+			copy(dAtA[i:], keysForAttributes[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForAttributes[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *Device) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -1456,6 +2184,18 @@ func (m *Device) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Composite != nil {
+		{
+			size, err := m.Composite.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	if m.Basic != nil {
 		{
 			size, err := m.Basic.MarshalToSizedBuffer(dAtA[:i])
@@ -1654,6 +2394,162 @@ func (m *DeviceCapacity) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i -= size
 		i = encodeVarintGenerated(dAtA, i, uint64(size))
 	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *DeviceCapacityConsumption) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeviceCapacityConsumption) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeviceCapacityConsumption) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Capacity) > 0 {
+		keysForCapacity := make([]string, 0, len(m.Capacity))
+		for k := range m.Capacity {
+			keysForCapacity = append(keysForCapacity, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		for iNdEx := len(keysForCapacity) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Capacity[QualifiedName(keysForCapacity[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCapacity[iNdEx])
+			copy(dAtA[i:], keysForCapacity[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCapacity[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	if len(m.Includes) > 0 {
+		for iNdEx := len(m.Includes) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Includes[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.CapacityPool)
+	copy(dAtA[i:], m.CapacityPool)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.CapacityPool)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *DeviceCapacityConsumptionMixin) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeviceCapacityConsumptionMixin) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeviceCapacityConsumptionMixin) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Capacity) > 0 {
+		keysForCapacity := make([]string, 0, len(m.Capacity))
+		for k := range m.Capacity {
+			keysForCapacity = append(keysForCapacity, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		for iNdEx := len(keysForCapacity) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Capacity[QualifiedName(keysForCapacity[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForCapacity[iNdEx])
+			copy(dAtA[i:], keysForCapacity[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForCapacity[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *DeviceCapacityConsumptionMixinRef) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeviceCapacityConsumptionMixinRef) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeviceCapacityConsumptionMixinRef) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
 	i--
 	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
@@ -2011,6 +2907,74 @@ func (m *DeviceConstraint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			dAtA[i] = 0xa
 		}
 	}
+	return len(dAtA) - i, nil
+}
+
+func (m *DeviceMixin) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeviceMixin) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeviceMixin) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Composite != nil {
+		{
+			size, err := m.Composite.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *DeviceMixinRef) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *DeviceMixinRef) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *DeviceMixinRef) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -2812,6 +3776,71 @@ func (m *ResourceSliceList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *ResourceSliceMixins) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ResourceSliceMixins) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ResourceSliceMixins) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.CapacityPool) > 0 {
+		for iNdEx := len(m.CapacityPool) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.CapacityPool[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	if len(m.DeviceCapacityConsumption) > 0 {
+		for iNdEx := len(m.DeviceCapacityConsumption) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.DeviceCapacityConsumption[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if len(m.Device) > 0 {
+		for iNdEx := len(m.Device) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Device[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *ResourceSliceSpec) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -2832,6 +3861,40 @@ func (m *ResourceSliceSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Mixins != nil {
+		{
+			size, err := m.Mixins.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x4a
+	}
+	if len(m.CapacityPools) > 0 {
+		for iNdEx := len(m.CapacityPools) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.CapacityPools[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x42
+		}
+	}
+	i--
+	if m.PerDeviceNodeSelection {
+		dAtA[i] = 1
+	} else {
+		dAtA[i] = 0
+	}
+	i--
+	dAtA[i] = 0x38
 	if len(m.Devices) > 0 {
 		for iNdEx := len(m.Devices) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -2980,6 +4043,136 @@ func (m *CELDeviceSelector) Size() (n int) {
 	return n
 }
 
+func (m *CapacityPool) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Includes) > 0 {
+		for _, e := range m.Includes {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.Capacity) > 0 {
+		for k, v := range m.Capacity {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
+func (m *CapacityPoolMixin) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Capacity) > 0 {
+		for k, v := range m.Capacity {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
+func (m *CapacityPoolMixinRef) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *CompositeDevice) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Includes) > 0 {
+		for _, e := range m.Includes {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.Attributes) > 0 {
+		for k, v := range m.Attributes {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	if len(m.Capacity) > 0 {
+		for k, v := range m.Capacity {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	if len(m.ConsumesCapacity) > 0 {
+		for _, e := range m.ConsumesCapacity {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	l = len(m.NodeName)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.NodeSelector != nil {
+		l = m.NodeSelector.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	n += 2
+	return n
+}
+
+func (m *CompositeDeviceMixin) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Attributes) > 0 {
+		for k, v := range m.Attributes {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	if len(m.Capacity) > 0 {
+		for k, v := range m.Capacity {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
 func (m *Device) Size() (n int) {
 	if m == nil {
 		return 0
@@ -2990,6 +4183,10 @@ func (m *Device) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	if m.Basic != nil {
 		l = m.Basic.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.Composite != nil {
+		l = m.Composite.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -3065,6 +4262,63 @@ func (m *DeviceCapacity) Size() (n int) {
 	var l int
 	_ = l
 	l = m.Value.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *DeviceCapacityConsumption) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.CapacityPool)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Includes) > 0 {
+		for _, e := range m.Includes {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.Capacity) > 0 {
+		for k, v := range m.Capacity {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
+func (m *DeviceCapacityConsumptionMixin) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Capacity) > 0 {
+		for k, v := range m.Capacity {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
+func (m *DeviceCapacityConsumptionMixinRef) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
 	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
@@ -3204,6 +4458,32 @@ func (m *DeviceConstraint) Size() (n int) {
 		l = len(*m.MatchAttribute)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	return n
+}
+
+func (m *DeviceMixin) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.Composite != nil {
+		l = m.Composite.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *DeviceMixinRef) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -3496,6 +4776,33 @@ func (m *ResourceSliceList) Size() (n int) {
 	return n
 }
 
+func (m *ResourceSliceMixins) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Device) > 0 {
+		for _, e := range m.Device {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.DeviceCapacityConsumption) > 0 {
+		for _, e := range m.DeviceCapacityConsumption {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.CapacityPool) > 0 {
+		for _, e := range m.CapacityPool {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *ResourceSliceSpec) Size() (n int) {
 	if m == nil {
 		return 0
@@ -3518,6 +4825,17 @@ func (m *ResourceSliceSpec) Size() (n int) {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
+	}
+	n += 2
+	if len(m.CapacityPools) > 0 {
+		for _, e := range m.CapacityPools {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if m.Mixins != nil {
+		l = m.Mixins.Size()
+		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
 }
@@ -3600,6 +4918,141 @@ func (this *CELDeviceSelector) String() string {
 	}, "")
 	return s
 }
+func (this *CapacityPool) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForIncludes := "[]CapacityPoolMixinRef{"
+	for _, f := range this.Includes {
+		repeatedStringForIncludes += strings.Replace(strings.Replace(f.String(), "CapacityPoolMixinRef", "CapacityPoolMixinRef", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForIncludes += "}"
+	keysForCapacity := make([]string, 0, len(this.Capacity))
+	for k := range this.Capacity {
+		keysForCapacity = append(keysForCapacity, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	mapStringForCapacity := "map[QualifiedName]DeviceCapacity{"
+	for _, k := range keysForCapacity {
+		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[QualifiedName(k)])
+	}
+	mapStringForCapacity += "}"
+	s := strings.Join([]string{`&CapacityPool{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Includes:` + repeatedStringForIncludes + `,`,
+		`Capacity:` + mapStringForCapacity + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CapacityPoolMixin) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForCapacity := make([]string, 0, len(this.Capacity))
+	for k := range this.Capacity {
+		keysForCapacity = append(keysForCapacity, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	mapStringForCapacity := "map[QualifiedName]DeviceCapacity{"
+	for _, k := range keysForCapacity {
+		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[QualifiedName(k)])
+	}
+	mapStringForCapacity += "}"
+	s := strings.Join([]string{`&CapacityPoolMixin{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Capacity:` + mapStringForCapacity + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CapacityPoolMixinRef) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&CapacityPoolMixinRef{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CompositeDevice) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForIncludes := "[]DeviceMixinRef{"
+	for _, f := range this.Includes {
+		repeatedStringForIncludes += strings.Replace(strings.Replace(f.String(), "DeviceMixinRef", "DeviceMixinRef", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForIncludes += "}"
+	repeatedStringForConsumesCapacity := "[]DeviceCapacityConsumption{"
+	for _, f := range this.ConsumesCapacity {
+		repeatedStringForConsumesCapacity += strings.Replace(strings.Replace(f.String(), "DeviceCapacityConsumption", "DeviceCapacityConsumption", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForConsumesCapacity += "}"
+	keysForAttributes := make([]string, 0, len(this.Attributes))
+	for k := range this.Attributes {
+		keysForAttributes = append(keysForAttributes, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForAttributes)
+	mapStringForAttributes := "map[QualifiedName]DeviceAttribute{"
+	for _, k := range keysForAttributes {
+		mapStringForAttributes += fmt.Sprintf("%v: %v,", k, this.Attributes[QualifiedName(k)])
+	}
+	mapStringForAttributes += "}"
+	keysForCapacity := make([]string, 0, len(this.Capacity))
+	for k := range this.Capacity {
+		keysForCapacity = append(keysForCapacity, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	mapStringForCapacity := "map[QualifiedName]DeviceCapacity{"
+	for _, k := range keysForCapacity {
+		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[QualifiedName(k)])
+	}
+	mapStringForCapacity += "}"
+	s := strings.Join([]string{`&CompositeDevice{`,
+		`Includes:` + repeatedStringForIncludes + `,`,
+		`Attributes:` + mapStringForAttributes + `,`,
+		`Capacity:` + mapStringForCapacity + `,`,
+		`ConsumesCapacity:` + repeatedStringForConsumesCapacity + `,`,
+		`NodeName:` + fmt.Sprintf("%v", this.NodeName) + `,`,
+		`NodeSelector:` + strings.Replace(fmt.Sprintf("%v", this.NodeSelector), "NodeSelector", "v11.NodeSelector", 1) + `,`,
+		`AllNodes:` + fmt.Sprintf("%v", this.AllNodes) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *CompositeDeviceMixin) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForAttributes := make([]string, 0, len(this.Attributes))
+	for k := range this.Attributes {
+		keysForAttributes = append(keysForAttributes, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForAttributes)
+	mapStringForAttributes := "map[QualifiedName]DeviceAttribute{"
+	for _, k := range keysForAttributes {
+		mapStringForAttributes += fmt.Sprintf("%v: %v,", k, this.Attributes[QualifiedName(k)])
+	}
+	mapStringForAttributes += "}"
+	keysForCapacity := make([]string, 0, len(this.Capacity))
+	for k := range this.Capacity {
+		keysForCapacity = append(keysForCapacity, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	mapStringForCapacity := "map[QualifiedName]DeviceCapacity{"
+	for _, k := range keysForCapacity {
+		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[QualifiedName(k)])
+	}
+	mapStringForCapacity += "}"
+	s := strings.Join([]string{`&CompositeDeviceMixin{`,
+		`Attributes:` + mapStringForAttributes + `,`,
+		`Capacity:` + mapStringForCapacity + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *Device) String() string {
 	if this == nil {
 		return "nil"
@@ -3607,6 +5060,7 @@ func (this *Device) String() string {
 	s := strings.Join([]string{`&Device{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Basic:` + strings.Replace(this.Basic.String(), "BasicDevice", "BasicDevice", 1) + `,`,
+		`Composite:` + strings.Replace(this.Composite.String(), "CompositeDevice", "CompositeDevice", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3663,6 +5117,64 @@ func (this *DeviceCapacity) String() string {
 	}
 	s := strings.Join([]string{`&DeviceCapacity{`,
 		`Value:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Value), "Quantity", "resource.Quantity", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeviceCapacityConsumption) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForIncludes := "[]DeviceCapacityConsumptionMixinRef{"
+	for _, f := range this.Includes {
+		repeatedStringForIncludes += strings.Replace(strings.Replace(f.String(), "DeviceCapacityConsumptionMixinRef", "DeviceCapacityConsumptionMixinRef", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForIncludes += "}"
+	keysForCapacity := make([]string, 0, len(this.Capacity))
+	for k := range this.Capacity {
+		keysForCapacity = append(keysForCapacity, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	mapStringForCapacity := "map[QualifiedName]DeviceCapacity{"
+	for _, k := range keysForCapacity {
+		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[QualifiedName(k)])
+	}
+	mapStringForCapacity += "}"
+	s := strings.Join([]string{`&DeviceCapacityConsumption{`,
+		`CapacityPool:` + fmt.Sprintf("%v", this.CapacityPool) + `,`,
+		`Includes:` + repeatedStringForIncludes + `,`,
+		`Capacity:` + mapStringForCapacity + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeviceCapacityConsumptionMixin) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForCapacity := make([]string, 0, len(this.Capacity))
+	for k := range this.Capacity {
+		keysForCapacity = append(keysForCapacity, string(k))
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	mapStringForCapacity := "map[QualifiedName]DeviceCapacity{"
+	for _, k := range keysForCapacity {
+		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[QualifiedName(k)])
+	}
+	mapStringForCapacity += "}"
+	s := strings.Join([]string{`&DeviceCapacityConsumptionMixin{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Capacity:` + mapStringForCapacity + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeviceCapacityConsumptionMixinRef) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeviceCapacityConsumptionMixinRef{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3780,6 +5292,27 @@ func (this *DeviceConstraint) String() string {
 	s := strings.Join([]string{`&DeviceConstraint{`,
 		`Requests:` + fmt.Sprintf("%v", this.Requests) + `,`,
 		`MatchAttribute:` + valueToStringGenerated(this.MatchAttribute) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeviceMixin) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeviceMixin{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Composite:` + strings.Replace(this.Composite.String(), "CompositeDeviceMixin", "CompositeDeviceMixin", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *DeviceMixinRef) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&DeviceMixinRef{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4026,6 +5559,33 @@ func (this *ResourceSliceList) String() string {
 	}, "")
 	return s
 }
+func (this *ResourceSliceMixins) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForDevice := "[]DeviceMixin{"
+	for _, f := range this.Device {
+		repeatedStringForDevice += strings.Replace(strings.Replace(f.String(), "DeviceMixin", "DeviceMixin", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForDevice += "}"
+	repeatedStringForDeviceCapacityConsumption := "[]DeviceCapacityConsumptionMixin{"
+	for _, f := range this.DeviceCapacityConsumption {
+		repeatedStringForDeviceCapacityConsumption += strings.Replace(strings.Replace(f.String(), "DeviceCapacityConsumptionMixin", "DeviceCapacityConsumptionMixin", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForDeviceCapacityConsumption += "}"
+	repeatedStringForCapacityPool := "[]CapacityPoolMixin{"
+	for _, f := range this.CapacityPool {
+		repeatedStringForCapacityPool += strings.Replace(strings.Replace(f.String(), "CapacityPoolMixin", "CapacityPoolMixin", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForCapacityPool += "}"
+	s := strings.Join([]string{`&ResourceSliceMixins{`,
+		`Device:` + repeatedStringForDevice + `,`,
+		`DeviceCapacityConsumption:` + repeatedStringForDeviceCapacityConsumption + `,`,
+		`CapacityPool:` + repeatedStringForCapacityPool + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *ResourceSliceSpec) String() string {
 	if this == nil {
 		return "nil"
@@ -4035,6 +5595,11 @@ func (this *ResourceSliceSpec) String() string {
 		repeatedStringForDevices += strings.Replace(strings.Replace(f.String(), "Device", "Device", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForDevices += "}"
+	repeatedStringForCapacityPools := "[]CapacityPool{"
+	for _, f := range this.CapacityPools {
+		repeatedStringForCapacityPools += strings.Replace(strings.Replace(f.String(), "CapacityPool", "CapacityPool", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForCapacityPools += "}"
 	s := strings.Join([]string{`&ResourceSliceSpec{`,
 		`Driver:` + fmt.Sprintf("%v", this.Driver) + `,`,
 		`Pool:` + strings.Replace(strings.Replace(this.Pool.String(), "ResourcePool", "ResourcePool", 1), `&`, ``, 1) + `,`,
@@ -4042,6 +5607,9 @@ func (this *ResourceSliceSpec) String() string {
 		`NodeSelector:` + strings.Replace(fmt.Sprintf("%v", this.NodeSelector), "NodeSelector", "v11.NodeSelector", 1) + `,`,
 		`AllNodes:` + fmt.Sprintf("%v", this.AllNodes) + `,`,
 		`Devices:` + repeatedStringForDevices + `,`,
+		`PerDeviceNodeSelection:` + fmt.Sprintf("%v", this.PerDeviceNodeSelection) + `,`,
+		`CapacityPools:` + repeatedStringForCapacityPools + `,`,
+		`Mixins:` + strings.Replace(this.Mixins.String(), "ResourceSliceMixins", "ResourceSliceMixins", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -4812,6 +6380,1316 @@ func (m *CELDeviceSelector) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *CapacityPool) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CapacityPool: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CapacityPool: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Includes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Includes = append(m.Includes, CapacityPoolMixinRef{})
+			if err := m.Includes[len(m.Includes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Capacity == nil {
+				m.Capacity = make(map[QualifiedName]DeviceCapacity)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceCapacity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceCapacity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Capacity[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CapacityPoolMixin) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CapacityPoolMixin: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CapacityPoolMixin: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Capacity == nil {
+				m.Capacity = make(map[QualifiedName]DeviceCapacity)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceCapacity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceCapacity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Capacity[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CapacityPoolMixinRef) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CapacityPoolMixinRef: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CapacityPoolMixinRef: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CompositeDevice) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CompositeDevice: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CompositeDevice: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Includes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Includes = append(m.Includes, DeviceMixinRef{})
+			if err := m.Includes[len(m.Includes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Attributes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Attributes == nil {
+				m.Attributes = make(map[QualifiedName]DeviceAttribute)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceAttribute{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceAttribute{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Attributes[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Capacity == nil {
+				m.Capacity = make(map[QualifiedName]DeviceCapacity)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceCapacity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceCapacity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Capacity[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ConsumesCapacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ConsumesCapacity = append(m.ConsumesCapacity, DeviceCapacityConsumption{})
+			if err := m.ConsumesCapacity[len(m.ConsumesCapacity)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeSelector", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.NodeSelector == nil {
+				m.NodeSelector = &v11.NodeSelector{}
+			}
+			if err := m.NodeSelector.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllNodes", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.AllNodes = bool(v != 0)
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *CompositeDeviceMixin) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: CompositeDeviceMixin: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: CompositeDeviceMixin: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Attributes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Attributes == nil {
+				m.Attributes = make(map[QualifiedName]DeviceAttribute)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceAttribute{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceAttribute{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Attributes[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Capacity == nil {
+				m.Capacity = make(map[QualifiedName]DeviceCapacity)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceCapacity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceCapacity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Capacity[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *Device) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -4906,6 +7784,42 @@ func (m *Device) Unmarshal(dAtA []byte) error {
 				m.Basic = &BasicDevice{}
 			}
 			if err := m.Basic.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Composite", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Composite == nil {
+				m.Composite = &CompositeDevice{}
+			}
+			if err := m.Composite.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -5413,6 +8327,544 @@ func (m *DeviceCapacity) Unmarshal(dAtA []byte) error {
 			if err := m.Value.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeviceCapacityConsumption) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeviceCapacityConsumption: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeviceCapacityConsumption: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CapacityPool", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CapacityPool = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Includes", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Includes = append(m.Includes, DeviceCapacityConsumptionMixinRef{})
+			if err := m.Includes[len(m.Includes)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Capacity == nil {
+				m.Capacity = make(map[QualifiedName]DeviceCapacity)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceCapacity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceCapacity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Capacity[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeviceCapacityConsumptionMixin) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeviceCapacityConsumptionMixin: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeviceCapacityConsumptionMixin: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Capacity", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Capacity == nil {
+				m.Capacity = make(map[QualifiedName]DeviceCapacity)
+			}
+			var mapkey QualifiedName
+			mapvalue := &DeviceCapacity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = QualifiedName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &DeviceCapacity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Capacity[QualifiedName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeviceCapacityConsumptionMixinRef) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeviceCapacityConsumptionMixinRef: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeviceCapacityConsumptionMixinRef: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -6315,6 +9767,206 @@ func (m *DeviceConstraint) Unmarshal(dAtA []byte) error {
 			}
 			s := FullyQualifiedName(dAtA[iNdEx:postIndex])
 			m.MatchAttribute = &s
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeviceMixin) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeviceMixin: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeviceMixin: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Composite", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Composite == nil {
+				m.Composite = &CompositeDeviceMixin{}
+			}
+			if err := m.Composite.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *DeviceMixinRef) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: DeviceMixinRef: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: DeviceMixinRef: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -8719,6 +12371,158 @@ func (m *ResourceSliceList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *ResourceSliceMixins) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ResourceSliceMixins: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ResourceSliceMixins: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Device", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Device = append(m.Device, DeviceMixin{})
+			if err := m.Device[len(m.Device)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DeviceCapacityConsumption", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DeviceCapacityConsumption = append(m.DeviceCapacityConsumption, DeviceCapacityConsumptionMixin{})
+			if err := m.DeviceCapacityConsumption[len(m.DeviceCapacityConsumption)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CapacityPool", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CapacityPool = append(m.CapacityPool, CapacityPoolMixin{})
+			if err := m.CapacityPool[len(m.CapacityPool)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *ResourceSliceSpec) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -8932,6 +12736,96 @@ func (m *ResourceSliceSpec) Unmarshal(dAtA []byte) error {
 			}
 			m.Devices = append(m.Devices, Device{})
 			if err := m.Devices[len(m.Devices)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PerDeviceNodeSelection", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.PerDeviceNodeSelection = bool(v != 0)
+		case 8:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field CapacityPools", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.CapacityPools = append(m.CapacityPools, CapacityPool{})
+			if err := m.CapacityPools[len(m.CapacityPools)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 9:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Mixins", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Mixins == nil {
+				m.Mixins = &ResourceSliceMixins{}
+			}
+			if err := m.Mixins.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
