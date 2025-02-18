@@ -17,9 +17,7 @@ limitations under the License.
 package spdy
 
 import (
-	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -35,12 +33,16 @@ type Upgrader interface {
 	NewConnection(resp *http.Response) (httpstream.Connection, error)
 }
 
+type rt struct{}
+
+func (rt rt) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("executing custom roundtripper")
+}
+
 // RoundTripperFor returns a round tripper and upgrader to use with SPDY.
 func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, error) {
 	// test if is actually ignored
-	config.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
-		return nil, fmt.Errorf("custom dial function not supported for streaming connections")
-	}
+	config.Transport = rt{}
 
 	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
