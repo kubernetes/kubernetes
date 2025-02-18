@@ -42,13 +42,11 @@ func (pr PodResourceAllocation) Clone() PodResourceAllocation {
 type Reader interface {
 	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
 	GetPodResourceAllocation() PodResourceAllocation
-	GetPodResizeStatus(podUID string) v1.PodResizeStatus
 }
 
 type writer interface {
 	SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error
 	SetPodResourceAllocation(podUID string, alloc map[string]v1.ResourceRequirements) error
-	SetPodResizeStatus(podUID string, resizeStatus v1.PodResizeStatus)
 	Delete(podUID string, containerName string) error
 }
 

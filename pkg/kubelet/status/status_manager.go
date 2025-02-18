@@ -72,9 +72,10 @@ type manager struct {
 	kubeClient clientset.Interface
 	podManager PodManager
 	// Map from pod UID to sync status of the corresponding pod.
-	podStatuses      map[types.UID]versionedPodStatus
-	podStatusesLock  sync.RWMutex
-	podStatusChannel chan struct{}
+	podStatuses       map[types.UID]versionedPodStatus
+	podResizeStatuses map[types.UID]v1.PodResizeStatus
+	podStatusesLock   sync.RWMutex
+	podStatusChannel  chan struct{}
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
@@ -174,6 +175,7 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		kubeClient:              kubeClient,
 		podManager:              podManager,
 		podStatuses:             make(map[types.UID]versionedPodStatus),
+		podResizeStatuses:       make(map[types.UID]v1.PodResizeStatus),
 		podStatusChannel:        make(chan struct{}, 1),
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
@@ -303,7 +305,7 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*
 func (m *manager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.state.GetPodResizeStatus(string(podUID))
+	return m.podResizeStatuses[podUID]
 }
 
 // SetPodAllocation checkpoints the resources allocated to a pod's containers
@@ -331,9 +333,9 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 
 // SetPodResizeStatus checkpoints the last resizing decision for the pod.
 func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
-	m.podStatusesLock.RLock()
-	defer m.podStatusesLock.RUnlock()
-	m.state.SetPodResizeStatus(string(podUID), resizeStatus)
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	m.podResizeStatuses[podUID] = resizeStatus
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
@@ -803,6 +805,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		delete(m.podResizeStatuses, uid)
 		m.state.Delete(string(uid), "")
 	}
 }
@@ -816,6 +819,7 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				delete(m.podResizeStatuses, key)
 				m.state.Delete(string(key), "")
 			}
 		}
