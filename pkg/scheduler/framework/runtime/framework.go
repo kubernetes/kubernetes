@@ -736,7 +736,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			s.SetPlugin(pl.Name())
 			if s.Code() == framework.UnschedulableAndUnresolvable {
 				// In this case, the preemption shouldn't happen in this scheduling cycle.
-				// So, no need to execute all PreFilter.
+				// So, no need to execute all PreFilter.k
 				return nil, s, nil
 			}
 			if s.Code() == framework.Unschedulable {
@@ -746,6 +746,9 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 				returnStatus = s
 				continue
 			}
+
+			// Pending should not be used in PreFilter.
+			// Pending is meant to stop the scheduling cycle in the Permit phase only.
 			return nil, framework.AsStatus(fmt.Errorf("running PreFilter plugin %q: %w", pl.Name(), s.AsError())).WithPlugin(pl.Name()), nil
 		}
 		if !r.AllNodes() {
