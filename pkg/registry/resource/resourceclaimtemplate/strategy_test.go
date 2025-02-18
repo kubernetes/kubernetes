@@ -40,9 +40,11 @@ var obj = &resource.ResourceClaimTemplate{
 			Devices: resource.DeviceClaim{
 				Requests: []resource.DeviceRequest{
 					{
-						Name:            "req-0",
-						DeviceClassName: "class",
-						AllocationMode:  resource.DeviceAllocationModeAll,
+						Name: "req-0",
+						Exactly: &resource.SpecificDeviceRequest{
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeAll,
+						},
 					},
 				},
 			},
@@ -60,10 +62,12 @@ var objWithAdminAccess = &resource.ResourceClaimTemplate{
 			Devices: resource.DeviceClaim{
 				Requests: []resource.DeviceRequest{
 					{
-						Name:            "req-0",
-						DeviceClassName: "class",
-						AllocationMode:  resource.DeviceAllocationModeAll,
-						AdminAccess:     ptr.To(true),
+						Name: "req-0",
+						Exactly: &resource.SpecificDeviceRequest{
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeAll,
+							AdminAccess:     ptr.To(true),
+						},
 					},
 				},
 			},

@@ -6305,10 +6305,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.SpecificDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6329,10 +6331,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.SpecificDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6352,10 +6356,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.SpecificDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6386,10 +6392,12 @@ func TestPrintResourceClaim(t *testing.T) {
 					Devices: resourceapis.DeviceClaim{
 						Requests: []resourceapis.DeviceRequest{
 							{
-								Name:            "deviceRequest",
-								DeviceClassName: "deviceClass",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "deviceRequest",
+								Exactly: &resourceapis.SpecificDeviceRequest{
+									DeviceClassName: "deviceClass",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							},
 						},
 					},
@@ -6430,10 +6438,12 @@ func TestPrintResourceClaimTemplate(t *testing.T) {
 					Spec: resourceapis.ResourceClaimSpec{
 						Devices: resourceapis.DeviceClaim{
 							Requests: []resourceapis.DeviceRequest{{
-								Name:            "test-deviceRequest",
-								DeviceClassName: "deviceClassName",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "test-deviceRequest",
+								Exactly: &resourceapis.SpecificDeviceRequest{
+									DeviceClassName: "deviceClassName",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							}},
 						},
 					},
@@ -6453,10 +6463,12 @@ func TestPrintResourceClaimTemplate(t *testing.T) {
 					Spec: resourceapis.ResourceClaimSpec{
 						Devices: resourceapis.DeviceClaim{
 							Requests: []resourceapis.DeviceRequest{{
-								Name:            "test-deviceRequest",
-								DeviceClassName: "deviceClassName",
-								AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
-								Count:           1,
+								Name: "test-deviceRequest",
+								Exactly: &resourceapis.SpecificDeviceRequest{
+									DeviceClassName: "deviceClassName",
+									AllocationMode:  resourceapis.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
 							}},
 						},
 					},

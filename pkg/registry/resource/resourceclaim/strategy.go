@@ -63,6 +63,9 @@ func (resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 		"resource.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"resource.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
@@ -129,6 +132,9 @@ func (resourceclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fi
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"resource.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+		"resource.k8s.io/v1beta2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}
@@ -231,7 +237,9 @@ func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim
 	}
 
 	for i := range newClaim.Spec.Devices.Requests {
-		newClaim.Spec.Devices.Requests[i].AdminAccess = nil
+		if newClaim.Spec.Devices.Requests[i].Exactly != nil {
+			newClaim.Spec.Devices.Requests[i].Exactly.AdminAccess = nil
+		}
 	}
 
 	if newClaim.Status.Allocation == nil {
@@ -248,7 +256,7 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 	}
 
 	for _, request := range claim.Spec.Devices.Requests {
-		if request.AdminAccess != nil {
+		if request.Exactly != nil && request.Exactly.AdminAccess != nil {
 			return true
 		}
 	}

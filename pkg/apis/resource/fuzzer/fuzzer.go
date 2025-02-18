@@ -29,7 +29,17 @@ import (
 // leads to errors during roundtrip tests.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(r *resource.DeviceRequest, c fuzz.Continue) {
+		func(r *resource.SpecificDeviceRequest, c fuzz.Continue) {
+			c.FuzzNoCustom(r) // fuzz self without calling this function again
+
+			if r.AllocationMode == "" {
+				r.AllocationMode = []resource.DeviceAllocationMode{
+					resource.DeviceAllocationModeAll,
+					resource.DeviceAllocationModeExactCount,
+				}[c.Int31n(2)]
+			}
+		},
+		func(r *resource.DeviceSubRequest, c fuzz.Continue) {
 			c.FuzzNoCustom(r) // fuzz self without calling this function again
 
 			if r.AllocationMode == "" {

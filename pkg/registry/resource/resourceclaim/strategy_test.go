@@ -39,9 +39,11 @@ var obj = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
 				},
 			},
 		},
@@ -57,9 +59,11 @@ var objWithStatus = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
 				},
 			},
 		},
@@ -89,10 +93,12 @@ var objWithAdminAccess = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
-					AdminAccess:     ptr.To(true),
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						AdminAccess:     ptr.To(true),
+					},
 				},
 			},
 		},
@@ -108,10 +114,12 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
-					AdminAccess:     ptr.To(true),
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						AdminAccess:     ptr.To(true),
+					},
 				},
 			},
 		},
@@ -406,14 +414,14 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access-because-of-status": {
 			oldObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
-				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
+				oldObj.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(false)
 				return oldObj
 			}(),
 			newObj:      objWithAdminAccessStatus,
 			adminAccess: false,
 			expectObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
-				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
+				oldObj.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(false)
 				return oldObj
 			}(),
 		},
