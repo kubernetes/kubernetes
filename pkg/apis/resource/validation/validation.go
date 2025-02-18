@@ -626,16 +626,6 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 func validateDevice(device resource.Device, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
-	if device.Basic == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("basic"), ""))
-	} else {
-		allErrs = append(allErrs, validateBasicDevice(*device.Basic, fldPath.Child("basic"))...)
-	}
-	return allErrs
-}
-
-func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
 	maxKeyLen := resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength

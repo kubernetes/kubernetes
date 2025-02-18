@@ -60,11 +60,9 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 	}
 	for i := 0; i < numDevices; i++ {
 		device := resourceapi.Device{
-			Name: fmt.Sprintf("device-%d", i),
-			Basic: &resourceapi.BasicDevice{
-				Attributes: testAttributes(),
-				Capacity:   testCapacity(),
-			},
+			Name:       fmt.Sprintf("device-%d", i),
+			Attributes: testAttributes(),
+			Capacity:   testCapacity(),
 		}
 		slice.Spec.Devices = append(slice.Spec.Devices, device)
 	}
@@ -307,36 +305,34 @@ func TestValidateResourceSlice(t *testing.T) {
 		"bad-devices": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-				field.Required(field.NewPath("spec", "devices").Index(2).Child("basic"), ""),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
 				slice.Spec.Devices[1].Name = badName
-				slice.Spec.Devices[2].Basic = nil
 				return slice
 			}(),
 		},
 		"bad-attribute": {
 			wantFailures: field.ErrorList{
-				field.TypeInvalid(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key(badName), "exactly one value must be specified"),
-				field.Invalid(field.NewPath("spec", "devices").Index(2).Child("basic", "attributes").Key(goodName), resourceapi.DeviceAttribute{StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")}, "exactly one value must be specified"),
-				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("basic", "attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), "must be a string compatible with semver.org spec 2.0.0"),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(3).Child("basic", "attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(4).Child("basic", "attributes").Key(goodName).Child("string"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
+				field.TypeInvalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), "exactly one value must be specified"),
+				field.Invalid(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName), resourceapi.DeviceAttribute{StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")}, "exactly one value must be specified"),
+				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), "must be a string compatible with semver.org spec 2.0.0"),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("string"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 5)
-				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(badName): {},
 				}
-				slice.Spec.Devices[2].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(goodName): {StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")},
 				}
-				slice.Spec.Devices[3].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(goodName): {VersionValue: ptr.To(strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1))},
 				}
-				slice.Spec.Devices[4].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[4].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(goodName): {StringValue: ptr.To(strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1))},
 				}
 				return slice
@@ -345,7 +341,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		"good-attribute-names": {
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxIDLength)):                                                                {StringValue: ptr.To("y")},
 					resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength)): {StringValue: ptr.To("z")},
 				}
@@ -354,12 +350,12 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-c-identifier": {
 			wantFailures: field.ErrorList{
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
-				field.TypeInvalid(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+				field.TypeInvalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)): {StringValue: ptr.To("y")},
 				}
 				return slice
@@ -367,12 +363,12 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-domain": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1) + "/y"): {StringValue: ptr.To("z")},
 				}
 				return slice
@@ -380,12 +376,12 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-key-too-long": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("y", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("y", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength+1)): {StringValue: ptr.To("z")},
 				}
 				return slice
@@ -393,12 +389,12 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"bad-attribute-empty-domain-and-c-identifier": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key("/"), "the domain must not be empty"),
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("basic", "attributes").Key("/"), "the name must not be empty"),
+				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "the domain must not be empty"),
+				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "the name must not be empty"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 					resourceapi.QualifiedName("/"): {StringValue: ptr.To("z")},
 				}
 				return slice
@@ -406,25 +402,25 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"combined-attributes-and-capacity-length": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(2).Child("basic"), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(2), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
-				slice.Spec.Devices[0].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
-				slice.Spec.Devices[0].Basic.Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+				slice.Spec.Devices[0].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
 				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
-					slice.Spec.Devices[0].Basic.Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr_%d", i))] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
+					slice.Spec.Devices[0].Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr_%d", i))] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
 				}
-				slice.Spec.Devices[1].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
-				slice.Spec.Devices[1].Basic.Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
+				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
+				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
 				quantity := resource.MustParse("1Gi")
 				capacity := resourceapi.DeviceCapacity{Value: quantity}
 				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
-					slice.Spec.Devices[1].Basic.Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = capacity
+					slice.Spec.Devices[1].Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = capacity
 				}
 				// Too large together by one.
-				slice.Spec.Devices[2].Basic.Attributes = slice.Spec.Devices[0].Basic.Attributes
-				slice.Spec.Devices[2].Basic.Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				slice.Spec.Devices[2].Attributes = slice.Spec.Devices[0].Attributes
+				slice.Spec.Devices[2].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 					"cap": capacity,
 				}
 				return slice

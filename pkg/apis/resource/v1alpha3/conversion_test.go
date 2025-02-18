@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha3
 
 import (
 	"reflect"
@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	k8sresource "k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,22 +38,22 @@ func TestConversion(t *testing.T) {
 		expectErr string
 	}{
 		{
-			name: "ResourceClaim: v1beta1 to internal without alternatives",
-			in: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			name: "ResourceClaim: v1alpha3 to internal without alternatives",
+			in: &resourcev1alpha3.ResourceClaim{
+				Spec: resourcev1alpha3.ResourceClaimSpec{
+					Devices: resourcev1alpha3.DeviceClaim{
+						Requests: []resourcev1alpha3.DeviceRequest{
 							{
 								Name:            "foo",
 								DeviceClassName: "class-a",
-								Selectors: []resourcev1beta1.DeviceSelector{
+								Selectors: []resourcev1alpha3.DeviceSelector{
 									{
-										CEL: &resourcev1beta1.CELDeviceSelector{
+										CEL: &resourcev1alpha3.CELDeviceSelector{
 											Expression: `device.attributes["driver-a"].exists`,
 										},
 									},
 								},
-								AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+								AllocationMode: resourcev1alpha3.DeviceAllocationModeExactCount,
 								Count:          2,
 							},
 						},
@@ -86,7 +86,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "ResourceClaim: internal to v1beta1 without alternatives",
+			name: "ResourceClaim: internal to v1alpha3 without alternatives",
 			in: &resource.ResourceClaim{
 				Spec: resource.ResourceClaimSpec{
 					Devices: resource.DeviceClaim{
@@ -110,22 +110,22 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			out: &resourcev1beta1.ResourceClaim{},
-			expectOut: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			out: &resourcev1alpha3.ResourceClaim{},
+			expectOut: &resourcev1alpha3.ResourceClaim{
+				Spec: resourcev1alpha3.ResourceClaimSpec{
+					Devices: resourcev1alpha3.DeviceClaim{
+						Requests: []resourcev1alpha3.DeviceRequest{
 							{
 								Name:            "foo",
 								DeviceClassName: "class-a",
-								Selectors: []resourcev1beta1.DeviceSelector{
+								Selectors: []resourcev1alpha3.DeviceSelector{
 									{
-										CEL: &resourcev1beta1.CELDeviceSelector{
+										CEL: &resourcev1alpha3.CELDeviceSelector{
 											Expression: `device.attributes["driver-a"].exists`,
 										},
 									},
 								},
-								AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+								AllocationMode: resourcev1alpha3.DeviceAllocationModeExactCount,
 								Count:          2,
 							},
 						},
@@ -135,38 +135,38 @@ func TestConversion(t *testing.T) {
 		},
 
 		{
-			name: "ResourceClaim: v1beta1 to internal with alternatives",
-			in: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			name: "ResourceClaim: v1alpha3 to internal with alternatives",
+			in: &resourcev1alpha3.ResourceClaim{
+				Spec: resourcev1alpha3.ResourceClaimSpec{
+					Devices: resourcev1alpha3.DeviceClaim{
+						Requests: []resourcev1alpha3.DeviceRequest{
 							{
 								Name: "foo",
-								FirstAvailable: []resourcev1beta1.DeviceSubRequest{
+								FirstAvailable: []resourcev1alpha3.DeviceSubRequest{
 									{
 										Name:            "sub-1",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1alpha3.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1alpha3.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1alpha3.DeviceAllocationModeExactCount,
 										Count:          2,
 									},
 									{
 										Name:            "sub-2",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1alpha3.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1alpha3.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1alpha3.DeviceAllocationModeExactCount,
 										Count:          1,
 									},
 								},
@@ -217,7 +217,7 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "ResourceClaim: internal to v1beta1 with alternatives",
+			name: "ResourceClaim: internal to v1alpha3 with alternatives",
 			in: &resource.ResourceClaim{
 				Spec: resource.ResourceClaimSpec{
 					Devices: resource.DeviceClaim{
@@ -257,38 +257,38 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			out: &resourcev1beta1.ResourceClaim{},
-			expectOut: &resourcev1beta1.ResourceClaim{
-				Spec: resourcev1beta1.ResourceClaimSpec{
-					Devices: resourcev1beta1.DeviceClaim{
-						Requests: []resourcev1beta1.DeviceRequest{
+			out: &resourcev1alpha3.ResourceClaim{},
+			expectOut: &resourcev1alpha3.ResourceClaim{
+				Spec: resourcev1alpha3.ResourceClaimSpec{
+					Devices: resourcev1alpha3.DeviceClaim{
+						Requests: []resourcev1alpha3.DeviceRequest{
 							{
 								Name: "foo",
-								FirstAvailable: []resourcev1beta1.DeviceSubRequest{
+								FirstAvailable: []resourcev1alpha3.DeviceSubRequest{
 									{
 										Name:            "sub-1",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1alpha3.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1alpha3.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1alpha3.DeviceAllocationModeExactCount,
 										Count:          2,
 									},
 									{
 										Name:            "sub-2",
 										DeviceClassName: "class-a",
-										Selectors: []resourcev1beta1.DeviceSelector{
+										Selectors: []resourcev1alpha3.DeviceSelector{
 											{
-												CEL: &resourcev1beta1.CELDeviceSelector{
+												CEL: &resourcev1alpha3.CELDeviceSelector{
 													Expression: `device.attributes["driver-a"].exists`,
 												},
 											},
 										},
-										AllocationMode: resourcev1beta1.DeviceAllocationModeExactCount,
+										AllocationMode: resourcev1alpha3.DeviceAllocationModeExactCount,
 										Count:          1,
 									},
 								},
@@ -299,43 +299,41 @@ func TestConversion(t *testing.T) {
 			},
 		},
 		{
-			name: "ResourceSlice: v1beta1 to internal",
-			in: &resourcev1beta1.ResourceSlice{
-				Spec: resourcev1beta1.ResourceSliceSpec{
+			name: "ResourceSlice: v1alpha3 to internal",
+			in: &resourcev1alpha3.ResourceSlice{
+				Spec: resourcev1alpha3.ResourceSliceSpec{
 					Driver: "",
-					Pool: resourcev1beta1.ResourcePool{
+					Pool: resourcev1alpha3.ResourcePool{
 						Name:               "pool-1",
 						Generation:         1,
 						ResourceSliceCount: 1,
 					},
 					NodeName: "node-1",
-					CapacityPools: []resourcev1beta1.CapacityPool{
+					CapacityPools: []resourcev1alpha3.CapacityPool{
 						{
 							Name: "capacity-pool",
-							Includes: []resourcev1beta1.CapacityPoolMixinRef{
+							Includes: []resourcev1alpha3.CapacityPoolMixinRef{
 								{
 									Name: "capacity-pool-mixin",
 								},
 							},
 						},
 					},
-					Mixins: &resourcev1beta1.ResourceSliceMixins{
-						CapacityPool: []resourcev1beta1.CapacityPoolMixin{
+					Mixins: &resourcev1alpha3.ResourceSliceMixins{
+						CapacityPool: []resourcev1alpha3.CapacityPoolMixin{
 							{
 								Name: "capacity-pool-mixin",
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("memory"): {
-										Value: k8sresource.MustParse("40Gi"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("memory"): k8sresource.MustParse("40Gi"),
 								},
 							},
 						},
-						Device: []resourcev1beta1.DeviceMixin{
+						Device: []resourcev1alpha3.DeviceMixin{
 							{
 								Name: "device-mixin",
-								Composite: &resourcev1beta1.CompositeDeviceMixin{
-									Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-										resourcev1beta1.QualifiedName("attr-1"): {
+								Composite: &resourcev1alpha3.CompositeDeviceMixin{
+									Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+										resourcev1alpha3.QualifiedName("attr-1"): {
 											IntValue: func() *int64 {
 												val := int64(42)
 												return &val
@@ -346,53 +344,47 @@ func TestConversion(t *testing.T) {
 							},
 						},
 					},
-					Devices: []resourcev1beta1.Device{
+					Devices: []resourcev1alpha3.Device{
 						{
 							Name: "device-1",
-							Basic: &resourcev1beta1.BasicDevice{
-								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-									resourcev1beta1.QualifiedName("attr-2"): {
+							Basic: &resourcev1alpha3.BasicDevice{
+								Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+									resourcev1alpha3.QualifiedName("attr-2"): {
 										StringValue: func() *string {
 											val := "foo"
 											return &val
 										}(),
 									},
 								},
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("cpus"): {
-										Value: k8sresource.MustParse("42"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("cpus"): k8sresource.MustParse("42"),
 								},
 							},
 						},
 						{
 							Name: "device-2",
-							Composite: &resourcev1beta1.CompositeDevice{
-								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-									resourcev1beta1.QualifiedName("attr-2"): {
+							Composite: &resourcev1alpha3.CompositeDevice{
+								Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+									resourcev1alpha3.QualifiedName("attr-2"): {
 										StringValue: func() *string {
 											val := "foo"
 											return &val
 										}(),
 									},
 								},
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("cpus"): {
-										Value: k8sresource.MustParse("42"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("cpus"): k8sresource.MustParse("42"),
 								},
-								Includes: []resourcev1beta1.DeviceMixinRef{
+								Includes: []resourcev1alpha3.DeviceMixinRef{
 									{
 										Name: "device-mixin",
 									},
 								},
-								ConsumesCapacity: []resourcev1beta1.DeviceCapacityConsumption{
+								ConsumesCapacity: []resourcev1alpha3.DeviceCapacityConsumption{
 									{
 										CapacityPool: "capacity-pool",
-										Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-											resourcev1beta1.QualifiedName("memory"): {
-												Value: k8sresource.MustParse("20Gi"),
-											},
+										Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+											resourcev1alpha3.QualifiedName("memory"): k8sresource.MustParse("20Gi"),
 										},
 									},
 								},
@@ -400,19 +392,17 @@ func TestConversion(t *testing.T) {
 						},
 						{
 							Name: "device-3",
-							Composite: &resourcev1beta1.CompositeDevice{
-								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-									resourcev1beta1.QualifiedName("attr-2"): {
+							Composite: &resourcev1alpha3.CompositeDevice{
+								Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+									resourcev1alpha3.QualifiedName("attr-2"): {
 										StringValue: func() *string {
 											val := "foo"
 											return &val
 										}(),
 									},
 								},
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("cpus"): {
-										Value: k8sresource.MustParse("42"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("cpus"): k8sresource.MustParse("42"),
 								},
 							},
 						},
@@ -656,43 +646,41 @@ func TestConversion(t *testing.T) {
 					},
 				},
 			},
-			out: &resourcev1beta1.ResourceSlice{},
-			expectOut: &resourcev1beta1.ResourceSlice{
-				Spec: resourcev1beta1.ResourceSliceSpec{
+			out: &resourcev1alpha3.ResourceSlice{},
+			expectOut: &resourcev1alpha3.ResourceSlice{
+				Spec: resourcev1alpha3.ResourceSliceSpec{
 					Driver: "",
-					Pool: resourcev1beta1.ResourcePool{
+					Pool: resourcev1alpha3.ResourcePool{
 						Name:               "pool-1",
 						Generation:         1,
 						ResourceSliceCount: 1,
 					},
 					NodeName: "node-1",
-					CapacityPools: []resourcev1beta1.CapacityPool{
+					CapacityPools: []resourcev1alpha3.CapacityPool{
 						{
 							Name: "capacity-pool",
-							Includes: []resourcev1beta1.CapacityPoolMixinRef{
+							Includes: []resourcev1alpha3.CapacityPoolMixinRef{
 								{
 									Name: "capacity-pool-mixin",
 								},
 							},
 						},
 					},
-					Mixins: &resourcev1beta1.ResourceSliceMixins{
-						CapacityPool: []resourcev1beta1.CapacityPoolMixin{
+					Mixins: &resourcev1alpha3.ResourceSliceMixins{
+						CapacityPool: []resourcev1alpha3.CapacityPoolMixin{
 							{
 								Name: "capacity-pool-mixin",
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("memory"): {
-										Value: k8sresource.MustParse("40Gi"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("memory"): k8sresource.MustParse("40Gi"),
 								},
 							},
 						},
-						Device: []resourcev1beta1.DeviceMixin{
+						Device: []resourcev1alpha3.DeviceMixin{
 							{
 								Name: "device-mixin",
-								Composite: &resourcev1beta1.CompositeDeviceMixin{
-									Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-										resourcev1beta1.QualifiedName("attr-1"): {
+								Composite: &resourcev1alpha3.CompositeDeviceMixin{
+									Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+										resourcev1alpha3.QualifiedName("attr-1"): {
 											IntValue: func() *int64 {
 												val := int64(42)
 												return &val
@@ -703,53 +691,47 @@ func TestConversion(t *testing.T) {
 							},
 						},
 					},
-					Devices: []resourcev1beta1.Device{
+					Devices: []resourcev1alpha3.Device{
 						{
 							Name: "device-1",
-							Basic: &resourcev1beta1.BasicDevice{
-								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-									resourcev1beta1.QualifiedName("attr-2"): {
+							Basic: &resourcev1alpha3.BasicDevice{
+								Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+									resourcev1alpha3.QualifiedName("attr-2"): {
 										StringValue: func() *string {
 											val := "foo"
 											return &val
 										}(),
 									},
 								},
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("cpus"): {
-										Value: k8sresource.MustParse("42"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("cpus"): k8sresource.MustParse("42"),
 								},
 							},
 						},
 						{
 							Name: "device-2",
-							Composite: &resourcev1beta1.CompositeDevice{
-								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-									resourcev1beta1.QualifiedName("attr-2"): {
+							Composite: &resourcev1alpha3.CompositeDevice{
+								Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+									resourcev1alpha3.QualifiedName("attr-2"): {
 										StringValue: func() *string {
 											val := "foo"
 											return &val
 										}(),
 									},
 								},
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("cpus"): {
-										Value: k8sresource.MustParse("42"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("cpus"): k8sresource.MustParse("42"),
 								},
-								Includes: []resourcev1beta1.DeviceMixinRef{
+								Includes: []resourcev1alpha3.DeviceMixinRef{
 									{
 										Name: "device-mixin",
 									},
 								},
-								ConsumesCapacity: []resourcev1beta1.DeviceCapacityConsumption{
+								ConsumesCapacity: []resourcev1alpha3.DeviceCapacityConsumption{
 									{
 										CapacityPool: "capacity-pool",
-										Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-											resourcev1beta1.QualifiedName("memory"): {
-												Value: k8sresource.MustParse("20Gi"),
-											},
+										Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+											resourcev1alpha3.QualifiedName("memory"): k8sresource.MustParse("20Gi"),
 										},
 									},
 								},
@@ -757,19 +739,17 @@ func TestConversion(t *testing.T) {
 						},
 						{
 							Name: "device-3",
-							Composite: &resourcev1beta1.CompositeDevice{
-								Attributes: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute{
-									resourcev1beta1.QualifiedName("attr-2"): {
+							Composite: &resourcev1alpha3.CompositeDevice{
+								Attributes: map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute{
+									resourcev1alpha3.QualifiedName("attr-2"): {
 										StringValue: func() *string {
 											val := "foo"
 											return &val
 										}(),
 									},
 								},
-								Capacity: map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity{
-									resourcev1beta1.QualifiedName("cpus"): {
-										Value: k8sresource.MustParse("42"),
-									},
+								Capacity: map[resourcev1alpha3.QualifiedName]k8sresource.Quantity{
+									resourcev1alpha3.QualifiedName("cpus"): k8sresource.MustParse("42"),
 								},
 							},
 						},
