@@ -61503,12 +61503,6 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},
-					"PodEvictionTimeout": {
-						SchemaProps: spec.SchemaProps{
-							Description: "podEvictionTimeout is the grace period for deleting pods on failed nodes.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
-						},
-					},
 					"LargeClusterSizeThreshold": {
 						SchemaProps: spec.SchemaProps{
 							Description: "secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold",
@@ -61526,7 +61520,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 						},
 					},
 				},
-				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold"},
+				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold"},
 			},
 		},
 		Dependencies: []string{
