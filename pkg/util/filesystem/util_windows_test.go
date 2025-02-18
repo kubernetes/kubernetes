@@ -119,41 +119,88 @@ func TestWindowsChmod(t *testing.T) {
 		require.NoError(t, err, "Failed to create temporary directory.")
 		defer os.RemoveAll(tempDir)
 
-		// Set the file GROUP to BUILTIN\Administrators (BA) for test determinism and
+		// Set the file OWNER to current user and GROUP to BUILTIN\Administrators (BA) for test determinism
+		currentUserSID, err := getCurrentUserSID()
+		require.NoError(t, err, "Failed to get current user SID")
+
+		err = setOwnerInfo(tempDir, currentUserSID)
+		require.NoError(t, err, "Failed to set current owner SID")
+
 		err = setGroupInfo(tempDir, "S-1-5-32-544")
 		require.NoError(t, err, "Failed to set group for directory.")
 
 		err = Chmod(tempDir, testCase.fileMode)
 		require.NoError(t, err, "Failed to set permissions for directory.")
 
-		owner, descriptor, err := getPermissionsInfo(tempDir)
+		owner, _, descriptor, err := getPermissionsInfo(tempDir)
 		require.NoError(t, err, "Failed to get permissions for directory.")
 
 		expectedDescriptor := strings.ReplaceAll(testCase.expectedDescriptor, "OWNER", owner)
+		// In cases where there is a single account in the Administrators group (which the case in CI)
+		// the SDDL format will simply say LA (for Local Administrator) instead of the actual SID,
+		// but we want to replace that with the actual SID for determinism
+		descriptor = strings.ReplaceAll(descriptor, "LA", owner)
 
 		assert.Equal(t, expectedDescriptor, descriptor, "Unexpected DACL for directory. when setting permissions to %o", testCase.fileMode)
 	}
 }
 
-// Gets the owner and entire security descriptor of a file or directory in the SDDL format
+// Gets the SID for the current user
+func getCurrentUserSID() (string, error) {
+	token := windows.GetCurrentProcessToken()
+	user, err := token.GetTokenUser()
+	if err != nil {
+		return "", fmt.Errorf("Error getting user SID: %v", err)
+	}
+
+	return user.User.Sid.String(), nil
+}
+
+// Gets the owner, group, and entire security descriptor of a file or directory in the SDDL format
 // https://learn.microsoft.com/en-us/windows/win32/secauthz/security-descriptor-definition-language
-func getPermissionsInfo(path string) (string, string, error) {
+func getPermissionsInfo(path string) (string, string, string, error) {
 	sd, err := windows.GetNamedSecurityInfo(
 		path,
 		windows.SE_FILE_OBJECT,
 		windows.DACL_SECURITY_INFORMATION|windows.OWNER_SECURITY_INFORMATION|windows.GROUP_SECURITY_INFORMATION)
 	if err != nil {
-		return "", "", fmt.Errorf("Error getting security descriptor for file %s: %v", path, err)
+		return "", "", "", fmt.Errorf("Error getting security descriptor for file %s: %v", path, err)
 	}
 
 	owner, _, err := sd.Owner()
 	if err != nil {
-		return "", "", fmt.Errorf("Error getting owner SID for file %s: %v", path, err)
+		return "", "", "", fmt.Errorf("Error getting owner SID for file %s: %v", path, err)
+	}
+	group, _, err := sd.Group()
+	if err != nil {
+		return "", "", "", fmt.Errorf("Error getting group SID for file %s: %v", path, err)
 	}
 
 	sdString := sd.String()
 
-	return owner.String(), sdString, nil
+	return owner.String(), group.String(), sdString, nil
+}
+
+// Sets the OWNER of a file or a directory to the specific SID
+func setOwnerInfo(path, owner string) error {
+	ownerSID, err := windows.StringToSid(owner)
+	if err != nil {
+		return fmt.Errorf("Error converting owner SID %s to SID: %v", owner, err)
+	}
+
+	err = windows.SetNamedSecurityInfo(
+		path, windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION,
+		ownerSID, // ownerSID
+		nil,      // Group SID
+		nil,      // DACL
+		nil,      // SACL
+	)
+
+	if err != nil {
+		return fmt.Errorf("Error setting owner SID for file %s: %v", path, err)
+	}
+	return nil
 }
 
 // Sets the GROUP of a file or a directory to the specified group
@@ -184,6 +231,12 @@ func setGroupInfo(path, group string) error {
 // TestDeleteFilePermissions tests that when a folder's permissions are set to 0660, child items
 // cannot be deleted in the folder but when a folder's permissions are set to 0770, child items can be deleted.
 func TestDeleteFilePermissions(t *testing.T) {
+
+	// On Windows, connections under an SSH session acquire SeBackupPrivilege and SeRestorePrivilege
+	// which allows you to delete a file bypassing ACLs (which invalidates this test)
+	if sshConn := os.Getenv("SSH_CONNECTION"); sshConn != "" {
+		t.Skip("Skipping test when running over SSH connection.")
+	}
 	tempDir, err := os.MkdirTemp("", "test-dir")
 	require.NoError(t, err, "Failed to create temporary directory.")
 
