@@ -226,13 +226,13 @@ leaderElection:
 			name: "default config with an alpha feature enabled",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
-				"--feature-gates=VolumeCapacityPriority=true",
+				"--feature-gates=StorageCapacityScoring=true",
 			},
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": defaults.ExpandedPluginsV1,
 			},
 			restoreFeatures: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
+				features.StorageCapacityScoring: false,
 			},
 		},
 		{

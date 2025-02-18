@@ -192,29 +192,16 @@ func SetDefaults_VolumeBindingArgs(obj *configv1.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = ptr.To[int64](600)
 	}
-	if len(obj.Shape) == 0 && feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
-		if feature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring) {
-			obj.Shape = []configv1.UtilizationShapePoint{
-				{
-					Utilization: 0,
-					Score:       int32(config.MaxCustomPriorityScore),
-				},
-				{
-					Utilization: 100,
-					Score:       0,
-				},
-			}
-		} else {
-			obj.Shape = []configv1.UtilizationShapePoint{
-				{
-					Utilization: 0,
-					Score:       0,
-				},
-				{
-					Utilization: 100,
-					Score:       int32(config.MaxCustomPriorityScore),
-				},
-			}
+	if len(obj.Shape) == 0 && feature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring) {
+		obj.Shape = []configv1.UtilizationShapePoint{
+			{
+				Utilization: 0,
+				Score:       int32(config.MaxCustomPriorityScore),
+			},
+			{
+				Utilization: 100,
+				Score:       0,
+			},
 		}
 	}
 }

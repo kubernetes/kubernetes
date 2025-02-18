@@ -810,9 +810,9 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "VolumeBindingArgs empty, VolumeCapacityPriority disabled",
+			name: "VolumeBindingArgs empty, StorageCapacityScoring disabled",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: false,
+				features.StorageCapacityScoring: false,
 			},
 			in: &configv1.VolumeBindingArgs{},
 			want: &configv1.VolumeBindingArgs{
@@ -820,16 +820,16 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "VolumeBindingArgs empty, VolumeCapacityPriority enabled",
+			name: "VolumeBindingArgs empty, StorageCapacityScoring enabled",
 			features: map[featuregate.Feature]bool{
-				features.VolumeCapacityPriority: true,
+				features.StorageCapacityScoring: true,
 			},
 			in: &configv1.VolumeBindingArgs{},
 			want: &configv1.VolumeBindingArgs{
 				BindTimeoutSeconds: ptr.To[int64](600),
 				Shape: []configv1.UtilizationShapePoint{
-					{Utilization: 0, Score: 0},
-					{Utilization: 100, Score: 10},
+					{Utilization: 0, Score: 10},
+					{Utilization: 100, Score: 0},
 				},
 			},
 		},

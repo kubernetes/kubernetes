@@ -592,7 +592,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
 	}
 	if err := validation.ValidateVolumeBindingArgsWithOptions(nil, args, validation.VolumeBindingArgsValidationOptions{
-		AllowVolumeCapacityPriority: fts.EnableVolumeCapacityPriority,
+		AllowStorageCapacityScoring: fts.EnableStorageCapacityScoring,
 	}); err != nil {
 		return nil, err
 	}
@@ -610,7 +610,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 
 	// build score function
 	var scorer volumeCapacityScorer
-	if fts.EnableVolumeCapacityPriority {
+	if fts.EnableStorageCapacityScoring {
 		shape := make(helper.FunctionShape, 0, len(args.Shape))
 		for _, point := range args.Shape {
 			shape = append(shape, helper.FunctionShapePoint{

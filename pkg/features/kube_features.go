@@ -681,7 +681,7 @@ const (
 	// kep: https://kep.k8s.io/4049
 	//
 	// Enables scoring nodes by available storage capacity with
-	// StorageCapacityScoring feature gate (dynamic provisioning only).
+	// StorageCapacityScoring feature gate.
 	StorageCapacityScoring featuregate.Feature = "StorageCapacityScoring"
 
 	// owner: @gjkim42 @SergeyKanzhelev @matthyx @tzneal
