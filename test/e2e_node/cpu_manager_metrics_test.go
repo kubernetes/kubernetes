@@ -18,8 +18,12 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -65,8 +69,8 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 
 			fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
-			_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-			smtLevel = getSMTLevel()
+			_, cpuAlloc, _ := getLocalNodeCPUDetails(ctx, f)
+			smtLevel = smtLevelFromSysFS()
 
 			// strict SMT alignment is trivially verified and granted on non-SMT systems
 			if smtLevel < 2 {
@@ -456,7 +460,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			framework.Logf("Threads per Core on the system %d", threadsPerCore)
 			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
 
-			smtLevel = getSMTLevel()
+			smtLevel = smtLevelFromSysFS()
 			framework.Logf("SMT Level on the system %d", smtLevel)
 
 			ginkgo.By("Querying the podresources endpoint to get the baseline")
@@ -557,4 +561,17 @@ func timelessSample(value interface{}) types.GomegaMatcher {
 		"Timestamp": gstruct.Ignore(),
 		"Histogram": gstruct.Ignore(),
 	}))
+}
+
+func getUncoreCPUGroupSize() int {
+	cpuID := 0 // this is just the most likely cpu to be present in a random system. No special meaning besides this.
+	out, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/cpu/cpu%d/cache/index3/shared_cpu_list", cpuID))
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0 // no Uncore/LLC cache detected, nothing to do
+	}
+	framework.ExpectNoError(err)
+	// how many cores share a same Uncore/LLC block?
+	cpus, err := cpuset.Parse(strings.TrimSpace(string(out)))
+	framework.ExpectNoError(err)
+	return cpus.Size()
 }
