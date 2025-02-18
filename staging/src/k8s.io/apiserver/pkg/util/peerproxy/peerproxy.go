@@ -40,6 +40,8 @@ type Interface interface {
 }
 
 // New creates a new instance to implement unknown version proxy
+// This method is used for an alpha feature UnknownVersionInteroperabilityProxy
+// and is subject to future modifications.
 func NewPeerProxyHandler(informerFactory kubeinformers.SharedInformerFactory,
 	serverId string,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,

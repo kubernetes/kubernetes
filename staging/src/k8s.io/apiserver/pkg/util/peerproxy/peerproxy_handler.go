@@ -133,7 +133,9 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		gvr := schema.GroupVersionResource{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion, Resource: requestInfo.Resource}
 		apiserversi, err := h.apiserverIdentityLeases()
 		if err != nil {
-			klog.ErrorS(err, "no apiserver identity leases found")
+			// No other option since no peers were discovered than to handle the
+			// request locally.
+			klog.InfoS("no apiserver identity leases found")
 			handler.ServeHTTP(w, r)
 			return
 		}
@@ -157,6 +159,7 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 }
 
 func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
+	clear(h.localDiscoveryResponseCache)
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(h.loopbackClientConfig)
 	if err != nil {
 		return fmt.Errorf("error creating discovery client: %w", err)
