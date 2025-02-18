@@ -97,10 +97,9 @@ func prependMemcgNotificationFlag(args string) string {
 // a credential provider plugin.
 func prependCredentialProviderFlag(args, workspace string) string {
 	credentialProviderConfig := filepath.Join(workspace, "credential-provider.yaml")
-	featureGateFlag := "--kubelet-flags=--feature-gates=DisableKubeletCloudCredentialProviders=true"
 	configFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-config=%s", credentialProviderConfig)
 	binFlag := fmt.Sprintf("--kubelet-flags=--image-credential-provider-bin-dir=%s", workspace)
-	return fmt.Sprintf("%s %s %s %s", featureGateFlag, configFlag, binFlag, args)
+	return fmt.Sprintf("%s %s %s", configFlag, binFlag, args)
 }
 
 // osSpecificActions takes OS specific actions required for the node tests
