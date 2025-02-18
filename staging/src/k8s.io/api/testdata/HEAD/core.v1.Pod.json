@@ -2037,6 +2037,16 @@
         "name": "nameValue",
         "resourceClaimName": "resourceClaimNameValue"
       }
-    ]
+    ],
+    "extendedResourceClaimStatus": {
+      "names": [
+        {
+          "containerName": "containerNameValue",
+          "extendedResourceName": "extendedResourceNameValue",
+          "requestName": "requestNameValue"
+        }
+      ],
+      "resourceClaimName": "resourceClaimNameValue"
+    }
   }
 }

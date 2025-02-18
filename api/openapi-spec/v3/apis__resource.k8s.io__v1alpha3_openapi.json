@@ -499,6 +499,10 @@
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
+          "extendedResourceName": {
+            "description": "ExtendedResourceName is the extended resource name for the devices of this class",
+            "type": "string"
+          },
           "selectors": {
             "description": "Each selector must be satisfied by a device which is claimed via this class.",
             "items": {
