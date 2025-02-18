@@ -19,6 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/cpuset"
 	"os"
 	"os/exec"
 	"regexp"
@@ -446,10 +447,10 @@ func runTopologyManagerPolicySuiteTests(ctx context.Context, f *framework.Framew
 	}
 
 	ginkgo.By("running a non-Gu pod")
-	runNonGuPodTest(ctx, f, cpuCap)
+	runNonGuPodTest(ctx, f, cpuCap, cpuset.New())
 
 	ginkgo.By("running a Gu pod")
-	runGuPodTest(ctx, f, 1)
+	runGuPodTest(ctx, f, 1, cpuset.New())
 
 	// Skip rest of the tests if CPU allocatable < 3.
 	if cpuAlloc < 3 {
