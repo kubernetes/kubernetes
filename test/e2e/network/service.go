@@ -64,11 +64,9 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
@@ -264,7 +262,7 @@ func checkAffinityFailed(tracker affinityTracker, err string) {
 	framework.Fail(err)
 }
 
-// StartServeHostnameService creates a replication controller that serves its
+// StartServeHostnameService creates a deployment that serves its
 // hostname and a service on top of it.
 func StartServeHostnameService(ctx context.Context, c clientset.Interface, svc *v1.Service, ns string, replicas int) ([]string, string, error) {
 	podNames := make([]string, replicas)
@@ -275,31 +273,28 @@ func StartServeHostnameService(ctx context.Context, c clientset.Interface, svc *
 		return podNames, "", err
 	}
 
-	var createdPods []*v1.Pod
-	maxContainerFailures := 0
-	config := testutils.RCConfig{
-		Client:               c,
-		Image:                imageutils.GetE2EImage(imageutils.Agnhost),
-		Command:              []string{"/agnhost", "serve-hostname"},
-		Name:                 name,
-		Namespace:            ns,
-		PollInterval:         3 * time.Second,
-		Timeout:              framework.PodReadyBeforeTimeout,
-		Replicas:             replicas,
-		CreatedPods:          &createdPods,
-		MaxContainerFailures: &maxContainerFailures,
-	}
-	err = e2erc.RunRC(ctx, config)
-	if err != nil {
-		return podNames, "", err
+	deploymentConfig := e2edeployment.NewDeployment(name,
+		int32(replicas),
+		map[string]string{"name": name},
+		name,
+		imageutils.GetE2EImage(imageutils.Agnhost),
+		appsv1.RecreateDeploymentStrategyType)
+	deploymentConfig.Spec.Template.Spec.Containers[0].Command = []string{"/agnhost", "serve-hostname"}
+	deployment, err := c.AppsV1().Deployments(ns).Create(ctx, deploymentConfig, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "failed to create deployment %s in namespace %s", name, ns)
+
+	err = e2edeployment.WaitForDeploymentComplete(c, deployment)
+	framework.ExpectNoError(err, "failed to wait for deployment %s in namespace %s", name, ns)
+
+	pods, err := e2edeployment.GetPodsForDeployment(ctx, c, deployment)
+	framework.ExpectNoError(err, "failed to get pods for deployment %s in namespace %s", name, ns)
+
+	if len(pods.Items) != replicas {
+		return podNames, "", fmt.Errorf("incorrect number of running pods: %v", len(pods.Items))
 	}
 
-	if len(createdPods) != replicas {
-		return podNames, "", fmt.Errorf("incorrect number of running pods: %v", len(createdPods))
-	}
-
-	for i := range createdPods {
-		podNames[i] = createdPods[i].ObjectMeta.Name
+	for i := range pods.Items {
+		podNames[i] = pods.Items[i].ObjectMeta.Name
 	}
 	sort.StringSlice(podNames).Sort()
 
@@ -316,7 +311,7 @@ func StartServeHostnameService(ctx context.Context, c clientset.Interface, svc *
 
 // StopServeHostnameService stops the given service.
 func StopServeHostnameService(ctx context.Context, clientset clientset.Interface, ns, name string) error {
-	if err := e2erc.DeleteRCAndWaitForGC(ctx, clientset, ns, name); err != nil {
+	if err := clientset.AppsV1().Deployments(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 	if err := clientset.CoreV1().Services(ns).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
@@ -1101,10 +1096,10 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.By("creating " + svc1 + " in namespace " + ns)
 		podNames1, svc1IP, err := StartServeHostnameService(ctx, cs, getServeHostnameService(svc1), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svc1, ns)
 		ginkgo.By("creating " + svc2 + " in namespace " + ns)
 		podNames2, svc2IP, err := StartServeHostnameService(ctx, cs, getServeHostnameService(svc2), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svc2, ns)
 
 		ginkgo.By("verifying service " + svc1 + " is up")
 		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podNames1, svc1IP, servicePort))
@@ -1124,7 +1119,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// Start another service and verify both are up.
 		ginkgo.By("creating service " + svc3 + " in namespace " + ns)
 		podNames3, svc3IP, err := StartServeHostnameService(ctx, cs, getServeHostnameService(svc3), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc3, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svc3, ns)
 
 		if svc2IP == svc3IP {
 			framework.Failf("service IPs conflict: %v", svc2IP)
@@ -1186,11 +1181,11 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.DeferCleanup(StopServeHostnameService, f.ClientSet, ns, svc1)
 		podNames1, svc1IP, err := StartServeHostnameService(ctx, cs, getServeHostnameService(svc1), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svc1, ns)
 
 		ginkgo.DeferCleanup(StopServeHostnameService, f.ClientSet, ns, svc2)
 		podNames2, svc2IP, err := StartServeHostnameService(ctx, cs, getServeHostnameService(svc2), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svc2, ns)
 
 		if svc1IP == svc2IP {
 			framework.Failf("VIPs conflict: %v", svc1IP)
@@ -1219,7 +1214,7 @@ var _ = common.SIGDescribe("Services", func() {
 
 		ginkgo.DeferCleanup(StopServeHostnameService, f.ClientSet, ns, svc1)
 		podNames1, svc1IP, err := StartServeHostnameService(ctx, cs, getServeHostnameService(svc1), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svc1, ns)
 
 		framework.ExpectNoError(verifyServeHostnameServiceUp(ctx, cs, ns, podNames1, svc1IP, servicePort))
 
@@ -1237,7 +1232,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// Create a new service and check if it's not reusing IP.
 		ginkgo.DeferCleanup(StopServeHostnameService, f.ClientSet, ns, svc2)
 		podNames2, svc2IP, err := StartServeHostnameService(ctx, cs, getServeHostnameService(svc2), ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svc2, ns)
 
 		if svc1IP == svc2IP {
 			framework.Failf("VIPs conflict: %v", svc1IP)
@@ -2182,7 +2177,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Release: v1.19
 		Testname: Service, ClusterIP type, session affinity to ClientIP
 		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning "ClusterIP" to the service.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create a Deployment to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
 		Create another pod to make requests to the service. Service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
 		[LinuxOnly]: Windows does not support session affinity.
@@ -2203,7 +2198,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Release: v1.19
 		Testname: Service, ClusterIP type, session affinity to None
 		Description: Create a service of type "ClusterIP". Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning "ClusterIP" to the service.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create a Deployment to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
 		Create another pod to make requests to the service. Update the service's sessionAffinity to "None". Service update MUST be successful. When a requests are made to the service, it MUST be able serve the hostname from any pod of the replica.
 		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort.
@@ -2219,7 +2214,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Release: v1.19
 		Testname: Service, NodePort type, session affinity to ClientIP
 		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning a "ClusterIP" to service and allocating NodePort on all nodes.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when a requests are sent to the service.
+		Create a Deployment to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when a requests are sent to the service.
 		Create another pod to make requests to the service on node's IP and NodePort. Service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
 		[LinuxOnly]: Windows does not support session affinity.
@@ -2240,7 +2235,7 @@ var _ = common.SIGDescribe("Services", func() {
 		Release: v1.19
 		Testname: Service, NodePort type, session affinity to None
 		Description: Create a service of type "NodePort" and provide service port and protocol. Service's sessionAffinity is set to "ClientIP". Service creation MUST be successful by assigning a "ClusterIP" to the service and allocating NodePort on all the nodes.
-		Create a Replication Controller to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
+		Create a Deployment to ensure that 3 pods are running and are targeted by the service to serve hostname of the pod when requests are sent to the service.
 		Create another pod to make requests to the service. Update the service's sessionAffinity to "None". Service update MUST be successful. When a requests are made to the service on node's IP and NodePort, service MUST be able serve the hostname from any pod of the replica.
 		When service's sessionAffinily is updated back to "ClientIP", service MUST serve the hostname from the same pod of the replica for all consecutive requests.
 		Service MUST be reachable over serviceName and the ClusterIP on servicePort. Service MUST also be reachable over node's IP on NodePort.
@@ -2266,12 +2261,12 @@ var _ = common.SIGDescribe("Services", func() {
 		svcDisabled := getServeHostnameService("service-proxy-disabled")
 		svcDisabled.ObjectMeta.Labels = serviceProxyNameLabels
 		_, svcDisabledIP, err := StartServeHostnameService(ctx, cs, svcDisabled, ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcDisabledIP, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svcDisabledIP, ns)
 
 		ginkgo.By("creating service in namespace " + ns)
 		svcToggled := getServeHostnameService("service-proxy-toggled")
 		podToggledNames, svcToggledIP, err := StartServeHostnameService(ctx, cs, svcToggled, ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcToggledIP, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svcToggledIP, ns)
 
 		jig := e2eservice.NewTestJig(cs, ns, svcToggled.ObjectMeta.Name)
 
@@ -2318,12 +2313,12 @@ var _ = common.SIGDescribe("Services", func() {
 		svcHeadless.ObjectMeta.Labels = serviceHeadlessLabels
 		// This should be improved, as we do not want a Headlesss Service to contain an IP...
 		_, svcHeadlessIP, err := StartServeHostnameService(ctx, cs, svcHeadless, ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
+		framework.ExpectNoError(err, "failed to create deployment with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
 
 		ginkgo.By("creating service in namespace " + ns)
 		svcHeadlessToggled := getServeHostnameService("service-headless-toggled")
 		podHeadlessToggledNames, svcHeadlessToggledIP, err := StartServeHostnameService(ctx, cs, svcHeadlessToggled, ns, numPods)
-		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcHeadlessToggledIP, ns)
+		framework.ExpectNoError(err, "failed to create deployment with service: %s in the namespace: %s", svcHeadlessToggledIP, ns)
 
 		jig := e2eservice.NewTestJig(cs, ns, svcHeadlessToggled.ObjectMeta.Name)
 
@@ -2831,10 +2826,13 @@ var _ = common.SIGDescribe("Services", func() {
 		healthCheckNodePortAddr := net.JoinHostPort(nodeIPs[0], strconv.Itoa(int(svc.Spec.HealthCheckNodePort)))
 		// validate that the health check node port from kube-proxy returns 200 when there are ready endpoints
 		err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`, healthCheckNodePortAddr)
+			cmd := fmt.Sprintf(`curl -s -o /dev/null -w "%%{http_code}" --max-time 5 http://%s/healthz`,
+				healthCheckNodePortAddr)
 			out, err := e2eoutput.RunHostCmd(pausePod0.Namespace, pausePod0.Name, cmd)
 			if err != nil {
-				framework.Logf("unexpected error trying to connect to nodeport %s : %v", healthCheckNodePortAddr, err)
+				framework.Logf("unexpected error trying to connect to nodeport %s : %v",
+					healthCheckNodePortAddr,
+					err)
 				return false, nil
 			}
 
@@ -4245,7 +4243,7 @@ func execAffinityTestForSessionAffinityTimeout(ctx context.Context, f *framework
 		ClientIP: &v1.ClientIPConfig{TimeoutSeconds: &svcSessionAffinityTimeout},
 	}
 	_, _, err := StartServeHostnameService(ctx, cs, svc, ns, numPods)
-	framework.ExpectNoError(err, "failed to create replication controller with service in the namespace: %s", ns)
+	framework.ExpectNoError(err, "failed to create deployment with service in the namespace: %s", ns)
 	ginkgo.DeferCleanup(StopServeHostnameService, cs, ns, serviceName)
 	jig := e2eservice.NewTestJig(cs, ns, serviceName)
 	svc, err = jig.Client.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
@@ -4328,7 +4326,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(ctx context.Context, 
 	serviceType := svc.Spec.Type
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	_, _, err := StartServeHostnameService(ctx, cs, svc, ns, numPods)
-	framework.ExpectNoError(err, "failed to create replication controller with service in the namespace: %s", ns)
+	framework.ExpectNoError(err, "failed to create deployment with service in the namespace: %s", ns)
 	ginkgo.DeferCleanup(StopServeHostnameService, cs, ns, serviceName)
 	jig := e2eservice.NewTestJig(cs, ns, serviceName)
 	svc, err = jig.Client.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
@@ -4398,7 +4396,7 @@ func execAffinityTestForLBServiceWithOptionalTransition(ctx context.Context, f *
 	ginkgo.By("creating service in namespace " + ns)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	_, _, err := StartServeHostnameService(ctx, cs, svc, ns, numPods)
-	framework.ExpectNoError(err, "failed to create replication controller with service in the namespace: %s", ns)
+	framework.ExpectNoError(err, "failed to create deployment with service in the namespace: %s", ns)
 	jig := e2eservice.NewTestJig(cs, ns, serviceName)
 	ginkgo.By("waiting for loadbalancer for service " + ns + "/" + serviceName)
 	svc, err = jig.WaitForLoadBalancer(ctx, e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs))

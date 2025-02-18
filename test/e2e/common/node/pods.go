@@ -638,7 +638,11 @@ var _ = SIGDescribe("Pods", func() {
 		})
 
 		ginkgo.By("submitting the pod to kubernetes")
-		podClient.CreateSync(ctx, pod)
+		pod = podClient.CreateSync(ctx, pod)
+
+		ginkgo.By("waiting for the container to be running")
+		err = e2epod.WaitForContainerRunning(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, framework.PodStartShortTimeout)
+		framework.ExpectNoError(err, "failed to wait for container to be running")
 
 		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
