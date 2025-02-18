@@ -790,9 +790,6 @@ const (
 	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
 	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
 
-	// owner: @cofyc
-	VolumeCapacityPriority featuregate.Feature = "VolumeCapacityPriority"
-
 	// owner: @ksubrmnn
 	//
 	// Allows kube-proxy to create DSR loadbalancers for Windows

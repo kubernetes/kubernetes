@@ -826,10 +826,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 	},
 
-	VolumeCapacityPriority: {
-		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
 	WinDSR: {
 		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
 	},

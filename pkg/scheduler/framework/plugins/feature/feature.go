@@ -23,7 +23,6 @@ type Features struct {
 	EnableDRAPrioritizedList                     bool
 	EnableDRAAdminAccess                         bool
 	EnableDynamicResourceAllocation              bool
-	EnableVolumeCapacityPriority                 bool
 	EnableVolumeAttributesClass                  bool
 	EnableCSIMigrationPortworx                   bool
 	EnableNodeInclusionPolicyInPodTopologySpread bool
