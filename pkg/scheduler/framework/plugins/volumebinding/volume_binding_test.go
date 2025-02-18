@@ -327,7 +327,7 @@ func TestVolumeBinding(t *testing.T) {
 					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
@@ -417,7 +417,7 @@ func TestVolumeBinding(t *testing.T) {
 					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
@@ -536,7 +536,7 @@ func TestVolumeBinding(t *testing.T) {
 					}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
@@ -654,7 +654,7 @@ func TestVolumeBinding(t *testing.T) {
 					}).PersistentVolume,
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
+				EnableStorageCapacityScoring: true,
 			},
 			args: &config.VolumeBindingArgs{
 				BindTimeoutSeconds: 300,
@@ -750,7 +750,6 @@ func TestVolumeBinding(t *testing.T) {
 				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
 				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
@@ -807,7 +806,6 @@ func TestVolumeBinding(t *testing.T) {
 				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
 				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
@@ -863,7 +861,6 @@ func TestVolumeBinding(t *testing.T) {
 				makeCapacity("node-a", waitSCWithStorageCapacity.Name, makeNode("node-a").withLabel(nodeLabelKey, "node-a").Node, "100Gi", ""),
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
 				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
@@ -902,7 +899,6 @@ func TestVolumeBinding(t *testing.T) {
 				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
 				EnableStorageCapacityScoring: true,
 			},
 			wantPreFilterStatus: nil,
@@ -944,7 +940,6 @@ func TestVolumeBinding(t *testing.T) {
 				makeCapacity("node-c", waitSCWithStorageCapacity.Name, makeNode("node-c").withLabel(nodeLabelKey, "node-c").Node, "10Gi", ""),
 			},
 			fts: feature.Features{
-				EnableVolumeCapacityPriority: true,
 				EnableStorageCapacityScoring: true,
 			},
 			args: &config.VolumeBindingArgs{
@@ -1006,7 +1001,7 @@ func TestVolumeBinding(t *testing.T) {
 				args = &config.VolumeBindingArgs{
 					BindTimeoutSeconds: 300,
 				}
-				if item.fts.EnableVolumeCapacityPriority {
+				if item.fts.EnableStorageCapacityScoring {
 					args.Shape = defaultShapePoint
 				}
 			}
