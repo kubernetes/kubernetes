@@ -17,10 +17,12 @@ limitations under the License.
 package websocket
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -181,6 +183,10 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 // websocket connection after RoundTrip() on the wrapper. Returns an error if there is
 // a problem creating the round trippers.
 func RoundTripperFor(config *restclient.Config) (http.RoundTripper, ConnectionHolder, error) {
+	// test if is actually ignored
+	config.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return nil, fmt.Errorf("custom dial function not supported for streaming connections")
+	}
 	transportCfg, err := config.TransportConfig()
 	if err != nil {
 		return nil, nil, err
