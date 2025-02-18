@@ -29,11 +29,10 @@ import (
 // called instead of IsLikelyNotMountPoint. IsNotMountPoint is more expensive
 // but properly handles bind mounts within the same fs.
 func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool) error {
-	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists && pathErr == nil {
-		klog.Warningf("Warning: mount cleanup skipped because path does not exist: %v", mountPath)
-		return nil
-	}
+	// If a parent directory of mountPath is a mount point for remote storage (e.g., object storage),
+	// and the content corresponding to mountPath is deleted remotely, Stat will detect that the path does not exist.
+	// However, it is still necessary to umount on mountPath because it remains a mount point.
+	_, pathErr := PathExists(mountPath)
 	corruptedMnt := IsCorruptedMnt(pathErr)
 	if pathErr != nil && !corruptedMnt {
 		return fmt.Errorf("Error checking path: %v", pathErr)
@@ -42,11 +41,7 @@ func CleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointC
 }
 
 func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, extensiveMountPointCheck bool, umountTimeout time.Duration) error {
-	pathExists, pathErr := PathExists(mountPath)
-	if !pathExists && pathErr == nil {
-		klog.Warningf("Warning: mount cleanup skipped because path does not exist: %v", mountPath)
-		return nil
-	}
+	_, pathErr := PathExists(mountPath)
 	corruptedMnt := IsCorruptedMnt(pathErr)
 	if pathErr != nil && !corruptedMnt {
 		return fmt.Errorf("Error checking path: %v", pathErr)
