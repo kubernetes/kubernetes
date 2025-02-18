@@ -435,7 +435,7 @@ var (
 	// TODO: remove when SELinuxMount feature gate is enabled by default.
 	SELinuxMountReadWriteOncePodOnly = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePodOnly"))
 
-	// SeparateDiskTest (SIG-node, used for testing separate image filesystem <https://kep.k8s.io/4191>)
+	// SeparateDiskTest (SIG-node, used for testing separate container runtime filesystem)
 	// The tests need separate disk settings on nodes and separate filesystems in storage.conf
 	SeparateDiskTest = framework.WithFeature(framework.ValidFeatures.Add("SeparateDiskTest"))
 
