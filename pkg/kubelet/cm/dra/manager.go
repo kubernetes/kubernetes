@@ -32,6 +32,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -187,8 +188,18 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	logger := klog.FromContext(ctx)
 	batches := make(map[string][]*drapb.Claim)
 	resourceClaims := make(map[types.UID]*resourceapi.ResourceClaim)
-	for i := range pod.Spec.ResourceClaims {
-		podClaim := &pod.Spec.ResourceClaims[i]
+
+	podResourceClaims := pod.Spec.ResourceClaims
+	if pod.Status.ExtendedResourceClaimStatus != nil {
+		extenedResourceClaim := v1.PodResourceClaim{
+			ResourceClaimName: &pod.Status.ExtendedResourceClaimStatus.ResourceClaimName,
+		}
+		podResourceClaims = make([]v1.PodResourceClaim, 0, len(pod.Spec.ResourceClaims)+1)
+		podResourceClaims = append(podResourceClaims, pod.Spec.ResourceClaims...)
+		podResourceClaims = append(podResourceClaims, extenedResourceClaim)
+	}
+	for i := range podResourceClaims {
+		podClaim := &podResourceClaims[i]
 		logger.V(3).Info("Processing resource", "pod", klog.KObj(pod), "podClaim", podClaim.Name)
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, podClaim)
 		if err != nil {
@@ -395,6 +406,48 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 			}
 		}
 	}
+	if pod.Status.ExtendedResourceClaimStatus != nil {
+		claimName := &pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+		// if the container has requests for extended resources backed by DRA,
+		// they must have been allocated via the extendedResourceClaim created
+		// by the kube-scheduler.
+		err := m.cache.withRLock(func() error {
+			claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+			if !exists {
+				return fmt.Errorf("unable to get claim info for claim %s in namespace %s", *claimName, pod.Namespace)
+			}
+
+			// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
+			for rName, rValue := range container.Resources.Requests {
+				if rValue.IsZero() {
+					// We only care about the resources requested by the pod
+					continue
+				}
+				switch rName {
+				case v1.ResourceCPU:
+				case v1.ResourceMemory:
+				case v1.ResourceEphemeralStorage:
+				default:
+					if v1helper.IsExtendedResourceName(rName) {
+						requestName := ""
+						for _, names := range pod.Status.ExtendedResourceClaimStatus.Names {
+							if names.ContainerName == container.Name && names.ExtendedResourceName == rName.String() {
+								requestName = names.RequestName
+								break
+							}
+						}
+						if requestName != "" {
+							cdiDevices = append(cdiDevices, claimInfo.cdiDevicesAsList(requestName)...)
+						}
+					}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("locked cache operation: %w", err)
+		}
+	}
 	return &ContainerInfo{CDIDevices: cdiDevices}, nil
 }
 
@@ -537,7 +590,6 @@ func (m *ManagerImpl) PodMightNeedToUnprepareResources(uid types.UID) bool {
 // GetContainerClaimInfos gets Container's ClaimInfo
 func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error) {
 	claimInfos := make([]*ClaimInfo, 0, len(pod.Spec.ResourceClaims))
-
 	for i, podResourceClaim := range pod.Spec.ResourceClaims {
 		claimName, _, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
 		if err != nil {
@@ -560,6 +612,31 @@ func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Containe
 			if err != nil {
 				return nil, fmt.Errorf("locked cache operation: %w", err)
 			}
+		}
+	}
+	// Handle the special claim for extended resources backed by DRA in the pod
+	if pod.Status.ExtendedResourceClaimStatus != nil {
+		var hasExtendedResourceClaim bool
+		for _, n := range pod.Status.ExtendedResourceClaimStatus.Names {
+			if n.ContainerName == container.Name {
+				hasExtendedResourceClaim = true
+				break
+			}
+		}
+		if !hasExtendedResourceClaim {
+			return claimInfos, nil
+		}
+		claimName := &pod.Status.ExtendedResourceClaimStatus.ResourceClaimName
+		err := m.cache.withRLock(func() error {
+			claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+			if !exists {
+				return fmt.Errorf("unable to get claim info for claim %s in namespace %s", *claimName, pod.Namespace)
+			}
+			claimInfos = append(claimInfos, claimInfo.DeepCopy())
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("locked cache operation: %w", err)
 		}
 	}
 	return claimInfos, nil

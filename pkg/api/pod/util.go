@@ -859,6 +859,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) && !dynamicResourceAllocationInUse(oldPodSpec) {
 		podStatus.ResourceClaimStatuses = nil
+		podStatus.ExtendedResourceClaimStatus = nil
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecursiveReadOnlyMounts) && !rroInUse(oldPodSpec) {
