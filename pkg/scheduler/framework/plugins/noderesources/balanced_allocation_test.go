@@ -23,7 +23,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
@@ -56,14 +55,6 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			},
 		},
 		NodeName: "node1",
-	}
-	labels1 := map[string]string{
-		"foo": "bar",
-		"baz": "blah",
-	}
-	labels2 := map[string]string{
-		"bar": "foo",
-		"baz": "blah",
 	}
 	cpuOnly := v1.PodSpec{
 		NodeName: "node1",
@@ -119,29 +110,23 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 	}
 
 	tests := []struct {
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
-		args         config.NodeResourcesBalancedAllocationArgs
-		runPreScore  bool
+		pod                    *v1.Pod
+		pods                   []*v1.Pod
+		nodes                  []*v1.Node
+		expectedList           framework.NodeScoreList
+		name                   string
+		args                   config.NodeResourcesBalancedAllocationArgs
+		runPreScore            bool
+		wantPreScoreStatusCode framework.Code
 	}{
 		{
-			// Node1 scores (remaining resources) on 0-MaxNodeScore scale
-			// CPU Fraction: 0 / 4000 = 0%
-			// Memory Fraction: 0 / 10000 = 0%
-			// Node1 Score: (1-0) * MaxNodeScore = MaxNodeScore
-			// Node2 scores (remaining resources) on 0-MaxNodeScore scale
-			// CPU Fraction: 0 / 4000 = 0 %
-			// Memory Fraction: 0 / 10000 = 0%
-			// Node2 Score: (1-0) * MaxNodeScore = MaxNodeScore
-			pod:          st.MakePod().Obj(),
-			nodes:        []*v1.Node{makeNode("node1", 4000, 10000, nil), makeNode("node2", 4000, 10000, nil)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: framework.MaxNodeScore}},
-			name:         "nothing scheduled, nothing requested",
-			args:         config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
-			runPreScore:  true,
+			// bestEffort pods, skip in PreScore
+			pod:                    st.MakePod().Obj(),
+			nodes:                  []*v1.Node{makeNode("node1", 4000, 10000, nil), makeNode("node2", 4000, 10000, nil)},
+			name:                   "nothing scheduled, nothing requested, skip in PreScore",
+			args:                   config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
+			runPreScore:            true,
+			wantPreScoreStatusCode: framework.Skip,
 		},
 		{
 			// Node1 scores on 0-MaxNodeScore scale
@@ -160,76 +145,6 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			name:         "nothing scheduled, resources requested, differently sized nodes",
 			args:         config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
 			runPreScore:  true,
-		},
-		{
-			// Node1 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 0 / 4000= 0%
-			// Memory Fraction: 0 / 10000 = 0%
-			// Node1 std: 0
-			// Node1 Score: (1-0) * MaxNodeScore = MaxNodeScore
-			// Node2 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 0 / 4000= 0%
-			// Memory Fraction: 0 / 10000 = 0%
-			// Node2 std: 0
-			// Node2 Score: (1-0) * MaxNodeScore = MaxNodeScore
-			pod:          st.MakePod().Obj(),
-			nodes:        []*v1.Node{makeNode("node1", 4000, 10000, nil), makeNode("node2", 4000, 10000, nil)},
-			expectedList: []framework.NodeScore{{Name: "node2", Score: framework.MaxNodeScore}, {Name: "node2", Score: framework.MaxNodeScore}},
-			name:         "no resources requested, pods without container scheduled",
-			pods: []*v1.Pod{
-				st.MakePod().Node("node1").Labels(labels2).Obj(),
-				st.MakePod().Node("node1").Labels(labels1).Obj(),
-				st.MakePod().Node("node2").Labels(labels1).Obj(),
-				st.MakePod().Node("node2").Labels(labels1).Obj(),
-			},
-			args:        config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
-			runPreScore: true,
-		},
-		{
-			// Node1 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 0 / 250 = 0%
-			// Memory Fraction: 0 / 1000 = 0%
-			// Node1 std: (0 - 0) / 2 = 0
-			// Node1 Score: (1 - 0)*MaxNodeScore = 100
-			// Node2 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 0 / 250 = 0%
-			// Memory Fraction: 0 / 1000 = 0%
-			// Node2 std: (0 - 0) / 2 = 0
-			// Node2 Score: (1 - 0)*MaxNodeScore = 100
-			pod:          st.MakePod().Obj(),
-			nodes:        []*v1.Node{makeNode("node1", 250, 1000*1024*1024, nil), makeNode("node2", 250, 1000*1024*1024, nil)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 100}, {Name: "node2", Score: 100}},
-			name:         "no resources requested, pods with container scheduled",
-			pods: []*v1.Pod{
-				st.MakePod().Node("node1").Obj(),
-				st.MakePod().Node("node1").Obj(),
-			},
-			args:        config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
-			runPreScore: true,
-		},
-		{
-			// Node1 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 6000 / 10000 = 60%
-			// Memory Fraction: 0 / 20000 = 0%
-			// Node1 std: (0.6 - 0) / 2 = 0.3
-			// Node1 Score: (1 - 0.3)*MaxNodeScore = 70
-			// Node2 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 6000 / 10000 = 60%
-			// Memory Fraction: 5000 / 20000 = 25%
-			// Node2 std: (0.6 - 0.25) / 2 = 0.175
-			// Node2 Score: (1 - 0.175)*MaxNodeScore = 82
-			pod:          st.MakePod().Obj(),
-			nodes:        []*v1.Node{makeNode("node1", 10000, 20000, nil), makeNode("node2", 10000, 20000, nil)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 70}, {Name: "node2", Score: 82}},
-			name:         "no resources requested, pods scheduled with resources",
-			pods: []*v1.Pod{
-				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
-				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
-				{Spec: cpuOnly2, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
-				{Spec: cpuAndMemory, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
-			},
-			args:        config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
-			runPreScore: true,
 		},
 		{
 			// Node1 scores on 0-MaxNodeScore scale
@@ -298,18 +213,6 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			args:        config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
 			runPreScore: true,
 		},
-		{
-			pod:          st.MakePod().Obj(),
-			nodes:        []*v1.Node{makeNode("node1", 0, 0, nil), makeNode("node2", 0, 0, nil)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 100}, {Name: "node2", Score: 100}},
-			name:         "zero node resources, pods scheduled with resources",
-			pods: []*v1.Pod{
-				{Spec: cpuOnly},
-				{Spec: cpuAndMemory},
-			},
-			args:        config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
-			runPreScore: true,
-		},
 		// Node1 scores on 0-MaxNodeScore scale
 		// CPU Fraction: 3000 / 3500 = 85.71%
 		// Memory Fraction: 5000 / 40000 = 12.5%
@@ -342,19 +245,25 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			runPreScore: true,
 		},
 		// Only one node (node1) has the scalar resource, pod doesn't request the scalar resource and the scalar resource should be skipped for consideration.
-		// Node1: std = 0, score = 100
-		// Node2: std = 0, score = 100
+		// Node1 scores on 0-MaxNodeScore scale
+		// CPU Fraction: 3000 / 3500 = 85.71%
+		// Memory Fraction: 5000 / 40000 = 12.5%
+		// Node1 std: (0.8571 - 0.125) / 2 = 0.36605
+		// Node1 Score: (1 - 0.22705)*MaxNodeScore = 63
+		// Node2 scores on 0-MaxNodeScore scale
+		// CPU Fraction: 3000 / 3500 = 85.71%
+		// Memory Fraction: 5000 / 40000 = 12.5%
+		// Node2 std: (0.8571 - 0.125) / 2 = 0.36605
+		// Node2 Score: (1 - 0.22705)*MaxNodeScore = 63
 		{
-			pod:          st.MakePod().Obj(),
+			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("node1", 3500, 40000, scalarResource), makeNode("node2", 3500, 40000, nil)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 100}, {Name: "node2", Score: 100}},
-			name:         "node without the scalar resource results to a higher score",
-			pods: []*v1.Pod{
-				{Spec: cpuOnly},
-				{Spec: cpuOnly2},
-			},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 63}, {Name: "node2", Score: 63}},
+			name:         "node without the scalar resource should skip the scalar resource",
+			pods:         []*v1.Pod{},
 			args: config.NodeResourcesBalancedAllocationArgs{Resources: []config.ResourceSpec{
 				{Name: string(v1.ResourceCPU), Weight: 1},
+				{Name: string(v1.ResourceMemory), Weight: 1},
 				{Name: "nvidia.com/gpu", Weight: 1},
 			}},
 			runPreScore: true,
@@ -392,13 +301,17 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			fh, _ := runtime.NewFramework(ctx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			p, _ := NewBalancedAllocation(ctx, &test.args, fh, feature.Features{})
 			state := framework.NewCycleState()
-			for i := range test.nodes {
-				if test.runPreScore {
-					status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
-					if !status.IsSuccess() {
-						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
-					}
+			if test.runPreScore {
+				status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
+				if status.Code() != test.wantPreScoreStatusCode {
+					t.Errorf("unexpected status code, want: %v, got: %v", test.wantPreScoreStatusCode, status.Code())
 				}
+				if status.Code() == framework.Skip {
+					t.Log("skipping score test as PreScore returned skip")
+					return
+				}
+			}
+			for i := range test.nodes {
 				nodeInfo, err := snapshot.Get(test.nodes[i].Name)
 				if err != nil {
 					t.Errorf("failed to get node %q from snapshot: %v", test.nodes[i].Name, err)
