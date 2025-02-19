@@ -74,6 +74,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		if len(outputFilePath) == 0 {
 			outputFilePath = file.RealPath
 		}
+		outputFilePath = filepath.ToSlash(outputFilePath)
 
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
 		fmt.Fprintf(w, "%s", fileBytes)
