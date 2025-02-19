@@ -281,3 +281,18 @@ headers:
 	}
 	return result
 }
+
+// isValidChallengeKey checks if the argument meets RFC6455 specification.
+func isValidChallengeKey(s string) bool {
+	// From RFC6455:
+	//
+	// A |Sec-WebSocket-Key| header field with a base64-encoded (see
+	// Section 4 of [RFC4648]) value that, when decoded, is 16 bytes in
+	// length.
+
+	if s == "" {
+		return false
+	}
+	decoded, err := base64.StdEncoding.DecodeString(s)
+	return err == nil && len(decoded) == 16
+}

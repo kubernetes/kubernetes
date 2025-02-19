@@ -7,12 +7,6 @@ Gorilla WebSocket is a [Go](http://golang.org/) implementation of the
 [WebSocket](http://www.rfc-editor.org/rfc/rfc6455.txt) protocol.
 
 
----
-
-⚠️ **[The Gorilla WebSocket Package is looking for a new maintainer](https://github.com/gorilla/websocket/issues/370)**
-
----
-
 ### Documentation
 
 * [API Reference](https://pkg.go.dev/github.com/gorilla/websocket?tab=doc)
