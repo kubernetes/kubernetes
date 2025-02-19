@@ -1953,7 +1953,7 @@ type ServiceAccountTokenProjection struct {
 	// its time to live or if the token is older than 24 hours.Defaults to 1 hour
 	// and must be at least 10 minutes.
 	// +optional
-	ExpirationSeconds *int64 `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
+	ExpirationSeconds *int32 `json:"expirationSeconds,omitempty" protobuf:"varint,2,opt,name=expirationSeconds"`
 	// path is the path relative to the mount point of the file to project the
 	// token into.
 	Path string `json:"path" protobuf:"bytes,3,opt,name=path"`
