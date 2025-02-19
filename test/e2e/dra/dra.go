@@ -411,26 +411,17 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.create(ctx, claim, pod)
 
 			// Waits for the ResourceClaim to be allocated and the pod to be scheduled.
-			var allocatedResourceClaim *resourceapi.ResourceClaim
-			var scheduledPod *v1.Pod
+			b.testPod(ctx, f, pod)
 
-			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
-				var err error
-				allocatedResourceClaim, err = b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
-				return allocatedResourceClaim, err
-			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
-
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				var err error
-				scheduledPod, err = b.f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-				if err != nil && scheduledPod.Spec.NodeName != "" {
-					return fmt.Errorf("expected the test pod %s to exist and to be scheduled on a node: %w", pod.Name, err)
-				}
-				return nil
-			}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.BeNil())
-
+			allocatedResourceClaim, err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(allocatedResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation).ToNot(gomega.BeNil())
 			gomega.Expect(allocatedResourceClaim.Status.Allocation.Devices.Results).To(gomega.HaveLen(1))
+
+			scheduledPod, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(scheduledPod).ToNot(gomega.BeNil())
 
 			ginkgo.By("Setting the device status a first time")
 			allocatedResourceClaim.Status.Devices = append(allocatedResourceClaim.Status.Devices,
@@ -446,8 +437,13 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 						HardwareAddress: "bc:1c:b6:3e:b8:25",
 					},
 				})
+
 			// Updates the ResourceClaim from the driver on the same node as the pod.
-			updatedResourceClaim, err := driver.Nodes[scheduledPod.Spec.NodeName].ExamplePlugin.UpdateStatus(ctx, allocatedResourceClaim)
+			plugin, ok := driver.Nodes[scheduledPod.Spec.NodeName]
+			if !ok {
+				framework.Failf("pod got scheduled to node %s without a plugin", scheduledPod.Spec.NodeName)
+			}
+			updatedResourceClaim, err := plugin.UpdateStatus(ctx, allocatedResourceClaim)
 			framework.ExpectNoError(err)
 			gomega.Expect(updatedResourceClaim).ToNot(gomega.BeNil())
 			gomega.Expect(updatedResourceClaim.Status.Devices).To(gomega.Equal(allocatedResourceClaim.Status.Devices))
@@ -465,7 +461,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 					HardwareAddress: "bc:1c:b6:3e:b8:26",
 				},
 			}
-			updatedResourceClaim2, err := driver.Nodes[scheduledPod.Spec.NodeName].ExamplePlugin.UpdateStatus(ctx, updatedResourceClaim)
+
+			updatedResourceClaim2, err := plugin.UpdateStatus(ctx, updatedResourceClaim)
 			framework.ExpectNoError(err)
 			gomega.Expect(updatedResourceClaim2).ToNot(gomega.BeNil())
 			gomega.Expect(updatedResourceClaim2.Status.Devices).To(gomega.Equal(updatedResourceClaim.Status.Devices))
