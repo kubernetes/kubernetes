@@ -18,6 +18,7 @@ package testing
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math"
@@ -622,7 +623,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 }
 
 func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
-	initialRV, preset, err := seedMultiLevelData(ctx, store)
+	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -663,6 +664,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		expectedOut                []example.Pod
 		expectedAlternatives       [][]example.Pod
 		expectContinue             bool
+		expectContinueExact        string
 		expectedRemainingItemCount *int64
 		expectError                bool
 		expectRVTooLarge           bool
@@ -698,13 +700,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:        "test List on existing key",
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{*preset[0]},
+			expectedOut: []example.Pod{*updatedPod},
 		},
 		{
 			name:                 "test List on existing key with resource version set to 0",
 			prefix:               "/pods/first/",
 			pred:                 storage.Everything,
-			expectedAlternatives: [][]example.Pod{{}, {*preset[0]}},
+			expectedAlternatives: [][]example.Pod{{}, {*updatedPod}},
 			rv:                   "0",
 		},
 		{
@@ -720,7 +722,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:                 "test List on existing key with resource version set to 0, match=NotOlderThan",
 			prefix:               "/pods/first/",
 			pred:                 storage.Everything,
-			expectedAlternatives: [][]example.Pod{{}, {*preset[0]}},
+			expectedAlternatives: [][]example.Pod{{}, {*updatedPod}},
 			rv:                   "0",
 			rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
 		},
@@ -736,7 +738,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:                 "test List on existing key with resource version set before first write, match=NotOlderThan",
 			prefix:               "/pods/first/",
 			pred:                 storage.Everything,
-			expectedAlternatives: [][]example.Pod{{}, {*preset[0]}},
+			expectedAlternatives: [][]example.Pod{{}, {*updatedPod}},
 			rv:                   initialRV,
 			rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
 		},
@@ -752,14 +754,14 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:        "test List on existing key with resource version set to current resource version",
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{*preset[0]},
+			expectedOut: []example.Pod{*updatedPod},
 			rv:          list.ResourceVersion,
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=Exact",
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{*preset[0]},
+			expectedOut: []example.Pod{*updatedPod},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    list.ResourceVersion,
@@ -768,7 +770,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{*preset[0]},
+			expectedOut: []example.Pod{*updatedPod},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 		},
@@ -806,8 +808,10 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []example.Pod{*preset[1]},
+			expectedOut:                []example.Pod{*createdPods[1]},
+			expectRV:                   currentRV,
 			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
 			expectedRemainingItemCount: utilpointer.Int64(1),
 		},
 		{
@@ -818,8 +822,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []example.Pod{*preset[1]},
+			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(list.ResourceVersion))),
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         list.ResourceVersion,
 			expectRV:                   list.ResourceVersion,
@@ -832,8 +837,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []example.Pod{*preset[1]},
+			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(list.ResourceVersion))),
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchExact,
@@ -847,7 +853,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:                []example.Pod{*preset[1]},
+			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         list.ResourceVersion,
@@ -867,7 +873,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			// While this should eventually get fixed, for now we're explicitly
 			// ignoring this testcase for watchcache.
 			ignoreForWatchCache:        true,
-			expectedOut:                []example.Pod{*preset[1]},
+			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         "0",
@@ -886,7 +892,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			// While this should eventually get fixed, for now we're explicitly
 			// ignoring this testcase for watchcache.
 			ignoreForWatchCache:        true,
-			expectedOut:                []example.Pod{*preset[1]},
+			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         "0",
@@ -916,7 +922,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Limit:    1,
 				Continue: secondContinuation,
 			},
-			expectedOut: []example.Pod{*preset[2]},
+			expectedOut: []example.Pod{*createdPods[2]},
 		},
 		{
 			name:   "ignores resource version 0 for List with pregenerated continue token",
@@ -928,13 +934,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Continue: secondContinuation,
 			},
 			rv:          "0",
-			expectedOut: []example.Pod{*preset[2]},
+			expectedOut: []example.Pod{*createdPods[2]},
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result",
 			prefix:      "/pods/second/",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{*preset[1], *preset[2]},
+			expectedOut: []example.Pod{*createdPods[1], *createdPods[2]},
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result with current resource version and match=NotOlderThan",
@@ -942,7 +948,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			pred:        storage.Everything,
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut: []example.Pod{*preset[1], *preset[2]},
+			expectedOut: []example.Pod{*createdPods[1], *createdPods[2]},
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned",
@@ -952,7 +958,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Label: labels.Everything(),
 				Limit: 1,
 			},
-			expectedOut:    []example.Pod{*preset[3]},
+			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: true,
 		},
 		{
@@ -965,7 +971,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			rv:             list.ResourceVersion,
 			rvMatch:        metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut:    []example.Pod{*preset[3]},
+			expectedOut:    []example.Pod{*createdPods[3]},
+			expectRVFunc:   resourceVersionNotOlderThan(list.ResourceVersion),
 			expectContinue: true,
 		},
 		{
@@ -976,7 +983,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Label: labels.Everything(),
 				Limit: 2,
 			},
-			expectedOut:    []example.Pod{*preset[3]},
+			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: false,
 		},
 		{
@@ -989,7 +996,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			rv:             list.ResourceVersion,
 			rvMatch:        metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut:    []example.Pod{*preset[3]},
+			expectedOut:    []example.Pod{*createdPods[3]},
+			expectRVFunc:   resourceVersionNotOlderThan(list.ResourceVersion),
 			expectContinue: false,
 		},
 		{
@@ -1001,7 +1009,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Limit: 2,
 			},
 			rv:                   "0",
-			expectedAlternatives: [][]example.Pod{{}, {*preset[3]}},
+			expectedAlternatives: [][]example.Pod{{}, {*createdPods[3]}},
 			expectContinue:       false,
 		},
 		{
@@ -1013,7 +1021,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Limit: 2,
 			},
 			expectContinue: true,
-			expectedOut:    []example.Pod{*preset[0], *preset[1]},
+			expectedOut:    []example.Pod{*updatedPod, *createdPods[1]},
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible with current resource version and match=NotOlderThan",
@@ -1026,7 +1034,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rv:             list.ResourceVersion,
 			rvMatch:        metav1.ResourceVersionMatchNotOlderThan,
 			expectContinue: true,
-			expectedOut:    []example.Pod{*preset[0], *preset[1]},
+			expectedOut:    []example.Pod{*updatedPod, *createdPods[1]},
 		},
 		{
 			name:   "filter returns two items split across multiple pages",
@@ -1036,7 +1044,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Label: labels.Everything(),
 				Limit: 2,
 			},
-			expectedOut: []example.Pod{*preset[2], *preset[4]},
+			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
 		},
 		{
 			name:   "filter returns two items split across multiple pages with current resource version and match=NotOlderThan",
@@ -1048,7 +1056,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut: []example.Pod{*preset[2], *preset[4]},
+			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
 		},
 		{
 			name:   "filter returns one item for last page, ends on last item, not full",
@@ -1059,7 +1067,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Limit:    2,
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
-			expectedOut: []example.Pod{*preset[4]},
+			expectedOut: []example.Pod{*createdPods[4]},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, full",
@@ -1070,7 +1078,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Limit:    1,
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
-			expectedOut: []example.Pod{*preset[4]},
+			expectedOut: []example.Pod{*createdPods[4]},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, partial page",
@@ -1081,7 +1089,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Limit:    2,
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
-			expectedOut: []example.Pod{*preset[4]},
+			expectedOut: []example.Pod{*createdPods[4]},
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size",
@@ -1091,7 +1099,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Label: labels.Everything(),
 				Limit: 5,
 			},
-			expectedOut: []example.Pod{*preset[2], *preset[4]},
+			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1103,7 +1111,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut: []example.Pod{*preset[2], *preset[4]},
+			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size",
@@ -1113,7 +1121,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Label: labels.Everything(),
 				Limit: 5,
 			},
-			expectedOut: []example.Pod{*preset[3]},
+			expectedOut: []example.Pod{*createdPods[3]},
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1125,13 +1133,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut: []example.Pod{*preset[3]},
+			expectedOut: []example.Pod{*createdPods[3]},
 		},
 		{
 			name:        "list all items",
 			prefix:      "/pods",
 			pred:        storage.Everything,
-			expectedOut: []example.Pod{*preset[0], *preset[1], *preset[2], *preset[3], *preset[4]},
+			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 		},
 		{
 			name:        "list all items with current resource version and match=NotOlderThan",
@@ -1139,7 +1147,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			pred:        storage.Everything,
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut: []example.Pod{*preset[0], *preset[1], *preset[2], *preset[3], *preset[4]},
+			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 		},
 		{
 			name:   "verify list returns updated version of object; filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1151,7 +1159,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
-			expectedOut: []example.Pod{*preset[0]},
+			expectedOut: []example.Pod{*updatedPod},
 		},
 		{
 			name:   "verify list does not return deleted object; filter for deleted object, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1212,8 +1220,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			}
 			err := store.GetList(ctx, tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
-				if err == nil || !apierrors.IsTimeout(err) || !storage.IsTooLargeResourceVersion(err) {
-					t.Fatalf("expecting resource version too high error, but get: %s", err)
+				// TODO: Clasify etcd future revision error as TooLargeResourceVersion
+				if err == nil || !(storage.IsTooLargeResourceVersion(err) || strings.Contains(err.Error(), "etcdserver: mvcc: required revision is a future revision")) {
+					t.Fatalf("expecting resource version too high error, but get: %q", err)
 				}
 				return
 			}
@@ -1229,6 +1238,10 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			}
 			if (len(out.Continue) > 0) != tt.expectContinue {
 				t.Errorf("unexpected continue token: %q", out.Continue)
+			}
+
+			if len(tt.expectContinueExact) > 0 {
+				ExpectContinueMatches(t, tt.expectContinueExact, out.Continue)
 			}
 
 			// If a client requests an exact resource version, it must be echoed back to them.
@@ -1254,6 +1267,24 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			}
 		})
 	}
+}
+
+func ExpectContinueMatches(t *testing.T, expect, got string) {
+	t.Helper()
+	if expect == got {
+		return
+	}
+	expectDecoded, err := base64.RawURLEncoding.DecodeString(expect)
+	if err != nil {
+		t.Errorf("expected continue token: %q, got: %q", expect, got)
+		return
+	}
+	gotDecoded, err := base64.RawURLEncoding.DecodeString(got)
+	if err != nil {
+		t.Errorf("expected continue token: %q, got: %q", expect, got)
+		return
+	}
+	t.Errorf("expected continue token: %s, got: %s", expectDecoded, gotDecoded)
 }
 
 func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, cacheEnabled, consistentReadsSupported bool) {
@@ -1319,7 +1350,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 
 // seedMultiLevelData creates a set of keys with a multi-level structure, returning a resourceVersion
 // from before any were created along with the full set of objects that were persisted
-func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, []*example.Pod, error) {
+func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV string, created []*example.Pod, updated *example.Pod, err error) {
 	// Setup storage with the following structure:
 	//  /
 	//   - first/
@@ -1374,15 +1405,15 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, [
 	// we want to figure out the resourceVersion before we create anything
 	initialList := &example.PodList{}
 	if err := store.GetList(ctx, "/pods", storage.ListOptions{Predicate: storage.Everything, Recursive: true}, initialList); err != nil {
-		return "", nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to determine starting resourceVersion: %w", err)
 	}
-	initialRV := initialList.ResourceVersion
+	initialRV = initialList.ResourceVersion
 
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
 		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to create object: %w", err)
+			return "", nil, nil, fmt.Errorf("failed to create object: %w", err)
 		}
 	}
 
@@ -1390,30 +1421,28 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (string, [
 	// it by changing its spec.nodeName. The point of doing this is to be able to
 	// test that if a pod with key /pods/first/bar is in fact returned, the returned
 	// pod is the updated one (i.e. with spec.nodeName changed).
-	preset[0].storedObj = &example.Pod{}
-	if err := store.GuaranteedUpdate(ctx, computePodKey(barFirst), preset[0].storedObj, true, nil,
+	updated = &example.Pod{}
+	if err := store.GuaranteedUpdate(ctx, computePodKey(barFirst), updated, true, nil,
 		func(input runtime.Object, _ storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
 			pod := input.(*example.Pod).DeepCopy()
 			pod.Spec.NodeName = "fakeNode"
 			return pod, nil, nil
 		}, nil); err != nil {
-		return "", nil, fmt.Errorf("failed to update object: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to update object: %w", err)
 	}
 
 	// We now delete bazSecond provided it has been created first. We do this to enable
 	// testing cases that had an object exist initially and then was deleted and how this
 	// would be reflected in responses of different calls.
-	if err := store.Delete(ctx, computePodKey(bazSecond), preset[len(preset)-1].storedObj, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
-		return "", nil, fmt.Errorf("failed to delete object: %w", err)
+	storedObj := &example.Pod{}
+	if err := store.Delete(ctx, computePodKey(bazSecond), storedObj, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
+		return "", nil, nil, fmt.Errorf("failed to delete object: %w", err)
 	}
 
-	// Since we deleted bazSecond (last element of preset), we remove it from preset.
-	preset = preset[:len(preset)-1]
-	var created []*example.Pod
 	for _, item := range preset {
 		created = append(created, item.storedObj)
 	}
-	return initialRV, created, nil
+	return initialRV, created, updated, nil
 }
 
 func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Compaction, store storage.Interface) {
