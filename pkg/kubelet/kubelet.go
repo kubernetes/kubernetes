@@ -333,7 +333,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	// source of all configuration
 	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder, kubeDeps.PodStartupLatencyTracker)
 
-	// TODO:  it needs to be replaced by a proper context in the future
+	// TODO(omerap12): it needs to be replaced by a proper context in the future
 	ctx := context.TODO()
 
 	// define file config source
@@ -1643,8 +1643,10 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		klog.ErrorS(err, "Kubelet failed to get node info")
 		os.Exit(1)
 	}
+	// TODO(omerap12): it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
 	// containerManager must start after cAdvisor because it needs filesystem capacity information
-	if err := kl.containerManager.Start(context.TODO(), node, kl.GetActivePods, kl.getNodeAnyWay, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
+	if err := kl.containerManager.Start(ctx, node, kl.GetActivePods, kl.getNodeAnyWay, kl.sourcesReady, kl.statusManager, kl.runtimeService, kl.supportLocalStorageCapacityIsolation()); err != nil {
 		// Fail kubelet and rely on the babysitter to retry starting kubelet.
 		klog.ErrorS(err, "Failed to start ContainerManager")
 		os.Exit(1)
@@ -1655,7 +1657,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 
 	// container log manager must start after container runtime is up to retrieve information from container runtime
 	// and inform container to reopen log file after log rotation.
-	kl.containerLogManager.Start()
+	kl.containerLogManager.Start(ctx)
 	// Adding Registration Callback function for CSI Driver
 	kl.pluginManager.AddHandler(pluginwatcherapi.CSIPlugin, plugincache.PluginHandler(csi.PluginHandler))
 	// Adding Registration Callback function for DRA Plugin and Device Plugin
