@@ -27,6 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -40,6 +41,11 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
+var (
+	recorder record.EventRecorder
+	pod      *v1.Pod
+)
+
 func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
 
 	if fsGroup == nil {
@@ -57,14 +63,22 @@ func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChan
 		return nil
 	}
 
-	// Channel for progress updates
-	progressChannel := make(chan ProgressUpdate)
-	defer close(progressChannel)
+	// Channel for progress updates, using buffered channel for deadlock prevention.
+	progressChannel := make(chan ProgressUpdate, 1)
 
 	// Goroutine for handling progress updates
 	go func() {
 		for update := range progressChannel {
 			klog.V(2).Infof("FSGroup permission change in progress for %s: %d files, %d directories processed (elapsed time: %v)", dir, update.Files, update.Dirs, update.Elapsed)
+
+			// Emit event.
+			if pod != nil && recorder != nil {
+				recorder.Eventf(pod, v1.EventTypeNormal, "FSGroupChangeProgress",
+					"FSGroup permission change in progress: %d files, %d directories processed (elapsed time: %v)",
+					update.Files, update.Dirs, update.Elapsed)
+			} else {
+				klog.Warningf("Pod or recorder is nil, skipping event emission")
+			}
 		}
 	}()
 
@@ -103,11 +117,16 @@ func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChan
 		return nil
 	})
 
-	// Final progress update
-	progressChannel <- ProgressUpdate{
-		Files:   fileCount,
-		Dirs:    dirCount,
-		Elapsed: time.Since(startTime),
+	// closing  the channel
+	close(progressChannel)
+
+	//emit the final progress event.
+	if pod != nil && recorder != nil {
+		recorder.Eventf(pod, v1.EventTypeNormal, "FSGroupChangeComplete",
+			"Completed FSGroup permission change: %d files, %d directories processed in %v)",
+			fileCount, dirCount, time.Since(startTime))
+	} else {
+		klog.Warningf("Pod or recorder is nil, skipping final event emission")
 	}
 
 	// Final log message
