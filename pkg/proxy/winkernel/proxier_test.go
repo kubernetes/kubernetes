@@ -1201,6 +1201,7 @@ func TestEndpointSlice(t *testing.T) {
 
 func TestNoopEndpointSlice(t *testing.T) {
 	p := Proxier{}
+	p.endpointsChanges = proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "", nil, nil)
 	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
 	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
 	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
