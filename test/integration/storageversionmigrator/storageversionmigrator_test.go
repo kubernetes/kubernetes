@@ -89,7 +89,7 @@ func TestStorageVersionMigration(t *testing.T) {
 	}
 
 	wantPrefix := "k8s:enc:aescbc:v1:key2"
-	etcdSecret, err := svmTest.getRawSecretFromETCD(t, secret.Name, secret.Namespace)
+	etcdSecret, err := svmTest.getRawSecretFromETCD(t, secret.Namespace, secret.Name)
 	if err != nil {
 		t.Fatalf("Failed to get secret from etcd: %v", err)
 	}
