@@ -275,7 +275,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
 			fakeClock := testingclock.NewFakeClock(time.Now())
-			store := newSecretCache(fakeClient, fakeClock, time.Minute)
+			store := newSecretCache(tCtx, fakeClient, fakeClock, time.Minute)
 
 			key := objectKey{namespace: "ns", name: "name"}
 			itemExists := func(_ context.Context) (bool, error) {
