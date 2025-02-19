@@ -85,14 +85,29 @@ type externalIPInfo struct {
 	hnsID string
 }
 
+func (info externalIPInfo) String() string {
+	return fmt.Sprintf("HnsID:%s, IP:%s", info.hnsID, info.ip)
+}
+
 type loadBalancerIngressInfo struct {
 	ip               string
 	hnsID            string
 	healthCheckHnsID string
 }
 
+func (info loadBalancerIngressInfo) String() string {
+	if len(info.healthCheckHnsID) > 0 {
+		return fmt.Sprintf("HealthCheckHnsID:%s, IP:%s", info.healthCheckHnsID, info.ip)
+	}
+	return fmt.Sprintf("HnsID:%s, IP:%s", info.hnsID, info.ip)
+}
+
 type loadBalancerInfo struct {
 	hnsID string
+}
+
+func (info loadBalancerInfo) String() string {
+	return fmt.Sprintf("HnsID:%s", info.hnsID)
 }
 
 type loadBalancerIdentifier struct {
@@ -101,6 +116,10 @@ type loadBalancerIdentifier struct {
 	externalPort  uint16
 	vip           string
 	endpointsHash [20]byte
+}
+
+func (info loadBalancerIdentifier) String() string {
+	return fmt.Sprintf("VIP:%s, Protocol:%d, InternalPort:%d, ExternalPort:%d", info.vip, info.protocol, info.internalPort, info.externalPort)
 }
 
 type loadBalancerFlags struct {
@@ -129,6 +148,20 @@ type serviceInfo struct {
 	localTrafficDSR        bool
 	internalTrafficLocal   bool
 	winProxyOptimization   bool
+}
+
+func (info serviceInfo) String() string {
+	svcInfoStr := fmt.Sprintf("HnsID:%s, TargetPort:%d", info.hnsID, info.targetPort)
+	if info.nodePorthnsID != "" {
+		svcInfoStr = fmt.Sprintf("%s, NodePortHnsID:%s", svcInfoStr, info.nodePorthnsID)
+	}
+	if len(info.externalIPs) > 0 {
+		svcInfoStr = fmt.Sprintf("%s, ExternalIPs:%v", svcInfoStr, info.externalIPs)
+	}
+	if len(info.loadBalancerIngressIPs) > 0 {
+		svcInfoStr = fmt.Sprintf("%s, IngressIPs:%v", svcInfoStr, info.loadBalancerIngressIPs)
+	}
+	return svcInfoStr
 }
 
 type hnsNetworkInfo struct {
@@ -291,8 +324,8 @@ type endpointInfo struct {
 }
 
 // String is part of proxy.Endpoint interface.
-func (info *endpointInfo) String() string {
-	return net.JoinHostPort(info.ip, strconv.Itoa(int(info.port)))
+func (info endpointInfo) String() string {
+	return fmt.Sprintf("HnsID:%s, Address:%s", info.hnsID, net.JoinHostPort(info.ip, strconv.Itoa(int(info.port))))
 }
 
 // IsLocal is part of proxy.Endpoint interface.
@@ -1396,7 +1429,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(3).InfoS("Endpoint resource found", "endpointInfo", ep)
 		}
 
-		klog.V(3).InfoS("Associated endpoints for service", "endpointInfo", hnsEndpoints, "serviceName", svcName)
+		klog.V(3).InfoS("Associated endpoints for service", "endpointInfo", fmt.Sprintf("%v", hnsEndpoints), "serviceName", svcName)
 
 		if len(svcInfo.hnsID) > 0 {
 			// This should not happen
@@ -1582,9 +1615,9 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 					externalIP.hnsID = hnsLoadBalancer.hnsID
-					klog.V(3).InfoS("Hns LoadBalancer resource created for externalIP resources", "externalIP", externalIP, "hnsID", hnsLoadBalancer.hnsID)
+					klog.V(3).InfoS("Hns LoadBalancer resource created for externalIP resources", "externalIPInfo", externalIP, "hnsID", hnsLoadBalancer.hnsID)
 				} else {
-					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for externalIP resources", "externalIP", externalIP, "allEndpointsTerminating", allEndpointsTerminating)
+					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for externalIP resources", "externalIPInfo", externalIP, "allEndpointsTerminating", allEndpointsTerminating)
 				}
 			}
 		}
@@ -1632,9 +1665,9 @@ func (proxier *Proxier) syncProxyRules() {
 						continue
 					}
 					lbIngressIP.hnsID = hnsLoadBalancer.hnsID
-					klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
+					klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIPInfo", lbIngressIP)
 				} else {
-					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
+					klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIPInfo", lbIngressIP)
 				}
 			}
 
@@ -1685,7 +1718,7 @@ func (proxier *Proxier) syncProxyRules() {
 					klog.V(3).InfoS("Hns Health Check LoadBalancer resource created for loadBalancer Ingress resources", "ip", lbIngressIP)
 				}
 			} else {
-				klog.V(3).InfoS("Skipped creating Hns Health Check LoadBalancer for loadBalancer Ingress resources", "ip", lbIngressIP, "allEndpointsTerminating", allEndpointsTerminating)
+				klog.V(3).InfoS("Skipped creating Hns Health Check LoadBalancer for loadBalancer Ingress resources", "IngressIPInfo", lbIngressIP, "allEndpointsTerminating", allEndpointsTerminating)
 			}
 		}
 		svcInfo.policyApplied = true
