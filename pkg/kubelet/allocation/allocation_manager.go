@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -44,10 +45,10 @@ type Manager interface {
 	SetPodAllocation(pod *v1.Pod) error
 
 	// DeletePodAllocation removes any stored state for the given pod UID.
-	DeletePodAllocation(uid types.UID) error
+	DeletePodAllocation(uid types.UID)
 
-	// RemoveOrphanedPods removes the stored state for any pods not included in the list of remaining pod UIDs.
-	RemoveOrphanedPods(remainingPods map[types.UID]bool)
+	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
+	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
 }
 
 type manager struct {
@@ -151,10 +152,13 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 	return m.state.SetPodResourceAllocation(string(pod.UID), podAlloc)
 }
 
-func (m *manager) DeletePodAllocation(uid types.UID) error {
-	return m.state.Delete(string(uid), "")
+func (m *manager) DeletePodAllocation(uid types.UID) {
+	if err := m.state.Delete(string(uid), ""); err != nil {
+		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
+		klog.V(3).ErrorS(err, "Failed to delete pod allocation", "podUID", uid)
+	}
 }
 
-func (m *manager) RemoveOrphanedPods(remainingPods map[types.UID]bool) {
+func (m *manager) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	m.state.RemoveOrphanedPods(remainingPods)
 }

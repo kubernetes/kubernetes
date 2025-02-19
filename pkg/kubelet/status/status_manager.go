@@ -38,7 +38,6 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -79,8 +78,6 @@ type manager struct {
 	podDeletionSafety PodDeletionSafetyProvider
 
 	podStartupLatencyHelper PodStartupLatencyStateHelper
-
-	allocation.Manager
 }
 
 // PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
@@ -144,28 +141,12 @@ type Manager interface {
 
 	// SetPodResizeStatus caches the last resizing decision for the pod.
 	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus)
-
-	allocationManager
-}
-
-// TODO(tallclair): Refactor allocation state handling out of the status manager.
-type allocationManager interface {
-	// GetContainerResourceAllocation returns the checkpointed AllocatedResources value for the container
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
-
-	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
-	// This function does a deep copy only if updates are needed.
-	// Returns the updated (or original) pod, and whether there was an allocation stored.
-	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
-
-	// SetPodAllocation checkpoints the resources allocated to a pod's containers.
-	SetPodAllocation(pod *v1.Pod) error
 }
 
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string) Manager {
+func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
 		podManager:              podManager,
@@ -175,7 +156,6 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
 		podStartupLatencyHelper: podStartupLatencyHelper,
-		Manager:                 allocation.NewManager(stateFileDirectory),
 	}
 }
 
@@ -709,7 +689,6 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		delete(m.podResizeStatuses, uid)
-		m.Manager.DeletePodAllocation(uid)
 	}
 }
 
@@ -725,9 +704,6 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 				delete(m.podResizeStatuses, key)
 			}
 		}
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		m.Manager.RemoveOrphanedPods(podUIDs)
 	}
 }
 

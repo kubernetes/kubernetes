@@ -20,13 +20,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type fakeManager struct {
 	podResizeStatuses map[types.UID]v1.PodResizeStatus
-	allocation.Manager
 }
 
 func (m *fakeManager) Start() {
@@ -75,7 +73,6 @@ func (m *fakeManager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodRe
 // NewFakeManager creates empty/fake memory manager
 func NewFakeManager() Manager {
 	return &fakeManager{
-		Manager:           allocation.NewInMemoryManager(),
 		podResizeStatuses: make(map[types.UID]v1.PodResizeStatus),
 	}
 }

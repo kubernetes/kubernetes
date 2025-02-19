@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
 
@@ -98,7 +99,7 @@ func (s *stateMemory) Delete(podUID string, containerName string) error {
 	return nil
 }
 
-func (s *stateMemory) RemoveOrphanedPods(remainingPods map[types.UID]bool) {
+func (s *stateMemory) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	s.Lock()
 	defer s.Unlock()
 
