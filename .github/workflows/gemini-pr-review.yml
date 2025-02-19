@@ -1,0 +1,57 @@
+name: Gemini PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize] # Triggers on PR open and code updates
+
+jobs:
+  gemini_review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9' # Or your preferred version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-generativeai
+
+      - name: Get PR diff
+        id: get_diff
+        run: |
+          echo "DIFF<<EOF" >> $GITHUB_OUTPUT
+          git diff origin/${GITHUB_BASE_REF}...origin/${GITHUB_HEAD_REF} >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Gemini API Call
+        id: gemini_review_call
+        run: |
+          python <<EOF
+          import os
+          import google.generativeai as genai
+
+          genai.configure(api_key=os.environ['GEMINI_API_KEY'])
+
+          model = genai.GenerativeModel('gemini-pro')
+          prompt = f"Review this code diff for potential issues and provide feedback:\n\n ${{ steps.get_diff.outputs.DIFF }}"
+          response = model.generate_content(prompt)
+
+          print(f"REVIEW<<EOF")
+          print(response.text)
+          print(f"EOF")
+          EOF
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Post Review Comment (Placeholder)
+        run: |
+          echo "This is a placeholder for posting a review comment."
+          echo "Gemini Review: ${{ steps.gemini_review_call.outputs.REVIEW }}"
