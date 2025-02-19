@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -695,6 +696,17 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 	}
 }
 
+// getFileNotFoundForOS returns the expected error message for a file not found error on the current OS
+// - on Windows, the error message is "The system cannot find the file specified"
+// - on other, the error message is "no such file or directory"
+func getFileNotFoundForOS() string {
+	if goruntime.GOOS == "windows" {
+		return "The system cannot find the file specified"
+	} else {
+		return "no such file or directory"
+	}
+}
+
 func TestReadMultipleStaticPodsFromDisk(t *testing.T) {
 	getTestPod := func(name string) *v1.Pod {
 		return &v1.Pod{
@@ -738,9 +750,9 @@ func TestReadMultipleStaticPodsFromDisk(t *testing.T) {
 			setup:      func(dir string) {},
 			components: kubeadmconstants.ControlPlaneComponents,
 			expectedErrorContains: []string{
-				"kube-apiserver.yaml: no such file or directory",
-				"kube-controller-manager.yaml: no such file or directory",
-				"kube-scheduler.yaml: no such file or directory",
+				"kube-apiserver.yaml: " + getFileNotFoundForOS(),
+				"kube-controller-manager.yaml: " + getFileNotFoundForOS(),
+				"kube-scheduler.yaml: " + getFileNotFoundForOS(),
 			},
 		},
 	}
