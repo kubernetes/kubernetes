@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -175,6 +176,7 @@ func TestApplySandboxResources(t *testing.T) {
 }
 
 func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := newTestPodWithLinuxSecurityContext()
@@ -189,7 +191,7 @@ func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
 		},
 	}
 
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	podSandboxConfig, err := m.generatePodSandboxConfig(logger, pod, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.SelinuxOptions, podSandboxConfig.Linux.SecurityContext.SelinuxOptions)
 	assert.Equal(t, expectedLinuxPodSandboxConfig.SecurityContext.RunAsUser, podSandboxConfig.Linux.SecurityContext.RunAsUser)

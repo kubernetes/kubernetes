@@ -39,7 +39,8 @@ import (
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
 func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
+	logger := klog.FromContext(ctx)
+	podSandboxConfig, err := m.generatePodSandboxConfig(logger, pod, attempt)
 	if err != nil {
 		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
 		klog.ErrorS(err, "Failed to generate sandbox config for pod", "pod", klog.KObj(pod))
@@ -77,7 +78,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 }
 
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, error) {
+func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(logger klog.Logger, pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
 	// Refer https://github.com/kubernetes/kubernetes/issues/29871
 	podUID := string(pod.UID)
@@ -92,7 +93,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		Annotations: newPodAnnotations(pod),
 	}
 
-	dnsConfig, err := m.runtimeHelper.GetPodDNS(pod)
+	dnsConfig, err := m.runtimeHelper.GetPodDNS(logger, pod)
 	if err != nil {
 		return nil, err
 	}

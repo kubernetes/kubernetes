@@ -34,12 +34,14 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 const testPodLogsDirectory = "/var/log/pods"
 
 func TestGeneratePodSandboxConfig(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := newTestPod()
@@ -62,7 +64,7 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 		},
 	}
 
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	podSandboxConfig, err := m.generatePodSandboxConfig(logger, pod, 1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLabels, podSandboxConfig.Labels)
 	assert.Equal(t, expectedLogDirectory, podSandboxConfig.LogDirectory)
