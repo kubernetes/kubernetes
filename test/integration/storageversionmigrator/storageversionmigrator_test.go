@@ -18,7 +18,6 @@ package storageversionmigrator
 
 import (
 	"bytes"
-	"context"
 	"strconv"
 	"sync"
 	"testing"
@@ -34,9 +33,9 @@ import (
 	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestStorageVersionMigration is an integration test that verifies storage version migration works.
@@ -56,9 +55,7 @@ func TestStorageVersionMigration(t *testing.T) {
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	svmTest := svmSetup(ctx, t)
 
@@ -163,9 +160,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 		goleak.IgnoreTopFunction("github.com/moby/spdystream.(*Connection).shutdown"),
 	)
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	crVersions := make(map[string]versions)
 
@@ -291,9 +286,7 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	t.Cleanup(cancel)
+	ctx := ktesting.Init(t)
 
 	svmTest := svmSetup(ctx, t)
 
