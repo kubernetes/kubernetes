@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	"k8s.io/klog/v2"
@@ -32,8 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	usernamespacefeature "k8s.io/kubernetes/pkg/kubelet/userns"
 	"k8s.io/kubernetes/pkg/volume"
@@ -83,7 +84,7 @@ func (plugin *emptyDirPlugin) GetPluginName() string {
 func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _ := getVolumeSource(spec)
 	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an EmptyDir volume type")
+		return "", fmt.Errorf("spec does not reference an emptyDir volume type")
 	}
 
 	// Return user defined volume name, since this is an ephemeral volume type
@@ -405,10 +406,19 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 		}
 	}
 
+	podLevelAndContainerLevelRequests := []v1.ResourceList{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, pod.Spec.Resources.Requests)
+	}
+
 	// In some rare cases init containers can also consume Huge pages
 	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
-		// We can take request because limit and requests must match.
-		for requestName := range container.Resources.Requests {
+		podLevelAndContainerLevelRequests = append(podLevelAndContainerLevelRequests, container.Resources.Requests)
+	}
+
+	// We can take request because limit and requests must match.
+	for _, resourceList := range podLevelAndContainerLevelRequests {
+		for requestName := range resourceList {
 			if !v1helper.IsHugePageResourceName(requestName) {
 				continue
 			}
@@ -438,7 +448,6 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 	}
 
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil
-
 }
 
 // setupDir creates the directory with the default permissions specified by the perm constant.
