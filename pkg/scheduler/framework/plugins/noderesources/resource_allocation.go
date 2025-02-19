@@ -49,7 +49,8 @@ func (r *resourceAllocationScorer) score(
 	ctx context.Context,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
-	podRequests []int64) (int64, *framework.Status) {
+	podRequests []int64,
+) (int64, *framework.Status) {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
@@ -116,7 +117,6 @@ func (r *resourceAllocationScorer) calculateResourceAllocatableRequest(logger kl
 // calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod
 // the Overhead is added to the result.
 func (r *resourceAllocationScorer) calculatePodResourceRequest(pod *v1.Pod, resourceName v1.ResourceName) int64 {
-
 	opts := resourcehelper.PodResourcesOptions{
 		UseStatusResources: utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
@@ -145,4 +145,13 @@ func (r *resourceAllocationScorer) calculatePodResourceRequestList(pod *v1.Pod, 
 		podRequests[i] = r.calculatePodResourceRequest(pod, v1.ResourceName(resources[i].Name))
 	}
 	return podRequests
+}
+
+func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {
+	for _, request := range podRequests {
+		if request != 0 {
+			return false
+		}
+	}
+	return true
 }
