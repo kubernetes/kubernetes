@@ -572,11 +572,6 @@ function start_apiserver {
       generate_certs
     fi
 
-    cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
-    if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
-      cloud_config_arg="--cloud-provider=external"
-    fi
-
     if [[ -z "${EGRESS_SELECTOR_CONFIG_FILE:-}" ]]; then
       cat <<EOF > "${TMP_DIR}"/kube_egress_selector_configuration.yaml
 apiVersion: apiserver.k8s.io/v1beta1
@@ -609,7 +604,6 @@ EOF
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
     # shellcheck disable=SC2086
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-apiserver" "${authorizer_args[@]}" "${priv_arg}" ${runtime_config} \
-      ${cloud_config_arg} \
       "${advertise_address}" \
       "${node_port_range}" \
       --v="${LOG_LEVEL}" \
