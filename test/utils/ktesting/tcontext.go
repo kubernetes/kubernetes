@@ -75,6 +75,15 @@ type TContext interface {
 	context.Context
 	TB
 
+	// Parallel signals that this test is to be run in parallel with (and
+	// only with) other parallel tests. In other words, it needs to be
+	// called in each test which is meant to run in parallel.
+	//
+	// Only supported in Go unit tests. When such a test is run multiple
+	// times due to use of -test.count or -test.cpu, multiple instances of
+	// a single test never run in parallel with each other.
+	Parallel()
+
 	// Cancel can be invoked to cancel the context before the test is completed.
 	// Tests which use the context to control goroutines and then wait for
 	// termination of those goroutines must call Cancel to avoid a deadlock.
@@ -379,6 +388,12 @@ type tContext struct {
 // between field and method in tContext.
 type testingTB struct {
 	TB
+}
+
+func (tCtx tContext) Parallel() {
+	if tb, ok := tCtx.TB().(interface{ Parallel() }); ok {
+		tb.Parallel()
+	}
 }
 
 func (tCtx tContext) Cancel(cause string) {

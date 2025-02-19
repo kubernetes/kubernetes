@@ -86,6 +86,23 @@ func TestCancelCtx(t *testing.T) {
 	tCtx.Cancel("test is complete")
 }
 
+func TestParallel(t *testing.T) {
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	tCtx := ktesting.Init(t)
+
+	// Each sub-test runs in parallel to the others and waits for the other two.
+	test := func(tCtx ktesting.TContext) {
+		tCtx.Parallel()
+		wg.Done()
+		wg.Wait()
+	}
+	tCtx.Run("one", test)
+	tCtx.Run("two", test)
+	tCtx.Run("three", test)
+}
+
 func TestWithTB(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
