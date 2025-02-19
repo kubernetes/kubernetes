@@ -214,6 +214,12 @@ type ResourcePool struct {
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+const ResourceSliceMaxCapacityPools = 32
+const ResourceSliceMaxMixins = 128
+const ResourceSliceMaxAttributesAndCapacities = 32
+const ResourceSliceMaxCapacityPoolMixinRefs = 8
+const ResourceSliceMaxDeviceMixinRefs = 8
+const ResourceSliceMaxDeviceCapacityConsumptions = 32
 
 // CapacityPool defines a named pool of capacities
 // that are available to be used by devices defined in the
