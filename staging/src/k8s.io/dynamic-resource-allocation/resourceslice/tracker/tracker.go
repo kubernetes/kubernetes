@@ -107,7 +107,7 @@ func newTracker(ctx context.Context, informerFactory informers.SharedInformerFac
 		resourceSlices:                  informerFactory.Resource().V1beta1().ResourceSlices().Informer(),
 		resourceSlicePatches:            informerFactory.Resource().V1alpha3().ResourceSlicePatches().Informer(),
 		deviceClasses:                   informerFactory.Resource().V1beta1().DeviceClasses().Informer(),
-		celCache:                        cel.NewCache(10), // TODO: share cache with scheduler
+		celCache:                        cel.NewCache(10),
 		patchedResourceSlices:           cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:                     utilruntime.HandleErrorWithContext,
 	}

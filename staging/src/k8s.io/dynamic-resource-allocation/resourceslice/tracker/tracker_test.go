@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/utils/ptr"
@@ -1765,7 +1765,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				return resourceSlices
 			}(),
 			patches: []*resourcealphaapi.ResourceSlicePatch{
-				&resourcealphaapi.ResourceSlicePatch{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "patch",
 					},
@@ -1773,14 +1773,14 @@ func BenchmarkEventHandlers(b *testing.B) {
 						Devices: resourcealphaapi.DevicePatch{
 							Filter: nil, // all slices
 							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
-								"dra.example.com/bench": resourcealphaapi.NullableDeviceAttribute{
+								"dra.example.com/bench": {
 									DeviceAttribute: resourcealphaapi.DeviceAttribute{
 										BoolValue: ptr.To(true),
 									},
 								},
 							},
 							Capacity: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.DeviceCapacity{
-								"dra.example.com/bench": resourcealphaapi.DeviceCapacity{
+								"dra.example.com/bench": {
 									Value: resource.MustParse("1"),
 								},
 							},
@@ -1808,7 +1808,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				return resourceSlices
 			}(),
 			patches: []*resourcealphaapi.ResourceSlicePatch{
-				&resourcealphaapi.ResourceSlicePatch{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "patch",
 					},
@@ -1816,14 +1816,14 @@ func BenchmarkEventHandlers(b *testing.B) {
 						Devices: resourcealphaapi.DevicePatch{
 							Filter: nil, // all slices
 							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
-								"dra.example.com/bench": resourcealphaapi.NullableDeviceAttribute{
+								"dra.example.com/bench": {
 									DeviceAttribute: resourcealphaapi.DeviceAttribute{
 										BoolValue: ptr.To(true),
 									},
 								},
 							},
 							Capacity: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.DeviceCapacity{
-								"dra.example.com/bench": resourcealphaapi.DeviceCapacity{
+								"dra.example.com/bench": {
 									Value: resource.MustParse("1"),
 								},
 							},
@@ -1859,7 +1859,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				return resourceSlices
 			}(),
 			patches: []*resourcealphaapi.ResourceSlicePatch{
-				&resourcealphaapi.ResourceSlicePatch{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "patch",
 					},
@@ -1870,14 +1870,14 @@ func BenchmarkEventHandlers(b *testing.B) {
 								Device: ptr.To("patchme"),
 							},
 							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
-								"dra.example.com/bench": resourcealphaapi.NullableDeviceAttribute{
+								"dra.example.com/bench": {
 									DeviceAttribute: resourcealphaapi.DeviceAttribute{
 										BoolValue: ptr.To(true),
 									},
 								},
 							},
 							Capacity: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.DeviceCapacity{
-								"dra.example.com/bench": resourcealphaapi.DeviceCapacity{
+								"dra.example.com/bench": {
 									Value: resource.MustParse("1"),
 								},
 							},
@@ -1913,7 +1913,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 				return resourceSlices
 			}(),
 			patches: []*resourcealphaapi.ResourceSlicePatch{
-				&resourcealphaapi.ResourceSlicePatch{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "patch",
 					},
@@ -1924,14 +1924,14 @@ func BenchmarkEventHandlers(b *testing.B) {
 								Device: ptr.To("patchme"),
 							},
 							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
-								"dra.example.com/bench": resourcealphaapi.NullableDeviceAttribute{
+								"dra.example.com/bench": {
 									DeviceAttribute: resourcealphaapi.DeviceAttribute{
 										BoolValue: ptr.To(true),
 									},
 								},
 							},
 							Capacity: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.DeviceCapacity{
-								"dra.example.com/bench": resourcealphaapi.DeviceCapacity{
+								"dra.example.com/bench": {
 									Value: resource.MustParse("1"),
 								},
 							},
@@ -1962,7 +1962,7 @@ func BenchmarkEventHandlers(b *testing.B) {
 	for name, benchmark := range benchmarks {
 		b.Run(name, func(b *testing.B) {
 			logger, ctx := ktesting.NewTestContext(b)
-			ctx = logr.NewContext(ctx, logger.V(2))
+			ctx = klog.NewContext(ctx, logger.V(2))
 			tracker := newBenchTracker(ctx)
 
 			for _, slice := range benchmark.resourceSlices {
