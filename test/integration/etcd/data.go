@@ -231,10 +231,20 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/coordination/v1beta1
+		gvr("coordination.k8s.io", "v1beta1", "leasecandidates"): {
+			Stub:              `{"metadata": {"name": "leasecandidatev1beta1"}, "spec": {"leaseName": "lease", "binaryVersion": "0.1.0", "emulationVersion": "0.1.0", "strategy": "OldestEmulationVersion"}}`,
+			ExpectedEtcdPath:  "/registry/leasecandidates/" + namespace + "/leasecandidatev1beta1",
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/coordination/v1alpha2
 		gvr("coordination.k8s.io", "v1alpha2", "leasecandidates"): {
 			Stub:              `{"metadata": {"name": "leasecandidatev1alpha2"}, "spec": {"leaseName": "lease", "binaryVersion": "0.1.0", "emulationVersion": "0.1.0", "strategy": "OldestEmulationVersion"}}`,
 			ExpectedEtcdPath:  "/registry/leasecandidates/" + namespace + "/leasecandidatev1alpha2",
+			ExpectedGVK:       gvkP("coordination.k8s.io", "v1beta1", "LeaseCandidate"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
