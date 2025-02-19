@@ -18,6 +18,7 @@ package storageversionmigrator
 
 import (
 	"bytes"
+	"context"
 	"strconv"
 	"sync"
 	"testing"
@@ -27,6 +28,8 @@ import (
 
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/wait"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -205,10 +208,24 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	svmTest.updateCRD(ctx, t, crd.Name, v2StorageCRDVersion, []string{"v1", "v2"}, "v2")
 
 	// create CR with v1
-	cr3 := svmTest.createCR(ctx, t, "cr3", "v1")
-	if ok := svmTest.isCRStoredAtVersion(t, "v2", cr3.GetName()); !ok {
-		t.Fatalf("CR not stored at version v2")
+	var cr3 *unstructured.Unstructured
+	// updateCRD checks discovery returns storageVersionHash matching storage version v2
+	// to make sure the API server uses v2 but CRD controllers may race and the resource
+	// might still get stored in v1.
+	// Attempt to recreate the CR until it gets stored as v2.
+	// https://github.com/kubernetes/kubernetes/issues/130235
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, func(waitCtx context.Context) (done bool, err error) {
+		cr3 = svmTest.createCR(waitCtx, t, "cr3", "v1")
+		if ok := svmTest.isCRStoredAtVersion(t, "v2", cr3.GetName()); !ok {
+			svmTest.deleteCR(waitCtx, t, cr3.GetName(), "v1")
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("timed out waiting for CR to be stored as v2: %v", err)
 	}
+
 	crVersions[cr3.GetName()] = versions{
 		generation:  cr3.GetGeneration(),
 		rv:          cr3.GetResourceVersion(),
