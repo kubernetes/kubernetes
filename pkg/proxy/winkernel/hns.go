@@ -168,7 +168,7 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 		}
 		endpointInfos[ep.IpConfigurations[1].IpAddress] = endpointDualstack
 	}
-	klog.V(3).InfoS("Queried endpoints from network", "network", networkName)
+	klog.V(3).InfoS("Queried endpoints from network", "network", networkName, "count", len(endpointInfos))
 	klog.V(5).InfoS("Queried endpoints details", "network", networkName, "endpointInfos", endpointInfos)
 	return endpointInfos, nil
 }
