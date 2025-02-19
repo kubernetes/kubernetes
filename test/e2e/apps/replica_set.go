@@ -547,6 +547,8 @@ func testRSLifeCycle(ctx context.Context, f *framework.Framework) {
 				framework.Logf("observed Replicaset %v in namespace %v with ReadyReplicas %v found %v", rset.ObjectMeta.Name, rset.ObjectMeta.Namespace, rset.Status.ReadyReplicas, found)
 			}
 			return found, nil
+		} else {
+			framework.Logf("observed event type %#v", event)
 		}
 		return false, nil
 	})
