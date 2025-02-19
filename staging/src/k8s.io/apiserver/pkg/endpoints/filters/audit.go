@@ -55,7 +55,9 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 			handler.ServeHTTP(w, req)
 			return
 		}
-		ev := &ac.Event
+		// avoid to fatal error: concurrent map iteration and map write of Event
+		// https://github.com/kubernetes/kubernetes/issues/120507#issuecomment-2568601851
+		ev := audit.DeepcopyAuditContextEvent(ac)
 
 		ctx := req.Context()
 		omitStages := ac.RequestAuditConfig.OmitStages
@@ -82,6 +84,7 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 		defer func() {
 			if r := recover(); r != nil {
 				defer panic(r)
+				populateAuditEventFromContext(req, ev)
 				ev.Stage = auditinternal.StagePanic
 				ev.ResponseStatus = &metav1.Status{
 					Code:    http.StatusInternalServerError,
@@ -92,6 +95,8 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 				processAuditEvent(ctx, sink, ev, omitStages)
 				return
 			}
+
+			populateAuditEventFromContext(req, ev)
 
 			// if no StageResponseStarted event was sent b/c neither a status code nor a body was sent, fake it here
 			// But Audit-Id http header will only be sent when http.ResponseWriter.WriteHeader is called.
@@ -114,6 +119,27 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 		}()
 		handler.ServeHTTP(respWriter, req)
 	})
+}
+
+// populateAuditEventFromContext sets audit response & request & status after ServeHTTP is done
+func populateAuditEventFromContext(req *http.Request, ev *auditinternal.Event) {
+	ac := audit.AuditContextFrom(req.Context())
+	if ev.ResponseObject == nil {
+		ev.ResponseObject = ac.Event.ResponseObject
+	}
+	if ev.RequestObject == nil {
+		ev.RequestObject = ac.Event.RequestObject
+	}
+	if ev.ResponseStatus == nil {
+		ev.ResponseStatus = ac.Event.ResponseStatus
+	}
+	// staging/src/k8s.io/apiserver/pkg/admission/audit.go#logAnnotations may change the annotations
+	if ac.Event.Annotations != nil {
+		ev.Annotations = ac.Event.Annotations
+	}
+	if ac.Event.ImpersonatedUser != nil {
+		ev.ImpersonatedUser = ac.Event.ImpersonatedUser
+	}
 }
 
 // evaluatePolicyAndCreateAuditEvent is responsible for evaluating the audit
@@ -237,6 +263,8 @@ func (a *auditResponseWriter) processCode(code int) {
 		a.event.Stage = auditinternal.StageResponseStarted
 
 		if a.sink != nil {
+			eventDeepCopy := a.event.DeepCopyObject().(*auditinternal.Event)
+			eventDeepCopy.Annotations = audit.AuditContextFrom(a.ctx).Event.Annotations
 			processAuditEvent(a.ctx, a.sink, a.event, a.omitStages)
 		}
 	})
