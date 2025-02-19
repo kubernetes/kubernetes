@@ -44,6 +44,8 @@ type threadedStoreIndexer struct {
 	indexer indexer
 }
 
+var _ orderedLister = (*threadedStoreIndexer)(nil)
+
 func (si *threadedStoreIndexer) Add(obj interface{}) error {
 	return si.addOrUpdate(obj)
 }
