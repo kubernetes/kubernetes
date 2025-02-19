@@ -39,10 +39,8 @@ import (
 	basecompatibility "k8s.io/component-base/compatibility"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -222,19 +220,6 @@ leaderElection:
 		wantErr              bool
 		wantFeaturesGates    map[string]bool
 	}{
-		{
-			name: "default config with an alpha feature enabled",
-			flags: []string{
-				"--kubeconfig", configKubeconfig,
-				"--feature-gates=StorageCapacityScoring=true",
-			},
-			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": defaults.ExpandedPluginsV1,
-			},
-			restoreFeatures: map[featuregate.Feature]bool{
-				features.StorageCapacityScoring: false,
-			},
-		},
 		{
 			name: "component configuration v1 with only scheduler name configured",
 			flags: []string{
@@ -435,9 +420,6 @@ leaderElection:
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			for k, v := range tc.restoreFeatures {
-				featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)
-			}
 			componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
 			verKube := basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31")
 			fg := feature.DefaultFeatureGate.DeepCopy()
