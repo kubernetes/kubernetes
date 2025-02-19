@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -56,14 +58,14 @@ type PodResourcesOptions struct {
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
 
 func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
-	return supportedPodLevelResources
+	return supportedPodLevelResources.Clone().Insert(v1.ResourceHugePagesPrefix)
 }
 
 // IsSupportedPodLevelResources checks if a given resource is supported by pod-level
 // resource management through the PodLevelResources feature. Returns true if
 // the resource is supported.
 func IsSupportedPodLevelResource(name v1.ResourceName) bool {
-	return supportedPodLevelResources.Has(name)
+	return supportedPodLevelResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
 }
 
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
