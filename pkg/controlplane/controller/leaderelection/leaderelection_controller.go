@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/coordination/v1"
-	v1alpha2 "k8s.io/api/coordination/v1alpha2"
+	v1beta1 "k8s.io/api/coordination/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,9 +32,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coordinationv1informers "k8s.io/client-go/informers/coordination/v1"
-	coordinationv1alpha2 "k8s.io/client-go/informers/coordination/v1alpha2"
+	coordinationv1beta1 "k8s.io/client-go/informers/coordination/v1beta1"
 	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
-	coordinationv1alpha2client "k8s.io/client-go/kubernetes/typed/coordination/v1alpha2"
+	coordinationv1beta1client "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -65,8 +65,8 @@ type Controller struct {
 	leaseClient       coordinationv1client.CoordinationV1Interface
 	leaseRegistration cache.ResourceEventHandlerRegistration
 
-	leaseCandidateInformer     coordinationv1alpha2.LeaseCandidateInformer
-	leaseCandidateClient       coordinationv1alpha2client.CoordinationV1alpha2Interface
+	leaseCandidateInformer     coordinationv1beta1.LeaseCandidateInformer
+	leaseCandidateClient       coordinationv1beta1client.CoordinationV1beta1Interface
 	leaseCandidateRegistration cache.ResourceEventHandlerRegistration
 
 	queue workqueue.TypedRateLimitingInterface[types.NamespacedName]
@@ -110,7 +110,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	<-ctx.Done()
 }
 
-func NewController(leaseInformer coordinationv1informers.LeaseInformer, leaseCandidateInformer coordinationv1alpha2.LeaseCandidateInformer, leaseClient coordinationv1client.CoordinationV1Interface, leaseCandidateClient coordinationv1alpha2client.CoordinationV1alpha2Interface) (*Controller, error) {
+func NewController(leaseInformer coordinationv1informers.LeaseInformer, leaseCandidateInformer coordinationv1beta1.LeaseCandidateInformer, leaseClient coordinationv1client.CoordinationV1Interface, leaseCandidateClient coordinationv1beta1client.CoordinationV1beta1Interface) (*Controller, error) {
 	c := &Controller{
 		leaseInformer:          leaseInformer,
 		leaseCandidateInformer: leaseCandidateInformer,
@@ -175,7 +175,7 @@ func (c *Controller) processNextElectionItem(ctx context.Context) bool {
 }
 
 func (c *Controller) enqueueCandidate(obj any) {
-	lc, ok := obj.(*v1alpha2.LeaseCandidate)
+	lc, ok := obj.(*v1beta1.LeaseCandidate)
 	if !ok {
 		return
 	}
@@ -197,7 +197,7 @@ func (c *Controller) enqueueLease(obj any) {
 	c.queue.Add(types.NamespacedName{Namespace: lease.Namespace, Name: lease.Name})
 }
 
-func (c *Controller) electionNeeded(candidates []*v1alpha2.LeaseCandidate, leaseNN types.NamespacedName) (bool, error) {
+func (c *Controller) electionNeeded(candidates []*v1beta1.LeaseCandidate, leaseNN types.NamespacedName) (bool, error) {
 	lease, err := c.leaseInformer.Lister().Leases(leaseNN.Namespace).Get(leaseNN.Name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, fmt.Errorf("error reading lease: %w", err)
@@ -316,7 +316,7 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 		}
 	}
 
-	var ackedCandidates []*v1alpha2.LeaseCandidate
+	var ackedCandidates []*v1beta1.LeaseCandidate
 	for _, candidate := range candidates {
 		if candidate.Spec.RenewTime.Add(electionDuration).After(now) {
 			ackedCandidates = append(ackedCandidates, candidate)
@@ -422,12 +422,12 @@ func (c *Controller) reconcileElectionStep(ctx context.Context, leaseNN types.Na
 	return defaultRequeueInterval, nil
 }
 
-func (c *Controller) listAdmissableCandidates(leaseNN types.NamespacedName) ([]*v1alpha2.LeaseCandidate, error) {
+func (c *Controller) listAdmissableCandidates(leaseNN types.NamespacedName) ([]*v1beta1.LeaseCandidate, error) {
 	leases, err := c.leaseCandidateInformer.Lister().LeaseCandidates(leaseNN.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
-	var results []*v1alpha2.LeaseCandidate
+	var results []*v1beta1.LeaseCandidate
 	for _, l := range leases {
 		if l.Spec.LeaseName != leaseNN.Name {
 			continue
