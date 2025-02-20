@@ -18,17 +18,19 @@ package resourceclaimtemplate
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -96,51 +98,59 @@ var objWithAdminAccessInNonAdminNamespace = &resource.ResourceClaimTemplate{
 	},
 }
 
-// MockNamespaceREST mocks the behavior of namespaceREST.
-type MockNamespaceREST struct{}
-
-func (m *MockNamespaceREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	if name == "default" {
-		return &core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "default",
-				Labels: map[string]string{"key": "value"},
-			},
-		}, nil
+// Function that uses v1.NamespaceInterface to create namespaces.
+func CreateNamespace(nsClient v1.NamespaceInterface) error {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "default",
+			Labels: map[string]string{"key": "value"},
+		},
 	}
-	if name == "kube-system" {
-		return &core.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "default",
-				Labels: map[string]string{DRAAdminNamespaceLabel: "true"},
-			},
-		}, nil
+	_, err := nsClient.Create(context.TODO(), ns, metav1.CreateOptions{})
+	if err != nil {
+		return err
 	}
-	return nil, errors.New("namespace not found")
+	ns = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "kube-system",
+			Labels: map[string]string{DRAAdminNamespaceLabel: "true"},
+		},
+	}
+	_, err = nsClient.Create(context.TODO(), ns, metav1.CreateOptions{})
+	return err
 }
 
 func TestClaimTemplateStrategy(t *testing.T) {
-	if !Strategy.NamespaceScoped() {
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
+
+	if !strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaimTemplate must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate() {
 		t.Errorf("ResourceClaimTemplate should not allow create on update")
 	}
-	Strategy.SetNamespaceStore(nil)
-	if Strategy.namespaceRest != nil {
-		t.Errorf("ResourceClaim namespace store should be nil")
+	if strategy.nsClient == nil {
+		t.Errorf("ResourceClaimTemplate nsClient should not be nil")
 	}
 }
 
 func TestClaimTemplateStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	err := CreateNamespace(mockNSClient)
+	if err != nil {
+		t.Fatalf("failed to create test namespaces: %v", err)
+	}
 
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaimTemplate
 		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaimTemplate
-		namespaceRest         NamespaceGetter
+		nsClient              v1.NamespaceInterface
 	}{
 		"simple": {
 			obj:       obj,
@@ -160,10 +170,10 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 			expectObj:   obj,
 		},
 		"keep-fields-admin-access": {
-			obj:           objWithAdminAccess,
-			adminAccess:   true,
-			expectObj:     objWithAdminAccess,
-			namespaceRest: &MockNamespaceREST{},
+			obj:         objWithAdminAccess,
+			adminAccess: true,
+			expectObj:   objWithAdminAccess,
+			nsClient:    mockNSClient,
 		},
 		"admin-access-nil-namespace": {
 			obj:                   objWithAdminAccess,
@@ -176,18 +186,18 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 			adminAccess:           true,
 			expectObj:             objWithAdminAccessInNonAdminNamespace,
 			expectValidationError: true,
-			namespaceRest:         &MockNamespaceREST{},
+			nsClient:              mockNSClient,
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+			strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, tc.nsClient)
 
 			obj := tc.obj.DeepCopy()
-			Strategy.SetNamespaceStore(tc.namespaceRest)
-			Strategy.PrepareForCreate(ctx, obj)
-			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
+			strategy.PrepareForCreate(ctx, obj)
+			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
 				if !tc.expectValidationError {
 					t.Fatalf("unexpected validation errors: %q", errs)
 				}
@@ -195,10 +205,10 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 			} else if tc.expectValidationError {
 				t.Fatal("expected validation error(s), got none")
 			}
-			if warnings := Strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
+			if warnings := strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
 				t.Fatalf("unexpected warnings: %q", warnings)
 			}
-			Strategy.Canonicalize(obj)
+			strategy.Canonicalize(obj)
 			assert.Equal(t, tc.expectObj, obj)
 		})
 	}
@@ -207,12 +217,19 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 func TestClaimTemplateStrategyUpdate(t *testing.T) {
 	t.Run("no-changes-okay", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
+		fakeClient := fake.NewSimpleClientset()
+		mockNSClient := fakeClient.CoreV1().Namespaces()
+		err := CreateNamespace(mockNSClient)
+		if err != nil {
+			t.Fatalf("failed to create test namespaces: %v", err)
+		}
+		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 		resourceClaimTemplate := obj.DeepCopy()
 		newClaimTemplate := resourceClaimTemplate.DeepCopy()
 		newClaimTemplate.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
-		errs := Strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
 		if len(errs) != 0 {
 			t.Errorf("unexpected validation errors: %v", errs)
 		}
@@ -220,13 +237,20 @@ func TestClaimTemplateStrategyUpdate(t *testing.T) {
 
 	t.Run("name-change-not-allowed", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
+		fakeClient := fake.NewSimpleClientset()
+		mockNSClient := fakeClient.CoreV1().Namespaces()
+		err := CreateNamespace(mockNSClient)
+		if err != nil {
+			t.Fatalf("failed to create test namespaces: %v", err)
+		}
+		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 		resourceClaimTemplate := obj.DeepCopy()
 		newClaimTemplate := resourceClaimTemplate.DeepCopy()
 		newClaimTemplate.Name = "valid-class-2"
 		newClaimTemplate.ResourceVersion = "4"
 
-		Strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
-		errs := Strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
 		if len(errs) == 0 {
 			t.Errorf("expected a validation error")
 		}

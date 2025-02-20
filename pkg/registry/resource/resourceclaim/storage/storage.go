@@ -24,11 +24,13 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	namespacestore "k8s.io/kubernetes/pkg/registry/core/namespace/storage"
 	"k8s.io/kubernetes/pkg/registry/resource/resourceclaim"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -39,16 +41,8 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against ResourceClaims.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
-	var err error
-	namespaceRest, _, _, err := namespacestore.NewREST(optsGetter)
-	if err != nil {
-		return nil, nil, err
-	}
-	if namespaceRest != nil {
-		resourceclaim.Strategy.SetNamespaceStore(namespaceRest)
-	}
-
+func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface) (*REST, *StatusREST, error) {
+	strategy := resourceclaim.NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, nsClient)
 	store := &genericregistry.Store{
 		NewFunc:                   func() runtime.Object { return &resource.ResourceClaim{} },
 		NewListFunc:               func() runtime.Object { return &resource.ResourceClaimList{} },
@@ -56,11 +50,11 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		DefaultQualifiedResource:  resource.Resource("resourceclaims"),
 		SingularQualifiedResource: resource.Resource("resourceclaim"),
 
-		CreateStrategy:      resourceclaim.Strategy,
-		UpdateStrategy:      resourceclaim.Strategy,
-		DeleteStrategy:      resourceclaim.Strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
 		ReturnDeletedObject: true,
-		ResetFieldsStrategy: resourceclaim.Strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -70,8 +64,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = resourceclaim.StatusStrategy
-	statusStore.ResetFieldsStrategy = resourceclaim.StatusStrategy
+	statusStrategy := resourceclaim.NewStatusStrategy(strategy)
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
 
 	rest := &REST{store}
 
