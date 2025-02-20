@@ -481,10 +481,16 @@ func (dc *DisruptionController) addDB(logger klog.Logger, obj interface{}) {
 }
 
 func (dc *DisruptionController) updateDB(logger klog.Logger, old, cur interface{}) {
-	// TODO(mml) ignore updates where 'old' is equivalent to 'cur'.
-	pdb := cur.(*policy.PodDisruptionBudget)
-	logger.V(4).Info("Update DB", "podDisruptionBudget", klog.KObj(pdb))
-	dc.enqueuePdb(logger, pdb)
+	curPdb := cur.(*policy.PodDisruptionBudget)
+	oldPdb := old.(*policy.PodDisruptionBudget)
+	if curPdb.ResourceVersion == oldPdb.ResourceVersion {
+		// Two different versions of the same pdb will always have different RVs.
+		// https://github.com/kubernetes/kubernetes/pull/30277#issuecomment-238985569
+		// https://github.com/kubernetes/kubernetes/pull/30277#issuecomment-238988825
+		return
+	}
+	logger.V(4).Info("Update DB", "podDisruptionBudget", klog.KObj(curPdb))
+	dc.enqueuePdb(logger, curPdb)
 }
 
 func (dc *DisruptionController) removeDB(logger klog.Logger, obj interface{}) {
