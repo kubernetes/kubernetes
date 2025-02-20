@@ -552,7 +552,7 @@ type KubeletConfiguration struct {
 	// Signals not specified in this configuration inherit their defaults.
 	// If false, and if any signal is specified in this configuration then other signals that
 	// are not specified in this configuration will be set to 0.
-	// It applies to merging the fileds for which the default exists, and currently only evictionHard has default values.
+	// It applies to merging the fields for which the default exists, and currently only evictionHard has default values.
 	// Default: false
 	// +optional
 	MergeDefaultEvictionSettings *bool `json:"mergeDefaultEvictionSettings,omitempty"`
