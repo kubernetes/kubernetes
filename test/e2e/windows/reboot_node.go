@@ -18,6 +18,7 @@ package windows
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -50,7 +51,8 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 		framework.ExpectNoError(err, "Error finding Windows node")
 		framework.Logf("Using node: %v", targetNode.Name)
 
-		bootID := targetNode.Status.NodeInfo.BootID
+		bootID, err := strconv.Atoi(targetNode.Status.NodeInfo.BootID)
+		framework.ExpectNoError(err, "Error converting bootID to int")
 		windowsImage := imageutils.GetE2EImage(imageutils.Agnhost)
 
 		// Create Windows pod on the selected Windows node Using Agnhost
@@ -178,12 +180,17 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 		restartCount := 0
 
 		ginkgo.By("Waiting for nodes to be rebooted")
-		gomega.Eventually(ctx, func(ctx context.Context) string {
+		gomega.Eventually(ctx, func(ctx context.Context) int {
 			refreshNode, err := f.ClientSet.CoreV1().Nodes().Get(ctx, targetNode.Name, metav1.GetOptions{})
 			if err != nil {
-				return ""
+				return -1
 			}
-			return refreshNode.Status.NodeInfo.BootID
+			num, err := strconv.Atoi(refreshNode.Status.NodeInfo.BootID) // Attempt to convert empty string
+			if err != nil {
+				return -1 // strconv.Atoi: parsing "": invalid syntax
+			} else {
+				return num
+			}
 		}).WithPolling(time.Second*30).WithTimeout(time.Minute*10).
 			Should(gomega.BeNumerically(">", bootID), "node was not rebooted")
 
