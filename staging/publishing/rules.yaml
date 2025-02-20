@@ -6,12 +6,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/apimachinery
-  - name: release-1.28
-    go: 1.23.6
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/apimachinery
   - name: release-1.29
     go: 1.23.6
     source:
@@ -44,15 +38,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/api
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/api
   - name: release-1.29
@@ -101,21 +86,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/client-go
-    smoke-test: |
-      # assumes GO111MODULE=on
-      go build -mod=mod ./...
-      go test -mod=mod ./...
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/client-go
     smoke-test: |
@@ -192,12 +162,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/code-generator
-  - name: release-1.28
-    go: 1.23.6
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/code-generator
   - name: release-1.29
     go: 1.23.6
     source:
@@ -242,19 +206,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/component-base
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/component-base
   - name: release-1.29
@@ -323,19 +274,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/component-helpers
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/component-helpers
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -398,19 +336,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/kms
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/kms
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -463,23 +388,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/apiserver
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/apiserver
   - name: release-1.29
@@ -570,27 +478,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/kube-aggregator
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    - repository: code-generator
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/kube-aggregator
   - name: release-1.29
@@ -696,32 +583,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/sample-apiserver
-    required-packages:
-    - k8s.io/code-generator
-    smoke-test: |
-      # assumes GO111MODULE=on
-      go build -mod=mod .
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: code-generator
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/sample-apiserver
     required-packages:
@@ -853,26 +714,6 @@ rules:
     smoke-test: |
       # assumes GO111MODULE=on
       go build -mod=mod .
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: code-generator
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/sample-controller
-    required-packages:
-    - k8s.io/code-generator
-    smoke-test: |
-      # assumes GO111MODULE=on
-      go build -mod=mod .
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -972,29 +813,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/apiextensions-apiserver
-    required-packages:
-    - k8s.io/code-generator
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: code-generator
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/apiextensions-apiserver
     required-packages:
@@ -1106,21 +924,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/metrics
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: code-generator
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/metrics
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -1195,19 +998,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/cli-runtime
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/cli-runtime
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -1274,21 +1064,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/sample-cli-plugin
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: cli-runtime
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/sample-cli-plugin
   - name: release-1.29
@@ -1366,21 +1141,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/kube-proxy
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/kube-proxy
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -1446,12 +1206,6 @@ rules:
   - name: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/cri-api
-  - name: release-1.28
-    go: 1.23.6
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/cri-api
   - name: release-1.29
@@ -1550,27 +1304,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/kubelet
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: cri-api
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/kubelet
   - name: release-1.29
@@ -1673,21 +1406,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/kube-scheduler
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/kube-scheduler
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -1766,25 +1484,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/controller-manager
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/controller-manager
   - name: release-1.29
@@ -1885,29 +1584,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/cloud-provider
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: controller-manager
-      branch: release-1.28
-    - repository: component-helpers
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/cloud-provider
   - name: release-1.29
@@ -2028,31 +1704,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/kube-controller-manager
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: controller-manager
-      branch: release-1.28
-    - repository: cloud-provider
-      branch: release-1.28
-    - repository: component-helpers
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/kube-controller-manager
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -2165,17 +1816,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/cluster-bootstrap
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/cluster-bootstrap
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -2232,17 +1872,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/csi-translation-lib
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/csi-translation-lib
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -2294,12 +1923,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/mount-utils
-  - name: release-1.28
-    go: 1.23.6
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/mount-utils
   - name: release-1.29
     go: 1.23.6
     source:
@@ -2326,31 +1949,6 @@ rules:
   library: true
 - destination: legacy-cloud-providers
   branches:
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: cloud-provider
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: controller-manager
-      branch: release-1.28
-    - repository: component-helpers
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/legacy-cloud-providers
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -2424,29 +2022,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/kubectl
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: cli-runtime
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: code-generator
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: component-helpers
-      branch: release-1.28
-    - repository: metrics
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/kubectl
   - name: release-1.29
@@ -2561,25 +2136,6 @@ rules:
       branch: master
       dirs:
       - staging/src/k8s.io/pod-security-admission
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: kms
-      branch: release-1.28
-    source:
-      branch: release-1.28
-      dirs:
-      - staging/src/k8s.io/pod-security-admission
   - name: release-1.29
     go: 1.23.6
     dependencies:
@@ -2680,27 +2236,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/dynamic-resource-allocation
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: apiserver
-      branch: release-1.28
-    - repository: api
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: cri-api
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    - repository: kubelet
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/dynamic-resource-allocation
   - name: release-1.29
@@ -2810,21 +2345,6 @@ rules:
       branch: master
     source:
       branch: master
-      dirs:
-      - staging/src/k8s.io/endpointslice
-  - name: release-1.28
-    go: 1.23.6
-    dependencies:
-    - repository: api
-      branch: release-1.28
-    - repository: apimachinery
-      branch: release-1.28
-    - repository: client-go
-      branch: release-1.28
-    - repository: component-base
-      branch: release-1.28
-    source:
-      branch: release-1.28
       dirs:
       - staging/src/k8s.io/endpointslice
   - name: release-1.29
