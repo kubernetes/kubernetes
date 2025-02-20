@@ -26,12 +26,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientauthenticationapi "k8s.io/client-go/pkg/apis/clientauthentication"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/flowcontrol"
+	"sigs.k8s.io/randfill"
 )
 
 func TestConfigToExecCluster(t *testing.T) {
@@ -211,60 +211,60 @@ func TestConfigToExecCluster(t *testing.T) {
 func TestConfigToExecClusterRoundtrip(t *testing.T) {
 	t.Parallel()
 
-	f := fuzz.New().NilChance(0.5).NumElements(1, 1)
+	f := randfill.New().NilChance(0.5).NumElements(1, 1)
 	f.Funcs(
-		func(r *runtime.Codec, f fuzz.Continue) {
+		func(r *runtime.Codec, f randfill.Continue) {
 			codec := &fakeCodec{}
-			f.Fuzz(codec)
+			f.Fill(codec)
 			*r = codec
 		},
-		func(r *http.RoundTripper, f fuzz.Continue) {
+		func(r *http.RoundTripper, f randfill.Continue) {
 			roundTripper := &fakeRoundTripper{}
-			f.Fuzz(roundTripper)
+			f.Fill(roundTripper)
 			*r = roundTripper
 		},
-		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
+		func(fn *func(http.RoundTripper) http.RoundTripper, f randfill.Continue) {
 			*fn = fakeWrapperFunc
 		},
-		func(fn *transport.WrapperFunc, f fuzz.Continue) {
+		func(fn *transport.WrapperFunc, f randfill.Continue) {
 			*fn = fakeWrapperFunc
 		},
-		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {
+		func(r *runtime.NegotiatedSerializer, f randfill.Continue) {
 			serializer := &fakeNegotiatedSerializer{}
-			f.Fuzz(serializer)
+			f.Fill(serializer)
 			*r = serializer
 		},
-		func(r *flowcontrol.RateLimiter, f fuzz.Continue) {
+		func(r *flowcontrol.RateLimiter, f randfill.Continue) {
 			limiter := &fakeLimiter{}
-			f.Fuzz(limiter)
+			f.Fill(limiter)
 			*r = limiter
 		},
-		func(h *WarningHandler, f fuzz.Continue) {
+		func(h *WarningHandler, f randfill.Continue) {
 			*h = &fakeWarningHandler{}
 		},
-		func(h *WarningHandlerWithContext, f fuzz.Continue) {
+		func(h *WarningHandlerWithContext, f randfill.Continue) {
 			*h = &fakeWarningHandlerWithContext{}
 		},
 		// Authentication does not require fuzzer
-		func(r *AuthProviderConfigPersister, f fuzz.Continue) {},
-		func(r *clientcmdapi.AuthProviderConfig, f fuzz.Continue) {
+		func(r *AuthProviderConfigPersister, f randfill.Continue) {},
+		func(r *clientcmdapi.AuthProviderConfig, f randfill.Continue) {
 			r.Config = map[string]string{}
 		},
-		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
+		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f randfill.Continue) {
 			*r = fakeDialFunc
 		},
-		func(r *func(*http.Request) (*url.URL, error), f fuzz.Continue) {
+		func(r *func(*http.Request) (*url.URL, error), f randfill.Continue) {
 			*r = fakeProxyFunc
 		},
-		func(r *runtime.Object, f fuzz.Continue) {
+		func(r *runtime.Object, f randfill.Continue) {
 			unknown := &runtime.Unknown{}
-			f.Fuzz(unknown)
+			f.Fill(unknown)
 			*r = unknown
 		},
 	)
 	for i := 0; i < 100; i++ {
 		expected := &Config{}
-		f.Fuzz(expected)
+		f.Fill(expected)
 
 		// This is the list of known fields that this roundtrip doesn't care about. We should add new
 		// fields to this list if we don't want to roundtrip them on exec cluster conversion.
@@ -347,9 +347,9 @@ func TestConfigToExecClusterRoundtrip(t *testing.T) {
 func TestExecClusterToConfigRoundtrip(t *testing.T) {
 	t.Parallel()
 
-	f := fuzz.New().NilChance(0.5).NumElements(1, 1)
+	f := randfill.New().NilChance(0.5).NumElements(1, 1)
 	f.Funcs(
-		func(r *runtime.Object, f fuzz.Continue) {
+		func(r *runtime.Object, f randfill.Continue) {
 			// We don't expect the clientauthentication.Cluster.Config to show up in the Config that
 			// comes back from the roundtrip, so just set it to nil.
 			*r = nil
@@ -357,7 +357,7 @@ func TestExecClusterToConfigRoundtrip(t *testing.T) {
 	)
 	for i := 0; i < 100; i++ {
 		expected := &clientauthenticationapi.Cluster{}
-		f.Fuzz(expected)
+		f.Fill(expected)
 
 		// Manually set URLs so we don't get an error when parsing these during the roundtrip.
 		if expected.Server != "" {

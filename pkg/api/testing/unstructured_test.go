@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -54,15 +54,15 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 		// because in this test we are simply doing json operations, in which
 		// those disappear.
 		Funcs(
-			func(s *api.PodSpec, c fuzz.Continue) {
-				c.FuzzNoCustom(s)
+			func(s *api.PodSpec, c randfill.Continue) {
+				c.FillNoCustom(s)
 				s.InitContainers = nil
 			},
-			func(s *api.PodStatus, c fuzz.Continue) {
-				c.FuzzNoCustom(s)
+			func(s *api.PodStatus, c randfill.Continue) {
+				c.FillNoCustom(s)
 				s.InitContainerStatuses = nil
 			},
-		).Fuzz(internalObj)
+		).Fill(internalObj)
 
 	item, err := legacyscheme.Scheme.New(externalVersion.WithKind(kind))
 	if err != nil {

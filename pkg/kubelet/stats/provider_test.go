@@ -26,9 +26,9 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -389,9 +389,9 @@ func getPodVolumeStats(seed int, volumeName string) statsapi.VolumeStats {
 }
 
 func generateCustomMetricSpec() []cadvisorapiv1.MetricSpec {
-	f := fuzz.New().NilChance(0).Funcs(
-		func(e *cadvisorapiv1.MetricSpec, c fuzz.Continue) {
-			c.Fuzz(&e.Name)
+	f := randfill.New().NilChance(0).Funcs(
+		func(e *cadvisorapiv1.MetricSpec, c randfill.Continue) {
+			c.Fill(&e.Name)
 			switch c.Intn(3) {
 			case 0:
 				e.Type = cadvisorapiv1.MetricGauge
@@ -406,28 +406,28 @@ func generateCustomMetricSpec() []cadvisorapiv1.MetricSpec {
 			case 1:
 				e.Format = cadvisorapiv1.FloatType
 			}
-			c.Fuzz(&e.Units)
+			c.Fill(&e.Units)
 		})
 	var ret []cadvisorapiv1.MetricSpec
-	f.Fuzz(&ret)
+	f.Fill(&ret)
 	return ret
 }
 
 func generateCustomMetrics(spec []cadvisorapiv1.MetricSpec) map[string][]cadvisorapiv1.MetricVal {
 	ret := map[string][]cadvisorapiv1.MetricVal{}
 	for _, metricSpec := range spec {
-		f := fuzz.New().NilChance(0).Funcs(
-			func(e *cadvisorapiv1.MetricVal, c fuzz.Continue) {
+		f := randfill.New().NilChance(0).Funcs(
+			func(e *cadvisorapiv1.MetricVal, c randfill.Continue) {
 				switch metricSpec.Format {
 				case cadvisorapiv1.IntType:
-					c.Fuzz(&e.IntValue)
+					c.Fill(&e.IntValue)
 				case cadvisorapiv1.FloatType:
-					c.Fuzz(&e.FloatValue)
+					c.Fill(&e.FloatValue)
 				}
 			})
 
 		var metrics []cadvisorapiv1.MetricVal
-		f.Fuzz(&metrics)
+		f.Fill(&metrics)
 		ret[metricSpec.Name] = metrics
 	}
 	return ret
