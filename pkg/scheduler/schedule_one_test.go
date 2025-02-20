@@ -638,17 +638,22 @@ func TestSchedulerGuaranteeNonNilNodeInSchedulingCycle(t *testing.T) {
 	for i := 0; i < waitSchedulingPodNumber; i++ {
 		allWaitSchedulingPods.Insert(fmt.Sprintf("pod%d", i))
 	}
-	var wg sync.WaitGroup
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
 	wg.Add(waitSchedulingPodNumber)
 	stopFn, err := broadcaster.StartEventWatcher(func(obj runtime.Object) {
 		e, ok := obj.(*eventsv1.Event)
 		if !ok || (e.Reason != "Scheduled" && e.Reason != "FailedScheduling") {
 			return
 		}
+		mu.Lock()
 		if allWaitSchedulingPods.Has(e.Regarding.Name) {
 			wg.Done()
 			allWaitSchedulingPods.Delete(e.Regarding.Name)
 		}
+		mu.Unlock()
 	})
 	if err != nil {
 		t.Fatal(err)
