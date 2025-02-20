@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"time"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -36,8 +36,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
-func fuzzBootstrapToken(obj *output.BootstrapToken, c fuzz.Continue) {
-	c.FuzzNoCustom(obj)
+func fuzzBootstrapToken(obj *output.BootstrapToken, c randfill.Continue) {
+	c.FillNoCustom(obj)
 
 	obj.Token = &bootstraptokenv1.BootstrapTokenString{ID: "uvxdac", Secret: "fq35fuyue3kd4gda"}
 	obj.Description = ""

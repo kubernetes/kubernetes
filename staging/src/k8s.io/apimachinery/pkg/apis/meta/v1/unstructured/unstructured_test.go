@@ -28,8 +28,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -67,7 +67,7 @@ func TestUnstructuredMetadataRoundTrip(t *testing.T) {
 		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 		uCopy := u.DeepCopy()
 		metadata := &metav1.ObjectMeta{}
-		fuzzer.Fuzz(metadata)
+		fuzzer.Fill(metadata)
 
 		if err := setObjectMeta(u, metadata); err != nil {
 			t.Fatalf("unexpected error setting fuzzed ObjectMeta: %v", err)
@@ -94,7 +94,7 @@ func TestUnstructuredMetadataOmitempty(t *testing.T) {
 	// fuzz to make sure we don't miss any function calls below
 	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	metadata := &metav1.ObjectMeta{}
-	fuzzer.Fuzz(metadata)
+	fuzzer.Fill(metadata)
 	if err := setObjectMeta(u, metadata); err != nil {
 		t.Fatalf("unexpected error setting fuzzed ObjectMeta: %v", err)
 	}
@@ -184,7 +184,7 @@ func roundtripType[U runtime.Unstructured](t *testing.T) {
 
 	for i := 0; i < 50; i++ {
 		original := reflect.New(reflect.TypeFor[U]().Elem()).Interface().(runtime.Unstructured)
-		fuzzer.Fuzz(original)
+		fuzzer.Fill(original)
 		// unstructured -> JSON > unstructured > CBOR -> unstructured -> JSON -> unstructured
 		roundtrip(t, original, jS, cS)
 		// unstructured -> CBOR > unstructured > JSON -> unstructured -> CBOR -> unstructured
@@ -285,25 +285,25 @@ const (
 
 func unstructuredFuzzerFuncs(codecs serializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(u *unstructured.Unstructured, c fuzz.Continue) {
+		func(u *unstructured.Unstructured, c randfill.Continue) {
 			obj := make(map[string]interface{})
 			obj["apiVersion"] = generateValidAPIVersionString(c)
 			obj["kind"] = generateNonEmptyString(c)
 			for j := c.Intn(maxUnstructuredFanOut); j >= 0; j-- {
-				obj[c.RandString()] = generateRandomTypeValue(maxUnstructuredDepth, c)
+				obj[c.String(0)] = generateRandomTypeValue(maxUnstructuredDepth, c)
 			}
 			u.Object = obj
 		},
-		func(ul *unstructured.UnstructuredList, c fuzz.Continue) {
+		func(ul *unstructured.UnstructuredList, c randfill.Continue) {
 			obj := make(map[string]interface{})
 			obj["apiVersion"] = generateValidAPIVersionString(c)
 			obj["kind"] = generateNonEmptyString(c)
 			for j := c.Intn(maxUnstructuredFanOut); j >= 0; j-- {
-				obj[c.RandString()] = generateRandomTypeValue(maxUnstructuredDepth, c)
+				obj[c.String(0)] = generateRandomTypeValue(maxUnstructuredDepth, c)
 			}
 			for j := c.Intn(maxUnstructuredFanOut); j >= 0; j-- {
 				var item = unstructured.Unstructured{}
-				c.Fuzz(&item)
+				c.Fill(&item)
 				ul.Items = append(ul.Items, item)
 			}
 			ul.Object = obj
@@ -311,16 +311,16 @@ func unstructuredFuzzerFuncs(codecs serializer.CodecFactory) []interface{} {
 	}
 }
 
-func generateNonEmptyString(c fuzz.Continue) string {
-	temp := c.RandString()
+func generateNonEmptyString(c randfill.Continue) string {
+	temp := c.String(0)
 	for len(temp) == 0 {
-		temp = c.RandString()
+		temp = c.String(0)
 	}
 	return temp
 }
 
 // generateNonEmptyNoSlashString generates a non-empty string without any slashes
-func generateNonEmptyNoSlashString(c fuzz.Continue) string {
+func generateNonEmptyNoSlashString(c randfill.Continue) string {
 	temp := strings.ReplaceAll(generateNonEmptyString(c), "/", "")
 	for len(temp) == 0 {
 		temp = strings.ReplaceAll(generateNonEmptyString(c), "/", "")
@@ -330,8 +330,8 @@ func generateNonEmptyNoSlashString(c fuzz.Continue) string {
 
 // generateValidAPIVersionString generates valid apiVersion string with formats:
 // <string>/<string> or <string>
-func generateValidAPIVersionString(c fuzz.Continue) string {
-	if c.RandBool() {
+func generateValidAPIVersionString(c randfill.Continue) string {
+	if c.Bool() {
 		return generateNonEmptyNoSlashString(c) + "/" + generateNonEmptyNoSlashString(c)
 	} else {
 		return generateNonEmptyNoSlashString(c)
@@ -355,7 +355,7 @@ func generateValidAPIVersionString(c fuzz.Continue) string {
 // All external-versioned builtin types are exercised through RoundtripToUnstructured
 // in apitesting package. Types like metav1.Time are implicitly being exercised
 // because they appear as fields in those types.
-func generateRandomTypeValue(depth int, c fuzz.Continue) interface{} {
+func generateRandomTypeValue(depth int, c randfill.Continue) interface{} {
 	t := c.Rand.Intn(120)
 	// If the max depth for unstructured is reached, only add non-recursive types
 	// which is 20+ in range
@@ -373,21 +373,21 @@ func generateRandomTypeValue(depth int, c fuzz.Continue) interface{} {
 	case t < 20:
 		item := map[string]interface{}{}
 		for j := c.Intn(maxUnstructuredFanOut); j >= 0; j-- {
-			item[c.RandString()] = generateRandomTypeValue(depth-1, c)
+			item[c.String(0)] = generateRandomTypeValue(depth-1, c)
 		}
 		return item
 	case t < 40:
 		// Only valid UTF-8 encodings
 		var item string
-		c.Fuzz(&item)
+		c.Fill(&item)
 		return item
 	case t < 60:
 		var item int64
-		c.Fuzz(&item)
+		c.Fill(&item)
 		return item
 	case t < 80:
 		var item bool
-		c.Fuzz(&item)
+		c.Fill(&item)
 		return item
 	case t < 100:
 		return c.Rand.NormFloat64()

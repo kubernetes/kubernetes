@@ -17,7 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 
@@ -27,15 +27,15 @@ import (
 // Funcs returns the fuzzer functions for the admissionregistration api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *admissionregistration.Rule, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.Rule, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.Scope == nil {
 				s := admissionregistration.AllScopes
 				obj.Scope = &s
 			}
 		},
-		func(obj *admissionregistration.ValidatingWebhook, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.ValidatingWebhook, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.FailurePolicy == nil {
 				p := admissionregistration.FailurePolicyType("Fail")
 				obj.FailurePolicy = &p
@@ -54,8 +54,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.AdmissionReviewVersions = []string{"v1beta1"}
 		},
-		func(obj *admissionregistration.MutatingWebhook, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.MutatingWebhook, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.FailurePolicy == nil {
 				p := admissionregistration.FailurePolicyType("Fail")
 				obj.FailurePolicy = &p
@@ -78,28 +78,28 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.AdmissionReviewVersions = []string{"v1beta1"}
 		},
-		func(obj *admissionregistration.ValidatingAdmissionPolicySpec, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.ValidatingAdmissionPolicySpec, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.FailurePolicy == nil {
 				p := admissionregistration.FailurePolicyType("Fail")
 				obj.FailurePolicy = &p
 			}
 		},
-		func(obj *admissionregistration.ValidatingAdmissionPolicyBindingSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.ValidatingAdmissionPolicyBindingSpec, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.ValidationActions == nil {
 				obj.ValidationActions = []admissionregistration.ValidationAction{admissionregistration.Deny}
 			}
 		},
-		func(obj *admissionregistration.MatchResources, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.MatchResources, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.MatchPolicy == nil {
 				m := admissionregistration.MatchPolicyType("Exact")
 				obj.MatchPolicy = &m
 			}
 		},
-		func(obj *admissionregistration.ParamRef, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.ParamRef, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 
 			// Populate required field
 			if obj.ParameterNotFoundAction == nil {
@@ -107,26 +107,26 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.ParameterNotFoundAction = &v
 			}
 		},
-		func(obj *admissionregistration.MutatingAdmissionPolicySpec, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.MutatingAdmissionPolicySpec, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			if obj.FailurePolicy == nil {
 				p := admissionregistration.FailurePolicyType("Fail")
 				obj.FailurePolicy = &p
 			}
 			obj.ReinvocationPolicy = admissionregistration.NeverReinvocationPolicy
 		},
-		func(obj *admissionregistration.Mutation, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *admissionregistration.Mutation, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			patchTypes := []admissionregistration.PatchType{admissionregistration.PatchTypeJSONPatch, admissionregistration.PatchTypeApplyConfiguration}
 			obj.PatchType = patchTypes[c.Rand.Intn(len(patchTypes))]
 			if obj.PatchType == admissionregistration.PatchTypeJSONPatch {
 				obj.JSONPatch = &admissionregistration.JSONPatch{}
-				c.Fuzz(&obj.JSONPatch)
+				c.Fill(&obj.JSONPatch)
 				obj.ApplyConfiguration = nil
 			}
 			if obj.PatchType == admissionregistration.PatchTypeApplyConfiguration {
 				obj.ApplyConfiguration = &admissionregistration.ApplyConfiguration{}
-				c.Fuzz(obj.ApplyConfiguration)
+				c.Fill(obj.ApplyConfiguration)
 				obj.JSONPatch = nil
 			}
 		},

@@ -35,11 +35,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"         // nolint:depguard // this package provides test utilities
 	"github.com/google/go-cmp/cmp/cmpopts" // nolint:depguard // this package provides test utilities
-	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/randfill"
 )
 
 // Scheme is similar to runtime.Scheme, but for validation testing purposes. Scheme only supports validation,
@@ -221,15 +221,15 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 	}
 }
 
-func fuzzer() *fuzz.Fuzzer {
+func randfiller() *randfill.Filler {
 	// Ensure that lists and maps are not empty and use a deterministic seed.
-	return fuzz.New().NilChance(0.0).NumElements(2, 2).RandSource(rand.NewSource(0))
+	return randfill.New().NilChance(0.0).NumElements(2, 2).RandSource(rand.NewSource(0))
 }
 
-// ValueFuzzed automatically populates the given value using a deterministic fuzzer.
-// The fuzzer sets pointers to values and always includes a two map keys and slice elements.
+// ValueFuzzed automatically populates the given value using a deterministic filler.
+// The filler sets pointers to values and always includes a two map keys and slice elements.
 func (s *ValidationTestBuilder) ValueFuzzed(value any) *ValidationTester {
-	fuzzer().Fuzz(value)
+	randfiller().Fill(value)
 	return &ValidationTester{ValidationTestBuilder: s, value: value}
 }
 
@@ -257,10 +257,10 @@ func (v *ValidationTester) OldValue(oldValue any) *ValidationTester {
 	return v
 }
 
-// OldValueFuzzed automatically populates the given value using a deterministic fuzzer.
-// The fuzzer sets pointers to values and always includes a two map keys and slice elements.
+// OldValueFuzzed automatically populates the given value using a deterministic filler.
+// The filler sets pointers to values and always includes a two map keys and slice elements.
 func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
-	fuzzer().Fuzz(oldValue)
+	randfiller().Fill(oldValue)
 	v.oldValue = oldValue
 	return v
 }

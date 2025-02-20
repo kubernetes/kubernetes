@@ -22,15 +22,15 @@ import (
 	"reflect"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 func TestPatchOptionsIsSuperSetOfUpdateOptions(t *testing.T) {
-	f := fuzz.New()
+	f := randfill.New()
 	for i := 0; i < 1000; i++ {
 		t.Run(fmt.Sprintf("Run %d/1000", i), func(t *testing.T) {
 			update := UpdateOptions{}
-			f.Fuzz(&update)
+			f.Fill(&update)
 
 			b, err := json.Marshal(update)
 			if err != nil {

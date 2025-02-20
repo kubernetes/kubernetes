@@ -39,9 +39,9 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 )
 
 func TestIsConfigTransportTLS(t *testing.T) {
@@ -313,60 +313,60 @@ func (fakeAuthProviderConfigPersister) Persist(map[string]string) error {
 var fakeAuthProviderConfigPersisterError = errors.New("fakeAuthProviderConfigPersisterError")
 
 func TestAnonymousAuthConfig(t *testing.T) {
-	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
+	f := randfill.New().NilChance(0.0).NumElements(1, 1)
 	f.Funcs(
-		func(r *runtime.Codec, f fuzz.Continue) {
+		func(r *runtime.Codec, f randfill.Continue) {
 			codec := &fakeCodec{}
-			f.Fuzz(codec)
+			f.Fill(codec)
 			*r = codec
 		},
-		func(r *http.RoundTripper, f fuzz.Continue) {
+		func(r *http.RoundTripper, f randfill.Continue) {
 			roundTripper := &fakeRoundTripper{}
-			f.Fuzz(roundTripper)
+			f.Fill(roundTripper)
 			*r = roundTripper
 		},
-		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
+		func(fn *func(http.RoundTripper) http.RoundTripper, f randfill.Continue) {
 			*fn = fakeWrapperFunc
 		},
-		func(fn *transport.WrapperFunc, f fuzz.Continue) {
+		func(fn *transport.WrapperFunc, f randfill.Continue) {
 			*fn = fakeWrapperFunc
 		},
-		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {
+		func(r *runtime.NegotiatedSerializer, f randfill.Continue) {
 			serializer := &fakeNegotiatedSerializer{}
-			f.Fuzz(serializer)
+			f.Fill(serializer)
 			*r = serializer
 		},
-		func(r *flowcontrol.RateLimiter, f fuzz.Continue) {
+		func(r *flowcontrol.RateLimiter, f randfill.Continue) {
 			limiter := &fakeLimiter{}
-			f.Fuzz(limiter)
+			f.Fill(limiter)
 			*r = limiter
 		},
-		func(h *WarningHandler, f fuzz.Continue) {
+		func(h *WarningHandler, f randfill.Continue) {
 			*h = &fakeWarningHandler{}
 		},
-		func(h *WarningHandlerWithContext, f fuzz.Continue) {
+		func(h *WarningHandlerWithContext, f randfill.Continue) {
 			*h = &fakeWarningHandlerWithContext{}
 		},
 		// Authentication does not require fuzzer
-		func(r *AuthProviderConfigPersister, f fuzz.Continue) {},
-		func(r *clientcmdapi.AuthProviderConfig, f fuzz.Continue) {
+		func(r *AuthProviderConfigPersister, f randfill.Continue) {},
+		func(r *clientcmdapi.AuthProviderConfig, f randfill.Continue) {
 			r.Config = map[string]string{}
 		},
-		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
+		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f randfill.Continue) {
 			*r = fakeDialFunc
 		},
-		func(r *func(*http.Request) (*url.URL, error), f fuzz.Continue) {
+		func(r *func(*http.Request) (*url.URL, error), f randfill.Continue) {
 			*r = fakeProxyFunc
 		},
-		func(r *runtime.Object, f fuzz.Continue) {
+		func(r *runtime.Object, f randfill.Continue) {
 			unknown := &runtime.Unknown{}
-			f.Fuzz(unknown)
+			f.Fill(unknown)
 			*r = unknown
 		},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}
-		f.Fuzz(original)
+		f.Fill(original)
 		actual := AnonymousClientConfig(original)
 		expected := *original
 
@@ -414,58 +414,58 @@ func TestAnonymousAuthConfig(t *testing.T) {
 }
 
 func TestCopyConfig(t *testing.T) {
-	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
+	f := randfill.New().NilChance(0.0).NumElements(1, 1)
 	f.Funcs(
-		func(r *runtime.Codec, f fuzz.Continue) {
+		func(r *runtime.Codec, f randfill.Continue) {
 			codec := &fakeCodec{}
-			f.Fuzz(codec)
+			f.Fill(codec)
 			*r = codec
 		},
-		func(r *http.RoundTripper, f fuzz.Continue) {
+		func(r *http.RoundTripper, f randfill.Continue) {
 			roundTripper := &fakeRoundTripper{}
-			f.Fuzz(roundTripper)
+			f.Fill(roundTripper)
 			*r = roundTripper
 		},
-		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
+		func(fn *func(http.RoundTripper) http.RoundTripper, f randfill.Continue) {
 			*fn = fakeWrapperFunc
 		},
-		func(fn *transport.WrapperFunc, f fuzz.Continue) {
+		func(fn *transport.WrapperFunc, f randfill.Continue) {
 			*fn = fakeWrapperFunc
 		},
-		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {
+		func(r *runtime.NegotiatedSerializer, f randfill.Continue) {
 			serializer := &fakeNegotiatedSerializer{}
-			f.Fuzz(serializer)
+			f.Fill(serializer)
 			*r = serializer
 		},
-		func(r *flowcontrol.RateLimiter, f fuzz.Continue) {
+		func(r *flowcontrol.RateLimiter, f randfill.Continue) {
 			limiter := &fakeLimiter{}
-			f.Fuzz(limiter)
+			f.Fill(limiter)
 			*r = limiter
 		},
-		func(h *WarningHandler, f fuzz.Continue) {
+		func(h *WarningHandler, f randfill.Continue) {
 			*h = &fakeWarningHandler{}
 		},
-		func(h *WarningHandlerWithContext, f fuzz.Continue) {
+		func(h *WarningHandlerWithContext, f randfill.Continue) {
 			*h = &fakeWarningHandlerWithContext{}
 		},
-		func(r *AuthProviderConfigPersister, f fuzz.Continue) {
+		func(r *AuthProviderConfigPersister, f randfill.Continue) {
 			*r = fakeAuthProviderConfigPersister{}
 		},
-		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
+		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f randfill.Continue) {
 			*r = fakeDialFunc
 		},
-		func(r *func(*http.Request) (*url.URL, error), f fuzz.Continue) {
+		func(r *func(*http.Request) (*url.URL, error), f randfill.Continue) {
 			*r = fakeProxyFunc
 		},
-		func(r *runtime.Object, f fuzz.Continue) {
+		func(r *runtime.Object, f randfill.Continue) {
 			unknown := &runtime.Unknown{}
-			f.Fuzz(unknown)
+			f.Fill(unknown)
 			*r = unknown
 		},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}
-		f.Fuzz(original)
+		f.Fill(original)
 		actual := CopyConfig(original)
 		expected := *original
 

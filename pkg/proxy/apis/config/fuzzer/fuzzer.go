@@ -21,7 +21,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -30,7 +30,7 @@ import (
 )
 
 // generateRandomIP is copied from pkg/apis/networking/fuzzer/fuzzer.go
-func generateRandomIP(is6 bool, c fuzz.Continue) string {
+func generateRandomIP(is6 bool, c randfill.Continue) string {
 	n := 4
 	if is6 {
 		n = 16
@@ -49,7 +49,7 @@ func generateRandomIP(is6 bool, c fuzz.Continue) string {
 }
 
 // generateRandomCIDR is copied from pkg/apis/networking/fuzzer/fuzzer.go
-func generateRandomCIDR(is6 bool, c fuzz.Continue) string {
+func generateRandomCIDR(is6 bool, c randfill.Continue) string {
 	ip, err := netip.ParseAddr(generateRandomIP(is6, c))
 	if err != nil {
 		// generateRandomIP already panics if returns a not valid ip
@@ -67,12 +67,12 @@ func generateRandomCIDR(is6 bool, c fuzz.Continue) string {
 }
 
 // getRandomDualStackCIDR returns a random dual-stack CIDR.
-func getRandomDualStackCIDR(c fuzz.Continue) []string {
+func getRandomDualStackCIDR(c randfill.Continue) []string {
 	cidrIPv4 := generateRandomCIDR(false, c)
 	cidrIPv6 := generateRandomCIDR(true, c)
 
 	cidrs := []string{cidrIPv4, cidrIPv6}
-	if c.RandBool() {
+	if c.Bool() {
 		cidrs = []string{cidrIPv6, cidrIPv4}
 	}
 	return cidrs[:1+c.Intn(2)]
@@ -81,19 +81,19 @@ func getRandomDualStackCIDR(c fuzz.Continue) []string {
 // Funcs returns the fuzzer functions for the kube-proxy apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *kubeproxyconfig.KubeProxyConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
+		func(obj *kubeproxyconfig.KubeProxyConfiguration, c randfill.Continue) {
+			c.FillNoCustom(obj)
 			obj.BindAddress = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
-			obj.ClientConnection.ContentType = c.RandString()
+			obj.ClientConnection.ContentType = c.String(0)
 			obj.DetectLocal.ClusterCIDRs = getRandomDualStackCIDR(c)
 			obj.Linux.Conntrack.MaxPerCore = ptr.To(c.Int31())
 			obj.Linux.Conntrack.Min = ptr.To(c.Int31())
 			obj.Linux.Conntrack.TCPCloseWaitTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
 			obj.Linux.Conntrack.TCPEstablishedTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
-			obj.FeatureGates = map[string]bool{c.RandString(): true}
+			obj.FeatureGates = map[string]bool{c.String(0): true}
 			obj.HealthzBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
 			obj.IPTables.MasqueradeBit = ptr.To(c.Int31())
-			obj.IPTables.LocalhostNodePorts = ptr.To(c.RandBool())
+			obj.IPTables.LocalhostNodePorts = ptr.To(c.Bool())
 			obj.NFTables.MasqueradeBit = ptr.To(c.Int31())
 			obj.MetricsBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
 			obj.Linux.OOMScoreAdj = ptr.To(c.Int31())

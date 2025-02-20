@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -480,13 +480,13 @@ func TestStoreCreateWithRetryNameGenerateFeatureDisabled(t *testing.T) {
 }
 
 func TestNewCreateOptionsFromUpdateOptions(t *testing.T) {
-	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
+	f := randfill.New().NilChance(0.0).NumElements(1, 1)
 
 	// The goal here is to trigger when any changes are made to either
 	// CreateOptions or UpdateOptions types, so we can update the converter.
 	for i := 0; i < 20; i++ {
 		in := &metav1.UpdateOptions{}
-		f.Fuzz(in)
+		f.Fill(in)
 		in.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
 
 		out := newCreateOptionsFromUpdateOptions(in)
@@ -532,13 +532,13 @@ func TestNewCreateOptionsFromUpdateOptions(t *testing.T) {
 }
 
 func TestNewDeleteOptionsFromUpdateOptions(t *testing.T) {
-	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
+	f := randfill.New().NilChance(0.0).NumElements(1, 1)
 
 	// The goal here is to trigger when any changes are made to either
 	// DeleteOptions or UpdateOptions types, so we can update the converter.
 	for i := 0; i < 20; i++ {
 		in := &metav1.UpdateOptions{}
-		f.Fuzz(in)
+		f.Fill(in)
 		in.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
 
 		out := newDeleteOptionsFromUpdateOptions(in)

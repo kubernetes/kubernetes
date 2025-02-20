@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
@@ -312,10 +312,10 @@ func TestSetListToMatchingType(t *testing.T) {
 func TestSetExtractListRoundTrip(t *testing.T) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	fuzzer := fuzz.New().NilChance(0).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).MaxDepth(10)
+	fuzzer := randfill.New().NilChance(0).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).MaxDepth(10)
 	for i := 0; i < 5; i++ {
 		start := &testapigroup.CarpList{}
-		fuzzer.Fuzz(&start.Items)
+		fuzzer.Fill(&start.Items)
 
 		list, err := meta.ExtractList(start)
 		if err != nil {
