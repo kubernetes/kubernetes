@@ -102,8 +102,8 @@ type informationForClaim struct {
 	availableOnNodes *nodeaffinity.NodeSelector
 
 	// Set by Reserved, published by PreBind.
-	allocation       *resourceapi.AllocationResult
-	allocatedDevices []resourceapi.AllocatedDeviceStatus
+	allocation *resourceapi.AllocationResult
+	//allocatedDevices []resourceapi.AllocatedDeviceStatus
 }
 
 // DynamicResources is a plugin that ensures that ResourceClaims are allocated.
@@ -525,14 +525,13 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 
 	// Use allocator to check the node and cache the result in case that the node is picked.
 	var allocations []resourceapi.AllocationResult
-	var allocatedDeviceStatus []resourceapi.AllocatedDeviceStatus
 	if state.allocator != nil {
 		allocCtx := ctx
 		if loggerV := logger.V(5); loggerV.Enabled() {
 			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
 		}
 
-		a, ad, err := state.allocator.Allocate(allocCtx, node)
+		a, err := state.allocator.Allocate(allocCtx, node)
 		if err != nil {
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
@@ -552,9 +551,6 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		}
 		// Reserve uses this information.
 		allocations = a
-		if pl.enableDeviceBindingConditions {
-			allocatedDeviceStatus = ad
-		}
 	}
 
 	// Store information in state while holding the mutex.
@@ -579,9 +575,6 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 
 	if state.allocator != nil {
 		state.nodeAllocations[node.Name] = allocations
-		if pl.enableDeviceBindingConditions && allocatedDeviceStatus != nil {
-			state.nodeAllocatedDevices[node.Name] = allocatedDeviceStatus
-		}
 	}
 
 	return nil
@@ -695,10 +688,6 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 				claim.Finalizers = append(claim.Finalizers, resourceapi.Finalizer)
 			}
 			claim.Status.Allocation = allocation
-			if pl.enableDeviceBindingConditions && state.nodeAllocatedDevices != nil {
-				state.informationsForClaim[index].allocatedDevices = state.nodeAllocatedDevices[nodeName]
-				claim.Status.Devices = state.nodeAllocatedDevices[nodeName]
-			}
 			err := pl.draManager.ResourceClaims().SignalClaimPendingAllocation(claim.UID, claim)
 			if err != nil {
 				return statusError(logger, fmt.Errorf("internal error, couldn't signal allocation for claim %s", claim.Name))
@@ -883,7 +872,6 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	logger := klog.FromContext(ctx)
 	claim := state.claims[index].DeepCopy()
 	allocation := state.informationsForClaim[index].allocation
-	allocatedDevices := state.informationsForClaim[index].allocatedDevices
 	defer func() {
 		if allocation != nil {
 			// The scheduler was handling allocation. Now that has
@@ -939,13 +927,24 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 				claim = updatedClaim
 			}
 			claim.Status.Allocation = allocation
-		}
 
-		if allocatedDevices != nil {
-			if claim.Status.Devices != nil {
-				return fmt.Errorf("claim %s got devices allocated elsewhere in the meantime", klog.KObj(claim))
+			// if the claim has devices with binding conditions, we need to store them in the claim status
+			if pl.enableDeviceBindingConditions {
+				for _, device := range allocation.Devices.Results {
+					if device.BindingConditions != nil {
+						ad := resourceapi.AllocatedDeviceStatus{
+							Driver:                   device.Driver,
+							Device:                   device.Device,
+							Pool:                     device.Pool,
+							UsageRestrictedToNode:    device.UsageRestrictedToNode,
+							BindingConditions:        device.BindingConditions,
+							BindingFailureConditions: device.BindingFailureConditions,
+							BindingTimeout:           device.BindingTimeout,
+						}
+						claim.Status.Devices = append(claim.Status.Devices, ad)
+					}
+				}
 			}
-			claim.Status.Devices = allocatedDevices
 		}
 
 		// We can simply try to add the pod here without checking
