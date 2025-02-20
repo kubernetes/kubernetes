@@ -204,6 +204,20 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		}
 	}
 
+	// Add support for writing TLS client random and master secret in NSS key log format.
+	// https: //developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/Key_Log_Format
+	// Only available in debug mode.
+	if klog.V(9).Enabled() { // nolint:logcheck
+		if keylogFile := os.Getenv("SSLKEYLOGFILE"); keylogFile != "" {
+			w, err := os.OpenFile(keylogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+			if err != nil {
+				klog.Warningf("Could not open SSLKEYLOGFILE %s", keylogFile)
+			} else {
+				tlsConfig.KeyLogWriter = w
+			}
+		}
+	}
+
 	return tlsConfig, nil
 }
 
