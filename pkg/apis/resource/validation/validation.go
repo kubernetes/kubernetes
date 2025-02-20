@@ -539,9 +539,6 @@ func validateDevice(device resource.Device, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-const BindingConditionsMaxSize = 4
-const BindingFailureConditionsMaxSize = 4
-
 func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	// Warn about exceeding the maximum length only once. If any individual
@@ -552,11 +549,11 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field
 	if combinedLen, max := len(device.Attributes)+len(device.Capacity), resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice; combinedLen > max {
 		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
 	}
-	if len(device.BindingConditions) > BindingConditionsMaxSize {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("BindingConditions"), len(device.BindingConditions), BindingConditionsMaxSize))
+	if len(device.BindingConditions) > resource.BindingConditionsMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("BindingConditions"), len(device.BindingConditions), resource.BindingConditionsMaxSize))
 	}
-	if len(device.BindingFailureConditions) > BindingFailureConditionsMaxSize {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), BindingFailureConditionsMaxSize))
+	if len(device.BindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), resource.BindingFailureConditionsMaxSize))
 	}
 	if device.BindingTimeout != nil && device.BindingTimeout.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeout, "must be greater than zero"))
@@ -768,11 +765,11 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 		allErrs = append(allErrs, validateRawExtension(device.Data, fldPath.Child("data"), false)...)
 	}
 	allErrs = append(allErrs, validateNetworkDeviceData(device.NetworkData, fldPath.Child("networkData"))...)
-	if len(device.BindingConditions) > BindingConditionsMaxSize {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingConditions"), len(device.BindingConditions), BindingConditionsMaxSize))
+	if len(device.BindingConditions) > resource.BindingConditionsMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingConditions"), len(device.BindingConditions), resource.BindingConditionsMaxSize))
 	}
-	if len(device.BindingFailureConditions) > BindingFailureConditionsMaxSize {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), BindingFailureConditionsMaxSize))
+	if len(device.BindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), resource.BindingFailureConditionsMaxSize))
 	}
 	if device.BindingTimeout.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeout, "must be greater than zero"))
