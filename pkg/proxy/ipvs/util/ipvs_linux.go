@@ -31,6 +31,9 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
+
+	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // runner implements ipvs.Interface.
@@ -183,9 +186,15 @@ func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
+	var dsts []*libipvs.Destination
+
 	runner.mu.Lock()
-	dsts, err := runner.ipvsHandle.GetDestinations(svc)
+	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
+		dsts, err = runner.ipvsHandle.GetDestinations(svc)
+		return err
+	})
 	runner.mu.Unlock()
+
 	if err != nil {
 		return nil, fmt.Errorf("could not get IPVS destination for service: %w", err)
 	}
