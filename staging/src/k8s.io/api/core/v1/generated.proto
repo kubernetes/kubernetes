@@ -1573,7 +1573,7 @@ message EphemeralContainerCommon {
   // +optional
   optional ResourceRequirements resources = 8;
 
-  // Resources resize policy for the container.
+  // ResizePolicy is not allowed for ephemeral containers.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   // +listType=atomic
