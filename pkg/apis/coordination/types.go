@@ -138,8 +138,6 @@ type LeaseCandidateSpec struct {
 	// If multiple candidates for the same Lease return different strategies, the strategy provided
 	// by the candidate with the latest BinaryVersion will be used. If there is still conflict,
 	// this is a user error and coordinated leader election will not operate the Lease until resolved.
-	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
-	// +featureGate=CoordinatedLeaderElection
 	// +listType=atomic
 	// +required
 	Strategy CoordinatedLeaseStrategy
