@@ -185,6 +185,8 @@ type ResourcePool struct {
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+const BindingConditionsMaxSize = 4
+const BindingFailureConditionsMaxSize = 4
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
