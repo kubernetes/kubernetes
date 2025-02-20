@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -83,6 +84,13 @@ type TContext interface {
 	// times due to use of -test.count or -test.cpu, multiple instances of
 	// a single test never run in parallel with each other.
 	Parallel()
+
+	// Run runs f as a subtest of t called name. It blocks until f returns or
+	// calls t.Parallel to become a parallel test.
+	//
+	// Only supported in Go unit tests or benchmarks. It fails the current
+	// test when called elsewhere.
+	Run(name string, f func(tCtx TContext)) bool
 
 	// Cancel can be invoked to cancel the context before the test is completed.
 	// Tests which use the context to control goroutines and then wait for
@@ -174,6 +182,7 @@ type TContext interface {
 	// - CleanupCtx
 	// - Expect
 	// - ExpectNoError
+	// - Run
 	// - Logger
 	//
 	// Usually these methods would be stand-alone functions with a TContext
@@ -337,6 +346,9 @@ func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
 //	   })
 //
 // WithTB sets up cancellation for the sub-test.
+//
+// A simpler API is to use TContext.Run as replacement
+// for [testing.T.Run].
 func WithTB(parentCtx TContext, tb TB) TContext {
 	tCtx := InitCtx(parentCtx, tb)
 	tCtx = WithCancel(tCtx)
@@ -348,6 +360,27 @@ func WithTB(parentCtx TContext, tb TB) TContext {
 		parentCtx.APIExtensions(),
 	)
 	return tCtx
+}
+
+// run implements the different Run methods. It's not an exported
+// method because tCtx.Run is more discoverable (same usage as
+// with normal Go).
+func run(tCtx TContext, name string, cb func(tCtx TContext)) bool {
+	tCtx.Helper()
+	switch tb := tCtx.TB().(type) {
+	case interface {
+		Run(string, func(t *testing.T)) bool
+	}:
+		return tb.Run(name, func(t *testing.T) { cb(WithTB(tCtx, t)) })
+	case interface {
+		Run(string, func(t *testing.B)) bool
+	}:
+		return tb.Run(name, func(b *testing.B) { cb(WithTB(tCtx, b)) })
+	default:
+		tCtx.Fatalf("Run not implemented, underlying %T does not support it", tCtx.TB())
+	}
+
+	return false
 }
 
 // WithContext constructs a new TContext with a different Context instance.
@@ -437,6 +470,10 @@ func cleanupCtx(tCtx TContext, cb func(TContext)) {
 		childCtx := WithContext(tCtx, context.WithoutCancel(tCtx))
 		cb(childCtx)
 	})
+}
+
+func (cCtx tContext) Run(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, cb)
 }
 
 func (tCtx tContext) Logger() klog.Logger {
