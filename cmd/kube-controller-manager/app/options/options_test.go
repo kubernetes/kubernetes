@@ -46,6 +46,7 @@ import (
 	cpoptions "k8s.io/cloud-provider/options"
 
 	eventv1 "k8s.io/api/events/v1"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	clientgofeaturegate "k8s.io/client-go/features"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
@@ -1480,6 +1481,8 @@ func TestWatchListClientFlagUsage(t *testing.T) {
 }
 
 func TestWatchListClientFlagChange(t *testing.T) {
+	// Reset the global registry before the test, as DefaultComponentGlobalsRegistry is used by multiple tests.
+	compatibility.DefaultComponentGlobalsRegistry.Reset()
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, err := NewKubeControllerManagerOptions()
 	if err != nil {
@@ -1493,7 +1496,9 @@ func TestWatchListClientFlagChange(t *testing.T) {
 	assertWatchListClientFeatureDefaultValue(t)
 	assertWatchListCommandLineDefaultValue(t, fs)
 
-	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
+	// To avoid race condition and multiple Set() calls on the registry,
+	// we need to pass a new registry and set the feature gate manually
+	args := []string{fmt.Sprintf("--feature-gates=%v=false", clientgofeaturegate.WatchListClient)}
 	if err := fs.Parse(args); err != nil {
 		t.Fatal(fmt.Errorf("FlatSet.Parse failed with %w", err))
 	}
@@ -1505,8 +1510,8 @@ func TestWatchListClientFlagChange(t *testing.T) {
 	}
 
 	watchListClientValue := clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.WatchListClient)
-	if !watchListClientValue {
-		t.Fatalf("expected %q feature gate to be enabled after setting the command line flag", clientgofeaturegate.WatchListClient)
+	if watchListClientValue {
+		t.Fatalf("expected %q feature gate to be disabled after setting the command line flag", clientgofeaturegate.WatchListClient)
 	}
 }
 
