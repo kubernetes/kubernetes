@@ -581,7 +581,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 
 	node, changed := kl.updateNode(ctx, originalNode)
 	// no need to update the status yet
-	if !changed && !kl.isUpdateStatusPeriodExperid() {
+	if !changed && !kl.isUpdateStatusPeriodExpired() {
 		kl.markVolumesFromNode(node)
 		return nil
 	}
@@ -602,9 +602,12 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	return err
 }
 
-func (kl *Kubelet) isUpdateStatusPeriodExperid() bool {
+func (kl *Kubelet) isUpdateStatusPeriodExpired() bool {
+	// Ensure that we do an initial status update.
+	// If the node.status is never updated after a kubelet restart, then the periodic update loop is never executed.
+	// See https://github.com/kubernetes/kubernetes/issues/130001
 	if kl.lastStatusReportTime.IsZero() {
-		return false
+		return true
 	}
 	if kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency+kl.delayAfterNodeStatusChange {
 		return true

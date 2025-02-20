@@ -3100,16 +3100,18 @@ func TestIsUpdateStatusPeriodExperid(t *testing.T) {
 		expectExpired              bool
 	}{
 		{
+			// Ensure that everything is properly initialized if the node status is not updated before
 			name:                       "no status update before and no delay",
 			lastStatusReportTime:       time.Time{},
 			delayAfterNodeStatusChange: 0,
-			expectExpired:              false,
+			expectExpired:              true,
 		},
 		{
+			// Ensure that everything is properly initialized if the node status is not updated before
 			name:                       "no status update before and existing delay",
 			lastStatusReportTime:       time.Time{},
 			delayAfterNodeStatusChange: 30 * time.Second,
-			expectExpired:              false,
+			expectExpired:              true,
 		},
 		{
 			name:                       "not expired and no delay",
@@ -3139,7 +3141,7 @@ func TestIsUpdateStatusPeriodExperid(t *testing.T) {
 	for _, tc := range testcases {
 		kubelet.lastStatusReportTime = tc.lastStatusReportTime
 		kubelet.delayAfterNodeStatusChange = tc.delayAfterNodeStatusChange
-		expired := kubelet.isUpdateStatusPeriodExperid()
+		expired := kubelet.isUpdateStatusPeriodExpired()
 		assert.Equal(t, tc.expectExpired, expired, tc.name)
 	}
 }
