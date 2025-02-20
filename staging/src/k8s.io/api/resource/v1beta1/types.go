@@ -877,6 +877,40 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
+
+	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	//
+	// +optional
+	UsageRestrictedToNode bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,6,opt,name=usageRestrictedToNode"`
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	// The maximum number of binding conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,7,rep,name=bindingConditions"`
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	// The maximum number of binding failure conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
+
+	// BindingTimeout indicates the prepare timeout period.
+	// If the timeout period is exceeded before all BindingConditions reach a True state,
+	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
+	//
+	// The default timeout if not set is 10 minutes.
+	//
+	// +optional
+	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty" protobuf:"bytes,9,opt,name=bindingTimeout"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
