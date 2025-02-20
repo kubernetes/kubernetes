@@ -72,7 +72,11 @@ fi
 # Start kube-apiserver
 # omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
-kube-apiserver \
+# KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA ensures that the OpenAPI is updated with all APIs
+# that are intended to be removed at a particular release during alpha. 
+# If a new version tag was just created and you are seeing an unrelated diff when adding
+# a new API, run `KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA=false ./hack/update-openapi-spec.sh`.
+KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA=${KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA:-true} kube-apiserver \
   --bind-address="${API_HOST}" \
   --secure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
