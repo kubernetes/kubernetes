@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -130,6 +131,7 @@ type MounterArgs struct {
 	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
 	DesiredSize         *resource.Quantity
 	SELinuxLabel        string
+	Recorder            record.EventRecorder
 }
 
 // Mounter interface provides methods to set up/mount the volume.
