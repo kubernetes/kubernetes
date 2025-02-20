@@ -28,8 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -47,14 +46,16 @@ type NamespaceGetter interface {
 type resourceClaimTemplateStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
-	namespaceRest NamespaceGetter
+	nsClient v1.NamespaceInterface
 }
 
-var Strategy = resourceClaimTemplateStrategy{legacyscheme.Scheme, names.SimpleNameGenerator, nil}
-
-// SetNamespaceStore sets the namespace store rest object for the strategy.
-func (s *resourceClaimTemplateStrategy) SetNamespaceStore(rest NamespaceGetter) {
-	s.namespaceRest = rest
+// NewStrategy is the default logic that applies when creating and updating ResourceClaimTemplate objects.
+func NewStrategy(ro runtime.ObjectTyper, ng names.NameGenerator, nsClient v1.NamespaceInterface) *resourceClaimTemplateStrategy {
+	return &resourceClaimTemplateStrategy{
+		ro,
+		ng,
+		nsClient,
+	}
 }
 
 func (resourceClaimTemplateStrategy) NamespaceScoped() bool {
@@ -68,7 +69,7 @@ func (resourceClaimTemplateStrategy) PrepareForCreate(ctx context.Context, obj r
 
 func (s resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	resourceClaimTemplate := obj.(*resource.ResourceClaimTemplate)
-	allErrs := authorizedForAdmin(ctx, resourceClaimTemplate, s.namespaceRest)
+	allErrs := authorizedForAdmin(ctx, resourceClaimTemplate, s.nsClient)
 	return append(allErrs, validation.ValidateResourceClaimTemplate(resourceClaimTemplate)...)
 }
 
@@ -91,7 +92,7 @@ func (resourceClaimTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, 
 func (s resourceClaimTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	claimTemplate, oldClaimTemplate := obj.(*resource.ResourceClaimTemplate), old.(*resource.ResourceClaimTemplate)
 
-	allErrs := authorizedForAdmin(ctx, claimTemplate, s.namespaceRest)
+	allErrs := authorizedForAdmin(ctx, claimTemplate, s.nsClient)
 	allErrs = append(allErrs, validation.ValidateResourceClaimTemplate(claimTemplate)...)
 	return append(allErrs, validation.ValidateResourceClaimTemplateUpdate(claimTemplate, oldClaimTemplate)...)
 }
@@ -121,7 +122,7 @@ func toSelectableFields(template *resource.ResourceClaimTemplate) fields.Set {
 
 // authorizedForAdmin checks if the request is authorized to get admin access to devices
 // based on namespace label
-func authorizedForAdmin(ctx context.Context, template *resource.ResourceClaimTemplate, namespaceRest NamespaceGetter) field.ErrorList {
+func authorizedForAdmin(ctx context.Context, template *resource.ResourceClaimTemplate, nsClient v1.NamespaceInterface) field.ErrorList {
 	allErrs := field.ErrorList{}
 	adminRequested := false
 
@@ -141,19 +142,15 @@ func authorizedForAdmin(ctx context.Context, template *resource.ResourceClaimTem
 		// No need to validate unless admin access is requested
 		return allErrs
 	}
-	if namespaceRest == nil {
-		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace store is nil"))
+	if nsClient == nil {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "nsClient is nil"))
 	}
 
 	namespaceName := template.Namespace
 	// Retrieve the namespace object from the store
-	obj, err := namespaceRest.Get(ctx, namespaceName, &metav1.GetOptions{ResourceVersion: "0"})
+	ns, err := nsClient.Get(ctx, namespaceName, metav1.GetOptions{ResourceVersion: "0"})
 	if err != nil {
 		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object cannot be retrieved"))
-	}
-	ns, ok := obj.(*core.Namespace)
-	if !ok {
-		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object is not of type core.Namespace"))
 	}
 	if value, exists := ns.Labels[DRAAdminNamespaceLabel]; !(exists && value == "true") {
 		return append(allErrs, field.Forbidden(field.NewPath(""), "admin access to devices is not allowed in namespace without DRA Admin Access label"))

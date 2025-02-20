@@ -30,9 +30,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/dynamic-resource-allocation/structured"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	"k8s.io/kubernetes/pkg/features"
@@ -51,16 +50,16 @@ type NamespaceGetter interface {
 type resourceclaimStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
-	namespaceRest NamespaceGetter
+	nsClient v1.NamespaceInterface
 }
 
-// Strategy is the default logic that applies when creating and updating
-// ResourceClaim objects via the REST API.
-var Strategy = resourceclaimStrategy{legacyscheme.Scheme, names.SimpleNameGenerator, nil}
-
-// SetNamespaceStore sets the namespace store rest object for the strategy.
-func (s *resourceclaimStrategy) SetNamespaceStore(rest NamespaceGetter) {
-	s.namespaceRest = rest
+// NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.
+func NewStrategy(ro runtime.ObjectTyper, ng names.NameGenerator, nsClient v1.NamespaceInterface) *resourceclaimStrategy {
+	return &resourceclaimStrategy{
+		ro,
+		ng,
+		nsClient,
+	}
 }
 
 func (resourceclaimStrategy) NamespaceScoped() bool {
@@ -94,7 +93,7 @@ func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 func (s resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	claim := obj.(*resource.ResourceClaim)
 
-	allErrs := authorizedForAdmin(ctx, claim, s.namespaceRest)
+	allErrs := authorizedForAdmin(ctx, claim, s.nsClient)
 	return append(allErrs, validation.ValidateResourceClaim(claim)...)
 }
 
@@ -120,7 +119,7 @@ func (resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 func (s resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
-	allErrs := authorizedForAdmin(ctx, newClaim, s.namespaceRest)
+	allErrs := authorizedForAdmin(ctx, newClaim, s.nsClient)
 	allErrs = append(allErrs, validation.ValidateResourceClaim(newClaim)...)
 	return append(allErrs, validation.ValidateResourceClaimUpdate(newClaim, oldClaim)...)
 }
@@ -137,7 +136,10 @@ type resourceclaimStatusStrategy struct {
 	resourceclaimStrategy
 }
 
-var StatusStrategy = resourceclaimStatusStrategy{Strategy}
+// NewStatusStrategy creates a strategy for operating the status object.
+func NewStatusStrategy(resourceclaimStrategy *resourceclaimStrategy) *resourceclaimStatusStrategy {
+	return &resourceclaimStatusStrategy{*resourceclaimStrategy}
+}
 
 // GetResetFields returns the set of fields that get reset by the strategy and
 // should not be modified by the user. For a status update that is the spec.
@@ -201,7 +203,7 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 
 // authorizedForAdmin checks if the request is authorized to get admin access to devices
 // based on namespace label
-func authorizedForAdmin(ctx context.Context, newClaim *resource.ResourceClaim, namespaceRest NamespaceGetter) field.ErrorList {
+func authorizedForAdmin(ctx context.Context, newClaim *resource.ResourceClaim, nsClient v1.NamespaceInterface) field.ErrorList {
 	allErrs := field.ErrorList{}
 	adminRequested := false
 
@@ -221,19 +223,15 @@ func authorizedForAdmin(ctx context.Context, newClaim *resource.ResourceClaim, n
 		// No need to validate unless admin access is requested
 		return allErrs
 	}
-	if namespaceRest == nil {
-		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace store is nil"))
+	if nsClient == nil {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "nsClient is nil"))
 	}
 
 	namespaceName := newClaim.Namespace
 	// Retrieve the namespace object from the store
-	obj, err := namespaceRest.Get(ctx, namespaceName, &metav1.GetOptions{ResourceVersion: "0"})
+	ns, err := nsClient.Get(ctx, namespaceName, metav1.GetOptions{ResourceVersion: "0"})
 	if err != nil {
 		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object cannot be retrieved"))
-	}
-	ns, ok := obj.(*core.Namespace)
-	if !ok {
-		return append(allErrs, field.Forbidden(field.NewPath(""), "namespace object is not of type core.Namespace"))
 	}
 	if value, exists := ns.Labels[DRAAdminNamespaceLabel]; !(exists && value == "true") {
 		return append(allErrs, field.Forbidden(field.NewPath(""), "admin access to devices is not allowed in namespace without DRA Admin Access label"))
