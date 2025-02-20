@@ -372,6 +372,9 @@ func TestDescribeSecret(t *testing.T) {
 	if strings.Contains(out, "YWRtaW4=") || strings.Contains(out, "MWYyZDFlMmU2N2Rm") {
 		t.Errorf("sensitive data should not be shown, unexpected out: %s", out)
 	}
+
+	expectedOut := "Name:         bar\nNamespace:    foo\nLabels:       <none>\nAnnotations:  <none>\n\nType:  \n\nData\n====\npassword:  16 bytes\nusername:  8 bytes\n"
+	assert.Equal(t, expectedOut, out)
 }
 
 func TestDescribeNamespace(t *testing.T) {
