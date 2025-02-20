@@ -415,7 +415,7 @@ var (
 		"volume_manager_selinux_pod_context_mismatch_warnings_total",
 	)
 	// All SELinux metrics
-	allMetrics = metricsWithoutVolumePluginLabel.Union(metricsWithVolumePluginLabel)
+	allSELinuxMetrics = metricsWithoutVolumePluginLabel.Union(metricsWithVolumePluginLabel)
 )
 
 // While kubelet VolumeManager and KCM SELinuxWarningController are quite different components,
@@ -676,7 +676,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				ginkgo.By("Grabbing initial metrics")
 				pod, err = m.cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
 				framework.ExpectNoError(err, "getting the initial pod")
-				metrics, err := grabNodeMetrics(ctx, grabber, pod.Spec.NodeName, allMetrics, volumePluginLabel)
+				metrics, err := grabNodeMetrics(ctx, grabber, pod.Spec.NodeName, allSELinuxMetrics, volumePluginLabel)
 				framework.ExpectNoError(err, "collecting the initial metrics")
 				dumpMetrics(metrics)
 
@@ -706,7 +706,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				// Assert: count the kubelet metrics
 				expectIncreaseWithLabels := addLabels(t.expectNodeIncreases, volumePluginLabel, t.volumeMode)
 				framework.Logf("Waiting for changes of metrics %+v", expectIncreaseWithLabels)
-				err = waitForNodeMetricIncrease(ctx, grabber, pod.Spec.NodeName, volumePluginLabel, allMetrics, expectIncreaseWithLabels, metrics, framework.PodStartShortTimeout)
+				err = waitForNodeMetricIncrease(ctx, grabber, pod.Spec.NodeName, volumePluginLabel, allSELinuxMetrics, expectIncreaseWithLabels, metrics, framework.PodStartShortTimeout)
 				framework.ExpectNoError(err, "waiting for metrics %s to increase", t.expectNodeIncreases)
 				if t.expectControllerConflictProperty != "" {
 					// Assert: count the KCM metrics + events
