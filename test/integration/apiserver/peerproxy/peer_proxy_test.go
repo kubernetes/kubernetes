@@ -18,7 +18,6 @@ package peerproxy
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -77,7 +76,7 @@ func TestPeerProxiedRequest(t *testing.T) {
 	serverA := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{
 		EnableCertAuth: true,
 		ProxyCA:        &proxyCA},
-		[]string{}, etcd)
+		[]string{"--runtime-config=api/all=true"}, etcd)
 	t.Cleanup(serverA.TearDownFn)
 
 	// start another test server with some api disabled
@@ -86,7 +85,7 @@ func TestPeerProxiedRequest(t *testing.T) {
 	serverB := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{
 		EnableCertAuth: true,
 		ProxyCA:        &proxyCA},
-		[]string{fmt.Sprintf("--runtime-config=%s", "batch/v1=false")}, etcd)
+		[]string{"--runtime-config=api/all=true,batch/v1=false"}, etcd)
 	t.Cleanup(serverB.TearDownFn)
 
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
@@ -144,7 +143,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-a")
 	t.Log("starting apiserver for ServerA")
-	serverA := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{}, etcd)
+	serverA := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{"--runtime-config=api/all=true"}, etcd)
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
 	// ensure storageversion garbage collector ctlr is set up
@@ -160,7 +159,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	server.SetHostnameFuncForTests("test-server-b")
 	t.Log("starting apiserver for ServerB")
 	serverB := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{
-		fmt.Sprintf("--runtime-config=%v", "batch/v1=false")}, etcd)
+		"--runtime-config=api/all=true,batch/v1=false"}, etcd)
 	t.Cleanup(serverB.TearDownFn)
 	kubeClientSetB, err := kubernetes.NewForConfig(serverB.ClientConfig)
 	require.NoError(t, err)
@@ -172,7 +171,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// override hostname to ensure unique ips
 	server.SetHostnameFuncForTests("test-server-c")
 	t.Log("starting apiserver for ServerC")
-	serverC := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{}, etcd)
+	serverC := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{"--runtime-config=api/all=true"}, etcd)
 	t.Cleanup(serverC.TearDownFn)
 
 	// create jobs resource using serverA
