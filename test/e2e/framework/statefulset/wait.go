@@ -34,7 +34,11 @@ import (
 func WaitForRunning(ctx context.Context, c clientset.Interface, numPodsRunning, numPodsReady int32, ss *appsv1.StatefulSet) {
 	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
-			podList := GetPodList(ctx, c, ss)
+			podList, err := GetPodList(ctx, c, ss)
+			if err != nil {
+				return false, err
+			}
+
 			SortStatefulPods(podList)
 			if int32(len(podList.Items)) < numPodsRunning {
 				framework.Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
@@ -67,7 +71,11 @@ func WaitForState(ctx context.Context, c clientset.Interface, ss *appsv1.Statefu
 			if err != nil {
 				return false, err
 			}
-			podList := GetPodList(ctx, c, ssGet)
+			podList, err := GetPodList(ctx, c, ssGet)
+			if err != nil {
+				return false, err
+			}
+
 			return until(ssGet, podList)
 		})
 	if pollErr != nil {
