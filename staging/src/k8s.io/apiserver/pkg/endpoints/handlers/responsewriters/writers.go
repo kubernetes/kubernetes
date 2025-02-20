@@ -107,6 +107,8 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		contentEncoding: negotiateContentEncoding(req),
 		hw:              hw,
 		ctx:             ctx,
+		// A minimal LIST JSON body has around 80 bytes
+		buffer: make([]byte, 0, 80),
 	}
 
 	err := encoder.Encode(object, w)
@@ -192,14 +194,43 @@ type deferredResponseWriter struct {
 	statusCode      int
 	contentEncoding string
 
-	hasWritten bool
-	hw         http.ResponseWriter
-	w          io.Writer
+	hasBuffered bool
+	buffer      []byte
+	hasWritten  bool
+	hw          http.ResponseWriter
+	w           io.Writer
 
 	ctx context.Context
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
+	switch {
+	case w.hasWritten:
+		// already written, cannot buffer
+		return w.unbufferedWrite(p)
+
+	case w.contentEncoding != "gzip":
+		// non-gzip, no need to buffer
+		return w.unbufferedWrite(p)
+
+	case !w.hasBuffered && len(p) > defaultGzipThresholdBytes:
+		// not yet buffered, first write is long enough to trigger gzip, no need to buffer
+		return w.unbufferedWrite(p)
+
+	default:
+		w.hasBuffered = true
+		w.buffer = append(w.buffer, p...)
+		var err error
+		if len(w.buffer) > defaultGzipThresholdBytes {
+			// we've accumulated enough to trigger gzip, write and clear buffer
+			_, err = w.unbufferedWrite(w.buffer)
+			w.buffer = nil
+		}
+		return len(p), err
+	}
+}
+
+func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 	ctx := w.ctx
 	span := tracing.SpanFromContext(ctx)
 	// This Step usually wraps in-memory object serialization.
@@ -245,11 +276,16 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 	return w.w.Write(p)
 }
 
-func (w *deferredResponseWriter) Close() error {
+func (w *deferredResponseWriter) Close() (err error) {
 	if !w.hasWritten {
-		return nil
+		if !w.hasBuffered {
+			return nil
+		}
+		_, err := w.unbufferedWrite(w.buffer)
+		w.buffer = nil
+		return err
 	}
-	var err error
+
 	switch t := w.w.(type) {
 	case *gzip.Writer:
 		err = t.Close()
