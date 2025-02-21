@@ -23,71 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-func TestIsDNS1123Label(t *testing.T) {
-	goodValues := []string{
-		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
-		"0", "01", "012", "1a", "1-a", "1--a--b--2",
-		strings.Repeat("a", 63),
-	}
-	for _, val := range goodValues {
-		if msgs := IsDNS1123Label(val); len(msgs) != 0 {
-			t.Errorf("expected true for '%s': %v", val, msgs)
-		}
-	}
-
-	badValues := []string{
-		"", "A", "ABC", "aBc", "A1", "A-1", "1-A",
-		"-", "a-", "-a", "1-", "-1",
-		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
-		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
-		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		strings.Repeat("a", 64),
-	}
-	for _, val := range badValues {
-		if msgs := IsDNS1123Label(val); len(msgs) == 0 {
-			t.Errorf("expected false for '%s'", val)
-		}
-	}
-}
-
-func TestIsDNS1123Subdomain(t *testing.T) {
-	goodValues := []string{
-		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
-		"0", "01", "012", "1a", "1-a", "1--a--b--2",
-		"a.a", "ab.a", "abc.a", "a1.a", "a-1.a", "a--1--2--b.a",
-		"a.1", "ab.1", "abc.1", "a1.1", "a-1.1", "a--1--2--b.1",
-		"0.a", "01.a", "012.a", "1a.a", "1-a.a", "1--a--b--2",
-		"0.1", "01.1", "012.1", "1a.1", "1-a.1", "1--a--b--2.1",
-		"a.b.c.d.e", "aa.bb.cc.dd.ee", "1.2.3.4.5", "11.22.33.44.55",
-		strings.Repeat("a", 253),
-	}
-	for _, val := range goodValues {
-		if msgs := IsDNS1123Subdomain(val); len(msgs) != 0 {
-			t.Errorf("expected true for '%s': %v", val, msgs)
-		}
-	}
-
-	badValues := []string{
-		"", "A", "ABC", "aBc", "A1", "A-1", "1-A",
-		"-", "a-", "-a", "1-", "-1",
-		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
-		".", "a.", ".a", "a..b", "1.", ".1", "1..2",
-		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		"A.a", "aB.a", "ab.A", "A1.a", "a1.A",
-		"A.1", "aB.1", "A1.1", "1A.1",
-		"0.A", "01.A", "012.A", "1A.a", "1a.A",
-		"A.B.C.D.E", "AA.BB.CC.DD.EE", "a.B.c.d.e", "aa.bB.cc.dd.ee",
-		"a@b", "a,b", "a_b", "a;b",
-		"a:b", "a%b", "a?b", "a$b",
-		strings.Repeat("a", 254),
-	}
-	for _, val := range badValues {
-		if msgs := IsDNS1123Subdomain(val); len(msgs) == 0 {
-			t.Errorf("expected false for '%s'", val)
-		}
-	}
-}
-
 func TestIsDNS1035Label(t *testing.T) {
 	goodValues := []string{
 		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
@@ -285,39 +220,6 @@ func TestIsQualifiedName(t *testing.T) {
 	for i := range errorCases {
 		if errs := IsQualifiedName(errorCases[i]); len(errs) == 0 {
 			t.Errorf("case[%d]: %q: expected failure", i, errorCases[i])
-		}
-	}
-}
-
-func TestIsValidLabelValue(t *testing.T) {
-	successCases := []string{
-		"simple",
-		"now-with-dashes",
-		"1-starts-with-num",
-		"end-with-num-1",
-		"1234",                  // only num
-		strings.Repeat("a", 63), // to the limit
-		"",                      // empty value
-	}
-	for i := range successCases {
-		if errs := IsValidLabelValue(successCases[i]); len(errs) != 0 {
-			t.Errorf("case %s expected success: %v", successCases[i], errs)
-		}
-	}
-
-	errorCases := []string{
-		"nospecialchars%^=@",
-		"Tama-nui-te-rā.is.Māori.sun",
-		"\\backslashes\\are\\bad",
-		"-starts-with-dash",
-		"ends-with-dash-",
-		".starts.with.dot",
-		"ends.with.dot.",
-		strings.Repeat("a", 64), // over the limit
-	}
-	for i := range errorCases {
-		if errs := IsValidLabelValue(errorCases[i]); len(errs) == 0 {
-			t.Errorf("case[%d] expected failure", i)
 		}
 	}
 }
@@ -831,11 +733,11 @@ func TestIsFullyQualifiedName(t *testing.T) {
 	}, {
 		name:       "name should not include scheme",
 		targetName: "http://foo.k8s.io",
-		err:        "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters",
+		err:        "each part must contain only lower-case alphanumeric characters or '-'",
 	}, {
 		name:       "email should be invalid",
 		targetName: "example@foo.k8s.io",
-		err:        "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters",
+		err:        "each part must contain only lower-case alphanumeric characters or '-'",
 	}, {
 		name:       "name cannot be empty",
 		targetName: "",
@@ -843,7 +745,7 @@ func TestIsFullyQualifiedName(t *testing.T) {
 	}, {
 		name:       "name must conform to RFC 1123",
 		targetName: "A.B.C",
-		err:        "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters",
+		err:        "each part must start and end with lower-case alphanumeric characters",
 	}}
 	for _, tc := range messageTests {
 		err := IsFullyQualifiedName(field.NewPath(""), tc.targetName).ToAggregate()
