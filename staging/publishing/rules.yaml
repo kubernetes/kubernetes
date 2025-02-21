@@ -2420,4 +2420,4 @@ rules:
       - staging/src/k8s.io/externaljwt
 recursive-delete-patterns:
 - '*/.gitattributes'
-default-go-version: 1.23.6
+default-go-version: 1.24.0
