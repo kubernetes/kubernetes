@@ -173,3 +173,39 @@ func TestNotSupported(t *testing.T) {
 		t.Errorf("Expected: %s\n, but got: %s\n", expected, notSupported.ErrorBody())
 	}
 }
+
+func TestErrListOrigin(t *testing.T) {
+	t.Run("AppendWithOrigin", func(t *testing.T) {
+		list := ErrorList{}
+
+		list.AppendWithOrigin("origin1", Invalid(NewPath("field1"), "", ""))
+		if len(list) != 1 {
+			t.Fatalf("Expected list of 1, got %d", len(list))
+		}
+		if list[0].Origin != "origin1" {
+			t.Errorf("Expected origin to be 'origin1', got %s", list[0].Origin)
+		}
+	})
+
+	t.Run("SetOrigin after AppendWithOrigin", func(t *testing.T) {
+		list := ErrorList{}
+		list.AppendWithOrigin("origin1", Invalid(NewPath("field1"), "", ""))
+		list.SetOrigin("origin2")
+		if list[0].Origin != "origin2" {
+			t.Errorf("Expected origin to be 'origin2', got %s", list[0].Origin)
+		}
+	})
+
+	t.Run("SetOrigin after Append", func(t *testing.T) {
+		list := ErrorList{}
+		list.AppendWithOrigin("origin1", Invalid(NewPath("field1"), "", ""))
+		list.Append(Invalid(NewPath("field2"), "", ""))
+		list.SetOrigin("origin2")
+		if len(list) != 2 {
+			t.Fatalf("Expected list of 2, got %d", len(list))
+		}
+		if list[1].Origin != "origin2" {
+			t.Errorf("Expected origin to be 'origin2', got %s", list[1].Origin)
+		}
+	})
+}
