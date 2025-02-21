@@ -64,12 +64,13 @@ func CreateStatefulSet(ctx context.Context, c clientset.Interface, manifestPath,
 }
 
 // GetPodList gets the current Pods in ss.
-func GetPodList(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) *v1.PodList {
+func GetPodList(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) (*v1.PodList, error) {
 	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
-	framework.ExpectNoError(err)
-	podList, err := c.CoreV1().Pods(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
-	framework.ExpectNoError(err)
-	return podList
+	if err != nil {
+		return nil, err
+	}
+
+	return c.CoreV1().Pods(ss.Namespace).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
 }
 
 // DeleteAllStatefulSets deletes all StatefulSet API Objects in Namespace ns.
@@ -154,7 +155,11 @@ func Scale(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, c
 
 	var statefulPodList *v1.PodList
 	pollErr := wait.PollUntilContextTimeout(ctx, StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
-		statefulPodList = GetPodList(ctx, c, ss)
+		statefulPodList, err := GetPodList(ctx, c, ss)
+		if err != nil {
+			return false, err
+		}
+
 		if int32(len(statefulPodList.Items)) == count {
 			return true, nil
 		}
@@ -193,7 +198,11 @@ func Restart(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet)
 // CheckHostname verifies that all Pods in ss have the correct Hostname. If the returned error is not nil than verification failed.
 func CheckHostname(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) error {
 	cmd := "printf $(hostname)"
-	podList := GetPodList(ctx, c, ss)
+	podList, err := GetPodList(ctx, c, ss)
+	if err != nil {
+		return err
+	}
+
 	for _, statefulPod := range podList.Items {
 		hostname, err := e2epodoutput.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		if err != nil {
@@ -237,7 +246,11 @@ func CheckServiceName(ss *appsv1.StatefulSet, expectedServiceName string) error 
 
 // CheckPodIndexLabel asserts that the pods for ss have expected index label and values.
 func CheckPodIndexLabel(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet) error {
-	pods := GetPodList(ctx, c, ss)
+	pods, err := GetPodList(ctx, c, ss)
+	if err != nil {
+		return err
+	}
+
 	labelIndices := sets.NewInt()
 	for _, pod := range pods.Items {
 		ix, err := strconv.Atoi(pod.Labels[appsv1.PodIndexLabel])
@@ -257,7 +270,11 @@ func CheckPodIndexLabel(ctx context.Context, c clientset.Interface, ss *appsv1.S
 
 // ExecInStatefulPods executes cmd in all Pods in ss. If a error occurs it is returned and cmd is not execute in any subsequent Pods.
 func ExecInStatefulPods(ctx context.Context, c clientset.Interface, ss *appsv1.StatefulSet, cmd string) error {
-	podList := GetPodList(ctx, c, ss)
+	podList, err := GetPodList(ctx, c, ss)
+	if err != nil {
+		return err
+	}
+
 	for _, statefulPod := range podList.Items {
 		stdout, err := e2epodoutput.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		framework.Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
