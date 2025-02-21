@@ -355,6 +355,7 @@ func dropNonResizeUpdatesForContainers(new, old []api.Container) []api.Container
 		}
 		oldCopyWithMergedResources[i].Resources = ctr.Resources
 		oldCopyWithMergedResources[i].ResizePolicy = ctr.ResizePolicy
+		oldCopyWithMergedResources[i].Env = ctr.Env
 	}
 
 	return oldCopyWithMergedResources
