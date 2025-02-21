@@ -313,7 +313,7 @@ func WatchPods(ctx context.Context, cs clientset.Interface, ns string, to io.Wri
 				}
 				buffer := new(bytes.Buffer)
 				fmt.Fprintf(buffer,
-					"%s pod: %s: %s/%s %s: %s %s\n",
+					"%s pod: %s: %s/%s %s: %s %v\n",
 					time.Now().Format(timeFormat),
 					e.Type,
 					pod.Namespace,

@@ -3308,6 +3308,11 @@ type PodCondition struct {
 	// Type is the type of the condition.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
+	// If set, this represents the .metadata.generation that the pod condition was set based upon.
+	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
@@ -4841,6 +4846,11 @@ type EphemeralContainer struct {
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
 type PodStatus struct {
+	// If set, this represents the .metadata.generation that the pod status was set based upon.
+	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
 	// The conditions array, the reason and message fields, and the individual container status
 	// arrays contain more detail about the pod's status.

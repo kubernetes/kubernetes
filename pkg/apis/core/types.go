@@ -2955,8 +2955,11 @@ const (
 
 // PodCondition represents pod's condition
 type PodCondition struct {
-	Type   PodConditionType
-	Status ConditionStatus
+	Type PodConditionType
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64
+	Status             ConditionStatus
 	// +optional
 	LastProbeTime metav1.Time
 	// +optional
@@ -4164,6 +4167,11 @@ type EphemeralContainer struct {
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
+	// If set, this represents the .metadata.generation that the pod status was set based upon.
+	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64
 	// +optional
 	Phase PodPhase
 	// +optional

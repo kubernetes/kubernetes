@@ -5449,9 +5449,10 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"), opts)...)
-	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, fldPath.Child("conditions"))...)
 
 	fldPath = field.NewPath("status")
+	allErrs = append(allErrs, validatePodConditions(newPod.Status.Conditions, fldPath.Child("conditions"))...)
+
 	if newPod.Spec.NodeName != oldPod.Spec.NodeName {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("nodeName"), "may not be changed directly"))
 	}
@@ -5460,6 +5461,10 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 		for _, msg := range ValidateNodeName(newPod.Status.NominatedNodeName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nominatedNodeName"), newPod.Status.NominatedNodeName, msg))
 		}
+	}
+
+	if newPod.Status.ObservedGeneration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("observedGeneration"), newPod.Status.ObservedGeneration, "must be a non-negative integer"))
 	}
 
 	// Pod QoS is immutable
@@ -5497,7 +5502,8 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	return allErrs
 }
 
-// validatePodConditions tests if the custom pod conditions are valid.
+// validatePodConditions tests if the custom pod conditions are valid, and that the observedGeneration
+// is a non-negative integer.
 func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	systemConditions := sets.New(
@@ -5505,6 +5511,9 @@ func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) 
 		core.PodReady,
 		core.PodInitialized)
 	for i, condition := range conditions {
+		if condition.ObservedGeneration < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("observedGeneration"), condition.ObservedGeneration, "must be a non-negative integer"))
+		}
 		if systemConditions.Has(condition.Type) {
 			continue
 		}
