@@ -520,6 +520,34 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		if nodeSelector := state.informationsForClaim[index].availableOnNodes; nodeSelector != nil && !nodeSelector.Match(node) {
 			logger.V(5).Info("allocation's node selector does not match", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim))
 			unavailableClaims = append(unavailableClaims, index)
+			continue
+		}
+
+		// If the claim is not completed to bind, cannot use this allocation.
+		if claim.Status.Allocation != nil {
+			bindingFailed := false
+			for _, device := range claim.Status.Devices {
+				if bindingFailed {
+					break
+				}
+				for _, cond := range device.BindingFailureConditions {
+					if apimeta.IsStatusConditionTrue(device.Conditions, cond) {
+						logger.V(5).Info("device binding failed", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "device", device.Device, "condition", cond)
+						bindingFailed = true
+						break
+					}
+				}
+				for _, cond := range device.BindingConditions {
+					if !apimeta.IsStatusConditionTrue(device.Conditions, cond) {
+						logger.V(5).Info("device binding condition not met", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "device", device.Device, "condition", cond)
+						bindingFailed = true
+						break
+					}
+				}
+			}
+			if bindingFailed {
+				unavailableClaims = append(unavailableClaims, index)
+			}
 		}
 	}
 
@@ -611,6 +639,8 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim := claim.DeepCopy()
 			claim.Status.ReservedFor = nil
 			claim.Status.Allocation = nil
+			claim.Status.Devices = nil
+			klog.InfoS("Deallocating ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 			logger.V(5).Info("Deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 			if _, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return nil, statusError(logger, err)
@@ -738,27 +768,6 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
 			}
 		}
-
-		// If the claim has a device that has binding conditions, we need to clear them.
-		if pl.enableDeviceBindingConditions && claim.Status.Allocation != nil {
-			updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
-			if err != nil {
-				logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
-			}
-			for _, device := range claim.Status.Devices {
-				if device.BindingConditions != nil {
-					updatedClaim.Status.Allocation = nil
-					updatedClaim.Status.ReservedFor = nil
-					updatedClaim.Status.Devices = nil
-					claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, updatedClaim, metav1.UpdateOptions{})
-					if err != nil {
-						logger.Error(err, "unreserve", "resourceclaim", klog.KObj(claim))
-					}
-					klog.InfoS("unreserve", "resourceclaim", klog.KObj(claim))
-					break
-				}
-			}
-		}
 	}
 }
 
@@ -835,25 +844,35 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 					return false, err
 				}
 				state.claims[claimIndex] = claim
+				bindingFailed := false
+				bindingCompleted := true
 				for _, device := range claim.Status.Devices {
 					for _, cond := range device.BindingFailureConditions {
 						if apimeta.IsStatusConditionTrue(device.Conditions, cond) {
 							// In this case, the device failed to bind, so we need to return an error.
-							klog.Infof("device %s failed to bind", device.Device)
-							return false, fmt.Errorf("device %s failed to bind", device.Device)
+							logger.V(5).Info("device binding failed", "claim", klog.KObj(claim), "device", device.Device, "condition", cond)
+							bindingFailed = true
+							break
 						}
 					}
 					for _, cond := range device.BindingConditions {
 						if !apimeta.IsStatusConditionTrue(device.Conditions, cond) {
 							// In this case, the device is not bound yet, so we need to retry.
-							klog.Infof("device %s is not bound, retry", device.Device)
-							return false, nil
+							logger.V(5).Info("device binding condition not met", "claim", klog.KObj(claim), "device", device.Device, "condition", cond)
+							bindingCompleted = false
+							break
 						}
 
 					}
 				}
+				if bindingFailed {
+					return false, fmt.Errorf("claim %s failed to bind", claim.Name)
+				}
+				if !bindingCompleted {
+					return false, nil
+				}
 			}
-			klog.Info("all devices are bound")
+			// If we get here, we know that all devices are bound to the node.
 			return true, nil
 		})
 	if err != nil {
