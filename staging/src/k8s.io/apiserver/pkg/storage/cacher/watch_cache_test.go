@@ -1163,6 +1163,49 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 	}
 }
 
+func TestCapacityUpperBound(t *testing.T) {
+	testCases := []struct {
+		name               string
+		eventFreshDuration time.Duration
+		expected           int
+	}{
+		{
+			name:               "default eventFreshDuration",
+			eventFreshDuration: DefaultEventFreshDuration, // 75s
+			expected:           defaultUpperBoundCapacity, // 100 * 1024
+		},
+		{
+			name:               "lower eventFreshDuration, capacity limit unchanged",
+			eventFreshDuration: 45 * time.Second,          // 45s
+			expected:           defaultUpperBoundCapacity, // 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled up",
+			eventFreshDuration: 4 * DefaultEventFreshDuration, // 4 * 75s
+			expected:           4 * defaultUpperBoundCapacity, // 4 * 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled and rounded up",
+			eventFreshDuration: 3 * DefaultEventFreshDuration, // 3 * 75s
+			expected:           4 * defaultUpperBoundCapacity, // 4 * 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled up and capped",
+			eventFreshDuration: DefaultEventFreshDuration << 20, // 2^20 * 75s
+			expected:           defaultUpperBoundCapacity << 14, // 2^14 * 100 * 1024
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			capacity := capacityUpperBound(test.eventFreshDuration)
+			if test.expected != capacity {
+				t.Errorf("expected %v, got %v", test.expected, capacity)
+			}
+		})
+	}
+}
+
 func BenchmarkWatchCache_updateCache(b *testing.B) {
 	store := newTestWatchCache(defaultUpperBoundCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
