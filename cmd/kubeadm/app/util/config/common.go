@@ -94,11 +94,11 @@ func validateSupportedVersion(gvk schema.GroupVersionKind, allowDeprecated, allo
 	gvString := gvk.GroupVersion().String()
 
 	if useKubeadmVersion := oldKnownAPIVersions[gvString]; useKubeadmVersion != "" {
-		return errors.Errorf("your configuration file uses an old API spec: %q (kind: %q). Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind, useKubeadmVersion)
+		return errors.Errorf("your configuration file uses an old API spec: %q (kind: %q). Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old-config-file --new-config new-config-file', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind, useKubeadmVersion)
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		klog.Warningf("your configuration file uses a deprecated API spec: %q (kind: %q). Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind)
+		klog.Warningf("your configuration file uses a deprecated API spec: %q (kind: %q). Please use 'kubeadm config migrate --old-config old-config-file --new-config new-config-file', which will write the new, similar spec using a newer API version.", gvString, gvk.Kind)
 	}
 
 	if _, present := experimentalAPIVersions[gvString]; present && !allowExperimental {

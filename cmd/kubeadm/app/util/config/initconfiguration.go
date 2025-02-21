@@ -291,7 +291,7 @@ func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapi
 }
 
 // BytesToInitConfiguration converts a byte slice to an internal, defaulted and validated InitConfiguration object.
-// The map may contain many different YAML documents. These YAML documents are parsed one-by-one
+// The map may contain many different YAML/JSON documents. These YAML/JSON documents are parsed one-by-one
 // and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct.
 // The resulting InitConfiguration is then dynamically defaulted and validated prior to return.
 func BytesToInitConfiguration(b []byte, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
@@ -303,7 +303,7 @@ func BytesToInitConfiguration(b []byte, skipCRIDetect bool) (*kubeadmapi.InitCon
 	return documentMapToInitConfiguration(gvkmap, false, false, false, skipCRIDetect)
 }
 
-// documentMapToInitConfiguration converts a map of GVKs and YAML documents to defaulted and validated configuration object.
+// documentMapToInitConfiguration converts a map of GVKs and YAML/JSON documents to defaulted and validated configuration object.
 func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated, allowExperimental, strictErrors, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
 	var initcfg *kubeadmapi.InitConfiguration
 	var clustercfg *kubeadmapi.ClusterConfiguration
@@ -326,7 +326,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 			return nil, err
 		}
 
-		// verify the validity of the YAML
+		// verify the validity of the JSON/YAML
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme, componentconfigs.Scheme}, gvk, fileContent); err != nil {
 			if !strictErrors {
 				klog.Warning(err.Error())
@@ -358,13 +358,13 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 
 		// If the group is neither a kubeadm core type or of a supported component config group, we dump a warning about it being ignored
 		if !componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
-			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+			klog.Warningf("[config] WARNING: Ignored configuration document with GroupVersionKind %v\n", gvk)
 		}
 	}
 
-	// Enforce that InitConfiguration and/or ClusterConfiguration has to exist among the YAML documents
+	// Enforce that InitConfiguration and/or ClusterConfiguration has to exist among the configuration documents
 	if initcfg == nil && clustercfg == nil {
-		return nil, errors.New("no InitConfiguration or ClusterConfiguration kind was found in the YAML file")
+		return nil, errors.New("no InitConfiguration or ClusterConfiguration kind was found in the configuration file")
 	}
 
 	// If InitConfiguration wasn't given, default it by creating an external struct instance, default it and convert into the internal type
@@ -408,7 +408,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 }
 
 // MarshalInitConfigurationToBytes marshals the internal InitConfiguration object to bytes. It writes the embedded
-// ClusterConfiguration object with ComponentConfigs out as separate YAML documents
+// ClusterConfiguration object with ComponentConfigs out as separate YAML/JSON documents
 func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schema.GroupVersion) ([]byte, error) {
 	initbytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg, gv, kubeadmscheme.Codecs)
 	if err != nil {

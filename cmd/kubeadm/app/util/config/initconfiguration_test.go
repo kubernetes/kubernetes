@@ -25,8 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -184,20 +182,22 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.desc, func(t *testing.T) {
-			b, err := yaml.Marshal(tc.cfg)
-			if err != nil {
-				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
-			}
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tc.desc, format.name), func(t *testing.T) {
+				b, err := format.marshal(tc.cfg)
+				if err != nil {
+					t.Fatalf("unexpected error while marshalling to %s: %v", format.name, err)
+				}
 
-			cfg, err := BytesToInitConfiguration(b, true)
-			if err != nil {
-				t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
-			}
+				cfg, err := BytesToInitConfiguration(b, true)
+				if err != nil {
+					t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
+				}
 
-			if tc.expectedTaintCnt != len(cfg.NodeRegistration.Taints) {
-				t.Fatalf("unexpected taints count\nexpected: %d\ngot: %d\ntaints: %v", tc.expectedTaintCnt, len(cfg.NodeRegistration.Taints), cfg.NodeRegistration.Taints)
-			}
-		})
+				if tc.expectedTaintCnt != len(cfg.NodeRegistration.Taints) {
+					t.Fatalf("unexpected taints count\nexpected: %d\ngot: %d\ntaints: %v", tc.expectedTaintCnt, len(cfg.NodeRegistration.Taints), cfg.NodeRegistration.Taints)
+				}
+			})
+		}
 	}
 }
