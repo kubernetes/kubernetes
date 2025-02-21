@@ -108,7 +108,7 @@ func kubeletExec(command ...string) error {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("command %q failed: %v\noutput:%s", prettyCmd(cmd), err, string(out))
+		return fmt.Errorf("command %q failed: %w\noutput:%s", prettyCmd(cmd), err, string(out))
 	}
 
 	framework.Logf("command %q succeeded:\n%s", prettyCmd(cmd), string(out))
