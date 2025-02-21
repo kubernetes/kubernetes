@@ -302,6 +302,10 @@ type FunctionGen interface {
 	// Conditions returns the conditions that must true for a resource to be
 	// validated by this function.
 	Conditions() Conditions
+
+	// Comments returns optional comments that should be added to the generated
+	// code (without the leading "//").
+	Comments() []string
 }
 
 // Conditions defines what conditions must be true for a resource to be validated.
@@ -356,11 +360,31 @@ func GenericFunction(tagName string, flags FunctionFlags, function types.Name, t
 	return &functionGen{tagName: tagName, flags: flags, function: function, extraArgs: anyArgs, typeArgs: typeArgs}
 }
 
+// WithCondition adds a condition to a FunctionGen.
 func WithCondition(fn FunctionGen, conditions Conditions) FunctionGen {
 	name, args := fn.SignatureAndArgs()
 	return &functionGen{
-		tagName: fn.TagName(), flags: fn.Flags(), function: name, extraArgs: args, typeArgs: fn.TypeArgs(),
+		tagName:    fn.TagName(),
+		flags:      fn.Flags(),
+		function:   name,
+		extraArgs:  args,
+		typeArgs:   fn.TypeArgs(),
+		comments:   fn.Comments(),
 		conditions: conditions,
+	}
+}
+
+// WithComment adds a comment to a FunctionGen.
+func WithComment(fn FunctionGen, comment string) FunctionGen {
+	name, args := fn.SignatureAndArgs()
+	return &functionGen{
+		tagName:    fn.TagName(),
+		flags:      fn.Flags(),
+		function:   name,
+		extraArgs:  args,
+		typeArgs:   fn.TypeArgs(),
+		comments:   append(fn.Comments(), comment),
+		conditions: fn.Conditions(),
 	}
 }
 
@@ -371,6 +395,7 @@ type functionGen struct {
 	typeArgs   []types.Name
 	flags      FunctionFlags
 	conditions Conditions
+	comments   []string
 }
 
 func (v *functionGen) TagName() string {
@@ -388,6 +413,8 @@ func (v *functionGen) Flags() FunctionFlags {
 }
 
 func (v *functionGen) Conditions() Conditions { return v.conditions }
+
+func (v *functionGen) Comments() []string { return v.comments }
 
 // Variable creates a VariableGen for a given function name and extraArgs.
 func Variable(variable PrivateVar, init FunctionGen) VariableGen {
