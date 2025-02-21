@@ -1622,6 +1622,7 @@ var map_PodCondition = map[string]string{
 	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
 	"reason":             "Unique, one-word, CamelCase reason for the condition's last transition.",
 	"message":            "Human-readable message indicating details about last transition.",
+	"observedGeneration": "The generation of the pod observed at the point this condition is being reported.",
 }
 
 func (PodCondition) SwaggerDoc() map[string]string {
@@ -1850,6 +1851,7 @@ var map_PodStatus = map[string]string{
 	"conditions":                 "Current service state of pod. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions",
 	"message":                    "A human readable message indicating details about why the pod is in this condition.",
 	"reason":                     "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
+	"observedGeneration":         "The generation of the pod observed at the point this pod status is being reported.",
 	"nominatedNodeName":          "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
 	"hostIP":                     "hostIP holds the IP address of the host to which the pod is assigned. Empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns mean that HostIP will not be updated even if there is a node is assigned to pod",
 	"hostIPs":                    "hostIPs holds the IP addresses allocated to the host. If this field is specified, the first entry must match the hostIP field. This list is empty if the pod has not started yet. A pod can be assigned to a node that has a problem in kubelet which in turns means that HostIPs will not be updated even if there is a node is assigned to this pod.",

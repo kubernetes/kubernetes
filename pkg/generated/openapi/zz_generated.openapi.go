@@ -27427,6 +27427,13 @@ func schema_k8sio_api_core_v1_PodCondition(ref common.ReferenceCallback) common.
 							Format:      "",
 						},
 					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The generation of the pod observed at the point this condition is being reported.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 				Required: []string{"type", "status"},
 			},
@@ -28697,6 +28704,13 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Description: "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"observedGeneration": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The generation of the pod observed at the point this pod status is being reported.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 					"nominatedNodeName": {

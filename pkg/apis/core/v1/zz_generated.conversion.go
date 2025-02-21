@@ -6110,6 +6110,7 @@ func autoConvert_v1_PodCondition_To_core_PodCondition(in *corev1.PodCondition, o
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 
@@ -6125,6 +6126,7 @@ func autoConvert_core_PodCondition_To_v1_PodCondition(in *core.PodCondition, out
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
 	out.Message = in.Message
+	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
 
@@ -6815,6 +6817,7 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *corev1.PodStatus, out *core.
 	out.Conditions = *(*[]core.PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
+	out.ObservedGeneration = in.ObservedGeneration
 	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
 	out.HostIPs = *(*[]core.HostIP)(unsafe.Pointer(&in.HostIPs))
@@ -6835,6 +6838,7 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *corev1.
 	out.Conditions = *(*[]corev1.PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
 	out.Reason = in.Reason
+	out.ObservedGeneration = in.ObservedGeneration
 	out.NominatedNodeName = in.NominatedNodeName
 	out.HostIP = in.HostIP
 	out.HostIPs = *(*[]corev1.HostIP)(unsafe.Pointer(&in.HostIPs))

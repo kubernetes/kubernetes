@@ -52,11 +52,13 @@
         "lastProbeTime": "2003-01-01T01:01:01Z",
         "lastTransitionTime": "2004-01-01T01:01:01Z",
         "reason": "reasonValue",
-        "message": "messageValue"
+        "message": "messageValue",
+        "observedGeneration": 8
       }
     ],
     "message": "messageValue",
     "reason": "reasonValue",
+    "observedGeneration": 20,
     "nominatedNodeName": "nominatedNodeNameValue",
     "hostIP": "hostIPValue",
     "hostIPs": [
