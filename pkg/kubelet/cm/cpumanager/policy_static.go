@@ -453,7 +453,8 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 					klog.InfoS("Topology Affinity", "pod", klog.KObj(pod), "containerName", container.Name, "affinity", hint)
 					// Attempt new allocation ( reusing allocated CPUs ) according to the NUMA affinity contained in the hint
 					// Since NUMA affinity container in the hint is unmutable already allocated CPUs pass the criteria
-					newallocatedcpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], &cpusInUseByPodContainerToResize, nil)
+					mustKeepCPUsForResize := p.GetMustKeepCPUs(container, cpuset)
+					newallocatedcpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], &cpusInUseByPodContainerToResize, mustKeepCPUsForResize)
 					if err != nil {
 						klog.ErrorS(err, "Static policy: Unable to allocate new CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
 						return err
@@ -502,6 +503,34 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	p.updateMetricsOnAllocate(logger, s, cpuAllocation)
 
 	logger.V(4).Info("Allocated exclusive CPUs", "cpuset", cpuAllocation.CPUs.String())
+	return nil
+}
+
+func (p *staticPolicy) GetMustKeepCPUs(container *v1.Container, oldCpuset cpuset.CPUSet) *cpuset.CPUSet {
+	mustKeepCPUs := cpuset.New()
+	for _, envVar := range container.Env {
+		if envVar.Name == "mustKeepCPUs" {
+			mustKeepCPUsInEnv, err := cpuset.Parse(envVar.Value)
+			if err == nil && mustKeepCPUsInEnv.Size() != 0 {
+				mustKeepCPUs = oldCpuset.Intersection(mustKeepCPUsInEnv)
+			}
+			klog.InfoS("mustKeepCPUs ", "is", mustKeepCPUs)
+			if p.options.FullPhysicalCPUsOnly {
+				// mustKeepCPUs must be aligned to the physical core
+				if (mustKeepCPUs.Size() % 2) != 0 {
+					return nil
+				}
+				mustKeepCPUsDetail := p.topology.CPUDetails.KeepOnly(mustKeepCPUs)
+				mustKeepCPUsDetailCores := mustKeepCPUsDetail.Cores()
+				if (mustKeepCPUs.Size() / mustKeepCPUsDetailCores.Size()) != p.cpuGroupSize {
+					klog.InfoS("mustKeepCPUs is nil")
+					return nil
+				}
+			}
+			return &mustKeepCPUs
+		}
+	}
+	klog.InfoS("mustKeepCPUs is nil")
 	return nil
 }
 
