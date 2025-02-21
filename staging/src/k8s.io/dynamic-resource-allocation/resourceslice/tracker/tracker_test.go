@@ -1943,6 +1943,58 @@ func BenchmarkEventHandlers(b *testing.B) {
 				tracker.resourceSliceAdd(ctx)(resourceSlices[250]) // the slice affected by the patch
 			},
 		},
+		"one-patch-for-each-of-many-slices-add-patch": {
+			resourceSlices: func() []*resourceapi.ResourceSlice {
+				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+				for i := range resourceSlices {
+					resourceSlices[i] = &resourceapi.ResourceSlice{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "slice-" + strconv.Itoa(i),
+						},
+						Spec: resourceapi.ResourceSliceSpec{
+							Pool: resourceapi.ResourcePool{
+								Name: "pool-" + strconv.Itoa(i),
+							},
+							Devices: slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, 64),
+						},
+					}
+				}
+				return resourceSlices
+			}(),
+			patches: func() []*resourcealphaapi.ResourceSlicePatch {
+				patches := make([]*resourcealphaapi.ResourceSlicePatch, 500)
+				for i := range patches {
+					patches[i] = &resourcealphaapi.ResourceSlicePatch{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "patch-" + strconv.Itoa(i),
+						},
+						Spec: resourcealphaapi.ResourceSlicePatchSpec{
+							Devices: resourcealphaapi.DevicePatch{
+								Filter: &resourcealphaapi.DevicePatchFilter{
+									Pool: ptr.To("pool-" + strconv.Itoa(i)),
+								},
+								Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
+									"dra.example.com/bench": {
+										DeviceAttribute: resourcealphaapi.DeviceAttribute{
+											BoolValue: ptr.To(true),
+										},
+									},
+								},
+								Capacity: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.DeviceCapacity{
+									"dra.example.com/bench": {
+										Value: resource.MustParse("1"),
+									},
+								},
+							},
+						},
+					}
+				}
+				return patches
+			}(),
+			loop: func(ctx context.Context, b *testing.B, tracker *Tracker, resourceSlices []*resourceapi.ResourceSlice, patches []*resourcealphaapi.ResourceSlicePatch, i int) {
+				tracker.resourceSlicePatchAdd(ctx)(patches[i%len(patches)])
+			},
+		},
 	}
 
 	newBenchTracker := func(ctx context.Context) *Tracker {
