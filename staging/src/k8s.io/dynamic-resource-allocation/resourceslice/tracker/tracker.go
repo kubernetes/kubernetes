@@ -245,7 +245,7 @@ func (t *Tracker) resourceSliceAdd(ctx context.Context) func(obj any) {
 			return
 		}
 		logger.V(5).Info("ResourceSlice add", "slice", klog.KObj(slice))
-		t.syncSlice(ctx, slice.Name)
+		t.syncSlice(ctx, slice.Name, true)
 	}
 }
 
@@ -265,7 +265,7 @@ func (t *Tracker) resourceSliceUpdate(ctx context.Context) func(oldObj, newObj a
 		} else {
 			logger.V(5).Info("ResourceSlice update", "slice", klog.KObj(newSlice))
 		}
-		t.syncSlice(ctx, newSlice.Name)
+		t.syncSlice(ctx, newSlice.Name, true)
 	}
 }
 
@@ -280,7 +280,7 @@ func (t *Tracker) resourceSliceDelete(ctx context.Context) func(obj any) {
 			return
 		}
 		logger.V(5).Info("ResourceSlice delete", "slice", klog.KObj(slice))
-		t.syncSlice(ctx, slice.Name)
+		t.syncSlice(ctx, slice.Name, true)
 	}
 }
 
@@ -293,7 +293,7 @@ func (t *Tracker) resourceSlicePatchAdd(ctx context.Context) func(obj any) {
 		}
 		logger.V(5).Info("ResourceSlicePatch add", "patch", klog.KObj(patch))
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName)
+			t.syncSlice(ctx, sliceName, false)
 		}
 	}
 }
@@ -315,7 +315,7 @@ func (t *Tracker) resourceSlicePatchUpdate(ctx context.Context) func(oldObj, new
 			logger.V(5).Info("ResourceSlicePatch update", "patch", klog.KObj(newPatch))
 		}
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName)
+			t.syncSlice(ctx, sliceName, false)
 		}
 	}
 }
@@ -332,7 +332,7 @@ func (t *Tracker) resourceSlicePatchDelete(ctx context.Context) func(obj any) {
 		}
 		logger.V(5).Info("ResourceSlicePatch delete", "patch", klog.KObj(patch))
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName)
+			t.syncSlice(ctx, sliceName, false)
 		}
 	}
 }
@@ -346,7 +346,7 @@ func (t *Tracker) deviceClassAdd(ctx context.Context) func(obj any) {
 		}
 		logger.V(5).Info("DeviceClass add", "class", klog.KObj(class))
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName)
+			t.syncSlice(ctx, sliceName, false)
 		}
 	}
 }
@@ -368,7 +368,7 @@ func (t *Tracker) deviceClassUpdate(ctx context.Context) func(oldObj, newObj any
 			logger.V(5).Info("DeviceClass update", "class", klog.KObj(newClass))
 		}
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName)
+			t.syncSlice(ctx, sliceName, false)
 		}
 	}
 }
@@ -385,12 +385,12 @@ func (t *Tracker) deviceClassDelete(ctx context.Context) func(obj any) {
 		}
 		logger.V(5).Info("DeviceClass delete", "class", klog.KObj(class))
 		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
-			t.syncSlice(ctx, sliceName)
+			t.syncSlice(ctx, sliceName, false)
 		}
 	}
 }
 
-func (t *Tracker) syncSlice(ctx context.Context, name string) {
+func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	defer t.emitEvents()
 
 	logger := klog.FromContext(ctx)
@@ -402,7 +402,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) {
 		t.handleError(ctx, err, "failed to lookup existing resource slice")
 		return
 	}
-	oldPatchedObj, _, err := t.patchedResourceSlices.GetByKey(name)
+	oldPatchedObj, oldSliceExists, err := t.patchedResourceSlices.GetByKey(name)
 	if err != nil {
 		t.handleError(ctx, err, "failed to lookup cached patched resource slice")
 		return
@@ -416,12 +416,21 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) {
 		t.pushEvent(oldPatchedObj, nil)
 		return
 	}
+	var oldPatchedSlice *resourceapi.ResourceSlice
+	if oldSliceExists {
+		var ok bool
+		oldPatchedSlice, ok = oldPatchedObj.(*resourceapi.ResourceSlice)
+		if !ok {
+			t.handleError(ctx, errors.New("invalid type in resource slice cache"), fmt.Sprintf("expected type to be %T, got %T", (*resourceapi.ResourceSlice)(nil), obj))
+			return
+		}
+	}
 	slice, ok := obj.(*resourceapi.ResourceSlice)
 	if !ok {
 		t.handleError(ctx, errors.New("invalid type in resource slice cache"), fmt.Sprintf("expected type to be %T, got %T", (*resourceapi.ResourceSlice)(nil), obj))
 		return
 	}
-	patchedSlice := slice.DeepCopy()
+	patchedSlice := slice
 
 	patches := typedSlice[*resourcealphaapi.ResourceSlicePatch](t.resourceSlicePatches.GetIndexer().List())
 	slices.SortFunc(patches, func(p1, p2 *resourcealphaapi.ResourceSlicePatch) int {
@@ -478,11 +487,15 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) {
 				continue
 			}
 
-			var deviceAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-			var deviceCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+			var deviceAttributes, oldDeviceAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+			var deviceCapacity, oldDeviceCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
 			if device.Basic != nil {
 				deviceAttributes = device.Basic.Attributes
 				deviceCapacity = device.Basic.Capacity
+				if oldPatchedSlice != nil {
+					oldDeviceAttributes = oldPatchedSlice.Spec.Devices[dIndex].Basic.Attributes
+					oldDeviceCapacity = oldPatchedSlice.Spec.Devices[dIndex].Basic.Capacity
+				}
 			}
 
 			for i, expr := range filterDeviceClassExprs {
@@ -548,6 +561,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) {
 				if len(newAttrs) == 0 {
 					newAttrs = nil
 				}
+				sendEvent = sendEvent || !maps.EqualFunc(newAttrs, oldDeviceAttributes, attrsEqual)
 
 				newCaps := maps.Clone(deviceCapacity)
 				if newCaps == nil {
@@ -560,6 +574,11 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) {
 				}
 				if len(newCaps) == 0 {
 					newCaps = nil
+				}
+				sendEvent = sendEvent || !maps.EqualFunc(newCaps, oldDeviceCapacity, capsEqual)
+
+				if patchedSlice == slice {
+					patchedSlice = patchedSlice.DeepCopy()
 				}
 
 				if device.Basic != nil {
@@ -575,9 +594,17 @@ func (t *Tracker) syncSlice(ctx context.Context, name string) {
 		t.handleError(ctx, err, "failed to add patched resource slice to cache")
 		return
 	}
-	if !apiequality.Semantic.DeepEqual(oldPatchedObj, patchedSlice) {
+	if sendEvent {
 		t.pushEvent(oldPatchedObj, patchedSlice)
 	}
+}
+
+func attrsEqual(a1, a2 resourceapi.DeviceAttribute) bool {
+	return apiequality.Semantic.DeepEqual(a1, a2)
+}
+
+func capsEqual(c1, c2 resourceapi.DeviceCapacity) bool {
+	return c1.Value.Equal(c2.Value)
 }
 
 func typedSlice[T any](objs []any) []T {
