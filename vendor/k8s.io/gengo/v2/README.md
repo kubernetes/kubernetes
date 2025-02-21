@@ -50,4 +50,4 @@ The `tracer` example in this repo can be used to examine all of the hooks.
 
 ## Contributing
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on how to contribute.
+Please see [CONTRIBUTING.md](../CONTRIBUTING.md) for instructions on how to contribute.
