@@ -4584,6 +4584,12 @@ func TestSortPodIPs(t *testing.T) {
 			podIPs:      []string{"10.0.0.1", "10.0.0.2", "fd01::1234", "10.0.0.3", "fd01::5678"},
 			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
 		},
+		{
+			name:        "Badly-formatted IPs from CRI",
+			nodeIP:      "",
+			podIPs:      []string{"010.000.000.001", "fd01:0:0:0:0:0:0:1234"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
 	}
 
 	for _, tc := range testcases {

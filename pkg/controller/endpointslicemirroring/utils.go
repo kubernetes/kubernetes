@@ -49,18 +49,6 @@ func (pk addrTypePortMapKey) addressType() discovery.AddressType {
 	return discovery.AddressTypeIPv4
 }
 
-func getAddressType(address string) *discovery.AddressType {
-	ip := netutils.ParseIPSloppy(address)
-	if ip == nil {
-		return nil
-	}
-	addressType := discovery.AddressTypeIPv4
-	if ip.To4() == nil {
-		addressType = discovery.AddressTypeIPv6
-	}
-	return &addressType
-}
-
 // newEndpointSlice returns an EndpointSlice generated from an Endpoints
 // resource, ports, and address type.
 func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPort, addrType discovery.AddressType, sliceName string) *discovery.EndpointSlice {
@@ -115,10 +103,20 @@ func getEndpointSlicePrefix(serviceName string) string {
 }
 
 // addressToEndpoint converts an address from an Endpoints resource to an
-// EndpointSlice endpoint.
-func addressToEndpoint(address corev1.EndpointAddress, ready bool) *discovery.Endpoint {
+// EndpointSlice endpoint and AddressType.
+func addressToEndpoint(address corev1.EndpointAddress, ready bool) (*discovery.Endpoint, *discovery.AddressType) {
+	ip := netutils.ParseIPSloppy(address.IP)
+	if ip == nil {
+		return nil, nil
+	}
+	addressType := discovery.AddressTypeIPv4
+	if ip.To4() == nil {
+		addressType = discovery.AddressTypeIPv6
+	}
+
 	endpoint := &discovery.Endpoint{
-		Addresses: []string{address.IP},
+		// We parse and restringify the Endpoints IP in case it is in an irregular format.
+		Addresses: []string{ip.String()},
 		Conditions: discovery.EndpointConditions{
 			Ready: &ready,
 		},
@@ -132,7 +130,7 @@ func addressToEndpoint(address corev1.EndpointAddress, ready bool) *discovery.En
 		endpoint.Hostname = &address.Hostname
 	}
 
-	return endpoint
+	return endpoint, &addressType
 }
 
 // epPortsToEpsPorts converts ports from an Endpoints resource to ports for an
