@@ -62,6 +62,7 @@ type ResizableContainerInfo struct {
 	RestartPolicy        v1.ContainerRestartPolicy
 	InitCtr              bool
 	CPUsAllowedListValue string
+	CPUsAllowedList      string
 }
 
 func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
@@ -516,11 +517,11 @@ func formatErrors(err error) error {
 
 func VerifyPodContainersCPUsAllowedListValue(f *framework.Framework, pod *v1.Pod, wantCtrs []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
-	verifyCPUsAllowedListValue := func(cName, expectedCPUsAllowedListValue string) error {
+	verifyCPUsAllowedListValue := func(cName, expectedCPUsAllowedListValue string, expectedCPUsAllowedList string) error {
 		mycmd := "grep Cpus_allowed_list /proc/self/status | cut -f2"
 		calValue, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", mycmd)
 		framework.Logf("Namespace %s Pod %s Container %s - looking for Cpus allowed list value %s in /proc/self/status",
-			pod.Namespace, pod.Name, cName, expectedCPUsAllowedListValue)
+			pod.Namespace, pod.Name, cName, calValue)
 		if err != nil {
 			return fmt.Errorf("failed to find expected value '%s' in container '%s' Cpus allowed list '/proc/self/status'", cName, expectedCPUsAllowedListValue)
 		}
@@ -530,13 +531,20 @@ func VerifyPodContainersCPUsAllowedListValue(f *framework.Framework, pod *v1.Pod
 		if cpuTotalValue != expectedCPUsAllowedListValue {
 			return fmt.Errorf("container '%s' cgroup value '%s' results to total CPUs '%s' not equal to expected '%s'", cName, calValue, cpuTotalValue, expectedCPUsAllowedListValue)
 		}
+		if expectedCPUsAllowedList != "" {
+			cExpected, err := cpuset.Parse(expectedCPUsAllowedList)
+			framework.ExpectNoError(err, "failed parsing Cpus allowed list for cexpectedCPUset")
+			if !c.Equals(cExpected) {
+				return fmt.Errorf("container '%s' cgroup value '%s' results to total CPUs '%v' not equal to expected '%v'", cName, calValue, c, cExpected)
+			}
+		}
 		return nil
 	}
 	for _, ci := range wantCtrs {
 		if ci.CPUsAllowedListValue == "" {
 			continue
 		}
-		err := verifyCPUsAllowedListValue(ci.Name, ci.CPUsAllowedListValue)
+		err := verifyCPUsAllowedListValue(ci.Name, ci.CPUsAllowedListValue, ci.CPUsAllowedList)
 		if err != nil {
 			return err
 		}
