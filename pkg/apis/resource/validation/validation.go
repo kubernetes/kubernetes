@@ -771,7 +771,7 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	if len(device.BindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), resource.BindingFailureConditionsMaxSize))
 	}
-	if device.BindingTimeout.Duration <= 0 {
+	if device.BindingTimeout != nil && device.BindingTimeout.Duration <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeout, "must be greater than zero"))
 	}
 	return allErrs
