@@ -17,88 +17,96 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/lithammer/dedent"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestLoadResetConfigurationFromFile(t *testing.T) {
-	// Create temp folder for the test case
 	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir: %v", err)
 	}
-	defer os.RemoveAll(tmpdir)
+	defer func() {
+		if err := os.RemoveAll(tmpdir); err != nil {
+			t.Fatalf("Couldn't remove tmpdir: %v", err)
+		}
+	}()
+	filename := "kubeadmConfig"
+	filePath := filepath.Join(tmpdir, filename)
+	options := LoadOrDefaultConfigurationOptions{}
 
-	var tests = []struct {
-		name         string
-		fileContents string
-		expectErr    bool
+	tests := []struct {
+		name    string
+		cfgPath string
+		cfg     *kubeadmapiv1.ResetConfiguration
+		want    *kubeadmapi.ResetConfiguration
 	}{
 		{
-			name:      "empty file causes error",
-			expectErr: true,
+			name:    "Normal configuration",
+			cfgPath: filePath,
+			cfg: &kubeadmapiv1.ResetConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.ResetConfigurationKind,
+				},
+				CertificatesDir: "/custom/certs",
+				CleanupTmpDir:   true,
+			},
+			want: &kubeadmapi.ResetConfiguration{
+				CertificatesDir: "/custom/certs",
+				CleanupTmpDir:   true,
+				SkipPhases:      nil,
+				CRISocket:       "unix:///var/run/containerd/containerd.sock",
+			},
 		},
 		{
-			name: "Invalid v1beta4 causes error",
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/unknownVersion
-				kind: ResetConfiguration
-				criSocket: unix:///var/run/containerd/containerd.sock
-			`),
-			expectErr: true,
-		},
-		{
-			name: "valid v1beta4 is loaded",
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta4
-				kind: ResetConfiguration
-				force: true
-				cleanupTmpDir: true
-				criSocket: unix:///var/run/containerd/containerd.sock
-				certificatesDir: /etc/kubernetes/pki
-				ignorePreflightErrors:
-				- a
-				- b
-			`),
+			name:    "Default configuration",
+			cfgPath: filePath,
+			cfg: &kubeadmapiv1.ResetConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.ResetConfigurationKind,
+				},
+			},
+			want: &kubeadmapi.ResetConfiguration{
+				CertificatesDir: "/etc/kubernetes/pki",
+				CleanupTmpDir:   false,
+				SkipPhases:      nil,
+				CRISocket:       "unix:///var/run/containerd/containerd.sock",
+			},
 		},
 	}
 
-	for _, rt := range tests {
-		t.Run(rt.name, func(t2 *testing.T) {
-			cfgPath := filepath.Join(tmpdir, rt.name)
-			err := os.WriteFile(cfgPath, []byte(rt.fileContents), 0644)
-			if err != nil {
-				t.Errorf("Couldn't create file: %v", err)
-				return
-			}
-
-			opts := LoadOrDefaultConfigurationOptions{
-				AllowExperimental: true,
-				SkipCRIDetect:     true,
-			}
-
-			obj, err := LoadResetConfigurationFromFile(cfgPath, opts)
-			if rt.expectErr {
-				if err == nil {
-					t.Error("Unexpected success")
-				}
-			} else {
+	for _, tt := range tests {
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tt.name, format.name), func(t *testing.T) {
+				bytes, err := format.marshal(tt.cfg)
 				if err != nil {
-					t.Errorf("Error reading file: %v", err)
-					return
+					t.Fatalf("Could not marshal test config: %v", err)
+				}
+				err = os.WriteFile(filePath, bytes, 0644)
+				if err != nil {
+					t.Fatalf("Couldn't write content to file: %v", err)
 				}
 
-				if obj == nil {
-					t.Error("Unexpected nil return value")
+				got, _ := LoadResetConfigurationFromFile(tt.cfgPath, options)
+				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.ResetConfiguration{}, "Timeouts")); diff != "" {
+					t.Errorf("LoadResetConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)
 				}
-			}
-		})
+			})
+		}
 	}
 }
 

@@ -28,25 +28,19 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 )
 
-// documentMapToUpgradeConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
+// documentMapToUpgradeConfiguration takes a map between GVKs and YAML/JSON documents (as returned by SplitYAMLDocuments),
 // finds a UpgradeConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
 func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.UpgradeConfiguration, error) {
 	upgradeBytes := []byte{}
 
 	for gvk, bytes := range gvkmap {
-		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvk) || componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
-			klog.Warningf("[config] WARNING: YAML document with GroupVersionKind %v is deprecated for upgrade, please use config file with kind of UpgradeConfiguration instead \n", gvk)
-			continue
-		}
-
 		if gvk.Kind != constants.UpgradeConfigurationKind {
-			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+			klog.Warningf("[config] WARNING: Ignored configuration document with GroupVersionKind %v\n", gvk)
 			continue
 		}
 
@@ -55,7 +49,7 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 			return nil, err
 		}
 
-		// verify the validity of the YAML
+		// verify the validity of the YAML/JSON
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
 			klog.Warning(err.Error())
 		}
@@ -99,7 +93,7 @@ func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurati
 		return nil, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
 	}
 
-	// Split the YAML documents in the file into a DocumentMap
+	// Split the YAML/JSON documents in the file into a DocumentMap
 	docmap, err := kubeadmutil.SplitYAMLDocuments(configBytes)
 	if err != nil {
 		return nil, err
