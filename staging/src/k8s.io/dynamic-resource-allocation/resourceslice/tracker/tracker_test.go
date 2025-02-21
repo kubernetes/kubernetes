@@ -1665,7 +1665,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				EnableAdminControlledAttributes: !test.adminAttrsDisabled,
 				KubeClient:                      kubeClient,
 			}
-			tracker := newTracker(ctx, informerFactory, opts)
+			tracker, err := newTracker(ctx, informerFactory, opts)
+			require.NoError(t, err)
 			var unhandledErrors []error
 			tracker.handleError = func(_ context.Context, err error, _ string, _ ...any) {
 				unhandledErrors = append(unhandledErrors, err)
@@ -2004,7 +2005,8 @@ func BenchmarkEventHandlers(b *testing.B) {
 			EnableAdminControlledAttributes: true,
 			KubeClient:                      kubeClient,
 		}
-		tracker := newTracker(ctx, informerFactory, opts)
+		tracker, err := newTracker(ctx, informerFactory, opts)
+		require.NoError(b, err)
 		tracker.handleError = func(_ context.Context, err error, _ string, _ ...any) {
 			b.Error("unexpected unhandled error:", err)
 		}

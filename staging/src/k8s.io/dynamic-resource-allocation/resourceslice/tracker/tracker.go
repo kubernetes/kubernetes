@@ -44,6 +44,13 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+const (
+	driverPoolIndexName = "driverPool"
+
+	anyDriver = "*"
+	anyPool   = "*"
+)
+
 type Tracker struct {
 	enableAdminControlledAttributes bool
 
@@ -93,15 +100,18 @@ type Options struct {
 }
 
 func StartTracker(ctx context.Context, informerFactory informers.SharedInformerFactory, opts Options) (*Tracker, error) {
-	t := newTracker(ctx, informerFactory, opts)
-	err := t.initInformers(ctx)
+	t, err := newTracker(ctx, informerFactory, opts)
+	if err != nil {
+		return nil, err
+	}
+	err = t.initInformers(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return t, nil
 }
 
-func newTracker(ctx context.Context, informerFactory informers.SharedInformerFactory, opts Options) *Tracker {
+func newTracker(ctx context.Context, informerFactory informers.SharedInformerFactory, opts Options) (*Tracker, error) {
 	t := &Tracker{
 		enableAdminControlledAttributes: opts.EnableAdminControlledAttributes,
 		resourceSlices:                  informerFactory.Resource().V1beta1().ResourceSlices().Informer(),
@@ -110,6 +120,10 @@ func newTracker(ctx context.Context, informerFactory informers.SharedInformerFac
 		celCache:                        cel.NewCache(10),
 		patchedResourceSlices:           cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:                     utilruntime.HandleErrorWithContext,
+	}
+	err := t.resourceSlices.AddIndexers(cache.Indexers{driverPoolIndexName: sliceDriverPoolIndexFunc})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add %s index to ResourceSlice informer: %w", driverPoolIndexName, err)
 	}
 	t.handlerRegistration = handlerRegistrationFunc(func() bool {
 		return t.resourceSlices.HasSynced() &&
@@ -123,7 +137,7 @@ func newTracker(ctx context.Context, informerFactory informers.SharedInformerFac
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: opts.KubeClient.CoreV1().Events("")})
 		t.recorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "resource_slice_tracker"})
 	}
-	return t
+	return t, nil
 }
 
 func (t *Tracker) ListPatchedResourceSlices() ([]*resourceapi.ResourceSlice, error) {
@@ -195,6 +209,36 @@ func (t *Tracker) pushEvent(oldObj, newObj interface{}) {
 			})
 		}
 	}
+}
+
+func sliceDriverPoolIndexFunc(obj any) ([]string, error) {
+	slice := obj.(*resourceapi.ResourceSlice)
+	return []string{
+		slice.Spec.Driver + "/" + slice.Spec.Pool.Name,
+		slice.Spec.Driver + "/" + anyPool,
+		anyDriver + "/" + slice.Spec.Pool.Name,
+		anyDriver + "/" + anyPool,
+	}, nil
+}
+
+func driverPoolIndexPatchKey(patch *resourcealphaapi.ResourceSlicePatch) string {
+	driverKey := anyDriver
+	poolKey := anyPool
+	if patch.Spec.Devices.Filter != nil {
+		driverKey = ptr.Deref(patch.Spec.Devices.Filter.Driver, driverKey)
+		poolKey = ptr.Deref(patch.Spec.Devices.Filter.Pool, poolKey)
+	}
+	return driverKey + "/" + poolKey
+}
+
+func (t *Tracker) sliceNamesForPatch(ctx context.Context, patch *resourcealphaapi.ResourceSlicePatch) []string {
+	patchKey := driverPoolIndexPatchKey(patch)
+	sliceNames, err := t.resourceSlices.GetIndexer().IndexKeys(driverPoolIndexName, patchKey)
+	if err != nil {
+		t.handleError(ctx, err, "failed listing ResourceSlices for driver/pool key", "key", patchKey)
+		return nil
+	}
+	return sliceNames
 }
 
 func (t *Tracker) initInformers(ctx context.Context) error {
@@ -292,7 +336,7 @@ func (t *Tracker) resourceSlicePatchAdd(ctx context.Context) func(obj any) {
 			return
 		}
 		logger.V(5).Info("ResourceSlicePatch add", "patch", klog.KObj(patch))
-		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
+		for _, sliceName := range t.sliceNamesForPatch(ctx, patch) {
 			t.syncSlice(ctx, sliceName, false)
 		}
 	}
@@ -314,7 +358,7 @@ func (t *Tracker) resourceSlicePatchUpdate(ctx context.Context) func(oldObj, new
 		} else {
 			logger.V(5).Info("ResourceSlicePatch update", "patch", klog.KObj(newPatch))
 		}
-		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
+		for _, sliceName := range t.sliceNamesForPatch(ctx, newPatch) {
 			t.syncSlice(ctx, sliceName, false)
 		}
 	}
@@ -331,7 +375,7 @@ func (t *Tracker) resourceSlicePatchDelete(ctx context.Context) func(obj any) {
 			return
 		}
 		logger.V(5).Info("ResourceSlicePatch delete", "patch", klog.KObj(patch))
-		for _, sliceName := range t.resourceSlices.GetIndexer().ListKeys() {
+		for _, sliceName := range t.sliceNamesForPatch(ctx, patch) {
 			t.syncSlice(ctx, sliceName, false)
 		}
 	}
