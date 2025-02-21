@@ -1,0 +1,47 @@
+{
+    "*sliceofprimitive.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "listField": [
+        "field Struct.ListField"
+      ],
+      "listField[0]": [
+        "field Struct.ListField[*]"
+      ],
+      "listField[1]": [
+        "field Struct.ListField[*]"
+      ],
+      "listPtrField": [
+        "field Struct.ListPtrField"
+      ],
+      "listPtrField[0]": [
+        "field Struct.ListPtrField[*]"
+      ],
+      "listPtrField[1]": [
+        "field Struct.ListPtrField[*]"
+      ],
+      "listTypedefField": [
+        "field Struct.ListTypedefField"
+      ],
+      "listTypedefField[0]": [
+        "field Struct.ListTypedefField[*]",
+        "type StringType"
+      ],
+      "listTypedefField[1]": [
+        "field Struct.ListTypedefField[*]",
+        "type StringType"
+      ],
+      "listTypedefPtrField": [
+        "field Struct.ListTypedefPtrField"
+      ],
+      "listTypedefPtrField[0]": [
+        "field Struct.ListTypedefPtrField[*]",
+        "type StringType"
+      ],
+      "listTypedefPtrField[1]": [
+        "field Struct.ListTypedefPtrField[*]",
+        "type StringType"
+      ]
+    }
+  }

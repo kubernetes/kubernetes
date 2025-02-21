@@ -1,0 +1,57 @@
+{
+    "*sliceofstruct.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "UnvalidatedListField[0]": [
+        "type OtherStruct"
+      ],
+      "UnvalidatedListField[1]": [
+        "type OtherStruct"
+      ],
+      "listField": [
+        "field Struct.ListField"
+      ],
+      "listField[0]": [
+        "field Struct.ListField[*]",
+        "type OtherStruct"
+      ],
+      "listField[1]": [
+        "field Struct.ListField[*]",
+        "type OtherStruct"
+      ],
+      "listPtrField": [
+        "field Struct.ListPtrField"
+      ],
+      "listPtrField[0]": [
+        "field Struct.ListPtrField[*]",
+        "type OtherStruct"
+      ],
+      "listPtrField[1]": [
+        "field Struct.ListPtrField[*]",
+        "type OtherStruct"
+      ],
+      "listTypedefField": [
+        "field Struct.ListTypedefField"
+      ],
+      "listTypedefField[0]": [
+        "field Struct.ListTypedefField[*]",
+        "type OtherTypedefStruct"
+      ],
+      "listTypedefField[1]": [
+        "field Struct.ListTypedefField[*]",
+        "type OtherTypedefStruct"
+      ],
+      "listTypedefPtrField": [
+        "field Struct.ListTypedefPtrField"
+      ],
+      "listTypedefPtrField[0]": [
+        "field Struct.ListTypedefPtrField[*]",
+        "type OtherTypedefStruct"
+      ],
+      "listTypedefPtrField[1]": [
+        "field Struct.ListTypedefPtrField[*]",
+        "type OtherTypedefStruct"
+      ]
+    }
+  }

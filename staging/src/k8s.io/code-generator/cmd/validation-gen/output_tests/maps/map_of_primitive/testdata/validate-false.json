@@ -1,0 +1,47 @@
+{
+    "*mapofprimitive.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "mapField": [
+        "field Struct.MapField"
+      ],
+      "mapField[ÀYǎ3g成oɜH偩j0âȰ]": [
+        "field Struct.MapField[*]"
+      ],
+      "mapField[岯Ȉ\u0026\u003c沲3]": [
+        "field Struct.MapField[*]"
+      ],
+      "mapPtrField": [
+        "field Struct.MapPtrField"
+      ],
+      "mapPtrField[V噘¢\u003eóǲ岋笨Gń條ģ]": [
+        "field Struct.MapPtrField[*]"
+      ],
+      "mapPtrField[讻IeYF墄[C]": [
+        "field Struct.MapPtrField[*]"
+      ],
+      "mapTypedefField": [
+        "field Struct.MapTypedefField"
+      ],
+      "mapTypedefField[\u003eƯ]ɹȽ東潇澍]": [
+        "field Struct.MapTypedefField[*]",
+        "type StringType"
+      ],
+      "mapTypedefField[闌剾溏]": [
+        "field Struct.MapTypedefField[*]",
+        "type StringType"
+      ],
+      "mapTypedefPtrField": [
+        "field Struct.MapTypedefPtrField"
+      ],
+      "mapTypedefPtrField[-ƀh婉Ţ飦]": [
+        "field Struct.MapTypedefPtrField[*]",
+        "type StringType"
+      ],
+      "mapTypedefPtrField[x瑻霳鸻ȉĔȹ$Ievɥʈ]": [
+        "field Struct.MapTypedefPtrField[*]",
+        "type StringType"
+      ]
+    }
+  }

@@ -1,0 +1,23 @@
+{
+    "*multiplevalidations.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "mapField": [
+        "field Struct.MapField #1",
+        "field Struct.MapField #2",
+        "field Struct.MapField(keys) #1",
+        "field Struct.MapField(keys) #1",
+        "field Struct.MapField(keys) #2",
+        "field Struct.MapField(keys) #2"
+      ],
+      "mapField[ÀYǎ3g成oɜH偩j0âȰ]": [
+        "field Struct.MapField[*] #1",
+        "field Struct.MapField[*] #2"
+      ],
+      "mapField[岯Ȉ\u0026\u003c沲3]": [
+        "field Struct.MapField[*] #1",
+        "field Struct.MapField[*] #2"
+      ]
+    }
+  }

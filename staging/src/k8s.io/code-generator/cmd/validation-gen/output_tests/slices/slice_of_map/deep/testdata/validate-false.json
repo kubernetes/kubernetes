@@ -1,0 +1,88 @@
+{
+    "*deep.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "UnvalidatedListField[0]": [
+        "type MapType"
+      ],
+      "UnvalidatedListField[0][`JT瘮Q8ý]": [
+        "type MapType[*]",
+        "type StringType"
+      ],
+      "UnvalidatedListField[0][答Bc黰¢]": [
+        "type MapType[*]",
+        "type StringType"
+      ],
+      "UnvalidatedListField[1]": [
+        "type MapType"
+      ],
+      "UnvalidatedListField[1][ɸ¢\u003c1]": [
+        "type MapType[*]",
+        "type StringType"
+      ],
+      "UnvalidatedListField[1][黷Ǭ}J攷Ǥ\u003e]": [
+        "type MapType[*]",
+        "type StringType"
+      ],
+      "listField": [
+        "field Struct.ListField"
+      ],
+      "listField[0][ũ桑I朻 9铃]3g!fȺ苬ĥ]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listField[0][袢捺悲ȅ-@烱ęssĂZ稈V噘¢\u003e]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listField[1][Ì]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listField[1][讻IeYF墄[C]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listPtrField": [
+        "field Struct.ListPtrField"
+      ],
+      "listPtrField[0][ș$0đ\u003eƯ]ɹȽ東]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listPtrField[0][伸~槱¡rŔ綂2暮斚嬆ʅ]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listPtrField[1][瑻霳鸻ȉĔ]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listPtrField[1][豐Ȭ-ƀh婉Ţ飦tD6ɀk諮]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listTypedefField": [
+        "field Struct.ListTypedefField"
+      ],
+      "listTypedefField[0]": [
+        "type MapType"
+      ],
+      "listTypedefField[0][ƹ棳]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type MapType[*]",
+        "type StringType"
+      ],
+      "listTypedefField[0][溹*x唎蕍冻垰40F7楣ƛ隨Ǩmȷā]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type MapType[*]",
+        "type StringType"
+      ],
+      "listTypedefField[1]": [
+        "type MapType"
+      ],
+      "listTypedefField[1][G炕炎鷖Ʊ腘]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type MapType[*]",
+        "type StringType"
+      ],
+      "listTypedefField[1][鷸ȳ琍殪\"g踮螧喘夓麑Y·L继Ɂ]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type MapType[*]",
+        "type StringType"
+      ]
+    }
+  }
