@@ -129,7 +129,7 @@ func doPodResizeAdmissionPluginsTests() {
 				},
 			}
 			patchStringExceedCPU := `{"spec":{"containers":[
-				{"name":"c1", "resources":{"requests":{"cpu":"600m","memory":"200Mi"},"limits":{"cpu":"600m","memory":"200Mi"}}}
+				{"name":"c1", "resources":{"requests":{"cpu":"600m"},"limits":{"cpu":"600m"}}}
 			]}}`
 			patchStringExceedMemory := `{"spec":{"containers":[
 				{"name":"c1", "resources":{"requests":{"cpu":"250m","memory":"750Mi"},"limits":{"cpu":"250m","memory":"750Mi"}}}

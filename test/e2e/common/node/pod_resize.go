@@ -83,8 +83,7 @@ func doPodResizeTests() {
 	doRestart := v1.RestartContainer
 	tests := []testCase{
 		{
-			name:         "Guaranteed QoS pod, one container - increase CPU & memory",
-			testRollback: true,
+			name: "Guaranteed QoS pod, one container - increase CPU & memory",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -106,66 +105,30 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Guaranteed QoS pod, one container - decrease CPU & memory",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, reducedCPU, reducedMem, reducedCPU, reducedMem),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: reducedMem, MemLim: reducedMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-			},
-		},
-		{
-			name: "Guaranteed QoS pod, one container - increase CPU & decrease memory",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, reducedMem, increasedCPU, reducedMem),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: reducedMem, MemLim: reducedMem},
-				},
-			},
-		},
-		{
-			name: "Guaranteed QoS pod, one container - decrease CPU & increase memory",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, reducedCPU, increasedMem, reducedCPU, increasedMem),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: increasedMem, MemLim: increasedMem},
-				},
-			},
-		},
-		{
-			name:         "Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2) ; decrease: CPU (c2), memory (c1,c3)",
+			name:         "Guaranteed QoS pod, one container - decrease CPU only",
 			testRollback: true,
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+					]}}`, reducedCPU, reducedCPU),
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: originalMem, MemLim: originalMem},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+		},
+		{
+			name: "Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -187,17 +150,17 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
+						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}},
 						{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
 						{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
 					]}}`,
-				increasedCPU, reducedMem, increasedCPU, reducedMem,
+				increasedCPU, increasedCPU,
 				offsetCPU(1, reducedCPU), offsetMemory(1, increasedMem), offsetCPU(1, reducedCPU), offsetMemory(1, increasedMem),
-				offsetCPU(2, increasedCPU), offsetMemory(2, reducedMem), offsetCPU(2, increasedCPU), offsetMemory(2, reducedMem)),
+				offsetCPU(2, increasedCPU), offsetMemory(2, increasedMem), offsetCPU(2, increasedCPU), offsetMemory(2, increasedMem)),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: reducedMem, MemLim: reducedMem},
+					Resources: &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: originalMem, MemLim: originalMem},
 					CPUPolicy: &noRestart,
 					MemPolicy: &noRestart,
 				},
@@ -209,7 +172,7 @@ func doPodResizeTests() {
 				},
 				{
 					Name:      "c3",
-					Resources: &e2epod.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMem)},
+					Resources: &e2epod.ContainerResources{CPUReq: offsetCPU(2, increasedCPU), CPULim: offsetCPU(2, increasedCPU), MemReq: offsetMemory(2, increasedMem), MemLim: offsetMemory(2, increasedMem)},
 					CPUPolicy: &noRestart,
 					MemPolicy: &noRestart,
 				},
@@ -231,25 +194,6 @@ func doPodResizeTests() {
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
-				},
-			},
-		},
-		{
-			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory limits only",
-			testRollback: true,
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"limits":{"memory":"%s"}}}
-					]}}`, reducedMemLimit),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: reducedMemLimit},
 				},
 			},
 		},
@@ -436,24 +380,6 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests and limits",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, reducedMem, reducedMemLimit),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: reducedMemLimit},
-				},
-			},
-		},
-		{
 			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and limits",
 			containers: []e2epod.ResizableContainerInfo{
 				{
@@ -490,24 +416,6 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests and decrease memory limits",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, increasedMem, reducedMemLimit),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: increasedMem, MemLim: reducedMemLimit},
-				},
-			},
-		},
-		{
 			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests and increase memory limits",
 			containers: []e2epod.ResizableContainerInfo{
 				{
@@ -522,24 +430,6 @@ func doPodResizeTests() {
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: increasedMemLimit},
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests and decrease memory limits",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, increasedCPU, reducedMemLimit),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: reducedMemLimit},
 				},
 			},
 		},
@@ -658,14 +548,14 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name:         "Burstable QoS pod, one container - decrease CPU (RestartContainer) & memory (NotRequired)",
+			name:         "Burstable QoS pod, one container - decrease CPU (NotRequired) & memory (RestartContainer)",
 			testRollback: true,
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
-					CPUPolicy: &doRestart,
-					MemPolicy: &noRestart,
+					CPUPolicy: &noRestart,
+					MemPolicy: &doRestart,
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
@@ -675,8 +565,8 @@ func doPodResizeTests() {
 				{
 					Name:         "c1",
 					Resources:    &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: reducedMemLimit},
-					CPUPolicy:    &doRestart,
-					MemPolicy:    &noRestart,
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &doRestart,
 					RestartCount: 1,
 				},
 			},
@@ -705,10 +595,10 @@ func doPodResizeTests() {
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
 						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
-						{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s"}}}
 					]}}`,
 				increasedCPU, increasedMem, increasedCPULimit, increasedMemLimit,
-				offsetCPU(2, reducedCPU), offsetMemory(2, reducedMem), offsetCPU(2, reducedCPULimit), offsetMemory(2, reducedMemLimit)),
+				offsetCPU(2, reducedCPU), offsetMemory(2, reducedMem), offsetCPU(2, reducedCPULimit)),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -724,7 +614,7 @@ func doPodResizeTests() {
 				},
 				{
 					Name:      "c3",
-					Resources: &e2epod.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPULimit), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, reducedMemLimit)},
+					Resources: &e2epod.ContainerResources{CPUReq: offsetCPU(2, reducedCPU), CPULim: offsetCPU(2, reducedCPULimit), MemReq: offsetMemory(2, reducedMem), MemLim: offsetMemory(2, originalMemLimit)},
 					CPUPolicy: &noRestart,
 					MemPolicy: &noRestart,
 				},
@@ -753,15 +643,15 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
+						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s"}}},
 						{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
 					]}}`,
-				reducedCPU, reducedMem, reducedCPULimit, reducedMemLimit,
+				reducedCPU, reducedMem, reducedCPULimit,
 				offsetCPU(2, increasedCPU), offsetMemory(2, increasedMem), offsetCPU(2, increasedCPULimit), offsetMemory(2, increasedMemLimit)),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: reducedMemLimit},
+					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
 					CPUPolicy: &noRestart,
 					MemPolicy: &noRestart,
 				},
@@ -910,8 +800,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c2", "resources":{"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, originalCPULimit, originalMemLimit),
+						{"name":"c2", "resources":{"limits":{"cpu":"%s"}}}
+					]}}`, originalCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -921,7 +811,7 @@ func doPodResizeTests() {
 				},
 				{
 					Name:      "c2",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
 					CPUPolicy: &noRestart,
 					MemPolicy: &noRestart,
 				},
@@ -1007,74 +897,6 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Guaranteed QoS pod, one restartable init container - decrease CPU & memory",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy:     &noRestart,
-					MemPolicy:     &noRestart,
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, reducedCPU, reducedMem, reducedCPU, reducedMem),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					CPUPolicy: &noRestart,
-					MemPolicy: &noRestart,
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: reducedMem, MemLim: reducedMem},
-					CPUPolicy:     &noRestart,
-					MemPolicy:     &noRestart,
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Guaranteed QoS pod, one restartable init container - increase CPU & decrease memory",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, reducedMem, increasedCPU, reducedMem),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: reducedMem, MemLim: reducedMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
 			name: "Guaranteed QoS pod, one restartable init container - decrease CPU & increase memory",
 			containers: []e2epod.ResizableContainerInfo{
 				{
@@ -1105,67 +927,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container, one restartable init container - decrease init container CPU & memory",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, reducedCPU, reducedMem, reducedCPU, reducedMem),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPU, MemReq: reducedMem, MemLim: reducedMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU & memory",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
-				},
-				{
-					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: increasedMem, MemLim: increasedMem},
-					InitCtr:       true,
-					RestartPolicy: v1.ContainerRestartPolicyAlways,
-				},
-			},
-		},
-		{
-			name: "Burstable QoS pod, one container, one restartable init container - decrease init container CPU only",
+			name: "Guaranteed QoS pod, one container, one restartable init container - decrease init container CPU",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1195,37 +957,97 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU only",
+			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU & memory",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, increasedCPU, increasedCPU),
+						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+					]}}`, increasedCPU, increasedMem, increasedCPULimit, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources:     &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit, MemReq: increasedMem, MemLim: increasedMemLimit},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
 			},
 		},
 		{
-			name: "Burstable QoS pod, one container, one restartable init container - decrease init container memory only",
+			name: "Burstable QoS pod, one container, one restartable init container - decrease init container CPU only",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+					]}}`, reducedCPU, reducedCPULimit),
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - increase init container CPU only",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
+						{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+					]}}`, increasedCPU, increasedCPULimit),
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+				{
+					Name:          "c1-init",
+					Resources:     &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					InitCtr:       true,
+					RestartPolicy: v1.ContainerRestartPolicyAlways,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container, one restartable init container - decrease init container memory requests only",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1233,14 +1055,14 @@ func doPodResizeTests() {
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, reducedMem, reducedMem),
+						{"name":"c1-init", "resources":{"requests":{"memory":"%s"}}}
+					]}}`, reducedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1248,7 +1070,7 @@ func doPodResizeTests() {
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: reducedMem, MemLim: reducedMem},
+					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
@@ -1263,14 +1085,14 @@ func doPodResizeTests() {
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
 						{"name":"c1-init", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, increasedMem, increasedMem),
+					]}}`, increasedMem, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1278,7 +1100,7 @@ func doPodResizeTests() {
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: increasedMem, MemLim: increasedMem},
+					Resources:     &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: increasedMem, MemLim: increasedMemLimit},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
@@ -1466,6 +1288,25 @@ func doPodResizeErrorTests() {
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod with memory requests + limits - decrease memory limit",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"containers":[
+						{"name":"c1", "resources":{"limits":{"memory":"%s"}}}
+					]}}`, reducedMemLimit),
+			patchError: "memory limits cannot be decreased",
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 		},
