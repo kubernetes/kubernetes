@@ -37,10 +37,8 @@ type BalancedAllocation struct {
 	resourceAllocationScorer
 }
 
-var (
-	_ framework.PreScorePlugin = &BalancedAllocation{}
-	_ framework.ScorePlugin    = &BalancedAllocation{}
-)
+var _ framework.PreScorePlugin = &BalancedAllocation{}
+var _ framework.ScorePlugin = &BalancedAllocation{}
 
 // BalancedAllocationName is the name of the plugin used in the plugin registry and configurations.
 const (

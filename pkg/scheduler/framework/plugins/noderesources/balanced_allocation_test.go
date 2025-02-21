@@ -140,7 +140,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			pod:                    st.MakePod().Obj(),
 			nodes:                  []*v1.Node{makeNode("node1", 4000, 10000, nil), makeNode("node2", 4000, 10000, nil)},
 			expectedList:           []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: framework.MaxNodeScore}},
-			name:                   "nothing scheduled, nothing requested",
+			name:                   "nothing scheduled, nothing requested, skip in PreScore",
 			args:                   config.NodeResourcesBalancedAllocationArgs{Resources: defaultResourceBalancedAllocationSet},
 			runPreScore:            true,
 			wantPreScoreStatusCode: framework.Skip,
