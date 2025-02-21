@@ -62,7 +62,7 @@ func NewManager(checkpointDirectory string) Manager {
 		stateImpl, err := state.NewStateCheckpoint(checkpointDirectory, podStatusManagerStateFile)
 		if err != nil {
 			// This is a crictical, non-recoverable failure.
-			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
+			klog.ErrorS(err, "Failed to initialize allocation checkpoint manager")
 			panic(err)
 		}
 		m.state = stateImpl
