@@ -102,6 +102,7 @@ func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	for gvk, bytes := range gvkmap {
 		// not interested in anything other than JoinConfiguration
 		if gvk.Kind != constants.JoinConfigurationKind {
+			klog.Warningf("[config] WARNING: Ignored configuration document with GroupVersionKind %v\n", gvk)
 			continue
 		}
 

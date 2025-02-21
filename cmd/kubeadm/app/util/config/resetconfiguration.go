@@ -106,6 +106,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 	for gvk, bytes := range gvkmap {
 		// not interested in anything other than ResetConfiguration
 		if gvk.Kind != constants.ResetConfigurationKind {
+			klog.Warningf("[config] WARNING: Ignored configuration document with GroupVersionKind %v\n", gvk)
 			continue
 		}
 
