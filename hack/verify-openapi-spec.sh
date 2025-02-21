@@ -15,6 +15,11 @@
 # limitations under the License.
 
 # This script checks whether updating of OpenAPI specification is needed or not.
+# It verifies that the OpenAPI specification is up to date in strict mode, and
+# will fallback to check in non-strict mode if that fails. Strict mode removes
+# all APIs marked # as removed in a particular version, while non-strict mode
+# allows them to persist until the release cutoff. We allow non-strict to
+# prevent CI failures when we bump the version number in the git tag.
 # We should run `hack/update-openapi-spec.sh` if OpenAPI specification is out of
 # date.
 # Usage: `hack/verify-openapi-spec.sh`.
