@@ -9183,7 +9183,7 @@ func TestValidateContainers(t *testing.T) {
 				t.Fatal("expected error but received none")
 			}
 
-			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin")); diff != "" {
 				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
 				t.Errorf("INFO: all errors:\n%s", prettyErrorList(errs))
 			}
@@ -20674,7 +20674,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	errorCases := map[string]struct {
 		endpoints   core.Endpoints
 		errorType   field.ErrorType
-		errorDetail string
+		errorOrigin string
 	}{
 		"missing namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
@@ -20685,14 +20685,12 @@ func TestValidateEndpointsCreate(t *testing.T) {
 			errorType: "FieldValueRequired",
 		},
 		"invalid namespace": {
-			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
-			errorType:   "FieldValueInvalid",
-			errorDetail: dnsLabelErrMsg,
+			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
+			errorType: "FieldValueInvalid",
 		},
 		"invalid name": {
-			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
-			errorType:   "FieldValueInvalid",
-			errorDetail: dnsSubdomainLabelErrMsg,
+			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
+			errorType: "FieldValueInvalid",
 		},
 		"empty addresses": {
 			endpoints: core.Endpoints{
@@ -20712,7 +20710,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IP address",
+			errorOrigin: "format=ip-sloppy",
 		},
 		"Multiple ports, one without name": {
 			endpoints: core.Endpoints{
@@ -20733,7 +20731,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "between",
+			errorOrigin: "portNum",
 		},
 		"Invalid protocol": {
 			endpoints: core.Endpoints{
@@ -20754,7 +20752,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IP address",
+			errorOrigin: "format=ip-sloppy",
 		},
 		"Port missing number": {
 			endpoints: core.Endpoints{
@@ -20765,7 +20763,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "between",
+			errorOrigin: "portNum",
 		},
 		"Port missing protocol": {
 			endpoints: core.Endpoints{
@@ -20786,7 +20784,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "loopback",
+			errorOrigin: "format=non-special-ip",
 		},
 		"Address is link-local": {
 			endpoints: core.Endpoints{
@@ -20797,7 +20795,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "link-local",
+			errorOrigin: "format=non-special-ip",
 		},
 		"Address is link-local multicast": {
 			endpoints: core.Endpoints{
@@ -20808,7 +20806,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "link-local multicast",
+			errorOrigin: "format=non-special-ip",
 		},
 		"Invalid AppProtocol": {
 			endpoints: core.Endpoints{
@@ -20819,14 +20817,14 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
+			errorOrigin: "format=qualified-name",
 		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
-				t.Errorf("Expected error type %s with detail %q, got %v", v.errorType, v.errorDetail, errs)
+			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || errs[0].Origin != v.errorOrigin {
+				t.Errorf("Expected error type %s with origin %q, got %#v", v.errorType, v.errorOrigin, errs[0])
 			}
 		})
 	}
@@ -21190,7 +21188,7 @@ func TestValidateSchedulingGates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			errs := validateSchedulingGates(tt.schedulingGates, fieldPath)
-			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+			if diff := cmp.Diff(tt.wantFieldErrors, errs, cmpopts.IgnoreFields(field.Error{}, "Detail", "Origin")); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
 		})
