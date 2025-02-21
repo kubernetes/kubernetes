@@ -94,7 +94,7 @@ func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurati
 	}
 
 	// Split the YAML/JSON documents in the file into a DocumentMap
-	docmap, err := kubeadmutil.SplitYAMLDocuments(configBytes)
+	docmap, err := kubeadmutil.SplitConfigDocuments(configBytes)
 	if err != nil {
 		return nil, err
 	}

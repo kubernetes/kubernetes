@@ -87,7 +87,7 @@ func LoadJoinConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurati
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
 	if err != nil {
 		return nil, err
 	}
