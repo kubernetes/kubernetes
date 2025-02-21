@@ -19,6 +19,7 @@ package util
 import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/cache"
 )
 
 // FinishedCondition returns true if a job is finished as well as the condition type indicating that.
@@ -47,4 +48,9 @@ func IsJobSucceeded(j *batch.Job) bool {
 		}
 	}
 	return false
+}
+
+func keyExists(key string, store cache.Store) bool {
+	_, exists, _ := store.GetByKey(key)
+	return exists
 }
