@@ -123,6 +123,10 @@ type Controller struct {
 	// Store with information to compute the expotential backoff delay for pod
 	// recreation in case of pod failures.
 	podBackoffStore *backoffStore
+
+	// completedJobStore contains the job ids for which the job status is updated to completed
+	// but the corresponding event is not yet received.
+	completedJobStore *jobUIDCache
 }
 
 type syncJobCtx struct {
@@ -184,6 +188,9 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		clock:                 clock,
 		podBackoffStore:       newBackoffStore(),
+		completedJobStore: &jobUIDCache{
+			set: sets.New[types.UID](),
+		},
 	}
 
 	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -536,6 +543,7 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 			return
 		}
 	}
+	jm.completedJobStore.remove(jobObj.UID)
 	jm.enqueueLabelSelector(jobObj)
 }
 
@@ -820,7 +828,6 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		}
 		return err
 	}
-
 	// Skip syncing of the job it is managed by another controller.
 	// We cannot rely solely on skipping of queueing such jobs for synchronization,
 	// because it is possible a synchronization task is queued for a job, without
@@ -841,6 +848,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			// re-syncing here as the record has to be removed for finished/deleted jobs
 			return fmt.Errorf("error removing backoff record %w", err)
 		}
+		jm.completedJobStore.remove(job.UID)
+		return nil
+	}
+	if jm.completedJobStore.exists(job.UID) {
+		logger.V(2).Info("Skip syncing the job as its marked completed but the completed update event is not yet received", "uid", job.UID, "key", key)
 		return nil
 	}
 
@@ -1304,6 +1316,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		}
 		if jobFinished {
 			jm.recordJobFinished(jobCtx.job, jobCtx.finishedCondition)
+			jm.completedJobStore.add(jobCtx.job.UID)
 		}
 		recordJobPodFinished(logger, jobCtx.job, oldCounters)
 	}
