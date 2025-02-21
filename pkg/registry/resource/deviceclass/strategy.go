@@ -40,10 +40,11 @@ func (deviceClassStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (deviceClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (deviceClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	class := obj.(*resource.DeviceClass)
 	class.Generation = 1
 	dropDisabledFields(class, nil)
+	return nil, nil
 }
 
 func (deviceClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

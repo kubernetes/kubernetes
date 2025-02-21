@@ -527,7 +527,7 @@ func TestJobStrategy_PrepareForUpdate(t *testing.T) {
 }
 
 // TestJobStrategy_PrepareForCreate tests various scenarios for PrepareForCreate
-func TestJobStrategy_PrepareForCreate(t *testing.T) {
+func TestJobStrategy_PrepareForCreate(t *testing.T, fieldValidation string) ([]string, error) {
 	validSelector := getValidLabelSelector()
 	validPodTemplateSpec := getValidPodTemplateSpecForSelector(validSelector)
 	validSelectorWithBatchLabels := &metav1.LabelSelector{MatchLabels: getValidBatchLabelsWithNonBatch()}
@@ -899,7 +899,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
 			ctx := genericapirequest.NewDefaultContext()
 
-			Strategy.PrepareForCreate(ctx, &tc.job)
+			Strategy.PrepareForCreate(ctx, &tc.job, fieldValidation string) ([]string, error)
 
 			if diff := cmp.Diff(tc.wantJob, tc.job); diff != "" {
 				t.Errorf("Job pod failure policy (-want,+got):\n%s", diff)

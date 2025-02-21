@@ -63,9 +63,10 @@ func (strategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // PrepareForCreate clears the status of an StorageVersion before creation.
-func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	svm := obj.(*storagemigration.StorageVersionMigration)
 	svm.Status = storagemigration.StorageVersionMigrationStatus{}
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

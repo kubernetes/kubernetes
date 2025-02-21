@@ -104,7 +104,7 @@ func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) 
 // errors that can be converted to api.Status. It will invoke update validation with the provided existing
 // and updated objects.
 // It sets zero values only if the object does not have a zero value for the respective field.
-func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old runtime.Object) error {
+func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
@@ -126,7 +126,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	strategy.PrepareForUpdate(ctx, obj, old)
+	strategy.PrepareForUpdate(ctx, obj, old /*TODO: options.FieldValidation*/)
 
 	// Use the existing UID if none is provided
 	if len(objectMeta.GetUID()) == 0 {

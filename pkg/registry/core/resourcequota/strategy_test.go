@@ -53,7 +53,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 			},
 		},
 	}
-	Strategy.PrepareForCreate(genericapirequest.NewContext(), resourceQuota)
+	Strategy.PrepareForCreate(genericapirequest.NewContext(), resourceQuota, fieldValidation string) ([]string, error)
 	if resourceQuota.Status.Used != nil {
 		t.Errorf("ResourceQuota does not allow setting status on create")
 	}

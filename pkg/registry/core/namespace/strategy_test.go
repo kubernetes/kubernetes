@@ -41,7 +41,7 @@ func TestNamespaceStrategy(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "10", Labels: map[string]string{v1.LabelMetadataName: "foo"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
-	Strategy.PrepareForCreate(ctx, namespace)
+	Strategy.PrepareForCreate(ctx, namespace, fieldValidation string) ([]string, error)
 	if namespace.Status.Phase != api.NamespaceActive {
 		t.Errorf("Namespaces do not allow setting phase on create")
 	}

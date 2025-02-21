@@ -45,9 +45,10 @@ func (resourceClaimTemplateStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (resourceClaimTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (resourceClaimTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	claimTemplate := obj.(*resource.ResourceClaimTemplate)
 	dropDisabledFields(claimTemplate, nil)
+	return nil, nil
 }
 
 func (resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

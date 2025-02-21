@@ -43,7 +43,7 @@ func TestConfigMapStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, cfg)
+	Strategy.PrepareForCreate(ctx, cfg, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, cfg)
 	if len(errs) != 0 {

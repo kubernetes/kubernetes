@@ -278,7 +278,7 @@ func TestStatusCreate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			obj := tc.newObj.DeepCopy()
-			StatusStrategy.PrepareForCreate(context.TODO(), obj)
+			StatusStrategy.PrepareForCreate(context.TODO(), obj, fieldValidation string) ([]string, error)
 			if !reflect.DeepEqual(obj, tc.expectedObj) {
 				t.Errorf("object diff: %s", cmp.Diff(obj, tc.expectedObj))
 			}

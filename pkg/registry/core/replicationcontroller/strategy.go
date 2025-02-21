@@ -88,13 +88,14 @@ func (rcStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // PrepareForCreate clears the status of a replication controller before creation.
-func (rcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (rcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	controller := obj.(*api.ReplicationController)
 	controller.Status = api.ReplicationControllerStatus{}
 
 	controller.Generation = 1
 
 	pod.DropDisabledTemplateFields(controller.Spec.Template, nil)
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

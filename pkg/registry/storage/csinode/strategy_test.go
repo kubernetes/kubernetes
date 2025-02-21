@@ -27,7 +27,7 @@ import (
 	ptr "k8s.io/utils/ptr"
 )
 
-func TestPrepareForCreate(t *testing.T) {
+func TestPrepareForCreate(t *testing.T, fieldValidation string) ([]string, error) {
 	valid := getValidCSINode("foo")
 	emptyAllocatable := &storage.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
@@ -63,18 +63,18 @@ func TestPrepareForCreate(t *testing.T) {
 
 	for _, test := range volumeLimitsCases {
 		t.Run(test.name, func(t *testing.T) {
-			testPrepareForCreate(t, test.obj, test.expected)
+			testPrepareForCreate(t, test.obj, test.expected, fieldValidation string) ([]string, error)
 		})
 	}
 }
 
-func testPrepareForCreate(t *testing.T, obj, expected *storage.CSINode) {
+func testPrepareForCreate(t *testing.T, obj, expected *storage.CSINode, fieldValidation string) ([]string, error) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "storage.k8s.io",
 		APIVersion: "v1beta1",
 		Resource:   "csinodes",
 	})
-	Strategy.PrepareForCreate(ctx, obj)
+	Strategy.PrepareForCreate(ctx, obj, fieldValidation string) ([]string, error)
 	if !reflect.DeepEqual(*expected, *obj) {
 		t.Errorf("Object mismatch! Expected:\n%#v\ngot:\n%#v", *expected, *obj)
 	}
@@ -172,7 +172,7 @@ func TestCSINodeStrategy(t *testing.T) {
 
 	csiNode := getValidCSINode("valid-csinode")
 
-	Strategy.PrepareForCreate(ctx, csiNode)
+	Strategy.PrepareForCreate(ctx, csiNode, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, csiNode)
 	if len(errs) != 0 {

@@ -43,7 +43,7 @@ func TestIngressClassStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, &ingressClass)
+	Strategy.PrepareForCreate(ctx, &ingressClass, fieldValidation string) ([]string, error)
 	if ingressClass.Generation != 1 {
 		t.Error("IngressClass generation should be 1")
 	}

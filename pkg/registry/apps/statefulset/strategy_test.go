@@ -65,7 +65,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		Status: apps.StatefulSetStatus{Replicas: 3},
 	}
 
-	Strategy.PrepareForCreate(ctx, ps)
+	Strategy.PrepareForCreate(ctx, ps, fieldValidation string) ([]string, error)
 	if ps.Status.Replicas != 0 {
 		t.Error("StatefulSet should not allow setting status.replicas on create")
 	}
@@ -99,7 +99,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 				MinReadySeconds:     int32(-1),
 			},
 		}
-		Strategy.PrepareForCreate(ctx, ps)
+		Strategy.PrepareForCreate(ctx, ps, fieldValidation string) ([]string, error)
 		errs := Strategy.Validate(ctx, ps)
 		if len(errs) == 0 {
 			t.Errorf("expected failure when MinReadySeconds is not positive number but got no error %v", errs)
@@ -201,7 +201,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 				},
 			},
 		}
-		Strategy.PrepareForCreate(ctx, ps)
+		Strategy.PrepareForCreate(ctx, ps, fieldValidation string) ([]string, error)
 		errs := Strategy.Validate(ctx, ps)
 		if len(errs) == 0 {
 			t.Errorf("expected failure when PersistentVolumeClaimRetentionPolicy is invalid")
@@ -242,7 +242,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 				},
 			},
 		}
-		Strategy.PrepareForCreate(ctx, ps)
+		Strategy.PrepareForCreate(ctx, ps, fieldValidation string) ([]string, error)
 		errs := Strategy.Validate(ctx, ps)
 		if len(errs) != 0 {
 			t.Errorf("unexpected failure with PersistentVolumeClaimRetentionPolicy: %v", errs)

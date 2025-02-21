@@ -84,7 +84,7 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	pod := obj.(*api.Pod)
 	pod.Generation = 1
 	pod.Status = api.PodStatus{
@@ -97,6 +97,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	applySchedulingGatedCondition(pod)
 	mutatePodAffinity(pod)
 	applyAppArmorVersionSkew(ctx, pod)
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

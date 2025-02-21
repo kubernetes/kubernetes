@@ -69,7 +69,7 @@ func (statefulSetStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.
 }
 
 // PrepareForCreate clears the status of an StatefulSet before creation.
-func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	statefulSet := obj.(*apps.StatefulSet)
 	// create cannot set status
 	statefulSet.Status = apps.StatefulSetStatus{}
@@ -78,6 +78,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 
 	dropStatefulSetDisabledFields(statefulSet, nil)
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
+	return nil, nil
 }
 
 // maxUnavailableInUse returns true if StatefulSet's maxUnavailable set(used)

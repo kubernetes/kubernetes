@@ -73,7 +73,7 @@ func (csrStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users
 // on creation.
-func (csrStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (csrStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	csr := obj.(*certificates.CertificateSigningRequest)
 
 	// Clear any user-specified info
@@ -97,6 +97,7 @@ func (csrStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	// Be explicit that users cannot create pre-approved certificate requests.
 	csr.Status = certificates.CertificateSigningRequestStatus{}
 	csr.Status.Conditions = []certificates.CertificateSigningRequestCondition{}
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users

@@ -65,11 +65,12 @@ func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 
 	// create cannot set status
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
+	return nil, nil
 }
 
 // Validate validates a new autoscaler.

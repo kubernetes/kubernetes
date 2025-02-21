@@ -53,9 +53,10 @@ func (strategy) NamespaceScoped() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	configMap := obj.(*api.ConfigMap)
 	dropDisabledFields(configMap, nil)
+	return nil, nil
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

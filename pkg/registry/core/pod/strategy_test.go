@@ -308,7 +308,7 @@ func TestGetPodQOS(t *testing.T) {
 		},
 	}
 	for id, testCase := range testCases {
-		Strategy.PrepareForCreate(genericapirequest.NewContext(), testCase.pod)
+		Strategy.PrepareForCreate(genericapirequest.NewContext(), testCase.pod, fieldValidation string) ([]string, error)
 		actual := testCase.pod.Status.QOSClass
 		if actual != testCase.expected {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
@@ -345,7 +345,7 @@ func TestSchedulingGatedCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			Strategy.PrepareForCreate(genericapirequest.NewContext(), tt.pod)
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), tt.pod, fieldValidation string) ([]string, error)
 			var got api.PodCondition
 			for _, condition := range tt.pod.Status.Conditions {
 				if condition.Type == api.PodScheduled {
@@ -1349,7 +1349,7 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 				t.Errorf("Unexpected error: %v", errs.ToAggregate())
 			}
 
-			Strategy.PrepareForCreate(genericapirequest.NewContext(), pod)
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), pod, fieldValidation string) ([]string, error)
 			wantPod.Spec.TopologySpreadConstraints = append(wantPod.Spec.TopologySpreadConstraints, tc.wantTopologySpreadConstraints...)
 			if diff := cmp.Diff(wantPod, pod, cmpopts.IgnoreFields(pod.Status, "Phase", "QOSClass")); diff != "" {
 				t.Errorf("%s unexpected result (-want, +got): %s", tc.name, diff)
@@ -1384,7 +1384,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 	}
 
 	createdPod := pod.DeepCopy()
-	Strategy.PrepareForCreate(ctx, createdPod)
+	Strategy.PrepareForCreate(ctx, createdPod, fieldValidation string) ([]string, error)
 
 	if len(createdPod.Spec.TopologySpreadConstraints) != 1 ||
 		*createdPod.Spec.TopologySpreadConstraints[0].NodeAffinityPolicy != ignore ||
@@ -1875,7 +1875,7 @@ func TestPodLifecycleSleepActionEnablement(t *testing.T) {
 
 			newPod := tc.newPod
 
-			Strategy.PrepareForCreate(genericapirequest.NewContext(), newPod)
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), newPod, fieldValidation string) ([]string, error)
 			if errs := Strategy.Validate(genericapirequest.NewContext(), newPod); len(errs) != 0 {
 				t.Errorf("Unexpected error: %v", errs.ToAggregate())
 			}

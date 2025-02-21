@@ -47,7 +47,9 @@ func (strategy) NamespaceScoped() bool {
 	return false
 }
 
-func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {}
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
+	return nil, nil
+}
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	bundle := obj.(*certificates.ClusterTrustBundle)

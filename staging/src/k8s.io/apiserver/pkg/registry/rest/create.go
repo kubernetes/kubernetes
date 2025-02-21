@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -54,7 +55,21 @@ type RESTCreateStrategy interface {
 	// status. Clear the status because status changes are internal. External
 	// callers of an api (users) should not be setting an initial status on
 	// newly created objects.
-	PrepareForCreate(ctx context.Context, obj runtime.Object)
+	//
+	// PrepareForCreate may return an error to abort the operation. The error
+	// must be one which can be converted to api.Status.
+	//
+	// PrepareForCreate may return warnings when it drops disabled fields.
+	// Warnings should be of the format "path.to.field: message" where
+	// "message" is something like "MyFeature disabled".
+	// Other warnings should be emitted by WarningsOnCreate.
+	//
+	// If fieldValidation is Ignore, the caller will ignore
+	// warnings, so generating them can be skipped. If it is Warn, the
+	// caller will return them to the client as if they had been generated
+	// in WarningsOnCreate. If it is Strict, the warnings are turned into
+	// an error and the operation fails immediately.
+	PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) (warnings []string, err error)
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in
 	// before the object is persisted.  This method should not mutate the
@@ -92,7 +107,7 @@ type RESTCreateStrategy interface {
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
 // errors that can be converted to api.Status. It invokes PrepareForCreate, then Validate.
 // It returns nil if the object should be created.
-func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.Object) error {
+func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
@@ -117,7 +132,38 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return err
 	}
 
-	strategy.PrepareForCreate(ctx, obj)
+	warnings, err := strategy.PrepareForCreate(ctx, obj, options.FieldValidation)
+	if err != nil {
+		return err
+	}
+	switch options.FieldValidation {
+	case metav1.FieldValidationWarn:
+		for _, w := range warnings {
+			warning.AddWarning(ctx, "", w)
+		}
+	case metav1.FieldValidationStrict:
+		// Generate a BadRequest error, same as when strict decoding fails because of unknown fields.
+		err := errors.NewBadRequest("object contains unsupported fields")
+		details := &metav1.StatusDetails{}
+		for _, w := range warnings {
+			var field, message string
+			index := strings.Index(w, ":")
+			if index > 0 {
+				field = w[0:index]
+				message = strings.TrimSpace(w[index+1:])
+			} else {
+				message = w
+			}
+			cause := metav1.StatusCause{
+				Type:    metav1.CauseTypeUnsupported,
+				Message: message,
+				Field:   field,
+			}
+			details.Causes = append(details.Causes, cause)
+		}
+		err.ErrStatus.Details = details
+		return err
+	}
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)

@@ -60,7 +60,7 @@ func TestControllerStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, rc)
+	Strategy.PrepareForCreate(ctx, rc, fieldValidation string) ([]string, error)
 	if rc.Status.Replicas != 0 {
 		t.Error("ReplicationController should not allow setting status.replicas on create")
 	}

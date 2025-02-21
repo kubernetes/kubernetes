@@ -62,12 +62,13 @@ func (podDisruptionBudgetStrategy) GetResetFields() map[fieldpath.APIVersion]*fi
 }
 
 // PrepareForCreate clears the status of an PodDisruptionBudget before creation.
-func (podDisruptionBudgetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (podDisruptionBudgetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	// create cannot set status
 	podDisruptionBudget.Status = policy.PodDisruptionBudgetStatus{}
 
 	podDisruptionBudget.Generation = 1
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

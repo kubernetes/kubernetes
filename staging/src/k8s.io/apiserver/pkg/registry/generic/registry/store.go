@@ -498,7 +498,7 @@ func (e *Store) create(ctx context.Context, obj runtime.Object, createValidation
 		}()
 	}
 
-	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
+	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj, options); err != nil {
 		return nil, err
 	}
 	// at this point we have a fully formed object.  It is time to call the validators that the apiserver
@@ -672,8 +672,9 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 			var finishCreate FinishFunc = finishNothing
 
+			createOptions := newCreateOptionsFromUpdateOptions(options)
 			if e.BeginCreate != nil {
-				fn, err := e.BeginCreate(ctx, obj, newCreateOptionsFromUpdateOptions(options))
+				fn, err := e.BeginCreate(ctx, obj, createOptions)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -685,7 +686,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 			creating = true
 			creatingObj = obj
-			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
+			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj, createOptions); err != nil {
 				return nil, nil, err
 			}
 			// at this point we have a fully formed object.  It is time to call the validators that the apiserver
@@ -747,7 +748,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			}()
 		}
 
-		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
+		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing, options); err != nil {
 			return nil, nil, err
 		}
 

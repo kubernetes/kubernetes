@@ -76,12 +76,13 @@ func (deploymentStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	deployment := obj.(*apps.Deployment)
 	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
 
 	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
+	return nil, nil
 }
 
 // Validate validates a new deployment.

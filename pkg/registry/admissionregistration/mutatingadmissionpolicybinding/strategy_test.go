@@ -38,7 +38,7 @@ func TestPolicyBindingStrategy(t *testing.T) {
 	}
 
 	for _, configuration := range validPolicyBindings() {
-		strategy.PrepareForCreate(ctx, configuration)
+		strategy.PrepareForCreate(ctx, configuration, fieldValidation string) ([]string, error)
 		errs := strategy.Validate(ctx, configuration)
 		if len(errs) != 0 {
 			t.Errorf("Unexpected error validating %v", errs)

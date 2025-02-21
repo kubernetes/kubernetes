@@ -48,7 +48,7 @@ func TestStorageClassStrategy(t *testing.T) {
 		VolumeBindingMode: &bindingMode,
 	}
 
-	Strategy.PrepareForCreate(ctx, storageClass)
+	Strategy.PrepareForCreate(ctx, storageClass, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, storageClass)
 	if len(errs) != 0 {

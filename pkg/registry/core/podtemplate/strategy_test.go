@@ -47,7 +47,7 @@ func TestStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, podTemplate)
+	Strategy.PrepareForCreate(ctx, podTemplate, fieldValidation string) ([]string, error)
 	if podTemplate.Generation != 1 {
 		t.Errorf("expected Generation=1, got %d", podTemplate.Generation)
 	}

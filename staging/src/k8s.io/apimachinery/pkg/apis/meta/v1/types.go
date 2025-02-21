@@ -1088,6 +1088,9 @@ const (
 	// CauseTypeResourceVersionTooLarge is used to report that the requested resource version
 	// is newer than the data observed by the API server, so the request cannot be served.
 	CauseTypeResourceVersionTooLarge CauseType = "ResourceVersionTooLarge"
+	// CauseTypeUnsupported is used to report that support for a resource or
+	// field is disabled.
+	CauseTypeUnsupported CauseType = "Unsupported"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

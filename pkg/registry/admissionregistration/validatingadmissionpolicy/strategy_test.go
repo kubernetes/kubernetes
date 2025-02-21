@@ -37,7 +37,7 @@ func TestValidatingAdmissionPolicyStrategy(t *testing.T) {
 	}
 
 	configuration := validValidatingAdmissionPolicy()
-	strategy.PrepareForCreate(ctx, configuration)
+	strategy.PrepareForCreate(ctx, configuration, fieldValidation string) ([]string, error)
 	errs := strategy.Validate(ctx, configuration)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)

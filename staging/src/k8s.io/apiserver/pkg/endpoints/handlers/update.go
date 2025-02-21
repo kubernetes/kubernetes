@@ -104,7 +104,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		defaultGVK := scope.Kind
 		original := r.New()
 
-		validationDirective := fieldValidation(options.FieldValidation)
+		options.FieldValidation = fieldValidation(options.FieldValidation)
+		validationDirective := options.FieldValidation
 		decodeSerializer := s.Serializer
 		if validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict {
 			decodeSerializer = s.StrictSerializer

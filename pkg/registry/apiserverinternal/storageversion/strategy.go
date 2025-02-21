@@ -56,9 +56,10 @@ func (storageVersionStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpa
 }
 
 // PrepareForCreate clears the status of an StorageVersion before creation.
-func (storageVersionStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (storageVersionStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	sv := obj.(*apiserverinternal.StorageVersion)
 	sv.Status = apiserverinternal.StorageVersionStatus{}
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

@@ -40,7 +40,7 @@ func TestPriorityClassStrategy(t *testing.T) {
 		Value: 10,
 	}
 
-	Strategy.PrepareForCreate(ctx, priorityClass)
+	Strategy.PrepareForCreate(ctx, priorityClass, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, priorityClass)
 	if len(errs) != 0 {

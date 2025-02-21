@@ -42,7 +42,8 @@ func (volumeAttributesClassStrategy) NamespaceScoped() bool {
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (volumeAttributesClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (volumeAttributesClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
+	return nil, nil
 }
 
 func (volumeAttributesClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

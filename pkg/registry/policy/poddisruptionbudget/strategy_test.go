@@ -46,7 +46,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, pdb)
+	Strategy.PrepareForCreate(ctx, pdb, fieldValidation string) ([]string, error)
 	errs := Strategy.Validate(ctx, pdb)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
