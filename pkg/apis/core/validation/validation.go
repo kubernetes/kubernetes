@@ -68,6 +68,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/utils/cpuset"
 )
 
 const isNegativeErrorMsg string = apimachineryvalidation.IsNegativeErrorMsg
@@ -6323,6 +6324,7 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	var newContainers []core.Container
 	for ix, container := range newPodSpecCopy.Containers {
 		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
+		allErrs = append(allErrs, dropMustKeepCPUsEnvFromContainer(&container, &oldPod.Spec.Containers[ix], specPath)...)
 		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.Containers[ix]) {
 			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
 			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
@@ -6496,6 +6498,52 @@ func dropCPUMemoryResourceRequirementsUpdates(resources *core.ResourceRequiremen
 		}
 	}
 	return resources
+}
+
+func removeEnvVar(envs []core.EnvVar, nameToRemove string) []core.EnvVar {
+	var newEnvs []core.EnvVar
+	for _, env := range envs {
+		if env.Name != nameToRemove {
+			newEnvs = append(newEnvs, env)
+		}
+	}
+	return newEnvs
+}
+
+// dropMustKeepCPUsEnvFromContainer deletes the "mustKeepCPUs" in env from the container, and copies them from the old pod container resources if present.
+func dropMustKeepCPUsEnvFromContainer(container *core.Container, oldPodSpecContainer *core.Container, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// the element named "mustKeepCPUs" in env can be update or add
+	existNewMustKeepCPUs := false
+	existOldMustKeepCPUs := false
+	for jx, newEnv := range container.Env {
+		if newEnv.Name == "mustKeepCPUs" {
+			existNewMustKeepCPUs = true
+			_, err := cpuset.Parse(newEnv.Value)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath, newEnv, "Check mustKeepCPUs format, only number \",\" and \"-\" are allowed"))
+			}
+			// Change mustKeepCPUs
+			for _, oldEnv := range oldPodSpecContainer.Env {
+				if oldEnv.Name == "mustKeepCPUs" {
+					existOldMustKeepCPUs = true
+					container.Env[jx] = oldEnv
+					break
+				}
+			}
+			// Add mustKeepCPUs
+			if !existOldMustKeepCPUs && (len(container.Env)-len(oldPodSpecContainer.Env)) == 1 {
+				// Delete "mustKeepCPUs" in newPod to make newPod equal to oldPod
+				container.Env = removeEnvVar(container.Env, "mustKeepCPUs")
+			}
+			break
+		}
+	}
+	// Delete mustKeepCPUs
+	if !existNewMustKeepCPUs && (len(oldPodSpecContainer.Env)-len(container.Env)) == 1 {
+		oldPodSpecContainer.Env = removeEnvVar(oldPodSpecContainer.Env, "mustKeepCPUs")
+	}
+	return allErrs
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.

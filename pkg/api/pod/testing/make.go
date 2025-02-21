@@ -299,6 +299,12 @@ func SetContainerResources(rr api.ResourceRequirements) TweakContainer {
 	}
 }
 
+func SetContainerEnv(env []api.EnvVar) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.Env = env
+	}
+}
+
 func SetContainerPorts(ports ...api.ContainerPort) TweakContainer {
 	return func(cnr *api.Container) {
 		cnr.Ports = ports
