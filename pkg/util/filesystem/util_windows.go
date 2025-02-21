@@ -285,7 +285,7 @@ func IsPathValidForMount(path string) (bool, error) {
 	isSymlink := dir.Mode()&os.ModeSymlink != 0 || dir.Mode()&os.ModeIrregular != 0
 
 	// mounted folder created by SetVolumeMountPoint may still report ModeSymlink == 0
-	mountedFolder, err := isMountedFolder(path)
+	mountedFolder, err := IsMountedFolder(path)
 	if err != nil {
 		return false, err
 	}
@@ -297,8 +297,8 @@ func IsPathValidForMount(path string) (bool, error) {
 	return false, fmt.Errorf("path %v exists but is not a mounted path", path)
 }
 
-// isMountedFolder checks whether the `path` is a mounted folder.
-func isMountedFolder(path string) (bool, error) {
+// IsMountedFolder checks whether the `path` is a mounted folder.
+func IsMountedFolder(path string) (bool, error) {
 	// https://learn.microsoft.com/en-us/windows/win32/fileio/determining-whether-a-directory-is-a-volume-mount-point
 	utf16Path, _ := windows.UTF16PtrFromString(path)
 	attrs, err := windows.GetFileAttributes(utf16Path)
