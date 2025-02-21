@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Runs test-cmd and test-integration,
+# Runs test-integration,
 # producing JUnit-style XML test
 # reports in ${WORKSPACE}/artifacts. This script is intended to be run from
 # kubekins-test container with a kubernetes repo mapped in. See
@@ -43,5 +43,4 @@ cd "${GOPATH}/src/k8s.io/kubernetes"
 
 ./hack/install-etcd.sh
 
-make test-cmd
 make test-integration

@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Runs test-cmd and test-integration,
+# Runs test-cmd,
 # producing JUnit-style XML test
 # reports in ${WORKSPACE}/artifacts. This script is intended to be run from
 # kubekins-test container with a kubernetes repo mapped in. See
@@ -27,21 +27,12 @@ set -o xtrace
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-# Install tools we need
-go -C "./hack/tools" install gotest.tools/gotestsum
-
-# Disable coverage report
-export KUBE_COVER="n"
 # Set artifacts directory
 export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
-# Save the verbose stdout as well.
-export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
-export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
-export LOG_LEVEL=4
 
 cd "${GOPATH}/src/k8s.io/kubernetes"
 
 ./hack/install-etcd.sh
 
 make test-cmd
-make test-integration
+
