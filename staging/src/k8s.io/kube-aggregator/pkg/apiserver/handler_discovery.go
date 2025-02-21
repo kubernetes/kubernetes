@@ -258,7 +258,7 @@ func (dm *discoveryManager) fetchFreshDiscoveryForService(gv metav1.GroupVersion
 	case writer.RespCode() == http.StatusServiceUnavailable:
 		return nil, fmt.Errorf("service %s returned non-success response code: %v",
 			info.service.String(), writer.RespCode())
-	case writer.respCode == http.StatusOK && isV2GVK:
+	case writer.RespCode() == http.StatusOK && isV2GVK:
 		parsed := &apidiscoveryv2.APIGroupDiscoveryList{}
 		if err := runtime.DecodeInto(dm.codecs.UniversalDecoder(), writer.Data(), parsed); err != nil {
 			return nil, err
