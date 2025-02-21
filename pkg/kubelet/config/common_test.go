@@ -32,6 +32,7 @@ import (
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/utils/ptr"
 )
@@ -312,5 +313,85 @@ func TestStaticPodNameGenerate(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestApplyDefaults(t *testing.T) {
+	testCases := []struct {
+		name      string
+		isFile    bool
+		staticPod *core.Pod
+		as        func(pod *core.Pod)
+	}{
+		{
+			"static pod without namespace",
+			true,
+			podtest.MakePod("testpod"),
+			func(pod *core.Pod) {
+				assert.Equal(t, metav1.NamespaceDefault, pod.Namespace)
+			},
+		},
+		{
+			"static pod with explicit namespace",
+			false,
+			podtest.MakePod("testpod", podtest.SetNamespace("testnamespace")),
+			func(pod *core.Pod) {
+				assert.Equal(t, "testnamespace", pod.Namespace)
+			},
+		},
+		{
+			"static pod has hashkey annotation",
+			true,
+			podtest.MakePod("testpod"),
+			func(pod *core.Pod) {
+				assert.Contains(t, pod.Annotations, kubetypes.ConfigHashAnnotationKey)
+			},
+		},
+		{
+			"static pod from file manifest has Exists:NoExecute toleration set",
+			true,
+			podtest.MakePod("testpod"),
+			func(pod *core.Pod) {
+				assert.Contains(t, pod.Spec.Tolerations, core.Toleration{
+					Operator: "Exists",
+					Effect:   core.TaintEffectNoExecute,
+				})
+			},
+		},
+		{
+			"static pod from url manifest does not have Exists:NoExecute toleration set",
+			false,
+			podtest.MakePod("testpod"),
+			func(pod *core.Pod) {
+				assert.NotContains(t, pod.Spec.Tolerations, core.Toleration{
+					Operator: "Exists",
+					Effect:   core.TaintEffectNoExecute,
+				})
+			},
+		},
+		{
+			"static pod with restartPolicy set as Never",
+			true,
+			podtest.MakePod("testpod", podtest.SetRestartPolicy(core.RestartPolicyNever)),
+			nil,
+		},
+		{
+			"static pod with no restartPolicy set",
+			true,
+			podtest.MakePod("testpod"),
+			nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			applyDefaults(tc.staticPod, "source", tc.isFile, "node")
+			assert.Equal(t, tc.staticPod.Spec.NodeName, "node")
+			assert.Equal(t, tc.staticPod.Spec.RestartPolicy, core.RestartPolicyAlways)
+			assert.Equal(t, tc.staticPod.Status.Phase, core.PodPending)
+			// more custom assertions
+			if nil != tc.as {
+				tc.as(tc.staticPod)
+			}
+		})
 	}
 }
