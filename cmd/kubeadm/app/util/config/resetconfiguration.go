@@ -91,7 +91,7 @@ func LoadResetConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurat
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
 	if err != nil {
 		return nil, err
 	}
