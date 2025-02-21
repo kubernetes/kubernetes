@@ -336,7 +336,7 @@ func SetResizeStatus(resizeStatus api.PodResizeStatus) TweakPodStatus {
 	}
 }
 
-// TweakContainers applies the container tweaks to all containers in the pod with a masked type.
+// TweakContainers applies the container tweaks to all containers (regular & init) in the pod.
 // Note: this should typically be added to pod tweaks after all containers have been added.
 func TweakContainers(tweaks ...TweakContainer) Tweak {
 	return func(pod *api.Pod) {
