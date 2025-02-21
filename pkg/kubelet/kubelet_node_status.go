@@ -19,7 +19,6 @@ package kubelet
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	goruntime "runtime"
 	"sort"
@@ -580,40 +579,18 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	}
 
 	node, changed := kl.updateNode(ctx, originalNode)
-	// no need to update the status yet
-	if !changed && !kl.isUpdateStatusPeriodExperid() {
+	shouldPatchNodeStatus := changed || kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency
+
+	if !shouldPatchNodeStatus {
 		kl.markVolumesFromNode(node)
 		return nil
 	}
 
-	// We need to update the node status, if this is caused by a node change we want to calculate a new
-	// random delay so we avoid all the nodes to reach the apiserver at the same time. If the update is not related
-	// to a node change, because we run over the period, we reset the random delay so the node keeps updating
-	// its status at the same cadence
-	if changed {
-		kl.delayAfterNodeStatusChange = kl.calculateDelay()
-	} else {
-		kl.delayAfterNodeStatusChange = 0
-	}
 	updatedNode, err := kl.patchNodeStatus(originalNode, node)
 	if err == nil {
 		kl.markVolumesFromNode(updatedNode)
 	}
 	return err
-}
-
-func (kl *Kubelet) isUpdateStatusPeriodExperid() bool {
-	if kl.lastStatusReportTime.IsZero() {
-		return false
-	}
-	if kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency+kl.delayAfterNodeStatusChange {
-		return true
-	}
-	return false
-}
-
-func (kl *Kubelet) calculateDelay() time.Duration {
-	return time.Duration(float64(kl.nodeStatusReportFrequency) * (-0.5 + rand.Float64()))
 }
 
 // updateNode creates a copy of originalNode and runs update logic on it.
