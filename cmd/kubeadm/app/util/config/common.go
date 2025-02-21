@@ -256,7 +256,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrate
 		mutators = defaultMigrateMutators()
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(oldConfig)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(oldConfig)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -329,7 +329,7 @@ func MigrateOldConfig(oldConfig []byte, allowExperimental bool, mutators migrate
 // ValidateConfig takes a byte slice containing a kubeadm configuration and performs conversion
 // to internal types and validation.
 func ValidateConfig(config []byte, allowExperimental bool) error {
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(config)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(config)
 	if err != nil {
 		return err
 	}

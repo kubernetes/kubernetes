@@ -295,7 +295,7 @@ func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapi
 // and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct.
 // The resulting InitConfiguration is then dynamically defaulted and validated prior to return.
 func BytesToInitConfiguration(b []byte, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
 	if err != nil {
 		return nil, err
 	}
