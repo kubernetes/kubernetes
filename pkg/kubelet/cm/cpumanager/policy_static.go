@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -386,7 +387,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 	s.SetCPUSet(string(pod.UID), container.Name, cpuset)
 	p.updateCPUsToReuse(pod, container, cpuset)
-	p.updateMetricsOnAllocate(cpuset)
+	p.updateMetricsOnAllocate(s, cpuset)
 
 	klog.V(4).InfoS("Allocated exclusive CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpuset", cpuset)
 	return nil
@@ -413,7 +414,8 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 		// Mutate the shared pool, adding released cpus.
 		toRelease = toRelease.Difference(cpusInUse)
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
-		p.updateMetricsOnRelease(toRelease)
+		return p.updateMetricsOnRelease(s, toRelease)
+
 	}
 	return nil
 }
@@ -749,29 +751,57 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 	return alignedCPUs
 }
 
-func (p *staticPolicy) initializeMetrics(s state.State) {
+func (p *staticPolicy) initializeMetrics(s state.State) error {
 	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
-	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(countExclusiveCPUs(s)))
+
+	totalAssignedCPUs, countExclusiveCPUs := getTotalAssignedExclusiveCPUs(s)
+	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(countExclusiveCPUs))
+	return updateNUMASpreadMetric(p.topology, totalAssignedCPUs)
 }
 
-func (p *staticPolicy) updateMetricsOnAllocate(cset cpuset.CPUSet) {
+func (p *staticPolicy) updateMetricsOnAllocate(s state.State, cset cpuset.CPUSet) error {
 	ncpus := cset.Size()
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(ncpus))
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(-ncpus * 1000))
+	totalAssignedCPUs, _ := getTotalAssignedExclusiveCPUs(s)
+	return updateNUMASpreadMetric(p.topology, totalAssignedCPUs)
 }
 
-func (p *staticPolicy) updateMetricsOnRelease(cset cpuset.CPUSet) {
+func (p *staticPolicy) updateMetricsOnRelease(s state.State, cset cpuset.CPUSet) error {
 	ncpus := cset.Size()
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(-ncpus))
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(ncpus * 1000))
+	totalAssignedCPUs, _ := getTotalAssignedExclusiveCPUs(s)
+	return updateNUMASpreadMetric(p.topology, totalAssignedCPUs.Difference(cset))
+
 }
 
-func countExclusiveCPUs(s state.State) int {
-	exclusiveCPUs := 0
-	for _, cpuAssign := range s.GetCPUAssignments() {
-		for _, cset := range cpuAssign {
-			exclusiveCPUs += cset.Size()
+func getTotalAssignedExclusiveCPUs(s state.State) (cpuset.CPUSet, int) {
+	totalAssignedCPUs := cpuset.New()
+	for _, assignment := range s.GetCPUAssignments() {
+		for _, cset := range assignment {
+			totalAssignedCPUs = totalAssignedCPUs.Union(cset)
 		}
+
 	}
-	return exclusiveCPUs
+	return totalAssignedCPUs, totalAssignedCPUs.Size()
+}
+
+func updateNUMASpreadMetric(topo *topology.CPUTopology, allocatedCPUs cpuset.CPUSet) error {
+	numaCount := make(map[int]int)
+
+	// Count CPUs allocated per NUMA node
+	for _, cpuID := range allocatedCPUs.List() {
+		numaNode, err := topo.CPUNUMANodeID(cpuID)
+		if err != nil {
+			return err
+		}
+		numaCount[numaNode]++
+	}
+
+	// Update metric
+	for numaNode, count := range numaCount {
+		metrics.CPUManagerNUMAAllocationSpread.WithLabelValues(strconv.Itoa(numaNode)).Add(float64(count))
+	}
+	return nil
 }
