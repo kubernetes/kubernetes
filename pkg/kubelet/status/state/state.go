@@ -42,15 +42,12 @@ func (pr PodResourceAllocation) Clone() PodResourceAllocation {
 type Reader interface {
 	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
 	GetPodResourceAllocation() PodResourceAllocation
-	GetPodResizeStatus(podUID string) v1.PodResizeStatus
 }
 
 type writer interface {
 	SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error
-	SetPodResourceAllocation(PodResourceAllocation) error
-	SetPodResizeStatus(podUID string, resizeStatus v1.PodResizeStatus)
+	SetPodResourceAllocation(podUID string, alloc map[string]v1.ResourceRequirements) error
 	Delete(podUID string, containerName string) error
-	ClearState() error
 }
 
 // State interface provides methods for tracking and setting pod resource allocation

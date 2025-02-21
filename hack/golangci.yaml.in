@@ -2,8 +2,6 @@
 # enable an increasing amount of checks:
 # - golangci.yaml is the most permissive configuration. All existing code
 #   passed.
-# - golangci-strict.yaml adds checks that all new code in pull requests
-#   must pass.
 # - golangci-hints.yaml adds checks for code patterns where developer
 #   and reviewer may decide whether findings should get addressed before
 #   merging. Beware that the golangci-lint output includes also the
@@ -44,6 +42,12 @@ issues:
     - linters:
         - forbidigo
       text: should not be used because managedFields was removed
+      path: _test.go$
+
+    # Adding unversioned feature gates is allowed in tests
+    - linters:
+        - forbidigo
+      text: should not use MutableFeatureGate.Add, use AddVersioned instead
       path: _test.go$
 
     {{- if .Base}}
@@ -147,6 +151,7 @@ issues:
 linters:
   disable-all: {{if .Base -}} true {{- else -}} false {{- end}}
   enable: # please keep this alphabetized
+    - depguard
     - forbidigo
     - ginkgolinter
     - gocritic
@@ -164,11 +169,6 @@ linters:
   {{- if not .Base }}
     - usestdlibvars
   {{- end}}
-  {{- if .Strict}}
-  disable:
-    # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008359
-    - errcheck
-  {{- end}}
 
 linters-settings: # please keep this alphabetized
   custom:
@@ -180,6 +180,16 @@ linters-settings: # please keep this alphabetized
       settings:
         config: |
           {{include "hack/logcheck.conf" | indent 10 | trim}}
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+          - "!$test"
+          - "!**/test/**"
+        deny:
+          - pkg: "github.com/google/go-cmp/cmp"
+            desc: "cmp is allowed only in test files"
   forbidigo:
     analyze-types: true
     forbid:
@@ -189,6 +199,10 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+    - p: \.Add$
+      pkg: ^k8s\.io/component-base/featuregate$
+      type: ^MutableFeatureGate$
+      msg: should not use MutableFeatureGate.Add, use AddVersioned instead
     {{- if .Hints}}
     - p: ^gomega\.BeTrue$
       pkg: ^github.com/onsi/gomega$

@@ -32,7 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
-
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -41,23 +41,22 @@ import (
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	utilversion "k8s.io/component-base/version"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
 	netutils "k8s.io/utils/net"
 )
 
 func TestAddFlags(t *testing.T) {
-	componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
-	t.Cleanup(func() {
-		componentGlobalsRegistry.Reset()
-	})
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
-	utilruntime.Must(componentGlobalsRegistry.Register("test", utilversion.NewEffectiveVersion("1.32"), featuregate.NewFeatureGate()))
+	utilruntime.Must(componentGlobalsRegistry.Register("test", basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31"), featuregate.NewFeatureGate()))
 	s := NewOptions()
+	s.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	var fss cliflag.NamedFlagSets
 	s.AddFlags(&fss)
 	for _, f := range fss.FlagSets {
@@ -141,7 +140,7 @@ func TestAddFlags(t *testing.T) {
 			JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
 			ComponentGlobalsRegistry:     componentGlobalsRegistry,
-			ComponentName:                featuregate.DefaultKubeComponent,
+			ComponentName:                basecompatibility.DefaultKubeComponent,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -264,8 +263,9 @@ func TestAddFlags(t *testing.T) {
 			OIDC:           s.Authentication.OIDC,
 			RequestHeader:  &apiserveroptions.RequestHeaderAuthenticationOptions{},
 			ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
-				Lookup:           true,
-				ExtendExpiration: true,
+				Lookup:                true,
+				ExtendExpiration:      true,
+				MaxExtendedExpiration: serviceaccount.ExpirationExtensionSeconds * time.Second,
 			},
 			TokenFile:            &kubeoptions.TokenFileAuthenticationOptions{},
 			TokenSuccessCacheTTL: 10 * time.Second,
@@ -309,7 +309,7 @@ func TestAddFlags(t *testing.T) {
 	s.Authorization.AreLegacyFlagsSet = nil
 
 	if !reflect.DeepEqual(expected, s) {
-		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{}, kubeoptions.AnonymousAuthenticationOptions{})))
+		t.Errorf("Got different run options than expected.\nDifference detected on:\n%s", cmp.Diff(expected, s, cmpopts.IgnoreFields(apiserveroptions.ServerRunOptions{}, "ComponentGlobalsRegistry"), cmpopts.IgnoreUnexported(admission.Plugins{}, kubeoptions.OIDCAuthenticationOptions{}, kubeoptions.AnonymousAuthenticationOptions{})))
 	}
 
 	testEffectiveVersion := s.GenericServerRunOptions.ComponentGlobalsRegistry.EffectiveVersionFor("test")
@@ -352,13 +352,14 @@ func TestCompleteForServiceAccount(t *testing.T) {
 		externalSigner           bool
 		signingKeyFiles          string
 		maxExpiration            time.Duration
+		maxExtendedExpiration    time.Duration
 		externalMaxExpirationSec int64
 		fetchError               error
 		metadataError            error
 
 		wantError                      error
 		expectedMaxtokenExp            time.Duration
-		expectedIsExternalSigner       bool
+		expectedExtendedMaxTokenExp    time.Duration
 		externalPublicKeyGetterPresent bool
 	}{
 		{
@@ -373,7 +374,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			wantError: fmt.Errorf("service-account-signing-key-file and service-account-signing-endpoint are mutually exclusive and cannot be set at the same time"),
 		},
 		{
-			desc: "max token expiration breaching accepteable values",
+			desc: "max token expiration breaching acceptable values",
 			issuers: []string{
 				"iss",
 			},
@@ -392,35 +393,50 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			signingKeyFiles: "private_key.pem",
 			maxExpiration:   time.Second * 3600,
 
-			expectedIsExternalSigner:       false,
 			externalPublicKeyGetterPresent: false,
 			expectedMaxtokenExp:            time.Second * 3600,
 		},
 		{
-			desc: "signing endpoint provided",
+			desc: "signing endpoint provided, use endpoint expiration",
 			issuers: []string{
 				"iss",
 			},
 			externalSigner:           true,
 			signingKeyFiles:          "",
 			maxExpiration:            0,
+			maxExtendedExpiration:    365 * 24 * time.Hour,
 			externalMaxExpirationSec: 600, // 10m
 
-			expectedIsExternalSigner:       true,
+			expectedMaxtokenExp:            10 * time.Minute,
+			expectedExtendedMaxTokenExp:    10 * time.Minute,
 			externalPublicKeyGetterPresent: true,
-			expectedMaxtokenExp:            time.Second * 600, // 10m
 		},
 		{
-			desc: "signing endpoint provided and max token expiration set",
+			desc: "signing endpoint provided, use local smaller expirations",
 			issuers: []string{
 				"iss",
 			},
 			externalSigner:           true,
 			signingKeyFiles:          "",
-			maxExpiration:            time.Second * 3600,
-			externalMaxExpirationSec: 600, // 10m
+			maxExpiration:            1 * time.Hour,
+			maxExtendedExpiration:    24 * time.Hour,
+			externalMaxExpirationSec: 31556952, // 1 year
 
-			wantError: fmt.Errorf("service-account-max-token-expiration and service-account-signing-endpoint are mutually exclusive and cannot be set at the same time"),
+			expectedMaxtokenExp:            1 * time.Hour,
+			expectedExtendedMaxTokenExp:    24 * time.Hour,
+			externalPublicKeyGetterPresent: true,
+		},
+		{
+			desc: "signing endpoint provided and want larger than signer can provide",
+			issuers: []string{
+				"iss",
+			},
+			externalSigner:           true,
+			signingKeyFiles:          "",
+			maxExpiration:            1 * time.Hour, // want 1hr
+			externalMaxExpirationSec: 600,           // signer can only sign 10m
+
+			wantError: fmt.Errorf("service-account-max-token-expiration cannot be set longer than the token expiration supported by service-account-signing-endpoint: 1h0m0s > 10m0s"),
 		},
 		{
 			desc: "signing endpoint provided but return smaller than accaptable max token exp",
@@ -468,7 +484,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			options := NewOptions()
 			if tc.externalSigner {
 				// create and start mock signer.
-				socketPath := fmt.Sprintf("@mock-external-jwt-signer-%d.sock", time.Now().Nanosecond())
+				socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
 				mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
 				defer mockSigner.CleanUp()
 
@@ -481,8 +497,9 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			options.ServiceAccountSigningKeyFile = tc.signingKeyFiles
 			options.Authentication = &kubeoptions.BuiltInAuthenticationOptions{
 				ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
-					Issuers:       tc.issuers,
-					MaxExpiration: tc.maxExpiration,
+					Issuers:               tc.issuers,
+					MaxExpiration:         tc.maxExpiration,
+					MaxExtendedExpiration: tc.maxExtendedExpiration,
 				},
 			}
 
@@ -507,8 +524,8 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			if tc.externalPublicKeyGetterPresent != (co.Authentication.ServiceAccounts.ExternalPublicKeysGetter != nil) {
 				t.Errorf("Unexpected value of ExternalPublicKeysGetter: %v", co.Authentication.ServiceAccounts.ExternalPublicKeysGetter)
 			}
-			if tc.expectedIsExternalSigner != co.Authentication.ServiceAccounts.IsTokenSignerExternal {
-				t.Errorf("Expected IsTokenSignerExternal %v, found %v", tc.expectedIsExternalSigner, co.Authentication.ServiceAccounts.IsTokenSignerExternal)
+			if tc.expectedExtendedMaxTokenExp != co.Authentication.ServiceAccounts.MaxExtendedExpiration {
+				t.Errorf("Expected MaxExtendedExpiration %v, found %v", tc.expectedExtendedMaxTokenExp, co.Authentication.ServiceAccounts.MaxExtendedExpiration)
 			}
 			if tc.expectedMaxtokenExp.Seconds() != co.Authentication.ServiceAccounts.MaxExpiration.Seconds() {
 				t.Errorf("Expected MaxExpiration to be %v, found %v", tc.expectedMaxtokenExp, co.Authentication.ServiceAccounts.MaxExpiration)

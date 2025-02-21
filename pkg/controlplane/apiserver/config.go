@@ -89,10 +89,10 @@ type Extra struct {
 	// version skew. If unset, AdvertiseAddress/BindAddress will be used.
 	PeerAdvertiseAddress peerreconcilers.PeerAdvertiseAddress
 
-	ServiceAccountIssuer        serviceaccount.TokenGenerator
-	ServiceAccountMaxExpiration time.Duration
-	ExtendExpiration            bool
-	IsTokenSignerExternal       bool
+	ServiceAccountIssuer                serviceaccount.TokenGenerator
+	ServiceAccountMaxExpiration         time.Duration
+	ServiceAccountExtendedMaxExpiration time.Duration
+	ExtendExpiration                    bool
 
 	// ServiceAccountIssuerDiscovery
 	ServiceAccountIssuerURL        string
@@ -189,8 +189,7 @@ func BuildGenericConfig(
 		s.Etcd.StorageConfig.Transport.TracerProvider = noopoteltrace.NewTracerProvider()
 	}
 
-	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
-	storageFactoryConfig.CurrentVersion = genericConfig.EffectiveVersion
+	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfigEffectiveVersion(genericConfig.EffectiveVersion)
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
 	storageFactoryConfig.DefaultResourceEncoding.SetEffectiveVersion(genericConfig.EffectiveVersion)
 	storageFactory, lastErr = storageFactoryConfig.Complete(s.Etcd).New()
@@ -299,10 +298,10 @@ func CreateConfig(
 			ProxyTransport:          proxyTransport,
 			SystemNamespaces:        opts.SystemNamespaces,
 
-			ServiceAccountIssuer:        opts.ServiceAccountIssuer,
-			ServiceAccountMaxExpiration: opts.ServiceAccountTokenMaxExpiration,
-			ExtendExpiration:            opts.Authentication.ServiceAccounts.ExtendExpiration,
-			IsTokenSignerExternal:       opts.Authentication.ServiceAccounts.IsTokenSignerExternal,
+			ServiceAccountIssuer:                opts.ServiceAccountIssuer,
+			ServiceAccountMaxExpiration:         opts.ServiceAccountTokenMaxExpiration,
+			ServiceAccountExtendedMaxExpiration: opts.Authentication.ServiceAccounts.MaxExtendedExpiration,
+			ExtendExpiration:                    opts.Authentication.ServiceAccounts.ExtendExpiration,
 
 			VersionedInformers: versionedInformers,
 		},

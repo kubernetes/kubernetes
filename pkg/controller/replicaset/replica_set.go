@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -60,6 +61,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -564,10 +566,10 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 }
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
-// Does NOT modify <filteredPods>.
+// Does NOT modify <activePods>.
 // It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
-	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
+func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods []*v1.Pod, rs *apps.ReplicaSet) error {
+	diff := len(activePods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
@@ -627,7 +629,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, filteredPod
 		utilruntime.HandleError(err)
 
 		// Choose which Pods to delete, preferring those in earlier phases of startup.
-		podsToDelete := getPodsToDelete(filteredPods, relatedPods, diff)
+		podsToDelete := getPodsToDelete(activePods, relatedPods, diff)
 
 		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
 		// deleted, so we know to record their expectations exactly once either
@@ -707,22 +709,27 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if err != nil {
 		return err
 	}
-	// Ignore inactive pods.
-	filteredPods := controller.FilterActivePods(logger, allPods)
 
-	// NOTE: filteredPods are pointing to objects from cache - if you need to
+	// NOTE: activePods and terminatingPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
-	filteredPods, err = rsc.claimPods(ctx, rs, selector, filteredPods)
+	allActivePods := controller.FilterActivePods(logger, allPods)
+	activePods, err := rsc.claimPods(ctx, rs, selector, allActivePods)
 	if err != nil {
 		return err
 	}
 
+	var terminatingPods []*v1.Pod
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		allTerminatingPods := controller.FilterTerminatingPods(allPods)
+		terminatingPods = controller.FilterClaimedPods(rs, selector, allTerminatingPods)
+	}
+
 	var manageReplicasErr error
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
-		manageReplicasErr = rsc.manageReplicas(ctx, filteredPods, rs)
+		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
 	rs = rs.DeepCopy()
-	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
+	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
 	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)

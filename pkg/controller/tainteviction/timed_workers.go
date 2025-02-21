@@ -105,13 +105,7 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Con
 		err := q.workFunc(ctx, fireAt, args)
 		q.Lock()
 		defer q.Unlock()
-		if err == nil {
-			// To avoid duplicated calls we keep the key in the queue, to prevent
-			// subsequent additions.
-			q.workers[key] = nil
-		} else {
-			delete(q.workers, key)
-		}
+		delete(q.workers, key)
 		return err
 	}
 }

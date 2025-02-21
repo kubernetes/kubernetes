@@ -17,12 +17,55 @@ limitations under the License.
 package cache
 
 import (
-	"fmt"
 	"reflect"
 	"runtime"
 	"testing"
 	"time"
 )
+
+// List returns a list of all the items.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) List() []interface{} {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	list := make([]interface{}, 0, len(f.items))
+	for _, item := range f.items {
+		list = append(list, item)
+	}
+	return list
+}
+
+// ListKeys returns a list of all the keys of the objects currently
+// in the FIFO.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) ListKeys() []string {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	list := make([]string, 0, len(f.items))
+	for key := range f.items {
+		list = append(list, key)
+	}
+	return list
+}
+
+// Get returns the requested item, or sets exists=false.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	key, err := f.keyFunc(obj)
+	if err != nil {
+		return nil, false, KeyError{obj, err}
+	}
+	return f.GetByKey(key)
+}
+
+// GetByKey returns the requested item, or sets exists=false.
+// This function was moved here because it is not consistent with normal list semantics, but is used in unit testing.
+func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	item, exists = f.items[key]
+	return item, exists, nil
+}
 
 func testFifoObjectKeyFunc(obj interface{}) (string, error) {
 	return obj.(testFifoObject).name, nil
@@ -69,50 +112,6 @@ func TestFIFO_basic(t *testing.T) {
 		default:
 			t.Fatalf("unexpected type %#v", obj)
 		}
-	}
-}
-
-func TestFIFO_requeueOnPop(t *testing.T) {
-	f := NewFIFO(testFifoObjectKeyFunc)
-
-	f.Add(mkFifoObj("foo", 10))
-	_, err := f.Pop(func(obj interface{}, isInInitialList bool) error {
-		if obj.(testFifoObject).name != "foo" {
-			t.Fatalf("unexpected object: %#v", obj)
-		}
-		return ErrRequeue{Err: nil}
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
-		t.Fatalf("object should have been requeued: %t %v", ok, err)
-	}
-
-	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
-		if obj.(testFifoObject).name != "foo" {
-			t.Fatalf("unexpected object: %#v", obj)
-		}
-		return ErrRequeue{Err: fmt.Errorf("test error")}
-	})
-	if err == nil || err.Error() != "test error" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
-		t.Fatalf("object should have been requeued: %t %v", ok, err)
-	}
-
-	_, err = f.Pop(func(obj interface{}, isInInitialList bool) error {
-		if obj.(testFifoObject).name != "foo" {
-			t.Fatalf("unexpected object: %#v", obj)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok, err := f.GetByKey("foo"); ok || err != nil {
-		t.Fatalf("object should have been removed: %t %v", ok, err)
 	}
 }
 
@@ -201,26 +200,6 @@ func TestFIFO_detectLineJumpers(t *testing.T) {
 
 	if e, a := 14, Pop(f).(testFifoObject).val; a != e {
 		t.Fatalf("expected %d, got %d", e, a)
-	}
-}
-
-func TestFIFO_addIfNotPresent(t *testing.T) {
-	f := NewFIFO(testFifoObjectKeyFunc)
-
-	f.Add(mkFifoObj("a", 1))
-	f.Add(mkFifoObj("b", 2))
-	f.AddIfNotPresent(mkFifoObj("b", 3))
-	f.AddIfNotPresent(mkFifoObj("c", 4))
-
-	if e, a := 3, len(f.items); a != e {
-		t.Fatalf("expected queue length %d, got %d", e, a)
-	}
-
-	expectedValues := []int{1, 2, 4}
-	for _, expected := range expectedValues {
-		if actual := Pop(f).(testFifoObject).val; actual != expected {
-			t.Fatalf("expected value %d, got %d", expected, actual)
-		}
 	}
 }
 

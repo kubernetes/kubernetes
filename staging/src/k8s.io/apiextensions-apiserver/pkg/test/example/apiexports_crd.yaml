@@ -1,0 +1,293 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.15.0
+  name: apiexports.apis.kcp.io
+spec:
+  group: apis.kcp.io
+  names:
+    categories:
+    - kcp
+    kind: APIExport
+    listKind: APIExportList
+    plural: apiexports
+    singular: apiexport
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .status.conditions[?(@.type=="VirtualWorkspaceURLsReady")].status
+      name: Ready
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          APIExport registers an API and implementation to allow consumption by others
+          through APIBindings.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec holds the desired state.
+            properties:
+              identity:
+                description: |-
+                  identity points to a secret that contains the API identity in the 'key' file.
+                  The API identity determines an unique etcd prefix for objects stored via this
+                  APIExport.
+
+
+                  Different APIExport in a workspace can share a common identity, or have different
+                  ones. The identity (the secret) can also be transferred to another workspace
+                  when the APIExport is moved.
+
+
+                  The identity is a secret of the API provider. The APIBindings referencing this APIExport
+                  will store a derived, non-sensitive value of this identity.
+
+
+                  The identity of an APIExport cannot be changed. A derived, non-sensitive value of
+                  the identity key is stored in the APIExport status and this value is immutable.
+
+
+                  The identity is defaulted. A secret with the name of the APIExport is automatically
+                  created.
+                properties:
+                  secretRef:
+                    description: secretRef is a reference to a secret that contains
+                      the API identity in the 'key' file.
+                    properties:
+                      name:
+                        description: name is unique within a namespace to reference
+                          a secret resource.
+                        type: string
+                      namespace:
+                        description: namespace defines the space within which the
+                          secret name must be unique.
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                type: object
+              latestResourceSchemas:
+                description: |-
+                  latestResourceSchemas records the latest APIResourceSchemas that are exposed
+                  with this APIExport.
+
+
+                  The schemas can be changed in the life-cycle of the APIExport. These changes
+                  have no effect on existing APIBindings, but only on newly bound ones.
+
+
+                  For updating existing APIBindings, use an APIDeployment keeping bound
+                  workspaces up-to-date.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              maximalPermissionPolicy:
+                description: |-
+                  maximalPermissionPolicy will allow for a service provider to set an upper bound on what is allowed
+                  for a consumer of this API. If the policy is not set, no upper bound is applied,
+                  i.e the consuming users can do whatever the user workspace allows the user to do.
+
+
+                  The policy consists of RBAC (Cluster)Roles and (Cluster)Bindings. A request of a user in
+                  a workspace that binds to this APIExport via an APIBinding is additionally checked against
+                  these rules, with the user name and the groups prefixed with `apis.kcp.io:binding:`.
+
+
+                  For example: assume a user `adam` with groups `system:authenticated` and `a-team` binds to
+                  this APIExport in another workspace root:org:ws. Then a request in that workspace
+                  against a resource of this APIExport is authorized as every other request in that workspace,
+                  but in addition the RBAC policy here in the APIExport workspace has to grant access to the
+                  user `apis.kcp.io:binding:adam` with the groups `apis.kcp.io:binding:system:authenticated`
+                  and `apis.kcp.io:binding:a-team`.
+                oneOf:
+                - required:
+                  - local
+                properties:
+                  local:
+                    description: local is the policy that is defined in same workspace
+                      as the API Export.
+                    type: object
+                type: object
+              permissionClaims:
+                description: |-
+                  permissionClaims make resources available in APIExport's virtual workspace that are not part
+                  of the actual APIExport resources.
+
+
+                  PermissionClaims are optional and should be the least access necessary to complete the functions
+                  that the service provider needs. Access is asked for on a GroupResource + identity basis.
+
+
+                  PermissionClaims must be accepted by the user's explicit acknowledgement. Hence, when claims
+                  change, the respecting objects are not visible immediately.
+
+
+                  PermissionClaims overlapping with the APIExport resources are ignored.
+                items:
+                  description: |-
+                    PermissionClaim identifies an object by GR and identity hash.
+                    Its purpose is to determine the added permissions that a service provider may
+                    request and that a consumer may accept and allow the service provider access to.
+                  properties:
+                    all:
+                      description: |-
+                        all claims all resources for the given group/resource.
+                        This is mutually exclusive with resourceSelector.
+                      type: boolean
+                    group:
+                      default: ""
+                      description: |-
+                        group is the name of an API group.
+                        For core groups this is the empty string '""'.
+                      pattern: ^(|[a-z0-9]([-a-z0-9]*[a-z0-9](\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?)$
+                      type: string
+                    identityHash:
+                      description: |-
+                        This is the identity for a given APIExport that the APIResourceSchema belongs to.
+                        The hash can be found on APIExport and APIResourceSchema's status.
+                        It will be empty for core types.
+                        Note that one must look this up for a particular KCP instance.
+                      type: string
+                    resource:
+                      description: |-
+                        resource is the name of the resource.
+                        Note: it is worth noting that you can not ask for permissions for resource provided by a CRD
+                        not provided by an api export.
+                      pattern: ^[a-z][-a-z0-9]*[a-z0-9]$
+                      type: string
+                    resourceSelector:
+                      description: resourceSelector is a list of claimed resource
+                        selectors.
+                      items:
+                        properties:
+                          name:
+                            description: |-
+                              name of an object within a claimed group/resource.
+                              It matches the metadata.name field of the underlying object.
+                              If namespace is unset, all objects matching that name will be claimed.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^([a-z0-9][-a-z0-9_.]*)?[a-z0-9]$
+                            type: string
+                          namespace:
+                            description: |-
+                              namespace containing the named object. Matches metadata.namespace field.
+                              If "name" is unset, all objects from the namespace are being claimed.
+                            minLength: 1
+                            type: string
+                        type: object
+                        x-kubernetes-validations:
+                        - message: at least one field must be set
+                          rule: has(self.__namespace__) || has(self.name)
+                      type: array
+                  required:
+                  - resource
+                  type: object
+                  x-kubernetes-validations:
+                  - message: either "all" or "resourceSelector" must be set
+                    rule: (has(self.all) && self.all) != (has(self.resourceSelector)
+                      && size(self.resourceSelector) > 0)
+                type: array
+                x-kubernetes-list-map-keys:
+                - group
+                - resource
+                x-kubernetes-list-type: map
+            type: object
+          status:
+            description: Status communicates the observed state.
+            properties:
+              conditions:
+                description: conditions is a list of conditions that apply to the
+                  APIExport.
+                items:
+                  description: Condition defines an observation of a object operational
+                    state.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        Last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed. If that is not known, then using the time when
+                        the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A human readable message indicating details about the transition.
+                        This field may be empty.
+                      type: string
+                    reason:
+                      description: |-
+                        The reason for the condition's last transition in CamelCase.
+                        The specific API may choose whether or not this field is considered a guaranteed API.
+                        This field may not be empty.
+                      type: string
+                    severity:
+                      description: |-
+                        Severity provides an explicit classification of Reason code, so the users or machines can immediately
+                        understand the current situation and act accordingly.
+                        The Severity field MUST be set only when Status=False.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: |-
+                        Type of condition in CamelCase or in foo.example.com/CamelCase.
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions
+                        can be useful (see .node.status.conditions), the ability to deconflict is important.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - status
+                  - type
+                  type: object
+                type: array
+              identityHash:
+                description: |-
+                  identityHash is the hash of the API identity key of this APIExport. This value
+                  is immutable as soon as it is set.
+                type: string
+              virtualWorkspaces:
+                description: |-
+                  virtualWorkspaces contains all APIExport virtual workspace URLs.
+
+
+                  Deprecated: use APIExportEndpointSlice.status.endpoints instead
+                items:
+                  properties:
+                    url:
+                      description: url is an APIExport virtual workspace URL.
+                      minLength: 1
+                      type: string
+                  required:
+                  - url
+                  type: object
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

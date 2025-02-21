@@ -916,6 +916,14 @@ items:
     - nodes/stats
     verbs:
     - '*'
+  - apiGroups:
+    - ""
+    resources:
+    - nodes/configz
+    - nodes/healthz
+    - nodes/pods
+    verbs:
+    - '*'
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -1199,6 +1207,13 @@ items:
     - create
     - patch
     - update
+  - apiGroups:
+    - networking.k8s.io
+    resources:
+    - servicecidrs
+    verbs:
+    - list
+    - watch
   - apiGroups:
     - discovery.k8s.io
     resources:

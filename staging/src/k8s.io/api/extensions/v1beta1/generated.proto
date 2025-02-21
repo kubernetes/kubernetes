@@ -320,19 +320,19 @@ message DeploymentStatus {
   // +optional
   optional int64 observedGeneration = 1;
 
-  // Total number of non-terminated pods targeted by this deployment (their labels match the selector).
+  // Total number of non-terminating pods targeted by this deployment (their labels match the selector).
   // +optional
   optional int32 replicas = 2;
 
-  // Total number of non-terminated pods targeted by this deployment that have the desired template spec.
+  // Total number of non-terminating pods targeted by this deployment that have the desired template spec.
   // +optional
   optional int32 updatedReplicas = 3;
 
-  // Total number of ready pods targeted by this deployment.
+  // Total number of non-terminating pods targeted by this Deployment with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 7;
 
-  // Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
+  // Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.
   // +optional
   optional int32 availableReplicas = 4;
 
@@ -341,6 +341,13 @@ message DeploymentStatus {
   // either be pods that are running but not yet available or pods that still have not been created.
   // +optional
   optional int32 unavailableReplicas = 5;
+
+  // Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
+  // .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
+  //
+  // This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.
+  // +optional
+  optional int32 terminatingReplicas = 9;
 
   // Represents the latest available observations of a deployment's current state.
   // +patchMergeKey=type
@@ -863,16 +870,16 @@ message ReplicaSetList {
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // List of ReplicaSets.
-  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
   repeated ReplicaSet items = 2;
 }
 
 // ReplicaSetSpec is the specification of a ReplicaSet.
 message ReplicaSetSpec {
-  // Replicas is the number of desired replicas.
+  // Replicas is the number of desired pods.
   // This is a pointer to distinguish between explicit zero and unspecified.
   // Defaults to 1.
-  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
   // +optional
   optional int32 replicas = 1;
 
@@ -891,28 +898,35 @@ message ReplicaSetSpec {
 
   // Template is the object that describes the pod that will be created if
   // insufficient replicas are detected.
-  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset/#pod-template
   // +optional
   optional .k8s.io.api.core.v1.PodTemplateSpec template = 3;
 }
 
 // ReplicaSetStatus represents the current status of a ReplicaSet.
 message ReplicaSetStatus {
-  // Replicas is the most recently observed number of replicas.
-  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+  // Replicas is the most recently observed number of non-terminating pods.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicaset
   optional int32 replicas = 1;
 
-  // The number of pods that have labels matching the labels of the pod template of the replicaset.
+  // The number of non-terminating pods that have labels matching the labels of the pod template of the replicaset.
   // +optional
   optional int32 fullyLabeledReplicas = 2;
 
-  // The number of ready replicas for this replica set.
+  // The number of non-terminating pods targeted by this ReplicaSet with a Ready Condition.
   // +optional
   optional int32 readyReplicas = 4;
 
-  // The number of available replicas (ready for at least minReadySeconds) for this replica set.
+  // The number of available non-terminating pods (ready for at least minReadySeconds) for this replica set.
   // +optional
   optional int32 availableReplicas = 5;
+
+  // The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp
+  // and have not yet reached the Failed or Succeeded .status.phase.
+  //
+  // This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.
+  // +optional
+  optional int32 terminatingReplicas = 7;
 
   // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
   // +optional

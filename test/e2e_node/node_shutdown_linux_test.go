@@ -40,10 +40,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 
 	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
@@ -57,7 +57,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), nodefeature.GracefulNodeShutdown, nodefeature.GracefulNodeShutdownBasedOnPodPriority, func() {
+var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.GracefulNodeShutdown, feature.GracefulNodeShutdownBasedOnPodPriority, func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 

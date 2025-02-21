@@ -113,13 +113,14 @@ func (DeploymentSpec) SwaggerDoc() map[string]string {
 
 var map_DeploymentStatus = map[string]string{
 	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
-	"observedGeneration":  "observedGeneration is the generation observed by the deployment controller.",
-	"replicas":            "replicas is the total number of non-terminated pods targeted by this deployment (their labels match the selector).",
-	"updatedReplicas":     "updatedReplicas is the total number of non-terminated pods targeted by this deployment that have the desired template spec.",
-	"readyReplicas":       "readyReplicas is the number of pods targeted by this Deployment controller with a Ready Condition.",
-	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
-	"unavailableReplicas": "unavailableReplicas is the total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
-	"conditions":          "Conditions represent the latest available observations of a deployment's current state.",
+	"observedGeneration":  "The generation observed by the deployment controller.",
+	"replicas":            "Total number of non-terminating pods targeted by this deployment (their labels match the selector).",
+	"updatedReplicas":     "Total number of non-terminating pods targeted by this deployment that have the desired template spec.",
+	"readyReplicas":       "Total number of non-terminating pods targeted by this Deployment with a Ready Condition.",
+	"availableReplicas":   "Total number of available non-terminating pods (ready for at least minReadySeconds) targeted by this deployment.",
+	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
+	"terminatingReplicas": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
+	"conditions":          "Represents the latest available observations of a deployment's current state.",
 	"collisionCount":      "collisionCount is the count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
 }
 

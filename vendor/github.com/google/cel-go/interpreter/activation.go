@@ -156,6 +156,11 @@ type PartialActivation interface {
 	UnknownAttributePatterns() []*AttributePattern
 }
 
+// partialActivationConverter indicates whether an Activation implementation supports conversion to a PartialActivation
+type partialActivationConverter interface {
+	asPartialActivation() (PartialActivation, bool)
+}
+
 // partActivation is the default implementations of the PartialActivation interface.
 type partActivation struct {
 	Activation
@@ -165,4 +170,21 @@ type partActivation struct {
 // UnknownAttributePatterns implements the PartialActivation interface method.
 func (a *partActivation) UnknownAttributePatterns() []*AttributePattern {
 	return a.unknowns
+}
+
+// asPartialActivation returns the partActivation as a PartialActivation interface.
+func (a *partActivation) asPartialActivation() (PartialActivation, bool) {
+	return a, true
+}
+
+func asPartialActivation(vars Activation) (PartialActivation, bool) {
+	// Only internal activation instances may implement this interface
+	if pv, ok := vars.(partialActivationConverter); ok {
+		return pv.asPartialActivation()
+	}
+	// Since Activations may be hierarchical, test whether a parent converts to a PartialActivation
+	if vars.Parent() != nil {
+		return asPartialActivation(vars.Parent())
+	}
+	return nil, false
 }

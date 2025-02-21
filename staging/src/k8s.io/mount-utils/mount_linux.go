@@ -722,7 +722,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	return getDiskFormat(mounter.Exec, disk)
 }
 
-// ListProcMounts is shared with NsEnterMounter
+// ListProcMounts returns a list of all mounted filesystems.
 func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
 	content, err := readMountInfo(mountFilePath)
 	if err != nil {
@@ -776,7 +776,6 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 // Some filesystems may share a source name, e.g. tmpfs. And for bind mounting,
 // it's possible to mount a non-root path of a filesystem, so we need to use
 // root path and major:minor to represent mount source uniquely.
-// This implementation is shared between Linux and NsEnterMounter
 func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	mis, err := ParseMountInfo(mountInfoPath)
 	if err != nil {

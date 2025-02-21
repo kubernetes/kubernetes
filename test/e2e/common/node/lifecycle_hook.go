@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -115,7 +114,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
 			ginkgo.By("delete the pod with lifecycle hook")
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
 				if podWithHook.Spec.Containers[0].Lifecycle.PreStop.HTTPGet != nil {
@@ -255,7 +254,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "Restartable Init Container Lifecycle Hook", func() {
+var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -333,7 +332,7 @@ var _ = SIGDescribe(nodefeature.SidecarContainers, feature.SidecarContainers, "R
 				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
 			ginkgo.By("delete the pod with lifecycle hook")
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(15), f.Timeouts.PodDelete)
 			if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop != nil {
 				ginkgo.By("check prestop hook")
 				if podWithHook.Spec.InitContainers[0].Lifecycle.PreStop.HTTPGet != nil {
@@ -571,7 +570,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 			podClient.CreateSync(ctx, podWithHook)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
 			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			cost := time.Since(start)
 			// cost should be
 			// longer than 5 seconds (pod should sleep for 5 seconds)
@@ -592,7 +591,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 			podClient.CreateSync(ctx, podWithHook)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
 			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(2), e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, *metav1.NewDeleteOptions(2), f.Timeouts.PodDelete)
 			cost := time.Since(start)
 			// cost should be
 			// longer than 2 seconds (we change gracePeriodSeconds to 2 seconds here, and it's less than sleep action)
@@ -618,7 +617,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 			framework.ExpectNoError(e2epod.WaitForContainerTerminated(ctx, f.ClientSet, f.Namespace.Name, p.Name, name, 3*time.Minute))
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
 			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			cost := time.Since(start)
 			// cost should be
 			// shorter than sleep action (container is terminated and sleep action should be ignored)
@@ -650,7 +649,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
 			podClient.CreateSync(ctx, podWithHook)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action with zero duration")
 			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 			cost := time.Since(start)
 			// cost should be
 			// longer than 0 seconds (pod shouldn't sleep and the handler should return immediately)

@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -60,7 +61,9 @@ import (
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/component-base/zpages/flagz"
+	"k8s.io/component-base/zpages/statusz"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -78,6 +81,11 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+const (
+	// kubeProxy defines variable used internally when referring to kube-proxy component
+	kubeProxy = "kube-proxy"
+)
+
 func init() {
 	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
@@ -93,7 +101,7 @@ func NewProxyCommand() *cobra.Command {
 	opts := NewOptions()
 
 	cmd := &cobra.Command{
-		Use: "kube-proxy",
+		Use: kubeProxy,
 		Long: `The Kubernetes network proxy runs on each node. This
 reflects services as defined in the Kubernetes API on each node and can do simple
 TCP, UDP, and SCTP stream forwarding or round robin TCP, UDP, and SCTP forwarding across a set of backends.
@@ -159,7 +167,7 @@ type ProxyServer struct {
 	Broadcaster     events.EventBroadcaster
 	Recorder        events.EventRecorder
 	NodeRef         *v1.ObjectReference
-	HealthzServer   *healthcheck.ProxierHealthServer
+	HealthzServer   *healthcheck.ProxyHealthServer
 	Hostname        string
 	PrimaryIPFamily v1.IPFamily
 	NodeIPs         map[v1.IPFamily]net.IP
@@ -214,7 +222,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	s.Broadcaster = events.NewBroadcaster(&events.EventSinkImpl{Interface: s.Client.EventsV1()})
-	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, "kube-proxy")
+	s.Recorder = s.Broadcaster.NewRecorder(proxyconfigscheme.Scheme, kubeProxy)
 
 	s.NodeRef = &v1.ObjectReference{
 		Kind:      "Node",
@@ -224,7 +232,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxierHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
+		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
 	}
 
 	err = s.platformSetup(ctx)
@@ -415,7 +423,7 @@ func createClient(ctx context.Context, config componentbaseconfig.ClientConnecti
 	return client, nil
 }
 
-func serveHealthz(ctx context.Context, hz *healthcheck.ProxierHealthServer, errCh chan error) {
+func serveHealthz(ctx context.Context, hz *healthcheck.ProxyHealthServer, errCh chan error) {
 	logger := klog.FromContext(ctx)
 	if hz == nil {
 		return
@@ -443,7 +451,7 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 		return
 	}
 
-	proxyMux := mux.NewPathRecorderMux("kube-proxy")
+	proxyMux := mux.NewPathRecorderMux(kubeProxy)
 	healthz.InstallHandler(proxyMux)
 	slis.SLIMetricsWithReset{}.Install(proxyMux)
 
@@ -464,6 +472,10 @@ func serveMetrics(ctx context.Context, bindAddress string, proxyMode kubeproxyco
 
 	if flagzReader != nil {
 		flagz.Install(proxyMux, "kube-proxy", flagzReader)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		statusz.Install(proxyMux, kubeProxy, statusz.NewRegistry(compatibility.DefaultBuildEffectiveVersion()))
 	}
 
 	fn := func() {
@@ -573,7 +585,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	go endpointSliceConfig.Run(ctx.Done())
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
-		serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1beta1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
+		serviceCIDRConfig := config.NewServiceCIDRConfig(ctx, informerFactory.Networking().V1().ServiceCIDRs(), s.Config.ConfigSyncPeriod.Duration)
 		serviceCIDRConfig.RegisterEventHandler(s.Proxier)
 		go serviceCIDRConfig.Run(wait.NeverStop)
 	}
@@ -592,11 +604,9 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(ctx, s.podCIDRs))
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeProxyDrainingTerminatingNodes) {
-		nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
-			HealthServer: s.HealthzServer,
-		})
-	}
+	nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
+		HealthServer: s.HealthzServer,
+	})
 	nodeConfig.RegisterEventHandler(s.Proxier)
 
 	go nodeConfig.Run(wait.NeverStop)

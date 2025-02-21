@@ -94,7 +94,7 @@ var _ = SIGDescribe("Node Performance Testing", framework.WithSerial(), framewor
 		delOpts := metav1.DeleteOptions{
 			GracePeriodSeconds: &gp,
 		}
-		e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, delOpts, e2epod.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, delOpts, f.Timeouts.PodDelete)
 
 		// We are going to give some more time for the CPU manager to do any clean
 		// up it needs to do now that the pod has been deleted. Otherwise we may

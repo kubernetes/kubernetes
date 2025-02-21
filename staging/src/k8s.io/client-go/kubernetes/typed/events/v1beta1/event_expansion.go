@@ -52,7 +52,7 @@ func (e *events) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event,
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
 		Body(event).
-		Do(context.TODO()).
+		Do(context.Background() /* Nothing to do here, v1beta1 will be removed eventually. */).
 		Into(result)
 	return result, err
 }
@@ -73,7 +73,7 @@ func (e *events) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event,
 		Resource("events").
 		Name(event.Name).
 		Body(event).
-		Do(context.TODO()).
+		Do(context.Background() /* Nothing to do here, v1beta1 will be removed eventually. */).
 		Into(result)
 	return result, err
 }
@@ -93,7 +93,7 @@ func (e *events) PatchWithEventNamespace(event *v1beta1.Event, data []byte) (*v1
 		Resource("events").
 		Name(event.Name).
 		Body(data).
-		Do(context.TODO()).
+		Do(context.Background() /* Nothing to do here, v1beta1 will be removed eventually. */).
 		Into(result)
 	return result, err
 }

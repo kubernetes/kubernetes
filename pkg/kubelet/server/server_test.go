@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -534,38 +535,109 @@ func TestAuthzCoverage(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
-	// method:path -> has coverage
-	expectedCases := map[string]bool{}
+	for _, fineGrained := range []bool{false, true} {
+		t.Run(fmt.Sprintf("fineGrained=%v", fineGrained), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGrained)
+			// method:path -> has coverage
+			expectedCases := map[string]bool{}
+
+			// Test all the non-web-service handlers
+			for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
+				expectedCases["GET:"+path] = false
+				expectedCases["POST:"+path] = false
+			}
+
+			// Test all the generated web-service paths
+			for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
+				for _, r := range ws.Routes() {
+					expectedCases[r.Method+":"+r.Path] = false
+				}
+			}
+
+			// This is a sanity check that the Handle->HandleWithFilter() delegation is working
+			// Ideally, these would move to registered web services and this list would get shorter
+			expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor"}
+			for _, expectedPath := range expectedPaths {
+				if _, expected := expectedCases["GET:"+expectedPath]; !expected {
+					t.Errorf("Expected registered handle path %s was missing", expectedPath)
+				}
+			}
+
+			for _, tc := range AuthzTestCases(fineGrained) {
+				expectedCases[tc.Method+":"+tc.Path] = true
+			}
+
+			for tc, found := range expectedCases {
+				if !found {
+					t.Errorf("Missing authz test case for %s", tc)
+				}
+			}
+		})
+	}
+}
+
+func TestInstallAuthNotRequiredHandlers(t *testing.T) {
+	fw := newServerTestWithDebug(false, nil)
+	defer fw.testHTTPServer.Close()
+
+	// No new handlers should be added to this list.
+	allowedAuthNotRequiredHandlers := sets.NewString(
+		"/healthz",
+		"/healthz/log",
+		"/healthz/ping",
+		"/healthz/syncloop",
+		"/metrics",
+		"/metrics/slis",
+		"/metrics/cadvisor",
+		"/metrics/probes",
+		"/metrics/resource",
+		"/pods/",
+		"/stats/",
+		"/stats/summary",
+	)
+
+	// These handlers are explicitly disabled.
+	debuggingDisabledHandlers := sets.NewString(
+		"/run/",
+		"/exec/",
+		"/attach/",
+		"/portForward/",
+		"/containerLogs/",
+		"/runningpods/",
+		"/debug/pprof/",
+		"/logs/",
+	)
+	allowedAuthNotRequiredHandlers.Insert(debuggingDisabledHandlers.UnsortedList()...)
 
 	// Test all the non-web-service handlers
 	for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
-		expectedCases["GET:"+path] = false
-		expectedCases["POST:"+path] = false
+		if !allowedAuthNotRequiredHandlers.Has(path) {
+			t.Errorf("New handler %q must require auth", path)
+		}
 	}
 
 	// Test all the generated web-service paths
 	for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
 		for _, r := range ws.Routes() {
-			expectedCases[r.Method+":"+r.Path] = false
+			if !allowedAuthNotRequiredHandlers.Has(r.Path) {
+				t.Errorf("New handler %q must require auth", r.Path)
+			}
 		}
 	}
 
-	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
-	// Ideally, these would move to registered web services and this list would get shorter
-	expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor"}
-	for _, expectedPath := range expectedPaths {
-		if _, expected := expectedCases["GET:"+expectedPath]; !expected {
-			t.Errorf("Expected registered handle path %s was missing", expectedPath)
-		}
-	}
+	// Ensure the disabled handlers are in fact disabled.
+	for path := range debuggingDisabledHandlers {
+		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+			t.Run(method+":"+path, func(t *testing.T) {
+				req, err := http.NewRequest(method, fw.testHTTPServer.URL+path, nil)
+				require.NoError(t, err)
 
-	for _, tc := range AuthzTestCases(false) {
-		expectedCases[tc.Method+":"+tc.Path] = true
-	}
+				resp, err := http.DefaultClient.Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close() //nolint:errcheck
 
-	for tc, found := range expectedCases {
-		if !found {
-			t.Errorf("Missing authz test case for %s", tc)
+				assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+			})
 		}
 	}
 }
@@ -580,43 +652,47 @@ func TestAuthFilters(t *testing.T) {
 
 	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
 
-	for _, tc := range AuthzTestCases(false) {
-		t.Run(tc.Method+":"+tc.Path, func(t *testing.T) {
-			var (
-				expectedUser = AuthzTestUser()
+	for _, fineGraned := range []bool{false, true} {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, fineGraned)
+		for _, tc := range AuthzTestCases(fineGraned) {
+			t.Run(fmt.Sprintf("method=%v:path=%v:fineGrained=%v", tc.Method, tc.Method, fineGraned), func(t *testing.T) {
+				var (
+					expectedUser = AuthzTestUser()
 
-				calledAuthenticate = false
-				calledAuthorize    = false
-				calledAttributes   = false
-			)
+					calledAuthenticate = false
+					calledAuthorize    = false
+					calledAttributes   = false
+				)
 
-			fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
-				calledAuthenticate = true
-				return &authenticator.Response{User: expectedUser}, true, nil
-			}
-			fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) []authorizer.Attributes {
-				calledAttributes = true
-				require.Equal(t, expectedUser, u)
-				return attributesGetter.GetRequestAttributes(u, req)
-			}
-			fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
-				calledAuthorize = true
-				tc.AssertAttributes(t, []authorizer.Attributes{a})
-				return authorizer.DecisionNoOpinion, "", nil
-			}
+				fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
+					calledAuthenticate = true
+					return &authenticator.Response{User: expectedUser}, true, nil
+				}
+				fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) []authorizer.Attributes {
+					calledAttributes = true
+					require.Equal(t, expectedUser, u)
+					attrs := attributesGetter.GetRequestAttributes(u, req)
+					tc.AssertAttributes(t, attrs)
+					return attrs
+				}
+				fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+					calledAuthorize = true
+					return authorizer.DecisionNoOpinion, "", nil
+				}
 
-			req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
-			require.NoError(t, err)
+				req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
+				require.NoError(t, err)
 
-			resp, err := http.DefaultClient.Do(req)
-			require.NoError(t, err)
-			defer resp.Body.Close()
+				resp, err := http.DefaultClient.Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close() //nolint:errcheck
 
-			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
-			assert.True(t, calledAuthenticate, "Authenticate was not called")
-			assert.True(t, calledAttributes, "Attributes were not called")
-			assert.True(t, calledAuthorize, "Authorize was not called")
-		})
+				assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+				assert.True(t, calledAuthenticate, "Authenticate was not called")
+				assert.True(t, calledAttributes, "Attributes were not called")
+				assert.True(t, calledAuthorize, "Authorize was not called")
+			})
+		}
 	}
 }
 

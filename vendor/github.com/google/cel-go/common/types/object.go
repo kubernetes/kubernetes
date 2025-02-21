@@ -151,7 +151,7 @@ func (o *protoObj) Get(index ref.Val) ref.Val {
 	}
 	fv, err := fd.GetFrom(o.value)
 	if err != nil {
-		return NewErr(err.Error())
+		return NewErrFromString(err.Error())
 	}
 	return o.NativeToValue(fv)
 }

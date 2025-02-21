@@ -96,7 +96,7 @@ func validateKubeFinalizerName(stringValue string, fldPath *field.Path) []string
 	return allWarnings
 }
 
-func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old *unstructured.Unstructured, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
+func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old *unstructured.Unstructured, scale *apiextensions.CustomResourceSubresourceScale, options ...apiextensionsvalidation.ValidationOption) field.ErrorList {
 	if errs := a.ValidateTypeMeta(ctx, obj); len(errs) > 0 {
 		return errs
 	}
@@ -105,7 +105,7 @@ func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, 
 
 	allErrs = append(allErrs, validation.ValidateObjectMetaAccessorUpdate(obj, old, field.NewPath("metadata"))...)
 	if status, hasStatus := obj.UnstructuredContent()["status"]; hasStatus {
-		allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(field.NewPath("status"), status, old.UnstructuredContent()["status"], a.statusSchemaValidator)...)
+		allErrs = append(allErrs, apiextensionsvalidation.ValidateCustomResourceUpdate(field.NewPath("status"), status, old.UnstructuredContent()["status"], a.statusSchemaValidator, options...)...)
 	}
 	allErrs = append(allErrs, a.ValidateScaleStatus(ctx, obj, scale)...)
 

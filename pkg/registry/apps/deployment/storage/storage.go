@@ -306,7 +306,7 @@ func (r *ScaleREST) Destroy() {
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
-		return nil, errors.NewNotFound(apps.Resource("deployments/scale"), name)
+		return nil, err
 	}
 	deployment := obj.(*apps.Deployment)
 	scale, err := scaleFromDeployment(deployment)

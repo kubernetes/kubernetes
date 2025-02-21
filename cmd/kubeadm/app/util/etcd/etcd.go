@@ -249,7 +249,7 @@ func (c *Client) Sync() error {
 	// Syncs the list of endpoints
 	var cli etcdClient
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			var err error
 			cli, err = c.newEtcdClient(c.Endpoints)
@@ -289,7 +289,7 @@ func (c *Client) listMembers(timeout time.Duration) (*clientv3.MemberListRespons
 	var lastError error
 	var resp *clientv3.MemberListResponse
 	if timeout == 0 {
-		timeout = constants.EtcdAPICallTimeout
+		timeout = kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration
 	}
 	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, timeout,
 		true, func(_ context.Context) (bool, error) {
@@ -358,7 +358,7 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 		lastError   error
 		respMembers []*etcdserverpb.Member
 	)
-	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
@@ -447,7 +447,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 		respMembers []*etcdserverpb.Member
 		resp        *clientv3.MemberAddResponse
 	)
-	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
@@ -571,7 +571,7 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 	var (
 		lastError error
 	)
-	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+	err = wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
 			ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 			defer cancel()
@@ -604,7 +604,7 @@ func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error)
 		// Gets the member status
 		var lastError error
 		var resp *clientv3.StatusResponse
-		err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, constants.EtcdAPICallTimeout,
+		err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 			true, func(_ context.Context) (bool, error) {
 				cli, err := c.newEtcdClient(c.Endpoints)
 				if err != nil {

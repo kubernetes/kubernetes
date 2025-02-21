@@ -49,7 +49,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 )
 
 const (
@@ -844,7 +843,7 @@ func podresourcesGetTests(ctx context.Context, f *framework.Framework, cli kubel
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResources, nodefeature.PodResources, func() {
+var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResources, func() {
 	f := framework.NewDefaultFramework("podresources-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -904,7 +903,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					podresourcesGetAllocatableResourcesTests(ctx, cli, sd, onlineCPUs, reservedSystemCPUs)
 				})
 
-				framework.It("should return the expected responses", nodefeature.SidecarContainers, func(ctx context.Context) {
+				framework.It("should return the expected responses", feature.SidecarContainers, func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
 
@@ -1008,7 +1007,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					podresourcesGetTests(ctx, f, cli, false)
 				})
 
-				framework.It("should return the expected responses", nodefeature.SidecarContainers, func(ctx context.Context) {
+				framework.It("should return the expected responses", feature.SidecarContainers, func(ctx context.Context) {
 					onlineCPUs, err := getOnlineCPUs()
 					framework.ExpectNoError(err, "getOnlineCPUs() failed err: %v", err)
 
@@ -1034,7 +1033,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					pod := makePodResourcesTestPod(pd)
 					pod.Spec.Containers[0].Command = []string{"sh", "-c", "/bin/true"}
 					pod = e2epod.NewPodClient(f).Create(ctx, pod)
-					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, time.Minute)
+					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
 					framework.ExpectNoError(err)
 					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)

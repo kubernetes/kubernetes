@@ -17,6 +17,7 @@ limitations under the License.
 package fc
 
 import (
+	"errors"
 	"os"
 	"reflect"
 	"testing"
@@ -75,7 +76,13 @@ func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 		f6 := &fakeFileInfo{
 			name: "fc-0x5005076810213b32-lun-25",
 		}
-		return []os.FileInfo{f4, f5, f6, f1, f2, f3}, nil
+		f7 := &fakeFileInfo{
+			name: "fc-0x500507681021a537-lun-0",
+		}
+		f8 := &fakeFileInfo{
+			name: "fc-0x500507681022a554-lun-2",
+		}
+		return []os.FileInfo{f4, f5, f6, f1, f2, f3, f7, f8}, nil
 	case "/sys/block/":
 		f := &fakeFileInfo{
 			name: "dm-1",
@@ -91,7 +98,15 @@ func (handler *fakeIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 }
 
 func (handler *fakeIOHandler) Lstat(name string) (os.FileInfo, error) {
-	return nil, nil
+	links := map[string]string{
+		"/sys/block/dm-1/slaves/sde": "sde",
+		"/sys/block/dm-1/slaves/sdf": "sdf",
+		"/sys/block/dm-1/slaves/sdg": "sdg",
+	}
+	if dev, ok := links[name]; ok {
+		return &fakeFileInfo{name: dev}, nil
+	}
+	return nil, errors.New("device not found for mock")
 }
 
 func (handler *fakeIOHandler) EvalSymlinks(path string) (string, error) {
@@ -108,12 +123,24 @@ func (handler *fakeIOHandler) EvalSymlinks(path string) (string, error) {
 		return "/dev/sdx", nil
 	case "/dev/disk/by-id/scsi-3600508b400105e210000900000490000":
 		return "/dev/sdd", nil
+	case "/dev/disk/by-path/fc-0x500507681021a537-lun-0":
+		return "/dev/sde", nil
+	case "/dev/disk/by-path/fc-0x500507681022a554-lun-2":
+		return "/dev/sdf", nil
+	case "/dev/sde":
+		return "/dev/sde", nil
+	case "/dev/sdf":
+		return "/dev/sdf", nil
 	}
 	return "", nil
 }
 
 func (handler *fakeIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	return nil
+}
+
+func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
+	return nil, nil
 }
 
 func TestSearchDisk(t *testing.T) {
@@ -164,7 +191,7 @@ func TestSearchDisk(t *testing.T) {
 					lun:  test.lun,
 					io:   &fakeIOHandler{},
 				},
-				deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+				deviceUtil: util.NewDeviceHandler(&fakeIOHandler{}),
 			}
 			devicePath, err := searchDisk(fakeMounter)
 			if test.expectError && err == nil {

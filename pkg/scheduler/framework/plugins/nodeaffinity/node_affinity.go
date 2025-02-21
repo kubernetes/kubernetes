@@ -238,9 +238,6 @@ func (s *preScoreState) Clone() framework.StateData {
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
 func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
-	if len(nodes) == 0 {
-		return nil
-	}
 	preferredNodeAffinity, err := getPodPreferredNodeAffinity(pod)
 	if err != nil {
 		return framework.AsStatus(err)

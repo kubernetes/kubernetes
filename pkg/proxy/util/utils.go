@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,6 +38,9 @@ const (
 
 	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
+
+	// FullSyncPeriod is iptables and nftables proxier full sync period
+	FullSyncPeriod = 1 * time.Hour
 )
 
 // IsZeroCIDR checks whether the input CIDR string is either

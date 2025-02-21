@@ -18,7 +18,6 @@ package componentstatus
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -136,7 +136,7 @@ func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions
 	servers := rs.GetServersToValidate()
 
 	if server, ok := servers[name]; !ok {
-		return nil, fmt.Errorf("Component not found: %s", name)
+		return nil, apierrors.NewNotFound(api.Resource("componentstatus"), name)
 	} else {
 		return rs.getComponentStatus(name, server), nil
 	}

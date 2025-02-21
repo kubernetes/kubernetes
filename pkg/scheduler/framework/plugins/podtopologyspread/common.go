@@ -27,11 +27,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type topologyPair struct {
-	key   string
-	value string
-}
-
 // topologySpreadConstraint is an internal version for v1.TopologySpreadConstraint
 // and where the selector is parsed.
 // Fields are exported for comparison during testing.

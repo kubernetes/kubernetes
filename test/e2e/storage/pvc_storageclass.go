@@ -56,14 +56,14 @@ var _ = utils.SIGDescribe("Retroactive StorageClass Assignment", func() {
 		ginkgo.DeferCleanup(func(cleanupContext context.Context) {
 			// Restore existing default StorageClasses at the end of the test
 			for _, sc := range defaultSCs {
-				setStorageClassDefault(cleanupContext, client, sc.Name, "true")
+				updateDefaultStorageClass(cleanupContext, client, sc.Name, "true")
 			}
 		})
 
 		// Unset all default StorageClasses
 		for _, sc := range defaultSCs {
 			klog.InfoS("Unsetting default StorageClass", "StorageClass", sc.Name)
-			setStorageClassDefault(ctx, client, sc.Name, "false")
+			updateDefaultStorageClass(ctx, client, sc.Name, "false")
 		}
 
 		// Ensure no default StorageClasses exist
@@ -106,19 +106,6 @@ func getDefaultStorageClasses(ctx context.Context, client clientset.Interface) (
 		}
 	}
 	return defaultSCs, nil
-}
-
-func setStorageClassDefault(ctx context.Context, client clientset.Interface, scName string, isDefault string) {
-	sc, err := client.StorageV1().StorageClasses().Get(ctx, scName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Error getting StorageClass")
-
-	if sc.Annotations == nil {
-		sc.Annotations = make(map[string]string)
-	}
-	sc.Annotations[storageutil.IsDefaultStorageClassAnnotation] = isDefault
-
-	_, err = client.StorageV1().StorageClasses().Update(ctx, sc, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "Error updating StorageClass")
 }
 
 func ensureNoDefaultStorageClasses(ctx context.Context, client clientset.Interface) {

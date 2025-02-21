@@ -604,13 +604,12 @@ func WaitForPodNotFoundInNamespace(ctx context.Context, c clientset.Interface, p
 }
 
 // WaitForPodsResponding waits for the pods to response.
-func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string, controllerName string, wantName bool, timeout time.Duration, pods *v1.PodList) error {
+func WaitForPodsResponding(ctx context.Context, c clientset.Interface, ns string, controllerName string, selector labels.Selector, wantName bool, timeout time.Duration, pods *v1.PodList) error {
 	if timeout == 0 {
 		timeout = podRespondingTimeout
 	}
 	ginkgo.By("trying to dial each unique pod")
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": controllerName}))
-	options := metav1.ListOptions{LabelSelector: label.String()}
+	options := metav1.ListOptions{LabelSelector: selector.String()}
 
 	type response struct {
 		podName  string

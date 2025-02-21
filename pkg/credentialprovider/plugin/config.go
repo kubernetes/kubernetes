@@ -18,10 +18,10 @@ package plugin
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"os"
-
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -78,6 +78,7 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 	}
 
 	fieldPath := field.NewPath("providers")
+	seenProviderNames := sets.NewString()
 	for _, provider := range config.Providers {
 		if strings.Contains(provider.Name, "/") {
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("name"), provider.Name, "provider name cannot contain '/'"))
@@ -95,14 +96,15 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("name"), provider.Name, "provider name cannot be '..'"))
 		}
 
+		if seenProviderNames.Has(provider.Name) {
+			allErrs = append(allErrs, field.Duplicate(fieldPath.Child("name"), provider.Name))
+		}
+		seenProviderNames.Insert(provider.Name)
+
 		if provider.APIVersion == "" {
 			allErrs = append(allErrs, field.Required(fieldPath.Child("apiVersion"), "apiVersion is required"))
 		} else if _, ok := apiVersions[provider.APIVersion]; !ok {
-			validAPIVersions := []string{}
-			for apiVersion := range apiVersions {
-				validAPIVersions = append(validAPIVersions, apiVersion)
-			}
-
+			validAPIVersions := sets.StringKeySet(apiVersions).List()
 			allErrs = append(allErrs, field.NotSupported(fieldPath.Child("apiVersion"), provider.APIVersion, validAPIVersions))
 		}
 

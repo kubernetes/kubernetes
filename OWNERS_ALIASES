@@ -159,9 +159,10 @@ aliases:
   # - verult
   sig-scheduling-maintainers:
     - alculquicondor
-    - Huang-Wei
     - ahg-g
+    - Huang-Wei
     - kerthcet
+    - macsko
     - sanposhiho
   # emeritus:
   # - damemi
@@ -173,6 +174,7 @@ aliases:
     - AxeZhan
     - damemi
     - denkensk
+    - dom4ha
     - macsko
     - sanposhiho
     - kerthcet
@@ -365,7 +367,6 @@ aliases:
     - liggitt
     - smarterclayton
   sig-cluster-lifecycle-leads:
-    - CecileRobertMichon
     - fabriziopandini
     - justinsb
     - neolit123

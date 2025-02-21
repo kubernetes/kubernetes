@@ -6894,6 +6894,64 @@ func TestPrintLeaseCandidate(t *testing.T) {
 	}
 }
 
+func TestPrintResourceQuota(t *testing.T) {
+	tests := []struct {
+		resourceQuota api.ResourceQuota
+		options       printers.GenerateOptions
+		expected      []metav1.TableRow
+	}{
+		{
+			resourceQuota: api.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-resourcequota",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: api.ResourceQuotaSpec{},
+				Status: api.ResourceQuotaStatus{
+					Used: api.ResourceList{
+						api.ResourceCPU:                    resource.MustParse("1"),
+						api.ResourceMemory:                 resource.MustParse("1Gi"),
+						api.ResourcePods:                   resource.MustParse("1"),
+						api.ResourceServices:               resource.MustParse("1"),
+						api.ResourceReplicationControllers: resource.MustParse("1"),
+						api.ResourceQuotas:                 resource.MustParse("1"),
+						api.ResourceLimitsCPU:              resource.MustParse("2"),
+						api.ResourceLimitsMemory:           resource.MustParse("2Gi"),
+					},
+					Hard: api.ResourceList{
+						api.ResourceCPU:                    resource.MustParse("100"),
+						api.ResourceMemory:                 resource.MustParse("4Gi"),
+						api.ResourcePods:                   resource.MustParse("10"),
+						api.ResourceServices:               resource.MustParse("10"),
+						api.ResourceReplicationControllers: resource.MustParse("10"),
+						api.ResourceQuotas:                 resource.MustParse("1"),
+						api.ResourceLimitsCPU:              resource.MustParse("200"),
+						api.ResourceLimitsMemory:           resource.MustParse("8Gi"),
+					},
+				},
+			},
+			expected: []metav1.TableRow{
+				{
+					Cells: []interface{}{"test-resourcequota", "cpu: 1/100, memory: 1Gi/4Gi, pods: 1/10, replicationcontrollers: 1/10, resourcequotas: 1/1, services: 1/10", "limits.cpu: 2/200, limits.memory: 2Gi/8Gi", "5m"},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printResourceQuota(&test.resourceQuota, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
 func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -17,6 +17,8 @@ limitations under the License.
 package image
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -28,7 +30,6 @@ import (
 // feature "ImageVolume"
 // See: https://kep.k8s.io/4639
 type imagePlugin struct {
-	spec *volume.Spec
 	volume.MetricsNil
 }
 
@@ -44,9 +45,16 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{p}
 }
 
-func (o *imagePlugin) Init(volume.VolumeHost) error                    { return nil }
-func (o *imagePlugin) GetPluginName() string                           { return pluginName }
-func (o *imagePlugin) GetVolumeName(spec *volume.Spec) (string, error) { return o.spec.Name(), nil }
+func (o *imagePlugin) Init(volume.VolumeHost) error { return nil }
+func (o *imagePlugin) GetPluginName() string        { return pluginName }
+func (o *imagePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("the volumeSpec does not reference an Image volume type")
+	}
+
+	return volumeSource.Reference, nil
+}
 
 func (o *imagePlugin) CanSupport(spec *volume.Spec) bool {
 	return spec != nil && spec.Volume != nil && spec.Volume.Image != nil
@@ -61,7 +69,7 @@ func (o *imagePlugin) NewUnmounter(name string, podUID types.UID) (volume.Unmoun
 }
 
 func (o *imagePlugin) ConstructVolumeSpec(volumeName, mountPath string) (volume.ReconstructedVolume, error) {
-	return volume.ReconstructedVolume{Spec: o.spec}, nil
+	return volume.ReconstructedVolume{}, nil
 }
 
 func (o *imagePlugin) GetAttributes() volume.Attributes {
@@ -81,3 +89,10 @@ func (o *imagePlugin) SupportsMountOption() bool                                
 func (o *imagePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) { return false, nil }
 func (o *imagePlugin) TearDown() error                                             { return nil }
 func (o *imagePlugin) TearDownAt(string) error                                     { return nil }
+
+func getVolumeSource(spec *volume.Spec) *v1.ImageVolumeSource {
+	if spec == nil || spec.Volume == nil {
+		return nil
+	}
+	return spec.Volume.Image
+}

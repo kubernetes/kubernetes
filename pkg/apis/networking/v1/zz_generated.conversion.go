@@ -61,6 +61,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IPAddress)(nil), (*networking.IPAddress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IPAddress_To_networking_IPAddress(a.(*networkingv1.IPAddress), b.(*networking.IPAddress), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.IPAddress)(nil), (*networkingv1.IPAddress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPAddress_To_v1_IPAddress(a.(*networking.IPAddress), b.(*networkingv1.IPAddress), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IPAddressList)(nil), (*networking.IPAddressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IPAddressList_To_networking_IPAddressList(a.(*networkingv1.IPAddressList), b.(*networking.IPAddressList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.IPAddressList)(nil), (*networkingv1.IPAddressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPAddressList_To_v1_IPAddressList(a.(*networking.IPAddressList), b.(*networkingv1.IPAddressList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.IPAddressSpec)(nil), (*networking.IPAddressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_IPAddressSpec_To_networking_IPAddressSpec(a.(*networkingv1.IPAddressSpec), b.(*networking.IPAddressSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.IPAddressSpec)(nil), (*networkingv1.IPAddressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPAddressSpec_To_v1_IPAddressSpec(a.(*networking.IPAddressSpec), b.(*networkingv1.IPAddressSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*networkingv1.IPBlock)(nil), (*networking.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_IPBlock_To_networking_IPBlock(a.(*networkingv1.IPBlock), b.(*networking.IPBlock), scope)
 	}); err != nil {
@@ -301,6 +331,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.ParentReference)(nil), (*networking.ParentReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ParentReference_To_networking_ParentReference(a.(*networkingv1.ParentReference), b.(*networking.ParentReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ParentReference)(nil), (*networkingv1.ParentReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ParentReference_To_v1_ParentReference(a.(*networking.ParentReference), b.(*networkingv1.ParentReference), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*networkingv1.ServiceBackendPort)(nil), (*networking.ServiceBackendPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(a.(*networkingv1.ServiceBackendPort), b.(*networking.ServiceBackendPort), scope)
 	}); err != nil {
@@ -308,6 +348,46 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*networking.ServiceBackendPort)(nil), (*networkingv1.ServiceBackendPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(a.(*networking.ServiceBackendPort), b.(*networkingv1.ServiceBackendPort), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.ServiceCIDR)(nil), (*networking.ServiceCIDR)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ServiceCIDR_To_networking_ServiceCIDR(a.(*networkingv1.ServiceCIDR), b.(*networking.ServiceCIDR), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDR)(nil), (*networkingv1.ServiceCIDR)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDR_To_v1_ServiceCIDR(a.(*networking.ServiceCIDR), b.(*networkingv1.ServiceCIDR), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.ServiceCIDRList)(nil), (*networking.ServiceCIDRList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ServiceCIDRList_To_networking_ServiceCIDRList(a.(*networkingv1.ServiceCIDRList), b.(*networking.ServiceCIDRList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDRList)(nil), (*networkingv1.ServiceCIDRList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDRList_To_v1_ServiceCIDRList(a.(*networking.ServiceCIDRList), b.(*networkingv1.ServiceCIDRList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.ServiceCIDRSpec)(nil), (*networking.ServiceCIDRSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(a.(*networkingv1.ServiceCIDRSpec), b.(*networking.ServiceCIDRSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDRSpec)(nil), (*networkingv1.ServiceCIDRSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDRSpec_To_v1_ServiceCIDRSpec(a.(*networking.ServiceCIDRSpec), b.(*networkingv1.ServiceCIDRSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networkingv1.ServiceCIDRStatus)(nil), (*networking.ServiceCIDRStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(a.(*networkingv1.ServiceCIDRStatus), b.(*networking.ServiceCIDRStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*networking.ServiceCIDRStatus)(nil), (*networkingv1.ServiceCIDRStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_ServiceCIDRStatus_To_v1_ServiceCIDRStatus(a.(*networking.ServiceCIDRStatus), b.(*networkingv1.ServiceCIDRStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -360,6 +440,74 @@ func autoConvert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in *
 // Convert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue is an autogenerated conversion function.
 func Convert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in *networking.HTTPIngressRuleValue, out *networkingv1.HTTPIngressRuleValue, s conversion.Scope) error {
 	return autoConvert_networking_HTTPIngressRuleValue_To_v1_HTTPIngressRuleValue(in, out, s)
+}
+
+func autoConvert_v1_IPAddress_To_networking_IPAddress(in *networkingv1.IPAddress, out *networking.IPAddress, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1_IPAddressSpec_To_networking_IPAddressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1_IPAddress_To_networking_IPAddress is an autogenerated conversion function.
+func Convert_v1_IPAddress_To_networking_IPAddress(in *networkingv1.IPAddress, out *networking.IPAddress, s conversion.Scope) error {
+	return autoConvert_v1_IPAddress_To_networking_IPAddress(in, out, s)
+}
+
+func autoConvert_networking_IPAddress_To_v1_IPAddress(in *networking.IPAddress, out *networkingv1.IPAddress, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_networking_IPAddressSpec_To_v1_IPAddressSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_networking_IPAddress_To_v1_IPAddress is an autogenerated conversion function.
+func Convert_networking_IPAddress_To_v1_IPAddress(in *networking.IPAddress, out *networkingv1.IPAddress, s conversion.Scope) error {
+	return autoConvert_networking_IPAddress_To_v1_IPAddress(in, out, s)
+}
+
+func autoConvert_v1_IPAddressList_To_networking_IPAddressList(in *networkingv1.IPAddressList, out *networking.IPAddressList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]networking.IPAddress)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1_IPAddressList_To_networking_IPAddressList is an autogenerated conversion function.
+func Convert_v1_IPAddressList_To_networking_IPAddressList(in *networkingv1.IPAddressList, out *networking.IPAddressList, s conversion.Scope) error {
+	return autoConvert_v1_IPAddressList_To_networking_IPAddressList(in, out, s)
+}
+
+func autoConvert_networking_IPAddressList_To_v1_IPAddressList(in *networking.IPAddressList, out *networkingv1.IPAddressList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]networkingv1.IPAddress)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_networking_IPAddressList_To_v1_IPAddressList is an autogenerated conversion function.
+func Convert_networking_IPAddressList_To_v1_IPAddressList(in *networking.IPAddressList, out *networkingv1.IPAddressList, s conversion.Scope) error {
+	return autoConvert_networking_IPAddressList_To_v1_IPAddressList(in, out, s)
+}
+
+func autoConvert_v1_IPAddressSpec_To_networking_IPAddressSpec(in *networkingv1.IPAddressSpec, out *networking.IPAddressSpec, s conversion.Scope) error {
+	out.ParentRef = (*networking.ParentReference)(unsafe.Pointer(in.ParentRef))
+	return nil
+}
+
+// Convert_v1_IPAddressSpec_To_networking_IPAddressSpec is an autogenerated conversion function.
+func Convert_v1_IPAddressSpec_To_networking_IPAddressSpec(in *networkingv1.IPAddressSpec, out *networking.IPAddressSpec, s conversion.Scope) error {
+	return autoConvert_v1_IPAddressSpec_To_networking_IPAddressSpec(in, out, s)
+}
+
+func autoConvert_networking_IPAddressSpec_To_v1_IPAddressSpec(in *networking.IPAddressSpec, out *networkingv1.IPAddressSpec, s conversion.Scope) error {
+	out.ParentRef = (*networkingv1.ParentReference)(unsafe.Pointer(in.ParentRef))
+	return nil
+}
+
+// Convert_networking_IPAddressSpec_To_v1_IPAddressSpec is an autogenerated conversion function.
+func Convert_networking_IPAddressSpec_To_v1_IPAddressSpec(in *networking.IPAddressSpec, out *networkingv1.IPAddressSpec, s conversion.Scope) error {
+	return autoConvert_networking_IPAddressSpec_To_v1_IPAddressSpec(in, out, s)
 }
 
 func autoConvert_v1_IPBlock_To_networking_IPBlock(in *networkingv1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
@@ -936,6 +1084,32 @@ func Convert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(in *networking
 	return autoConvert_networking_NetworkPolicySpec_To_v1_NetworkPolicySpec(in, out, s)
 }
 
+func autoConvert_v1_ParentReference_To_networking_ParentReference(in *networkingv1.ParentReference, out *networking.ParentReference, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resource = in.Resource
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_v1_ParentReference_To_networking_ParentReference is an autogenerated conversion function.
+func Convert_v1_ParentReference_To_networking_ParentReference(in *networkingv1.ParentReference, out *networking.ParentReference, s conversion.Scope) error {
+	return autoConvert_v1_ParentReference_To_networking_ParentReference(in, out, s)
+}
+
+func autoConvert_networking_ParentReference_To_v1_ParentReference(in *networking.ParentReference, out *networkingv1.ParentReference, s conversion.Scope) error {
+	out.Group = in.Group
+	out.Resource = in.Resource
+	out.Namespace = in.Namespace
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_networking_ParentReference_To_v1_ParentReference is an autogenerated conversion function.
+func Convert_networking_ParentReference_To_v1_ParentReference(in *networking.ParentReference, out *networkingv1.ParentReference, s conversion.Scope) error {
+	return autoConvert_networking_ParentReference_To_v1_ParentReference(in, out, s)
+}
+
 func autoConvert_v1_ServiceBackendPort_To_networking_ServiceBackendPort(in *networkingv1.ServiceBackendPort, out *networking.ServiceBackendPort, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Number = in.Number
@@ -956,4 +1130,98 @@ func autoConvert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in *netw
 // Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort is an autogenerated conversion function.
 func Convert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in *networking.ServiceBackendPort, out *networkingv1.ServiceBackendPort, s conversion.Scope) error {
 	return autoConvert_networking_ServiceBackendPort_To_v1_ServiceBackendPort(in, out, s)
+}
+
+func autoConvert_v1_ServiceCIDR_To_networking_ServiceCIDR(in *networkingv1.ServiceCIDR, out *networking.ServiceCIDR, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1_ServiceCIDR_To_networking_ServiceCIDR is an autogenerated conversion function.
+func Convert_v1_ServiceCIDR_To_networking_ServiceCIDR(in *networkingv1.ServiceCIDR, out *networking.ServiceCIDR, s conversion.Scope) error {
+	return autoConvert_v1_ServiceCIDR_To_networking_ServiceCIDR(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDR_To_v1_ServiceCIDR(in *networking.ServiceCIDR, out *networkingv1.ServiceCIDR, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_networking_ServiceCIDRSpec_To_v1_ServiceCIDRSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_networking_ServiceCIDRStatus_To_v1_ServiceCIDRStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_networking_ServiceCIDR_To_v1_ServiceCIDR is an autogenerated conversion function.
+func Convert_networking_ServiceCIDR_To_v1_ServiceCIDR(in *networking.ServiceCIDR, out *networkingv1.ServiceCIDR, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDR_To_v1_ServiceCIDR(in, out, s)
+}
+
+func autoConvert_v1_ServiceCIDRList_To_networking_ServiceCIDRList(in *networkingv1.ServiceCIDRList, out *networking.ServiceCIDRList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]networking.ServiceCIDR)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1_ServiceCIDRList_To_networking_ServiceCIDRList is an autogenerated conversion function.
+func Convert_v1_ServiceCIDRList_To_networking_ServiceCIDRList(in *networkingv1.ServiceCIDRList, out *networking.ServiceCIDRList, s conversion.Scope) error {
+	return autoConvert_v1_ServiceCIDRList_To_networking_ServiceCIDRList(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDRList_To_v1_ServiceCIDRList(in *networking.ServiceCIDRList, out *networkingv1.ServiceCIDRList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]networkingv1.ServiceCIDR)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_networking_ServiceCIDRList_To_v1_ServiceCIDRList is an autogenerated conversion function.
+func Convert_networking_ServiceCIDRList_To_v1_ServiceCIDRList(in *networking.ServiceCIDRList, out *networkingv1.ServiceCIDRList, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDRList_To_v1_ServiceCIDRList(in, out, s)
+}
+
+func autoConvert_v1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *networkingv1.ServiceCIDRSpec, out *networking.ServiceCIDRSpec, s conversion.Scope) error {
+	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
+	return nil
+}
+
+// Convert_v1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec is an autogenerated conversion function.
+func Convert_v1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in *networkingv1.ServiceCIDRSpec, out *networking.ServiceCIDRSpec, s conversion.Scope) error {
+	return autoConvert_v1_ServiceCIDRSpec_To_networking_ServiceCIDRSpec(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDRSpec_To_v1_ServiceCIDRSpec(in *networking.ServiceCIDRSpec, out *networkingv1.ServiceCIDRSpec, s conversion.Scope) error {
+	out.CIDRs = *(*[]string)(unsafe.Pointer(&in.CIDRs))
+	return nil
+}
+
+// Convert_networking_ServiceCIDRSpec_To_v1_ServiceCIDRSpec is an autogenerated conversion function.
+func Convert_networking_ServiceCIDRSpec_To_v1_ServiceCIDRSpec(in *networking.ServiceCIDRSpec, out *networkingv1.ServiceCIDRSpec, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDRSpec_To_v1_ServiceCIDRSpec(in, out, s)
+}
+
+func autoConvert_v1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in *networkingv1.ServiceCIDRStatus, out *networking.ServiceCIDRStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+// Convert_v1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus is an autogenerated conversion function.
+func Convert_v1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in *networkingv1.ServiceCIDRStatus, out *networking.ServiceCIDRStatus, s conversion.Scope) error {
+	return autoConvert_v1_ServiceCIDRStatus_To_networking_ServiceCIDRStatus(in, out, s)
+}
+
+func autoConvert_networking_ServiceCIDRStatus_To_v1_ServiceCIDRStatus(in *networking.ServiceCIDRStatus, out *networkingv1.ServiceCIDRStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]metav1.Condition)(unsafe.Pointer(&in.Conditions))
+	return nil
+}
+
+// Convert_networking_ServiceCIDRStatus_To_v1_ServiceCIDRStatus is an autogenerated conversion function.
+func Convert_networking_ServiceCIDRStatus_To_v1_ServiceCIDRStatus(in *networking.ServiceCIDRStatus, out *networkingv1.ServiceCIDRStatus, s conversion.Scope) error {
+	return autoConvert_networking_ServiceCIDRStatus_To_v1_ServiceCIDRStatus(in, out, s)
 }

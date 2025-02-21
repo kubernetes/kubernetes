@@ -421,7 +421,7 @@ var _ = SIGDescribe("kubelet", func() {
 					pod = createPodUsingNfs(ctx, f, c, ns, nfsIP, t.podCmd)
 
 					ginkgo.By("Stop the NFS server")
-					e2evolume.StopNFSServer(f, nfsServerPod)
+					e2evolume.StopNFSServer(ctx, f, nfsServerPod)
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
 					err := e2epod.DeletePodWithWait(ctx, c, pod)
@@ -432,7 +432,7 @@ var _ = SIGDescribe("kubelet", func() {
 					checkPodCleanup(ctx, c, pod, false)
 
 					ginkgo.By("Restart the nfs server")
-					e2evolume.RestartNFSServer(f, nfsServerPod)
+					e2evolume.RestartNFSServer(ctx, f, nfsServerPod)
 
 					ginkgo.By("Verify that the deleted client pod is now cleaned up")
 					checkPodCleanup(ctx, c, pod, true)

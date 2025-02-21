@@ -131,9 +131,9 @@ type ServiceAccountAuthenticationOptions struct {
 	Lookup                bool
 	Issuers               []string
 	JWKSURI               string
-	MaxExpiration         time.Duration
 	ExtendExpiration      bool
-	IsTokenSignerExternal bool
+	MaxExpiration         time.Duration
+	MaxExtendedExpiration time.Duration
 	// OptionalTokenGetter is a function that returns a service account token getter.
 	// If not set, the default token getter will be used.
 	OptionalTokenGetter func(factory informers.SharedInformerFactory) serviceaccount.ServiceAccountTokenGetter
@@ -224,6 +224,7 @@ func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticat
 	}
 	o.ServiceAccounts.Lookup = true
 	o.ServiceAccounts.ExtendExpiration = true
+	o.ServiceAccounts.MaxExtendedExpiration = serviceaccount.ExpirationExtensionSeconds * time.Second
 	return o
 }
 

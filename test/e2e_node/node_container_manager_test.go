@@ -36,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo/v2"
@@ -71,7 +71,7 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration, 
 var _ = SIGDescribe("Node Container Manager", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("node-container-manager")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	f.Describe("Validate Node Allocatable", nodefeature.NodeAllocatable, func() {
+	f.Describe("Validate Node Allocatable", feature.NodeAllocatable, func() {
 		ginkgo.It("sets up the node and runs the test", func(ctx context.Context) {
 			framework.ExpectNoError(runTest(ctx, f))
 		})

@@ -161,7 +161,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testProportionalScalingDeployment(ctx, f)
 	})
 	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func(ctx context.Context) {
-		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce")
 		e2eskipper.SkipIfIPv6("aws")
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)
@@ -396,9 +396,6 @@ var _ = SIGDescribe("Deployment", func() {
 
 		ginkgo.By("patching the DeploymentStatus")
 		deploymentStatusPatch, err := json.Marshal(map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"labels": map[string]string{"test-deployment": "patched-status"},
-			},
 			"status": map[string]interface{}{
 				"readyReplicas":     testDeploymentNoReplicas,
 				"availableReplicas": testDeploymentAvailableReplicas,
@@ -416,11 +413,13 @@ var _ = SIGDescribe("Deployment", func() {
 			case watch.Modified:
 				if deployment, ok := event.Object.(*appsv1.Deployment); ok {
 					found := deployment.ObjectMeta.Name == testDeployment.Name &&
-						deployment.ObjectMeta.Labels["test-deployment-static"] == "true"
+						deployment.Status.ReadyReplicas == testDeploymentNoReplicas &&
+						deployment.Status.AvailableReplicas == testDeploymentAvailableReplicas
+
 					return found, nil
 				}
 			default:
-				framework.Logf("observed event type %v", event.Type)
+				framework.Logf("observed event type %#v", event)
 			}
 			return false, nil
 		})
@@ -738,9 +737,10 @@ func testRollingUpdateDeployment(ctx context.Context, f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 	// Create webserver pods.
-	deploymentPodLabels := map[string]string{"name": "sample-pod"}
+	podName := "sample-pod"
+	deploymentPodLabels := map[string]string{"name": podName}
 	rsPodLabels := map[string]string{
-		"name": "sample-pod",
+		"name": podName,
 		"pod":  WebserverImageName,
 	}
 
@@ -755,7 +755,13 @@ func testRollingUpdateDeployment(ctx context.Context, f *framework.Framework) {
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	// Verify that the required pods have come up.
-	err = e2epod.VerifyPodsRunning(ctx, c, ns, "sample-pod", false, replicas)
+	err = e2epod.VerifyPodsRunning(ctx,
+		c,
+		ns,
+		podName,
+		labels.SelectorFromSet(map[string]string{"name": podName}),
+		false,
+		replicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
 
 	// Create a deployment to delete webserver pods and instead bring up agnhost pods.
@@ -821,9 +827,10 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 	// Create webserver pods.
-	deploymentPodLabels := map[string]string{"name": "cleanup-pod"}
+	podName := "cleanup-pod"
+	deploymentPodLabels := map[string]string{"name": podName}
 	rsPodLabels := map[string]string{
-		"name": "cleanup-pod",
+		"name": podName,
 		"pod":  WebserverImageName,
 	}
 	rsName := "test-cleanup-controller"
@@ -833,7 +840,13 @@ func testDeploymentCleanUpPolicy(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
-	err = e2epod.VerifyPodsRunning(ctx, c, ns, "cleanup-pod", false, replicas)
+	err = e2epod.VerifyPodsRunning(ctx,
+		c,
+		ns,
+		podName,
+		labels.SelectorFromSet(map[string]string{"name": podName}),
+		false,
+		replicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Create a deployment to delete webserver pods and instead bring up agnhost pods.
@@ -904,7 +917,13 @@ func testRolloverDeployment(ctx context.Context, f *framework.Framework) {
 	_, err := c.AppsV1().ReplicaSets(ns).Create(ctx, newRS(rsName, rsReplicas, rsPodLabels, WebserverImageName, WebserverImage, nil), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	// Verify that the required pods have come up.
-	err = e2epod.VerifyPodsRunning(ctx, c, ns, podName, false, rsReplicas)
+	err = e2epod.VerifyPodsRunning(ctx,
+		c,
+		ns,
+		podName,
+		labels.SelectorFromSet(map[string]string{"name": podName}),
+		false,
+		rsReplicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Wait for replica set to become ready before adopting it.
@@ -1203,7 +1222,7 @@ func testProportionalScalingDeployment(ctx context.Context, f *framework.Framewo
 
 	// Verify that the required pods have come up.
 	framework.Logf("Waiting for all required pods to come up")
-	err = e2epod.VerifyPodsRunning(ctx, c, ns, WebserverImageName, false, *(deployment.Spec.Replicas))
+	err = e2epod.VerifyPodsRunning(ctx, c, ns, WebserverImageName, labels.SelectorFromSet(podLabels), false, *(deployment.Spec.Replicas))
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	framework.Logf("Waiting for deployment %q to complete", deployment.Name)

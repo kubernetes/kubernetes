@@ -204,6 +204,49 @@ fi
 # is not used.
 suite_args+=(--report-complete-ginkgo --report-complete-junit)
 
+# When SIGTERM doesn't reach the E2E test suite binaries, ginkgo will exit
+# without collecting information from about the currently running and
+# potentially stuck tests. This seems to happen when Prow shuts down a test
+# job because of a timeout.
+#
+# It's useful to print one final progress report in that case,
+# so GINKGO_PROGRESS_REPORT_ON_SIGTERM (enabled by default when CI=true)
+# catches SIGTERM and forwards it to all processes spawned by ginkgo.
+#
+# Manual invocations can trigger a similar report with `killall -USR1 e2e.test`
+# without having to kill the test run.
+GINKGO_CLI_PID=
+signal_handler() {
+  if [ -n "${GINKGO_CLI_PID}" ]; then
+    cat <<EOF
+
+*** $0: received $1 signal -> asking Ginkgo to stop.
+***
+*** Beware that a timeout may have been caused by some earlier test,
+*** not necessarily the one which gets interrupted now.
+*** See the "Spec runtime" for information about how long the
+*** interrupted test was running.
+
+EOF
+    # This goes to the process group, which is important because we
+    # need to reach the e2e.test processes forked by the Ginkgo CLI.
+    kill -TERM "-${GINKGO_CLI_PID}" || true
+
+    echo "Waiting for Ginkgo with pid ${GINKGO_CLI_PID}..."
+    wait "{$GINKGO_CLI_PID}"
+    echo "Ginkgo terminated."
+  fi
+}
+case "${GINKGO_PROGRESS_REPORT_ON_SIGTERM:-${CI:-no}}" in
+  y|yes|true)
+    kube::util::trap_add "signal_handler INT" INT
+    kube::util::trap_add "signal_handler TERM" TERM
+    # Job control is needed to make the Ginkgo CLI and all workers run
+    # in their own process group.
+    set -m
+    ;;
+esac
+
 # The following invocation is fairly complex. Let's dump it to simplify
 # determining what the final options are. Enabled by default in CI
 # environments like Prow.
@@ -236,4 +279,8 @@ case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
   "${suite_args[@]:+${suite_args[@]}}" \
-  "${@}"
+  "${@}" &
+
+set +x
+GINKGO_CLI_PID=$!
+wait "${GINKGO_CLI_PID}"

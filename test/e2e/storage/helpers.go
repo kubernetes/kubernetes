@@ -67,7 +67,7 @@ func newStorageClass(t testsuites.StorageClassTest, ns string, prefix string) *s
 
 func getDefaultPluginName() string {
 	switch {
-	case framework.ProviderIs("gke"), framework.ProviderIs("gce"):
+	case framework.ProviderIs("gce"):
 		return "kubernetes.io/gce-pd"
 	case framework.ProviderIs("aws"):
 		return "kubernetes.io/aws-ebs"

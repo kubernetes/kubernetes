@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 	clientset "k8s.io/client-go/kubernetes"
 
 	v1 "k8s.io/api/core/v1"
@@ -72,9 +72,10 @@ type manager struct {
 	kubeClient clientset.Interface
 	podManager PodManager
 	// Map from pod UID to sync status of the corresponding pod.
-	podStatuses      map[types.UID]versionedPodStatus
-	podStatusesLock  sync.RWMutex
-	podStatusChannel chan struct{}
+	podStatuses       map[types.UID]versionedPodStatus
+	podResizeStatuses map[types.UID]v1.PodResizeStatus
+	podStatusesLock   sync.RWMutex
+	podStatusChannel  chan struct{}
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
@@ -174,6 +175,7 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		kubeClient:              kubeClient,
 		podManager:              podManager,
 		podStatuses:             make(map[types.UID]versionedPodStatus),
+		podResizeStatuses:       make(map[types.UID]v1.PodResizeStatus),
 		podStatusChannel:        make(chan struct{}, 1),
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
@@ -269,17 +271,31 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*
 	}
 
 	updated := false
-	for i, c := range pod.Spec.Containers {
+	containerAlloc := func(c v1.Container) (v1.ResourceRequirements, bool) {
 		if cAlloc, ok := allocated[c.Name]; ok {
 			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
-				// Allocation differs from pod spec, update
+				// Allocation differs from pod spec, retrieve the allocation
 				if !updated {
-					// If this is the first update, copy the pod
+					// If this is the first update to be performed, copy the pod
 					pod = pod.DeepCopy()
 					updated = true
 				}
-				pod.Spec.Containers[i].Resources = cAlloc
+				return cAlloc, true
 			}
+		}
+		return v1.ResourceRequirements{}, false
+	}
+
+	for i, c := range pod.Spec.Containers {
+		if cAlloc, found := containerAlloc(c); found {
+			// Allocation differs from pod spec, update
+			pod.Spec.Containers[i].Resources = cAlloc
+		}
+	}
+	for i, c := range pod.Spec.InitContainers {
+		if cAlloc, found := containerAlloc(c); found {
+			// Allocation differs from pod spec, update
+			pod.Spec.InitContainers[i].Resources = cAlloc
 		}
 	}
 	return pod, updated
@@ -289,27 +305,37 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*
 func (m *manager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.state.GetPodResizeStatus(string(podUID))
+	return m.podResizeStatuses[podUID]
 }
 
 // SetPodAllocation checkpoints the resources allocated to a pod's containers
 func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
+
+	podAlloc := make(map[string]v1.ResourceRequirements)
 	for _, container := range pod.Spec.Containers {
 		alloc := *container.Resources.DeepCopy()
-		if err := m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc); err != nil {
-			return err
+		podAlloc[container.Name] = alloc
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, container := range pod.Spec.InitContainers {
+			if podutil.IsRestartableInitContainer(&container) {
+				alloc := *container.Resources.DeepCopy()
+				podAlloc[container.Name] = alloc
+			}
 		}
 	}
-	return nil
+
+	return m.state.SetPodResourceAllocation(string(pod.UID), podAlloc)
 }
 
 // SetPodResizeStatus checkpoints the last resizing decision for the pod.
 func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
-	m.podStatusesLock.RLock()
-	defer m.podStatusesLock.RUnlock()
-	m.state.SetPodResizeStatus(string(podUID), resizeStatus)
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	m.podResizeStatuses[podUID] = resizeStatus
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
@@ -779,6 +805,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		delete(m.podResizeStatuses, uid)
 		m.state.Delete(string(uid), "")
 	}
 }
@@ -792,6 +819,7 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				delete(m.podResizeStatuses, key)
 				m.state.Delete(string(key), "")
 			}
 		}

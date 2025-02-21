@@ -178,7 +178,7 @@ func setupSuite(ctx context.Context) {
 	// Run only on Ginkgo node 1
 
 	switch framework.TestContext.Provider {
-	case "gce", "gke":
+	case "gce":
 		logClusterImageSources()
 	}
 

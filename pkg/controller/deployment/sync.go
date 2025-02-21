@@ -27,9 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/features"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -503,6 +505,9 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 		AvailableReplicas:   availableReplicas,
 		UnavailableReplicas: unavailableReplicas,
 		CollisionCount:      deployment.Status.CollisionCount,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		status.TerminatingReplicas = deploymentutil.GetTerminatingReplicaCountForReplicaSets(allRSs)
 	}
 
 	// Copy conditions one by one so we won't mutate the original object.

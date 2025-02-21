@@ -40,6 +40,13 @@ nodes:
     nodeRegistration:
       kubeletExtraArgs:
         v: "5"
+- role: worker
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        v: "5"
 # Feature gates must be the last entry in this YAML.
 # Some Prow jobs add more feature gates with
 #

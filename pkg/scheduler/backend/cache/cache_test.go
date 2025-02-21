@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -51,7 +52,7 @@ func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.No
 		expected.Generation = 0
 	}
 	if actual != nil {
-		if diff := cmp.Diff(expected, actual.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+		if diff := cmp.Diff(expected, actual.info, cmp.AllowUnexported(framework.NodeInfo{}), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 			return fmt.Errorf("Unexpected node info (-want,+got):\n%s", diff)
 		}
 	}
@@ -465,7 +466,7 @@ func TestDump(t *testing.T) {
 	}
 	for name, ni := range snapshot.Nodes {
 		nItem := cache.nodes[name]
-		if diff := cmp.Diff(nItem.info, ni, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+		if diff := cmp.Diff(nItem.info, ni, cmp.AllowUnexported(framework.NodeInfo{}), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 			t.Errorf("Unexpected node info (-want,+got):\n%s", diff)
 		}
 	}
@@ -1245,7 +1246,7 @@ func TestNodeOperators(t *testing.T) {
 
 			// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 			expected.Generation = got.info.Generation
-			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{}), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Failed to add node into scheduler cache (-want,+got):\n%s", diff)
 			}
 
@@ -1264,7 +1265,7 @@ func TestNodeOperators(t *testing.T) {
 				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes.nodeInfoMap, tc.nodes)
 			}
 			expected.Generation = newNode.Generation
-			if diff := cmp.Diff(newNode, expected.Snapshot(), cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			if diff := cmp.Diff(newNode, expected.Snapshot(), cmp.AllowUnexported(framework.NodeInfo{}), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Failed to clone node:\n%s", diff)
 			}
 			// check imageState of NodeInfo with specific image when update snapshot
@@ -1286,7 +1287,7 @@ func TestNodeOperators(t *testing.T) {
 			}
 			expected.Generation = got.info.Generation
 
-			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+			if diff := cmp.Diff(expected, got.info, cmp.AllowUnexported(framework.NodeInfo{}), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 				t.Errorf("Unexpected schedulertypes after updating node (-want, +got):\n%s", diff)
 			}
 			// check imageState of NodeInfo with specific image when update node
@@ -1763,7 +1764,7 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		if want.Node() == nil {
 			want = nil
 		}
-		if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], cmp.AllowUnexported(framework.NodeInfo{})); diff != "" {
+		if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], cmp.AllowUnexported(framework.NodeInfo{}), cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 			return fmt.Errorf("Unexpected node info for node (-want, +got):\n%s", diff)
 		}
 	}

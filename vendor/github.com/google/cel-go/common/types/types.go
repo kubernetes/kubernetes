@@ -768,6 +768,19 @@ func ProtoAsType(t *celpb.Type) (*Type, error) {
 	}
 }
 
+// TypeToProto converts from a CEL-native type representation to canonical CEL celpb.Type protobuf type.
+func TypeToProto(t *Type) (*celpb.Type, error) {
+	exprType, err := TypeToExprType(t)
+	if err != nil {
+		return nil, err
+	}
+	var pbtype celpb.Type
+	if err = convertProto(exprType, &pbtype); err != nil {
+		return nil, err
+	}
+	return &pbtype, nil
+}
+
 func maybeWrapper(t *Type, pbType *exprpb.Type) *exprpb.Type {
 	if t.IsAssignableType(NullType) {
 		return chkdecls.NewWrapperType(pbType)

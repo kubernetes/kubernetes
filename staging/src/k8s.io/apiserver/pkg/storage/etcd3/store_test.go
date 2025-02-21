@@ -952,6 +952,45 @@ func BenchmarkStoreListCreate(b *testing.B) {
 }
 
 func BenchmarkStoreList(b *testing.B) {
-	ctx, store, _ := testSetup(b)
-	storagetesting.RunBenchmarkStoreList(ctx, b, store)
+	klog.SetLogger(logr.Discard())
+	// Based on https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md
+	dimensions := []struct {
+		namespaceCount       int
+		podPerNamespaceCount int
+		nodeCount            int
+	}{
+		{
+			namespaceCount:       10_000,
+			podPerNamespaceCount: 15,
+			nodeCount:            5_000,
+		},
+		{
+			namespaceCount:       50,
+			podPerNamespaceCount: 3_000,
+			nodeCount:            5_000,
+		},
+		{
+			namespaceCount:       100,
+			podPerNamespaceCount: 1_100,
+			nodeCount:            1000,
+		},
+	}
+	for _, dims := range dimensions {
+		b.Run(fmt.Sprintf("Namespaces=%d/Pods=%d/Nodes=%d", dims.namespaceCount, dims.namespaceCount*dims.podPerNamespaceCount, dims.nodeCount), func(b *testing.B) {
+			data := storagetesting.PrepareBenchchmarkData(dims.namespaceCount, dims.podPerNamespaceCount, dims.nodeCount)
+			ctx, store, _ := testSetup(b)
+			var out example.Pod
+			for _, pod := range data.Pods {
+				err := store.Create(ctx, computePodKey(pod), pod, &out, 0)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+			storagetesting.RunBenchmarkStoreList(ctx, b, store, data, false)
+		})
+	}
+}
+
+func computePodKey(obj *example.Pod) string {
+	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }

@@ -178,6 +178,7 @@ func (p *ExecPlugin) invokePlugin(input []byte) ([]byte, error) {
 	}
 	result, err := cmd.Output()
 	if err != nil {
+		//nolint:govet
 		return nil, errors.WrapPrefixf(
 			fmt.Errorf("failure in plugin configured via %s; %w",
 				f.Name(), err), stdErr.String())

@@ -303,12 +303,16 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Internal().V1alpha1().StorageVersions().Informer()}, nil
 
 		// Group=networking.k8s.io, Version=v1
+	case networkingv1.SchemeGroupVersion.WithResource("ipaddresses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().IPAddresses().Informer()}, nil
 	case networkingv1.SchemeGroupVersion.WithResource("ingresses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().Ingresses().Informer()}, nil
 	case networkingv1.SchemeGroupVersion.WithResource("ingressclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().IngressClasses().Informer()}, nil
 	case networkingv1.SchemeGroupVersion.WithResource("networkpolicies"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().NetworkPolicies().Informer()}, nil
+	case networkingv1.SchemeGroupVersion.WithResource("servicecidrs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Networking().V1().ServiceCIDRs().Informer()}, nil
 
 		// Group=networking.k8s.io, Version=v1alpha1
 	case networkingv1alpha1.SchemeGroupVersion.WithResource("ipaddresses"):

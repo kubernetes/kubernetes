@@ -97,6 +97,7 @@ func TestLRUCacheLookup(t *testing.T) {
 			accessor, _ := newQuotaAccessor()
 			accessor.client = kubeClient
 			accessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+			accessor.hasSynced = func() bool { return false }
 			accessor.liveLookupCache = liveLookupCache
 
 			for _, q := range tc.cacheInput {
@@ -151,6 +152,7 @@ func TestGetQuotas(t *testing.T) {
 	accessor, _ := newQuotaAccessor()
 	accessor.client = kubeClient
 	accessor.lister = informerFactory.Core().V1().ResourceQuotas().Lister()
+	accessor.hasSynced = func() bool { return false }
 
 	kubeClient.AddReactor("list", "resourcequotas", func(action core.Action) (bool, runtime.Object, error) {
 		switch action.GetNamespace() {

@@ -93,7 +93,7 @@ func (n *NodePodCIDRHandler) OnNodeSynced() {}
 // NodeEligibleHandler handles the life cycle of the Node's eligibility, as
 // determined by the health server for directing load balancer traffic.
 type NodeEligibleHandler struct {
-	HealthServer *healthcheck.ProxierHealthServer
+	HealthServer *healthcheck.ProxyHealthServer
 }
 
 var _ config.NodeHandler = &NodeEligibleHandler{}

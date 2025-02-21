@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
-	jose "gopkg.in/square/go-jose.v2"
+	jose "gopkg.in/go-jose/go-jose.v2"
 )
 
 const (
@@ -185,7 +185,7 @@ func parseClaim(raw []byte, name string, v interface{}) error {
 	return json.Unmarshal([]byte(val), v)
 }
 
-// Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
+// Verify parses a raw ID Token, verifies it's been signed by the provider, performs
 // any additional checks depending on the Config, and returns the payload.
 //
 // Verify does NOT do nonce validation, which is the callers responsibility.

@@ -973,14 +973,27 @@ func compareMaxContainerRestarts(pi *v1.Pod, pj *v1.Pod) *bool {
 	return nil
 }
 
+// FilterClaimedPods returns pods that are controlled by the controller and match the selector.
+func FilterClaimedPods(controller metav1.Object, selector labels.Selector, pods []*v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
+	for _, pod := range pods {
+		if !metav1.IsControlledBy(pod, controller) {
+			// It's an orphan or owned by someone else.
+			continue
+		}
+		if selector.Matches(labels.Set(pod.Labels)) {
+			result = append(result, pod)
+		}
+	}
+	return result
+}
+
 // FilterActivePods returns pods that have not terminated.
 func FilterActivePods(logger klog.Logger, pods []*v1.Pod) []*v1.Pod {
 	var result []*v1.Pod
 	for _, p := range pods {
 		if IsPodActive(p) {
 			result = append(result, p)
-		} else {
-			logger.V(4).Info("Ignoring inactive pod", "pod", klog.KObj(p), "phase", p.Status.Phase, "deletionTime", klog.SafePtr(p.DeletionTimestamp))
 		}
 	}
 	return result

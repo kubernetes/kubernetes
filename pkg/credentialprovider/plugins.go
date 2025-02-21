@@ -17,16 +17,21 @@ limitations under the License.
 package credentialprovider
 
 import (
-	"reflect"
-	"sort"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
 
+type provider struct {
+	name string
+	impl DockerConfigProvider
+}
+
 // All registered credential providers.
 var providersMutex sync.Mutex
-var providers = make(map[string]DockerConfigProvider)
+var providers = make([]provider, 0)
+var seenProviderNames = sets.NewString()
 
 // RegisterCredentialProvider is called by provider implementations on
 // initialization to register themselves, like so:
@@ -34,15 +39,17 @@ var providers = make(map[string]DockerConfigProvider)
 //	func init() {
 //	 	RegisterCredentialProvider("name", &myProvider{...})
 //	}
-func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
+func RegisterCredentialProvider(name string, p DockerConfigProvider) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
-	_, found := providers[name]
-	if found {
+
+	if seenProviderNames.Has(name) {
 		klog.Fatalf("Credential provider %q was registered twice", name)
 	}
+	seenProviderNames.Insert(name)
+
+	providers = append(providers, provider{name, p})
 	klog.V(4).Infof("Registered credential provider %q", name)
-	providers[name] = provider
 }
 
 // NewDockerKeyring creates a DockerKeyring to use for resolving credentials,
@@ -52,18 +59,10 @@ func NewDockerKeyring() DockerKeyring {
 		Providers: make([]DockerConfigProvider, 0),
 	}
 
-	keys := reflect.ValueOf(providers).MapKeys()
-	stringKeys := make([]string, len(keys))
-	for ix := range keys {
-		stringKeys[ix] = keys[ix].String()
-	}
-	sort.Strings(stringKeys)
-
-	for _, key := range stringKeys {
-		provider := providers[key]
-		if provider.Enabled() {
-			klog.V(4).Infof("Registering credential provider: %v", key)
-			keyring.Providers = append(keyring.Providers, provider)
+	for _, p := range providers {
+		if p.impl.Enabled() {
+			klog.V(4).Infof("Registering credential provider: %v", p.name)
+			keyring.Providers = append(keyring.Providers, p.impl)
 		}
 	}
 

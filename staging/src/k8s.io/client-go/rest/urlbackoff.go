@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"context"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -32,11 +34,23 @@ import (
 var serverIsOverloadedSet = sets.NewInt(429)
 var maxResponseCode = 499
 
+//go:generate mockery
+
+// Deprecated: BackoffManager.Sleep ignores the caller's context. Use BackoffManagerWithContext instead.
 type BackoffManager interface {
-	UpdateBackoff(actualUrl *url.URL, err error, responseCode int)
-	CalculateBackoff(actualUrl *url.URL) time.Duration
+	UpdateBackoff(actualURL *url.URL, err error, responseCode int)
+	CalculateBackoff(actualURL *url.URL) time.Duration
 	Sleep(d time.Duration)
 }
+
+type BackoffManagerWithContext interface {
+	UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int)
+	CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration
+	SleepWithContext(ctx context.Context, d time.Duration)
+}
+
+var _ BackoffManager = &URLBackoff{}
+var _ BackoffManagerWithContext = &URLBackoff{}
 
 // URLBackoff struct implements the semantics on top of Backoff which
 // we need for URL specific exponential backoff.
@@ -49,11 +63,19 @@ type URLBackoff struct {
 type NoBackoff struct {
 }
 
-func (n *NoBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (n *NoBackoff) UpdateBackoff(actualURL *url.URL, err error, responseCode int) {
 	// do nothing.
 }
 
-func (n *NoBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
+func (n *NoBackoff) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
+	// do nothing.
+}
+
+func (n *NoBackoff) CalculateBackoff(actualURL *url.URL) time.Duration {
+	return 0 * time.Second
+}
+
+func (n *NoBackoff) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
 	return 0 * time.Second
 }
 
@@ -61,10 +83,21 @@ func (n *NoBackoff) Sleep(d time.Duration) {
 	time.Sleep(d)
 }
 
+func (n *NoBackoff) SleepWithContext(ctx context.Context, d time.Duration) {
+	if d == 0 {
+		return
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	}
+}
+
 // Disable makes the backoff trivial, i.e., sets it to zero.  This might be used
 // by tests which want to run 1000s of mock requests without slowing down.
 func (b *URLBackoff) Disable() {
-	klog.V(4).Infof("Disabling backoff strategy")
 	b.Backoff = flowcontrol.NewBackOff(0*time.Second, 0*time.Second)
 }
 
@@ -76,32 +109,74 @@ func (b *URLBackoff) baseUrlKey(rawurl *url.URL) string {
 	// in the future.
 	host, err := url.Parse(rawurl.String())
 	if err != nil {
-		klog.V(4).Infof("Error extracting url: %v", rawurl)
-		panic("bad url!")
+		panic(fmt.Sprintf("Error parsing bad URL %q: %v", rawurl, err))
 	}
 	return host.Host
 }
 
 // UpdateBackoff updates backoff metadata
-func (b *URLBackoff) UpdateBackoff(actualUrl *url.URL, err error, responseCode int) {
+func (b *URLBackoff) UpdateBackoff(actualURL *url.URL, err error, responseCode int) {
+	b.UpdateBackoffWithContext(context.Background(), actualURL, err, responseCode)
+}
+
+// UpdateBackoffWithContext updates backoff metadata
+func (b *URLBackoff) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
 	// range for retry counts that we store is [0,13]
 	if responseCode > maxResponseCode || serverIsOverloadedSet.Has(responseCode) {
-		b.Backoff.Next(b.baseUrlKey(actualUrl), b.Backoff.Clock.Now())
+		b.Backoff.Next(b.baseUrlKey(actualURL), b.Backoff.Clock.Now())
 		return
 	} else if responseCode >= 300 || err != nil {
-		klog.V(4).Infof("Client is returning errors: code %v, error %v", responseCode, err)
+		klog.FromContext(ctx).V(4).Info("Client is returning errors", "code", responseCode, "err", err)
 	}
 
 	//If we got this far, there is no backoff required for this URL anymore.
-	b.Backoff.Reset(b.baseUrlKey(actualUrl))
+	b.Backoff.Reset(b.baseUrlKey(actualURL))
 }
 
 // CalculateBackoff takes a url and back's off exponentially,
 // based on its knowledge of existing failures.
-func (b *URLBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
-	return b.Backoff.Get(b.baseUrlKey(actualUrl))
+func (b *URLBackoff) CalculateBackoff(actualURL *url.URL) time.Duration {
+	return b.Backoff.Get(b.baseUrlKey(actualURL))
+}
+
+// CalculateBackoffWithContext takes a url and back's off exponentially,
+// based on its knowledge of existing failures.
+func (b *URLBackoff) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
+	return b.Backoff.Get(b.baseUrlKey(actualURL))
 }
 
 func (b *URLBackoff) Sleep(d time.Duration) {
 	b.Backoff.Clock.Sleep(d)
+}
+
+func (b *URLBackoff) SleepWithContext(ctx context.Context, d time.Duration) {
+	if d == 0 {
+		return
+	}
+	t := b.Backoff.Clock.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C():
+	}
+}
+
+// backoffManagerNopContext wraps a BackoffManager and adds the *WithContext methods.
+type backoffManagerNopContext struct {
+	BackoffManager
+}
+
+var _ BackoffManager = &backoffManagerNopContext{}
+var _ BackoffManagerWithContext = &backoffManagerNopContext{}
+
+func (b *backoffManagerNopContext) UpdateBackoffWithContext(ctx context.Context, actualURL *url.URL, err error, responseCode int) {
+	b.UpdateBackoff(actualURL, err, responseCode)
+}
+
+func (b *backoffManagerNopContext) CalculateBackoffWithContext(ctx context.Context, actualURL *url.URL) time.Duration {
+	return b.CalculateBackoff(actualURL)
+}
+
+func (b *backoffManagerNopContext) SleepWithContext(ctx context.Context, d time.Duration) {
+	b.Sleep(d)
 }

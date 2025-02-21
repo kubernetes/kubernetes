@@ -350,7 +350,7 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 	ginkgo.JustAfterEach(func(ctx context.Context) {
 		// delete the test pod
 		if testPod != nil && testPod.Name != "" {
-			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		}
 
 		// release hugepages
@@ -555,7 +555,7 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 			ginkgo.JustAfterEach(func(ctx context.Context) {
 				// delete the test pod 2
 				if testPod2.Name != "" {
-					e2epod.NewPodClient(f).DeleteSync(ctx, testPod2.Name, metav1.DeleteOptions{}, 2*time.Minute)
+					e2epod.NewPodClient(f).DeleteSync(ctx, testPod2.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 				}
 			})
 		})
@@ -634,7 +634,7 @@ var _ = SIGDescribe("Memory Manager", framework.WithDisruptive(), framework.With
 			ginkgo.JustAfterEach(func(ctx context.Context) {
 				for _, workloadPod := range workloadPods {
 					if workloadPod.Name != "" {
-						e2epod.NewPodClient(f).DeleteSync(ctx, workloadPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+						e2epod.NewPodClient(f).DeleteSync(ctx, workloadPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 					}
 				}
 			})

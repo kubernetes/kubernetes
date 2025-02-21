@@ -1077,7 +1077,6 @@ func TestAddWhileActive(t *testing.T) {
 		wg.Wait()
 	}()
 
-	go informer.Run(stop)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
 	if !listener1.ok() {

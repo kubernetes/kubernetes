@@ -190,7 +190,7 @@ func (r *ScaleREST) Destroy() {
 func (r *ScaleREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	obj, err := r.store.Get(ctx, name, options)
 	if err != nil {
-		return nil, errors.NewNotFound(autoscaling.Resource("replicationcontrollers/scale"), name)
+		return nil, err
 	}
 	rc := obj.(*api.ReplicationController)
 	return scaleFromRC(rc), nil

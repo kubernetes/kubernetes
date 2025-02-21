@@ -49,10 +49,7 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KeyFunction:  MetaNamespaceKeyFunc,
-		KnownObjects: downstream,
-	})
+	fifo := NewRealFIFO(MetaNamespaceKeyFunc, downstream, nil)
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -62,7 +59,6 @@ func Example() {
 		ListerWatcher:    source,
 		ObjectType:       &v1.Pod{},
 		FullResyncPeriod: time.Millisecond * 100,
-		RetryOnError:     false,
 
 		// Let's implement a simple controller that just deletes
 		// everything that comes in.
@@ -88,7 +84,7 @@ func Example() {
 
 				// fifo's KeyOf is easiest, because it handles
 				// DeletedFinalStateUnknown markers.
-				key, err := fifo.KeyOf(newest.Object)
+				key, err := fifo.keyOf(newest.Object)
 				if err != nil {
 					return err
 				}
@@ -367,7 +363,7 @@ func TestUpdate(t *testing.T) {
 	// everything we've added has been deleted.
 	watchCh := make(chan struct{})
 	_, controller := NewInformer(
-		&testLW{
+		&ListWatch{
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				watch, err := source.Watch(options)
 				close(watchCh)

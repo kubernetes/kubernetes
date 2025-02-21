@@ -47,7 +47,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -236,14 +235,14 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		e2eservice.TestReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		ginkgo.By("Scaling the pods to 0")
-		err = tcpJig.Scale(ctx, 0)
+		err = tcpJig.Scale(0)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer with no backends, no answer expected")
 		testNotReachableHTTP(ctx, tcpIngressIP, svcPort, loadBalancerLagTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
-		err = tcpJig.Scale(ctx, 1)
+		err = tcpJig.Scale(1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the TCP service's LoadBalancer")
@@ -384,14 +383,14 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 		testReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 0")
-		err = udpJig.Scale(ctx, 0)
+		err = udpJig.Scale(0)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking that the UDP service's LoadBalancer is not reachable")
 		testNotReachableUDP(ctx, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 
 		ginkgo.By("Scaling the pods to 1")
-		err = udpJig.Scale(ctx, 1)
+		err = udpJig.Scale(1)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("hitting the UDP service's NodePort")
@@ -820,7 +819,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		e2epod.NewPodClient(f).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(f).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -952,7 +951,7 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 
 		// and delete the first pod
 		framework.Logf("Cleaning up %s pod", podBackend1)
-		e2epod.NewPodClient(f).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+		e2epod.NewPodClient(f).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
 		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
 
@@ -1115,10 +1114,10 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 			endpointNodeName := nodes.Items[i].Name
 
 			ginkgo.By("creating a pod to be part of the service " + serviceName + " on node " + endpointNodeName)
-			_, err = jig.Run(ctx, func(rc *v1.ReplicationController) {
-				rc.Name = serviceName
+			_, err = jig.Run(ctx, func(deployment *appsv1.Deployment) {
+				deployment.Name = serviceName
 				if endpointNodeName != "" {
-					rc.Spec.Template.Spec.NodeName = endpointNodeName
+					deployment.Spec.Template.Spec.NodeName = endpointNodeName
 				}
 			})
 			framework.ExpectNoError(err)
@@ -1146,7 +1145,9 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 					threshold)
 				framework.ExpectNoError(err)
 			}
-			framework.ExpectNoError(e2erc.DeleteRCAndWaitForGC(ctx, f.ClientSet, namespace, serviceName))
+
+			err = f.ClientSet.AppsV1().Deployments(namespace).Delete(ctx, serviceName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
 		}
 	})
 
@@ -1172,9 +1173,9 @@ var _ = common.SIGDescribe("LoadBalancers ExternalTrafficPolicy: Local", feature
 		framework.Logf("ingress is %s:%d", ingress, svcPort)
 
 		ginkgo.By("creating endpoints on multiple nodes")
-		_, err = jig.Run(ctx, func(rc *v1.ReplicationController) {
-			rc.Spec.Replicas = ptr.To[int32](2)
-			rc.Spec.Template.Spec.Affinity = &v1.Affinity{
+		_, err = jig.Run(ctx, func(deployment *appsv1.Deployment) {
+			deployment.Spec.Replicas = ptr.To[int32](2)
+			deployment.Spec.Template.Spec.Affinity = &v1.Affinity{
 				PodAntiAffinity: &v1.PodAntiAffinity{
 					RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 						{

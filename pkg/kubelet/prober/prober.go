@@ -98,24 +98,37 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 	}
 
 	result, output, err := pb.runProbeWithRetries(ctx, probeType, probeSpec, pod, status, container, containerID, maxProbeRetries)
-	if err != nil || (result != probe.Success && result != probe.Warning) {
-		// Probe failed in one way or another.
-		if err != nil {
-			klog.V(1).ErrorS(err, "Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
-			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
-		} else { // result != probe.Success
-			klog.V(1).InfoS("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
-			pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
-		}
+
+	if err != nil {
+		// Handle probe error
+		klog.V(1).ErrorS(err, "Probe errored", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
+		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored and resulted in %s state: %s", probeType, result, err)
 		return results.Failure, err
 	}
-	if result == probe.Warning {
+
+	switch result {
+	case probe.Success:
+		klog.V(3).InfoS("Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+		return results.Success, nil
+
+	case probe.Warning:
 		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", probeType, output)
 		klog.V(3).InfoS("Probe succeeded with a warning", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "output", output)
-	} else {
-		klog.V(3).InfoS("Probe succeeded", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+		return results.Success, nil
+
+	case probe.Failure:
+		klog.V(1).InfoS("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
+		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+		return results.Failure, nil
+
+	case probe.Unknown:
+		klog.V(1).InfoS("Probe unknown without error", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
+		return results.Failure, nil
+
+	default:
+		klog.V(1).InfoS("Unsupported probe result", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result)
+		return results.Failure, nil
 	}
-	return results.Success, nil
 }
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
@@ -144,6 +157,8 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 	case p.HTTPGet != nil:
 		req, err := httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
 		if err != nil {
+			// Log and record event for Unknown result
+			klog.V(4).InfoS("HTTP-Probe failed to create request", "error", err)
 			return probe.Unknown, "", err
 		}
 		if klogV4 := klog.V(4); klogV4.Enabled() {
@@ -152,13 +167,14 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 			path := req.URL.Path
 			scheme := req.URL.Scheme
 			headers := p.HTTPGet.HTTPHeaders
-			klogV4.InfoS("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers)
+			klogV4.InfoS("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers, "probeType", probeType)
 		}
 		return pb.http.Probe(req, timeout)
 
 	case p.TCPSocket != nil:
 		port, err := probe.ResolveContainerPort(p.TCPSocket.Port, &container)
 		if err != nil {
+			klog.V(4).InfoS("TCP-Probe failed to resolve port", "error", err)
 			return probe.Unknown, "", err
 		}
 		host := p.TCPSocket.Host
@@ -178,7 +194,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		return pb.grpc.Probe(host, service, int(p.GRPC.Port), timeout)
 
 	default:
-		klog.InfoS("Failed to find probe builder for container", "containerName", container.Name)
+		klog.V(4).InfoS("Failed to find probe builder for container", "containerName", container.Name)
 		return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(pod), container.Name)
 	}
 }

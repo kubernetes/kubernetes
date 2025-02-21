@@ -1464,7 +1464,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.EnvFromSource": {
-        "description": "EnvFromSource represents the source of a set of ConfigMaps",
+        "description": "EnvFromSource represents the source of a set of ConfigMaps or Secrets",
         "properties": {
           "configMapRef": {
             "allOf": [
@@ -1475,7 +1475,7 @@
             "description": "The ConfigMap to select from"
           },
           "prefix": {
-            "description": "An optional identifier to prepend to each key in the ConfigMap. Must be a C_IDENTIFIER.",
+            "description": "Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.",
             "type": "string"
           },
           "secretRef": {
@@ -3041,7 +3041,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "initContainers": {
-            "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
+            "description": "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
             "items": {
               "allOf": [
                 {

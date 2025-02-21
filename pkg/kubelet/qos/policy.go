@@ -86,7 +86,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 
 	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
 	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && isSidecarContainer(pod, container) {
+	if isSidecarContainer(pod, container) {
 		// check min memory quantity in regular containers
 		minMemoryRequest := minRegularContainerMemory(*pod)
 

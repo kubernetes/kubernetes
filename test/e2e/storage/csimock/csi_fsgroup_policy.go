@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -166,27 +165,27 @@ func waitUtilFSGroupInPod(ctx context.Context, m *mockDriverSetup, modified bool
 
 			// Create the subdirectory to ensure that fsGroup propagates
 			createDirectory := fmt.Sprintf("mkdir %s", dirName)
-			_, _, err = e2evolume.PodExec(m.f, pod, createDirectory)
+			_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, m.f, pod.Name, createDirectory)
 			framework.ExpectNoError(err, "failed: creating the directory: %s", err)
 
 			// Inject the contents onto the mount
 			createFile := fmt.Sprintf("echo '%s' > '%s'; sync", "filecontents", fileName)
-			_, _, err = e2evolume.PodExec(m.f, pod, createFile)
+			_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, m.f, pod.Name, createFile)
 			framework.ExpectNoError(err, "failed: writing the contents: %s", err)
 
 			// Delete the created file. This step is mandatory, as the mock driver
 			// won't clean up the contents automatically.
 			defer func() {
 				deleteDir := fmt.Sprintf("rm -fr %s", dirName)
-				_, _, err = e2evolume.PodExec(m.f, pod, deleteDir)
+				_, _, err = e2epod.ExecShellInPodWithFullOutput(ctx, m.f, pod.Name, deleteDir)
 				framework.ExpectNoError(err, "failed: deleting the directory: %s", err)
 			}()
 
 			// Ensure that the fsGroup matches what we expect
 			if modified {
-				utils.VerifyFSGroupInPod(m.f, fileName, strconv.FormatInt(*fsGroup, 10), pod)
+				utils.VerifyFSGroupInPod(ctx, m.f, fileName, strconv.FormatInt(*fsGroup, 10), pod)
 			} else {
-				utils.VerifyFSGroupInPod(m.f, fileName, "root", pod)
+				utils.VerifyFSGroupInPod(ctx, m.f, fileName, "root", pod)
 			}
 		})
 

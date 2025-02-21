@@ -40,7 +40,6 @@ import (
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -149,7 +148,7 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 	pdbLister := fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister()
 
 	ev := &Evaluator{
-		PluginName:            names.DefaultPreemption,
+		PluginName:            pluginName,
 		Handler:               fh,
 		PodLister:             podLister,
 		PdbLister:             pdbLister,
@@ -261,6 +260,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state *framework.CycleState, p
 
 	// Return a FitError only when there are no candidates that fit the pod.
 	if len(candidates) == 0 {
+		logger.V(2).Info("No preemption candidate is found; preemption is not helpful for scheduling", "pod", klog.KObj(pod))
 		fitError := &framework.FitError{
 			Pod:         pod,
 			NumAllNodes: len(allNodes),

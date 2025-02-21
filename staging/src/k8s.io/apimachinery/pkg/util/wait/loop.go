@@ -49,7 +49,7 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 	// if we haven't requested immediate execution, delay once
 	if immediate {
 		if ok, err := func() (bool, error) {
-			defer runtime.HandleCrash()
+			defer runtime.HandleCrashWithContext(ctx)
 			return condition(ctx)
 		}(); err != nil || ok {
 			return err
@@ -83,7 +83,7 @@ func loopConditionUntilContext(ctx context.Context, t Timer, immediate, sliding 
 			t.Next()
 		}
 		if ok, err := func() (bool, error) {
-			defer runtime.HandleCrash()
+			defer runtime.HandleCrashWithContext(ctx)
 			return condition(ctx)
 		}(); err != nil || ok {
 			return err

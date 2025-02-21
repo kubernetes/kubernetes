@@ -19,8 +19,6 @@ package hostutil
 import (
 	"fmt"
 	"os"
-
-	"k8s.io/mount-utils"
 )
 
 // FileType enumerates the known set of possible file types.
@@ -52,10 +50,6 @@ type HostUtils interface {
 	DeviceOpened(pathname string) (bool, error)
 	// PathIsDevice determines if a path is a device.
 	PathIsDevice(pathname string) (bool, error)
-	// GetDeviceNameFromMount finds the device name by checking the mount path
-	// to get the global mount path within its plugin directory.
-	// TODO: Remove this method once the rbd and vsphere plugins are removed from in-tree.
-	GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error)
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
 	MakeRShared(path string) error

@@ -101,29 +101,29 @@ run_kubectl_get_tests() {
   ### Test kubectl get all
   output_message=$(kubectl --v=6 --namespace default get all --chunk-size=0 2>&1 "${kube_flags[@]}")
   # Post-condition: Check if we get 200 OK from all the url(s)
-  kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/pods 200 OK"
-  kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"
-  kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/services 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/daemonsets 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/deployments 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/replicasets 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/statefulsets 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/autoscaling/v2/namespaces/default/horizontalpodautoscalers 200"
-  kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
-  kube::test::if_has_not_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/daemonsets 200 OK"
-  kube::test::if_has_not_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
-  kube::test::if_has_not_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/api/v1/namespaces/default/pods" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/api/v1/namespaces/default/replicationcontrollers" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/api/v1/namespaces/default/services" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/apis/apps/v1/namespaces/default/daemonsets" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/apis/apps/v1/namespaces/default/deployments" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/apis/apps/v1/namespaces/default/replicasets" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/apis/apps/v1/namespaces/default/statefulsets" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/apis/autoscaling/v2/namespaces/default/horizontalpodautoscalers" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/apis/batch/v1/namespaces/default/jobs" status="200 OK"'
+  kube::test::if_has_not_string "${output_message}" '"Response" verb="GET" url=".*/apis/extensions/v1beta1/namespaces/default/daemonsets" status="200 OK"'
+  kube::test::if_has_not_string "${output_message}" '"Response" verb="GET" url=".*/apis/extensions/v1beta1/namespaces/default/deployments" status="200 OK"'
+  kube::test::if_has_not_string "${output_message}" '"Response" verb="GET" url=".*/apis/extensions/v1beta1/namespaces/default/replicasets" status="200 OK"'
 
   ### Test kubectl get chunk size
   output_message=$(kubectl --v=6 get clusterrole --chunk-size=10 2>&1 "${kube_flags[@]}")
   # Post-condition: Check if we get a limit and continue
-  kube::test::if_has_string "${output_message}" "/clusterroles?limit=10 200 OK"
-  kube::test::if_has_string "${output_message}" "/v1/clusterroles?continue="
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/clusterroles?limit=10" status="200 OK"'
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/v1/clusterroles?continue=.*'
 
   ### Test kubectl get chunk size defaults to 500
   output_message=$(kubectl --v=6 get clusterrole 2>&1 "${kube_flags[@]}")
   # Post-condition: Check if we get a limit and continue
-  kube::test::if_has_string "${output_message}" "/clusterroles?limit=500 200 OK"
+  kube::test::if_has_string "${output_message}" '"Response" verb="GET" url=".*/clusterroles?limit=500" status="200 OK"'
 
   ### Test kubectl get accumulates pages
   output_message=$(kubectl get namespaces --chunk-size=1 --no-headers "${kube_flags[@]}")

@@ -145,6 +145,10 @@ type ResourceSliceSpec struct {
 	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
 }
 
+// DriverNameMaxLength is the maximum valid length of a driver name in the
+// ResourceSliceSpec and other places. It's the same as for CSI driver names.
+const DriverNameMaxLength = 63
+
 // ResourcePool describes the pool that ResourceSlices belong to.
 type ResourcePool struct {
 	// Name is used to identify the pool. For node-local devices, this
@@ -428,10 +432,11 @@ type DeviceRequest struct {
 	//   count field.
 	//
 	// - All: This request is for all of the matching devices in a pool.
+	//   At least one device must exist on the node for the allocation to succeed.
 	//   Allocation will fail if some devices are already allocated,
 	//   unless adminAccess is requested.
 	//
-	// If AlloctionMode is not specified, the default mode is ExactCount. If
+	// If AllocationMode is not specified, the default mode is ExactCount. If
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other requests must specify this field.
 	//
@@ -687,7 +692,7 @@ type ResourceClaimStatus struct {
 	// which issued it knows that it must put the pod back into the queue,
 	// waiting for the ResourceClaim to become usable again.
 	//
-	// There can be at most 32 such reservations. This may get increased in
+	// There can be at most 256 such reservations. This may get increased in
 	// the future, but not reduced.
 	//
 	// +optional
@@ -715,9 +720,9 @@ type ResourceClaimStatus struct {
 	Devices []AllocatedDeviceStatus `json:"devices,omitempty" protobuf:"bytes,4,opt,name=devices"`
 }
 
-// ReservedForMaxSize is the maximum number of entries in
+// ResourceClaimReservedForMaxSize is the maximum number of entries in
 // claim.status.reservedFor.
-const ResourceClaimReservedForMaxSize = 32
+const ResourceClaimReservedForMaxSize = 256
 
 // ResourceClaimConsumerReference contains enough information to let you
 // locate the consumer of a ResourceClaim. The user must be a resource in the same

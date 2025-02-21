@@ -20,6 +20,7 @@ limitations under the License.
 package conntrack
 
 import (
+	"errors"
 	"time"
 
 	"github.com/vishvananda/netlink"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	netutils "k8s.io/utils/net"
 )
 
@@ -42,8 +44,12 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 
 	entries, err := ct.ListEntries(ipFamilyMap[ipFamily])
 	if err != nil {
-		klog.ErrorS(err, "Failed to list conntrack entries")
-		return
+		if errors.Is(err, unix.EINTR) {
+			klog.V(2).ErrorS(err, "received a partial result, continuing to clean with partial result")
+		} else {
+			klog.ErrorS(err, "Failed to list conntrack entries")
+			return
+		}
 	}
 
 	// serviceIPEndpointIPs maps service IPs (ClusterIP, LoadBalancerIPs and ExternalIPs)
@@ -115,11 +121,14 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 		}
 	}
 
-	if n, err := ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
+	var n int
+	if n, err = ct.ClearEntries(ipFamilyMap[ipFamily], filters...); err != nil {
 		klog.ErrorS(err, "Failed to clear all conntrack entries", "ipFamily", ipFamily, "entriesDeleted", n, "took", time.Since(start))
 	} else {
 		klog.V(4).InfoS("Finished reconciling conntrack entries", "ipFamily", ipFamily, "entriesDeleted", n, "took", time.Since(start))
 	}
+	metrics.ReconcileConntrackFlowsLatency.WithLabelValues(string(ipFamily)).Observe(metrics.SinceInSeconds(start))
+	metrics.ReconcileConntrackFlowsDeletedEntriesTotal.WithLabelValues(string(ipFamily)).Add(float64(n))
 }
 
 // ipFamilyMap maps v1.IPFamily to the corresponding unix constant.
@@ -139,7 +148,7 @@ var protocolMap = map[v1.Protocol]uint8{
 // filterForNAT returns *conntrackFilter to delete the conntrack entries for connections
 // specified by the destination IP (original direction) and source IP (reply direction).
 func filterForNAT(origin, dest string, protocol v1.Protocol) *conntrackFilter {
-	klog.V(4).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "reply-src", dest, "protocol", protocol)
+	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "reply-src", dest, "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{
@@ -154,7 +163,7 @@ func filterForNAT(origin, dest string, protocol v1.Protocol) *conntrackFilter {
 // filterForPortNAT returns *conntrackFilter to delete the conntrack entries for connections
 // specified by the destination Port (original direction) and source IP (reply direction).
 func filterForPortNAT(dest string, port int, protocol v1.Protocol) *conntrackFilter {
-	klog.V(4).InfoS("Adding conntrack filter for cleanup", "org-port-dst", port, "reply-src", dest, "protocol", protocol)
+	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-port-dst", port, "reply-src", dest, "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{

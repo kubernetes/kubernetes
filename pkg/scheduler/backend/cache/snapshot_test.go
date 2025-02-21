@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -407,7 +408,7 @@ func TestNewSnapshot(t *testing.T) {
 					t.Error("node infos should not be nil")
 				}
 				for j := range test.expectedNodesInfos[i].Pods {
-					if diff := cmp.Diff(test.expectedNodesInfos[i].Pods[j], info.Pods[j]); diff != "" {
+					if diff := cmp.Diff(test.expectedNodesInfos[i].Pods[j], info.Pods[j], cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 						t.Errorf("Unexpected PodInfo (-want +got):\n%s", diff)
 					}
 				}

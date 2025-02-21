@@ -948,7 +948,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// Safe, allowed sysctls can always be used as unsafe sysctls in the spec.
 	// Hence, we concatenate those two lists.
-	safeAndUnsafeSysctls := append(sysctl.SafeSysctlAllowlist(), allowedUnsafeSysctls...)
+	safeAndUnsafeSysctls := append(sysctl.SafeSysctlAllowlist(ctx), allowedUnsafeSysctls...)
 	sysctlsAllowlist, err := sysctl.NewAllowlist(safeAndUnsafeSysctls)
 	if err != nil {
 		return nil, err
@@ -1575,7 +1575,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
 // Note that the modules here must not depend on modules that are not initialized here.
-func (kl *Kubelet) initializeModules() error {
+func (kl *Kubelet) initializeModules(ctx context.Context) error {
 	// Prometheus metrics.
 	metrics.Register(
 		collectors.NewVolumeStatsCollector(kl),
@@ -1614,7 +1614,7 @@ func (kl *Kubelet) initializeModules() error {
 
 	// Start out of memory watcher.
 	if kl.oomWatcher != nil {
-		if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
+		if err := kl.oomWatcher.Start(ctx, kl.nodeRef); err != nil {
 			return fmt.Errorf("failed to start OOM watcher: %w", err)
 		}
 	}
@@ -1721,7 +1721,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		go kl.cloudResourceSyncManager.Run(wait.NeverStop)
 	}
 
-	if err := kl.initializeModules(); err != nil {
+	if err := kl.initializeModules(ctx); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
 		klog.ErrorS(err, "Failed to initialize internal modules")
 		os.Exit(1)
@@ -2812,30 +2812,6 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 	}
 }
 
-func isPodResizeInProgress(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	for _, c := range pod.Spec.Containers {
-		if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
-			if cs.State != kubecontainer.ContainerStateRunning || cs.Resources == nil {
-				continue
-			}
-			if c.Resources.Requests != nil {
-				if cs.Resources.CPURequest != nil && !cs.Resources.CPURequest.Equal(*c.Resources.Requests.Cpu()) {
-					return true
-				}
-			}
-			if c.Resources.Limits != nil {
-				if cs.Resources.CPULimit != nil && !cs.Resources.CPULimit.Equal(*c.Resources.Limits.Cpu()) {
-					return true
-				}
-				if cs.Resources.MemoryLimit != nil && !cs.Resources.MemoryLimit.Equal(*c.Resources.Limits.Memory()) {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
 // canResizePod determines if the requested resize is currently feasible.
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed.
@@ -2853,7 +2829,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
-			if kl.containerManager.GetNodeConfig().ExperimentalMemoryManagerPolicy == "static" {
+			if kl.containerManager.GetNodeConfig().MemoryManagerPolicy == "static" {
 				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 				return false, v1.PodResizeStatusInfeasible, msg
@@ -2928,6 +2904,14 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			if !apiequality.Semantic.DeepEqual(container.Resources, allocatedPod.Spec.Containers[i].Resources) {
 				key := kuberuntime.GetStableKey(pod, &container)
 				kl.backOff.Reset(key)
+			}
+		}
+		for i, container := range pod.Spec.InitContainers {
+			if podutil.IsRestartableInitContainer(&container) {
+				if !apiequality.Semantic.DeepEqual(container.Resources, allocatedPod.Spec.InitContainers[i].Resources) {
+					key := kuberuntime.GetStableKey(pod, &container)
+					kl.backOff.Reset(key)
+				}
 			}
 		}
 		allocatedPod = pod

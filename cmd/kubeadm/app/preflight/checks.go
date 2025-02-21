@@ -863,9 +863,6 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 				klog.V(1).Infof("image exists: %s", image)
 				continue
 			}
-			if err != nil {
-				errorList = append(errorList, errors.Wrapf(err, "failed to check if image %s exists", image))
-			}
 			fallthrough // Proceed with pulling the image if it does not exist
 		case v1.PullAlways:
 			klog.V(1).Infof("pulling: %s", image)
@@ -1086,6 +1083,15 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		IsPrivilegedUserCheck{},
+	}
+
+	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+}
+
+// RunUpgradeChecks initializes checks slice of structs and call RunChecks
+func RunUpgradeChecks(ignorePreflightErrors sets.Set[string]) error {
+	checks := []Checker{
+		SystemVerificationCheck{},
 	}
 
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)

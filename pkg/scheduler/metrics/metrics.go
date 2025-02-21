@@ -110,7 +110,7 @@ var (
 	PermitWaitDuration *metrics.HistogramVec
 	CacheSize          *metrics.GaugeVec
 	// Deprecated: SchedulerCacheSize is deprecated,
-	// and will be removed at v1.33. Please use CacheSize instead.
+	// and will be removed at v1.34. Please use CacheSize instead.
 	SchedulerCacheSize    *metrics.GaugeVec
 	unschedulableReasons  *metrics.GaugeVec
 	PluginEvaluationTotal *metrics.CounterVec

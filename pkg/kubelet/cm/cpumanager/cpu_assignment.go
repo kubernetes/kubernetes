@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 
@@ -39,11 +40,7 @@ const (
 type mapIntInt map[int]int
 
 func (m mapIntInt) Clone() mapIntInt {
-	cp := make(mapIntInt, len(m))
-	for k, v := range m {
-		cp[k] = v
-	}
-	return cp
+	return maps.Clone(m)
 }
 
 func (m mapIntInt) Keys() []int {

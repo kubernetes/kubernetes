@@ -42,7 +42,7 @@ var _ = SIGDescribe(feature.CloudProvider, framework.WithDisruptive(), "Nodes", 
 	ginkgo.BeforeEach(func() {
 		// Only supported in AWS/GCE because those are the only cloud providers
 		// where E2E test are currently running.
-		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 	})
 

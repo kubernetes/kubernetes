@@ -257,7 +257,7 @@ func formatLiteral(c ref.Val) string {
 	case types.Bool:
 		return fmt.Sprintf("%t", v)
 	case types.Bytes:
-		return fmt.Sprintf("b\"%s\"", string(v))
+		return fmt.Sprintf("b%s", strconv.Quote(string(v)))
 	case types.Double:
 		return fmt.Sprintf("%v", float64(v))
 	case types.Int:
