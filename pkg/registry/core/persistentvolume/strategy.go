@@ -20,12 +20,15 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -33,7 +36,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	volumevalidation "k8s.io/kubernetes/pkg/volume/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // persistentvolumeStrategy implements behavior for PersistentVolume objects
@@ -77,7 +79,9 @@ func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object
 	persistentvolume := obj.(*api.PersistentVolume)
 	opts := validation.ValidationOptionsForPersistentVolume(persistentvolume, nil)
 	errorList := validation.ValidatePersistentVolume(persistentvolume, opts)
-	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
+	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
+	errorList = append(errorList, rest.ValidateDeclaratively(ctx, nil, legacyscheme.Scheme, obj)...)
+	return errorList
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -107,7 +111,9 @@ func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	opts := validation.ValidationOptionsForPersistentVolume(newPv, oldPv)
 	errorList := validation.ValidatePersistentVolume(newPv, opts)
 	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
-	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)...)
+	errorList = append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)...)
+	errorList = append(errorList, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old)...)
+	return errorList
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -159,7 +165,9 @@ func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 }
 
 func (persistentvolumeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
+	allErrs := validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old, "status")...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

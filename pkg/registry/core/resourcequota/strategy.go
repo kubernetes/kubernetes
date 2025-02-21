@@ -19,13 +19,15 @@ package resourcequota
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // resourcequotaStrategy implements behavior for ResourceQuota objects
@@ -71,7 +73,9 @@ func (resourcequotaStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new resourcequota.
 func (resourcequotaStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
-	return validation.ValidateResourceQuota(resourcequota)
+	allErrs := validation.ValidateResourceQuota(resourcequota)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, nil, legacyscheme.Scheme, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -91,7 +95,9 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (resourcequotaStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj, oldObj := obj.(*api.ResourceQuota), old.(*api.ResourceQuota)
-	return validation.ValidateResourceQuotaUpdate(newObj, oldObj)
+	allErrs := validation.ValidateResourceQuotaUpdate(newObj, oldObj)
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old)...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -129,7 +135,9 @@ func (resourcequotaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 }
 
 func (resourcequotaStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
+	allErrs := validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old, "status")...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

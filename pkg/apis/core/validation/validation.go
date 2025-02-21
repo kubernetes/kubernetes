@@ -417,8 +417,10 @@ func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath 
 		namePath := idxPath.Child("name")
 		el := validateVolumeSource(&vol.VolumeSource, idxPath, vol.Name, podMeta, opts)
 		if len(vol.Name) == 0 {
+			// Also validated declaratively.
 			el = append(el, field.Required(namePath, ""))
 		} else {
+			// Also validated declaratively.
 			el = append(el, ValidateDNS1123Label(vol.Name, namePath)...)
 		}
 		if allNames.Has(vol.Name) {

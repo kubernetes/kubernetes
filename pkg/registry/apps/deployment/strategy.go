@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -37,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // deploymentStrategy implements behavior for Deployments.
@@ -88,7 +89,9 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
 	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
-	return appsvalidation.ValidateDeployment(deployment, opts)
+	allErrs := appsvalidation.ValidateDeployment(deployment, opts)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, nil, legacyscheme.Scheme, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -152,6 +155,8 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 		}
 	}
 
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old)...)
+
 	return allErrs
 }
 
@@ -199,7 +204,9 @@ func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 
 // ValidateUpdate is the default update validation for an end user updating status
 func (deploymentStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return appsvalidation.ValidateDeploymentStatusUpdate(obj.(*apps.Deployment), old.(*apps.Deployment))
+	allErrs := appsvalidation.ValidateDeploymentStatusUpdate(obj.(*apps.Deployment), old.(*apps.Deployment))
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old, "status")...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

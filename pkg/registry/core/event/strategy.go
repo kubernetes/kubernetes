@@ -61,7 +61,9 @@ func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obje
 func (eventStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
-	return validation.ValidateEventCreate(event, groupVersion)
+	allErrs := validation.ValidateEventCreate(event, groupVersion)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, nil, legacyscheme.Scheme, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -79,7 +81,9 @@ func (eventStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object
 	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
 	oldEvent := old.(*api.Event)
-	return validation.ValidateEventUpdate(event, oldEvent, groupVersion)
+	allErrs := validation.ValidateEventUpdate(event, oldEvent, groupVersion)
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old)...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

@@ -6499,6 +6499,8 @@ message Volume {
   // name of the volume.
   // Must be a DNS_LABEL and unique within the pod.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +required
+  // +k8s:validation:format="dns-label"
   optional string name = 1;
 
   // volumeSource represents the location and type of the mounted volume.

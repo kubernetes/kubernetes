@@ -61,7 +61,9 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cfg := obj.(*api.ConfigMap)
 
-	return validation.ValidateConfigMap(cfg)
+	allErrs := validation.ValidateConfigMap(cfg)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, nil, legacyscheme.Scheme, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -84,7 +86,9 @@ func (strategy) PrepareForUpdate(ctx context.Context, newObj, oldObj runtime.Obj
 func (strategy) ValidateUpdate(ctx context.Context, newObj, oldObj runtime.Object) field.ErrorList {
 	oldCfg, newCfg := oldObj.(*api.ConfigMap), newObj.(*api.ConfigMap)
 
-	return validation.ValidateConfigMapUpdate(newCfg, oldCfg)
+	allErrs := validation.ValidateConfigMapUpdate(newCfg, oldCfg)
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, newCfg, oldCfg)...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

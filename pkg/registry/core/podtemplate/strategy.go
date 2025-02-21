@@ -22,6 +22,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
@@ -55,7 +56,9 @@ func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	template := obj.(*api.PodTemplate)
 	opts := pod.GetValidationOptionsFromPodTemplate(&template.Template, nil)
-	return corevalidation.ValidatePodTemplate(template, opts)
+	allErrs := corevalidation.ValidatePodTemplate(template, opts)
+	allErrs = append(allErrs, rest.ValidateDeclaratively(ctx, nil, legacyscheme.Scheme, obj)...)
+	return allErrs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -95,7 +98,9 @@ func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 
 	// Allow downward api usage of hugepages on pod update if feature is enabled or if the old pod already had used them.
 	opts := pod.GetValidationOptionsFromPodTemplate(&template.Template, &oldTemplate.Template)
-	return corevalidation.ValidatePodTemplateUpdate(template, oldTemplate, opts)
+	allErrs := corevalidation.ValidatePodTemplateUpdate(template, oldTemplate, opts)
+	allErrs = append(allErrs, rest.ValidateUpdateDeclaratively(ctx, nil, legacyscheme.Scheme, obj, old)...)
+	return allErrs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
