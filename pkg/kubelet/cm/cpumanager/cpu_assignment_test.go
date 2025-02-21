@@ -1080,6 +1080,473 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 	}
 }
 
+type takeByTopologyTestCaseForResize struct {
+	description   string
+	topo          *topology.CPUTopology
+	opts          StaticPolicyOptions
+	availableCPUs cpuset.CPUSet
+	reusableCPUs  cpuset.CPUSet
+	numCPUs       int
+	expErr        string
+	expResult     cpuset.CPUSet
+}
+
+func commonTakeByTopologyTestCasesForResize(t *testing.T) []takeByTopologyTestCaseForResize {
+	return []takeByTopologyTestCaseForResize{
+		{
+			"Allocated 1 CPUs, and take 1 cpus from single socket with HT",
+			topoSingleSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1-7"),
+			cpuset.New(0),
+			1,
+			"",
+			cpuset.New(0),
+		},
+		{
+			"Allocated 1 CPU, and take 2 cpu from single socket with HT",
+			topoSingleSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1-7"),
+			cpuset.New(0),
+			2,
+			"",
+			cpuset.New(0, 4),
+		},
+		{
+			"Allocated 1 CPU, and take 2 cpu from single socket with HT, some cpus are taken, no sibling CPU of allocated CPU",
+			topoSingleSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1,3,5,6,7"),
+			cpuset.New(0),
+			2,
+			"",
+			cpuset.New(0, 6),
+		},
+		{
+			"Allocated 1 CPU, and take 3 cpu from single socket with HT, some cpus are taken, no sibling CPU of allocated CPU",
+			topoSingleSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1,3,5,6,7"),
+			cpuset.New(0),
+			3,
+			"",
+			cpuset.New(0, 1, 5),
+		},
+		{
+			"Allocated 1 CPU, and take all cpu from single socket with HT",
+			topoSingleSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "1-7"),
+			cpuset.New(0),
+			8,
+			"",
+			mustParseCPUSet(t, "0-7"),
+		},
+		{
+			"Allocated 1 CPU, take a core from dual socket with HT",
+			topoDualSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-10"),
+			cpuset.New(11),
+			2,
+			"",
+			cpuset.New(5, 11),
+		},
+		{
+			"Allocated 1 CPU, take a socket of cpus from dual socket with HT",
+			topoDualSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-10"),
+			cpuset.New(11),
+			6,
+			"",
+			cpuset.New(1, 3, 5, 7, 9, 11),
+		},
+		{
+			"Allocated 1 CPU, take a socket of cpus and 1 core of CPU from dual socket with HT",
+			topoDualSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-10"),
+			cpuset.New(11),
+			8,
+			"",
+			cpuset.New(0, 1, 3, 5, 6, 7, 9, 11),
+		},
+		{
+			"Allocated 1 CPU, take a socket of cpus from dual socket with multi-numa-per-socket with HT",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-38,40-79"),
+			cpuset.New(39),
+			40,
+			"",
+			mustParseCPUSet(t, "20-39,60-79"),
+		},
+		{
+			"Allocated 1 CPU, take a NUMA node of cpus from dual socket with multi-numa-per-socket with HT",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-38,40-79"),
+			cpuset.New(39),
+			20,
+			"",
+			mustParseCPUSet(t, "30-39,70-79"),
+		},
+		{
+			"Allocated 2 CPUs, take a socket and a NUMA node of cpus from dual socket with multi-numa-per-socket with HT",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-38,40-58,60-79"),
+			cpuset.New(39, 59),
+			60,
+			"",
+			mustParseCPUSet(t, "0-19,30-59,70-79"),
+		},
+		{
+			"Allocated 1 CPU, take NUMA nodes of cpus from dual socket with multi-numa-per-socket with HT, the NUMA node with allocated CPUs already taken some CPUs",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-38,40-69"),
+			cpuset.New(39),
+			40,
+			"",
+			mustParseCPUSet(t, "0-9,20-29,39-48,60-69"),
+		},
+		{
+			"Allocated 1 CPU, take NUMA nodes of cpus from dual socket with multi-numa-per-socket with HT, the NUMA node with allocated CPUs already taken more CPUs",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "9,30-38,49"),
+			cpuset.New(),
+			1,
+			"",
+			mustParseCPUSet(t, "9"),
+		},
+		{
+			"Allocated 1 CPU, take NUMA nodes of cpus and 1 CPU from dual socket with multi-numa-per-socket with HT, the NUMA node with allocated CPUs already taken some CPUs",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{},
+			mustParseCPUSet(t, "0-38,40-69"),
+			cpuset.New(39),
+			41,
+			"",
+			mustParseCPUSet(t, "0-19,39-59"),
+		},
+		{
+			"Allocated 1 CPUs, take a socket of cpus from single socket with HT, 3 cpus",
+			topoSingleSocketHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-6"),
+			cpuset.New(7),
+			3,
+			"",
+			mustParseCPUSet(t, "0,1,7"),
+		},
+		{
+			"Allocated 1 CPUs, take a socket of cpus from dual socket with HT, 3 cpus",
+			topoDualSocketHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-10"),
+			cpuset.New(11),
+			3,
+			"",
+			mustParseCPUSet(t, "1,3,11"),
+		},
+		{
+			"Allocated 1 CPUs, take a socket of cpus from dual socket with HT, 6 cpus",
+			topoDualSocketHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-10"),
+			cpuset.New(11),
+			6,
+			"",
+			mustParseCPUSet(t, "1,3,5,7,9,11"),
+		},
+		{
+			"Allocated 1 CPUs, take a socket of cpus from dual socket with HT, 8 cpus",
+			topoDualSocketHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-10"),
+			cpuset.New(11),
+			8,
+			"",
+			mustParseCPUSet(t, "0,1,2,3,5,7,9,11"),
+		},
+		{
+			"Allocated 1 CPUs, take a socket of cpus from dual socket without HT, 2 cpus",
+			topoDualSocketNoHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-6"),
+			cpuset.New(7),
+			2,
+			"",
+			mustParseCPUSet(t, "4,7"),
+		},
+		{
+			"Allocated 1 CPUs, take a socket of cpus from dual socket with multi numa per socket and HT, 8 cpus",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-38,40-79"),
+			cpuset.New(39),
+			8,
+			"",
+			mustParseCPUSet(t, "20-26,39"),
+		},
+		{
+			"Allocated 1 CPU, take NUMA nodes of cpus from dual socket with multi-numa-per-socket with HT, the NUMA node with allocated CPUs already taken some CPUs",
+			topoDualSocketMultiNumaPerSocketHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-38,40-69"),
+			cpuset.New(39),
+			40,
+			"",
+			mustParseCPUSet(t, "0-9,20-39,60-69"),
+		},
+		{
+			"Allocated 1 CPUs, take a socket of cpus from quad socket four way with HT, 12 cpus",
+			topoQuadSocketFourWayHT,
+			StaticPolicyOptions{DistributeCPUsAcrossCores: true},
+			mustParseCPUSet(t, "0-59,61-287"),
+			cpuset.New(60),
+			8,
+			"",
+			mustParseCPUSet(t, "3,4,11,12,15,16,23,60"),
+		},
+	}
+}
+
+func TestTakeByTopologyNUMAPackedForResize(t *testing.T) {
+	testCases := commonTakeByTopologyTestCasesForResize(t)
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			strategy := CPUSortingStrategyPacked
+			if tc.opts.DistributeCPUsAcrossCores {
+				strategy = CPUSortingStrategySpread
+			}
+
+			result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs, strategy, tc.opts.PreferAlignByUncoreCacheOption, &tc.reusableCPUs, nil)
+
+			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
+				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+			}
+			if !result.Equals(tc.expResult) {
+				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
+			}
+		})
+	}
+}
+
+type takeByTopologyExtendedTestCaseForResize struct {
+	description   string
+	topo          *topology.CPUTopology
+	availableCPUs cpuset.CPUSet
+	reusableCPUs  cpuset.CPUSet
+	numCPUs       int
+	cpuGroupSize  int
+	expErr        string
+	expResult     cpuset.CPUSet
+}
+
+func commonTakeByTopologyExtendedTestCasesForResize(t *testing.T) []takeByTopologyExtendedTestCaseForResize {
+	return []takeByTopologyExtendedTestCaseForResize{
+		{
+			"Allocated 1 CPUs, allocate 4 full cores with 2 distributed across each NUMA node",
+			topoDualSocketHT,
+			mustParseCPUSet(t, "0-10"),
+			cpuset.New(11),
+			8,
+			1,
+			"",
+			mustParseCPUSet(t, "0,6,2,8,1,7,5,11"),
+		},
+		{
+			"Allocated 8 CPUs, allocate 32 full cores with 8 distributed across each NUMA node",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-35,40-75"),
+			mustParseCPUSet(t, "36-39,76-79"),
+			64,
+			1,
+			"",
+			mustParseCPUSet(t, "0-7,10-17,20-27,30-33,36-39,40-47,50-57,60-67,70-73,76-79"),
+		},
+		{
+			"Allocated 2 CPUs, allocate 8 full cores with 2 distributed across each NUMA node",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "2,10-12,20-22,30-32,40-41,50-51,60-61,70-71"),
+			mustParseCPUSet(t, "0,1"),
+			16,
+			1,
+			"",
+			mustParseCPUSet(t, "0-1,10-11,20-21,30-31,40-41,50-51,60-61,70-71"),
+		},
+		{
+			"Allocated 1 CPUs, take 1 cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			mustParseCPUSet(t, "0-10"),
+			mustParseCPUSet(t, "11"),
+			1,
+			1,
+			"",
+			mustParseCPUSet(t, "11"),
+		},
+		{
+			"Allocated 1 CPUs, take 2 cpu from dual socket with HT - core from Socket 0",
+			topoDualSocketHT,
+			mustParseCPUSet(t, "0-10"),
+			mustParseCPUSet(t, "11"),
+			2,
+			1,
+			"",
+			mustParseCPUSet(t, "5,11"),
+		},
+		{
+			"Allocated 2 CPUs, allocate 31 full cores with 15 CPUs distributed across each NUMA node and 1 CPU spilling over to each of NUMA 0, 1",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "2-79"),
+			mustParseCPUSet(t, "0,1"),
+			62,
+			1,
+			"",
+			mustParseCPUSet(t, "0-7,10-17,20-27,30-37,40-47,50-57,60-66,70-76"),
+		},
+		{
+			"Allocated 2 CPUs, allocate 31 full cores with 14 CPUs distributed across each NUMA node and 2 CPUs spilling over to each of NUMA 0, 1, 2 (cpuGroupSize 2)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "2-79"),
+			mustParseCPUSet(t, "0,1"),
+			62,
+			2,
+			"",
+			mustParseCPUSet(t, "0-7,10-17,20-27,30-36,40-47,50-57,60-67,70-76"),
+		},
+		{
+			"Allocated 2 CPUs, allocate 31 full cores with 15 CPUs distributed across each NUMA node and 1 CPU spilling over to each of NUMA 2, 3 (to keep balance)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "2-8,10-18,20-39,40-48,50-58,60-79"),
+			mustParseCPUSet(t, "0,1"),
+			62,
+			1,
+			"",
+			mustParseCPUSet(t, "0-7,10-17,20-27,30-37,40-46,50-56,60-67,70-77"),
+		},
+		{
+			"Allocated 2 CPUs, allocate 31 full cores with 14 CPUs distributed across each NUMA node and 2 CPUs spilling over to each of NUMA 0, 2, 3 (to keep balance with cpuGroupSize 2)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "2-8,10-18,20-39,40-48,50-58,60-79"),
+			mustParseCPUSet(t, "0,1"),
+			62,
+			2,
+			"",
+			mustParseCPUSet(t, "0-7,10-16,20-27,30-37,40-47,50-56,60-67,70-77"),
+		},
+		{
+			"Allocated 4 CPUs, ensure bestRemainder chosen with NUMA nodes that have enough CPUs to satisfy the request",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "10-13,20-23,30-36,40-43,50-53,60-63,70-76"),
+			mustParseCPUSet(t, "0-3"),
+			34,
+			1,
+			"",
+			mustParseCPUSet(t, "0-3,10-13,20-23,30-34,40-43,50-53,60-63,70-74"),
+		},
+		{
+			"Allocated 4 CPUs, ensure previous failure encountered on live machine has been fixed (1/1)",
+			topoDualSocketMultiNumaPerSocketHTLarge,
+			mustParseCPUSet(t, "0,128,30,31,158,159,47,171-175,62,63,190,191,75-79,203-207,94,96,222,223,101-111,229-239,126,127,254,255"),
+			mustParseCPUSet(t, "43-46"),
+			28,
+			1,
+			"",
+			mustParseCPUSet(t, "43-47,75-79,96,101-105,171-174,203-206,229-232"),
+		},
+		{
+			"Allocated 14 CPUs, allocate 24 full cores with 8 distributed across the first 3 NUMA nodes",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "8-39,48-79"),
+			mustParseCPUSet(t, "0-7,40-47"),
+			48,
+			1,
+			"",
+			mustParseCPUSet(t, "0-7,10-17,20-27,40-47,50-57,60-67"),
+		},
+		{
+			"Allocated 20 CPUs, allocated CPUs in numa0 is bigger than distribute CPUs, allocated CPUs by takeByTopologyNUMAPacked",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "10-39,50-79"),
+			mustParseCPUSet(t, "0-9,40-49"),
+			48,
+			1,
+			"",
+			mustParseCPUSet(t, "0-23,40-63"),
+		},
+		{
+			"Allocated 12 CPUs, allocate 24 full cores with 8 distributed across the first 3 NUMA nodes (taking all but 2 from the first NUMA node)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "8-29,32-39,48-69,72-79"),
+			mustParseCPUSet(t, "1-7,41-47"),
+			48,
+			1,
+			"",
+			mustParseCPUSet(t, "1-8,10-17,20-27,41-48,50-57,60-67"),
+		},
+		{
+			"Allocated 10 CPUs, allocate 24 full cores with 8 distributed across the first 3 NUMA nodes (even though all 8 could be allocated from the first NUMA node)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "2-29,31-39,42-69,71-79"),
+			mustParseCPUSet(t, "2-7,42-47"),
+			48,
+			1,
+			"",
+			mustParseCPUSet(t, "2-9,10-17,20-27,42-49,50-57,60-67"),
+		},
+		{
+			"Allocated 2 CPUs, allocate 13 full cores distributed across the 2 NUMA nodes",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-29,31-69,71-79"),
+			mustParseCPUSet(t, "30,70"),
+			26,
+			1,
+			"",
+			mustParseCPUSet(t, "20-26,30-36,60-65,70-75"),
+		},
+		{
+			"Allocated 2 CPUs, allocate 13 full cores distributed across the 2 NUMA nodes (cpuGroupSize 2)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-29,31-69,71-79"),
+			mustParseCPUSet(t, "30,70"),
+			26,
+			2,
+			"",
+			mustParseCPUSet(t, "20-25,30-36,60-65,70-76"),
+		},
+	}
+}
+
+func TestTakeByTopologyNUMADistributedForResize(t *testing.T) {
+	testCases := commonTakeByTopologyExtendedTestCasesForResize(t)
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+
+			result, err := takeByTopologyNUMADistributed(tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize, CPUSortingStrategyPacked, &tc.reusableCPUs, nil)
+			if err != nil {
+				if tc.expErr == "" {
+					t.Errorf("unexpected error [%v]", err)
+				}
+				if tc.expErr != "" && err.Error() != tc.expErr {
+					t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+				}
+				return
+			}
+			if !result.Equals(tc.expResult) {
+				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
+			}
+		})
+	}
+}
+
 func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
 	cpus, err := cpuset.Parse(s)
 	if err != nil {
