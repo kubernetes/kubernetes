@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"fmt"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -389,7 +390,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 
 	s.SetCPUSet(string(pod.UID), container.Name, cpuAllocation.CPUs)
 	p.updateCPUsToReuse(pod, container, cpuAllocation.CPUs)
-	p.updateMetricsOnAllocate(cpuAllocation)
+	p.updateMetricsOnAllocate(s, cpuAllocation)
 
 	klog.V(4).InfoS("Allocated exclusive CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpuset", cpuAllocation.CPUs.String())
 	return nil
@@ -416,7 +417,8 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 		// Mutate the shared pool, adding released cpus.
 		toRelease = toRelease.Difference(cpusInUse)
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
-		p.updateMetricsOnRelease(toRelease)
+		p.updateMetricsOnRelease(s, toRelease)
+
 	}
 	return nil
 }
@@ -755,33 +757,60 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 
 func (p *staticPolicy) initializeMetrics(s state.State) {
 	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
-	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(countExclusiveCPUs(s)))
 	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0)        // ensure the value exists
 	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Add(0)        // ensure the value exists
+	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
+	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(totalAssignedCPUs.Size()))
+	updateAllocationPerNUMAMetric(p.topology, totalAssignedCPUs)
 }
 
-func (p *staticPolicy) updateMetricsOnAllocate(cpuAlloc topology.Allocation) {
+func (p *staticPolicy) updateMetricsOnAllocate(s state.State, cpuAlloc topology.Allocation) {
 	ncpus := cpuAlloc.CPUs.Size()
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(ncpus))
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(-ncpus * 1000))
 	if cpuAlloc.Aligned.UncoreCache {
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedUncoreCache).Inc()
 	}
+	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
+	updateAllocationPerNUMAMetric(p.topology, totalAssignedCPUs)
 }
 
-func (p *staticPolicy) updateMetricsOnRelease(cset cpuset.CPUSet) {
+func (p *staticPolicy) updateMetricsOnRelease(s state.State, cset cpuset.CPUSet) {
 	ncpus := cset.Size()
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Add(float64(-ncpus))
 	metrics.CPUManagerSharedPoolSizeMilliCores.Add(float64(ncpus * 1000))
+	totalAssignedCPUs := getTotalAssignedExclusiveCPUs(s)
+	updateAllocationPerNUMAMetric(p.topology, totalAssignedCPUs.Difference(cset))
 }
 
-func countExclusiveCPUs(s state.State) int {
-	exclusiveCPUs := 0
-	for _, cpuAssign := range s.GetCPUAssignments() {
-		for _, cset := range cpuAssign {
-			exclusiveCPUs += cset.Size()
+func getTotalAssignedExclusiveCPUs(s state.State) cpuset.CPUSet {
+	totalAssignedCPUs := cpuset.New()
+	for _, assignment := range s.GetCPUAssignments() {
+		for _, cset := range assignment {
+			totalAssignedCPUs = totalAssignedCPUs.Union(cset)
 		}
+
 	}
-	return exclusiveCPUs
+	return totalAssignedCPUs
+}
+
+func updateAllocationPerNUMAMetric(topo *topology.CPUTopology, allocatedCPUs cpuset.CPUSet) {
+	numaCount := make(map[int]int)
+
+	// Count CPUs allocated per NUMA node
+	for _, cpuID := range allocatedCPUs.UnsortedList() {
+		numaNode, err := topo.CPUNUMANodeID(cpuID)
+		if err != nil {
+			//NOTE: We are logging the error but it is highly unlikely to happen as the CPUset
+			//      is already computed, evaluated and there is no room for user tampering.
+			klog.ErrorS(err, "Unable to determine NUMA node", "cpuID", cpuID)
+		}
+		numaCount[numaNode]++
+	}
+
+	// Update metric
+	for numaNode, count := range numaCount {
+		metrics.CPUManagerAllocationPerNUMA.WithLabelValues(strconv.Itoa(numaNode)).Set(float64(count))
+	}
 }
