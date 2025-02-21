@@ -27,6 +27,7 @@ import (
 // with apply.
 type PodConditionApplyConfiguration struct {
 	Type               *corev1.PodConditionType `json:"type,omitempty"`
+	ObservedGeneration *int64                   `json:"observedGeneration,omitempty"`
 	Status             *corev1.ConditionStatus  `json:"status,omitempty"`
 	LastProbeTime      *metav1.Time             `json:"lastProbeTime,omitempty"`
 	LastTransitionTime *metav1.Time             `json:"lastTransitionTime,omitempty"`
@@ -45,6 +46,14 @@ func PodCondition() *PodConditionApplyConfiguration {
 // If called multiple times, the Type field is set to the value of the last call.
 func (b *PodConditionApplyConfiguration) WithType(value corev1.PodConditionType) *PodConditionApplyConfiguration {
 	b.Type = &value
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *PodConditionApplyConfiguration) WithObservedGeneration(value int64) *PodConditionApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }
 

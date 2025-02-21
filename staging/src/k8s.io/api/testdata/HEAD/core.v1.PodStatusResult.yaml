@@ -37,6 +37,7 @@ status:
   - lastProbeTime: "2003-01-01T01:01:01Z"
     lastTransitionTime: "2004-01-01T01:01:01Z"
     message: messageValue
+    observedGeneration: 7
     reason: reasonValue
     status: statusValue
     type: typeValue
@@ -231,6 +232,7 @@ status:
       recursiveReadOnly: recursiveReadOnlyValue
   message: messageValue
   nominatedNodeName: nominatedNodeNameValue
+  observedGeneration: 17
   phase: phaseValue
   podIP: podIPValue
   podIPs:
