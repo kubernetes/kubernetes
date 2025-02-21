@@ -25,6 +25,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -66,22 +67,27 @@ var _ = utils.SIGDescribe("CSI Mock when kubelet restart", feature.Kind, framewo
 		framework.ExpectNoError(err, "failed to get PVC %s", pvc.Name)
 		gomega.Expect(pvc.DeletionTimestamp).NotTo(gomega.BeNil(), "PVC %s should have deletion timestamp", pvc.Name)
 
-		// FIXME: the expected behavior is no NodeUnpublishVolume call is made during kubelet restart
-		ginkgo.By(fmt.Sprintf("Verifying that the driver received NodeUnpublishVolume call for PVC %s", pvc.Name))
-		gomega.Eventually(ctx, m.driver.GetCalls).
+		ginkgo.By(fmt.Sprintf("Verifying that the driver didn't receive NodeUnpublishVolume call for PVC %s", pvc.Name))
+		gomega.Consistently(ctx,
+			func(ctx context.Context) interface{} {
+				calls, err := m.driver.GetCalls(ctx)
+				if err != nil {
+					if apierrors.IsUnexpectedServerError(err) {
+						// kubelet might not be ready yet when getting the calls
+						gomega.TryAgainAfter(framework.Poll).Wrap(err).Now()
+						return nil
+					}
+					return nil
+				}
+				return calls
+			}).
 			WithPolling(framework.Poll).
-			WithTimeout(framework.RestartNodeReadyAgainTimeout).
-			Should(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("NodeUnpublishVolume"))))
+			WithTimeout(framework.ClaimProvisionShortTimeout).
+			ShouldNot(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("NodeUnpublishVolume"))))
 
-		// ginkgo.By(fmt.Sprintf("Verifying that the driver didn't receive NodeUnpublishVolume call for PVC %s", pvc.Name))
-		// gomega.Consistently(ctx, m.driver.GetCalls).
-		// 	WithPolling(framework.Poll).
-		// 	WithTimeout(framework.ClaimProvisionShortTimeout).
-		// 	ShouldNot(gomega.ContainElement(gomega.HaveField("Method", gomega.Equal("NodeUnpublishVolume"))))
-
-		// ginkgo.By("Verifying the Pod is still running")
-		// err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
-		// framework.ExpectNoError(err, "failed to wait for pod %s to be running", pod.Name)
+		ginkgo.By("Verifying the Pod is still running")
+		err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+		framework.ExpectNoError(err, "failed to wait for pod %s to be running", pod.Name)
 	})
 })
 
