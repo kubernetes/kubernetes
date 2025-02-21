@@ -486,6 +486,12 @@ const (
 	// Enables only stdout or stderr of the container to be retrievd.
 	PodLogsQuerySplitStreams featuregate.Feature = "PodLogsQuerySplitStreams"
 
+	// owner: @natasha41575
+	// kep: https://kep.k8s.io/5067
+	//
+	// Enables reporting of the ObservedGeneration in the pod status.
+	PodObservedGenerationTracking featuregate.Feature = "PodObservedGenerationTracking"
+
 	// owner: @ddebroy, @kannon92
 	//
 	// Enables reporting of PodReadyToStartContainersCondition condition in pod status after pod

@@ -3324,6 +3324,9 @@ type PodCondition struct {
 	// Human-readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+	// The generation of the pod observed at the point this condition is being reported.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,8,opt,name=observedGeneration"`
 }
 
 // PodResizeStatus shows status of desired resize of a pod's containers.
@@ -4876,6 +4879,9 @@ type PodStatus struct {
 	// e.g. 'Evicted'
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,4,opt,name=reason"`
+	// The generation of the pod observed at the point this pod status is being reported.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,20,opt,name=observedGeneration"`
 	// nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be
 	// scheduled right away as preemption victims receive their graceful termination periods.
 	// This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide
