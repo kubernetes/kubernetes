@@ -167,36 +167,6 @@
         },
         "type": "object"
       },
-      "io.k8s.api.resource.v1beta2.BasicDevice": {
-        "description": "BasicDevice defines one device instance.",
-        "properties": {
-          "attributes": {
-            "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceAttribute"
-                }
-              ],
-              "default": {}
-            },
-            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-            "type": "object"
-          },
-          "capacity": {
-            "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacity"
-                }
-              ],
-              "default": {}
-            },
-            "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
       "io.k8s.api.resource.v1beta2.CELDeviceSelector": {
         "description": "CELDeviceSelector contains a CEL expression for selecting a device.",
         "properties": {
@@ -211,25 +181,164 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.resource.v1beta2.Device": {
-        "description": "Device represents one individual hardware instance that can be selected based on its attributes. Besides the name, exactly one field must be set.",
+      "io.k8s.api.resource.v1beta2.CapacityPool": {
+        "description": "CapacityPool defines a named pool of capacities that are available to be used by devices defined in the ResourceSlice.\n\nThe capacities are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the capacity it uses will no longer be available for use by other devices.",
         "properties": {
-          "basic": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.BasicDevice"
-              }
-            ],
-            "description": "Basic defines one device instance."
+          "capacity": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Capacity defines the set of capacities for this capacity pool The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nCapacities listed here will always take precedence over any included from a mixin.\n\nThe maximum number of capacities is 32. This limit is defined in ResourceSliceMaxAttributesAndCapacities",
+            "type": "object"
+          },
+          "includes": {
+            "description": "Includes defines the set of capacity pool mixins that this capacity pool includes.\n\nThe propertes of each included mixin are applied to this capacity pool in order. Conflicting properties from multiple mixins are taken from the last mixin listed that contains them. Properties set on the capacity pool will always override properties from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of mixins that can be included is 8. This limit is defined in ResourceSliceMaxCapacityPoolMixinRefs.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CapacityPoolMixinRef"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
           },
           "name": {
             "default": "",
-            "description": "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
+            "description": "Name defines the name of the capacity pool. It must be a DNS label.",
             "type": "string"
           }
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.CapacityPoolMixin": {
+        "description": "CapacityPoolMixin defines a mixin that a capacity pool can include.",
+        "properties": {
+          "capacity": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting capacities from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of capacities is 32. This limit is defined in ResourceSliceMaxAttributesAndCapacities.",
+            "type": "object"
+          },
+          "name": {
+            "default": "",
+            "description": "Name is a unique identifier among all capacity pool mixins in the ResourceSlice. It must be a DNS label.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "capacity"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.CapacityPoolMixinRef": {
+        "description": "CapacityPoolMixinRef defines a reference from a capacity pool to a capacity pool mixin.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of a CapacityPoolMixin.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.Device": {
+        "description": "Device represents one individual hardware instance that can be selected based on its attributes. Besides the name, exactly one field must be set.",
+        "properties": {
+          "allNodes": {
+            "description": "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+            "type": "boolean"
+          },
+          "attributes": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceAttribute"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting attributes from those provided via mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32. This limit is defined in ResourceSliceMaxAttributesAndCapacities.",
+            "type": "object"
+          },
+          "capacity": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting capacities from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32. This limit is defined in ResourceSliceMaxAttributesAndCapacities.",
+            "type": "object"
+          },
+          "consumesCapacity": {
+            "description": "ConsumesCapacity defines a list of references to capacity pools and the set of capacities that the device will consume from those pools.\n\nThe capacities can be defined either by referencing one or more DeviceCapacityConsumptionMixins by listing the capacities directly. The latter will always override any capacities coming in from the mixins.\n\nThere can only be a single entry per capacity pool.\n\nThe maximum number of device capacity consumption entries is 32. This is the same as the maximum number of capacity pools allowed in a ResourceSlice. This limit is defined in ResourceSliceMaxDeviceCapacityConsumptions.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacityConsumption"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "includes": {
+            "description": "Includes defines the set of device mixins that this device includes.\n\nThe propertes of each included mixin are applied to this device in order. Conflicting properties from multiple mixins are taken from the last mixin listed that contains them. Properties set on the device will always override properties from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of mixins that can be included is 8. This limit is defined in ResourceSliceMaxCapacityPoolMixinRefs.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceMixinRef"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "name": {
+            "default": "",
+            "description": "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
+            "type": "string"
+          },
+          "nodeName": {
+            "description": "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+            "type": "string"
+          },
+          "nodeSelector": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector"
+              }
+            ],
+            "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set."
+          }
+        },
+        "required": [
+          "name",
+          "consumesCapacity"
         ],
         "type": "object"
       },
@@ -333,6 +442,86 @@
         },
         "required": [
           "value"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.DeviceCapacityConsumption": {
+        "description": "DeviceCapacityConsumption defines a set of capacities that a device will consume from a capacity pool.",
+        "properties": {
+          "capacity": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Capacity defines the capacity that will be consumed by the device.\n\nCapacities listed here will override any capacities that are also defined in any of the referenced mixins.\n\nThe maximum number of capacities is 32.",
+            "type": "object"
+          },
+          "capacityPool": {
+            "default": "",
+            "description": "CapacityPool defines the capacity pool from which the capacities defined (either directly or through a mixin) will be consumed from.",
+            "type": "string"
+          },
+          "includes": {
+            "description": "Includes defines a list of references to DeviceCapacityConsumptionMixins. The capacities listed in these will be included in among the capacities that will be consumed by the device.\n\nCapacities listed directly will override any capacities coming from mixins.\n\nThe maximum number of mixins that can be included is 8. This limit is defined in ResourceSliceMaxDeviceCapacityConsumptionMixinRefs.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixinRef"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "required": [
+          "capacityPool"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixin": {
+        "description": "DeviceCapacityConsumptionMixin defines a mixin that composite devices can include to adopt the consuption capacity defined in the mixin.",
+        "properties": {
+          "capacity": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Capacity defines a set of capacities that a device will consume from a capacity pool.\n\nThe capacity pool is not specified here but is determined from the context in which the DeviceCapacityConsumptionMixin is referenced from the device.\n\nThe maximum number of capacities is 32. This limit is defined in ResourceSliceMaxAttributesAndCapacities.",
+            "type": "object"
+          },
+          "name": {
+            "default": "",
+            "description": "Name is a unique identifier among all device capacity consumption mixins in the ResourceSlice. It must be a DNS label.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "capacity"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixinRef": {
+        "description": "DeviceCapacityConsumptionMixinRef defines a reference to a DeviceCapacityConsumptionMixin.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name is the name of a DeviceCapacityConsumptionMixin.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
         ],
         "type": "object"
       },
@@ -554,6 +743,58 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.DeviceMixin": {
+        "description": "DeviceMixin defines a specific device mixin for each device type. Besides the name, exactly one field must be set.",
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceAttribute"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Attributes defines the set of attributes for this mixin. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting attributes from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32. This limit is defined in ResourceSliceMaxAttributesAndCapacities.",
+            "type": "object"
+          },
+          "capacity": {
+            "additionalProperties": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacity"
+                }
+              ],
+              "default": {}
+            },
+            "description": "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting capacities from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32. This limit is defined in ResourceSliceMaxAttributesAndCapacities.",
+            "type": "object"
+          },
+          "name": {
+            "default": "",
+            "description": "Name is a unique identifier among all device mixins in the ResourceSlice. It must be a DNS label.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.resource.v1beta2.DeviceMixinRef": {
+        "description": "DeviceMixinRef defines a reference to a device mixin.",
+        "properties": {
+          "name": {
+            "default": "",
+            "description": "Name refers to the name of a device mixin in the pool.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1beta2.DeviceRequest": {
@@ -1149,6 +1390,51 @@
           }
         ]
       },
+      "io.k8s.api.resource.v1beta2.ResourceSliceMixins": {
+        "description": "ResourceSliceMixins defines mixins for the ResourceSlice.",
+        "properties": {
+          "capacityPool": {
+            "description": "CapacityPool represents a list of capacity pool mixins, i.e. a collection of capacities that a CapacityPool can \"include\" to extend the set of capacities it already defines.\n\nThe main purposes of these mixins is to reduce the memory footprint of capacity pools since they can reference the mixins provided here rather than duplicate them.\n\nThe total number of device mixins, device capacity consumption mixins, capacity pool mixins, basic devices, and composite devices must be less than 128. This limit is defined in ResourceSliceMaxMixins.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CapacityPoolMixin"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "device": {
+            "description": "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe main purposes of these mixins is to reduce the memory footprint of devices since they can reference the mixins provided here rather than duplicate them.\n\nThe total number of device mixins, device capacity consumption mixins, capacity pool mixins, basic devices, and composite devices must be less than 128. This limit is defined in ResourceSliceMaxMixins.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceMixin"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "deviceCapacityConsumption": {
+            "description": "DeviceCapacityConsumption represents a list of capacity consumption mixins, each of which contains a set of capacities that a device will consume from a capacity pool.\n\nThis makes it possible to define a set of shared capacities that are not tied to a specific pool. The pool is inferred by context in which the DeviceCapacityConsumptionMixin is referenced from the device.\n\nThe total number of device mixins, device capacity consumption mixins, capacity pool mixins, basic devices, and composite devices must be less than 128. This limit is defined in ResourceSliceMaxMixins.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceCapacityConsumptionMixin"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.resource.v1beta2.ResourceSliceSpec": {
         "description": "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
         "properties": {
@@ -1156,8 +1442,21 @@
             "description": "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
             "type": "boolean"
           },
+          "capacityPools": {
+            "description": "CapacityPools defines a list of capacity pools, each of which has a name and a list of capacities available in the pool.\n\nThe names of the pools must be unique in the ResourceSlice.\n\nThe maximum number of pools is 32. This limit is defined in ResourceSliceMaxCapacityPools.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.CapacityPool"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
           "devices": {
-            "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+            "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. This limit is defined in ResourceSliceMaxDevices.",
             "items": {
               "allOf": [
                 {
@@ -1174,6 +1473,14 @@
             "description": "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
             "type": "string"
           },
+          "mixins": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.ResourceSliceMixins"
+              }
+            ],
+            "description": "Mixins defines the mixins available for devices and capacity pools in the ResourceSlice."
+          },
           "nodeName": {
             "description": "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
             "type": "string"
@@ -1185,6 +1492,10 @@
               }
             ],
             "description": "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set."
+          },
+          "perDeviceNodeSelection": {
+            "description": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+            "type": "boolean"
           },
           "pool": {
             "allOf": [

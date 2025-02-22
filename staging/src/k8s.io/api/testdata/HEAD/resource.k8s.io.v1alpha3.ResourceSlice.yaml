@@ -34,6 +34,12 @@ metadata:
   uid: uidValue
 spec:
   allNodes: true
+  capacityPools:
+  - capacity:
+      capacityKey: "0"
+    includes:
+    - name: nameValue
+    name: nameValue
   devices:
   - basic:
       attributes:
@@ -44,8 +50,59 @@ spec:
           version: versionValue
       capacity:
         capacityKey: "0"
+    composite:
+      allNodes: true
+      attributes:
+        attributesKey:
+          bool: true
+          int: 2
+          string: stringValue
+          version: versionValue
+      capacity:
+        capacityKey: "0"
+      consumesCapacity:
+      - capacity:
+          capacityKey: "0"
+        capacityPool: capacityPoolValue
+        includes:
+        - name: nameValue
+      includes:
+      - name: nameValue
+      nodeName: nodeNameValue
+      nodeSelector:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchFields:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
     name: nameValue
   driver: driverValue
+  mixins:
+    capacityPool:
+    - capacity:
+        capacityKey: "0"
+      name: nameValue
+    device:
+    - composite:
+        attributes:
+          attributesKey:
+            bool: true
+            int: 2
+            string: stringValue
+            version: versionValue
+        capacity:
+          capacityKey: "0"
+      name: nameValue
+    deviceCapacityConsumption:
+    - capacity:
+        capacityKey: "0"
+      name: nameValue
   nodeName: nodeNameValue
   nodeSelector:
     nodeSelectorTerms:
@@ -59,6 +116,7 @@ spec:
         operator: operatorValue
         values:
         - valuesValue
+  perDeviceNodeSelection: true
   pool:
     generation: 2
     name: nameValue

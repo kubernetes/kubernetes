@@ -100,6 +100,7 @@ message BasicDevice {
   // The name of each attribute must be unique in that set.
   //
   // The maximum number of attributes and capacities combined is 32.
+  // This limit is defined in ResourceSliceMaxAttributesAndCapacities.
   //
   // +optional
   map<string, DeviceAttribute> attributes = 1;
@@ -108,6 +109,7 @@ message BasicDevice {
   // The name of each capacity must be unique in that set.
   //
   // The maximum number of attributes and capacities combined is 32.
+  // This limit is defined in ResourceSliceMaxAttributesAndCapacities.
   //
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
@@ -170,6 +172,224 @@ message CELDeviceSelector {
   optional string expression = 1;
 }
 
+// CapacityPool defines a named pool of capacities
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The capacities are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the capacity it uses will no longer be available for use
+// by other devices.
+message CapacityPool {
+  // Name defines the name of the capacity pool.
+  // It must be a DNS label.
+  //
+  // +required
+  optional string name = 1;
+
+  // Includes defines the set of capacity pool mixins that this capacity
+  // pool includes.
+  //
+  // The propertes of each included mixin are applied to this capacity pool in
+  // order. Conflicting properties from multiple mixins are taken from the
+  // last mixin listed that contains them. Properties set on the capacity pool will
+  // always override properties from mixins.
+  //
+  // The mixins referenced here must be defined in the same
+  // ResourceSlice.
+  //
+  // The maximum number of mixins that can be included is 8. This limit
+  // is defined in ResourceSliceMaxCapacityPoolMixinRefs.
+  //
+  // +optional
+  // +listType=atomic
+  repeated CapacityPoolMixinRef includes = 2;
+
+  // Capacity defines the set of capacities for this capacity pool
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Capacities listed here will always take precedence over any included
+  // from a mixin.
+  //
+  // The maximum number of capacities is 32. This limit is defined in
+  // ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+}
+
+// CapacityPoolMixin defines a mixin that a capacity pool can include.
+message CapacityPoolMixin {
+  // Name is a unique identifier among all capacity pool mixins in the ResourceSlice.
+  // It must be a DNS label.
+  //
+  // +required
+  optional string name = 1;
+
+  // Capacity defines the set of capacities for this mixin.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of capacities is 32. This limit is defined
+  // in ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +required
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
+}
+
+// CapacityPoolMixinRef defines a reference from a capacity pool
+// to a capacity pool mixin.
+message CapacityPoolMixinRef {
+  // Name is the name of a CapacityPoolMixin.
+  //
+  // +required
+  optional string name = 1;
+}
+
+// CompositeDevice defines one device instance.
+message CompositeDevice {
+  // Includes defines the set of device mixins that this device includes.
+  //
+  // The propertes of each included mixin are applied to this device in
+  // order. Conflicting properties from multiple mixins are taken from the
+  // last mixin listed that contains them. Properties set on the device will
+  // always override properties from mixins.
+  //
+  // The mixins referenced here must be defined in the same
+  // ResourceSlice.
+  //
+  // The maximum number of mixins that can be included is 8. This limit is
+  // defined in ResourceSliceMaxCapacityPoolMixinRefs.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceMixinRef includes = 1;
+
+  // Attributes defines the set of attributes for this device.
+  // The name of each attribute must be unique in that set.
+  //
+  // To ensure this uniqueness, attributes defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting attributes from those provided via mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  // This limit is defined in ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +optional
+  map<string, DeviceAttribute> attributes = 2;
+
+  // Capacity defines the set of capacities for this device.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  // This limit is defined in ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+
+  // ConsumesCapacity defines a list of references to capacity
+  // pools and the set of capacities that the device will
+  // consume from those pools.
+  //
+  // The capacities can be defined either by referencing one
+  // or more DeviceCapacityConsumptionMixins by listing
+  // the capacities directly. The latter will always override
+  // any capacities coming in from the mixins.
+  //
+  // The maximum number of device capacity consumption entries
+  // is 32. This is the same as the maximum number of capacity
+  // pools allowed in a ResourceSlice. This limit is defined
+  // in ResourceSliceMaxDeviceCapacityConsumptions.
+  //
+  // +required
+  // +listType=atomic
+  repeated DeviceCapacityConsumption consumesCapacity = 4;
+
+  // NodeName identifies the node where the device is available.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional string nodeName = 5;
+
+  // NodeSelector defines the nodes where the device is available.
+  //
+  // Must use exactly one term.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 6;
+
+  // AllNodes indicates that all nodes have access to the device.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional bool allNodes = 7;
+}
+
+// CompositeDeviceMixin defines a mixin that a composite device can include.
+message CompositeDeviceMixin {
+  // Attributes defines the set of attributes for this mixin.
+  // The name of each attribute must be unique in that set.
+  //
+  // To ensure this uniqueness, attributes defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting attributes from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  // This limit is defined in ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +optional
+  map<string, DeviceAttribute> attributes = 1;
+
+  // Capacity defines the set of capacities for this mixin.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  // This limit is defined in ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
+}
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 message Device {
@@ -184,6 +404,12 @@ message Device {
   // +optional
   // +oneOf=deviceType
   optional BasicDevice basic = 2;
+
+  // Composite defines one composite device instance.
+  //
+  // +optional
+  // +oneOf=deviceType
+  optional CompositeDevice composite = 3;
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -256,6 +482,76 @@ message DeviceAttribute {
   // +optional
   // +oneOf=ValueType
   optional string version = 5;
+}
+
+// DeviceCapacityConsumption defines a set of capacities that
+// a device will consume from a capacity pool.
+message DeviceCapacityConsumption {
+  // CapacityPool defines the capacity pool from which the
+  // capacities defined (either directly or through a mixin)
+  // will be consumed from.
+  //
+  // +required
+  optional string capacityPool = 1;
+
+  // Includes defines a list of references to DeviceCapacityConsumptionMixins.
+  // The capacities listed in these will be included in among the
+  // capacities that will be consumed by the device.
+  //
+  // Capacities listed directly will override any capacities coming
+  // from mixins.
+  //
+  // The maximum number of mixins that can be included is 8. This
+  // limit is defined in ResourceSliceMaxDeviceCapacityConsumptionMixinRefs.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceCapacityConsumptionMixinRef includes = 2;
+
+  // Capacity defines the capacity that will be consumed by
+  // the device.
+  //
+  // Capacities listed here will override any capacities that
+  // are also defined in any of the referenced mixins.
+  //
+  // The maximum number of capacities is 32. This limit is
+  // defined in ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +optional
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+}
+
+// DeviceCapacityConsumptionMixin defines a mixin that composite
+// devices can include to adopt the consuption capacity defined in
+// the mixin.
+message DeviceCapacityConsumptionMixin {
+  // Name is a unique identifier among all device capacity consumption
+  // mixins in the ResourceSlice. It must be a DNS label.
+  //
+  // +required
+  optional string name = 1;
+
+  // Capacity defines a set of capacities
+  // that a device will consume from a capacity pool.
+  //
+  // The capacity pool is not specified here but is determined
+  // from the context in which the DeviceCapacityConsumptionMixin
+  // is referenced from the device.
+  //
+  // The maximum number of capacities is 32. This limit is defined
+  // in ResourceSliceMaxAttributesAndCapacities.
+  //
+  // +required
+  map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
+}
+
+// DeviceCapacityConsumptionMixinRef defines a reference to a
+// DeviceCapacityConsumptionMixin.
+message DeviceCapacityConsumptionMixinRef {
+  // Name is the name of a DeviceCapacityConsumptionMixin.
+  //
+  // +required
+  optional string name = 1;
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.
@@ -400,6 +696,30 @@ message DeviceConstraint {
   // +optional
   // +oneOf=ConstraintType
   optional string matchAttribute = 2;
+}
+
+// DeviceMixin defines a specific device mixin for each device type.
+// Besides the name, exactly one field must be set.
+message DeviceMixin {
+  // Name is a unique identifier among all device mixins in the ResourceSlice.
+  // It must be a DNS label.
+  //
+  // +required
+  optional string name = 1;
+
+  // Composite defines a mixin usable by a composite device.
+  //
+  // +optional
+  // +oneOf=deviceMixinType
+  optional CompositeDeviceMixin composite = 2;
+}
+
+// DeviceMixinRef defines a reference to a device mixin.
+message DeviceMixinRef {
+  // Name refers to the name of a device mixin in the pool.
+  //
+  // +required
+  optional string name = 1;
 }
 
 // DeviceRequest is a request for devices required for a claim.
@@ -928,6 +1248,58 @@ message ResourceSliceList {
   repeated ResourceSlice items = 2;
 }
 
+// ResourceSliceMixins defines mixins for the ResourceSlice.
+message ResourceSliceMixins {
+  // Device represents a list of device mixins, i.e. a collection of
+  // shared attributes and capacities that an actual device can "include"
+  // to extend the set of attributes and capacities it already defines.
+  //
+  // The main purposes of these mixins is to reduce the memory footprint
+  // of devices since they can reference the mixins provided here rather
+  // than duplicate them.
+  //
+  // The total number of device mixins, device capacity consumption mixins,
+  // capacity pool mixins, basic devices, and composite devices must be
+  // less than 128. This limit is defined in ResourceSliceMaxMixins.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceMixin device = 1;
+
+  // DeviceCapacityConsumption represents a list of capacity
+  // consumption mixins, each of which contains a set of capacities
+  // that a device will consume from a capacity pool.
+  //
+  // This makes it possible to define a set of shared capacities that
+  // are not tied to a specific pool. The pool is inferred by context
+  // in which the DeviceCapacityConsumptionMixin is referenced from
+  // the device.
+  //
+  // The total number of device mixins, device capacity consumption mixins,
+  // capacity pool mixins, basic devices, and composite devices must be
+  // less than 128. This limit is defined in ResourceSliceMaxMixins.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceCapacityConsumptionMixin deviceCapacityConsumption = 2;
+
+  // CapacityPool represents a list of capacity pool mixins, i.e.
+  // a collection of capacities that a CapacityPool can "include"
+  // to extend the set of capacities it already defines.
+  //
+  // The main purposes of these mixins is to reduce the memory footprint
+  // of capacity pools since they can reference the mixins provided here rather
+  // than duplicate them.
+  //
+  // The total number of device mixins, device capacity consumption mixins,
+  // capacity pool mixins, basic devices, and composite devices must be
+  // less than 128. This limit is defined in ResourceSliceMaxMixins.
+  //
+  // +optional
+  // +listType=atomic
+  repeated CapacityPoolMixin capacityPool = 3;
+}
+
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
 message ResourceSliceSpec {
   // Driver identifies the DRA driver providing the capacity information.
@@ -982,10 +1354,41 @@ message ResourceSliceSpec {
 
   // Devices lists some or all of the devices in this pool.
   //
-  // Must not have more than 128 entries.
+  // Must not have more than 128 entries. This limit is defined
+  // in ResourceSliceMaxDevices.
   //
   // +optional
   // +listType=atomic
   repeated Device devices = 6;
+
+  // PerDeviceNodeSelection defines whether the access from nodes to
+  // resources in the pool is set on the ResourceSlice level or on each
+  // device. If it is set to true, every device defined the ResourceSlice
+  // must specify this individually.
+  //
+  // Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
+  // must be set.
+  //
+  // +optional
+  // +oneOf=NodeSelection
+  optional bool perDeviceNodeSelection = 7;
+
+  // CapacityPools defines a list of capacity pools, each of which
+  // has a name and a list of capacities available in the pool.
+  //
+  // The names of the pools must be unique in the ResourceSlice.
+  //
+  // The maximum number of pools is 32. This limit is defined
+  // in ResourceSliceMaxCapacityPools.
+  //
+  // +optional
+  // +listType=atomic
+  repeated CapacityPool capacityPools = 8;
+
+  // Mixins defines the mixins available for devices and capacity pools
+  // in the ResourceSlice.
+  //
+  // +optional
+  optional ResourceSliceMixins mixins = 9;
 }
 
