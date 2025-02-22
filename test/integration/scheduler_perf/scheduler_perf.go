@@ -1496,9 +1496,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 
 	// Everything else started by this function gets stopped before it returns.
 	tCtx = ktesting.WithCancel(tCtx)
-	var wg sync.WaitGroup
-	defer wg.Wait()
-	defer tCtx.Cancel("workload is done")
 
 	var dataItems []DataItem
 
@@ -1507,14 +1504,12 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	// the metrics collecting needs to be sure that the goroutines
 	// are stopped.
 	var collectorCtx ktesting.TContext
-	var collectorWG sync.WaitGroup
-	defer collectorWG.Wait()
 
 	executor := WorkloadExecutor{
 		tCtx:                         tCtx,
-		wg:                           wg,
+		wg:                           sync.WaitGroup{},
 		collectorCtx:                 collectorCtx,
-		collectorWG:                  collectorWG,
+		collectorWG:                  sync.WaitGroup{},
 		collectors:                   collectors,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
@@ -1524,6 +1519,10 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		nextNodeIndex:                0,
 		dataItems:                    dataItems,
 	}
+
+	defer executor.wg.Wait()
+	defer executor.collectorWG.Wait()
+	defer tCtx.Cancel("workload is done")
 
 	for opIndex, op := range unrollWorkloadTemplate(tCtx, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
@@ -1538,14 +1537,10 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		switch concreteOp := realOp.(type) {
 		case *createNodesOp:
 			executor.runCreateNodesOp(opIndex, concreteOp)
-
 		case *createNamespacesOp:
 			executor.runCreateNamespaceOp(opIndex, concreteOp)
 		case *createPodsOp:
 			executor.runCreatePodsOp(opIndex, concreteOp)
-			if executor.collectorCtx != nil {
-				executor.collectorCtx.Cancel("cleaning up")
-			}
 		case *deletePodsOp:
 			executor.runDeletePodsOp(opIndex, concreteOp)
 		case *churnOp:
@@ -1666,9 +1661,7 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) {
 			e.tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 		}
 		e.collectorCtx, e.collectors = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
-		// e.collectorCtx.Cleanup(func() {
-		// 	e.collectorCtx.Cancel("cleaning up")
-		// })
+		defer e.collectorCtx.Cancel("cleaning up")
 	}
 	if err := createPodsRapidly(e.tCtx, namespace, op); err != nil {
 		e.tCtx.Fatalf("op %d: %v", opIndex, err)
@@ -1869,9 +1862,6 @@ func (e *WorkloadExecutor) runStartCollectingMetricsOp(opIndex int, op *startCol
 		e.tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 	}
 	e.collectorCtx, e.collectors = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, op.Name, op.Namespaces, op.LabelSelector)
-	// e.collectorCtx.Cleanup(func() {
-	// 	collectorCtx.Cancel("cleaning up")
-	// })
 }
 
 func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsPerNamespace *map[string]int) {
