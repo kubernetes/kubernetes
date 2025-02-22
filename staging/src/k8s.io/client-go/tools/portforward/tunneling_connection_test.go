@@ -17,6 +17,7 @@ limitations under the License.
 package portforward
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -165,17 +166,14 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 // a websocket connection. Returns the TunnelingConnection injected with the
 // websocket connection or an error if one occurs.
 func dialForTunnelingConnection(url *url.URL) (*TunnelingConnection, error) {
-	req, err := http.NewRequest("GET", url.String(), nil)
-	if err != nil {
-		return nil, err
-	}
+
 	// Tunneling must initiate a websocket upgrade connection, using tunneling portforward protocol.
 	tunnelingProtocols := []string{constants.WebsocketsSPDYTunnelingPortForwardV1}
-	transport, holder, err := websocket.RoundTripperFor(&rest.Config{Host: url.Host})
+	client, err := websocket.NewClient(&rest.Config{Host: url.Host})
 	if err != nil {
 		return nil, err
 	}
-	conn, err := websocket.Negotiate(transport, holder, req, tunnelingProtocols...)
+	conn, err := client.Connect(context.Background(), url.String(), tunnelingProtocols...)
 	if err != nil {
 		return nil, err
 	}

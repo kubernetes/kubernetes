@@ -17,12 +17,12 @@ limitations under the License.
 package websocket
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	gwebsocket "github.com/gorilla/websocket"
@@ -32,15 +32,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 )
 
+const dataBufferSize = 32 * 1024
+
 var (
-	_ utilnet.TLSClientConfigHolder = &RoundTripper{}
-	_ http.RoundTripper             = &RoundTripper{}
+	_ utilnet.TLSClientConfigHolder = &Client{}
+	_ http.RoundTripper             = &wsRoundtripper{}
 )
 
 var (
@@ -61,42 +62,12 @@ type ConnectionHolder interface {
 	Connection() *gwebsocket.Conn
 }
 
-// RoundTripper knows how to establish a connection to a remote WebSocket endpoint and make it available for use.
-// RoundTripper must not be reused.
-type RoundTripper struct {
-	// TLSConfig holds the TLS configuration settings to use when connecting
-	// to the remote server.
-	TLSConfig *tls.Config
-
-	// Proxier specifies a function to return a proxy for a given
-	// Request. If the function returns a non-nil error, the
-	// request is aborted with the provided error.
-	// If Proxy is nil or returns a nil *URL, no proxy is used.
-	Proxier func(req *http.Request) (*url.URL, error)
-
-	// Conn holds the WebSocket connection after a round trip.
-	Conn *gwebsocket.Conn
+type wsRoundtripper struct {
+	dialer *gwebsocket.Dialer
+	conn   *gwebsocket.Conn
 }
 
-// Connection returns the stored websocket connection.
-func (rt *RoundTripper) Connection() *gwebsocket.Conn {
-	return rt.Conn
-}
-
-// DataBufferSize returns the size of buffers for the
-// websocket connection.
-func (rt *RoundTripper) DataBufferSize() int {
-	return 32 * 1024
-}
-
-// TLSClientConfig implements pkg/util/net.TLSClientConfigHolder.
-func (rt *RoundTripper) TLSClientConfig() *tls.Config {
-	return rt.TLSConfig
-}
-
-// RoundTrip connects to the remote websocket using the headers in the request and the TLS
-// configuration from the config
-func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response, retErr error) {
+func (rt *wsRoundtripper) RoundTrip(request *http.Request) (response *http.Response, retErr error) {
 	defer func() {
 		if request.Body != nil {
 			err := request.Body.Close()
@@ -106,17 +77,6 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 		}
 	}()
 
-	// set the protocol version directly on the dialer from the header
-	protocolVersions := request.Header[wsstream.WebSocketProtocolHeader]
-	delete(request.Header, wsstream.WebSocketProtocolHeader)
-
-	dialer := gwebsocket.Dialer{
-		Proxy:           rt.Proxier,
-		TLSClientConfig: rt.TLSConfig,
-		Subprotocols:    protocolVersions,
-		ReadBufferSize:  rt.DataBufferSize() + 1024, // add space for the protocol byte indicating which channel the data is for
-		WriteBufferSize: rt.DataBufferSize() + 1024, // add space for the protocol byte indicating which channel the data is for
-	}
 	switch request.URL.Scheme {
 	case "https":
 		request.URL.Scheme = "wss"
@@ -125,7 +85,7 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	default:
 		return nil, fmt.Errorf("unknown url scheme: %s", request.URL.Scheme)
 	}
-	wsConn, resp, err := dialer.DialContext(request.Context(), request.URL.String(), request.Header)
+	wsConn, resp, err := rt.dialer.DialContext(request.Context(), request.URL.String(), request.Header)
 	if err != nil {
 		// BadHandshake error becomes an "UpgradeFailureError" (used for streaming fallback).
 		if errors.Is(err, gwebsocket.ErrBadHandshake) {
@@ -160,7 +120,7 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 
 	// Ensure we got back a protocol we understand
 	foundProtocol := false
-	for _, protocolVersion := range protocolVersions {
+	for _, protocolVersion := range rt.dialer.Subprotocols {
 		if protocolVersion == wsConn.Subprotocol() {
 			foundProtocol = true
 			break
@@ -168,57 +128,101 @@ func (rt *RoundTripper) RoundTrip(request *http.Request) (retResp *http.Response
 	}
 	if !foundProtocol {
 		wsConn.Close() // nolint:errcheck
-		return nil, &httpstream.UpgradeFailureError{Cause: fmt.Errorf("invalid protocol, expected one of %q, got %q", protocolVersions, wsConn.Subprotocol())}
+		return nil, &httpstream.UpgradeFailureError{Cause: fmt.Errorf("invalid protocol, expected one of %q, got %q", rt.dialer.Subprotocols, wsConn.Subprotocol())}
 	}
 
-	rt.Conn = wsConn
+	rt.conn = wsConn
 
 	return resp, nil
 }
 
-// RoundTripperFor transforms the passed rest config into a wrapped roundtripper, as well
-// as a pointer to the websocket RoundTripper. The websocket RoundTripper contains the
-// websocket connection after RoundTrip() on the wrapper. Returns an error if there is
-// a problem creating the round trippers.
-func RoundTripperFor(config *restclient.Config) (http.RoundTripper, ConnectionHolder, error) {
+// Client knows how to establish a connection to a remote WebSocket endpoint and make it available for use.
+type Client struct {
+	rt        *wsRoundtripper
+	rtUpgrade http.RoundTripper
+}
+
+// Connection returns the stored websocket connection.
+func (c *Client) Connection() *gwebsocket.Conn {
+	return c.rt.conn
+}
+
+// DataBufferSize returns the size of buffers for the
+// websocket connection.
+func (c *Client) DataBufferSize() int {
+	return dataBufferSize
+}
+
+// TLSClientConfig implements pkg/util/net.TLSClientConfigHolder.
+func (c *Client) TLSClientConfig() *tls.Config {
+	return c.rt.dialer.TLSClientConfig
+}
+
+// NewClient from the restclient.Config.
+// The websocket Client contains the websocket connection after the connection is established.
+// Returns an error if there is a problem creating the round trippers.
+func NewClient(config *restclient.Config) (*Client, error) {
 	transportCfg, err := config.TransportConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	tlsConfig, err := transport.TLSConfigFor(transportCfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	proxy := config.Proxy
 	if proxy == nil {
 		proxy = utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 	}
 
-	upgradeRoundTripper := &RoundTripper{
-		TLSConfig: tlsConfig,
-		Proxier:   proxy,
+	dialer := gwebsocket.Dialer{
+		Proxy:           proxy,
+		TLSClientConfig: tlsConfig,
+		ReadBufferSize:  dataBufferSize + 1024, // add space for the protocol byte indicating which channel the data is for
+		WriteBufferSize: dataBufferSize + 1024, // add space for the protocol byte indicating which channel the data is for
 	}
-	wrapper, err := transport.HTTPWrappersForConfig(transportCfg, upgradeRoundTripper)
+
+	if config.Dial != nil {
+		dialer.NetDialContext = config.Dial
+	}
+
+	rt := &wsRoundtripper{
+		dialer: &dialer,
+	}
+
+	wrapper, err := transport.HTTPWrappersForConfig(transportCfg, rt)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return wrapper, upgradeRoundTripper, nil
+
+	client := &Client{
+		rt:        rt,
+		rtUpgrade: wrapper,
+	}
+
+	return client, nil
 }
 
-// Negotiate opens a connection to a remote server and attempts to negotiate
+// Connect opens a connection to a remote server and attempts to negotiate
 // a WebSocket connection. Upon success, it returns the negotiated connection.
 // The round tripper rt must use the WebSocket round tripper wsRt - see RoundTripperFor.
-func Negotiate(rt http.RoundTripper, connectionInfo ConnectionHolder, req *http.Request, protocols ...string) (*gwebsocket.Conn, error) {
-	// Plumb protocols to RoundTripper#RoundTrip
-	req.Header[wsstream.WebSocketProtocolHeader] = protocols
-	resp, err := rt.RoundTrip(req)
+func (c *Client) Connect(ctx context.Context, url string, protocols ...string) (*gwebsocket.Conn, error) {
+	// fake request to trigger the websocket upgrade
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.rt.dialer.Subprotocols = protocols
+	// it executes all the wrapped roundtrippers and end dialing
+	// using the gorilla websocket dialer
+	resp, err := c.rtUpgrade.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
 	err = resp.Body.Close()
 	if err != nil {
-		connectionInfo.Connection().Close()
+		c.rt.conn.Close()
 		return nil, fmt.Errorf("error closing response body: %v", err)
 	}
-	return connectionInfo.Connection(), nil
+	return c.rt.conn, nil
 }

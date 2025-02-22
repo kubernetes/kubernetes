@@ -67,10 +67,9 @@ const (
 
 // wsStreamExecutor handles transporting standard shell streams over an httpstream connection.
 type wsStreamExecutor struct {
-	transport http.RoundTripper
-	upgrader  websocket.ConnectionHolder
-	method    string
-	url       string
+	wsClient *websocket.Client
+	method   string
+	url      string
 	// requested protocols in priority order (e.g. v5.channel.k8s.io before v4.channel.k8s.io).
 	protocols []string
 	// selected protocol from the handshake process; could be empty string if handshake fails.
@@ -91,13 +90,13 @@ func NewWebSocketExecutor(config *restclient.Config, method, url string) (Execut
 
 // NewWebSocketExecutorForProtocols allows to execute commands via a WebSocket connection.
 func NewWebSocketExecutorForProtocols(config *restclient.Config, method, url string, protocols ...string) (Executor, error) {
-	transport, upgrader, err := websocket.RoundTripperFor(config)
+	wsClient, err := websocket.NewClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("error creating websocket transports: %v", err)
 	}
+
 	return &wsStreamExecutor{
-		transport:         transport,
-		upgrader:          upgrader,
+		wsClient:          wsClient,
 		method:            method,
 		url:               url,
 		protocols:         protocols,
@@ -117,11 +116,7 @@ func (e *wsStreamExecutor) Stream(options StreamOptions) error {
 // defines which streams are requested. Returns an error if one occurred. This method is NOT
 // safe to run concurrently with the same executor (because of the state stored in the upgrader).
 func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options StreamOptions) error {
-	req, err := http.NewRequestWithContext(ctx, e.method, e.url, nil)
-	if err != nil {
-		return err
-	}
-	conn, err := websocket.Negotiate(e.transport, e.upgrader, req, e.protocols...)
+	conn, err := e.wsClient.Connect(ctx, e.url, e.protocols...)
 	if err != nil {
 		return err
 	}
@@ -159,7 +154,7 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 		}()
 		creator := newWSStreamCreator(conn)
 		go creator.readDemuxLoop(
-			e.upgrader.DataBufferSize(),
+			e.wsClient.DataBufferSize(),
 			e.heartbeatPeriod,
 			e.heartbeatDeadline,
 		)

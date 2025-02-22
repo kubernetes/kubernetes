@@ -52,17 +52,14 @@ func TestWebSocketRoundTripper_RoundTripperSucceeds(t *testing.T) {
 	// Create the wrapped roundtripper and websocket upgrade roundtripper and call "RoundTrip()".
 	websocketLocation, err := url.Parse(websocketServer.URL)
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
-	require.NoError(t, err)
-	rt, wsRt, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
+	client, err := NewClient(&restclient.Config{Host: websocketLocation.Host})
 	require.NoError(t, err)
 	requestedProtocol := remotecommand.StreamProtocolV5Name
-	req.Header[wsstream.WebSocketProtocolHeader] = []string{requestedProtocol}
-	_, err = rt.RoundTrip(req)
+	wsConn, err := client.Connect(context.Background(), websocketServer.URL, requestedProtocol)
 	require.NoError(t, err)
 	// WebSocket Connection is stored in websocket RoundTripper.
 	// Compare the expected negotiated subprotocol with the actual subprotocol.
-	actualProtocol := wsRt.Connection().Subprotocol()
+	actualProtocol := wsConn.Subprotocol()
 	assert.Equal(t, requestedProtocol, actualProtocol)
 
 }
@@ -126,11 +123,9 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 			// Create the wrapped roundtripper and websocket upgrade roundtripper and call "RoundTrip()".
 			websocketLocation, err := url.Parse(websocketServer.URL)
 			require.NoError(t, err)
-			req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
+			client, err := NewClient(&restclient.Config{Host: websocketLocation.Host})
 			require.NoError(t, err)
-			rt, _, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
-			require.NoError(t, err)
-			_, err = rt.RoundTrip(req)
+			_, err = client.Connect(context.Background(), websocketServer.URL, remotecommand.StreamProtocolV5Name)
 			require.Error(t, err)
 			assert.True(t, httpstream.IsUpgradeFailure(err))
 			if testCase.status != nil {
@@ -164,12 +159,10 @@ func TestWebSocketRoundTripper_NegotiateCreatesConnection(t *testing.T) {
 	// Create the websocket roundtripper and call "Negotiate" to create websocket connection.
 	websocketLocation, err := url.Parse(websocketServer.URL)
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), "GET", websocketServer.URL, nil)
-	require.NoError(t, err)
-	rt, wsRt, err := RoundTripperFor(&restclient.Config{Host: websocketLocation.Host})
+	client, err := NewClient(&restclient.Config{Host: websocketLocation.Host})
 	require.NoError(t, err)
 	requestedProtocol := remotecommand.StreamProtocolV5Name
-	conn, err := Negotiate(rt, wsRt, req, requestedProtocol)
+	conn, err := client.Connect(context.Background(), websocketServer.URL, requestedProtocol)
 	require.NoError(t, err)
 	// Compare the expected negotiated subprotocol with the actual subprotocol.
 	actualProtocol := conn.Subprotocol()
