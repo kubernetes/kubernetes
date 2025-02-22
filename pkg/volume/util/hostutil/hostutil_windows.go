@@ -29,7 +29,6 @@ import (
 
 	"golang.org/x/sys/windows"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 )
@@ -102,14 +101,6 @@ func isSystemCannotAccessErr(err error) bool {
 // GetFileType checks for sockets/block/character devices
 func (hu *(HostUtil)) GetFileType(pathname string) (FileType, error) {
 	filetype, err := getFileType(pathname)
-
-	// os.Stat will return a 1920 error (windows.ERROR_CANT_ACCESS_FILE) if we use it on a Unix Socket
-	// on Windows. In this case, we need to use a different method to check if it's a Unix Socket.
-	if err == errUnknownFileType || isSystemCannotAccessErr(err) {
-		if isSocket, errSocket := filesystem.IsUnixDomainSocket(pathname); errSocket == nil && isSocket {
-			return FileTypeSocket, nil
-		}
-	}
 
 	return filetype, err
 }
