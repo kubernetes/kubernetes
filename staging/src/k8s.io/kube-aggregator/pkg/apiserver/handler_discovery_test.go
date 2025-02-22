@@ -393,13 +393,19 @@ func TestV2Beta1Skew(t *testing.T) {
 		// Force a v2beta1 response from the aggregated apiserver
 		v2b := apidiscoveryv2beta1.APIGroupDiscoveryList{}
 		err := apidiscoveryv2scheme.Convertv2APIGroupDiscoveryListTov2beta1APIGroupDiscoveryList(&apiGroup, &v2b, nil)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		converted, err := json.Marshal(v2b)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		w.Header().Set("Content-Type", "application/json;"+"g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
 		w.WriteHeader(200)
 		_, err = w.Write(converted)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	testCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()

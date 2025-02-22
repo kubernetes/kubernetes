@@ -199,7 +199,9 @@ func TestReconcile(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// The controller is blocked because the reconcile function sends on an
@@ -255,7 +257,9 @@ func TestShutdown(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// Wait for controller and informer to start up
@@ -287,7 +291,9 @@ func TestInformerNeverStarts(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.DeadlineExceeded)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// Wait for deadline to pass without syncing the cache
@@ -335,7 +341,9 @@ func TestIgnoredUpdate(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// The controller is blocked because the reconcile function sends on an
@@ -392,7 +400,9 @@ func TestReconcileRetry(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		require.ErrorIs(t, stopReason, context.Canceled)
+		if !errors.Is(stopReason, context.Canceled) {
+			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
+		}
 	}()
 
 	// Add object to informer
