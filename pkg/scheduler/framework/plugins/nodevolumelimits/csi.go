@@ -89,7 +89,7 @@ func (pl *CSILimits) EventsToRegister(_ context.Context) ([]framework.ClusterEve
 		{Event: framework.ClusterEvent{Resource: framework.CSINode, ActionType: framework.Add}},
 		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
 		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterPVCAdded},
-		{Event: framework.ClusterEvent{Resource: framework.VolumeAttachment, ActionType: framework.Delete}},
+		{Event: framework.ClusterEvent{Resource: framework.VolumeAttachment, ActionType: framework.Delete}, QueueingHintFn: pl.isSchedulableAfterVolumeAttachmentDeleted},
 	}, nil
 }
 
@@ -146,6 +146,44 @@ func (pl *CSILimits) isSchedulableAfterPVCAdded(logger klog.Logger, pod *v1.Pod,
 	}
 
 	logger.V(5).Info("PVC irrelevant to the Pod was created, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(addedPvc))
+	return framework.QueueSkip, nil
+}
+
+func (pl *CSILimits) isSchedulableAfterVolumeAttachmentDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+	deletedVolumeAttachment, _, err := util.As[*storagev1.VolumeAttachment](oldObj, newObj)
+	if err != nil {
+		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterVolumeAttachmentDeleted: %w", err)
+	}
+
+	for _, vol := range pod.Spec.Volumes {
+		// Check if the pod volume uses a PVC
+		// If it does, return Queue
+		if vol.PersistentVolumeClaim != nil {
+			logger.V(5).Info("Pod volume uses PersistentVolumeClaim, which might make this pod schedulable due to VolumeAttachment deletion", "pod", klog.KObj(pod), "volumeAttachment", klog.KObj(deletedVolumeAttachment), "volume", vol.Name)
+			return framework.Queue, nil
+		}
+
+		if !pl.translator.IsInlineMigratable(&vol) {
+			continue
+		}
+
+		translatedPV, err := pl.translator.TranslateInTreeInlineVolumeToCSI(logger, &vol, pod.Namespace)
+		if err != nil || translatedPV == nil {
+			return framework.Queue, fmt.Errorf("converting volume(%s) from inline to csi: %w", vol.Name, err)
+		}
+
+		if translatedPV.Spec.CSI != nil && deletedVolumeAttachment.Spec.Attacher == translatedPV.Spec.CSI.Driver {
+			// deleted VolumeAttachment Attacher matches the translated PV CSI driver
+			logger.V(5).Info("Pod volume is an Inline Migratable volume that matches the CSI driver, which might make this pod schedulable due to VolumeAttachment deletion",
+				"pod", klog.KObj(pod), "volumeAttachment", klog.KObj(deletedVolumeAttachment),
+				"volume", vol.Name, "csiDriver", translatedPV.Spec.CSI.Driver,
+			)
+			return framework.Queue, nil
+		}
+	}
+
+	logger.V(5).Info("the VolumeAttachment deletion wouldn't make this pod schedulable because the pod has no volume related to a deleted VolumeAttachment",
+		"pod", klog.KObj(pod), "volumeAttachment", klog.KObj(deletedVolumeAttachment))
 	return framework.QueueSkip, nil
 }
 
