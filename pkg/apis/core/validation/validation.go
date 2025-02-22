@@ -3381,7 +3381,7 @@ var supportedResizePolicies = sets.New(
 	core.ResizeRestartPolicyRestartContainer,
 )
 
-func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *field.Path, podRestartPolicy *core.RestartPolicy) field.ErrorList {
+func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *field.Path, podRestartPolicy *core.RestartPolicy, opts PodValidationOptions) field.ErrorList {
 	allErrors := field.ErrorList{}
 
 	// validate that resource name is not repeated, supported resource names and policy values are specified
@@ -3400,6 +3400,9 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 		}
 		if p.RestartPolicy == "" {
 			allErrors = append(allErrors, field.Required(fldPath, ""))
+		} else if p.RestartPolicy == core.ResizeRestartPolicyPreferNoRestart && !opts.AllowResizeRestartPolicyPreferNoRestart {
+			allErrors = append(allErrors, field.Forbidden(fldPath, fmt.Sprintf("resize policy %q requires the %q feature gate",
+				core.ResizeRestartPolicyPreferNoRestart, features.InPlacePodVerticalScalingPreferNoRestart)))
 		} else if !supportedResizePolicies.Has(p.RestartPolicy) {
 			allErrors = append(allErrors, field.NotSupported(fldPath, p.RestartPolicy, sets.List(supportedResizePolicies)))
 		}
@@ -3601,7 +3604,7 @@ func validateContainerCommon(ctr *core.Container, volumes map[string]core.Volume
 	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
 	allErrs = append(allErrs, ValidateContainerResourceRequirements(&ctr.Resources, podClaimNames, path.Child("resources"), opts)...)
-	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy)...)
+	allErrs = append(allErrs, validateResizePolicy(ctr.ResizePolicy, path.Child("resizePolicy"), podRestartPolicy, opts)...)
 	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers)...)
 	return allErrs
 }
@@ -4065,6 +4068,8 @@ type PodValidationOptions struct {
 	AllowSidecarResizePolicy bool
 	// Allow invalid label-value in RequiredNodeSelector
 	AllowInvalidLabelValueInRequiredNodeAffinity bool
+	// Allow restart resize policy to be set to "PreferNoRestart".
+	AllowResizeRestartPolicyPreferNoRestart bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,

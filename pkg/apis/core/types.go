@@ -2420,9 +2420,9 @@ const (
 	// restarting it, if possible. This option does not guarantee that the container won't be
 	// restarted during the resize.
 	// This is the implicit default when no resource resize policy is specified.
+	// +featureGate=InPlacePodVerticalScaling
 	ResizeRestartPolicyPreferNoRestart ResourceResizeRestartPolicy = "PreferNoRestart"
 	// ResizeRestartPolicyNotRequired is equivalent to "PreferNoRestart".
-	// Deprecated: use "PreferNoRestart" instead.
 	ResizeRestartPolicyNotRequired ResourceResizeRestartPolicy = "NotRequired"
 	// ResizeRestartPolicyRestartContainer means Kubernetes will resize the container in-place
 	// by stopping and starting the container when new resources are applied.
