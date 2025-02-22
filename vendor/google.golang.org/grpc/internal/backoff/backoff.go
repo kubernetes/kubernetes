@@ -25,7 +25,7 @@ package backoff
 import (
 	"context"
 	"errors"
-	"math/rand"
+	rand "math/rand/v2"
 	"time"
 
 	grpcbackoff "google.golang.org/grpc/backoff"

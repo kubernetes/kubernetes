@@ -22,7 +22,7 @@
 package roundrobin
 
 import (
-	"math/rand"
+	rand "math/rand/v2"
 	"sync/atomic"
 
 	"google.golang.org/grpc/balancer"
@@ -60,7 +60,7 @@ func (*rrPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 		// Start at a random index, as the same RR balancer rebuilds a new
 		// picker when SubConn states change, and we don't want to apply excess
 		// load to the first server in the list.
-		next: uint32(rand.Intn(len(scs))),
+		next: uint32(rand.IntN(len(scs))),
 	}
 }
 

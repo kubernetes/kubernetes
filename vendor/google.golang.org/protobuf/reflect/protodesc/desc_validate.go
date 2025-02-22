@@ -149,7 +149,7 @@ func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds
 					return errors.New("message field %q under proto3 optional semantics must be within a single element oneof", f.FullName())
 				}
 			}
-			if f.IsWeak() && !flags.ProtoLegacy {
+			if f.IsWeak() && !flags.ProtoLegacyWeak {
 				return errors.New("message field %q is a weak field, which is a legacy proto1 feature that is no longer supported", f.FullName())
 			}
 			if f.IsWeak() && (!f.HasPresence() || !isOptionalMessage(f) || f.ContainingOneof() != nil) {

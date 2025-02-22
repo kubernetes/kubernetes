@@ -32,6 +32,10 @@ type coderMessageInfo struct {
 	needsInitCheck     bool
 	isMessageSet       bool
 	numRequiredFields  uint8
+
+	lazyOffset     offset
+	presenceOffset offset
+	presenceSize   presenceSize
 }
 
 type coderFieldInfo struct {
@@ -45,12 +49,19 @@ type coderFieldInfo struct {
 	tagsize    int                      // size of the varint-encoded tag
 	isPointer  bool                     // true if IsNil may be called on the struct field
 	isRequired bool                     // true if field is required
+
+	isLazy        bool
+	presenceIndex uint32
 }
+
+const noPresence = 0xffffffff
 
 func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 	mi.sizecacheOffset = invalidOffset
 	mi.unknownOffset = invalidOffset
 	mi.extensionOffset = invalidOffset
+	mi.lazyOffset = invalidOffset
+	mi.presenceOffset = si.presenceOffset
 
 	if si.sizecacheOffset.IsValid() && si.sizecacheType == sizecacheType {
 		mi.sizecacheOffset = si.sizecacheOffset
@@ -107,12 +118,12 @@ func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 				},
 			}
 		case isOneof:
-			fieldOffset = offsetOf(fs, mi.Exporter)
+			fieldOffset = offsetOf(fs)
 		case fd.IsWeak():
 			fieldOffset = si.weakOffset
 			funcs = makeWeakMessageFieldCoder(fd)
 		default:
-			fieldOffset = offsetOf(fs, mi.Exporter)
+			fieldOffset = offsetOf(fs)
 			childMessage, funcs = fieldCoder(fd, ft)
 		}
 		cf := &preallocFields[i]
@@ -127,6 +138,8 @@ func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 			validation: newFieldValidationInfo(mi, si, fd, ft),
 			isPointer:  fd.Cardinality() == protoreflect.Repeated || fd.HasPresence(),
 			isRequired: fd.Cardinality() == protoreflect.Required,
+
+			presenceIndex: noPresence,
 		}
 		mi.orderedCoderFields = append(mi.orderedCoderFields, cf)
 		mi.coderFields[cf.num] = cf

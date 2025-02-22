@@ -32,6 +32,7 @@
       "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
       "github.com/googleapis/gax-go/v2": "references cloud dependencies",
+      "github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp": "GCP-specific OpenTelemetry resource detection library: https://github.com/grpc/grpc-go/issues/8092",
       "github.com/gorilla/handlers": "unmaintained, archive mode",
       "github.com/gorilla/mux": "unmaintained, archive mode",
       "github.com/gorilla/rpc": "unmaintained, archive mode",
@@ -65,11 +66,13 @@
       "github.com/modern-go/reflect2": "problematic reliance on golang internals, e.g. https://github.com/modern-go/reflect2/issues/24",
       "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/pkg/errors": "unmaintained, archive mode",
+      "github.com/planetscale/vtprotobuf": "avoid using additional proto implementations",
       "github.com/smartystreets/goconvey": "MPL license not in CNCF allowlist",
       "github.com/spf13/viper": "refer to #102598",
       "github.com/xeipuuv/gojsonschema": "unmaintained",
       "go.mongodb.org/mongo-driver": "",
       "go.opencensus.io": "unmaintained, https://github.com/census-instrumentation/opencensus-go archive mode",
+      "go.opentelemetry.io/contrib/detectors/gcp": "GCP-specific OpenTelemetry resource detection library: https://github.com/grpc/grpc-go/issues/8092",
       "golang.org/x/exp": "This subrepository holds experimental and deprecated packages",
       "golang.org/x/lint": "unmaintained, archive mode",
       "google.golang.org/api": "cloud dependency",
@@ -98,6 +101,9 @@
       "cloud.google.com/go/firestore": [
         "google.golang.org/genproto"
       ],
+      "github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp": [
+        "google.golang.org/grpc"
+      ],
       "github.com/davecgh/go-spew": [
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",
@@ -115,6 +121,7 @@
         "go.etcd.io/etcd/client/pkg/v3",
         "go.etcd.io/etcd/pkg/v3",
         "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/auto/sdk",
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
         "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
@@ -252,6 +259,12 @@
         "k8s.io/kubernetes",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
+      ],
+      "github.com/planetscale/vtprotobuf": [
+        "google.golang.org/grpc"
+      ],
+      "go.opentelemetry.io/contrib/detectors/gcp": [
+        "google.golang.org/grpc"
       ],
       "golang.org/x/exp": [
         "github.com/antlr4-go/antlr/v4",
