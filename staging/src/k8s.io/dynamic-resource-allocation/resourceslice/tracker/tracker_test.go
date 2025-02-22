@@ -1838,7 +1838,9 @@ func BenchmarkEventHandlers(b *testing.B) {
 		},
 		"one-patched-device-among-many-slices-add-patch": {
 			resourceSlices: func() []*resourceapi.ResourceSlice {
-				resourceSlices := make([]*resourceapi.ResourceSlice, 500)
+				nSlices := 500
+				nDevices := 64
+				resourceSlices := make([]*resourceapi.ResourceSlice, nSlices)
 				for i := range resourceSlices {
 					resourceSlices[i] = &resourceapi.ResourceSlice{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1849,14 +1851,19 @@ func BenchmarkEventHandlers(b *testing.B) {
 								Name: "pool-" + strconv.Itoa(i),
 							},
 							Devices: func() []resourceapi.Device {
-								nDevices := 64
-								devices := slices.Repeat([]resourceapi.Device{{Basic: &resourceapi.BasicDevice{}}}, nDevices)
-								devices[nDevices/2].Name = "patchme"
+								devices := make([]resourceapi.Device, nDevices)
+								for j := range devices {
+									devices[j] = resourceapi.Device{
+										Name:  "device-" + strconv.Itoa(j),
+										Basic: &resourceapi.BasicDevice{},
+									}
+								}
 								return devices
 							}(),
 						},
 					}
 				}
+				resourceSlices[nSlices/2].Spec.Devices[nDevices/2].Name = "patchme"
 				return resourceSlices
 			}(),
 			patches: []*resourcealphaapi.ResourceSlicePatch{
@@ -1867,7 +1874,6 @@ func BenchmarkEventHandlers(b *testing.B) {
 					Spec: resourcealphaapi.ResourceSlicePatchSpec{
 						Devices: resourcealphaapi.DevicePatch{
 							Filter: &resourcealphaapi.DevicePatchFilter{
-								Pool:   ptr.To("pool-250"),
 								Device: ptr.To("patchme"),
 							},
 							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{

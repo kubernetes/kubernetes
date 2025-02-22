@@ -45,10 +45,11 @@ import (
 )
 
 const (
-	driverPoolIndexName = "driverPool"
+	driverPoolDeviceIndexName = "driverPoolDevice"
 
 	anyDriver = "*"
 	anyPool   = "*"
+	anyDevice = "*"
 )
 
 type Tracker struct {
@@ -121,9 +122,9 @@ func newTracker(ctx context.Context, informerFactory informers.SharedInformerFac
 		patchedResourceSlices:           cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:                     utilruntime.HandleErrorWithContext,
 	}
-	err := t.resourceSlices.AddIndexers(cache.Indexers{driverPoolIndexName: sliceDriverPoolIndexFunc})
+	err := t.resourceSlices.AddIndexers(cache.Indexers{driverPoolDeviceIndexName: sliceDriverPoolDeviceIndexFunc})
 	if err != nil {
-		return nil, fmt.Errorf("failed to add %s index to ResourceSlice informer: %w", driverPoolIndexName, err)
+		return nil, fmt.Errorf("failed to add %s index to ResourceSlice informer: %w", driverPoolDeviceIndexName, err)
 	}
 	t.handlerRegistration = handlerRegistrationFunc(func() bool {
 		return t.resourceSlices.HasSynced() &&
@@ -211,29 +212,39 @@ func (t *Tracker) pushEvent(oldObj, newObj interface{}) {
 	}
 }
 
-func sliceDriverPoolIndexFunc(obj any) ([]string, error) {
+func sliceDriverPoolDeviceIndexFunc(obj any) ([]string, error) {
 	slice := obj.(*resourceapi.ResourceSlice)
-	return []string{
-		slice.Spec.Driver + "/" + slice.Spec.Pool.Name,
-		slice.Spec.Driver + "/" + anyPool,
-		anyDriver + "/" + slice.Spec.Pool.Name,
-		anyDriver + "/" + anyPool,
-	}, nil
+	drivers := []string{
+		anyDriver,
+		slice.Spec.Driver,
+	}
+	pools := []string{
+		anyPool,
+		slice.Spec.Pool.Name,
+	}
+	indexValues := make([]string, 0, len(drivers)*len(pools)*(1+len(slice.Spec.Devices)))
+	for _, driver := range drivers {
+		for _, pool := range pools {
+			indexValues = append(indexValues, driver+"/"+pool+"/"+anyDevice)
+			for _, device := range slice.Spec.Devices {
+				indexValues = append(indexValues, driver+"/"+pool+"/"+device.Name)
+			}
+		}
+	}
+	return indexValues, nil
 }
 
-func driverPoolIndexPatchKey(patch *resourcealphaapi.ResourceSlicePatch) string {
-	driverKey := anyDriver
-	poolKey := anyPool
-	if patch.Spec.Devices.Filter != nil {
-		driverKey = ptr.Deref(patch.Spec.Devices.Filter.Driver, driverKey)
-		poolKey = ptr.Deref(patch.Spec.Devices.Filter.Pool, poolKey)
-	}
-	return driverKey + "/" + poolKey
+func driverPoolDeviceIndexPatchKey(patch *resourcealphaapi.ResourceSlicePatch) string {
+	filter := ptr.Deref(patch.Spec.Devices.Filter, resourcealphaapi.DevicePatchFilter{})
+	driverKey := ptr.Deref(filter.Driver, anyDriver)
+	poolKey := ptr.Deref(filter.Pool, anyPool)
+	deviceKey := ptr.Deref(filter.Device, anyDevice)
+	return driverKey + "/" + poolKey + "/" + deviceKey
 }
 
 func (t *Tracker) sliceNamesForPatch(ctx context.Context, patch *resourcealphaapi.ResourceSlicePatch) []string {
-	patchKey := driverPoolIndexPatchKey(patch)
-	sliceNames, err := t.resourceSlices.GetIndexer().IndexKeys(driverPoolIndexName, patchKey)
+	patchKey := driverPoolDeviceIndexPatchKey(patch)
+	sliceNames, err := t.resourceSlices.GetIndexer().IndexKeys(driverPoolDeviceIndexName, patchKey)
 	if err != nil {
 		t.handleError(ctx, err, "failed listing ResourceSlices for driver/pool key", "key", patchKey)
 		return nil
