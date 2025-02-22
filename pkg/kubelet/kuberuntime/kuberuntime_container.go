@@ -423,11 +423,12 @@ func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, 
 	if err != nil {
 		stat, _ := grpcstatus.FromError(err)
 		if stat.Code() == codes.Unimplemented {
-			klog.ErrorS(err, "updatePodSandboxResources failed: method unimplemented on runtime service", "sandboxID", sandboxID)
+			klog.InfoS("updatePodSandboxResources failed: method unimplemented on runtime service", "sandboxID", sandboxID)
 			return nil
 		}
+		klog.ErrorS(err, "updatePodSandboxResources failed", "sandboxID", sandboxID)
 	}
-	return err
+	return nil
 }
 
 // makeDevices generates container devices for kubelet runtime v1.
