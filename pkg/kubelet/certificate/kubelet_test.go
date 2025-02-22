@@ -30,10 +30,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/util/cert"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
@@ -402,6 +406,117 @@ func TestNewCertificateManagerConfigGetTemplate(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Wrong certificate, got %v expected %v", got, tt.want)
 				return
+			}
+		})
+	}
+}
+
+func TestGetNodeAddressesFromInformer(t *testing.T) {
+	testCases := []struct {
+		name          string
+		nodeName      types.NodeName
+		node          *v1.Node
+		expectedAddrs []v1.NodeAddress
+	}{
+		{
+			name:          "node not found",
+			nodeName:      "test-node",
+			node:          nil,
+			expectedAddrs: nil,
+		},
+		{
+			name:     "empty addresses",
+			nodeName: "test-node",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     v1.NodeStatus{Addresses: []v1.NodeAddress{}},
+			},
+			expectedAddrs: nil,
+		},
+		{
+			name:     "no taints",
+			nodeName: "test-node",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+						{Type: v1.NodeHostName, Address: "test-node"},
+					},
+				},
+			},
+			expectedAddrs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeHostName, Address: "test-node"},
+			},
+		},
+		{
+			name:     "external cloud provider taint",
+			nodeName: "test-node",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: cloudproviderapi.TaintExternalCloudProvider, Effect: v1.TaintEffectNoSchedule},
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+						{Type: v1.NodeHostName, Address: "test-node"},
+					},
+				},
+			},
+			expectedAddrs: nil,
+		},
+		{
+			name:     "other taint",
+			nodeName: "test-node",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Spec: v1.NodeSpec{
+					Taints: []v1.Taint{
+						{Key: "other-taint", Effect: v1.TaintEffectNoSchedule},
+					},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+						{Type: v1.NodeHostName, Address: "test-node"},
+					},
+				},
+			},
+			expectedAddrs: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeHostName, Address: "test-node"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			if tc.node != nil {
+				_, err := client.CoreV1().Nodes().Create(context.TODO(), tc.node, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("failed to create node: %v", err)
+				}
+			}
+			kubeInformers := informers.NewSharedInformerFactory(client, 0)
+			nodeLister := kubeInformers.Core().V1().Nodes().Lister()
+			kubeInformers.Start(nil)
+			kubeInformers.WaitForCacheSync(nil)
+
+			addrs := getNodeAddressesFromInformer(tc.nodeName, nodeLister)
+
+			if len(addrs) != len(tc.expectedAddrs) {
+				t.Errorf("expected %d addresses, got %d", len(tc.expectedAddrs), len(addrs))
+			} else {
+				for i := range addrs {
+					if addrs[i] != tc.expectedAddrs[i] {
+						t.Errorf("expected address %v, got %v", tc.expectedAddrs[i], addrs[i])
+					}
+				}
 			}
 		})
 	}

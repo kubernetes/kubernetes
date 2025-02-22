@@ -34,7 +34,9 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/certificate"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
@@ -70,9 +72,32 @@ func newGetTemplateFn(nodeName types.NodeName, getAddresses func() []v1.NodeAddr
 	}
 }
 
+// getNodeAddressesFromInformer returns the node addresses from the informer cache.
+// On external cloud providers nodes it waits for the external cloud provider to
+// remove the taint, since the node may start with some initial addresses that are changed
+// later by the cloud provider and we need to use only the definitive addresses for the
+// certificate request.
+func getNodeAddressesFromInformer(nodeName types.NodeName, nodeLister corelisters.NodeLister) []v1.NodeAddress {
+	node, err := nodeLister.Get(string(nodeName))
+	if err != nil {
+		klog.ErrorS(err, "fail to obtain node from local cache", "node", nodeName)
+		return nil
+	}
+	if len(node.Status.Addresses) == 0 {
+		return nil
+	}
+	// wait for the cloud provider to initialize the node addresses
+	for _, taint := range node.Spec.Taints {
+		if taint.Key == cloudproviderapi.TaintExternalCloudProvider {
+			return nil
+		}
+	}
+	return node.Status.Addresses
+}
+
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
 // or returns an error.
-func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, getAddresses func() []v1.NodeAddress, certDirectory string) (certificate.Manager, error) {
+func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg *kubeletconfig.KubeletConfiguration, nodeName types.NodeName, nodeLister corelisters.NodeLister, certDirectory string) (certificate.Manager, error) {
 	var clientsetFn certificate.ClientsetFunc
 	if kubeClient != nil {
 		clientsetFn = func(current *tls.Certificate) (clientset.Interface, error) {
@@ -120,7 +145,10 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	)
 	legacyregistry.MustRegister(certificateRotationAge)
 
-	getTemplate := newGetTemplateFn(nodeName, getAddresses)
+	getAddressesFn := func() []v1.NodeAddress {
+		return getNodeAddressesFromInformer(nodeName, nodeLister)
+	}
+	getTemplate := newGetTemplateFn(nodeName, getAddressesFn)
 
 	m, err := certificate.NewManager(&certificate.Config{
 		ClientsetFn:             clientsetFn,
