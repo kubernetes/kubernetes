@@ -19,7 +19,9 @@ package main
 
 import (
 	"flag"
+	"maps"
 	"os"
+	"slices"
 
 	"errors"
 	"fmt"
@@ -409,19 +411,15 @@ func (boss *ImportBoss) verifyRules(pkg *packages.Package, restrictionFiles []*F
 	return nil
 }
 
-func uniq(slices ...[]string) []string {
+func uniq(allSlices ...[]string) []string {
 	m := map[string]bool{}
-	for _, sl := range slices {
+	for _, sl := range allSlices {
 		for _, str := range sl {
 			m[str] = true
 		}
 	}
-	ret := []string{}
-	for str := range m {
-		ret = append(ret, str)
-	}
-	sort.Strings(ret)
-	return ret
+
+	return slices.Sorted(maps.Keys(m))
 }
 
 func hasPathPrefix(path, prefix string) bool {

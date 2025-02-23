@@ -18,7 +18,8 @@ package componentconfigs
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,11 +49,7 @@ type UnsupportedConfigVersionsErrorMap map[string]*UnsupportedConfigVersionError
 // Error implements the standard Golang error interface for UnsupportedConfigVersionsErrorMap
 func (errs UnsupportedConfigVersionsErrorMap) Error() string {
 	// Make sure the error messages we print are predictable by sorting them by the group names involved
-	groups := make([]string, 0, len(errs))
-	for group := range errs {
-		groups = append(groups, group)
-	}
-	sort.Strings(groups)
+	groups := slices.Sorted(maps.Keys(errs))
 
 	msgs := make([]string, 1, 1+len(errs))
 	msgs[0] = "multiple unsupported config version errors encountered:"

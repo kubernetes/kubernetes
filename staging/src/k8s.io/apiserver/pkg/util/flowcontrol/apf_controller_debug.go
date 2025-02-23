@@ -19,8 +19,9 @@ package flowcontrol
 import (
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -65,11 +66,7 @@ func (cfgCtlr *configController) dumpPriorityLevels(w http.ResponseWriter, r *ht
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
-	plNames := make([]string, 0, len(cfgCtlr.priorityLevelStates))
-	for plName := range cfgCtlr.priorityLevelStates {
-		plNames = append(plNames, plName)
-	}
-	sort.Strings(plNames)
+	plNames := slices.Sorted(maps.Keys(cfgCtlr.priorityLevelStates))
 	for i := range plNames {
 		plState, ok := cfgCtlr.priorityLevelStates[plNames[i]]
 		if !ok {

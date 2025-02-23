@@ -20,9 +20,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
 	"math/rand"
 	"net/http"
-	"sort"
+	"slices"
 	"sync"
 
 	"k8s.io/component-base/zpages/httputil"
@@ -90,12 +91,7 @@ func (reg *registry) handleFlags(componentName string, flagReader Reader) http.H
 }
 
 func printSortedFlags(w io.Writer, flags map[string]string, separator string) {
-	var sortedKeys []string
-	for key := range flags {
-		sortedKeys = append(sortedKeys, key)
-	}
-
-	sort.Strings(sortedKeys)
+	sortedKeys := slices.Sorted(maps.Keys(flags))
 	for _, key := range sortedKeys {
 		fmt.Fprintf(w, "%s%s%s\n", key, separator, flags[key])
 	}

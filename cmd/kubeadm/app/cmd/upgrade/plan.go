@@ -18,8 +18,9 @@ package upgrade
 
 import (
 	"io"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -234,12 +235,7 @@ func genAvailableUpgrade(up *upgrade.Upgrade, etcdUpgrade bool) outputapiv1alpha
 
 // sortedSliceFromStringStringArrayMap returns a slice of the keys in the map sorted alphabetically
 func sortedSliceFromStringStringArrayMap(strMap map[string][]string) []string {
-	strSlice := []string{}
-	for k := range strMap {
-		strSlice = append(strSlice, k)
-	}
-	sort.Strings(strSlice)
-	return strSlice
+	return slices.Sorted(maps.Keys(strMap))
 }
 
 // upgradePlanTextPrintFlags provides flags necessary for printing upgrade plan in a text form

@@ -18,6 +18,7 @@ package labels
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -1008,12 +1009,8 @@ func (s ValidatedSetSelector) Empty() bool {
 }
 
 func (s ValidatedSetSelector) String() string {
-	keys := make([]string, 0, len(s))
-	for k := range s {
-		keys = append(keys, k)
-	}
 	// Ensure deterministic output
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(s))
 	b := strings.Builder{}
 	for i, key := range keys {
 		v := s[key]

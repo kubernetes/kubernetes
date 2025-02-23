@@ -18,8 +18,9 @@ package get
 
 import (
 	"fmt"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -42,12 +43,7 @@ type CustomColumnsPrintFlags struct {
 }
 
 func (f *CustomColumnsPrintFlags) AllowedFormats() []string {
-	formats := make([]string, 0, len(columnsFormats))
-	for format := range columnsFormats {
-		formats = append(formats, format)
-	}
-	sort.Strings(formats)
-	return formats
+	return slices.Sorted(maps.Keys(columnsFormats))
 }
 
 // ToPrinter receives an templateFormat and returns a printer capable of

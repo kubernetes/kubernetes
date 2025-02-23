@@ -18,8 +18,10 @@ package e2enode
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -65,11 +67,7 @@ func (R *numaPodResources) String() string {
 		nodeNum := R.CPUToNUMANode[k]
 		b.WriteString(fmt.Sprintf("CPU cpu#%03d=%02d\n", k, nodeNum))
 	}
-	var pciKeys []string
-	for pk := range R.PCIDevsToNUMANode {
-		pciKeys = append(pciKeys, pk)
-	}
-	sort.Strings(pciKeys)
+	pciKeys := slices.Sorted(maps.Keys(R.PCIDevsToNUMANode))
 	for _, k := range pciKeys {
 		nodeNum := R.PCIDevsToNUMANode[k]
 		b.WriteString(fmt.Sprintf("PCI %s=%02d\n", k, nodeNum))

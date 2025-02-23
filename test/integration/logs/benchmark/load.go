@@ -22,10 +22,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -223,11 +224,7 @@ func parseLine(line []byte, stats *logStats) (item logMessage, err error) {
 	}
 
 	// Sort by key.
-	var keys []string
-	for key := range kvs {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(kvs))
 	for _, key := range keys {
 		item.kvs = append(item.kvs, key, kvs[key])
 	}

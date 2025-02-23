@@ -20,7 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -905,11 +906,7 @@ func waitForConflictEvent(ctx context.Context, cs clientset.Interface, pod, othe
 
 func dumpMetrics(metrics map[string]float64) {
 	// Print the metrics sorted by metric name for better readability
-	keys := make([]string, 0, len(metrics))
-	for key := range metrics {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(metrics))
 
 	for _, key := range keys {
 		framework.Logf("Metric %s: %v", key, metrics[key])

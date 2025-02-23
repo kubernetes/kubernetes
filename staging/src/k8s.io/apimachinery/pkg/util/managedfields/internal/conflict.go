@@ -19,7 +19,8 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -52,13 +53,8 @@ func getConflictMessage(conflicts merge.Conflicts) string {
 		m[conflict.Manager] = append(m[conflict.Manager], conflict.Path)
 	}
 
-	uniqueManagers := []string{}
-	for manager := range m {
-		uniqueManagers = append(uniqueManagers, manager)
-	}
-
 	// Print conflicts by sorted managers.
-	sort.Strings(uniqueManagers)
+	uniqueManagers := slices.Sorted(maps.Keys(m))
 
 	messages := []string{}
 	for _, manager := range uniqueManagers {

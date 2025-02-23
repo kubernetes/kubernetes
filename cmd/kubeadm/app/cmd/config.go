@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/lithammer/dedent"
@@ -180,12 +181,7 @@ var legacyKindToGroupMap = map[string]string{
 
 // getSupportedComponentConfigKinds returns all currently supported component config API object names
 func getSupportedComponentConfigKinds() []string {
-	objects := []string{}
-	for componentType := range legacyKindToGroupMap {
-		objects = append(objects, componentType)
-	}
-	sort.Strings(objects)
-	return objects
+	return slices.Sorted(maps.Keys(legacyKindToGroupMap))
 }
 
 func mapLegacyKindsToGroups(kinds []string) ([]string, error) {
