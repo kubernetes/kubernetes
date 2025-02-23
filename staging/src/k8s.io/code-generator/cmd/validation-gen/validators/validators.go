@@ -232,7 +232,7 @@ type Validations struct {
 
 	// Variables holds any variables which must be generated to perform
 	// validation.  Variables are not permitted in every context.
-	Variables []VariableGen
+	Variables []*VariableGen
 
 	// Comments holds comments to emit (without the leanding "//").
 	Comments []string
@@ -263,7 +263,7 @@ func (v *Validations) AddFunction(f FunctionGen) {
 	v.Functions = append(v.Functions, f)
 }
 
-func (v *Validations) AddVariable(variable VariableGen) {
+func (v *Validations) AddVariable(variable *VariableGen) {
 	v.Variables = append(v.Variables, variable)
 }
 
@@ -324,20 +324,6 @@ type Identifier types.Name
 // PrivateVar is a variable name that the generator will output as a private identifier.
 // PrivateVars are generated using the PrivateNamer strategy.
 type PrivateVar types.Name
-
-// VariableGen provides validation-gen with the information needed to generate variable.
-// Variables typically support generated functions by providing static information such
-// as the list of supported symbols for an enum.
-type VariableGen interface {
-	// TagName returns the tag which triggers this validator.
-	TagName() string
-
-	// Var returns the variable identifier.
-	Var() PrivateVar
-
-	// Init generates the function call that the variable is assigned to.
-	Init() FunctionGen
-}
 
 // Function creates a FunctionGen for a given function name and extraArgs.
 func Function(tagName string, flags FunctionFlags, function types.Name, extraArgs ...any) FunctionGen {
@@ -405,28 +391,19 @@ func (fg FunctionGen) WithComment(comment string) FunctionGen {
 }
 
 // Variable creates a VariableGen for a given function name and extraArgs.
-func Variable(variable PrivateVar, init FunctionGen) VariableGen {
-	return &variableGen{
-		variable: variable,
-		init:     init,
+func Variable(variable PrivateVar, initFunc FunctionGen) *VariableGen {
+	return &VariableGen{
+		Variable: variable,
+		InitFunc: initFunc,
 	}
 }
 
-type variableGen struct {
-	variable PrivateVar
-	init     FunctionGen
-}
+type VariableGen struct {
+	// Variable holds the variable identifier.
+	Variable PrivateVar
 
-func (v variableGen) TagName() string {
-	return v.init.TagName
-}
-
-func (v variableGen) Var() PrivateVar {
-	return v.variable
-}
-
-func (v variableGen) Init() FunctionGen {
-	return v.init
+	// InitFunc describes the function call that the variable is assigned to.
+	InitFunc FunctionGen
 }
 
 // WrapperFunction describes a function literal which has the fingerprint of a

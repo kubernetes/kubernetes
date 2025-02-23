@@ -1211,21 +1211,20 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 	tn := g.discovered.typeNodes[t]
 
 	variables := tn.typeValidations.Variables
-	slices.SortFunc(variables, func(a, b validators.VariableGen) int {
-		return cmp.Compare(a.Var().Name, b.Var().Name)
+	slices.SortFunc(variables, func(a, b *validators.VariableGen) int {
+		return cmp.Compare(a.Variable.Name, b.Variable.Name)
 	})
 	for _, variable := range variables {
-		fn := variable.Init()
+		fn := variable.InitFunc
 		targs := generator.Args{
-			"varName": c.Universe.Type(types.Name(variable.Var())),
+			"varName": c.Universe.Type(types.Name(variable.Variable)),
 			"initFn":  c.Universe.Type(fn.Function),
 		}
 		for _, comment := range fn.Comments {
 			sw.Do("// $.$\n", comment)
 		}
 		sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
-		typeArgs := variable.Init().TypeArgs
-		if len(typeArgs) > 0 {
+		if typeArgs := fn.TypeArgs; len(typeArgs) > 0 {
 			sw.Do("[", nil)
 			for i, typeArg := range typeArgs {
 				sw.Do("$.|raw$", c.Universe.Type(typeArg))
