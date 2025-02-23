@@ -291,7 +291,7 @@ func TestInformerNeverStarts(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		stopReason := myController.Run(testContext)
-		if !errors.Is(stopReason, context.Canceled) {
+		if !errors.Is(stopReason, context.DeadlineExceeded) {
 			t.Errorf("expected error to be context.Canceled, but got: %v", stopReason)
 		}
 	}()

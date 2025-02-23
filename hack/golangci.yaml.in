@@ -242,7 +242,6 @@ linters-settings: # please keep this alphabetized
     disable:  # TODO: remove each disabled rule and fix it
       {{- if .Base }}
       - float-compare
-      - go-require
       {{- end}}
       - require-error
     {{- end}}

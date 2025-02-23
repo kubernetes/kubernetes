@@ -277,5 +277,4 @@ linters-settings: # please keep this alphabetized
     enable-all: true
     disable:  # TODO: remove each disabled rule and fix it
       - float-compare
-      - go-require
       - require-error
