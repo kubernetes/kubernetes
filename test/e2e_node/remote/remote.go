@@ -239,9 +239,11 @@ func getTestArtifacts(host, testDir string) error {
 		}
 	}
 	// Copy container logs to artifacts/hostname
-	if _, err := SSH(host, "chmod", "-R", "a+r", "/var/log/pods"); err == nil {
-		if _, err = runSSHCommand(host, "scp", "-r", fmt.Sprintf("%s:/var/log/pods/", GetHostnameOrIP(host)), logPath); err != nil {
-			return err
+	if _, err := SSH(host, "find", "/var/log/pods", "-type", "d", "-exec", "chmod +x"); err == nil {
+		if _, err := SSH(host, "chmod", "-R", "a+r", "/var/log/pods"); err == nil {
+			if _, err = runSSHCommand(host, "scp", "-r", fmt.Sprintf("%s:/var/log/pods/", GetHostnameOrIP(host)), logPath); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
