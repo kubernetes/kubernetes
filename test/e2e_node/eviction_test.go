@@ -103,8 +103,11 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 	})
 })
 
-// ImageGCNoEviction tests that the node does not evict pods when inodes are consumed by images
-// Disk pressure is induced by pulling large images
+// ImageGCNoEviction tests that the eviction manager is able to prevent eviction
+// by reclaiming resources(inodes) through image garbage collection.
+// Disk pressure is induced by consuming a lot of inodes on the node.
+// Images are pre-pulled before running the test workload to ensure
+// that the image garbage collerctor can remove them to avoid eviction.
 var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
 	f := framework.NewDefaultFramework("image-gc-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -113,6 +116,17 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 	expectedStarvedResource := resourceInodes
 	inodesConsumed := uint64(100000)
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		prepull := func(ctx context.Context) {
+			// Prepull images for image garbage collector to remove them
+			// when reclaiming resources
+			err := PrePullAllImages(ctx)
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		}
+		ginkgo.BeforeEach(prepull)
+		if framework.TestContext.PrepullImages {
+			ginkgo.AfterEach(prepull)
+		}
+
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
 			summary := eventuallyGetSummary(ctx)
@@ -646,17 +660,6 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
-			prePullImagesIfNeccecary := func() {
-				if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
-					// The disk eviction test may cause the prepulled images to be evicted,
-					// prepull those images again to ensure this test not affect following tests.
-					err := PrePullAllImages(ctx)
-					gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
-				}
-			}
-			// Run prePull using a defer to make sure it is executed even when the assertions below fails
-			defer prePullImagesIfNeccecary()
-
 			ginkgo.By("deleting pods")
 			for _, spec := range testSpecs {
 				ginkgo.By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
@@ -674,17 +677,6 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
 
 			reduceAllocatableMemoryUsageIfCgroupv1()
-			ginkgo.By("making sure we have all the required images for testing")
-			prePullImagesIfNeccecary()
-
-			// Ensure that the NodeCondition hasn't returned after pulling images
-			ginkgo.By(fmt.Sprintf("making sure NodeCondition %s doesn't exist again after pulling images", expectedNodeCondition))
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				if expectedNodeCondition != noPressure && hasNodeCondition(ctx, f, expectedNodeCondition) {
-					return fmt.Errorf("Conditions haven't returned to normal, node still has %s", expectedNodeCondition)
-				}
-				return nil
-			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
 
 			ginkgo.By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
