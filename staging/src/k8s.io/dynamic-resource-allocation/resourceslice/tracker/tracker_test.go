@@ -394,6 +394,123 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				assert.Equal(t, "slice", events[1].newObj.Name)
 			},
 		},
+		"update-patch": {
+			inputEvents: func(event inputEventGenerator) {
+				patch := &resourcealphaapi.ResourceSlicePatch{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "patch",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Filter: &resourcealphaapi.DevicePatchFilter{
+								Pool: ptr.To("pool-1"),
+							},
+							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
+								"test.example.com/patchAttr": {
+									DeviceAttribute: resourcealphaapi.DeviceAttribute{
+										StringValue: ptr.To("value"),
+									},
+								},
+							},
+							Capacity: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.DeviceCapacity{
+								"test.example.com/patchCap": {
+									Value: resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				}
+				event.addResourceSlicePatch(patch.DeepCopy())
+				event.addResourceSlice(&resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice-1",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool: resourceapi.ResourcePool{
+							Name: "pool-1",
+						},
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				})
+				event.addResourceSlice(&resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice-2",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool: resourceapi.ResourcePool{
+							Name: "pool-2",
+						},
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				})
+				patch.Spec.Devices.Filter.Pool = ptr.To("pool-2")
+				event.addResourceSlicePatch(patch)
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice-1",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool: resourceapi.ResourcePool{
+							Name: "pool-1",
+						},
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{},
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice-2",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Pool: resourceapi.ResourcePool{
+							Name: "pool-2",
+						},
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{
+									Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+										"test.example.com/patchAttr": {
+											StringValue: ptr.To("value"),
+										},
+									},
+									Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+										"test.example.com/patchCap": {
+											Value: resource.MustParse("1"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if !assert.Len(t, events, 4) {
+					return
+				}
+				assert.Equal(t, handlerEventAdd, events[0].event)
+				assert.Equal(t, "slice-1", events[0].newObj.Name)
+				assert.Equal(t, handlerEventAdd, events[1].event)
+				assert.Equal(t, "slice-2", events[1].newObj.Name)
+
+				assert.Equal(t, handlerEventUpdate, events[2].event)
+				assert.Equal(t, handlerEventUpdate, events[3].event)
+				assert.ElementsMatch(t, []string{"slice-1", "slice-2"}, []string{events[2].newObj.Name, events[3].newObj.Name})
+			},
+		},
 		"merge-attributes": {
 			inputEvents: func(event inputEventGenerator) {
 				event.addResourceSlicePatch(&resourcealphaapi.ResourceSlicePatch{

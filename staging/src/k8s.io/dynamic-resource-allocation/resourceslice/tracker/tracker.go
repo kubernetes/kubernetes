@@ -32,6 +32,7 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -369,7 +370,11 @@ func (t *Tracker) resourceSlicePatchUpdate(ctx context.Context) func(oldObj, new
 		} else {
 			logger.V(5).Info("ResourceSlicePatch update", "patch", klog.KObj(newPatch))
 		}
-		for _, sliceName := range t.sliceNamesForPatch(ctx, newPatch) {
+
+		slicesToSync := sets.New[string]()
+		slicesToSync.Insert(t.sliceNamesForPatch(ctx, oldPatch)...)
+		slicesToSync.Insert(t.sliceNamesForPatch(ctx, newPatch)...)
+		for _, sliceName := range slicesToSync.UnsortedList() {
 			t.syncSlice(ctx, sliceName, false)
 		}
 	}
@@ -542,16 +547,8 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 				continue
 			}
 
-			var deviceAttributes, oldDeviceAttributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-			var deviceCapacity, oldDeviceCapacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
-			if device.Basic != nil {
-				deviceAttributes = device.Basic.Attributes
-				deviceCapacity = device.Basic.Capacity
-				if oldPatchedSlice != nil {
-					oldDeviceAttributes = oldPatchedSlice.Spec.Devices[dIndex].Basic.Attributes
-					oldDeviceCapacity = oldPatchedSlice.Spec.Devices[dIndex].Basic.Capacity
-				}
-			}
+			deviceAttributes := getAttributes(device)
+			deviceCapacity := getCapacity(device)
 
 			for i, expr := range filterDeviceClassExprs {
 				if expr.Error != nil {
@@ -616,7 +613,6 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 				if len(newAttrs) == 0 {
 					newAttrs = nil
 				}
-				sendEvent = sendEvent || !maps.EqualFunc(newAttrs, oldDeviceAttributes, attrsEqual)
 
 				newCaps := maps.Clone(deviceCapacity)
 				if newCaps == nil {
@@ -630,17 +626,24 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 				if len(newCaps) == 0 {
 					newCaps = nil
 				}
-				sendEvent = sendEvent || !maps.EqualFunc(newCaps, oldDeviceCapacity, capsEqual)
 
 				if patchedSlice == slice {
 					patchedSlice = patchedSlice.DeepCopy()
 				}
 
-				if device.Basic != nil {
-					patchedSlice.Spec.Devices[dIndex].Basic.Attributes = newAttrs
-					patchedSlice.Spec.Devices[dIndex].Basic.Capacity = newCaps
-				}
+				setAttributes(&patchedSlice.Spec.Devices[dIndex], newAttrs)
+				setCapacity(&patchedSlice.Spec.Devices[dIndex], newCaps)
 			}
+		}
+	}
+
+	if !sendEvent && oldPatchedSlice != nil {
+		for i := range patchedSlice.Spec.Devices {
+			oldDevice := oldPatchedSlice.Spec.Devices[i]
+			newDevice := patchedSlice.Spec.Devices[i]
+			sendEvent = sendEvent ||
+				!maps.EqualFunc(getAttributes(oldDevice), getAttributes(newDevice), attrsEqual) ||
+				!maps.EqualFunc(getCapacity(oldDevice), getCapacity(newDevice), capsEqual)
 		}
 	}
 
@@ -651,6 +654,34 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	}
 	if sendEvent {
 		t.pushEvent(oldPatchedObj, patchedSlice)
+	}
+}
+
+func getAttributes(device resourceapi.Device) map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+	if device.Basic != nil {
+		return device.Basic.Attributes
+	}
+	return nil
+}
+
+func setAttributes(device *resourceapi.Device, attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
+	if device.Basic != nil {
+		device.Basic.Attributes = attrs
+		return
+	}
+}
+
+func getCapacity(device resourceapi.Device) map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
+	if device.Basic != nil {
+		return device.Basic.Capacity
+	}
+	return nil
+}
+
+func setCapacity(device *resourceapi.Device, caps map[resourceapi.QualifiedName]resourceapi.DeviceCapacity) {
+	if device.Basic != nil {
+		device.Basic.Capacity = caps
+		return
 	}
 }
 
