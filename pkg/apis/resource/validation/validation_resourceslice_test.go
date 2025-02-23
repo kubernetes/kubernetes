@@ -314,20 +314,20 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"combined-attributes-and-capacity-length": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(2), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
+				field.Invalid(field.NewPath("spec", "devices").Index(2), resourceapi.ResourceSliceMaxAttributesAndCapacities+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacities)),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 3)
 				slice.Spec.Devices[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
 				slice.Spec.Devices[0].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
-				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacities; i++ {
 					slice.Spec.Devices[0].Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr_%d", i))] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
 				}
 				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
 				slice.Spec.Devices[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
 				quantity := resource.MustParse("1Gi")
 				capacity := resourceapi.DeviceCapacity{Value: quantity}
-				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacities; i++ {
 					slice.Spec.Devices[1].Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = capacity
 				}
 				// Too large together by one.
@@ -436,7 +436,7 @@ func TestValidateResourceSlice(t *testing.T) {
 		},
 		"device-mixin-combined-attributes-and-capacity-length": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "mixins", "device").Index(2), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
+				field.Invalid(field.NewPath("spec", "mixins", "device").Index(2), resourceapi.ResourceSliceMaxAttributesAndCapacities+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacities)),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, goodName, 1)
@@ -456,14 +456,14 @@ func TestValidateResourceSlice(t *testing.T) {
 
 				slice.Spec.Mixins.Device[0].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
 				slice.Spec.Mixins.Device[0].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
-				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacities; i++ {
 					slice.Spec.Mixins.Device[0].Attributes[resourceapi.QualifiedName(fmt.Sprintf("attr_%d", i))] = resourceapi.DeviceAttribute{StringValue: ptr.To("x")}
 				}
 				slice.Spec.Mixins.Device[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{}
 				slice.Spec.Mixins.Device[1].Capacity = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{}
 				quantity := resource.MustParse("1Gi")
 				capacity := resourceapi.DeviceCapacity{Value: quantity}
-				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+				for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacities; i++ {
 					slice.Spec.Mixins.Device[1].Capacity[resourceapi.QualifiedName(fmt.Sprintf("cap_%d", i))] = capacity
 				}
 				// Too large together by one.

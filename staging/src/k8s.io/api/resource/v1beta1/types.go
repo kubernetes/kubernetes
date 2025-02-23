@@ -216,8 +216,6 @@ type ResourcePool struct {
 	ResourceSliceCount int64 `json:"resourceSliceCount" protobuf:"bytes,3,name=resourceSliceCount"`
 }
 
-const ResourceSliceMaxSharedCapacity = 128
-
 // Defines the max number of devices that can be specified in a ResourceSlice.
 // The is used to validate the fields:
 // * spec.devices
@@ -695,9 +693,6 @@ type DeviceCapacity struct {
 	// potential future addition: fields which define how to "consume"
 	// capacity (= share a single device between different consumers).
 }
-
-// Limit for the sum of the number of entries in both attributes and capacity.
-const ResourceSliceMaxAttributesAndCapacitiesPerDevice = ResourceSliceMaxAttributesAndCapacities
 
 // QualifiedName is the name of a device attribute or capacity.
 //
