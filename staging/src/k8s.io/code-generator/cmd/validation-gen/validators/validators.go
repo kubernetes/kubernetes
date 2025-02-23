@@ -17,10 +17,11 @@ limitations under the License.
 package validators
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // TagValidator describes a single validation tag and how to use it.
