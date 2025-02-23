@@ -30,7 +30,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -686,7 +685,15 @@ func setCapacity(device *resourceapi.Device, caps map[resourceapi.QualifiedName]
 }
 
 func attrsEqual(a1, a2 resourceapi.DeviceAttribute) bool {
-	return apiequality.Semantic.DeepEqual(a1, a2)
+	return ptrsEqual(a1.BoolValue, a2.BoolValue) &&
+		ptrsEqual(a1.IntValue, a2.IntValue) &&
+		ptrsEqual(a1.StringValue, a2.StringValue) &&
+		ptrsEqual(a1.VersionValue, a2.VersionValue)
+}
+
+func ptrsEqual[T comparable](p1, p2 *T) bool {
+	return p1 == nil && p2 == nil ||
+		p1 != nil && p2 != nil && *p1 == *p2
 }
 
 func capsEqual(c1, c2 resourceapi.DeviceCapacity) bool {
