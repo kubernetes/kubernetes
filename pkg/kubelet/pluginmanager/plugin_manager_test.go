@@ -34,6 +34,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (
@@ -125,6 +126,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 func TestPluginRegistration(t *testing.T) {
 	defer cleanup(t)
 
+	tCtx := ktesting.Init(t)
 	pluginManager := newTestPluginManager(socketDir)
 
 	// Start the plugin manager
@@ -154,7 +156,7 @@ func TestPluginRegistration(t *testing.T) {
 		// Add a new plugin
 		pluginName := fmt.Sprintf("example-plugin-%d", i)
 		p := pluginwatcher.NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+		require.NoError(t, p.Serve(tCtx, "v1beta1", "v1beta2"))
 
 		// Verify that the plugin is registered
 		waitForRegistration(t, fakeHandler, pluginName)

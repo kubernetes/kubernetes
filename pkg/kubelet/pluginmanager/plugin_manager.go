@@ -17,6 +17,7 @@ limitations under the License.
 package pluginmanager
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -108,19 +109,24 @@ var _ PluginManager = &pluginManager{}
 func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
-	if err := pm.desiredStateOfWorldPopulator.Start(stopCh); err != nil {
-		klog.ErrorS(err, "The desired_state_of_world populator (plugin watcher) starts failed!")
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+
+	if err := pm.desiredStateOfWorldPopulator.Start(ctx, stopCh); err != nil {
+		logger.Error(err, "The desired_state_of_world populator (plugin watcher) starts failed!")
 		return
 	}
 
-	klog.V(2).InfoS("The desired_state_of_world populator (plugin watcher) starts")
+	logger.V(2).Info("The desired_state_of_world populator (plugin watcher) starts")
 
-	klog.InfoS("Starting Kubelet Plugin Manager")
-	go pm.reconciler.Run(stopCh)
+	logger.Info("Starting Kubelet Plugin Manager")
+	go pm.reconciler.Run(ctx, stopCh)
 
 	metrics.Register(pm.actualStateOfWorld, pm.desiredStateOfWorld)
 	<-stopCh
-	klog.InfoS("Shutting down Kubelet Plugin Manager")
+	logger.Info("Shutting down Kubelet Plugin Manager")
 }
 
 func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandler) {
