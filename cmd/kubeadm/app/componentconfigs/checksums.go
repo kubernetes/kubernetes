@@ -19,7 +19,8 @@ package componentconfigs
 import (
 	"crypto/sha256"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 
@@ -30,27 +31,11 @@ import (
 func ChecksumForConfigMap(cm *v1.ConfigMap) string {
 	hash := sha256.New()
 
-	// Since maps are not ordered we need to make sure we order them somehow so we'll always get the same checksums
-	// for the same config maps. The solution here is to extract the keys into a slice and sort them.
-	// Then iterate over that slice to fetch the values to be hashed.
-	keys := []string{}
-	for key := range cm.Data {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
+	for _, key := range slices.Sorted(maps.Keys(cm.Data)) {
 		hash.Write([]byte(cm.Data[key]))
 	}
 
-	// Do the same as above, but for binaryData this time.
-	keys = []string{}
-	for key := range cm.BinaryData {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	for _, key := range keys {
+	for _, key := range slices.Sorted(maps.Keys(cm.BinaryData)) {
 		hash.Write(cm.BinaryData[key])
 	}
 
