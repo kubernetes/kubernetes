@@ -120,6 +120,7 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 			if inodesFree <= inodesConsumed {
 				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
+			framework.Logf("Setting eviction threshold to %d inodes", inodesFree-inodesConsumed)
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
@@ -924,16 +925,25 @@ func logDiskMetrics(ctx context.Context) {
 	if summary.Node.Fs != nil && summary.Node.Fs.CapacityBytes != nil && summary.Node.Fs.AvailableBytes != nil {
 		framework.Logf("rootFsInfo.CapacityBytes: %d, rootFsInfo.AvailableBytes: %d", *summary.Node.Fs.CapacityBytes, *summary.Node.Fs.AvailableBytes)
 	}
+	if summary.Node.Fs != nil && summary.Node.Fs.Inodes != nil && summary.Node.Fs.InodesUsed != nil && summary.Node.Fs.InodesFree != nil {
+		framework.Logf("rootFsInfo.Inodes: %d, rootFsInfo.InodesUsed: %d, rootFsInfo.InodesFree: %d", *summary.Node.Fs.Inodes, *summary.Node.Fs.InodesUsed, *summary.Node.Fs.InodesFree)
+	}
 	for _, pod := range summary.Pods {
 		framework.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
-			if container.Rootfs != nil && container.Rootfs.UsedBytes != nil {
-				framework.Logf("--- summary Container: %s UsedBytes: %d", container.Name, *container.Rootfs.UsedBytes)
+			if container.Rootfs != nil && container.Rootfs.UsedBytes != nil && container.Rootfs.AvailableBytes != nil {
+				framework.Logf("--- summary Container: %s UsedBytes: %d, AvailableBytes: %d", container.Name, *container.Rootfs.UsedBytes, *container.Rootfs.AvailableBytes)
+			}
+			if container.Rootfs != nil && container.Rootfs.Inodes != nil && container.Rootfs.InodesUsed != nil && container.Rootfs.InodesFree != nil {
+				framework.Logf("--- summary Container: %s Inodes: %d, InodesUsed: %d, InodesFree: %d", container.Name, *container.Rootfs.Inodes, *container.Rootfs.InodesUsed, *container.Rootfs.InodesFree)
 			}
 		}
 		for _, volume := range pod.VolumeStats {
-			if volume.FsStats.InodesUsed != nil {
-				framework.Logf("--- summary Volume: %s UsedBytes: %d", volume.Name, *volume.FsStats.UsedBytes)
+			if volume.FsStats.UsedBytes != nil && volume.FsStats.AvailableBytes != nil {
+				framework.Logf("--- summary Volume: %s UsedBytes: %d, AvailableBytest: %d", volume.Name, *volume.FsStats.UsedBytes, *volume.FsStats.AvailableBytes)
+			}
+			if volume.FsStats.Inodes != nil && volume.FsStats.InodesUsed != nil && volume.FsStats.InodesFree != nil {
+				framework.Logf("--- summary Volume: %s Inodes: %d, InodesUsed: %d, InodesFree: %d", volume.Name, *volume.FsStats.Inodes, *volume.FsStats.InodesUsed, *volume.FsStats.InodesFree)
 			}
 		}
 	}
