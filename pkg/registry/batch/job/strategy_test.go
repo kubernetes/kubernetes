@@ -627,7 +627,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
-		"create job with a new fields; JobBackoffLimitPerIndex enabled": {
+		"create job with new fields; JobBackoffLimitPerIndex enabled": {
 			enableJobBackoffLimitPerIndex: true,
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),
@@ -650,7 +650,7 @@ func TestJobStrategy_PrepareForCreate(t *testing.T) {
 				},
 			},
 		},
-		"create job with a new fields; JobBackoffLimitPerIndex disabled": {
+		"create job with new fields; JobBackoffLimitPerIndex disabled": {
 			enableJobBackoffLimitPerIndex: false,
 			job: batch.Job{
 				ObjectMeta: getValidObjectMeta(0),

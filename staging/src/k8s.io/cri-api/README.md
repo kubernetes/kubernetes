@@ -139,7 +139,7 @@ No changes
 
 - [Add Support for Evented PLEG](https://github.com/kubernetes/kubernetes/pull/111384)
   - The type `ContainerEventResponse` updated: the field `pod_sandbox_metadata` removed and fields `pod_sandbox_status` and `containers_statuses` added.
-  - The type `PodSandboxStatusResponse` has a new fields `containers_statuses` and `timestamp`
+  - The type `PodSandboxStatusResponse` has new fields `containers_statuses` and `timestamp`
 
 ### v1.27
 
