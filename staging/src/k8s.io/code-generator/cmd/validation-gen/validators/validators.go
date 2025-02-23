@@ -207,13 +207,47 @@ type TagPayloadSchema struct {
 	Default string
 }
 
-// Validations defines the function calls and variables to generate to perform validation.
+// Validations defines the function calls and variables to generate to perform
+// validation.
 type Validations struct {
-	Functions     []FunctionGen
-	Variables     []VariableGen
-	Comments      []string
-	OpaqueType    bool
+	// Functions holds the function calls that should be generated to perform
+	// validation.  These functions may not be called in order - they may be
+	// sorted based on their flags and other criteria.
+	//
+	// Each function's signature must be of the form:
+	//   func(
+	//        // standard arguments
+	//        ctx context.Context
+	//        op operation.Operation,
+	//        fldPath field.Path,
+	//        value, oldValue <ValueType>, // always nilable
+	//        // additional arguments (optional)
+	//        Args[0] <Args[0]Type>,
+	//        Args[1] <Args[1]Type>,
+	//        ...
+	//        Args[N] <Args[N]Type>)
+	//
+	// The standard arguments are not included in the FunctionGen.Args list.
+	Functions []*FunctionGen
+
+	// Variables holds any variables which must be generated to perform
+	// validation.  Variables are not permitted in every context.
+	Variables []VariableGen
+
+	// Comments holds comments to emit (without the leanding "//").
+	Comments []string
+
+	// OpaqueType indicates that the type being validated is opaque, and that
+	// any validations defined on it should not be emitted.
+	OpaqueType bool
+
+	// OpaqueKeyType indicates that the key type of a map being validated is
+	// opaque, and that any validations defined on it should not be emitted.
 	OpaqueKeyType bool
+
+	// OpaqueValType indicates that the key type of a map or slice being
+	// validated is opaque, and that any validations defined on it should not
+	// be emitted.
 	OpaqueValType bool
 }
 
@@ -225,7 +259,7 @@ func (v *Validations) Len() int {
 	return len(v.Functions) + len(v.Variables) + len(v.Comments)
 }
 
-func (v *Validations) AddFunction(f FunctionGen) {
+func (v *Validations) AddFunction(f *FunctionGen) {
 	v.Functions = append(v.Functions, f)
 }
 
@@ -269,46 +303,6 @@ const (
 	NonError
 )
 
-// FunctionGen provides validation-gen with the information needed to generate a
-// validation function invocation.
-type FunctionGen interface {
-	// TagName returns the tag which triggers this validator.
-	TagName() string
-
-	// SignatureAndArgs returns the function name and all extraArg value literals that are passed when the function
-	// invocation is generated.
-	//
-	// The function signature must be of the form:
-	//   func(op operation.Operation,
-	//        fldPath field.Path,
-	//        value, oldValue <ValueType>,     // always nilable
-	//        extraArgs[0] <extraArgs[0]Type>, // optional
-	//        ...,
-	//        extraArgs[N] <extraArgs[N]Type>)
-	//
-	// extraArgs may contain:
-	// - data literals comprised of maps, slices, strings, ints, floats and bools
-	// - references, represented by types.Type (to reference any type in the universe), and types.Member (to reference members of the current value)
-	//
-	// If validation function to be called does not have a signature of this form, please introduce
-	// a function that does and use that function to call the validation function.
-	SignatureAndArgs() (function types.Name, extraArgs []any)
-
-	// TypeArgs assigns types to the type parameters of the function, for invocation.
-	TypeArgs() []types.Name
-
-	// Flags returns the options for this validator function.
-	Flags() FunctionFlags
-
-	// Conditions returns the conditions that must true for a resource to be
-	// validated by this function.
-	Conditions() Conditions
-
-	// Comments returns optional comments that should be added to the generated
-	// code (without the leading "//").
-	Comments() []string
-}
-
 // Conditions defines what conditions must be true for a resource to be validated.
 // If any of the conditions are not true, the resource is not validated.
 type Conditions struct {
@@ -342,83 +336,76 @@ type VariableGen interface {
 	Var() PrivateVar
 
 	// Init generates the function call that the variable is assigned to.
-	Init() FunctionGen
+	Init() *FunctionGen
 }
 
 // Function creates a FunctionGen for a given function name and extraArgs.
-func Function(tagName string, flags FunctionFlags, function types.Name, extraArgs ...any) FunctionGen {
-	return GenericFunction(tagName, flags, function, nil, extraArgs...)
-}
-
-func GenericFunction(tagName string, flags FunctionFlags, function types.Name, typeArgs []types.Name, extraArgs ...any) FunctionGen {
-	// Callers of Signature don't care if the args are all of a known type, it just
-	// makes it easier to declare validators.
-	var anyArgs []any
-	if len(extraArgs) > 0 {
-		anyArgs = make([]any, len(extraArgs))
-		copy(anyArgs, extraArgs)
-	}
-	return &functionGen{tagName: tagName, flags: flags, function: function, extraArgs: anyArgs, typeArgs: typeArgs}
-}
-
-// WithCondition adds a condition to a FunctionGen.
-func WithCondition(fn FunctionGen, conditions Conditions) FunctionGen {
-	name, args := fn.SignatureAndArgs()
-	return &functionGen{
-		tagName:    fn.TagName(),
-		flags:      fn.Flags(),
-		function:   name,
-		extraArgs:  args,
-		typeArgs:   fn.TypeArgs(),
-		comments:   fn.Comments(),
-		conditions: conditions,
+func Function(tagName string, flags FunctionFlags, function types.Name, extraArgs ...any) *FunctionGen {
+	return &FunctionGen{
+		TagName:  tagName,
+		Flags:    flags,
+		Function: function,
+		Args:     extraArgs,
 	}
 }
 
-// WithComment adds a comment to a FunctionGen.
-func WithComment(fn FunctionGen, comment string) FunctionGen {
-	name, args := fn.SignatureAndArgs()
-	return &functionGen{
-		tagName:    fn.TagName(),
-		flags:      fn.Flags(),
-		function:   name,
-		extraArgs:  args,
-		typeArgs:   fn.TypeArgs(),
-		comments:   append(fn.Comments(), comment),
-		conditions: fn.Conditions(),
-	}
+// FunctionGen describes a function call that should be generated.
+type FunctionGen struct {
+	// TagName is the tag which triggered this function.
+	TagName string
+
+	// Flags holds the options for this validator function.
+	Flags FunctionFlags
+
+	// Function is the name of the function to call.
+	Function types.Name
+
+	// Args holds arguments to pass to the function, and may conatin:
+	// - data literals comprised of maps, slices, strings, ints, floats, and bools
+	// - types.Type (to reference any type in the universe)
+	// - types.Member (to reference members of the current value)
+	// - types.Identifier (to reference any identifier in the universe)
+	// - validators.WrapperFunction (to call another validation function)
+	// - validators.Literal (to pass a literal value)
+	// - validators.FunctionLiteral (to pass a function literal)
+	// - validators.PrivateVar (to reference a variable)
+	//
+	// See toGolangSourceDataLiteral for details.
+	Args []any
+
+	// TypeArgs assigns types to the type parameters of the function, for
+	// generic function calls which require explicit type arguments.
+	TypeArgs []types.Name
+
+	// Conditions holds any conditions that must true for a field to be
+	// validated by this function.
+	Conditions Conditions
+
+	// Comments holds optional comments that should be added to the generated
+	// code (without the leading "//").
+	Comments []string
 }
 
-type functionGen struct {
-	tagName    string
-	function   types.Name
-	extraArgs  []any
-	typeArgs   []types.Name
-	flags      FunctionFlags
-	conditions Conditions
-	comments   []string
+// WithTypeArgs sets the type arguments for a FunctionGen.
+func (fg *FunctionGen) WithTypeArgs(typeArgs ...types.Name) *FunctionGen {
+	fg.TypeArgs = typeArgs
+	return fg
 }
 
-func (v *functionGen) TagName() string {
-	return v.tagName
+// WithConditions sets the conditions for a FunctionGen.
+func (fg *FunctionGen) WithConditions(conditions Conditions) *FunctionGen {
+	fg.Conditions = conditions
+	return fg
 }
 
-func (v *functionGen) SignatureAndArgs() (function types.Name, args []any) {
-	return v.function, v.extraArgs
+// AddComment adds a comment to a FunctionGen.
+func (fg *FunctionGen) AddComment(comment string) *FunctionGen {
+	fg.Comments = append(fg.Comments, comment)
+	return fg
 }
-
-func (v *functionGen) TypeArgs() []types.Name { return v.typeArgs }
-
-func (v *functionGen) Flags() FunctionFlags {
-	return v.flags
-}
-
-func (v *functionGen) Conditions() Conditions { return v.conditions }
-
-func (v *functionGen) Comments() []string { return v.comments }
 
 // Variable creates a VariableGen for a given function name and extraArgs.
-func Variable(variable PrivateVar, init FunctionGen) VariableGen {
+func Variable(variable PrivateVar, init *FunctionGen) VariableGen {
 	return &variableGen{
 		variable: variable,
 		init:     init,
@@ -427,18 +414,18 @@ func Variable(variable PrivateVar, init FunctionGen) VariableGen {
 
 type variableGen struct {
 	variable PrivateVar
-	init     FunctionGen
+	init     *FunctionGen
 }
 
 func (v variableGen) TagName() string {
-	return v.init.TagName()
+	return v.init.TagName
 }
 
 func (v variableGen) Var() PrivateVar {
 	return v.variable
 }
 
-func (v variableGen) Init() FunctionGen {
+func (v variableGen) Init() *FunctionGen {
 	return v.init
 }
 
@@ -446,7 +433,7 @@ func (v variableGen) Init() FunctionGen {
 // regular validation function (op, fldPath, obj, oldObj) and calls another
 // validation function with the same signature, plus extra args if needed.
 type WrapperFunction struct {
-	Function FunctionGen
+	Function *FunctionGen
 	ObjType  *types.Type
 }
 

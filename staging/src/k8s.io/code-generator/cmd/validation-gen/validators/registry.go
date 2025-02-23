@@ -165,7 +165,7 @@ func (reg *registry) sortTagsIntoPhases(tags map[string][]gengo.Tag) [][]string 
 	// Tag extraction will retain the relative order between 111 and 222, but
 	// 333 is extracted as tag "k8s:ifOptionEnabled".  Those are all in a map,
 	// which we iterate (in a random order).  When it reaches the emit stage,
-	// the "ifOptionEnabled" part is gone, and we will have 3 functionGen
+	// the "ifOptionEnabled" part is gone, and we will have 3 FunctionGen
 	// objects, all with tag "k8s:validateFalse", in a non-deterministic order
 	// because of the map iteration.  If we sort them at that point, we won't
 	// have enough information to do something smart, unless we look at the
