@@ -122,12 +122,12 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 	return hc, nil
 }
 
-func (hc *healthChecker) Start() {
+func (hc *healthChecker) Start(logger klog.Logger) {
 	if hc.interval <= 0 {
-		klog.InfoS("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
+		logger.Info("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
 		return
 	}
-	klog.InfoS("Starting systemd watchdog with interval", "interval", hc.interval)
+	logger.Info("Starting systemd watchdog with interval", "interval", hc.interval)
 
 	go wait.Forever(func() {
 		if err := hc.doCheck(); err != nil {
@@ -138,18 +138,18 @@ func (hc *healthChecker) Start() {
 		err := wait.ExponentialBackoff(hc.retryBackoff, func() (bool, error) {
 			ack, err := hc.watchdog.SdNotify(false)
 			if err != nil {
-				klog.V(5).InfoS("Failed to notify systemd watchdog, retrying", "error", err)
+				logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
 				return false, nil
 			}
 			if !ack {
 				return false, fmt.Errorf("failed to notify systemd watchdog, notification not supported - (i.e. NOTIFY_SOCKET is unset)")
 			}
 
-			klog.V(5).InfoS("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
+			logger.V(5).Info("Watchdog plugin notified", "acknowledgment", ack, "state", daemon.SdNotifyWatchdog)
 			return true, nil
 		})
 		if err != nil {
-			klog.ErrorS(err, "Failed to notify watchdog")
+			logger.Error(err, "Failed to notify watchdog")
 		}
 	}, hc.interval)
 }

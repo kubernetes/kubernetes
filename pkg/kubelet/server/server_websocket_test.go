@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -56,7 +57,7 @@ func TestServeWSPortForward(t *testing.T) {
 		"max port":                      {port: "65535", shouldError: false},
 		"normal port with uid":          {port: "8000", uid: true, shouldError: false},
 	}
-
+	logger, _ := ktesting.NewTestContext(t)
 	podNamespace := "other"
 	podName := "foo"
 
@@ -66,7 +67,7 @@ func TestServeWSPortForward(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, ss)
+			fw := newServerTestWithDebug(logger, true, ss)
 			defer fw.testHTTPServer.Close()
 
 			portForwardFuncDone := make(chan struct{})
@@ -154,11 +155,12 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 	ports := []uint16{7000, 8000, 9000}
 	podNamespace := "other"
 	podName := "foo"
+	logger, _ := ktesting.NewTestContext(t)
 
 	ss, err := newTestStreamingServer(0)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, ss)
+	fw := newServerTestWithDebug(logger, true, ss)
 	defer fw.testHTTPServer.Close()
 
 	portForwardWG := sync.WaitGroup{}

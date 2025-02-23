@@ -164,6 +164,7 @@ func (a *filteringContainer) RegisteredHandlePaths() []string {
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletServer(
+	logger klog.Logger,
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
@@ -174,8 +175,8 @@ func ListenAndServeKubeletServer(
 
 	address := netutils.ParseIPSloppy(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
-	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, checkers, auth, kubeCfg)
+	logger.Info("Starting to listen", "address", address, "port", port)
+	handler := NewServer(logger, host, resourceAnalyzer, checkers, auth, kubeCfg)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		handler.InstallTracingFilter(tp)
@@ -196,25 +197,27 @@ func ListenAndServeKubeletServer(
 		// cert/keys are specified and GetCertificate in the TLSConfig
 		// should be called instead.
 		if err := s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile); err != nil {
-			klog.ErrorS(err, "Failed to listen and serve")
+			logger.Error(err, "Failed to listen and serve")
 			os.Exit(1)
 		}
 	} else if err := s.ListenAndServe(); err != nil {
-		klog.ErrorS(err, "Failed to listen and serve")
+		logger.Error(err, "Failed to listen and serve")
 		os.Exit(1)
 	}
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(
+	logger klog.Logger,
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
 	address net.IP,
 	port uint,
 	tp oteltrace.TracerProvider) {
-	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, checkers, nil, nil)
+
+	logger.Info("Starting to listen read-only", "address", address, "port", port)
+	s := NewServer(logger, host, resourceAnalyzer, checkers, nil, nil)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
 		s.InstallTracingFilter(tp, otelrestful.WithPublicEndpoint())
@@ -230,13 +233,13 @@ func ListenAndServeKubeletReadOnlyServer(
 	}
 
 	if err := server.ListenAndServe(); err != nil {
-		klog.ErrorS(err, "Failed to listen and serve")
+		logger.Error(err, "Failed to listen and serve")
 		os.Exit(1)
 	}
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
-func ListenAndServePodResources(endpoint string, providers podresources.PodResourcesProviders) {
+func ListenAndServePodResources(logger klog.Logger, endpoint string, providers podresources.PodResourcesProviders) {
 	server := grpc.NewServer(apisgrpc.WithRateLimiter("podresources", podresources.DefaultQPS, podresources.DefaultBurstTokens))
 
 	podresourcesapiv1alpha1.RegisterPodResourcesListerServer(server, podresources.NewV1alpha1PodResourcesServer(providers))
@@ -244,19 +247,19 @@ func ListenAndServePodResources(endpoint string, providers podresources.PodResou
 
 	l, err := util.CreateListener(endpoint)
 	if err != nil {
-		klog.ErrorS(err, "Failed to create listener for podResources endpoint")
+		logger.Error(err, "Failed to create listener for podResources endpoint")
 		os.Exit(1)
 	}
 
-	klog.InfoS("Starting to serve the podresources API", "endpoint", endpoint)
+	logger.Info("Starting to serve the podresources API", "endpoint", endpoint)
 	if err := server.Serve(l); err != nil {
-		klog.ErrorS(err, "Failed to serve")
+		logger.Error(err, "Failed to serve")
 		os.Exit(1)
 	}
 }
 
 type NodeRequestAttributesGetter interface {
-	GetRequestAttributes(u user.Info, r *http.Request) []authorizer.Attributes
+	GetRequestAttributes(logger klog.Logger, u user.Info, r *http.Request) []authorizer.Attributes
 }
 
 // AuthInterface contains all methods required by the auth filters
@@ -288,6 +291,7 @@ type HostInterface interface {
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
 func NewServer(
+	logger klog.Logger,
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	checkers []healthz.HealthChecker,
@@ -304,11 +308,11 @@ func NewServer(
 		extendedCheckers:     checkers,
 	}
 	if auth != nil {
-		server.InstallAuthFilter()
+		server.InstallAuthFilter(logger)
 	}
 	server.InstallAuthNotRequiredHandlers()
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
-		klog.InfoS("Adding debug handlers to kubelet server")
+		logger.Info("Adding debug handlers to kubelet server")
 		server.InstallAuthRequiredHandlers()
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
 		// see https://github.com/kubernetes/kubernetes/pull/87273
@@ -322,12 +326,12 @@ func NewServer(
 }
 
 // InstallAuthFilter installs authentication filters with the restful Container.
-func (s *Server) InstallAuthFilter() {
+func (s *Server) InstallAuthFilter(logger klog.Logger) {
 	s.restfulCont.Filter(func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
 		// Authenticate
 		info, ok, err := s.auth.AuthenticateRequest(req.Request)
 		if err != nil {
-			klog.ErrorS(err, "Unable to authenticate the request due to an error")
+			logger.Error(err, "Unable to authenticate the request due to an error")
 			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
 			return
 		}
@@ -337,7 +341,7 @@ func (s *Server) InstallAuthFilter() {
 		}
 
 		// Get authorization attributes
-		attrs := s.auth.GetRequestAttributes(info.User, req.Request)
+		attrs := s.auth.GetRequestAttributes(logger, info.User, req.Request)
 		var allowed bool
 		var msg string
 		var subresources []string
@@ -345,7 +349,7 @@ func (s *Server) InstallAuthFilter() {
 			subresources = append(subresources, attr.GetSubresource())
 			decision, _, err := s.auth.Authorize(req.Request.Context(), attr)
 			if err != nil {
-				klog.ErrorS(err, "Authorization error", "user", attr.GetUser().GetName(), "verb", attr.GetVerb(), "resource", attr.GetResource(), "subresource", attr.GetSubresource())
+				logger.Error(err, "Authorization error", "user", attr.GetUser().GetName(), "verb", attr.GetVerb(), "resource", attr.GetResource(), "subresource", attr.GetSubresource())
 				msg = fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attr.GetUser().GetName(), attr.GetVerb(), attr.GetResource(), attr.GetSubresource())
 				resp.WriteErrorString(http.StatusInternalServerError, msg)
 				return
@@ -360,12 +364,12 @@ func (s *Server) InstallAuthFilter() {
 
 		if !allowed {
 			if len(attrs) == 0 {
-				klog.ErrorS(fmt.Errorf("could not determine attributes for request"), "Authorization error")
+				logger.Error(fmt.Errorf("could not determine attributes for request"), "Authorization error")
 				resp.WriteErrorString(http.StatusForbidden, "Authorization error: could not determine attributes for request")
 				return
 			}
 			// The attributes only differ by subresource so we just use the first one.
-			klog.V(2).InfoS("Forbidden", "user", attrs[0].GetUser().GetName(), "verb", attrs[0].GetVerb(), "resource", attrs[0].GetResource(), "subresource(s)", subresources)
+			logger.V(2).Info("Forbidden", "user", attrs[0].GetUser().GetName(), "verb", attrs[0].GetVerb(), "resource", attrs[0].GetResource(), "subresource(s)", subresources)
 			resp.WriteErrorString(http.StatusForbidden, fmt.Sprintf("Forbidden (user=%s, verb=%s, resource=%s, subresource(s)=%v)\n", attrs[0].GetUser().GetName(), attrs[0].GetVerb(), attrs[0].GetResource(), subresources))
 			return
 		}
@@ -832,7 +836,7 @@ func (s *Server) getPods(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	writeJSONResponse(response, data)
+	writeJSONResponse(request.Request.Context(), response, data)
 }
 
 // getRunningPods returns a list of pods running on Kubelet. The list is
@@ -850,7 +854,7 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	writeJSONResponse(response, data)
+	writeJSONResponse(ctx, response, data)
 }
 
 // getLogs handles logs requests against the Kubelet.
@@ -893,7 +897,8 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	klog.ErrorS(err, "Error while proxying request")
+	logger := klog.FromContext(req.Context())
+	logger.Error(err, "Error while proxying request")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
@@ -969,11 +974,11 @@ func (s *Server) getRun(request *restful.Request, response *restful.Response) {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
 	}
-	writeJSONResponse(response, data)
+	writeJSONResponse(request.Request.Context(), response, data)
 }
 
 // Derived from go-restful writeJSON.
-func writeJSONResponse(response *restful.Response, data []byte) {
+func writeJSONResponse(ctx context.Context, response *restful.Response, data []byte) {
 	if data == nil {
 		response.WriteHeader(http.StatusOK)
 		// do not write a nil representation
@@ -982,7 +987,8 @@ func writeJSONResponse(response *restful.Response, data []byte) {
 	response.Header().Set(restful.HEADER_ContentType, restful.MIME_JSON)
 	response.WriteHeader(http.StatusOK)
 	if _, err := response.Write(data); err != nil {
-		klog.ErrorS(err, "Error writing response")
+		logger := klog.FromContext(ctx)
+		logger.Error(err, "Error writing response")
 	}
 }
 
@@ -1091,6 +1097,7 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		return
 	}
 	writeJSONResponse(
+		ctx,
 		response,
 		[]byte(fmt.Sprintf("{\"items\":[\"%s\"]}", options.Location)),
 	)

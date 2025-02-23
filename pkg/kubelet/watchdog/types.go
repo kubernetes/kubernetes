@@ -16,11 +16,15 @@ limitations under the License.
 
 package watchdog
 
-import "net/http"
+import (
+	"net/http"
+
+	"k8s.io/klog/v2"
+)
 
 // HealthChecker defines the interface of health checkers.
 type HealthChecker interface {
-	Start()
+	Start(logger klog.Logger)
 }
 
 // syncLoopHealthChecker contains the health check method for syncLoop.

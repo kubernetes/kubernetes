@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,15 +30,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
-func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetSystemContainersStats(ctx context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
-	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
+	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats(ctx))
 	return stats
 }
 
-func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(ctx context.Context, nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
 	stats = append(stats, sp.getSystemPodsCPUAndMemoryStats(nodeConfig, podStats, updateStats))
-	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats())
+	stats = append(stats, sp.getSystemWindowsGlobalmemoryStats(ctx))
 	return stats
 }
 
@@ -101,7 +102,7 @@ func (sp *summaryProviderImpl) getSystemPodsCPUAndMemoryStats(nodeConfig cm.Node
 	return podsSummary
 }
 
-func (sp *summaryProviderImpl) getSystemWindowsGlobalmemoryStats() statsapi.ContainerStats {
+func (sp *summaryProviderImpl) getSystemWindowsGlobalmemoryStats(ctx context.Context) statsapi.ContainerStats {
 	now := metav1.NewTime(time.Now())
 	globalMemorySummary := statsapi.ContainerStats{
 		StartTime: now,
@@ -111,7 +112,8 @@ func (sp *summaryProviderImpl) getSystemWindowsGlobalmemoryStats() statsapi.Cont
 
 	perfInfo, err := winstats.GetPerformanceInfo()
 	if err != nil {
-		klog.Errorf("Failed to get Windows performance info: %v", err)
+		logger := klog.FromContext(ctx)
+		logger.Error(err, "Failed to get Windows performance info")
 		return globalMemorySummary
 	}
 

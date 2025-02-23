@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Mock syncLoopHealthChecker
@@ -141,6 +142,7 @@ func TestHealthCheckerStart(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Capture logs
 			logBuffer := setupLogging(t)
+			logger, _ := ktesting.NewTestContext(t)
 
 			// Mock SdWatchdogEnabled to return a valid value
 			mockClient := &mockWatchdogClient{
@@ -156,7 +158,7 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Start the health checker
-			hc.Start()
+			hc.Start(logger)
 
 			// Wait for a short period to allow the health check to run
 			time.Sleep(2 * interval)
