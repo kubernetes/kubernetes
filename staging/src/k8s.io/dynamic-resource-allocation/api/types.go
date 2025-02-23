@@ -37,7 +37,6 @@ type ResourceSliceSpec struct {
 	Devices                []Device
 	PerDeviceNodeSelection bool
 	CapacityPools          []CapacityPool
-	Mixins                 *ResourceSliceMixins
 }
 
 type ResourcePool struct {
@@ -48,73 +47,22 @@ type ResourcePool struct {
 
 type CapacityPool struct {
 	Name     UniqueString
-	Includes []CapacityPoolMixinRef
 	Capacity map[QualifiedName]DeviceCapacity
-}
-
-type CapacityPoolMixinRef struct {
-	Name UniqueString
-}
-
-type ResourceSliceMixins struct {
-	Device                    []DeviceMixin
-	DeviceCapacityConsumption []DeviceCapacityConsumptionMixin
-	CapacityPool              []CapacityPoolMixin
-}
-
-type DeviceCapacityConsumptionMixin struct {
-	Name     UniqueString
-	Capacity map[QualifiedName]DeviceCapacity
-}
-
-type CapacityPoolMixin struct {
-	Name     UniqueString
-	Capacity map[QualifiedName]DeviceCapacity
-}
-
-type DeviceMixin struct {
-	Name      UniqueString
-	Composite *CompositeDeviceMixin
-}
-
-type CompositeDeviceMixin struct {
-	Attributes map[QualifiedName]DeviceAttribute
-	Capacity   map[QualifiedName]DeviceCapacity
 }
 
 type Device struct {
-	Name      UniqueString
-	Basic     *BasicDevice
-	Composite *CompositeDevice
-}
-
-type BasicDevice struct {
-	Attributes map[QualifiedName]DeviceAttribute
-	Capacity   map[QualifiedName]DeviceCapacity
-}
-
-type CompositeDevice struct {
-	Includes         []DeviceMixinRef
+	Name             UniqueString
 	Attributes       map[QualifiedName]DeviceAttribute
 	Capacity         map[QualifiedName]DeviceCapacity
 	ConsumesCapacity []DeviceCapacityConsumption
-	NodeName         string
+	NodeName         UniqueString
 	NodeSelector     *v1.NodeSelector
 	AllNodes         bool
 }
 
-type DeviceMixinRef struct {
-	Name UniqueString
-}
-
 type DeviceCapacityConsumption struct {
-	CapacityPool string
-	Includes     []DeviceCapacityConsumptionMixinRef
+	CapacityPool UniqueString
 	Capacity     map[QualifiedName]DeviceCapacity
-}
-
-type DeviceCapacityConsumptionMixinRef struct {
-	Name UniqueString
 }
 
 type QualifiedName string
