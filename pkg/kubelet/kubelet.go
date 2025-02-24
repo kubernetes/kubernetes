@@ -2887,7 +2887,7 @@ func resizeMsgGenerate(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus)
 			memReq, hasMemReq := c.Resources.Requests[v1.ResourceMemory]
 			memLim, hasMemLim := c.Resources.Limits[v1.ResourceMemory]
 
-            msg = fmt.Sprintf("}") + msg
+			msg = fmt.Sprintf("}") + msg
 			if hasMemReq{
 				msg = fmt.Sprintf("Requested memory: %s ", memReq.String()) + msg
 			}
