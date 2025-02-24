@@ -387,26 +387,63 @@ const (
 
 // DeviceRequest is a request for devices required for a claim.
 // This is typically a request for a single resource like a device, but can
-// also ask for several identical devices.
-//
-// A DeviceClassName is currently required. Clients must check that it is
-// indeed set. It's absence indicates that something changed in a way that
-// is not supported by the client yet, in which case it must refuse to
-// handle the request.
+// also ask for several identical devices. With FirstAvailable it is also
+// possible to provide a prioritized list of requests.
 type DeviceRequest struct {
 	// Name can be used to reference this request in a pod.spec.containers[].resources.claims
 	// entry and in a constraint of the claim.
+	//
+	// References using the name in the DeviceRequest will uniquely
+	// identify a request when the Exactly field is set. When the
+	// FirstAvailable field is set, a reference to the name of the
+	// DeviceRequest will match whatever subrequest is chosen by the
+	// scheduler.
 	//
 	// Must be a DNS label.
 	//
 	// +required
 	Name string
 
+	// Exactly specifies the details for a single request that must
+	// be met exactly for the request to be satisfied.
+	//
+	// One of Exactly or FirstAvailable must be set.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	Exactly *SpecificDeviceRequest
+
+	// FirstAvailable contains subrequests, of which exactly one will be
+	// satisfied by the scheduler to satisfy this request. It tries to
+	// satisfy them in the order in which they are listed here. So if
+	// there are two entries in the list, the schduler will only check
+	// the second one if it determines that the first one can not be used.
+	//
+	// DRA does not yet implement scoring, so the scheduler will
+	// select the first set of devices that satisfies all the
+	// requests in the claim. And if the requirements can
+	// be satisfied on more than one node, other scheduling features
+	// will determine which node is chosen. This means that the set of
+	// devices allocated to a claim might not be the optimal set
+	// available to the cluster. Scoring will be implemented later.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	// +listType=atomic
+	// +featureGate=DRAPrioritizedList
+	FirstAvailable []DeviceSubRequest
+}
+
+// SpecificDeviceRequest is a request for one or more identical devices.
+type SpecificDeviceRequest struct {
 	// DeviceClassName references a specific DeviceClass, which can define
 	// additional configuration and selectors to be inherited by this
 	// request.
 	//
-	// A class is required. Which classes are available depends on the cluster.
+	// A DeviceClassName is required. Clients must check that it is
+	// indeed set. It's absence indicates that something changed in a way that
+	// is not supported by the client yet, in which case it must refuse to
+	// handle the request.
 	//
 	// Administrators may use this to restrict which devices may get
 	// requested by only installing classes with selectors for permitted
@@ -470,8 +507,80 @@ type DeviceRequest struct {
 	AdminAccess *bool
 }
 
+// DeviceSubRequest describes a request for device provided in the
+// claim.spec.devices.requests[].firstAvailable array. Each
+// is typically a request for a single resource like a device, but can
+// also ask for several identical devices.
+//
+// DeviceSubRequest is similar to SpecificDeviceRequest, but doesn't expose the
+// AdminAccess field as that one is only supported when requesting a
+// specific device.
+type DeviceSubRequest struct {
+	// Name can be used to reference this subrequest in the list of constraints
+	// or the list of configurations for the claim. References must use the
+	// format <main request>/<subrequest>.
+	//
+	// Must be a DNS label.
+	//
+	// +required
+	Name string
+
+	// DeviceClassName references a specific DeviceClass, which can define
+	// additional configuration and selectors to be inherited by this
+	// subrequest.
+	//
+	// A class is required. Which classes are available depends on the cluster.
+	//
+	// Administrators may use this to restrict which devices may get
+	// requested by only installing classes with selectors for permitted
+	// devices. If users are free to request anything without restrictions,
+	// then administrators can create an empty DeviceClass for users
+	// to reference.
+	//
+	// +required
+	DeviceClassName string
+
+	// Selectors define criteria which must be satisfied by a specific
+	// device in order for that device to be considered for this
+	// subrequest. All selectors must be satisfied for a device to be
+	// considered.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []DeviceSelector
+
+	// AllocationMode and its related fields define how devices are allocated
+	// to satisfy this subrequest. Supported values are:
+	//
+	// - ExactCount: This request is for a specific number of devices.
+	//   This is the default. The exact number is provided in the
+	//   count field.
+	//
+	// - All: This subrequest is for all of the matching devices in a pool.
+	//   Allocation will fail if some devices are already allocated,
+	//   unless adminAccess is requested.
+	//
+	// If AlloctionMode is not specified, the default mode is ExactCount. If
+	// the mode is ExactCount and count is not specified, the default count is
+	// one. Any other subrequests must specify this field.
+	//
+	// More modes may get added in the future. Clients must refuse to handle
+	// requests with unknown modes.
+	//
+	// +optional
+	AllocationMode DeviceAllocationMode
+
+	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
+	// If AllocationMode is ExactCount and this field is not specified, the default is one.
+	//
+	// +optional
+	// +oneOf=AllocationMode
+	Count int64
+}
+
 const (
-	DeviceSelectorsMaxSize = 32
+	DeviceSelectorsMaxSize             = 32
+	FirstAvailableDeviceRequestMaxSize = 8
 )
 
 type DeviceAllocationMode string
@@ -584,6 +693,10 @@ type DeviceConstraint struct {
 	// constraint. If this is not specified, this constraint applies to all
 	// requests in this claim.
 	//
+	// References to subrequests must include the name of both the main request
+	// and the subrequest using the format <main request>/<subrequest>. If just
+	// the main request is given, the constraint applies to all subrequests.
+	//
 	// +optional
 	// +listType=atomic
 	Requests []string
@@ -620,6 +733,10 @@ type DeviceConstraint struct {
 type DeviceClaimConfiguration struct {
 	// Requests lists the names of requests where the configuration applies.
 	// If empty, it applies to all requests.
+	//
+	// References to subrequests must include the name of both the main request
+	// and the subrequest using the format <main request>/<subrequest>. If just
+	// the main request is given, the configuration applies to all subrequests.
 	//
 	// +optional
 	// +listType=atomic
@@ -793,8 +910,12 @@ const AllocationResultsMaxSize = 32
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
 	// Request is the name of the request in the claim which caused this
-	// device to be allocated. Multiple devices may have been allocated
-	// per request.
+	// device to be allocated. If it references a subrequest in the
+	// firstAvailable list on a DeviceRequest, this field must
+	// include both the name of the main request and the subrequest
+	// using the format <main request>/<subrequest>.
+	//
+	// Multiple devices may have been allocated per request.
 	//
 	// +required
 	Request string
@@ -848,6 +969,10 @@ type DeviceAllocationConfiguration struct {
 
 	// Requests lists the names of requests where the configuration applies.
 	// If empty, its applies to all requests.
+	//
+	// References to subrequests must include the name of both the main request
+	// and the subrequest using the format <main request>/<subrequest>. If just
+	// the main request is given, the configuration applies to all subrequests.
 	//
 	// +optional
 	// +listType=atomic
