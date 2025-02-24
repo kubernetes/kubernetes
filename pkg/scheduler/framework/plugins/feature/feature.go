@@ -22,7 +22,6 @@ package feature
 type Features struct {
 	EnableDRAAdminAccess                         bool
 	EnableDynamicResourceAllocation              bool
-	EnableVolumeCapacityPriority                 bool
 	EnableNodeInclusionPolicyInPodTopologySpread bool
 	EnableMatchLabelKeysInPodTopologySpread      bool
 	EnableInPlacePodVerticalScaling              bool
@@ -30,4 +29,5 @@ type Features struct {
 	EnableSchedulingQueueHint                    bool
 	EnableAsyncPreemption                        bool
 	EnablePodLevelResources                      bool
+	EnableStorageCapacityScoring                 bool
 }

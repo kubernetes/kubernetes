@@ -16,7 +16,7 @@ limitations under the License.
 
 package volumescheduling
 
-// This file tests the VolumeCapacityPriority feature.
+// This file tests the StorageCapacityScoring feature.
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func mergeNodeLabels(node *v1.Node, labels map[string]string) *v1.Node {
 	return node
 }
 
-func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
+func setupClusterForStorageCapacityScoring(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
 	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
 	testutil.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
@@ -75,10 +75,10 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 	}
 }
 
-func TestVolumeCapacityPriority(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeCapacityPriority, true)
+func TestStorageCapacityScoring(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageCapacityScoring, true)
 
-	config := setupClusterForVolumeCapacityPriority(t, "volume-capacity-priority", 0, 0)
+	config := setupClusterForStorageCapacityScoring(t, "volume-capacity-priority", 0, 0)
 	defer config.teardown()
 
 	tests := []struct {
