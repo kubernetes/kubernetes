@@ -294,6 +294,22 @@ type DeviceAttribute struct {
 	VersionValue *string
 }
 
+// NullableDeviceAttribute must have exactly one field set.
+// It has the exact same fields as a DeviceAttribute plus `null` as
+// an additional alternative.
+type NullableDeviceAttribute struct {
+	DeviceAttribute
+
+	// NullValue, if set, marks an intentionally empty attribute.
+	//
+	// +optional
+	// +oneOf=ValueType
+	NullValue *NullValue
+}
+
+// NullValue denotes the value of an attribute to be removed by a [NullableDeviceAttribute].
+type NullValue struct{}
+
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
 
@@ -1076,4 +1092,136 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	HardwareAddress string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSlicePatch augments ResourceSlices.
+type ResourceSlicePatch struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec contains modifications to a ResourceSlice.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec ResourceSlicePatchSpec
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+type ResourceSlicePatchSpec struct {
+	// Devices defines how to patch device attributes and taints.
+	Devices DevicePatch
+}
+
+// DevicePatch selects one or more devices by class, driver, pool, device names
+// and/or CEL selectors. All of these criteria must be satisfied by a device, otherwise
+// it is ignored by the patch. A DevicePatch with no selection criteria is
+// valid and matches all devices.
+type DevicePatch struct {
+	// Filter defines which device(s) the patch is applied to.
+	//
+	// +optional
+	Filter *DevicePatchFilter
+
+	// If a ResourceSlice and a DevicePatch define the same attribute or
+	// capacity, the value of the DevicePatch is used. If multiple
+	// different DevicePatches match the same device, then the one with
+	// the highest priority wins. If priorities are equal, the older
+	// patch wins. This ensures that adding a new patch does not
+	// accidentally change the effect of some existing patch unless
+	// that is clearly intended according to the priority.
+	//
+	// +optional
+	Priority *int32
+
+	// Attributes defines the set of attributes to patch for matching devices.
+	// The name of each attribute must be unique in that set and
+	// include the domain prefix.
+	//
+	// In contrast to attributes in a ResourceSlice, entries here are allowed to
+	// be marked as empty by setting their null field. Such entries remove the
+	// corresponding attribute in a ResourceSlice, if there is one, instead of
+	// overriding it. Because entries get removed and are not allowed in
+	// slices, CEL expressions do not need need to deal with null values.
+	//
+	// The maximum number of attributes and capacities in the DevicePatch combined is 32.
+	// This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes
+	// feature gate.
+	//
+	// +optional
+	// +featureGate:DRAAdminControlledDeviceAttributes
+	Attributes map[FullyQualifiedName]NullableDeviceAttribute
+
+	// Capacity defines the set of capacities to patch for matching devices.
+	// The name of each capacity must be unique in that set and
+	// include the domain prefix.
+	//
+	// Removing a capacity is not supported. It can be reduced to 0 instead.
+	//
+	// The maximum number of attributes and capacities in the DevicePatch combined is 32.
+	// This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes
+	// feature gate.
+	//
+	// +optional
+	// +featureGate:DRAAdminControlledDeviceAttributes
+	Capacity map[FullyQualifiedName]DeviceCapacity
+}
+
+// DevicePatchFilter defines which device(s) a [DevicePatch] applies to.
+type DevicePatchFilter struct {
+	// If DeviceClassName is set, the selectors defined there must be
+	// satisfied by a device to be patched. This field corresponds
+	// to class.metadata.name.
+	//
+	// +optional
+	DeviceClassName *string
+
+	// If driver is set, only devices from that driver are patched.
+	// This fields corresponds to slice.spec.driver.
+	//
+	// +optional
+	Driver *string
+
+	// If pool is set, only devices in that pool are patched.
+	//
+	// Also setting the driver name may be useful to avoid
+	// ambiguity when different drivers use the same pool name,
+	// but this is not required because selecting pools from
+	// different drivers may also be useful, for example when
+	// drivers with node-local devices use the node name as
+	// their pool name.
+	//
+	// +optional
+	Pool *string
+
+	// If device is set, only devices with that name are patched.
+	// This field corresponds to slice.spec.devices[].name.
+	//
+	// Setting also driver and pool may be required to avoid ambiguity,
+	// but is not required.
+	//
+	// +optional
+	Device *string
+
+	// Selectors define criteria which must be satisfied by a
+	// device to be patched. All selectors must be satisfied.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []DeviceSelector
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+type ResourceSlicePatchList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of resource slice patches.
+	Items []ResourceSlicePatch
 }
