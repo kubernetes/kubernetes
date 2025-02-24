@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -993,4 +994,63 @@ func BenchmarkStoreList(b *testing.B) {
 
 func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+}
+
+func TestGetCurrentResourceVersionFromStorage(t *testing.T) {
+	_, store, _ := testSetup(t)
+	versioner := storage.APIObjectVersioner{}
+
+	makePod := func(name string) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
+		}
+	}
+	createPod := func(obj *example.Pod) *example.Pod {
+		key := "pods/" + obj.Namespace + "/" + obj.Name
+		out := &example.Pod{}
+		err := store.Create(context.TODO(), key, obj, out, 0)
+		require.NoError(t, err)
+		return out
+	}
+	getPod := func(name, ns string) *example.Pod {
+		key := "pods/" + ns + "/" + name
+		out := &example.Pod{}
+		err := store.Get(context.TODO(), key, storage.GetOptions{}, out)
+		require.NoError(t, err)
+		return out
+	}
+	makeReplicaSet := func(name string) *example.ReplicaSet {
+		return &example.ReplicaSet{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
+		}
+	}
+	createReplicaSet := func(obj *example.ReplicaSet) *example.ReplicaSet {
+		key := "replicasets/" + obj.Namespace + "/" + obj.Name
+		out := &example.ReplicaSet{}
+		err := store.Create(context.TODO(), key, obj, out, 0)
+		require.NoError(t, err)
+		return out
+	}
+
+	// create a pod and make sure its RV is equal to the one maintained by etcd
+	pod := createPod(makePod("pod-1"))
+	currentStorageRV, err := store.GetCurrentResourceVersion(context.TODO())
+	require.NoError(t, err)
+	podRV, err := versioner.ParseResourceVersion(pod.ResourceVersion)
+	require.NoError(t, err)
+	require.Equal(t, currentStorageRV, podRV, "expected the global etcd RV to be equal to pod's RV")
+
+	// now create a replicaset (new resource) and make sure the target function returns global etcd RV
+	rs := createReplicaSet(makeReplicaSet("replicaset-1"))
+	currentStorageRV, err = store.GetCurrentResourceVersion(context.TODO())
+	require.NoError(t, err)
+	rsRV, err := versioner.ParseResourceVersion(rs.ResourceVersion)
+	require.NoError(t, err)
+	require.Equal(t, currentStorageRV, rsRV, "expected the global etcd RV to be equal to replicaset's RV")
+
+	// ensure that the pod's RV hasn't been changed
+	currentPod := getPod(pod.Name, pod.Namespace)
+	currentPodRV, err := versioner.ParseResourceVersion(currentPod.ResourceVersion)
+	require.NoError(t, err)
+	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
 }

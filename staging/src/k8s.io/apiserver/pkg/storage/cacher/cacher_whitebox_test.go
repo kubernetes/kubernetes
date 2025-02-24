@@ -199,6 +199,10 @@ func (d *dummyStorage) injectError(err error) {
 	d.err = err
 }
 
+func (d *dummyStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
+	return 100, nil
+}
+
 func TestGetListCacheBypass(t *testing.T) {
 	type opts struct {
 		ResourceVersion      string
