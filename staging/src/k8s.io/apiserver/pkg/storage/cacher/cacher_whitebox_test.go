@@ -113,6 +113,7 @@ type dummyStorage struct {
 	sync.RWMutex
 	err       error
 	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
+	getRVFn   func(_ context.Context) (uint64, error)
 	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 
 	// use getRequestWatchProgressCounter when reading
@@ -197,6 +198,13 @@ func (d *dummyStorage) injectError(err error) {
 	defer d.Unlock()
 
 	d.err = err
+}
+
+func (d *dummyStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
+	if d.getRVFn != nil {
+		return d.getRVFn(ctx)
+	}
+	return 100, nil
 }
 
 func TestGetListCacheBypass(t *testing.T) {
@@ -462,6 +470,14 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 				}
 				podList.ResourceVersion = tc.storageRV
 				return nil
+			}
+			backingStorage.getRVFn = func(_ context.Context) (uint64, error) {
+				requestToStorageCount += 1
+				rv, err := strconv.Atoi(tc.storageRV)
+				if err != nil {
+					t.Fatalf("failed to parse RV: %s", err)
+				}
+				return uint64(rv), nil
 			}
 			result := &example.PodList{}
 
@@ -2111,6 +2127,15 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					listAccessor.SetResourceVersion("105")
 					return nil
 				}
+				s.getRVFn = func(_ context.Context) (uint64, error) {
+					// the first call to this function
+					// primes the cacher
+					if !hasBeenPrimed {
+						hasBeenPrimed = true
+						return 100, nil
+					}
+					return 105, nil
+				}
 				return s
 			}(),
 			verifyBackingStore: func(t *testing.T, s *dummyStorage) {
@@ -2145,6 +2170,15 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 					}
 					listAccessor.SetResourceVersion("105")
 					return nil
+				}
+				s.getRVFn = func(_ context.Context) (uint64, error) {
+					// the first call to this function
+					// primes the cacher
+					if !hasBeenPrimed {
+						hasBeenPrimed = true
+						return 100, nil
+					}
+					return 105, nil
 				}
 				return s
 			}(),
