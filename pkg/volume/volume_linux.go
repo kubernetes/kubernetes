@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sync/atomic"
 	"syscall"
 
 	"os"
@@ -44,19 +43,7 @@ const (
 	progressReportDuration = 60 * time.Second
 )
 
-type VolumeOwnership struct {
-	mounter             Mounter
-	dir                 string
-	fsGroup             *int64
-	fsGroupChangePolicy *v1.PodFSGroupChangePolicy
-	completionCallback  func(types.CompleteFuncParam)
-
-	// for monitoring progress of permission change operation
-	pod         *v1.Pod
-	fileCounter atomic.Int64
-	recorder    record.EventRecorder
-}
-
+// NewVolumeOwnership returns an interface that can be used to recursively change volume permissions and ownership
 func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) *VolumeOwnership {
 	vo := &VolumeOwnership{
 		mounter:             mounter,
