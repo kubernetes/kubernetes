@@ -83,7 +83,7 @@ func (m *manager) Start() {
 			}
 		}
 		// cadvisor updates its cache in `update_machine_info_interval` defaulted to 5 minutes.
-	}, 5*time.Minute)
+	}, 1*time.Second)
 }
 
 func (m *manager) MachineInfo() <-chan *cadvisorapi.MachineInfo {

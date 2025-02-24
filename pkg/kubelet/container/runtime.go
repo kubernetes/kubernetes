@@ -137,6 +137,8 @@ type Runtime interface {
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
 	// GetContainerStatus returns the status for the container.
 	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
+
+	UpdateContainerResources(pod *v1.Pod, container *v1.Container, containerID ContainerID) error
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the

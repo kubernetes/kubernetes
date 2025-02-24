@@ -2574,11 +2574,78 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 			handler.HandlePodSyncs(pods)
 		}
 	case machineInfo := <-kl.nodeResourceManager.MachineInfo():
-		kl.setCachedMachineInfo(machineInfo)
-		// Resync the resource managers
+		resizeContainers := func() error {
+			// Fetch all the runtime reported containers grouped by pods.
+			runningPods, err := kl.runtimeCache.GetPods(ctx)
+			if err != nil {
+				klog.ErrorS(err, "Kubelet failed to retrieve running pods from runtime")
+				return err
+			}
+			klog.InfoS("Running pods returned by runtime", "RuntimePods", klog.KObjSlice(runningPods))
+
+			runningPodsByUID := make(map[types.UID]*kubecontainer.Pod)
+			for _, pod := range runningPods {
+				runningPodsByUID[pod.ID] = pod
+			}
+
+			// Fetch all the allocated pods.
+			allocatedPods := kl.getAllocatedPods()
+			klog.InfoS("Allocated pods", "AllocatedPods", klog.KObjSlice(allocatedPods))
+
+			for _, pod := range allocatedPods {
+				runningPod, knownPod := runningPodsByUID[pod.UID]
+				if !knownPod {
+					klog.InfoS("Ignoring pod as its not reported in runtime", "pod", pod.Name)
+					continue
+				}
+
+				for _, container := range pod.Spec.Containers {
+
+					// Calculate update OOMScoreAdj and Swap limit.
+					//containerMemReq := container.Resources.Requests.Memory().Value()
+					//
+					//oomScoreAdjust := 1000 - (1000*containerMemReq)/int64(machineInfo.MemoryCapacity)
+					//containerResources := &runtimeapi.ContainerResources{
+					//	Linux: &runtimeapi.LinuxContainerResources{
+					//		OomScoreAdj: oomScoreAdjust,
+					//	},
+					//}
+					//err := kl.runtimeService.UpdateContainerResources(ctx, containerDetails.ID.ID, containerResources)
+					//if err != nil {
+					//	klog.ErrorS(err, "UpdateContainerResources failed", "container", container.Name)
+					//}
+
+					containerDetails := runningPod.FindContainerByName(container.Name)
+					if containerDetails == nil {
+						klog.InfoS("Skipping resizing container as not able to find its ID", "container", container.Name)
+						continue
+					}
+
+					// Update the container resource.
+					err = kl.containerRuntime.UpdateContainerResources(pod, &container, containerDetails.ID)
+					if err != nil {
+						klog.ErrorS(err, "UpdateContainerResources failed", "container", container.Name)
+					}
+				}
+			}
+			return nil
+		}
+
+		// Resize the containers.
+		klog.InfoS("Resizing containers because of change in MachineInfo")
+		if err := resizeContainers(); err != nil {
+			klog.ErrorS(err, "Failed to resize containers with machine info update")
+		}
+
+		// Resync the resource managers.
+		klog.InfoS("ResyncComponents resource managers because of change in MachineInfo")
 		if err := kl.containerManager.ResyncComponents(machineInfo); err != nil {
 			klog.ErrorS(err, "Failed to resync resource managers with machine info update")
 		}
+
+		// Update the cached MachineInfo.
+		kl.setCachedMachineInfo(machineInfo)
+
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
