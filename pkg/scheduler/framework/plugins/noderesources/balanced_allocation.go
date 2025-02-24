@@ -65,9 +65,9 @@ func (s *balancedAllocationPreScoreState) Clone() framework.StateData {
 func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	podRequests := ba.calculatePodResourceRequestList(pod, ba.resources)
 	if ba.isBestEffortPod(podRequests) {
-		// skip BalancedAllocation scoring for best-effort pods to
+		// Skip BalancedAllocation scoring for best-effort pods to
 		// prevent a large number of pods from being scheduled to the same node.
-		// see: https://github.com/kubernetes/kubernetes/issues/129138
+		// See https://github.com/kubernetes/kubernetes/issues/129138 for details.
 		return framework.NewStatus(framework.Skip)
 	}
 	state := &balancedAllocationPreScoreState{
