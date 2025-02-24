@@ -707,6 +707,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	// Set DisruptionTarget.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
 
+	// Set the observedGeneration for this pod status. Static pods are excluded.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking) && !metav1.HasAnnotation(pod.ObjectMeta, v1.MirrorPodAnnotationKey) {{
+		status.ObservedGeneration = pod.GetGeneration()
+	}
+
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
 		status.StartTime = oldStatus.StartTime

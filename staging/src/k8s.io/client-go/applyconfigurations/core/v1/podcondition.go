@@ -32,6 +32,7 @@ type PodConditionApplyConfiguration struct {
 	LastTransitionTime *metav1.Time             `json:"lastTransitionTime,omitempty"`
 	Reason             *string                  `json:"reason,omitempty"`
 	Message            *string                  `json:"message,omitempty"`
+	ObservedGeneration *int64                   `json:"observedGeneration,omitempty"`
 }
 
 // PodConditionApplyConfiguration constructs a declarative configuration of the PodCondition type for use with
@@ -85,5 +86,13 @@ func (b *PodConditionApplyConfiguration) WithReason(value string) *PodConditionA
 // If called multiple times, the Message field is set to the value of the last call.
 func (b *PodConditionApplyConfiguration) WithMessage(value string) *PodConditionApplyConfiguration {
 	b.Message = &value
+	return b
+}
+
+// WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ObservedGeneration field is set to the value of the last call.
+func (b *PodConditionApplyConfiguration) WithObservedGeneration(value int64) *PodConditionApplyConfiguration {
+	b.ObservedGeneration = &value
 	return b
 }

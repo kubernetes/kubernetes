@@ -277,17 +277,20 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("TEST1: Create pod '%s' that fits the node '%s'", testPod1.Name, node.Name))
 		testPod1 = podClient.CreateSync(ctx, testPod1)
 		gomega.Expect(testPod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(1))
 
 		ginkgo.By(fmt.Sprintf("TEST1: Create pod '%s' that won't fit node '%s' with pod '%s' on it", testPod2.Name, node.Name, testPod1.Name))
 		testPod2 = podClient.Create(ctx, testPod2)
 		err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, testPod2.Name, testPod2.Namespace)
 		framework.ExpectNoError(err)
 		gomega.Expect(testPod2.Status.Phase).To(gomega.Equal(v1.PodPending))
+		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(1))
 
 		ginkgo.By(fmt.Sprintf("TEST1: Resize pod '%s' to fit in node '%s'", testPod2.Name, node.Name))
 		testPod2, pErr := f.ClientSet.CoreV1().Pods(testPod2.Namespace).Patch(ctx,
 			testPod2.Name, types.StrategicMergePatchType, []byte(patchTestpod2ToFitNode), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(pErr, "failed to patch pod for resize")
+		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By(fmt.Sprintf("TEST1: Verify that pod '%s' is running after resize", testPod2.Name))
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod2))
@@ -331,11 +334,13 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		p3Err := e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, testPod3.Name, testPod3.Namespace)
 		framework.ExpectNoError(p3Err, "failed to create pod3 or pod3 did not become pending!")
 		gomega.Expect(testPod3.Status.Phase).To(gomega.Equal(v1.PodPending))
+		gomega.Expect(testPod3.Generation).To(gomega.BeEquivalentTo(1))
 
 		ginkgo.By(fmt.Sprintf("TEST2: Resize pod '%s' to make enough space for pod '%s'", testPod1.Name, testPod3.Name))
 		testPod1, p1Err := f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
 			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ToMakeSpaceForPod3), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
+		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(2))
 
 		ginkgo.By(fmt.Sprintf("TEST2: Verify pod '%s' is running after successfully resizing pod '%s'", testPod3.Name, testPod1.Name))
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod1.Name, testPod1.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
