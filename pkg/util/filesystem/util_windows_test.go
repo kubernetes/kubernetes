@@ -24,6 +24,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -119,7 +120,7 @@ func TestWindowsChmod(t *testing.T) {
 		require.NoError(t, err, "Failed to create temporary directory.")
 		defer os.RemoveAll(tempDir)
 
-		// Set the file GROUP to BUILTIN\Administrators (BA) for test determinism and
+		// Set the file GROUP to BUILTIN\Administrators (BA) for test determinism
 		err = setGroupInfo(tempDir, "S-1-5-32-544")
 		require.NoError(t, err, "Failed to set group for directory.")
 
@@ -128,6 +129,10 @@ func TestWindowsChmod(t *testing.T) {
 
 		owner, descriptor, err := getPermissionsInfo(tempDir)
 		require.NoError(t, err, "Failed to get permissions for directory.")
+
+		if owner == "S-1-5-32-544" {
+			owner = "BA"
+		}
 
 		expectedDescriptor := strings.ReplaceAll(testCase.expectedDescriptor, "OWNER", owner)
 
@@ -184,26 +189,39 @@ func setGroupInfo(path, group string) error {
 // TestDeleteFilePermissions tests that when a folder's permissions are set to 0660, child items
 // cannot be deleted in the folder but when a folder's permissions are set to 0770, child items can be deleted.
 func TestDeleteFilePermissions(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "test-dir")
+	testDir, err := os.MkdirTemp("", "test-dir")
 	require.NoError(t, err, "Failed to create temporary directory.")
 
-	err = Chmod(tempDir, 0660)
+	// Remove inherited permissions for %TEMP% since this tests runs as a system account
+	// in CI which has access to all files and folders by default
+	cmd := exec.Command("icacls.exe", testDir, "/inheritance:r")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "Failed to disable inheritance for directory: %s", output)
+
+	_, afterInheritanceRemoval, _ := getPermissionsInfo(testDir)
+	err = Chmod(testDir, 0660)
+	_, afterChmod, _ := getPermissionsInfo(testDir)
+	require.Fail(t, fmt.Sprintf("Permissions after removing inheritance %s, after chmod %s", afterInheritanceRemoval, afterChmod))
+
 	require.NoError(t, err, "Failed to set permissions for directory to 0660.")
 
-	filePath := filepath.Join(tempDir, "test-file")
+	filePath := filepath.Join(testDir, "test-file")
 	err = os.WriteFile(filePath, []byte("test"), 0440)
 	require.NoError(t, err, "Failed to create file in directory.")
 
+	// temp logging to figure out why file is getting delete in CI when it should not
+	_, folderDescriptior, _ := getPermissionsInfo(testDir)
+	_, fileDescriptior, _ := getPermissionsInfo(filePath)
 	err = os.Remove(filePath)
-	require.Error(t, err, "Expected expected error when trying to remove file in directory.")
+	require.Error(t, err, "Expected expected error when trying to remove file in directory. Folder perms %s, file perms %s", folderDescriptior, fileDescriptior)
 
-	err = Chmod(tempDir, 0770)
+	err = Chmod(testDir, 0770)
 	require.NoError(t, err, "Failed to set permissions for directory to 0770.")
 
 	err = os.Remove(filePath)
 	require.NoError(t, err, "Failed to remove file in directory.")
 
-	err = os.Remove(tempDir)
+	err = os.Remove(testDir)
 	require.NoError(t, err, "Failed to remove directory.")
 }
 
