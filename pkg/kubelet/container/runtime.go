@@ -26,14 +26,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -225,9 +224,12 @@ func BuildContainerID(typ, ID string) ContainerID {
 }
 
 // ParseContainerID is a convenience method for creating a ContainerID from an ID string.
-func ParseContainerID(logger logr.Logger, containerID string) ContainerID {
+func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
+		// Use klog.TODO() because we currently do not have a proper logger to pass in.
+		// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
+		logger := klog.TODO()
 		logger.Error(err, "Parsing containerID failed")
 	}
 	return id
