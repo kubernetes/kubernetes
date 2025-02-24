@@ -682,7 +682,7 @@ done`}
 
 		tracker := NewIndexedPodAnnotationTracker(jobName, f.Namespace.Name, labelSelector, batchv1.JobCompletionIndexAnnotation, batchv1.JobIndexFailureCountAnnotation)
 		trackerCancel := tracker.Start(ctx, f.ClientSet)
-		defer trackerCancel()
+		ginkgo.DeferCleanup(trackerCancel)
 
 		ginkgo.By("Creating an indexed job with backoffLimit per index and failing pods")
 		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
@@ -693,9 +693,13 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Verify the failure-count annotation on Pods")
-		gomega.Eventually(ctx, tracker.GetMap).
-			WithTimeout(JobTimeout).
-			WithPolling(framework.Poll).
+		// Since the Job is already failed all the relevant Pod events are
+		// already being distributed. Still, there might be a little bit of lag
+		// between the events being receiced by the Job controller and the test
+		// code so we need to wait a little bit.
+		gomega.Eventually(ctx, tracker.cloneTrackedAnnotations).
+			WithTimeout(15 * time.Second).
+			WithPolling(500 * time.Millisecond).
 			Should(gomega.Equal(map[int][]string{0: {"0", "1"}, 1: {"0", "1"}}))
 
 		ginkgo.By("Verifying the Job status fields")

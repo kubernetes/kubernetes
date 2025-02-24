@@ -18,7 +18,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"strconv"
 	"sync"
@@ -26,11 +25,10 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -57,52 +55,59 @@ func NewIndexedPodAnnotationTracker(ownerName, ownerNs, labelSelector, podIndexA
 }
 
 func (t *IndexedPodAnnotationTracker) Start(ctx context.Context, c clientset.Interface) context.CancelFunc {
-	ownerKey := klog.KRef(t.ownerNs, t.ownerName)
-	podClient := c.CoreV1().Pods(t.ownerNs)
-	podsList, err := podClient.List(ctx, metav1.ListOptions{LabelSelector: t.labelSelector})
-	framework.ExpectNoError(err, "failed to list Pods")
-
 	trackerCtx, trackerCancel := context.WithCancel(ctx)
-
-	go func() {
-		defer ginkgo.GinkgoRecover()
-
-		w := &cache.ListWatch{
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+	_, podTracker := cache.NewInformerWithOptions(cache.InformerOptions{
+		ListerWatcher: &cache.ListWatch{
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 				options.LabelSelector = t.labelSelector
-				return podClient.Watch(ctx, options)
+				obj, err := c.CoreV1().Pods(t.ownerNs).List(ctx, options)
+				return runtime.Object(obj), err
 			},
-		}
-
-		ginkgo.By(fmt.Sprintf("Start the Pod watch for owner: %s", ownerKey))
-		_, err = watchtools.Until(trackerCtx, podsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-			if event.Type == watch.Added {
-				if pod, ok := event.Object.(*v1.Pod); ok {
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = t.labelSelector
+				return c.CoreV1().Pods(t.ownerNs).Watch(ctx, options)
+			},
+		},
+		ObjectType: &v1.Pod{},
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				defer ginkgo.GinkgoRecover()
+				if pod, ok := obj.(*v1.Pod); ok {
 					framework.Logf("Observed event for Pod %q with index=%v, annotation value=%v",
 						klog.KObj(pod), pod.Annotations[t.podIndexAnnotation], pod.Annotations[t.podTrackedAnnotation])
 					podIndex, err := strconv.Atoi(pod.Annotations[t.podIndexAnnotation])
 					if err != nil {
-						return true, fmt.Errorf("failed to parse pod index for Pod %q: %v", klog.KObj(pod), err.Error())
+						framework.Failf("failed to parse pod index for Pod %q: %v", klog.KObj(pod), err.Error())
+					} else {
+						t.Lock()
+						defer t.Unlock()
+						t.trackedAnnotations[podIndex] = append(t.trackedAnnotations[podIndex], pod.Annotations[t.podTrackedAnnotation])
 					}
-					t.Lock()
-					defer t.Unlock()
-					t.trackedAnnotations[podIndex] = append(t.trackedAnnotations[podIndex], pod.Annotations[t.podTrackedAnnotation])
-					return false, nil
 				}
-			}
-			return false, nil
-		})
-		// We ignore the error corresponding to the context getting interrupted.
-		// The test code is expected to assert on the map before cancelling the
-		// context.
-		if err != nil && !wait.Interrupted(err) {
-			framework.Failf("failed to track Pod annotation %q for owner %q: %v", t.podTrackedAnnotation, ownerKey, err.Error())
-		}
-	}()
+			},
+			UpdateFunc: func(old, new interface{}) {
+				defer ginkgo.GinkgoRecover()
+				oldPod, oldOk := old.(*v1.Pod)
+				newPod, newOk := new.(*v1.Pod)
+				if !oldOk || !newOk {
+					return
+				}
+				if oldPod.Annotations[t.podTrackedAnnotation] != newPod.Annotations[t.podTrackedAnnotation] {
+					framework.Failf("Unexepected mutation of the annotation %q for Pod %q, old=%q, new=%q",
+						t.podTrackedAnnotation,
+						klog.KObj(newPod),
+						oldPod.Annotations[t.podTrackedAnnotation],
+						newPod.Annotations[t.podTrackedAnnotation],
+					)
+				}
+			},
+		},
+	})
+	go podTracker.RunWithContext(trackerCtx)
 	return trackerCancel
 }
 
-func (t *IndexedPodAnnotationTracker) GetMap() map[int][]string {
+func (t *IndexedPodAnnotationTracker) cloneTrackedAnnotations() map[int][]string {
 	t.Lock()
 	defer t.Unlock()
 	return maps.Clone(t.trackedAnnotations)
