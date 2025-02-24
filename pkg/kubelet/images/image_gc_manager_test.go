@@ -37,6 +37,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	stats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -124,7 +125,7 @@ func makeContainer(id int) *container.Container {
 }
 
 func TestDetectImagesInitialDetect(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -172,7 +173,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
 	testRuntimeHandler := "test-runtimeHandler"
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -226,7 +227,7 @@ func TestDetectImagesInitialDetectWithRuntimeHandlerInImageCriAPIFeatureGate(t *
 }
 
 func TestDetectImagesWithNewImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	// Just one image initially.
@@ -278,7 +279,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -297,7 +298,7 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 }
 
 func TestDeletePinnedImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -320,7 +321,7 @@ func TestDeletePinnedImage(t *testing.T) {
 }
 
 func TestDoNotDeletePinnedImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -341,7 +342,7 @@ func TestDoNotDeletePinnedImage(t *testing.T) {
 }
 
 func TestDeleteUnPinnedImage(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -362,7 +363,7 @@ func TestDeleteUnPinnedImage(t *testing.T) {
 }
 
 func TestAllPinnedImages(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -384,7 +385,7 @@ func TestAllPinnedImages(t *testing.T) {
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -423,7 +424,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 }
 
 func TestDetectImagesWithRemovedImages(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -452,7 +453,7 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 }
 
 func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -473,7 +474,7 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -497,7 +498,7 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{
@@ -516,7 +517,7 @@ func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
 		}},
 	}
 	// start to detect images
-	manager.Start()
+	manager.Start(ctx)
 	// try to delete images, but images are not old enough,so no image will be deleted
 	err := manager.DeleteUnusedImages(ctx)
 	assert := assert.New(t)
@@ -530,7 +531,7 @@ func TestDeleteUnusedImagesLimitByImageLiveTime(t *testing.T) {
 }
 
 func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -582,7 +583,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 }
 
 func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	mockStatsProvider := statstest.NewMockProvider(t)
 
 	manager, fakeRuntime := newRealImageGCManager(ImageGCPolicy{}, mockStatsProvider)
@@ -616,7 +617,7 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 }
 
 func TestGarbageCollectBelowLowThreshold(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -635,7 +636,7 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 }
 
 func TestGarbageCollectCadvisorFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -648,7 +649,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 }
 
 func TestGarbageCollectBelowSuccess(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -671,7 +672,7 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 }
 
 func TestGarbageCollectNotEnoughFreed(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -693,7 +694,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 }
 
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -746,7 +747,7 @@ func getImagesAndFreeSpace(ctx context.Context, t *testing.T, assert *assert.Ass
 }
 
 func TestGarbageCollectImageTooOld(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
@@ -801,7 +802,7 @@ func TestGarbageCollectImageTooOld(t *testing.T) {
 }
 
 func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	policy := ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
