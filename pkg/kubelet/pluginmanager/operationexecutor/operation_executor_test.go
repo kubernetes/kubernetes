@@ -84,8 +84,7 @@ func TestOperationExecutor_UnregisterPlugin_ConcurrentUnregisterPlugin(t *testin
 	for i := 0; i < numPluginsToUnregister; i++ {
 		socketPath := "socket-path" + strconv.Itoa(i)
 		pluginInfo := cache.PluginInfo{SocketPath: socketPath}
-		oe.UnregisterPlugin(tCtx, pluginInfo, nil /* actual state of the world updator */)
-
+		_ = oe.UnregisterPlugin(tCtx, pluginInfo, nil /* actual state of the world updator */)
 	}
 	if !isOperationRunConcurrently(ch, quit, numPluginsToUnregister) {
 		t.Fatalf("Unable to start unregister operations in Concurrent for plugins")
@@ -97,8 +96,7 @@ func TestOperationExecutor_UnregisterPlugin_SerialUnregisterPlugin(t *testing.T)
 	socketPath := fmt.Sprintf("%s/plugin-serial.sock", socketDir)
 	for i := 0; i < numPluginsToUnregister; i++ {
 		pluginInfo := cache.PluginInfo{SocketPath: socketPath}
-		oe.UnregisterPlugin(tCtx, pluginInfo, nil /* actual state of the world updator */)
-
+		_ = oe.UnregisterPlugin(tCtx, pluginInfo, nil /* actual state of the world updator */)
 	}
 	if !isOperationRunSerially(ch, quit) {
 		t.Fatalf("Unable to start unregister operations serially for plugins")

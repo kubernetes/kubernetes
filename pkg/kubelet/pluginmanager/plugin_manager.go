@@ -35,7 +35,7 @@ import (
 // need to be registered/deregistered and makes it so.
 type PluginManager interface {
 	// Starts the plugin manager and all the asynchronous loops that it controls
-	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
+	Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
 	// AddHandler adds the given plugin handler for a specific plugin type, which
 	// will be added to the actual state of world cache so that it can be passed to
@@ -106,12 +106,9 @@ type pluginManager struct {
 
 var _ PluginManager = &pluginManager{}
 
-func (pm *pluginManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
 
 	if err := pm.desiredStateOfWorldPopulator.Start(ctx, stopCh); err != nil {

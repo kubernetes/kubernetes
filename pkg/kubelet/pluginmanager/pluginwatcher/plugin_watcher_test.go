@@ -40,7 +40,8 @@ var (
 func init() {
 	var logLevel string
 
-	klog.InitFlags(flag.CommandLine)
+	flags := &flag.FlagSet{}
+	klog.InitFlags(flags)
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	flag.StringVar(&logLevel, "logLevel", "6", "test")
 	flag.Lookup("v").Value.Set(logLevel)

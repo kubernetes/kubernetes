@@ -134,7 +134,7 @@ func TestPluginRegistration(t *testing.T) {
 	defer close(stopChan)
 	go func() {
 		sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
-		pluginManager.Run(sourcesReady, stopChan)
+		pluginManager.Run(tCtx, sourcesReady, stopChan)
 	}()
 
 	// Add handler for device plugin
