@@ -19,6 +19,7 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1022,16 +1023,15 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			k8s = initializeResources(ctx, f, protocols, ports)
 			nsX, _, _ := getK8sNamespaces(k8s)
-			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=a"})
-			framework.ExpectNoError(err, "Failing to find pod x/a")
-			podA := podList.Items[0]
 
-			podServerAllowCIDR := fmt.Sprintf("%s/4", podA.Status.PodIP)
-
-			podList, err = f.ClientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=b"})
+			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=b"})
 			framework.ExpectNoError(err, "Failing to find pod x/b")
 			podB := podList.Items[0]
 
+			// Create a rule that allows egress to a large set of IPs around
+			// podB, but not podB itself.
+
+			podServerAllowCIDR := makeLargeCIDRForIP(podB.Status.PodIP)
 			hostMask := 32
 			if utilnet.IsIPv6String(podB.Status.PodIP) {
 				hostMask = 128
@@ -1056,21 +1056,19 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ports := []int32{80}
 			k8s = initializeResources(ctx, f, protocols, ports)
 			nsX, _, _ := getK8sNamespaces(k8s)
-			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=a"})
-			framework.ExpectNoError(err, "Failing to find pod x/a")
-			podA := podList.Items[0]
 
-			podList, err = f.ClientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=b"})
+			podList, err := f.ClientSet.CoreV1().Pods(nsX).List(ctx, metav1.ListOptions{LabelSelector: "pod=b"})
 			framework.ExpectNoError(err, "Failing to find pod x/b")
 			podB := podList.Items[0]
 
-			// Exclude podServer's IP with an Except clause
+			// Create a rule that allows egress to a large set of IPs around
+			// podB, but not podB itself.
+
+			podServerAllowCIDR := makeLargeCIDRForIP(podB.Status.PodIP)
 			hostMask := 32
 			if utilnet.IsIPv6String(podB.Status.PodIP) {
 				hostMask = 128
 			}
-
-			podServerAllowCIDR := fmt.Sprintf("%s/4", podA.Status.PodIP)
 			podServerExceptList := []string{fmt.Sprintf("%s/%d", podB.Status.PodIP, hostMask)}
 			egressRule1 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule1.To = append(egressRule1.To, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: podServerAllowCIDR, Except: podServerExceptList}})
@@ -1083,8 +1081,8 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 
+			// Create a second NetworkPolicy which allows access to podB
 			podBIP := fmt.Sprintf("%s/%d", podB.Status.PodIP, hostMask)
-			//// Create NetworkPolicy which allows access to the podServer using podServer's IP in allow CIDR.
 			egressRule3 := networkingv1.NetworkPolicyEgressRule{}
 			egressRule3.To = append(egressRule3.To, networkingv1.NetworkPolicyPeer{IPBlock: &networkingv1.IPBlock{CIDR: podBIP}})
 			allowPolicy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-client-a-via-cidr-egress-rule",
@@ -1464,4 +1462,15 @@ func initializeResources(ctx context.Context, f *framework.Framework, protocols 
 	k8s, err := initializeCluster(ctx, f, protocols, ports)
 	framework.ExpectNoError(err, "unable to initialize resources")
 	return k8s
+}
+
+// makeLargeCIDRForIP returns a CIDR that matches the given IP and many many many other
+// IPs. (Specifically, it returns the /4 that contains the IP.)
+func makeLargeCIDRForIP(ip string) string {
+	podIP := utilnet.ParseIPSloppy(ip)
+	if ip4 := podIP.To4(); ip4 != nil {
+		podIP = ip4
+	}
+	cidrBase := podIP.Mask(net.CIDRMask(4, 8*len(podIP)))
+	return fmt.Sprintf("%s/4", cidrBase.String())
 }
