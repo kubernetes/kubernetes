@@ -1532,7 +1532,7 @@ func RunWatchSemantics(ctx context.Context, t *testing.T, store storage.Interfac
 			}
 
 			if scenario.useCurrentRV {
-				currentStorageRV, err := storage.GetCurrentResourceVersionFromStorage(ctx, store, func() runtime.Object { return &example.PodList{} }, "/pods", "")
+				currentStorageRV, err := store.GetCurrentResourceVersion(ctx)
 				require.NoError(t, err)
 				scenario.resourceVersion = fmt.Sprintf("%d", currentStorageRV)
 			}
