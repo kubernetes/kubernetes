@@ -838,7 +838,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	if kubeDeps.TLSOptions != nil {
 		if kubeCfg.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.getLastObservedNodeAddresses, certDirectory)
+			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, klet.nodeLister, certDirectory)
 			if err != nil {
 				return nil, fmt.Errorf("failed to initialize certificate manager: %w", err)
 			}
@@ -1056,9 +1056,6 @@ type Kubelet struct {
 
 	rootDirectory    string
 	podLogsDirectory string
-
-	lastObservedNodeAddressesMux sync.RWMutex
-	lastObservedNodeAddresses    []v1.NodeAddress
 
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
 	onRepeatedHeartbeatFailure func()
