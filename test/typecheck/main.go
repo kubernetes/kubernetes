@@ -22,8 +22,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -101,11 +102,7 @@ func verify(plat string, patterns []string, ignore map[string]bool) ([]string, e
 		}
 		accumulate(pkg, allMap)
 	}
-	keys := make([]string, 0, len(allMap))
-	for k := range allMap {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(allMap))
 	allList := make([]*packages.Package, 0, len(keys))
 	for _, k := range keys {
 		allList = append(allList, allMap[k])
