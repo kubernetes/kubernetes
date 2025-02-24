@@ -1,0 +1,88 @@
+{
+    "*deep.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "UnvalidatedListField[0]": [
+        "type SliceType"
+      ],
+      "UnvalidatedListField[0][0]": [
+        "type SliceType[*]",
+        "type StringType"
+      ],
+      "UnvalidatedListField[0][1]": [
+        "type SliceType[*]",
+        "type StringType"
+      ],
+      "UnvalidatedListField[1]": [
+        "type SliceType"
+      ],
+      "UnvalidatedListField[1][0]": [
+        "type SliceType[*]",
+        "type StringType"
+      ],
+      "UnvalidatedListField[1][1]": [
+        "type SliceType[*]",
+        "type StringType"
+      ],
+      "listField": [
+        "field Struct.ListField"
+      ],
+      "listField[0][0]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listField[0][1]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listField[1][0]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listField[1][1]": [
+        "field Struct.ListField[*][*]"
+      ],
+      "listPtrField": [
+        "field Struct.ListPtrField"
+      ],
+      "listPtrField[0][0]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listPtrField[0][1]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listPtrField[1][0]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listPtrField[1][1]": [
+        "field Struct.ListPtrField[*][*]"
+      ],
+      "listTypedefField": [
+        "field Struct.ListTypedefField"
+      ],
+      "listTypedefField[0]": [
+        "type SliceType"
+      ],
+      "listTypedefField[0][0]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type SliceType[*]",
+        "type StringType"
+      ],
+      "listTypedefField[0][1]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type SliceType[*]",
+        "type StringType"
+      ],
+      "listTypedefField[1]": [
+        "type SliceType"
+      ],
+      "listTypedefField[1][0]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type SliceType[*]",
+        "type StringType"
+      ],
+      "listTypedefField[1][1]": [
+        "field Struct.ListTypedefField[*][*]",
+        "type SliceType[*]",
+        "type StringType"
+      ]
+    }
+  }

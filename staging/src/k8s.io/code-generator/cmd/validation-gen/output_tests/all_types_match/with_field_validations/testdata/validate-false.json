@@ -1,0 +1,26 @@
+{
+    "*withfieldvalidations.T1": {
+      "s": [
+        "field T1.S"
+      ],
+      "t2": [
+        "field T1.T2"
+      ],
+      "t2.s": [
+        "field T2.S"
+      ],
+      "t3": [
+        "field T1.T3"
+      ]
+    },
+    "*withfieldvalidations.T2": {
+      "s": [
+        "field T2.S"
+      ]
+    },
+    "*withfieldvalidations.T4": {
+      "s": [
+        "field T4.S"
+      ]
+    }
+  }

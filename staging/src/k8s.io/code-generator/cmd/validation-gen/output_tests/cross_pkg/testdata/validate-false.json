@@ -1,0 +1,70 @@
+{
+    "*crosspkg.T1": {
+      "primitivest1.anothert2.b": [
+        "field T2.B"
+      ],
+      "primitivest1.anothert2.f": [
+        "field T2.F"
+      ],
+      "primitivest1.anothert2.i": [
+        "field T2.I"
+      ],
+      "primitivest1.anothert2.s": [
+        "field T2.S"
+      ],
+      "primitivest1.b": [
+        "field T1.B"
+      ],
+      "primitivest1.f": [
+        "field T1.F"
+      ],
+      "primitivest1.i": [
+        "field T1.I"
+      ],
+      "primitivest1.s": [
+        "field T1.S"
+      ],
+      "primitivest1.t2": [
+        "field T1.T2"
+      ],
+      "primitivest1.t2.b": [
+        "field T2.B"
+      ],
+      "primitivest1.t2.f": [
+        "field T2.F"
+      ],
+      "primitivest1.t2.i": [
+        "field T2.I"
+      ],
+      "primitivest1.t2.s": [
+        "field T2.S"
+      ],
+      "primitivest2.b": [
+        "field T2.B"
+      ],
+      "primitivest2.f": [
+        "field T2.F"
+      ],
+      "primitivest2.i": [
+        "field T2.I"
+      ],
+      "primitivest2.s": [
+        "field T2.S"
+      ],
+      "typedefse1": [
+        "type E1"
+      ],
+      "typedefse2": [
+        "type E2"
+      ],
+      "typedefse3": [
+        "type E3"
+      ],
+      "typedefse4": [
+        "type E4"
+      ],
+      "typedefse4.s": [
+        "field T2.S"
+      ]
+    }
+  }
