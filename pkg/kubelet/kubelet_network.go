@@ -67,5 +67,5 @@ func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error)
 // This function is defined in kubecontainer.RuntimeHelper interface so we
 // have to implement it.
 func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
-	return kl.dnsConfigurer.GetPodDNS(pod)
+	return kl.dnsConfigurer.GetPodDNS(klog.TODO(), pod)
 }

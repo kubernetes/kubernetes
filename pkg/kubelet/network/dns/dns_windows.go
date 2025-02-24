@@ -76,26 +76,26 @@ func fileExists(filename string) (bool, error) {
 	return stat.Mode().IsRegular(), nil
 }
 
-func getHostDNSConfig(resolverConfig string) (*runtimeapi.DNSConfig, error) {
+func getHostDNSConfig(logger klog.Logger, resolverConfig string) (*runtimeapi.DNSConfig, error) {
 	if resolverConfig == "" {
 		// This handles "" by returning defaults.
-		return getDNSConfig(resolverConfig)
+		return getDNSConfig(logger, resolverConfig)
 	}
 
 	isFile, err := fileExists(resolverConfig)
 	if err != nil {
 		err = fmt.Errorf(`Unexpected error while getting os.Stat for "%s" resolver config. Error: %w`, resolverConfig, err)
-		klog.ErrorS(err, "Cannot get host DNS Configuration.")
+		logger.Error(err, "Cannot get host DNS Configuration.")
 		return nil, err
 	}
 	if isFile {
 		// Get the DNS config from a resolv.conf-like file.
-		return getDNSConfig(resolverConfig)
+		return getDNSConfig(logger, resolverConfig)
 	}
 
 	if resolverConfig != hostResolvConf {
 		err := fmt.Errorf(`Unexpected resolver config value: "%s". Expected "", "%s", or a path to an existing resolv.conf file.`, resolverConfig, hostResolvConf)
-		klog.ErrorS(err, "Cannot get host DNS Configuration.")
+		logger.Error(err, "Cannot get host DNS Configuration.")
 		return nil, err
 	}
 
@@ -105,13 +105,13 @@ func getHostDNSConfig(resolverConfig string) (*runtimeapi.DNSConfig, error) {
 	hostDNS, err := getDNSServerList()
 	if err != nil {
 		err = fmt.Errorf("Could not get the host's DNS Server List. Error: %w", err)
-		klog.ErrorS(err, "Encountered error while getting host's DNS Server List.")
+		logger.Error(err, "Encountered error while getting host's DNS Server List.")
 		return nil, err
 	}
 	hostSearch, err := getDNSSuffixList()
 	if err != nil {
 		err = fmt.Errorf("Could not get the host's DNS Suffix List. Error: %w", err)
-		klog.ErrorS(err, "Encountered error while getting host's DNS Suffix List.")
+		logger.Error(err, "Encountered error while getting host's DNS Suffix List.")
 		return nil, err
 	}
 	return &runtimeapi.DNSConfig{
