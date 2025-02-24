@@ -32,7 +32,11 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
+
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -276,7 +280,13 @@ func TestCleanStaleEntries(t *testing.T) {
 
 	fake := NewFake()
 	fake.entries = mockEntries
+
+	metrics.RegisterMetrics(config.ProxyModeNFTables)
 	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
+
+	metricCount, err := countDeletedFlowsFromMetric(string(testIPFamily))
+	require.NoError(t, err)
+	require.Equal(t, metricCount, len(mockEntries)-len(expectedEntries))
 
 	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
 	require.Equal(t, len(expectedEntries), len(actualEntries))
@@ -372,4 +382,12 @@ func TestFilterForPortNAT(t *testing.T) {
 			require.Equal(t, tc.expectedFilter, filterForPortNAT(tc.dest, tc.port, tc.protocol))
 		})
 	}
+}
+
+func countDeletedFlowsFromMetric(ipFamily string) (int, error) {
+	numRulesFloat, err := testutil.GetCounterMetricValue(metrics.ReconcileConntrackFlowsDeletedEntriesTotal.WithLabelValues(ipFamily))
+	if err != nil {
+		return -1, err
+	}
+	return int(numRulesFloat), nil
 }
