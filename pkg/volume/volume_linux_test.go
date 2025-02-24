@@ -303,7 +303,8 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 			}
 
 			mounter := &localFakeMounter{path: "FAKE_DIR_DOESNT_EXIST"} // SetVolumeOwnership() must rely on tmpDir
-			err = SetVolumeOwnership(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy, nil)
+			ownershipChanger := NewVolumeOwnership(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy, nil)
+			err = ownershipChanger.ChangePermissions()
 			if err != nil {
 				t.Errorf("for %s error changing ownership with: %v", test.description, err)
 			}
@@ -439,7 +440,8 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 
 			mounter := &localFakeMounter{path: tmpDir}
 			always := v1.FSGroupChangeAlways
-			err = SetVolumeOwnership(mounter, tmpDir, test.fsGroup, &always, nil)
+			ownershipChanger := NewVolumeOwnership(mounter, tmpDir, test.fsGroup, &always, nil)
+			err = ownershipChanger.ChangePermissions()
 			if err != nil {
 				t.Errorf("for %s error changing ownership with: %v", test.description, err)
 			}

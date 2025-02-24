@@ -141,38 +141,6 @@ func (vo *VolumeOwnership) logWarning() {
 	vo.recorder.Event(vo.pod, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, msg)
 }
 
-// SetVolumeOwnership modifies the given volume to be owned by
-// fsGroup, and sets SetGid so that newly created files are owned by
-// fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
-	if fsGroup == nil {
-		return nil
-	}
-
-	timer := time.AfterFunc(30*time.Second, func() {
-		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
-	})
-	defer timer.Stop()
-
-	if skipPermissionChange(mounter, dir, fsGroup, fsGroupChangePolicy) {
-		klog.V(3).InfoS("Skipping permission and ownership change for volume", "path", dir)
-		return nil
-	}
-
-	err := walkDeep(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
-	})
-	if completeFunc != nil {
-		completeFunc(types.CompleteFuncParam{
-			Err: &err,
-		})
-	}
-	return err
-}
-
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
 	err := os.Lchown(filename, -1, int(*fsGroup))
 	if err != nil {
