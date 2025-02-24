@@ -2926,7 +2926,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			// (Desired == Allocated == Actual) => clear the resize status.
 			if(pod.Status.Resize == v1.PodResizeStatusDeferred || pod.Status.Resize == v1.PodResizeStatusInProgress) {
 				msg := resizeMsgGenerate(allocatedPod, podStatus)
-				kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeComplete, msg)
+				kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeComplete, msg)
 			}
 			
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
@@ -2968,7 +2968,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			// In this case, consider the resize complete.
 			if(pod.Status.Resize == v1.PodResizeStatusDeferred || pod.Status.Resize == v1.PodResizeStatusInProgress) {
 				msg := resizeMsgGenerate(allocatedPod, podStatus)
-				kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeComplete, msg)
+				kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeComplete, msg)
 			}			
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 			return allocatedPod, nil
