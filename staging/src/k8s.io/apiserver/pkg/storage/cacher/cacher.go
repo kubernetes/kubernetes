@@ -1319,7 +1319,7 @@ func (c *Cacher) Wait(ctx context.Context) error {
 
 // setInitialEventsEndBookmarkIfRequested sets initialEventsEndBookmark field in watchCacheInterval for watchlist request
 func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCacheInterval, opts storage.ListOptions, currentResourceVersion uint64) {
-	if opts.SendInitialEvents != nil && *opts.SendInitialEvents && opts.Predicate.AllowWatchBookmarks {
+	if isListWatchRequest(opts) {
 		// We don't need to set the InitialEventsAnnotation for this bookmark event,
 		// because this will be automatically set during event conversion in cacheWatcher.convertToWatchEvent method
 		initialEventsEndBookmark := &watchCacheEvent{
