@@ -173,3 +173,17 @@ func TestNotSupported(t *testing.T) {
 		t.Errorf("Expected: %s\n, but got: %s\n", expected, notSupported.ErrorBody())
 	}
 }
+
+func TestErrListOrigin(t *testing.T) {
+	t.Run("WithOrigin", func(t *testing.T) {
+		list := ErrorList{Invalid(NewPath("field1"), "", "")}
+
+		result := list.WithOrigin("origin1")
+		if len(result) != 1 {
+			t.Fatalf("Expected list of 1, got %d", len(list))
+		}
+		if list[0].Origin != "origin1" {
+			t.Errorf("Expected origin to be 'origin1', got %s", list[0].Origin)
+		}
+	})
+}
