@@ -89,7 +89,8 @@ func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error 
 	nonLegacy := []*genericapiserver.APIGroupInfo{}
 
 	// used later in the loop to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(s.GenericAPIServer.EffectiveVersion.EmulationVersion())
+	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(s.GenericAPIServer.EffectiveVersion.EmulationVersion(),
+		s.GenericAPIServer.EmulationForwardCompatible, s.GenericAPIServer.RuntimeConfigEmulationForwardCompatible)
 	if err != nil {
 		return err
 	}
@@ -111,6 +112,10 @@ func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error 
 		// We do this here so that we don't accidentally serve versions without resources or openapi information that for kinds we don't serve.
 		// This is a spot above the construction of individual storage handlers so that no sig accidentally forgets to check.
 		resourceExpirationEvaluator.RemoveDeletedKinds(groupName, apiGroupInfo.Scheme, apiGroupInfo.VersionedResourcesStorageMap)
+		err = resourceExpirationEvaluator.RemoveUnIntroducedKinds(groupName, apiGroupInfo.Scheme, apiGroupInfo.VersionedResourcesStorageMap, s.APIResourceConfigSource)
+		if err != nil {
+			return err
+		}
 		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
 			klog.V(1).Infof("Removing API group %v because it is time to stop serving it because it has no versions per APILifecycle.", groupName)
 			continue

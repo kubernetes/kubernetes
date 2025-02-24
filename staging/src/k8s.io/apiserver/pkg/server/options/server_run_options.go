@@ -98,6 +98,15 @@ type ServerRunOptions struct {
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
 	// ComponentName is name under which the server's global variabled are registered in the ComponentGlobalsRegistry.
 	ComponentName string
+	// EmulationForwardCompatible is an option to implicitly enable APIs which are introduced after the emulation version and
+	// have higher priority than APIs of the same group resource enabled at the emulation version.
+	// If true, APIs that have higher priority than the APIs of the same group resource enabled at the emulation version will be installed.
+	// This is useful if a controller has switched to use newer APIs in the binary version, and we want it still functional in an older emulation version.
+	EmulationForwardCompatible bool
+	// RuntimeConfigEmulationForwardCompatible is an option to explicit enable APIs introduced after the emulation version through the runtime-config.
+	// If true, APIs explicitly enabled in the --runtime-config flag (not through api/all,api/ga,api/beta) will be installed even if it is introduced after the emulation version.
+	// If false, error would be thrown if any GroupVersion or GroupVersionResource explicitly enabled in the --runtime-config flag is introduced after the emulation version.
+	RuntimeConfigEmulationForwardCompatible bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -152,6 +161,8 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
 	c.EffectiveVersion = s.ComponentGlobalsRegistry.EffectiveVersionFor(s.ComponentName)
 	c.FeatureGate = s.ComponentGlobalsRegistry.FeatureGateFor(s.ComponentName)
+	c.EmulationForwardCompatible = s.EmulationForwardCompatible
+	c.RuntimeConfigEmulationForwardCompatible = s.RuntimeConfigEmulationForwardCompatible
 
 	return nil
 }
@@ -230,6 +241,17 @@ func (s *ServerRunOptions) Validate() []error {
 	}
 	if errs := s.ComponentGlobalsRegistry.Validate(); len(errs) != 0 {
 		errors = append(errors, errs...)
+	}
+	effectiveVersion := s.ComponentGlobalsRegistry.EffectiveVersionFor(s.ComponentName)
+	if effectiveVersion == nil {
+		return errors
+	}
+	notEmulationMode := effectiveVersion.BinaryVersion().WithPatch(0).EqualTo(effectiveVersion.EmulationVersion())
+	if notEmulationMode && s.EmulationForwardCompatible {
+		errors = append(errors, fmt.Errorf("ServerRunOptions.EmulationForwardCompatible cannot be set to true if the emulation version is the same as the binary version"))
+	}
+	if notEmulationMode && s.RuntimeConfigEmulationForwardCompatible {
+		errors = append(errors, fmt.Errorf("ServerRunOptions.RuntimeConfigEmulationForwardCompatible cannot be set to true if the emulation version is the same as the binary version"))
 	}
 	return errors
 }
@@ -376,6 +398,12 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
 	s.ComponentGlobalsRegistry.AddFlags(fs)
+	fs.BoolVar(&s.EmulationForwardCompatible, "emulation-forward-compatible", s.EmulationForwardCompatible, ""+
+		"If true APIs that have higher priority than the APIs enabled at the emulation version of the same group resource will be installed. "+
+		"Can only be set to true if the emulation version is lower than the binary version.")
+	fs.BoolVar(&s.RuntimeConfigEmulationForwardCompatible, "runtime-config-emulation-forward-compatible", s.RuntimeConfigEmulationForwardCompatible, ""+
+		"If true, APIs explicitly enabled in the --runtime-config flag (not through api/all,api/ga,api/beta) will be installed even if it is introduced after the emulation version. "+
+		"Can only be set to true if the emulation version is lower than the binary version.")
 }
 
 // Complete fills missing fields with defaults.

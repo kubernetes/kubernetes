@@ -154,6 +154,15 @@ type Config struct {
 	// EffectiveVersion determines which apis and features are available
 	// based on when the api/feature lifecyle.
 	EffectiveVersion basecompatibility.EffectiveVersion
+	// EmulationForwardCompatible is an option to implicitly enable APIs which are introduced after the emulation version and
+	// have higher priority than APIs of the same group resource enabled at the emulation version.
+	// If true, APIs that have higher priority than the APIs of the same group resource enabled at the emulation version will be installed.
+	// This is useful if a controller has switched to use newer APIs in the binary version, and we want it still functional in an older emulation version.
+	EmulationForwardCompatible bool
+	// RuntimeConfigEmulationForwardCompatible is an option to explicit enable APIs introduced after the emulation version through the runtime-config.
+	// If true, APIs explicitly enabled in the --runtime-config flag (not through api/all,api/ga,api/beta) will be installed even if it is introduced after the emulation version.
+	// If false, error would be thrown if any GroupVersion or GroupVersionResource explicitly enabled in the --runtime-config flag is introduced after the emulation version.
+	RuntimeConfigEmulationForwardCompatible bool
 	// FeatureGate is a way to plumb feature gate through if you have them.
 	FeatureGate featuregate.FeatureGate
 	// AuditBackend is where audit events are sent to.
@@ -839,8 +848,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		StorageReadinessHook:  NewStorageReadinessHook(c.StorageInitializationTimeout),
 		StorageVersionManager: c.StorageVersionManager,
 
-		EffectiveVersion: c.EffectiveVersion,
-		FeatureGate:      c.FeatureGate,
+		EffectiveVersion:                        c.EffectiveVersion,
+		EmulationForwardCompatible:              c.EmulationForwardCompatible,
+		RuntimeConfigEmulationForwardCompatible: c.RuntimeConfigEmulationForwardCompatible,
+		FeatureGate:                             c.FeatureGate,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
