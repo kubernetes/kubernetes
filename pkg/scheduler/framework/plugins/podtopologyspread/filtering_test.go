@@ -18,9 +18,7 @@ package podtopologyspread
 
 import (
 	"context"
-	"fmt"
 	"math"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -41,10 +39,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var cmpOpts = []cmp.Option{
-	cmp.Comparer(func(s1 labels.Selector, s2 labels.Selector) bool {
-		return reflect.DeepEqual(s1, s2)
-	}),
+var stateCmpOpts = []cmp.Option{
 	cmp.Comparer(func(p1, p2 criticalPaths) bool {
 		p1.sort()
 		p2.sort()
@@ -1504,7 +1499,7 @@ func TestPreFilterState(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to get PreFilterState from cyclestate: %v", err)
 			}
-			if diff := cmp.Diff(tt.want, got, cmpOpts...); diff != "" {
+			if diff := cmp.Diff(tt.want, got, stateCmpOpts...); diff != "" {
 				t.Errorf("PodTopologySpread#PreFilter() returned unexpected prefilter status: diff (-want,+got):\n%s", diff)
 			}
 		})
@@ -1999,7 +1994,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(tt.want, state, cmpOpts...); diff != "" {
+			if diff := cmp.Diff(tt.want, state, stateCmpOpts...); diff != "" {
 				t.Errorf("PodTopologySpread.AddPod() returned diff (-want,+got):\n%s", diff)
 			}
 		})
@@ -2307,7 +2302,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(tt.want, state, cmpOpts...); diff != "" {
+			if diff := cmp.Diff(tt.want, state, stateCmpOpts...); diff != "" {
 				t.Errorf("PodTopologySpread.RemovePod() returned diff (-want,+got):\n%s", diff)
 			}
 		})
@@ -3415,9 +3410,9 @@ func TestPreFilterDisabled(t *testing.T) {
 	p := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(*PodTopologySpread).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	wantStatus := framework.AsStatus(framework.ErrNotFound)
+	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
+		t.Errorf("Status does not match (-want,+got):\n%s", diff)
 	}
 }
 
