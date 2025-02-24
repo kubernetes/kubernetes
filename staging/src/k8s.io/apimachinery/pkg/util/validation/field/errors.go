@@ -103,6 +103,7 @@ func (e *Error) ErrorBody() string {
 	return s
 }
 
+// SetOrigin sets the origin of the error.
 func (e *Error) SetOrigin(origin string) *Error {
 	e.Origin = origin
 	return e
@@ -286,24 +287,11 @@ func InternalError(field *Path, err error) *Error {
 // we can keep it simple and leave ErrorList here.
 type ErrorList []*Error
 
-// Append appends errors to the list.
-func (list *ErrorList) Append(errs ...*Error) {
-	*list = append(*list, errs...)
-}
-
-// AppendWithOrigin appends errors to the list with the given Origin.
-func (list *ErrorList) AppendWithOrigin(o string, errs ...*Error) {
-	for _, e := range errs {
+func (list ErrorList) WithOrigin(o string) ErrorList {
+	for _, e := range list {
 		e.Origin = o
 	}
-	*list = append(*list, errs...)
-}
-
-// SetOrigin sets the Origin for all errors in the list.
-func (list *ErrorList) SetOrigin(o string) {
-	for _, e := range *list {
-		e.Origin = o
-	}
+	return list
 }
 
 // NewErrorTypeMatcher returns an errors.Matcher that returns true
