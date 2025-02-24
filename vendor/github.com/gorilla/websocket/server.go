@@ -6,8 +6,7 @@ package websocket
 
 import (
 	"bufio"
-	"errors"
-	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -101,8 +100,8 @@ func checkSameOrigin(r *http.Request) bool {
 func (u *Upgrader) selectSubprotocol(r *http.Request, responseHeader http.Header) string {
 	if u.Subprotocols != nil {
 		clientProtocols := Subprotocols(r)
-		for _, serverProtocol := range u.Subprotocols {
-			for _, clientProtocol := range clientProtocols {
+		for _, clientProtocol := range clientProtocols {
+			for _, serverProtocol := range u.Subprotocols {
 				if clientProtocol == serverProtocol {
 					return clientProtocol
 				}
@@ -130,7 +129,8 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 	}
 
 	if !tokenListContainsValue(r.Header, "Upgrade", "websocket") {
-		return u.returnError(w, r, http.StatusBadRequest, badHandshake+"'websocket' token not found in 'Upgrade' header")
+		w.Header().Set("Upgrade", "websocket")
+		return u.returnError(w, r, http.StatusUpgradeRequired, badHandshake+"'websocket' token not found in 'Upgrade' header")
 	}
 
 	if r.Method != http.MethodGet {
@@ -172,28 +172,37 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 		}
 	}
 
-	h, ok := w.(http.Hijacker)
-	if !ok {
-		return u.returnError(w, r, http.StatusInternalServerError, "websocket: response does not implement http.Hijacker")
-	}
-	var brw *bufio.ReadWriter
-	netConn, brw, err := h.Hijack()
+	netConn, brw, err := http.NewResponseController(w).Hijack()
 	if err != nil {
-		return u.returnError(w, r, http.StatusInternalServerError, err.Error())
+		return u.returnError(w, r, http.StatusInternalServerError,
+			"websocket: hijack: "+err.Error())
 	}
 
-	if brw.Reader.Buffered() > 0 {
-		netConn.Close()
-		return nil, errors.New("websocket: client sent data before handshake is complete")
-	}
+	// Close the network connection when returning an error. The variable
+	// netConn is set to nil before the success return at the end of the
+	// function.
+	defer func() {
+		if netConn != nil {
+			// It's safe to ignore the error from Close() because this code is
+			// only executed when returning a more important error to the
+			// application.
+			_ = netConn.Close()
+		}
+	}()
 
 	var br *bufio.Reader
-	if u.ReadBufferSize == 0 && bufioReaderSize(netConn, brw.Reader) > 256 {
-		// Reuse hijacked buffered reader as connection reader.
+	if u.ReadBufferSize == 0 && brw.Reader.Size() > 256 {
+		// Use hijacked buffered reader as the connection reader.
 		br = brw.Reader
+	} else if brw.Reader.Buffered() > 0 {
+		// Wrap the network connection to read buffered data in brw.Reader
+		// before reading from the network connection. This should be rare
+		// because a client must not send message data before receiving the
+		// handshake response.
+		netConn = &brNetConn{br: brw.Reader, Conn: netConn}
 	}
 
-	buf := bufioWriterBuffer(netConn, brw.Writer)
+	buf := brw.Writer.AvailableBuffer()
 
 	var writeBuf []byte
 	if u.WriteBufferPool == nil && u.WriteBufferSize == 0 && len(buf) >= maxFrameHeaderSize+256 {
@@ -247,19 +256,29 @@ func (u *Upgrader) Upgrade(w http.ResponseWriter, r *http.Request, responseHeade
 	}
 	p = append(p, "\r\n"...)
 
-	// Clear deadlines set by HTTP server.
-	netConn.SetDeadline(time.Time{})
-
 	if u.HandshakeTimeout > 0 {
-		netConn.SetWriteDeadline(time.Now().Add(u.HandshakeTimeout))
+		if err := netConn.SetWriteDeadline(time.Now().Add(u.HandshakeTimeout)); err != nil {
+			return nil, err
+		}
+	} else {
+		// Clear deadlines set by HTTP server.
+		if err := netConn.SetDeadline(time.Time{}); err != nil {
+			return nil, err
+		}
 	}
+
 	if _, err = netConn.Write(p); err != nil {
-		netConn.Close()
 		return nil, err
 	}
 	if u.HandshakeTimeout > 0 {
-		netConn.SetWriteDeadline(time.Time{})
+		if err := netConn.SetWriteDeadline(time.Time{}); err != nil {
+			return nil, err
+		}
 	}
+
+	// Success! Set netConn to nil to stop the deferred function above from
+	// closing the network connection.
+	netConn = nil
 
 	return c, nil
 }
@@ -327,39 +346,28 @@ func IsWebSocketUpgrade(r *http.Request) bool {
 		tokenListContainsValue(r.Header, "Upgrade", "websocket")
 }
 
-// bufioReaderSize size returns the size of a bufio.Reader.
-func bufioReaderSize(originalReader io.Reader, br *bufio.Reader) int {
-	// This code assumes that peek on a reset reader returns
-	// bufio.Reader.buf[:0].
-	// TODO: Use bufio.Reader.Size() after Go 1.10
-	br.Reset(originalReader)
-	if p, err := br.Peek(0); err == nil {
-		return cap(p)
+type brNetConn struct {
+	br *bufio.Reader
+	net.Conn
+}
+
+func (b *brNetConn) Read(p []byte) (n int, err error) {
+	if b.br != nil {
+		// Limit read to buferred data.
+		if n := b.br.Buffered(); len(p) > n {
+			p = p[:n]
+		}
+		n, err = b.br.Read(p)
+		if b.br.Buffered() == 0 {
+			b.br = nil
+		}
+		return n, err
 	}
-	return 0
+	return b.Conn.Read(p)
 }
 
-// writeHook is an io.Writer that records the last slice passed to it vio
-// io.Writer.Write.
-type writeHook struct {
-	p []byte
+// NetConn returns the underlying connection that is wrapped by b.
+func (b *brNetConn) NetConn() net.Conn {
+	return b.Conn
 }
 
-func (wh *writeHook) Write(p []byte) (int, error) {
-	wh.p = p
-	return len(p), nil
-}
-
-// bufioWriterBuffer grabs the buffer from a bufio.Writer.
-func bufioWriterBuffer(originalWriter io.Writer, bw *bufio.Writer) []byte {
-	// This code assumes that bufio.Writer.buf[:1] is passed to the
-	// bufio.Writer's underlying writer.
-	var wh writeHook
-	bw.Reset(&wh)
-	bw.WriteByte(0)
-	bw.Flush()
-
-	bw.Reset(originalWriter)
-
-	return wh.p[:cap(wh.p)]
-}
