@@ -32,11 +32,8 @@ import (
 const discoveryPath = "/apis"
 const jsonAccept = "application/json"
 const protobufAccept = "application/vnd.kubernetes.protobuf"
-const aggregatedV2Beta1AcceptSuffix = ";g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
 const aggregatedAcceptSuffix = ";g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 
-const aggregatedV2Beta1JSONAccept = jsonAccept + aggregatedV2Beta1AcceptSuffix
-const aggregatedV2Beta1ProtoAccept = protobufAccept + aggregatedV2Beta1AcceptSuffix
 const aggregatedJSONAccept = jsonAccept + aggregatedAcceptSuffix
 const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
 
@@ -78,12 +75,6 @@ func TestAggregationEnabled(t *testing.T) {
 			// Empty accept headers are valid and should be handled by the unaggregated handler
 			accept:   "",
 			expected: "unaggregated",
-		}, {
-			accept:   aggregatedV2Beta1JSONAccept,
-			expected: "aggregated",
-		}, {
-			accept:   aggregatedV2Beta1ProtoAccept,
-			expected: "aggregated",
 		}, {
 			accept:   aggregatedJSONAccept,
 			expected: "aggregated",

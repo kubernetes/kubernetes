@@ -393,7 +393,6 @@ func TestCRD(t *testing.T) {
 				applyCRD(makeCRDSpec(stableGroup, "Foo", false, []string{"v1", "v1alpha1", "v1beta1", "v2"})),
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 			},
 		},
 		{
@@ -403,7 +402,6 @@ func TestCRD(t *testing.T) {
 				applyCRD(makeCRDSpec(stableGroup, "Foo", false, []string{"v1", "v1alpha1", "v1beta1", "v2"})),
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1, stableV1alpha1, stableV1beta1, stableV2}),
 				deleteObject{
 					GroupVersionResource: metav1.GroupVersionResource(apiextensionsv1.SchemeGroupVersion.WithResource("customresourcedefinitions")),
 					Name:                 "foos.stable.example.com",
@@ -471,7 +469,6 @@ func TestCRD(t *testing.T) {
 				// Wait for GV to appear in both discovery documents
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 
 				applyAPIService(
 					apiregistrationv1.APIServiceSpec{
@@ -490,13 +487,11 @@ func TestCRD(t *testing.T) {
 				// We should now have stable v1 available
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1}),
 
 				// The CRD group-versions not served by the aggregated
 				// apiservice should still be availablee
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 
 				// Remove API service. Show we have switched to CRD
 				deleteObject{
@@ -507,11 +502,9 @@ func TestCRD(t *testing.T) {
 				// Show that we still have stable v1 since it is in the CRD
 				waitForGroupVersionsV1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 				waitForGroupVersionsV2([]metav1.GroupVersion{stableV2, stableV1alpha1}),
-				waitForGroupVersionsV2Beta1([]metav1.GroupVersion{stableV2, stableV1alpha1}),
 
 				waitForAbsentGroupVersionsV1([]metav1.GroupVersion{stableV1}),
 				waitForAbsentGroupVersionsV2([]metav1.GroupVersion{stableV1}),
-				waitForAbsentGroupVersionsV2Beta1([]metav1.GroupVersion{stableV1}),
 			},
 		},
 		{
