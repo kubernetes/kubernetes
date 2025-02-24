@@ -350,6 +350,15 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 	return allErrs
 }
 
+// Validates that given value is positive.
+func ValidatePositiveField(value int64, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if value <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, isNotPositiveErrorMsg).WithOrigin("minimum"))
+	}
+	return allErrs
+}
+
 // Validates that a Quantity is positive
 func ValidatePositiveQuantityValue(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -7905,8 +7914,8 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 
 	for i, constraint := range constraints {
 		subFldPath := fldPath.Index(i)
-		if err := ValidateMaxSkew(subFldPath.Child("maxSkew"), constraint.MaxSkew); err != nil {
-			allErrs = append(allErrs, err)
+		if errs := ValidatePositiveField(int64(constraint.MaxSkew), subFldPath.Child("maxSkew")); len(errs) > 0 {
+			allErrs = append(allErrs, errs...)
 		}
 		if err := ValidateTopologyKey(subFldPath.Child("topologyKey"), constraint.TopologyKey); err != nil {
 			allErrs = append(allErrs, err)
@@ -7934,26 +7943,16 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 	return allErrs
 }
 
-// ValidateMaxSkew tests that the argument is a valid MaxSkew.
-func ValidateMaxSkew(fldPath *field.Path, maxSkew int32) *field.Error {
-	if maxSkew <= 0 {
-		return field.Invalid(fldPath, maxSkew, isNotPositiveErrorMsg)
-	}
-	return nil
-}
-
 // validateMinDomains tests that the argument is a valid MinDomains.
 func validateMinDomains(fldPath *field.Path, minDomains *int32, action core.UnsatisfiableConstraintAction) field.ErrorList {
 	if minDomains == nil {
 		return nil
 	}
 	var allErrs field.ErrorList
-	if *minDomains <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, minDomains, isNotPositiveErrorMsg))
-	}
+	allErrs = append(allErrs, ValidatePositiveField(int64(*minDomains), fldPath)...)
 	// When MinDomains is non-nil, whenUnsatisfiable must be DoNotSchedule.
 	if action != core.DoNotSchedule {
-		allErrs = append(allErrs, field.Invalid(fldPath, minDomains, fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", core.DoNotSchedule, action)))
+		allErrs = append(allErrs, field.Invalid(fldPath, minDomains, fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", core.DoNotSchedule, action)).WithOrigin("dependsOn"))
 	}
 	return allErrs
 }
@@ -8077,7 +8076,7 @@ func validateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys 
 	for i, key := range matchLabelKeys {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 		if labelSelectorKeys.Has(key) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("overlappingKeys"))
 		}
 	}
 
