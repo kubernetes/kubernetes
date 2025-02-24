@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestCTBSignerNameFieldSelector(t *testing.T) {
 
 	ctx := context.Background()
 
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=ClusterTrustBundle=true"}, framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certsv1alpha1.SchemeGroupVersion)}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client := kubernetes.NewForConfigOrDie(server.ClientConfig)

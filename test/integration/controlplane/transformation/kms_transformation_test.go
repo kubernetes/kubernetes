@@ -145,7 +145,7 @@ resources:
 `
 	providerName := "kms-provider"
 	pluginMock := mock.NewBase64Plugin(t, "@kms-provider.sock")
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -329,7 +329,7 @@ resources:
 	genericapiserver.SetHostnameFuncForTests("testAPIServerID")
 	_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 	var restarted bool
-	test, err := newTransformTest(t, encryptionConfig, true, "", storageConfig)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig, reload: true, storageConfig: storageConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -550,7 +550,7 @@ resources:
 	previousConfigDir := test.configDir
 	test.shutdownAPIServer()
 	restarted = true
-	test, err = newTransformTest(t, test.transformerConfig, true, previousConfigDir, storageConfig)
+	test, err = newTransformTest(t, transformTestConfig{transformerConfigYAML: test.transformerConfig, reload: true, configDir: previousConfigDir, storageConfig: storageConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -626,7 +626,7 @@ resources:
 		// Need to enable this explicitly as the feature is deprecated
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
-		test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+		test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig, runtimeConfig: []string{"api/alpha=true", "api/beta=true"}})
 		if err != nil {
 			t.Fatalf("failed to start KUBE API Server with encryptionConfig")
 		}
@@ -752,7 +752,7 @@ resources:
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 	}
@@ -899,7 +899,7 @@ resources:
 `
 			_ = mock.NewBase64Plugin(t, "@kms-provider.sock")
 
-			test, err := newTransformTest(t, encryptionConfig, true, "", nil)
+			test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig, reload: true})
 			if err != nil {
 				t.Fatalf("failed to start KUBE API Server with encryptionConfig\n %s, error: %v", encryptionConfig, err)
 			}
@@ -1111,7 +1111,7 @@ resources:
 	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, false, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig})
 	if err != nil {
 		t.Fatalf("failed to start kube-apiserver, error: %v", err)
 	}
@@ -1174,7 +1174,7 @@ resources:
 	pluginMock1 := mock.NewBase64Plugin(t, "@kms-provider-1.sock")
 	pluginMock2 := mock.NewBase64Plugin(t, "@kms-provider-2.sock")
 
-	test, err := newTransformTest(t, encryptionConfig, true, "", nil)
+	test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: encryptionConfig, reload: true})
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver, error: %v", err)
 	}
