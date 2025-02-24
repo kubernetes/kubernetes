@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -253,6 +254,25 @@ func TestTimeEqual(t *testing.T) {
 			result := c.x.Equal(c.y)
 			if result != c.result {
 				t.Errorf("Failed equality test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+			}
+		})
+	}
+}
+
+func TestTimeString(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  *Time
+		result string
+	}{
+		{"nil", nil, ""},
+		{"empty", &Time{}, "0001-01-01 00:00:00 +0000 UTC"},
+		{"time", &Time{Time: time.Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC)}, "1998-05-05 05:05:05 +0000 UTC"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if !strings.EqualFold(c.input.String(), c.result) {
+				t.Errorf("Failed equality: input '%v': expected %+v, got %+v", c.input, c.result, c.input.String())
 			}
 		})
 	}
