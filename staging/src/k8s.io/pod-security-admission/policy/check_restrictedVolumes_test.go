@@ -42,6 +42,7 @@ func TestRestrictedVolumes(t *testing.T) {
 					{Name: "a6", VolumeSource: corev1.VolumeSource{Projected: &corev1.ProjectedVolumeSource{}}},
 					{Name: "a7", VolumeSource: corev1.VolumeSource{CSI: &corev1.CSIVolumeSource{}}},
 					{Name: "a8", VolumeSource: corev1.VolumeSource{Ephemeral: &corev1.EphemeralVolumeSource{}}},
+					{Name: "a9", VolumeSource: corev1.VolumeSource{Image: &corev1.ImageVolumeSource{}}},
 
 					// known restricted types
 					{Name: "b1", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{}}},
