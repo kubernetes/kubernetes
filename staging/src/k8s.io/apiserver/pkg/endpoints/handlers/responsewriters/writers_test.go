@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -84,6 +85,7 @@ func TestSerializeObjectParallel(t *testing.T) {
 			},
 		}
 	}
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)
 	for i := 0; i < 100; i++ {
 		ctt := newTest()
@@ -347,6 +349,7 @@ func TestSerializeObject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIResponseCompression, tt.compressionEnabled)
 
 			encoder := &fakeEncoder{
@@ -579,6 +582,7 @@ func benchmarkSerializeObject(b *testing.B, payload []byte) {
 		},
 		URL: &url.URL{Path: "/path"},
 	}
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(b, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.APIResponseCompression, true)
 
 	encoder := &fakeEncoder{
