@@ -31,7 +31,19 @@ import (
 	"k8s.io/utils/pointer"
 )
 
+// This command runs an infinite loop, sleeping for 1 second in each iteration.
+// It sets up a trap to exit gracefully when a TERM signal is received.
+//
+// This is useful for testing scenarios where the container is terminated
+// with a zero exit code.
 const InfiniteSleepCommand = "trap exit TERM; while true; do sleep 1; done"
+
+// This command will cause the shell to remain in a sleep state indefinitely,
+// and it won't exit unless it receives a KILL signal.
+//
+// This is useful for testing scenarios where the container is terminated
+// with a non-zero exit code.
+const InfiniteSleepCommandWithoutGracefulShutdown = "sleep infinity"
 
 // GenerateScriptCmd generates the corresponding command lines to execute a command.
 func GenerateScriptCmd(command string) []string {
