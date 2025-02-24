@@ -43,7 +43,8 @@ const (
 	// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
 	DefaultMemoryThrottlingFactor = 0.9
 	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
-	MaxContainerBackOff = 300 * time.Second
+	MaxContainerBackOff            = 300 * time.Second
+	DefaultUserNamespacesIDsPerPod = uint32(65536)
 )
 
 var (
@@ -308,6 +309,14 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if localFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
 		if obj.CrashLoopBackOff.MaxContainerRestartPeriod == nil {
 			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
+		}
+	}
+	if localFeatureGate.Enabled(features.UserNamespacesSupport) {
+		if obj.UserNamespaces == nil {
+			obj.UserNamespaces = &kubeletconfigv1beta1.UserNamespaces{}
+		}
+		if obj.UserNamespaces.IDsPerPod == nil || *obj.UserNamespaces.IDsPerPod == 0 {
+			obj.UserNamespaces.IDsPerPod = ptr.To(DefaultUserNamespacesIDsPerPod)
 		}
 	}
 }

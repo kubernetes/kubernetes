@@ -38,5 +38,13 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 		return fmt.Errorf("invalid configuration: singleProcessOOMKill must not be explicitly set to false when using cgroup v1")
 	}
 
+	if userNs := kc.UserNamespaces; userNs != nil {
+		if idsPerPod := userNs.IDsPerPod; idsPerPod != nil {
+			if *idsPerPod%65536 != 0 {
+				return fmt.Errorf("invalid configuration: userNamespaces.idsPerPod must be a multiple of 65536")
+			}
+		}
+	}
+
 	return nil
 }

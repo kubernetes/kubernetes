@@ -514,6 +514,11 @@ type KubeletConfiguration struct {
 	// +featureGate=KubeletCrashLoopBackoffMax
 	// +optional
 	CrashLoopBackOff CrashLoopBackOffConfig
+
+	// UserNamespaces contains User Namespace configurations.
+	// +featureGate=UserNamespaceSupport
+	// +optional
+	UserNamespaces *UserNamespaces
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -702,4 +707,14 @@ type CrashLoopBackOffConfig struct {
 	// +featureGate=KubeletCrashLoopBackOffMax
 	// +optional
 	MaxContainerRestartPeriod *metav1.Duration
+}
+
+// UserNamespaces contains User Namespace configurations.
+type UserNamespaces struct {
+	// IDsPerPod is the mapping length of UIDs and GIDs.
+	// The length must be multiple of 65536.
+	// Default: 65536
+	// +featureGate=UserNamespaceSupport
+	// +optional
+	IDsPerPod *uint32
 }
