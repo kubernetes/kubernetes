@@ -25,29 +25,33 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Test all public methods behave ok when the feature gate is disabled.
 
 func TestMakeUserNsManagerDisabled(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
-	_, err := MakeUserNsManager(testUserNsPodsManager)
+	_, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	assert.NoError(t, err)
 }
 
 func TestReleaseDisabled(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
+	m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	require.NoError(t, err)
 
-	m.Release("some-pod")
+	m.Release(logger, "some-pod")
 }
 
 func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	trueVal := true
@@ -93,10 +97,10 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testUserNsPodsManager := &testUserNsPodsManager{}
-			m, err := MakeUserNsManager(testUserNsPodsManager)
+			m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 			require.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(test.pod, "")
+			userns, err := m.GetOrCreateUserNamespaceMappings(logger, test.pod, "")
 			assert.Nil(t, userns)
 			if test.success {
 				assert.NoError(t, err)
@@ -108,12 +112,13 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
-	m, err := MakeUserNsManager(testUserNsPodsManager)
+	m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	require.NoError(t, err)
 
-	err = m.CleanupOrphanedPodUsernsAllocations(nil, nil)
+	err = m.CleanupOrphanedPodUsernsAllocations(logger, nil, nil)
 	assert.NoError(t, err)
 }
