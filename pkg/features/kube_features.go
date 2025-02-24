@@ -417,6 +417,12 @@ const (
 	// Enables the dynamic configuration of Service IP ranges
 	MultiCIDRServiceAllocator featuregate.Feature = "MultiCIDRServiceAllocator"
 
+	// owner: torredil
+	// kep: https://kep.k8s.io/4876
+	//
+	// Makes CSINode.Spec.Drivers[*].Allocatable.Count mutable
+	MutableCSINodeAllocatableCount featuregate.Feature = "MutableCSINodeAllocatableCount"
+
 	// owner: @danwinship
 	// kep: https://kep.k8s.io/3866
 	//
