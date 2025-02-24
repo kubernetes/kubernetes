@@ -2880,26 +2880,21 @@ func resizeMsgGenerate(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus)
 			if cs.State != kubecontainer.ContainerStateRunning {
 				// If the container isn't running, it isn't resizing.
 				continue
-			}
-			
+			}			
 			cpuReq, hasCPUReq := c.Resources.Requests[v1.ResourceCPU]
 			cpuLim, hasCPULim := c.Resources.Limits[v1.ResourceCPU]
 			memReq, hasMemReq := c.Resources.Requests[v1.ResourceMemory]
 			memLim, hasMemLim := c.Resources.Limits[v1.ResourceMemory]
-
 			msg = fmt.Sprintf("}") + msg
 			if hasMemReq{
 				msg = fmt.Sprintf("Requested memory: %s ", memReq.String()) + msg
 			}
-
 			if hasMemLim{
 				msg = fmt.Sprintf("Limits memory: %s ", memLim.String()) + msg
 			}
-
 			if hasCPUReq{
 				msg = fmt.Sprintf("Requested CPU: %d ", cpuReq.MilliValue()) + msg
 			}
-
 			if hasCPULim{
 				msg = fmt.Sprintf("Limits CPU: %d ", cpuLim.MilliValue()) + msg
 			}
