@@ -338,7 +338,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 
 		// The driver joins all env variables in the order in which
 		// they appear in results (last one wins).
-		configs := resourceclaim.ConfigForResult(claim.Status.Allocation.Devices.Config, result, ex.driverName)
+		configs := resourceclaim.ConfigForResult(claim.Status.Allocation.Devices.Config, result)
 		env := make(map[string]string)
 		for i, config := range configs {
 			if err := extractParameters(config.Opaque.Parameters, &env, config.Source == resourceapi.AllocationConfigSourceClass); err != nil {

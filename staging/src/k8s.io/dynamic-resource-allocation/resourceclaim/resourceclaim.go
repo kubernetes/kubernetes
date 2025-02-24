@@ -118,7 +118,7 @@ func BaseRequestRef(requestRef string) string {
 
 // ConfigForResult returns the configs that are applicable to device
 // allocated for the provided result.
-func ConfigForResult(deviceConfigurations []resourceapi.DeviceAllocationConfiguration, result resourceapi.DeviceRequestAllocationResult, driver string) []resourceapi.DeviceAllocationConfiguration {
+func ConfigForResult(deviceConfigurations []resourceapi.DeviceAllocationConfiguration, result resourceapi.DeviceRequestAllocationResult) []resourceapi.DeviceAllocationConfiguration {
 	var configs []resourceapi.DeviceAllocationConfiguration
 	for _, deviceConfiguration := range deviceConfigurations {
 		if deviceConfiguration.Opaque != nil &&

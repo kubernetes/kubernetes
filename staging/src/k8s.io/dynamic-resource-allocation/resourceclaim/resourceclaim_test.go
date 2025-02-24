@@ -360,7 +360,6 @@ func TestConfigForResult(t *testing.T) {
 	testcases := map[string]struct {
 		deviceConfigurations []resourceapi.DeviceAllocationConfiguration
 		result               resourceapi.DeviceRequestAllocationResult
-		driver               string
 		expectedConfigs      []resourceapi.DeviceAllocationConfiguration
 	}{
 		"opaque-nil": {
@@ -377,37 +376,7 @@ func TestConfigForResult(t *testing.T) {
 				Request: "foo",
 				Device:  "device-1",
 			},
-			driver:          "driver-a",
 			expectedConfigs: nil,
-		},
-		"driver-doesn't-match": {
-			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
-				{
-					Source:   resourceapi.AllocationConfigSourceClass,
-					Requests: []string{},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
-							Driver: "driver-b",
-						},
-					},
-				},
-			},
-			result: resourceapi.DeviceRequestAllocationResult{
-				Request: "foo",
-				Device:  "device-1",
-			},
-			driver: "driver-a",
-			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
-				{
-					Source:   resourceapi.AllocationConfigSourceClass,
-					Requests: []string{},
-					DeviceConfiguration: resourceapi.DeviceConfiguration{
-						Opaque: &resourceapi.OpaqueDeviceConfiguration{
-							Driver: "driver-b",
-						},
-					},
-				},
-			},
 		},
 		"empty-requests-match-all": {
 			deviceConfigurations: []resourceapi.DeviceAllocationConfiguration{
@@ -425,7 +394,6 @@ func TestConfigForResult(t *testing.T) {
 				Request: "foo",
 				Device:  "device-1",
 			},
-			driver: "driver-a",
 			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
 				{
 					Source:   resourceapi.AllocationConfigSourceClass,
@@ -456,7 +424,6 @@ func TestConfigForResult(t *testing.T) {
 				Request: "foo",
 				Device:  "device-1",
 			},
-			driver: "driver-a",
 			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
 				{
 					Source: resourceapi.AllocationConfigSourceClass,
@@ -489,7 +456,6 @@ func TestConfigForResult(t *testing.T) {
 				Request: "foo/bar",
 				Device:  "device-1",
 			},
-			driver: "driver-a",
 			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
 				{
 					Source: resourceapi.AllocationConfigSourceClass,
@@ -533,7 +499,6 @@ func TestConfigForResult(t *testing.T) {
 				Request: "foo/bar",
 				Device:  "device-1",
 			},
-			driver: "driver-a",
 			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
 				{
 					Source: resourceapi.AllocationConfigSourceClass,
@@ -577,7 +542,6 @@ func TestConfigForResult(t *testing.T) {
 				Request: "foo/bar",
 				Device:  "device-1",
 			},
-			driver: "driver-a",
 			expectedConfigs: []resourceapi.DeviceAllocationConfiguration{
 				{
 					Source: resourceapi.AllocationConfigSourceClass,
@@ -607,7 +571,7 @@ func TestConfigForResult(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			configs := ConfigForResult(tc.deviceConfigurations, tc.result, tc.driver)
+			configs := ConfigForResult(tc.deviceConfigurations, tc.result)
 			assert.Equal(t, tc.expectedConfigs, configs)
 		})
 	}
