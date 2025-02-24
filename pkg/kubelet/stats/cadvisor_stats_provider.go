@@ -93,6 +93,7 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
 	}
+	logger := klog.FromContext(ctx)
 
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
 	// Map each container to a pod and update the PodStats with container data.
@@ -127,13 +128,13 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 			// the user and has network stats.
 			podStats.Network = cadvisorInfoToNetworkStats(&cinfo)
 		} else {
-			containerStat := cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo)
+			containerStat := cadvisorInfoToContainerStats(ctx,containerName, &cinfo, &rootFsInfo, &imageFsInfo)
 			// NOTE: This doesn't support the old pod log path, `/var/log/pods/UID`. For containers
 			// using old log path, they will be populated by cadvisorInfoToContainerStats.
 			podUID := types.UID(podStats.PodRef.UID)
 			logs, err := p.hostStatsProvider.getPodContainerLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, containerName, &rootFsInfo)
 			if err != nil {
-				klog.ErrorS(err, "Unable to fetch container log stats", "containerName", containerName)
+				logger.Error(err, "Unable to fetch container log stats", "containerName", containerName)
 			} else {
 				containerStat.Logs = logs
 			}
@@ -146,7 +147,7 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	// Add each PodStats to the result.
 	result := make([]statsapi.PodStats, 0, len(podToStats))
 	for _, podStats := range podToStats {
-		makePodStorageStats(podStats, &rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, false)
+		makePodStorageStats(ctx,podStats, &rootFsInfo, p.resourceAnalyzer, p.hostStatsProvider, false)
 
 		podUID := types.UID(podStats.PodRef.UID)
 		// Lookup the pod-level cgroup's CPU and memory stats
@@ -317,7 +318,8 @@ func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *s
 		return fsStats, fsStats, nil
 	}
 
-	klog.InfoS("Detect Split Filesystem", "ImageFilesystems", imageStats.ImageFilesystems[0], "ContainerFilesystems", imageStats.ContainerFilesystems[0])
+	logger := klog.FromContext(ctx)
+	logger.Info("Detect Split Filesystem", "ImageFilesystems", imageStats.ImageFilesystems[0], "ContainerFilesystems", imageStats.ContainerFilesystems[0])
 
 	var containerFsInodesUsed *uint64
 	if containerFsInfo.Inodes != nil && containerFsInfo.InodesFree != nil {
@@ -366,7 +368,8 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
 	if !managed && podName != podNamespace {
-		klog.InfoS(
+		logger := klog.FromContext(context.TODO())
+		logger.Info(
 			"Expect container to have either both podName and podNamespace labels, or neither",
 			"podNameLabel", podName, "podNamespaceLabel", podNamespace)
 	}
@@ -516,10 +519,11 @@ func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.C
 		Recursive: true,
 	})
 	if err != nil {
+		logger := klog.FromContext(context.TODO())
 		if _, ok := infos["/"]; ok {
 			// If the failure is partial, log it and return a best-effort
 			// response.
-			klog.ErrorS(err, "Partial failure issuing cadvisor.ContainerInfoV2")
+			logger.Error(err, "Partial failure issuing cadvisor.ContainerInfoV2")
 		} else {
 			return nil, fmt.Errorf("failed to get root cgroup stats: %w", err)
 		}

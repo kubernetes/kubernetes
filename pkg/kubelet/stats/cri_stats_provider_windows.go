@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -53,9 +54,11 @@ func (s networkStats) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpo
 func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
 	networkStatsProvider := newNetworkStatsProvider(p)
 
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	endpoints, err := networkStatsProvider.HNSListEndpointRequest()
 	if err != nil {
-		klog.ErrorS(err, "Failed to fetch current HNS endpoints")
+		logger.Error(err, "Failed to fetch current HNS endpoints")
 		return nil, err
 	}
 
@@ -63,7 +66,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	for _, endpoint := range endpoints {
 		endpointStats, err := networkStatsProvider.GetHNSEndpointStats(endpoint.Id)
 		if err != nil {
-			klog.V(2).InfoS("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
+			logger.V(2).Info("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
 			continue
 		}
 
@@ -180,8 +183,9 @@ func (p *criStatsProvider) makeWinContainerStats(
 	// using old log path, empty log stats are returned. This is fine, because we don't
 	// officially support in-place upgrade anyway.
 	result.Logs, err = p.hostStatsProvider.getPodContainerLogStats(meta.GetNamespace(), meta.GetName(), types.UID(meta.GetUid()), container.GetMetadata().GetName(), rootFsInfo)
+	logger := klog.FromContext(context.TODO())
 	if err != nil {
-		klog.ErrorS(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
+		logger.Error(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
 	}
 	return result, nil
 }
