@@ -27,6 +27,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -40,14 +41,21 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
+var (
+	recorder record.EventRecorder
+	pod      *v1.Pod
+)
+
 func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
+
 	if fsGroup == nil {
 		return nil
 	}
 
 	timer := time.AfterFunc(30*time.Second, func() {
-		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
+		klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files, setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", dir)
 	})
+
 	defer timer.Stop()
 
 	if skipPermissionChange(mounter, dir, fsGroup, fsGroupChangePolicy) {
@@ -55,18 +63,87 @@ func SetVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChan
 		return nil
 	}
 
+	// Channel for progress updates, using buffered channel for deadlock prevention.
+	progressChannel := make(chan ProgressUpdate, 1)
+
+	// Goroutine for handling progress updates
+	go func() {
+		for update := range progressChannel {
+			klog.V(2).Infof("FSGroup permission change in progress for %s: %d files, %d directories processed (elapsed time: %v)", dir, update.Files, update.Dirs, update.Elapsed)
+
+			// Emit event.
+			if pod != nil && recorder != nil {
+				recorder.Eventf(pod, v1.EventTypeNormal, "FSGroupChangeProgress",
+					"FSGroup permission change in progress: %d files, %d directories processed (elapsed time: %v)",
+					update.Files, update.Dirs, update.Elapsed)
+			} else {
+				klog.Warningf("Pod or recorder is nil, skipping event emission")
+			}
+		}
+	}()
+
+	// File counters and time tracking
+	var fileCount, dirCount int
+	startTime := time.Now()
 	err := walkDeep(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			klog.Errorf("Error accessing path %s: %v", path, err)
 			return err
 		}
-		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
+
+		// Apply permission changes
+		if err := changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info); err != nil {
+			klog.Errorf("Error changing permissions for %s: %v", path, err)
+			return err
+		}
+
+		// Increment file or directory count
+		if info.IsDir() {
+			dirCount++
+		} else {
+			fileCount++
+		}
+
+		// Send progress update every 1000 items or every 10 seconds
+		if time.Since(startTime).Seconds() > 60 {
+			progressChannel <- ProgressUpdate{
+				Files:   fileCount,
+				Dirs:    dirCount,
+				Elapsed: time.Since(startTime),
+			}
+
+			startTime = time.Now() // Reset timer for the next interval
+		}
+		return nil
 	})
+
+	// closing  the channel
+	close(progressChannel)
+
+	//emit the final progress event.
+	if pod != nil && recorder != nil {
+		recorder.Eventf(pod, v1.EventTypeNormal, "FSGroupChangeComplete",
+			"Completed FSGroup permission change: %d files, %d directories processed in %v)",
+			fileCount, dirCount, time.Since(startTime))
+	} else {
+		klog.Warningf("Pod or recorder is nil, skipping final event emission")
+	}
+
+	// Final log message
+	klog.Infof("Completed FSGroup permission change for %s: Total %d files, %d directories processed in %v", dir, fileCount, dirCount, time.Since(startTime))
 	if completeFunc != nil {
 		completeFunc(types.CompleteFuncParam{
 			Err: &err,
 		})
 	}
 	return err
+}
+
+// ProgressUpdate struct to hold progress information
+type ProgressUpdate struct {
+	Files   int
+	Dirs    int
+	Elapsed time.Duration
 }
 
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
