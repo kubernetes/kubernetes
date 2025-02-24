@@ -110,7 +110,7 @@ func ApplyPatchesToConfig(cfg *kubeadmapi.ClusterConfiguration, patchesDir strin
 		}
 	}
 
-	gvkmap, err := kubeadmutil.SplitYAMLDocuments(kubeletBytes)
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(kubeletBytes)
 	if err != nil {
 		return err
 	}
