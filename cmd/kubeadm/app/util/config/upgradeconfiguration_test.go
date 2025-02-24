@@ -33,10 +33,9 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func TestDocMapToUpgradeConfiguration(t *testing.T) {
+func TestBytesToUpgradeConfiguration(t *testing.T) {
 	tests := []struct {
 		name          string
 		cfg           interface{}
@@ -123,14 +122,12 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected error while marshalling to %s: %v", format.name, err)
 				}
-				docmap, err := kubeadmutil.SplitConfigDocuments(b)
-				if err != nil {
-					t.Fatalf("Unexpected error of SplitConfigDocuments: %v", err)
-				}
-				cfg, err := DocMapToUpgradeConfiguration(docmap)
+
+				cfg, err := BytesToUpgradeConfiguration(b)
 				if (err != nil) != tc.expectedError {
-					t.Fatalf("failed DocMapToUpgradeConfiguration:\n\texpected error: %t\n\t  actual error: %v", tc.expectedError, err)
+					t.Fatalf("failed BytesToUpgradeConfiguration:\n\texpected error: %t\n\t  actual error: %v", tc.expectedError, err)
 				}
+
 				if err == nil {
 					if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
 						t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
