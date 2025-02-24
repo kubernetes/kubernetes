@@ -507,10 +507,10 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 		var filterSelectorExprs []cel.CompilationResult
 		var filterDevice *string
 		if filter != nil {
-			if filter.Driver != nil && *filter.Driver != patchedSlice.Spec.Driver {
+			if filter.Driver != nil && *filter.Driver != slice.Spec.Driver {
 				continue
 			}
-			if filter.Pool != nil && *filter.Pool != patchedSlice.Spec.Pool.Name {
+			if filter.Pool != nil && *filter.Pool != slice.Spec.Pool.Name {
 				continue
 			}
 			filterDevice = filter.Device
@@ -541,7 +541,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 			}
 		}
 	devices:
-		for dIndex, device := range patchedSlice.Spec.Devices {
+		for dIndex, device := range slice.Spec.Devices {
 			if filterDevice != nil && *filterDevice != device.Name {
 				continue
 			}
@@ -560,7 +560,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 					t.handleError(ctx, err, "failed to compile CEL")
 					return
 				}
-				match, _, err := expr.DeviceMatches(ctx, cel.Device{Driver: patchedSlice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
+				match, _, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
 				// TODO: scheduler logs a lot more info about CEL expression results
 				if err != nil {
 					continue devices
@@ -581,7 +581,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 					t.handleError(ctx, err, "failed to compile CEL")
 					return
 				}
-				match, _, err := expr.DeviceMatches(ctx, cel.Device{Driver: patchedSlice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
+				match, _, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
 				if err != nil {
 					if t.recorder != nil {
 						t.recorder.Eventf(patch, v1.EventTypeWarning, "CELRuntimeError", "selector #%d: runtime error: %v", i, err)
@@ -594,12 +594,12 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 			}
 
 			if t.enableAdminControlledAttributes {
-				newAttrs := maps.Clone(deviceAttributes)
+				newAttrs := maps.Clone(getAttributes(patchedSlice.Spec.Devices[dIndex]))
 				if newAttrs == nil {
 					newAttrs = make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
 				}
 				for key, val := range patch.Spec.Devices.Attributes {
-					keyWithoutDomain := strings.TrimPrefix(string(key), patchedSlice.Spec.Driver+"/")
+					keyWithoutDomain := strings.TrimPrefix(string(key), slice.Spec.Driver+"/")
 					delete(newAttrs, resourceapi.QualifiedName(keyWithoutDomain))
 					if val.NullValue != nil {
 						delete(newAttrs, resourceapi.QualifiedName(key))
@@ -613,7 +613,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 					newAttrs = nil
 				}
 
-				newCaps := maps.Clone(deviceCapacity)
+				newCaps := maps.Clone(getCapacity(patchedSlice.Spec.Devices[dIndex]))
 				if newCaps == nil {
 					newCaps = make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
 				}

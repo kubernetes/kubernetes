@@ -1756,6 +1756,196 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				assert.Equal(t, "slice", events[0].newObj.Name)
 			},
 		},
+		"update-patched-slice": {
+			inputEvents: func(event inputEventGenerator) {
+				event.addResourceSlicePatch(&resourcealphaapi.ResourceSlicePatch{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "all-slices",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Filter: &resourcealphaapi.DevicePatchFilter{
+								Device: ptr.To("device-1"),
+							},
+							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
+								"test.example.com/patchAttr": {
+									DeviceAttribute: resourcealphaapi.DeviceAttribute{
+										StringValue: ptr.To("value"),
+									},
+								},
+							},
+						},
+					},
+				})
+				oneDevice := []resourceapi.Device{
+					{Name: "device-1", Basic: &resourceapi.BasicDevice{}},
+				}
+				threeDevices := []resourceapi.Device{
+					{Name: "device-0", Basic: &resourceapi.BasicDevice{}},
+					{Name: "device-1", Basic: &resourceapi.BasicDevice{}},
+					{Name: "device-2", Basic: &resourceapi.BasicDevice{}},
+				}
+				devicesAdded := &resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "devices-added",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: oneDevice,
+					},
+				}
+				devicesRemoved := &resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "devices-removed",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: threeDevices,
+					},
+				}
+				event.addResourceSlice(devicesAdded.DeepCopy())
+				devicesAdded.Spec.Devices = threeDevices
+				event.addResourceSlice(devicesAdded)
+				event.addResourceSlice(devicesRemoved.DeepCopy())
+				devicesRemoved.Spec.Devices = oneDevice
+				event.addResourceSlice(devicesRemoved)
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "devices-added",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{Name: "device-0", Basic: &resourceapi.BasicDevice{}},
+							{
+								Name: "device-1",
+								Basic: &resourceapi.BasicDevice{
+									Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+										"test.example.com/patchAttr": {
+											StringValue: ptr.To("value"),
+										},
+									},
+								},
+							},
+							{Name: "device-2", Basic: &resourceapi.BasicDevice{}},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "devices-removed",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Name: "device-1",
+								Basic: &resourceapi.BasicDevice{
+									Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+										"test.example.com/patchAttr": {
+											StringValue: ptr.To("value"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if !assert.Len(t, events, 4) {
+					return
+				}
+				assert.Equal(t, handlerEventAdd, events[0].event)
+				assert.Equal(t, "devices-added", events[0].newObj.Name)
+				assert.Equal(t, handlerEventUpdate, events[1].event)
+				assert.Equal(t, "devices-added", events[1].newObj.Name)
+				assert.Equal(t, handlerEventAdd, events[2].event)
+				assert.Equal(t, "devices-removed", events[2].newObj.Name)
+				assert.Equal(t, handlerEventUpdate, events[3].event)
+				assert.Equal(t, "devices-removed", events[3].newObj.Name)
+			},
+		},
+		"patches-cannot-match-patched-attributes": {
+			inputEvents: func(event inputEventGenerator) {
+				event.addResourceSlicePatch(&resourcealphaapi.ResourceSlicePatch{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "add-attr",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Priority: ptr.To[int32](50),
+							Attributes: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.NullableDeviceAttribute{
+								"test.example.com/patchAttr": {
+									DeviceAttribute: resourcealphaapi.DeviceAttribute{
+										StringValue: ptr.To("value"),
+									},
+								},
+							},
+						},
+					},
+				})
+				event.addResourceSlicePatch(&resourcealphaapi.ResourceSlicePatch{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "add-cap-for-attr",
+					},
+					Spec: resourcealphaapi.ResourceSlicePatchSpec{
+						Devices: resourcealphaapi.DevicePatch{
+							Priority: ptr.To[int32](100),
+							Filter: &resourcealphaapi.DevicePatchFilter{
+								Selectors: []resourcealphaapi.DeviceSelector{
+									{
+										CEL: &resourcealphaapi.CELDeviceSelector{
+											Expression: `"test.example.com" in device.attributes`,
+										},
+									},
+								},
+							},
+							Capacity: map[resourcealphaapi.FullyQualifiedName]resourcealphaapi.DeviceCapacity{
+								"test.example.com/patchCap": {
+									Value: resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				})
+				event.addResourceSlice(&resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{Basic: &resourceapi.BasicDevice{}},
+						},
+					},
+				})
+			},
+			expectedPatchedSlices: []*resourceapi.ResourceSlice{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "slice",
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Devices: []resourceapi.Device{
+							{
+								Basic: &resourceapi.BasicDevice{
+									Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+										"test.example.com/patchAttr": {
+											StringValue: ptr.To("value"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
+				if !assert.Len(t, events, 1) {
+					return
+				}
+				assert.Equal(t, handlerEventAdd, events[0].event)
+				assert.Equal(t, "slice", events[0].newObj.Name)
+			},
+		},
 	}
 
 	for name, test := range tests {
