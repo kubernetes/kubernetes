@@ -272,6 +272,11 @@ func TestFlags(t *testing.T) {
 			},
 			parseError: "component not registered: test3",
 		},
+		{
+			name:       "calling Set() twice",
+			flags:      []string{"--emulated-version=kube=1.30"},
+			parseError: "componentGlobalsRegistry.Set() already called",
+		},
 	}
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -281,6 +286,10 @@ func TestFlags(t *testing.T) {
 			err := fs.Parse(test.flags)
 			if err == nil {
 				err = r.Set()
+				// For the "calling Set() twice" test case, call Set() again
+				if err == nil && test.name == "calling Set() twice" {
+					err = r.Set()
+				}
 			}
 			if test.parseError != "" {
 				if err == nil || !strings.Contains(err.Error(), test.parseError) {

@@ -226,11 +226,6 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 			globals.featureGate.Close()
 		}
 	}
-	if r.emulationVersionConfig != nil || r.featureGatesConfig != nil {
-		klog.Warning("calling componentGlobalsRegistry.AddFlags more than once, the registry will be set by the latest flags")
-	}
-	r.emulationVersionConfig = []string{}
-	r.featureGatesConfig = make(map[string][]string)
 
 	fs.StringSliceVar(&r.emulationVersionConfig, "emulated-version", r.emulationVersionConfig, ""+
 		"The versions different components emulate their capabilities (APIs, features, ...) of.\n"+
@@ -324,6 +319,9 @@ func (r *componentGlobalsRegistry) SetFallback() error {
 func (r *componentGlobalsRegistry) Set() error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	if r.set {
+		return fmt.Errorf("componentGlobalsRegistry.Set() already called")
+	}
 	r.set = true
 	emulationVersionConfigMap, err := toVersionMap(r.emulationVersionConfig)
 	if err != nil {
@@ -415,7 +413,7 @@ func (r *componentGlobalsRegistry) SetEmulationVersionMapping(fromComponent, toC
 		return fmt.Errorf("EmulationVersion from %s to %s already exists", fromComponent, toComponent)
 	}
 	versionMapping[toComponent] = f
-	klog.V(klogLevel).Infof("setting the default EmulationVersion of %s based on mapping from the default EmulationVersion of %s", fromComponent, toComponent)
+	klog.V(klogLevel).Infof("setting the default EmulationVersion of %s based on mapping from the default EmulationVersion of %s", toComponent, fromComponent)
 	defaultFromVersion := r.componentGlobals[fromComponent].effectiveVersion.EmulationVersion()
 	emulationVersions, err := r.getFullEmulationVersionConfig(map[string]*version.Version{fromComponent: defaultFromVersion})
 	if err != nil {
