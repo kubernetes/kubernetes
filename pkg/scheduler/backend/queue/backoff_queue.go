@@ -32,8 +32,6 @@ type backoffQueuer interface {
 	// isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 	// If this returns true, the pod should not be re-tried.
 	isPodBackingoff(podInfo *framework.QueuedPodInfo) bool
-	// getBackoffTime returns the time that podInfo completes backoff
-	getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time
 	// popEachBackoffCompleted run fn for all pods from podBackoffQ and podErrorBackoffQ that completed backoff while popping them.
 	popEachBackoffCompleted(logger klog.Logger, fn func(pInfo *framework.QueuedPodInfo))
 
@@ -113,11 +111,17 @@ func (bq *backoffQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 	return boTime.After(bq.clock.Now())
 }
 
-// getBackoffTime returns the time that podInfo completes backoff
+// getBackoffTime returns the time that podInfo completes backoff.
+// It caches the result in podInfo.BackoffExpiration and returns this value in subsequent calls.
+// The cache will be cleared when this pod is poped from the scheduling queue again (i.e., at activeQ's pop),
+// because of the fact that the backoff time is calculated based on podInfo.Attempts,
+// which doesn't get changed until the pod's scheduling is retried.
 func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time {
-	duration := bq.calculateBackoffDuration(podInfo)
-	backoffTime := podInfo.Timestamp.Add(duration)
-	return backoffTime
+	if podInfo.BackoffExpiration.IsZero() {
+		duration := bq.calculateBackoffDuration(podInfo)
+		podInfo.BackoffExpiration = podInfo.Timestamp.Add(duration)
+	}
+	return podInfo.BackoffExpiration
 }
 
 // calculateBackoffDuration is a helper function for calculating the backoffDuration

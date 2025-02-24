@@ -3640,7 +3640,7 @@ func TestBackOffFlow(t *testing.T) {
 			}
 
 			// Check backoff duration.
-			deadline := q.backoffQ.getBackoffTime(podInfo)
+			deadline := podInfo.BackoffExpiration
 			backoff := deadline.Sub(timestamp)
 			if backoff != step.wantBackoff {
 				t.Errorf("got backoff %s, want %s", backoff, step.wantBackoff)
