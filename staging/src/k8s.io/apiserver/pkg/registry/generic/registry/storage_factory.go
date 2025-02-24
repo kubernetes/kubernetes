@@ -79,7 +79,7 @@ func StorageWithCacher() generic.StorageDecorator {
 			})
 		}
 
-		return cacherstorage.NewCacheProxy(cacher, s), destroyFunc, nil
+		return cacherstorage.NewCacheDelegator(cacher, s), destroyFunc, nil
 	}
 }
 

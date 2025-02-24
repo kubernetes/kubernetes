@@ -78,7 +78,7 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func compactStorage(c *CacheProxy, client *clientv3.Client) storagetesting.Compaction {
+func compactStorage(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)

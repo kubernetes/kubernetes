@@ -455,12 +455,12 @@ func withNodeNameAndNamespaceIndex(options *setupOptions) {
 	}
 }
 
-func testSetup(t *testing.T, opts ...setupOption) (context.Context, *CacheProxy, tearDownFunc) {
+func testSetup(t *testing.T, opts ...setupOption) (context.Context, *CacheDelegator, tearDownFunc) {
 	ctx, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 	return ctx, cacher, tearDown
 }
 
-func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context, *CacheProxy, *etcd3testing.EtcdTestServer, tearDownFunc) {
+func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context, *CacheDelegator, *etcd3testing.EtcdTestServer, tearDownFunc) {
 	setupOpts := setupOptions{}
 	opts = append([]setupOption{withDefaults}, opts...)
 	for _, opt := range opts {
@@ -514,7 +514,7 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 		}
 	}
 
-	return ctx, NewCacheProxy(cacher, wrappedStorage), server, terminate
+	return ctx, NewCacheDelegator(cacher, wrappedStorage), server, terminate
 }
 
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
@@ -525,20 +525,20 @@ func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (stora
 			t.Fatalf("unexpected error waiting for the cache to be ready")
 		}
 	}
-	return &createWrapper{CacheProxy: cacher}, tearDown
+	return &createWrapper{CacheDelegator: cacher}, tearDown
 }
 
 type createWrapper struct {
-	*CacheProxy
+	*CacheDelegator
 }
 
 func (c *createWrapper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	if err := c.CacheProxy.Create(ctx, key, obj, out, ttl); err != nil {
+	if err := c.CacheDelegator.Create(ctx, key, obj, out, ttl); err != nil {
 		return err
 	}
 	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (bool, error) {
-		currentObj := c.CacheProxy.cacher.newFunc()
-		err := c.CacheProxy.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
+		currentObj := c.CacheDelegator.cacher.newFunc()
+		err := c.CacheDelegator.Get(ctx, key, storage.GetOptions{ResourceVersion: "0"}, currentObj)
 		if err != nil {
 			if storage.IsNotFound(err) {
 				return false, nil
