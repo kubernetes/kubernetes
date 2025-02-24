@@ -753,11 +753,9 @@ func TestPrepareCandidate(t *testing.T) {
 					}
 
 					if asyncPreemptionEnabled {
-						if tt.expectedActivatedPods != nil {
-							if diff := cmp.Diff(tt.expectedActivatedPods, fakeActivator.activatedPods); diff != "" {
-								lastErrMsg = fmt.Sprintf("Unexpected activated pods (-want,+got):\n%s", diff)
-								return false, nil
-							}
+						if diff := cmp.Diff(tt.expectedActivatedPods, fakeActivator.activatedPods); tt.expectedActivatedPods != nil && diff != "" {
+							lastErrMsg = fmt.Sprintf("Unexpected activated pods (-want,+got):\n%s", diff)
+							return false, nil
 						}
 						if tt.expectedActivatedPods == nil && len(fakeActivator.activatedPods) != 0 {
 							lastErrMsg = fmt.Sprintf("expected no activated pods, got %v", fakeActivator.activatedPods)

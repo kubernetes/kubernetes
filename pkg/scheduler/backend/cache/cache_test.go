@@ -42,7 +42,8 @@ import (
 
 var nodeInfoCmpOpts = []cmp.Option{
 	cmp.AllowUnexported(framework.NodeInfo{}),
-	cmpopts.IgnoreUnexported(framework.PodInfo{}),
+	// This field needs to be ignored because we can't call AllowUnexported for type framework.podResource (it's not visible in this package).
+	cmpopts.IgnoreFields(framework.PodInfo{}, "cachedResource"),
 }
 
 func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.NodeInfo) error {

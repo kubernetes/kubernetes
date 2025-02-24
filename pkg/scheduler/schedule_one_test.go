@@ -972,7 +972,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 			},
 		}
 		if err == nil {
-			t.Errorf("unexpected error. wanted %v, got %v", expectErr, err)
+			t.Errorf("expected error %v, got nil", expectErr)
 		} else if diff := cmp.Diff(expectErr, err, schedulerCmpOpts...); diff != "" {
 			t.Errorf("unexpected error (-want,+got):\n%s", diff)
 		}
