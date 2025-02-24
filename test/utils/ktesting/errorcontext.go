@@ -149,6 +149,10 @@ func (eCtx *errorContext) ExpectNoError(err error, explain ...interface{}) {
 	expectNoError(eCtx, err, explain...)
 }
 
+func (cCtx *errorContext) Run(name string, cb func(tCtx TContext)) bool {
+	return run(cCtx, name, cb)
+}
+
 func (eCtx *errorContext) Logger() klog.Logger {
 	return klog.FromContext(eCtx)
 }
