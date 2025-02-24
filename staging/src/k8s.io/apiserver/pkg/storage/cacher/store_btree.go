@@ -250,7 +250,6 @@ func (s *btreeStore) ListPrefix(prefix, continueKey string, limit int) ([]interf
 		if !strings.HasPrefix(item.Key, prefix) {
 			return false
 		}
-		// TODO: Might be worth to lookup one more item to provide more accurate HasMore.
 		if len(result) >= limit {
 			hasMore = true
 			return false
