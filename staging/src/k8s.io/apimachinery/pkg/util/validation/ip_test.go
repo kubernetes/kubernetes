@@ -109,14 +109,26 @@ func TestIsValidIP(t *testing.T) {
 			err:   `must be in canonical form ("1234::abcd")`,
 		},
 
-		// BAD VALUES WE CURRENTLY CONSIDER GOOD
+		// GOOD WITH LEGACY VALIDATION, BAD WITH STRICT VALIDATION
 		{
-			name: "ipv4 with leading 0s",
-			in:   "1.1.1.01",
+			name:  "ipv4 with leading 0s (with legacy validation)",
+			in:    "1.1.1.01",
+			flags: []IPValidationFlag{IPLegacyValidation},
 		},
 		{
-			name: "ipv4-in-ipv6 value",
+			name: "ipv4 with leading 0s (with strict validation)",
+			in:   "1.1.1.01",
+			err:  "must not have leading 0s",
+		},
+		{
+			name:  "ipv4-in-ipv6 value (with legacy validation)",
+			in:    "::ffff:1.1.1.1",
+			flags: []IPValidationFlag{IPLegacyValidation},
+		},
+		{
+			name: "ipv4-in-ipv6 value (with strict validation)",
 			in:   "::ffff:1.1.1.1",
+			err:  "must not be an IPv4-mapped IPv6 address",
 		},
 
 		// BAD VALUES
@@ -299,13 +311,24 @@ func TestIsValidCIDR(t *testing.T) {
 			in:   "1.1.1.1/32",
 		},
 		{
-			name: "ipv4 ifaddr",
-			in:   "1.2.3.4/24",
+			name:  "ipv4 ifaddr (with legacy validation)",
+			in:    "1.2.3.4/24",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
 		},
 		{
-			name:  "ipv4 ifaddr (with CIDRIsCanonical)",
+			name:  "ipv4 ifaddr (with legacy validation and CIDRIsCanonical)",
 			in:    "1.2.3.4/24",
-			flags: []CIDRValidationFlag{CIDRIsCanonical},
+			flags: []CIDRValidationFlag{CIDRLegacyValidation, CIDRIsCanonical},
+		},
+		{
+			name:  "ipv4 ifaddr (with CIDRIsAddress)",
+			in:    "1.2.3.4/24",
+			flags: []CIDRValidationFlag{CIDRIsAddress},
+		},
+		{
+			name:  "ipv4 ifaddr (with CIDRIsAddress and CIDRIsCanonical)",
+			in:    "1.2.3.4/24",
+			flags: []CIDRValidationFlag{CIDRIsAddress, CIDRIsCanonical},
 		},
 		{
 			name: "ipv6",
@@ -330,13 +353,24 @@ func TestIsValidCIDR(t *testing.T) {
 			in:   "::1/128",
 		},
 		{
-			name: "ipv6 ifaddr",
-			in:   "2001:db8::1/64",
+			name:  "ipv6 ifaddr (with legacy validation)",
+			in:    "2001:db8::1/64",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
 		},
 		{
-			name:  "ipv6 ifaddr (with CIDRIsCanonical)",
+			name:  "ipv6 ifaddr (with legacy validation and CIDRIsCanonical)",
 			in:    "2001:db8::1/64",
-			flags: []CIDRValidationFlag{CIDRIsCanonical},
+			flags: []CIDRValidationFlag{CIDRLegacyValidation, CIDRIsCanonical},
+		},
+		{
+			name:  "ipv6 ifaddr (with CIDRIsAddress)",
+			in:    "2001:db8::1/64",
+			flags: []CIDRValidationFlag{CIDRIsAddress},
+		},
+		{
+			name:  "ipv6 ifaddr (with CIDRIsAddress and CIDRIsCanonical)",
+			in:    "2001:db8::1/64",
+			flags: []CIDRValidationFlag{CIDRIsAddress, CIDRIsCanonical},
 		},
 
 		// GOOD, THOUGH NON-CANONICAL, VALUES
@@ -361,32 +395,79 @@ func TestIsValidCIDR(t *testing.T) {
 			err:   `must be in canonical form ("2001:db8::/64")`,
 		},
 		{
-			name: "non-canonical ifaddr",
-			in:   "2a00:79e0:2:0::1/64",
+			name:  "non-canonical ifaddr",
+			in:    "2a00:79e0:2:0::1/64",
+			flags: []CIDRValidationFlag{CIDRIsAddress},
 		},
 		{
 			name:  "non-canonical ifaddr (with CIDRIsCanonical)",
 			in:    "2a00:79e0:2:0::1/64",
-			flags: []CIDRValidationFlag{CIDRIsCanonical},
+			flags: []CIDRValidationFlag{CIDRIsAddress, CIDRIsCanonical},
 			err:   `must be in canonical form ("2a00:79e0:2::1/64")`,
 		},
 
-		// BAD VALUES WE CURRENTLY CONSIDER GOOD
+		// GOOD WITH LEGACY VALIDATION, BAD WITH STRICT VALIDATION
 		{
-			name: "ipv4 with leading 0s",
+			name:  "ipv4 with leading 0s (with legacy parsing)",
+			in:    "1.1.01.0/24",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
+		},
+		{
+			name: "ipv4 with leading 0s (with strict parsing)",
 			in:   "1.1.01.0/24",
+			err:  "must not have leading 0s in IP",
 		},
 		{
-			name: "ipv4-in-ipv6 with ipv4-sized prefix",
-			in:   "::ffff:1.1.1.0/24",
+			name:  "ipv4-in-ipv6 with ipv4-sized prefix (with legacy parsing)",
+			in:    "::ffff:1.1.1.0/24",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
 		},
 		{
-			name: "ipv4-in-ipv6 with ipv6-sized prefix",
+			name: "ipv4-in-ipv6 (with strict parsing)",
 			in:   "::ffff:1.1.1.0/120",
+			err:  "must not have an IPv4-mapped IPv6 address",
 		},
 		{
-			name: "prefix length with leading 0s",
+			name:  "ipv4-in-ipv6 with ipv6-sized prefix (with legacy parsing)",
+			in:    "::ffff:1.1.1.0/120",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
+		},
+		// This generates two errors rather than just one, which the unit test
+		// doesn't handle, so we just skip it.
+		// {
+		//	name: "ipv4-in-ipv6 with ipv6-sized prefix (with strict parsing)",
+		//	in:   "::ffff:1.1.1.0/120",
+		//	err:  ...
+		// },
+		{
+			name:  "ipv4 with bits past prefix (with legacy parsing)",
+			in:    "1.2.3.4/24",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
+		},
+		{
+			name: "ipv4 with bits past prefix (with strict parsing)",
+			in:   "1.2.3.4/24",
+			err:  "must not have bits set beyond the prefix length",
+		},
+		{
+			name:  "ipv6 with bits past prefix (with legacy parsing)",
+			in:    "2001:db8::1/64",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
+		},
+		{
+			name: "ipv6 with bits past prefix (with strict parsing)",
+			in:   "2001:db8::1/64",
+			err:  "must not have bits set beyond the prefix length",
+		},
+		{
+			name:  "prefix length with leading 0s (with legacy parsing)",
+			in:    "192.168.0.0/016",
+			flags: []CIDRValidationFlag{CIDRLegacyValidation},
+		},
+		{
+			name: "prefix length with leading 0s (with strict parsing)",
 			in:   "192.168.0.0/016",
+			err:  "must not have leading 0s",
 		},
 
 		// BAD VALUES

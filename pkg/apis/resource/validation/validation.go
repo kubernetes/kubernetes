@@ -801,7 +801,7 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 
 	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, maxIPs,
 		func(address string, fldPath *field.Path) field.ErrorList {
-			return validation.IsValidCIDR(fldPath, address, validation.CIDRIsCanonical)
+			return validation.IsValidCIDR(fldPath, address, validation.CIDRIsAddress, validation.CIDRIsCanonical)
 		}, stringKey, fldPath.Child("ips"))...)
 	return allErrs
 }

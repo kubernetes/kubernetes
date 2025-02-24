@@ -38,9 +38,36 @@ const (
 
 	// IPIsCanonical validates that the IP is in canonical form.
 	IPIsCanonical IPValidationFlag = "IPIsCanonical"
+
+	// IPLegacyValidation validates the IP according to legacy validation rules
+	IPLegacyValidation IPValidationFlag = "IPLegacyValidation"
 )
 
-// IsValidIP tests that the argument is a valid IP address according to flags
+// IsValidIP tests that the argument is a valid IP address according to flags.
+//
+// By default, IsValidIP uses "strict" validation. If you pass the IPLegacyValidation
+// flag, it will instead use the traditional Kubernetes IP validation, which allows some
+// invalid or ambiguous formats:
+//
+//  1. Legacy validation allows IPv4 IPs to have leading "0"s in octets (e.g.
+//     "010.002.003.004"). Historically, net.ParseIP (and later netutils.ParseIPSloppy)
+//     simply ignored leading "0"s in IPv4 addresses, but most libc-based software treats
+//     0-prefixed IPv4 octets as octal, meaning different software might interpret the
+//     same string as two different IPs, potentially leading to security issues. (Current
+//     net.ParseIP and netip.ParseAddr simply reject inputs with leading "0"s.)
+//
+//  2. Legacy validation allows IPv4-mapped IPv6 IPs (e.g. "::ffff:1.2.3.4"). These can
+//     also lead to different software interpreting the value in different ways, because
+//     they may be treated as IPv4 by some software and IPv6 by other software, again
+//     potentially leading to different interpretations of the same values. (net.ParseIP
+//     and netip.ParseAddr both allow these, but there are no use cases for representing
+//     IPv4 addresses as IPv4-mapped IPv6 addresses in Kubernetes.)
+//
+// Legacy validation should *only* be used for the existing API fields that have
+// traditionally been validated that way (and only when the StrictIPCIDRValidation feature
+// gate is disabled). All new API fields should use strict validation, to ensure that the
+// IP address will be accepted, and interpreted identically, by net.ParseIP,
+// netutils.ParseIPSloppy, netip.ParseAddr, and equivalent APIs in other languages.
 func IsValidIP(fldPath *field.Path, value string, flags ...IPValidationFlag) field.ErrorList {
 	var allErrors field.ErrorList
 
@@ -52,7 +79,21 @@ func IsValidIP(fldPath *field.Path, value string, flags ...IPValidationFlag) fie
 
 	flagSet := sets.New(flags...)
 
-	if flagSet.Has(IPIsCanonical) {
+	if !flagSet.Has(IPLegacyValidation) {
+		addr, err := netip.ParseAddr(value)
+		if err != nil {
+			// If netutils.ParseIPSloppy parsed it, but netip.ParseAddr
+			// doesn't, then it must have illegal leading 0s.
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have leading 0s"))
+		}
+		if addr.Is4In6() {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not be an IPv4-mapped IPv6 address"))
+		}
+	}
+
+	// Skip checking IPIsCanonical if we got one of the above strict-parsing errors,
+	// to avoid complaining about the same problem twice.
+	if flagSet.Has(IPIsCanonical) && len(allErrors) == 0 {
 		if value != ip.String() {
 			allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", ip.String())))
 		}
@@ -110,9 +151,38 @@ const (
 
 	// CIDRIsCanonical validates that the CIDR is in canonical form.
 	CIDRIsCanonical CIDRValidationFlag = "CIDRIsCanonical"
+
+	// CIDRIsAddress says that a CIDR value is expected to be an interface address
+	// (with bits set beyond the prefix length) rather than a subnet/mask (with no
+	// bits set beyond the prefix length). With legacy parsing, either form is
+	// allowed, but with strict parsing, only the subnet/mask form is accepted unless
+	// you pass this flag.
+	CIDRIsAddress CIDRValidationFlag = "CIDRIsAddress"
+
+	// CIDRLegacyValidation validates the CIDR according to legacy validation rules
+	CIDRLegacyValidation CIDRValidationFlag = "CIDRLegacyValidation"
 )
 
 // IsValidCIDR tests that the argument is a valid CIDR value according to flags.
+//
+// By default, IsValidCIDR uses "strict" validation. If you pass the CIDRLegacyValidation
+// flag, it will instead use the traditional Kubernetes CIDR validation, which allows some
+// invalid or ambiguous formats:
+//
+//  1. The IP part of the CIDR value is parsed as with IsValidIP's IPLegacyValidation.
+//
+//  2. The CIDR value is allowed to be either a "subnet"/"mask" (with the lower bits after
+//     the prefix length all being 0), or an "interface address" as with `ip addr` (with a
+//     complete IP address and associated subnet length). With strict parsing, the value
+//     is required to be in "subnet"/"mask" form, unless you pass CIDRIsAddress.
+//
+//  3. The prefix length is allowed to have leading 0s.
+//
+// Legacy validation should *only* be used for the existing API fields that have
+// traditionally been validated that way (and only when the StrictIPCIDRValidation feature
+// gate is disabled). All new API fields should use strict validation, to ensure that the
+// CIDR value will be accepted, and interpreted identically, by net.ParseCIDR,
+// netutils.ParseCIDRSloppy, netip.ParsePrefix, and equivalent APIs in other languages.
 func IsValidCIDR(fldPath *field.Path, value string, flags ...CIDRValidationFlag) field.ErrorList {
 	var allErrors field.ErrorList
 	ip, ipnet, err := netutils.ParseCIDRSloppy(value)
@@ -123,12 +193,33 @@ func IsValidCIDR(fldPath *field.Path, value string, flags ...CIDRValidationFlag)
 
 	flagSet := sets.New(flags...)
 
-	if flagSet.Has(CIDRIsCanonical) {
+	if !flagSet.Has(CIDRLegacyValidation) {
+		prefix, err := netip.ParsePrefix(value)
+		if err != nil {
+			// If netutils.ParseCIDRSloppy parsed it, but netip.ParsePrefix
+			// doesn't, then it must have illegal leading 0s (either in the
+			// IP part or the prefix).
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have leading 0s in IP or prefix length"))
+		}
+		if prefix.Addr().Is4In6() {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have an IPv4-mapped IPv6 address"))
+		}
+	}
+
+	// Skip checking CIDRIsCanonical if we got one of the above strict-parsing errors,
+	// to avoid complaining about the same problem twice.
+	if flagSet.Has(CIDRIsCanonical) && len(allErrors) == 0 {
+		// (For subnet/mask CIDRs, we could just check "value != ipnet.String()",
+		// but this code does the right thing with ifaddr CIDRs too.)
 		maskSize, _ := ipnet.Mask.Size()
 		canonical := fmt.Sprintf("%s/%d", ip.String(), maskSize)
 		if value != canonical {
 			allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", canonical)))
 		}
+	}
+
+	if !flagSet.Has(CIDRLegacyValidation) && !flagSet.Has(CIDRIsAddress) && !ip.Equal(ipnet.IP) {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have bits set beyond the prefix length"))
 	}
 
 	if flagSet.Has(CIDRIsIPv4) && !netutils.IsIPv4(ip) {

@@ -3781,7 +3781,7 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nameservers"), dnsConfig.Nameservers, fmt.Sprintf("must not have more than %v nameservers", MaxDNSNameservers)))
 		}
 		for i, ns := range dnsConfig.Nameservers {
-			allErrs = append(allErrs, validation.IsValidIP(fldPath.Child("nameservers").Index(i), ns)...)
+			allErrs = append(allErrs, validation.IsValidIP(fldPath.Child("nameservers").Index(i), ns, IPValidationFlags()...)...)
 		}
 		// Validate searches.
 		if len(dnsConfig.Searches) > MaxDNSSearchPaths {
@@ -3957,7 +3957,7 @@ func validateOnlyDeletedSchedulingGates(newGates, oldGates []core.PodSchedulingG
 func ValidateHostAliases(hostAliases []core.HostAlias, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, hostAlias := range hostAliases {
-		allErrs = append(allErrs, validation.IsValidIP(fldPath.Index(i).Child("ip"), hostAlias.IP)...)
+		allErrs = append(allErrs, validation.IsValidIP(fldPath.Index(i).Child("ip"), hostAlias.IP, IPValidationFlags()...)...)
 		for j, hostname := range hostAlias.Hostnames {
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(hostname, fldPath.Index(i).Child("hostnames").Index(j))...)
 		}
@@ -4106,7 +4106,7 @@ func validatePodIPs(pod *core.Pod) field.ErrorList {
 
 	// all PodIPs must be valid IPs
 	for i, podIP := range pod.Status.PodIPs {
-		allErrs = append(allErrs, validation.IsValidIP(podIPsField.Index(i), podIP.IP)...)
+		allErrs = append(allErrs, validation.IsValidIP(podIPsField.Index(i), podIP.IP, IPValidationFlags()...)...)
 	}
 
 	// if we have more than one Pod.PodIP then we must have a dual-stack pair
@@ -4147,7 +4147,7 @@ func validateHostIPs(pod *core.Pod) field.ErrorList {
 
 	// all HostIPs must be valid IPs
 	for i, hostIP := range pod.Status.HostIPs {
-		allErrs = append(allErrs, validation.IsValidIP(hostIPsField.Index(i), hostIP.IP)...)
+		allErrs = append(allErrs, validation.IsValidIP(hostIPsField.Index(i), hostIP.IP, IPValidationFlags()...)...)
 	}
 
 	// if we have more than one Pod.HostIP then we must have a dual-stack pair
@@ -5889,7 +5889,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 	ipPath := specPath.Child("externalIPs")
 	for i, ip := range service.Spec.ExternalIPs {
 		idxPath := ipPath.Index(i)
-		if errs := validation.IsValidIP(idxPath, ip); len(errs) != 0 {
+		if errs := validation.IsValidIP(idxPath, ip, IPValidationFlags()...); len(errs) != 0 {
 			allErrs = append(allErrs, errs...)
 		} else {
 			// For historical reasons, this uses ValidateEndpointIP even
@@ -5957,7 +5957,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 			// Note: due to a historical accident around transition from the
 			// annotation value, these values are allowed to be space-padded.
 			value = strings.TrimSpace(value)
-			allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(idx), value)...)
+			allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(idx), value, CIDRValidationFlags()...)...)
 		}
 	} else if val, annotationSet := service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]; annotationSet {
 		fieldPath := field.NewPath("metadata", "annotations").Key(core.AnnotationLoadBalancerSourceRangesKey)
@@ -5970,7 +5970,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 			cidrs := strings.Split(val, ",")
 			for _, value := range cidrs {
 				value = strings.TrimSpace(value)
-				allErrs = append(allErrs, validation.IsValidCIDR(fieldPath, value)...)
+				allErrs = append(allErrs, validation.IsValidCIDR(fieldPath, value, CIDRValidationFlags()...)...)
 			}
 		}
 	}
@@ -6354,7 +6354,7 @@ func ValidateNode(node *core.Node) field.ErrorList {
 
 		// all PodCIDRs should be valid ones
 		for idx, value := range node.Spec.PodCIDRs {
-			allErrs = append(allErrs, validation.IsValidCIDR(podCIDRsField.Index(idx), value)...)
+			allErrs = append(allErrs, validation.IsValidCIDR(podCIDRsField.Index(idx), value, CIDRValidationFlags()...)...)
 		}
 
 		// if more than PodCIDR then it must be a dual-stack pair
@@ -7430,7 +7430,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path)
 
 func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validation.IsValidIP(fldPath.Child("ip"), address.IP)...)
+	allErrs = append(allErrs, validation.IsValidIP(fldPath.Child("ip"), address.IP, IPValidationFlags()...)...)
 	if len(address.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
 	}
@@ -7802,7 +7802,7 @@ func ValidateLoadBalancerStatus(status *core.LoadBalancerStatus, fldPath *field.
 		for i, ingress := range status.Ingress {
 			idxPath := ingrPath.Index(i)
 			if len(ingress.IP) > 0 {
-				allErrs = append(allErrs, validation.IsValidIP(idxPath.Child("ip"), ingress.IP)...)
+				allErrs = append(allErrs, validation.IsValidIP(idxPath.Child("ip"), ingress.IP, IPValidationFlags()...)...)
 			}
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.LoadBalancerIPMode) && ingress.IPMode == nil {
@@ -8147,7 +8147,7 @@ func ValidateServiceClusterIPsRelatedFields(service *core.Service) field.ErrorLi
 		}
 
 		// is it valid ip?
-		errorMessages := validation.IsValidIP(clusterIPsField.Index(i), clusterIP)
+		errorMessages := validation.IsValidIP(clusterIPsField.Index(i), clusterIP, IPValidationFlags()...)
 		hasInvalidIPs = (len(errorMessages) != 0) || hasInvalidIPs
 		allErrs = append(allErrs, errorMessages...)
 	}
@@ -8661,4 +8661,20 @@ func isRestartableInitContainer(initContainer *core.Container) bool {
 		return false
 	}
 	return *initContainer.RestartPolicy == core.ContainerRestartPolicyAlways
+}
+
+// IPValidationFlags returns the default IP validation flags
+func IPValidationFlags() []validation.IPValidationFlag {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictIPCIDRValidation) {
+		return nil
+	}
+	return []validation.IPValidationFlag{validation.IPLegacyValidation}
+}
+
+// CIDRValidationFlags returns the default CIDR validation flags
+func CIDRValidationFlags() []validation.CIDRValidationFlag {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictIPCIDRValidation) {
+		return nil
+	}
+	return []validation.CIDRValidationFlag{validation.CIDRLegacyValidation}
 }

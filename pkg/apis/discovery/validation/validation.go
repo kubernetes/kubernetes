@@ -84,6 +84,9 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 		return allErrs
 	}
 
+	ipv4ValidationFlags := append(apivalidation.IPValidationFlags(), validation.IPIsIPv4)
+	ipv6ValidationFlags := append(apivalidation.IPValidationFlags(), validation.IPIsIPv6)
+
 	for i, endpoint := range endpoints {
 		idxPath := fldPath.Index(i)
 		addressPath := idxPath.Child("addresses")
@@ -99,10 +102,10 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			// and do not get validated.
 			switch addrType {
 			case discovery.AddressTypeIPv4:
-				allErrs = append(allErrs, validation.IsValidIP(addressPath.Index(i), address, validation.IPIsIPv4)...)
+				allErrs = append(allErrs, validation.IsValidIP(addressPath.Index(i), address, ipv4ValidationFlags...)...)
 				allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeIPv6:
-				allErrs = append(allErrs, validation.IsValidIP(addressPath.Index(i), address, validation.IPIsIPv6)...)
+				allErrs = append(allErrs, validation.IsValidIP(addressPath.Index(i), address, ipv6ValidationFlags...)...)
 				allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
