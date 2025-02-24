@@ -425,8 +425,8 @@ github.com/opencontainers/runtime-spec v1.2.0 h1:z97+pHb3uELt/yiAWD691HNHQIF07bE
 github.com/opencontainers/runtime-spec v1.2.0/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/selinux v1.11.1 h1:nHFvthhM0qY8/m+vfhJylliSshm8G1jJ2jDMcgULaH8=
 github.com/opencontainers/selinux v1.11.1/go.mod h1:E5dMC3VPuVvVHDYmi78qvhJp8+M586T4DlDRYpFkyec=
-github.com/openshift-eng/openshift-tests-extension v0.0.0-20250205124614-2f0f92f05710 h1:/nhlfQ5nOCMkLRshi88UM8cAyhhRM+aM/ohe/wwgP6Q=
-github.com/openshift-eng/openshift-tests-extension v0.0.0-20250205124614-2f0f92f05710/go.mod h1:Ag89ggOpS/66wVeBawzEWLfplYI7YLFx6GW6EW/pgVQ=
+github.com/openshift-eng/openshift-tests-extension v0.0.0-20250220212757-b9c4d98a0c45 h1:hXpbYtP3iTh8oy/RKwKkcMziwchY3fIk95ciczf7cOA=
+github.com/openshift-eng/openshift-tests-extension v0.0.0-20250220212757-b9c4d98a0c45/go.mod h1:6gkP5f2HL0meusT0Aim8icAspcD1cG055xxBZ9yC68M=
 github.com/openshift/api v0.0.0-20250129162653-107848b719c5 h1:PzJJmofv/P9R1JUxO8X6tAMxKACVS6Quxo/xBzMkSmI=
 github.com/openshift/api v0.0.0-20250129162653-107848b719c5/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
 github.com/openshift/apiserver-library-go v0.0.0-20250127121756-dc9a973f14ce h1:w0Up6YV1APcn20v/1h5IfuToz96o2pVqZyjzbw0yotU=

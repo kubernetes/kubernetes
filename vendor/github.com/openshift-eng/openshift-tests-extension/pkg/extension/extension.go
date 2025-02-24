@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/version"
 )
 

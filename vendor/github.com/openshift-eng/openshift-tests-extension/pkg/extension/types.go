@@ -1,9 +1,8 @@
 package extension
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
 const CurrentExtensionAPIVersion = "v1.0"
