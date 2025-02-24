@@ -317,7 +317,7 @@ func newTestKubeletWithImageList(
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, noopoteltrace.NewTracerProvider())
+	imageGCManager, err := images.NewImageGCManager(fakeRuntime, kubelet.StatsProvider, nil, fakeRecorder, fakeNodeRef, fakeImageGCPolicy, noopoteltrace.NewTracerProvider())
 	assert.NoError(t, err)
 	kubelet.imageManager = &fakeImageGCManager{
 		fakeImageService: fakeRuntime,
@@ -3433,7 +3433,7 @@ func TestSyncPodSpans(t *testing.T) {
 	imageSvc, err := remote.NewRemoteImageService(endpoint, 15*time.Second, tp, &logger)
 	assert.NoError(t, err)
 
-	kubelet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+	kubelet.containerRuntime, _, err = kuberuntime.NewKubeGenericRuntimeManager(
 		kubelet.recorder,
 		kubelet.livenessManager,
 		kubelet.readinessManager,
@@ -3450,6 +3450,8 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeCfg.MaxParallelImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
 		int(kubeCfg.RegistryBurst),
+		string(kubeletconfiginternal.NeverVerify),
+		nil,
 		"",
 		"",
 		nil,
