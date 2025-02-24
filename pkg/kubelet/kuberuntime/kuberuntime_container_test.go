@@ -43,7 +43,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestRemoveContainer tests removing the container and its corresponding container logs.
@@ -551,10 +550,10 @@ func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Containe
 
 	// Post Start script
 	t.Run("PostStart-CmdExe", func(t *testing.T) {
-		logger, ctx := ktesting.NewTestContext(t)
+		ctx := context.Background()
 		// Fake all the things you need before trying to create a container
 		fakeSandBox, _ := makeAndSetFakePod(t, m, fakeRuntime, testPod)
-		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(logger, testPod, 0)
+		fakeSandBoxConfig, _ := m.generatePodSandboxConfig(testPod, 0)
 		testContainer.Lifecycle = cmdPostStart
 		fakePodStatus := &kubecontainer.PodStatus{
 			ContainerStatuses: []*kubecontainer.Status{
