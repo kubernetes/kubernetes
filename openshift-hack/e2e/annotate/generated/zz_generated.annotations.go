@@ -749,7 +749,7 @@ var Annotations = map[string]string{
 
 	"[sig-autoscaling] [Feature:HPA] [Serial] [Slow] Horizontal pod autoscaling (non-default behavior) with short downscale stabilization window should scale down soon after the stabilization period": " [Suite:k8s]",
 
-	"[sig-cli] Kubectl Port forwarding Shutdown client connection while the remote stream is writing data to the port-forward connection port-forward should keep working after detect broken connection": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-cli] Kubectl Port forwarding Shutdown client connection while the remote stream is writing data to the port-forward connection port-forward should keep working after detect broken connection": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-cli] Kubectl Port forwarding With a server listening on 0.0.0.0 should support forwarding over websockets": " [Skipped:Proxy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
