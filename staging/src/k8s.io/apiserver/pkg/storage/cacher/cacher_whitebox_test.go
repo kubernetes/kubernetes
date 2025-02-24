@@ -2197,7 +2197,9 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 
 			go func(t *testing.T) {
 				err := cacher.watchCache.Add(makeTestPodDetails("pod1", 105, "node1", map[string]string{"label": "value1"}))
-				require.NoError(t, err, "failed adding a pod to the watchCache")
+				if err != nil {
+					t.Errorf("failed adding a pod to the watchCache %v", err)
+				}
 			}(t)
 			w, err = cacher.Watch(context.Background(), "pods/ns", scenario.opts)
 			require.NoError(t, err, "failed to create watch: %v")
