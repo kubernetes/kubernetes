@@ -21,6 +21,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# STRICT_ALPHA_HANDLING ensures that the OpenAPI is updated with all APIs
+# that are intended to be removed at a particular release. This should be true by default.
+# If a new version tag was just created and you are seeing an unrelated diff when adding
+# a new API, run `STRICT_ALPHA_HANDLING=false ./hack/update-openapi-spec.sh`.
+STRICT_ALPHA_HANDLING=${STRICT_ALPHA_HANDLING:-true}
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 DISCOVERY_ROOT_DIR="${KUBE_ROOT}/api/discovery"
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
@@ -72,7 +77,7 @@ fi
 # Start kube-apiserver
 # omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
-kube-apiserver \
+KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA=${STRICT_ALPHA_HANDLING} kube-apiserver \
   --bind-address="${API_HOST}" \
   --secure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
