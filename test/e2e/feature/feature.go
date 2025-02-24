@@ -429,6 +429,10 @@ var (
 	// TODO: remove when SELinuxMount feature gate is enabled by default.
 	SELinuxMountReadWriteOncePodOnly = framework.WithFeature(framework.ValidFeatures.Add("SELinuxMountReadWriteOncePodOnly"))
 
+	// SeparateDiskTest (SIG-node, used for testing separate container runtime filesystem)
+	// The tests need separate disk settings on nodes and separate filesystems in storage.conf
+	SeparateDiskTest = framework.WithFeature(framework.ValidFeatures.Add("SeparateDiskTest"))
+
 	// Owner: sig-network
 	// Marks tests of KEP-1880 that require the `MultiCIDRServiceAllocator` feature gate
 	// and the networking.k8s.io/v1alpha1 API.
