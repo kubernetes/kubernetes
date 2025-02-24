@@ -333,7 +333,7 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterAr
 	if !b.readOnly {
 		// Since portworxVolume is in process of being removed from in-tree, we avoid larger refactor to add progress tracking for ownership operation
 		ownershipChanger := volume.NewVolumeOwnership(b, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
-		ownershipChanger.ChangePermissions()
+		_ = ownershipChanger.ChangePermissions()
 	}
 	klog.Infof("Portworx Volume %s setup at %s", b.volumeID, dir)
 	return nil

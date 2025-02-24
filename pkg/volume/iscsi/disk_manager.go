@@ -99,7 +99,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	if !b.readOnly {
 		// This code requires larger refactor to monitor progress of ownership change
 		ownershipChanger := volume.NewVolumeOwnership(&b, volPath, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
-		ownershipChanger.ChangePermissions()
+		_ = ownershipChanger.ChangePermissions()
 	}
 
 	return nil

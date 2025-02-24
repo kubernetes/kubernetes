@@ -230,7 +230,8 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	}
 
 	ownershipChanger := volume.NewVolumeOwnership(b, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
-	ownershipChanger.ChangePermissions()
+	// We do not care about return value, this plugin is deprecated
+	_ = ownershipChanger.ChangePermissions()
 	volumeutil.SetReady(b.getMetaDir())
 	return nil
 }

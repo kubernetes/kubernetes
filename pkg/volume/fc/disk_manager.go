@@ -92,7 +92,8 @@ func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mou
 
 	if !b.readOnly {
 		ownershipChanger := volume.NewVolumeOwnership(&b, volPath, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
-		ownershipChanger.ChangePermissions()
+		// TODO: Handle error returned here properly.
+		_ = ownershipChanger.ChangePermissions()
 	}
 
 	return nil
