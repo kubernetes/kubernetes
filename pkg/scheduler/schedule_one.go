@@ -294,10 +294,10 @@ func (sched *Scheduler) bindingCycle(
 
 	// Any failures after this point cannot lead to the Pod being considered unschedulable.
 	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and Permit is the last one in the scheduling/binding cycle.
-	// If a Pod fails on PreBind, it should be moved to BackoffQ for retry.
+	// If a Pod fails on PreBind or Bind, it should be moved to BackoffQ for retry.
 	//
 	// We can call Done() here because
-	// we can free the cluster events stored in the scheduling queue sonner, which is worth for busy clusters memory consumption wise.
+	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
 	sched.SchedulingQueue.Done(assumedPod.UID)
 
 	// Run "prebind" plugins.
