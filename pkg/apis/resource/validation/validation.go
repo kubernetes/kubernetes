@@ -383,14 +383,14 @@ func validateAllocationConfigSource(source resource.AllocationConfigSource, fldP
 	return allErrs
 }
 
-// ValidateClass validates a DeviceClass.
+// ValidateDeviceClass validates a DeviceClass.
 func ValidateDeviceClass(class *resource.DeviceClass) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMeta(&class.ObjectMeta, false, corevalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDeviceClassSpec(&class.Spec, nil, field.NewPath("spec"))...)
 	return allErrs
 }
 
-// ValidateClassUpdate tests if an update to DeviceClass is valid.
+// ValidateDeviceClassUpdate tests if an update to DeviceClass is valid.
 func ValidateDeviceClassUpdate(class, oldClass *resource.DeviceClass) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&class.ObjectMeta, &oldClass.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDeviceClassSpec(&class.Spec, &oldClass.Spec, field.NewPath("spec"))...)
@@ -466,7 +466,7 @@ func ValidateResourceSlice(slice *resource.ResourceSlice) field.ErrorList {
 	return allErrs
 }
 
-// ValidateResourceSlice tests if a ResourceSlice update is valid.
+// ValidateResourceSliceUpdate tests if a ResourceSlice update is valid.
 func ValidateResourceSliceUpdate(resourceSlice, oldResourceSlice *resource.ResourceSlice) field.ErrorList {
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&resourceSlice.ObjectMeta, &oldResourceSlice.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateResourceSliceSpec(&resourceSlice.Spec, &oldResourceSlice.Spec, field.NewPath("spec"))...)
@@ -483,13 +483,13 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.NodeName, oldSpec.NodeName, fldPath.Child("nodeName"))...)
 	}
 
-	numNodeSelectionFields := 0
+	setFields := make([]string, 0, 3)
 	if spec.NodeName != "" {
-		numNodeSelectionFields++
+		setFields = append(setFields, "`nodeName`")
 		allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
 	}
 	if spec.NodeSelector != nil {
-		numNodeSelectionFields++
+		setFields = append(setFields, "`nodeSelector`")
 		allErrs = append(allErrs, corevalidation.ValidateNodeSelector(spec.NodeSelector, false, fldPath.Child("nodeSelector"))...)
 		if len(spec.NodeSelector.NodeSelectorTerms) != 1 {
 			// This additional constraint simplifies merging of different selectors
@@ -498,14 +498,15 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		}
 	}
 	if spec.AllNodes {
-		numNodeSelectionFields++
+		setFields = append(setFields, "`allNodes`")
 	}
-	switch numNodeSelectionFields {
+	switch len(setFields) {
 	case 0:
 		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
 	case 1:
 	default:
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
+		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
+			"exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required, but multiple fields are set"))
 	}
 
 	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices, validateDevice,
@@ -569,7 +570,6 @@ var (
 
 		// optional dot-separated build identifier segments (e.g. +build.id.20240305)
 		`(\+` + buildIdentifier + `(\.` + buildIdentifier + `)*)?` +
-
 		`$`)
 )
 
