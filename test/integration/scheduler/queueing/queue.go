@@ -98,8 +98,9 @@ var (
 // We needed to do this because running all these test cases resulted in the timeout.
 var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	{
-		Name:         "Pod without a required toleration to a node isn't requeued to activeQ",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
+		Name:          "Pod without a required toleration to a node isn't requeued to activeQ",
+		EnablePlugins: []string{names.TaintToleration, names.NodeResourcesFit},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
 			//   (TaintToleration plugin is evaluated before NodeResourcesFit plugin.)
@@ -119,8 +120,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
-		Name:         "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Label("anti", "anti").Name("pod1").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Node("fake-node").Obj(),
 		},
@@ -152,8 +154,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
-		Name:         "Pod rejected by the NodeAffinity plugin is requeued when a Node's label is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
+		Name:          "Pod rejected by the NodeAffinity plugin is requeued when a Node's label is updated",
+		EnablePlugins: []string{names.NodeAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 will be rejected by the NodeAffinity plugin.
 			st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
@@ -172,7 +175,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name: "Pod rejected by the NodeAffinity plugin is not requeued when an updated Node haven't changed the 'match' verdict",
+		Name:          "Pod rejected by the NodeAffinity plugin is not requeued when an updated Node haven't changed the 'match' verdict",
+		EnablePlugins: []string{names.NodeAffinity, names.NodeResourcesFit},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("node1").Label("group", "a").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
 			st.MakeNode().Name("node2").Label("group", "b").Obj()},
@@ -193,8 +197,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the NodeAffinity plugin is requeued when a Node is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
+		Name:          "Pod rejected by the NodeAffinity plugin is requeued when a Node is added",
+		EnablePlugins: []string{names.NodeAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Label("group", "a").Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 will be rejected by the NodeAffinity plugin.
 			st.MakePod().Name("pod1").NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
@@ -213,8 +218,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name:         "Pod updated with toleration requeued to activeQ",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()},
+		Name:          "Pod updated with toleration requeued to activeQ",
+		EnablePlugins: []string{names.TaintToleration},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
 			st.MakePod().Name("pod1").Container("image").Obj(),
@@ -231,8 +237,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name:         "Pod rejected by the TaintToleration plugin is requeued when the Node's taint is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
+		Name:          "Pod rejected by the TaintToleration plugin is requeued when the Node's taint is updated",
+		EnablePlugins: []string{names.TaintToleration},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1, pod2 and pod3 don't have the required toleration and will be rejected by the TaintToleration plugin.
 			st.MakePod().Name("pod1").Toleration("taint-key").Container("image").Obj(),
@@ -251,8 +258,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the TaintToleration plugin is requeued when a Node that has the correspoding taint is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
+		Name:          "Pod rejected by the TaintToleration plugin is requeued when a Node that has the correspoding taint is added",
+		EnablePlugins: []string{names.TaintToleration},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 and Pod2 don't have the required toleration and will be rejected by the TaintToleration plugin.
 			st.MakePod().Name("pod1").Toleration("taint-key").Container("image").Obj(),
@@ -269,8 +277,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name:         "Pod rejected by the NodeResourcesFit plugin is requeued when the Pod is updated to scale down",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when the Pod is updated to scale down",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
@@ -286,8 +295,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Pod is deleted",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Pod is deleted",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Node("fake-node").Obj(),
 		},
@@ -306,8 +316,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
-		Name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is created",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
@@ -326,8 +337,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name:         "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated",
+		EnablePlugins: []string{names.NodeResourcesFit},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 requests a large amount of CPU and will be rejected by the NodeResourcesFit plugin.
 			st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Container("image").Obj(),
@@ -345,7 +357,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name: "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node is updated without increase in the requested resources",
+		Name:          "Pod rejected by the NodeResourcesFit plugin isn't requeued when a Node is updated without increase in the requested resources",
+		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
@@ -365,7 +378,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated with increase in the requested resources",
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated with increase in the requested resources",
+		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Label("group", "b").Obj(),
@@ -385,7 +399,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated with increase in the allowed pods number",
+		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated with increase in the allowed pods number",
+		EnablePlugins: []string{names.NodeResourcesFit, names.NodeAffinity},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Capacity(map[v1.ResourceName]string{v1.ResourcePods: "2"}).Obj(),
 			st.MakeNode().Name("fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourcePods: "1"}).Label("group", "b").Obj(),
@@ -409,8 +424,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Updating pod label doesn't retry scheduling if the Pod was rejected by TaintToleration",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
+		Name:          "Updating pod label doesn't retry scheduling if the Pod was rejected by TaintToleration",
+		EnablePlugins: []string{names.TaintToleration},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()},
 		Pods: []*v1.Pod{
 			// - Pod1 doesn't have the required toleration and will be rejected by the TaintToleration plugin.
 			st.MakePod().Name("pod1").Container("image").Obj(),
@@ -430,7 +446,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		// The test case makes sure that PreFilter plugins returning PreFilterResult are also inserted into pInfo.UnschedulablePlugins
 		// meaning, they're taken into consideration during requeuing flow of the queue.
 		// https://github.com/kubernetes/kubernetes/issues/122018
-		Name: "Pod rejected by the PreFilter of NodeAffinity plugin and Filter of NodeResourcesFit is requeued based on both plugins",
+		Name:          "Pod rejected by the PreFilter of NodeAffinity plugin and Filter of NodeResourcesFit is requeued based on both plugins",
+		EnablePlugins: []string{names.NodeAffinity, names.NodeResourcesFit},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
 			st.MakeNode().Name("fake-node2").Label("node", "fake-node2").Label("zone", "zone1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
@@ -462,8 +479,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		},
 	},
 	{
-		Name:         "Pod rejected by the PodAffinity plugin is requeued when deleting the existed pod's label that matches the podAntiAffinity",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existed pod's label that matches the podAntiAffinity",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Label("anti1", "anti1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(),
 		},
@@ -484,8 +502,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the PodAffinity plugin is requeued when updating the existed pod's label to make it match the pod's podAffinity",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected by the PodAffinity plugin is requeued when updating the existed pod's label to make it match the pod's podAffinity",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").Node("fake-node").Obj(),
 		},
@@ -507,8 +526,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 
 	{
-		Name:         "Pod rejected by the interPodAffinity plugin is requeued when creating the node with the topologyKey label of the pod affinity",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("aaa", "fake-node").Obj()},
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when creating the node with the topologyKey label of the pod affinity",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Label("aaa", "fake-node").Obj()},
 		Pods: []*v1.Pod{
 			// - pod1 and pod2 will be rejected by the PodAffinity plugin.
 			st.MakePod().Name("pod1").PodAffinityExists("bbb", "zone", st.PodAffinityWithRequiredReq).Container("image").Obj(),
@@ -526,7 +546,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pod rejected by the interPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod affinity",
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod affinity",
+		EnablePlugins: []string{names.InterPodAffinity},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node").Label("region", "region-1").Obj(),
 			st.MakeNode().Name("fake-node2").Label("region", "region-2").Label("group", "b").Obj(),
@@ -535,26 +556,24 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Name("pod1").Label("affinity1", "affinity1").Container("image").Node("fake-node").Obj(),
 		},
 		Pods: []*v1.Pod{
-			// - pod2, pod3, pod4 will be rejected by the PodAffinity plugin.
+			// - pod2, pod3 will be rejected by the PodAffinity plugin.
 			st.MakePod().Name("pod2").Label("affinity1", "affinity1").PodAffinityExists("affinity1", "node", st.PodAffinityWithRequiredReq).Container("image").Obj(),
 			st.MakePod().Name("pod3").Label("affinity1", "affinity1").PodAffinityExists("affinity1", "other", st.PodAffinityWithRequiredReq).Container("image").Obj(),
-			// This Pod doesn't have any label so that this PodAffinity doesn't match this Pod itself.
-			st.MakePod().Name("pod4").PodAffinityExists("affinity1", "region", st.PodAffinityWithRequiredReq).NodeAffinityIn("group", []string{"b"}, st.NodeSelectorTypeMatchExpressions).Container("image").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[framework.ClusterEvent]uint64, error) {
 			// Add "node" label to the node which may make pod2 schedulable.
-			// Update "region" label to the node which may make pod4 schedulable.
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("region", "region-2").Obj(), metav1.UpdateOptions{}); err != nil {
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 			return map[framework.ClusterEvent]uint64{{Resource: framework.Node, ActionType: framework.UpdateNodeLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2", "pod4"),
+		WantRequeuedPods:          sets.New("pod2"),
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the interPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod anti affinity",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("service", "service-a").Label("other", "fake-node").Obj()},
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod anti affinity",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("service", "service-a").Label("other", "fake-node").Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Label("anti1", "anti1").Container("image").Node("fake-node").Obj(),
 		},
@@ -576,8 +595,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the interPodAffinity plugin is requeued when creating the node with the topologyKey label of the pod anti affinity",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Label("zone", "fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when creating the node with the topologyKey label of the pod anti affinity",
+		EnablePlugins: []string{names.InterPodAffinity},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Label("zone", "fake-node").Label("node", "fake-node").Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Label("anti1", "anti1").Container("image").Node("fake-node1").Obj(),
 		},
@@ -597,8 +617,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with hostport by the NodePorts plugin is requeued when pod with common hostport is deleted",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with hostport by the NodePorts plugin is requeued when pod with common hostport is deleted",
+		EnablePlugins: []string{names.NodePorts},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Node("fake-node").Obj(),
 			st.MakePod().Name("pod2").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8081}}).Node("fake-node").Obj(),
@@ -620,8 +641,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with hostport by the NodePorts plugin is requeued when new node is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with hostport by the NodePorts plugin is requeued when new node is created",
+		EnablePlugins: []string{names.NodePorts},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").ContainerPort([]v1.ContainerPort{{ContainerPort: 8080, HostPort: 8080}}).Node("fake-node").Obj(),
 		},
@@ -641,8 +663,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the NodeUnschedulable plugin is requeued when the node is turned to ready",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Unschedulable(true).Obj()},
+		Name:          "Pod rejected by the NodeUnschedulable plugin is requeued when the node is turned to ready",
+		EnablePlugins: []string{names.NodeUnschedulable},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Unschedulable(true).Obj()},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").Obj(),
 		},
@@ -657,8 +680,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name:         "Pod rejected by the NodeUnschedulable plugin is requeued when a new node is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Unschedulable(true).Obj()},
+		Name:          "Pod rejected by the NodeUnschedulable plugin is requeued when a new node is created",
+		EnablePlugins: []string{names.NodeUnschedulable},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Unschedulable(true).Obj()},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").Obj(),
 		},
@@ -674,8 +698,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
-		Name:         "Pod rejected by the NodeUnschedulable plugin isn't requeued when another unschedulable node is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node1").Unschedulable(true).Obj()},
+		Name:          "Pod rejected by the NodeUnschedulable plugin isn't requeued when another unschedulable node is created",
+		EnablePlugins: []string{names.NodeUnschedulable},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node1").Unschedulable(true).Obj()},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").Obj(),
 		},
@@ -693,8 +718,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
+		EnablePlugins: []string{names.PodTopologySpread},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Label("key1", "val").Container("image").Node("fake-node").Obj(),
 			st.MakePod().Name("pod2").Label("key2", "val").Container("image").Node("fake-node").Obj(),
@@ -718,8 +744,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pods with PodTopologySpread should be requeued when a scheduled Pod label is updated to match the selector",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pods with PodTopologySpread should be requeued when a scheduled Pod label is updated to match the selector",
+		EnablePlugins: []string{names.PodTopologySpread},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Label("key1", "val").Container("image").Node("fake-node").Obj(),
 			st.MakePod().Name("pod2").Label("key2", "val").Container("image").Node("fake-node").Obj(),
@@ -742,8 +769,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pods with PodTopologySpread should be requeued when a scheduled Pod with matching label is deleted",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
+		Name:          "Pods with PodTopologySpread should be requeued when a scheduled Pod with matching label is deleted",
+		EnablePlugins: []string{names.PodTopologySpread},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		InitialPods: []*v1.Pod{
 			st.MakePod().Name("pod1").Label("key1", "val").Container("image").Node("fake-node").Obj(),
 			st.MakePod().Name("pod2").Label("key2", "val").Container("image").Node("fake-node").Obj(),
@@ -765,7 +793,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pods with PodTopologySpread should be requeued when a Node with topology label is created",
+		Name:          "Pods with PodTopologySpread should be requeued when a Node with topology label is created",
+		EnablePlugins: []string{names.PodTopologySpread},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
 			st.MakeNode().Name("fake-node2").Label("zone", "fake-zone").Obj(),
@@ -792,7 +821,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pods with PodTopologySpread should be requeued when a Node is updated to have the topology label",
+		Name:          "Pods with PodTopologySpread should be requeued when a Node is updated to have the topology label",
+		EnablePlugins: []string{names.PodTopologySpread},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Label("node", "fake-node").Label("region", "fake-node").Label("service", "service-a").Obj(),
 			st.MakeNode().Name("fake-node2").Label("node", "fake-node").Label("region", "fake-node").Label("service", "service-a").Obj(),
@@ -828,7 +858,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: enabled)",
+		Name:          "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: enabled)",
+		EnablePlugins: []string{names.PodTopologySpread},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
 			st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
@@ -854,7 +885,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: disabled)",
+		Name:          "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: disabled)",
+		EnablePlugins: []string{names.PodTopologySpread},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
 			st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
@@ -880,7 +912,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(false),
 	},
 	{
-		Name: "Pods with PodTopologySpread should be requeued when a NodeTaint of a Node with a topology label has been updated",
+		Name:          "Pods with PodTopologySpread should be requeued when a NodeTaint of a Node with a topology label has been updated",
+		EnablePlugins: []string{names.PodTopologySpread},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
 			st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
@@ -907,8 +940,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod4"),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PV is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
+		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the PV is added",
+		EnablePlugins: []string{names.VolumeZone},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -955,8 +989,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PV is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
+		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the PV is updated",
+		EnablePlugins: []string{names.VolumeZone},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1010,8 +1045,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
+		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is added",
+		EnablePlugins: []string{names.VolumeZone},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1061,8 +1097,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
+		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is updated",
+		EnablePlugins: []string{names.VolumeZone},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1118,8 +1155,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeZone plugin is requeued when the Storage class is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
+		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the Storage class is added",
+		EnablePlugins: []string{names.VolumeZone},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1166,8 +1204,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeZone plugin is not requeued when the PV is updated but the topology is same",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
+		Name:          "Pod rejected with node by the VolumeZone plugin is not requeued when the PV is updated but the topology is same",
+		EnablePlugins: []string{names.VolumeZone},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west1-a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1222,8 +1261,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the VolumeRestriction plugin is requeued when the PVC bound to the pod is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected by the VolumeRestriction plugin is requeued when the PVC bound to the pod is added",
+		EnablePlugins: []string{names.VolumeRestrictions},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1253,8 +1293,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected by the VolumeRestriction plugin is requeued when the pod is deleted",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected by the VolumeRestriction plugin is requeued when the pod is deleted",
+		EnablePlugins: []string{names.VolumeRestrictions},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1289,7 +1330,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name: "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
+		EnablePlugins: []string{names.VolumeBinding},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-east-1b").Obj(),
 		},
@@ -1325,7 +1367,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name: "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is updated",
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is updated",
+		EnablePlugins: []string{names.VolumeBinding},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().
 				Name("fake-node").
@@ -1365,8 +1408,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("aaa", "bbb").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is created",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label("aaa", "bbb").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1408,8 +1452,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-east-1a").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is updated",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-east-1a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1447,8 +1492,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is created",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}).
@@ -1491,8 +1537,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is updated",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1533,8 +1580,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass is created",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1568,8 +1616,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass's AllowedTopologies is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west-1a").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass's AllowedTopologies is updated",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west-1a").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1624,8 +1673,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is not requeued when the StorageClass is updated but the AllowedTopologies is same",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west-1c").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is not requeued when the StorageClass is updated but the AllowedTopologies is same",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Label(v1.LabelTopologyZone, "us-west-1c").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1682,8 +1732,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode is created",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().
 				Name("pv1").
@@ -1713,8 +1764,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode's MigratedPluginsAnnotation is updated",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode's MigratedPluginsAnnotation is updated",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1753,8 +1805,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIDriver's StorageCapacity gets disabled",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIDriver's StorageCapacity gets disabled",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1800,8 +1853,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIDriver is updated but the storage capacity is originally enabled",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIDriver is updated but the storage capacity is originally enabled",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1847,8 +1901,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is created",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is created",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1885,8 +1940,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is increased",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is increased",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1932,8 +1988,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true, false),
 	},
 	{
-		Name:         "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIStorageCapacity is updated but the volumelimit is not increased",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIStorageCapacity is updated but the volumelimit is not increased",
+		EnablePlugins: []string{names.VolumeBinding},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -1977,8 +2034,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected the CSI plugin is requeued when the CSINode is added",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected the CSI plugin is requeued when the CSINode is added",
+		EnablePlugins: []string{names.NodeVolumeLimits},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -2016,8 +2074,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
-		Name:         "Pod rejected with PVC by the CSI plugin is requeued when the pod having related PVC is deleted",
-		InitialNodes: []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
+		Name:          "Pod rejected with PVC by the CSI plugin is requeued when the pod having related PVC is deleted",
+		EnablePlugins: []string{names.NodeVolumeLimits},
+		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
@@ -2070,8 +2129,8 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	},
 	{
 		Name:          "Pod rejected with PVC by the CSI plugin is requeued when the related PVC is added",
+		EnablePlugins: []string{names.NodeVolumeLimits},
 		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Obj()},
-		EnablePlugins: []string{"VolumeBinding"},
 		InitialPVs: []*v1.PersistentVolume{
 			st.MakePersistentVolume().Name("pv1").
 				AccessModes([]v1.PersistentVolumeAccessMode{v1.ReadWriteMany}).
