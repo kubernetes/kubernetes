@@ -656,8 +656,8 @@ func TestDispatcher(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			informerFactory.WaitForCacheSync(ctx.Done())
 			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 			for i, h := range tc.policyHooks {
 				tc.policyHooks[i].ParamInformer = paramInformer
 				tc.policyHooks[i].ParamScope = testParamScope{}
