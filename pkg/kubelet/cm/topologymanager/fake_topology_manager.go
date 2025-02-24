@@ -45,7 +45,7 @@ func NewFakeManagerWithHint(hint *TopologyHint) Manager {
 
 // NewFakeManagerWithPolicy returns an instance of fake topology manager with specified policy
 func NewFakeManagerWithPolicy(policy Policy) Manager {
-	klog.InfoS("NewFakeManagerWithPolicy")
+	klog.InfoS("NewFakeManagerWithPolicy", "policy", policy.Name())
 	return &fakeManager{
 		policy: policy,
 	}
