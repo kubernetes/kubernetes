@@ -22,6 +22,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
@@ -34,29 +35,29 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func NewCacheProxy(cacher *Cacher, storage storage.Interface) *CacheProxy {
-	return &CacheProxy{
+func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegator {
+	return &CacheDelegator{
 		cacher:  cacher,
 		storage: storage,
 	}
 }
 
-type CacheProxy struct {
+type CacheDelegator struct {
 	cacher  *Cacher
 	storage storage.Interface
 }
 
-var _ storage.Interface = (*CacheProxy)(nil)
+var _ storage.Interface = (*CacheDelegator)(nil)
 
-func (c *CacheProxy) Versioner() storage.Versioner {
+func (c *CacheDelegator) Versioner() storage.Versioner {
 	return c.storage.Versioner()
 }
 
-func (c *CacheProxy) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+func (c *CacheDelegator) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	return c.storage.Create(ctx, key, obj, out, ttl)
 }
 
-func (c *CacheProxy) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
+func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.cacher.watchCache.GetByKey(key); err != nil {
@@ -71,7 +72,7 @@ func (c *CacheProxy) Delete(ctx context.Context, key string, out runtime.Object,
 	return c.storage.Delete(ctx, key, out, preconditions, validateDeletion, nil, opts)
 }
 
-func (c *CacheProxy) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
+func (c *CacheDelegator) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	// if the watch-list feature wasn't set and the resourceVersion is unset
 	// ensure that the rv from which the watch is being served, is the latest
 	// one. "latest" is ensured by serving the watch from
@@ -89,7 +90,7 @@ func (c *CacheProxy) Watch(ctx context.Context, key string, opts storage.ListOpt
 	return c.cacher.Watch(ctx, key, opts)
 }
 
-func (c *CacheProxy) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
+func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOptions, objPtr runtime.Object) error {
 	ctx, span := tracing.Start(ctx, "cacher.Get",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
@@ -104,7 +105,7 @@ func (c *CacheProxy) Get(ctx context.Context, key string, opts storage.GetOption
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if !c.cacher.Ready() {
-			// If Cache is not initialized, delegate Get requests to storage
+			// If Cache is not initialized, delegator Get requests to storage
 			// as described in https://kep.k8s.io/4568
 			span.AddEvent("About to Get from underlying storage - cache not initialized")
 			return c.storage.Get(ctx, key, opts, objPtr)
@@ -133,7 +134,7 @@ func (c *CacheProxy) Get(ctx context.Context, key string, opts storage.GetOption
 	return c.cacher.Get(ctx, key, opts, objPtr)
 }
 
-func (c *CacheProxy) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	if shouldDelegateList(opts) {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
@@ -145,7 +146,7 @@ func (c *CacheProxy) GetList(ctx context.Context, key string, opts storage.ListO
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if !c.cacher.Ready() && shouldDelegateListOnNotReadyCache(opts) {
-			// If Cacher is not initialized, delegate List requests to storage
+			// If Cacher is not initialized, delegator List requests to storage
 			// as described in https://kep.k8s.io/4568
 			return c.storage.GetList(ctx, key, opts, listObj)
 		}
@@ -186,7 +187,45 @@ func (c *CacheProxy) GetList(ctx context.Context, key string, opts storage.ListO
 	return nil
 }
 
-func (c *CacheProxy) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
+func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
+	pred := opts.Predicate
+	noLabelSelector := pred.Label == nil || pred.Label.Empty()
+	noFieldSelector := pred.Field == nil || pred.Field.Empty()
+	hasLimit := pred.Limit > 0
+	return noLabelSelector && noFieldSelector && hasLimit
+}
+
+// NOTICE: Keep in sync with shouldListFromStorage function in
+//
+//	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
+func shouldDelegateList(opts storage.ListOptions) bool {
+	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchExact:
+		return true
+	case metav1.ResourceVersionMatchNotOlderThan:
+	case "":
+		// Legacy exact match
+		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return true
+		}
+	default:
+		return true
+	}
+	// Continue
+	if len(opts.Predicate.Continue) > 0 {
+		return true
+	}
+	// Consistent Read
+	if opts.ResourceVersion == "" {
+		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
+	}
+	return false
+}
+
+func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
 	if elem, exists, err := c.cacher.watchCache.GetByKey(key); err != nil {
@@ -201,17 +240,17 @@ func (c *CacheProxy) GuaranteedUpdate(ctx context.Context, key string, destinati
 	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
-func (c *CacheProxy) Count(pathPrefix string) (int64, error) {
+func (c *CacheDelegator) Count(pathPrefix string) (int64, error) {
 	return c.storage.Count(pathPrefix)
 }
 
-func (c *CacheProxy) ReadinessCheck() error {
+func (c *CacheDelegator) ReadinessCheck() error {
 	if !c.cacher.Ready() {
 		return storage.ErrStorageNotReady
 	}
 	return nil
 }
 
-func (c *CacheProxy) RequestWatchProgress(ctx context.Context) error {
+func (c *CacheDelegator) RequestWatchProgress(ctx context.Context) error {
 	return c.storage.RequestWatchProgress(ctx)
 }
