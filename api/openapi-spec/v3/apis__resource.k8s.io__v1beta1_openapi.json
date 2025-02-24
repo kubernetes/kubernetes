@@ -245,7 +245,7 @@
             "description": "Opaque provides driver-specific configuration parameters."
           },
           "requests": {
-            "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of both the main request and the subrequest using the format <main request>/<subrequest>. If just the main request is given, the configuration applies to all subrequests.",
+            "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
             "items": {
               "default": "",
               "type": "string"
@@ -393,7 +393,7 @@
             "description": "Opaque provides driver-specific configuration parameters."
           },
           "requests": {
-            "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of both the main request and the subrequest using the format <main request>/<subrequest>. if just the main request is given, the configuration applies to all subrequests.",
+            "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
             "items": {
               "default": "",
               "type": "string"
@@ -545,7 +545,7 @@
             "type": "string"
           },
           "requests": {
-            "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of both the main request and the subrequest using the format <main request>/<subrequest>. If just the main request is given, the constraint applies to all subrequests.",
+            "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the constraint applies to all subrequests.",
             "items": {
               "default": "",
               "type": "string"
@@ -665,7 +665,7 @@
         "type": "object"
       },
       "io.k8s.api.resource.v1beta1.DeviceSubRequest": {
-        "description": "DeviceSubRequest describes a request for device provided in the claim.spec.devices.requests[].firstAvailable array. Each is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nDeviceSubRequest is similar to Request, but doesn't expose the AdminAccess (not supported) or FirstAvailable (recursion not supported) fields, as those can only be set on the top-level request.",
+        "description": "DeviceSubRequest describes a request for device provided in the claim.spec.devices.requests[].firstAvailable array. Each is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nDeviceSubRequest is similar to Request, but doesn't expose the AdminAccess or FirstAvailable fields, as those can only be set on the top-level request. AdminAccess is not supported for requests with a prioritized list, and recursive FirstAvailable fields are not supported.",
         "properties": {
           "allocationMode": {
             "description": "AllocationMode and its related fields define how devices are allocated to satisfy this subrequest. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This subrequest is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AlloctionMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other subrequests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
