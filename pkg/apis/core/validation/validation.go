@@ -133,7 +133,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123Label(value) {
-		allErrs.AppendWithOrigin("DNS1123Label", field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).SetOrigin("DNS1123Label"))
 	}
 	return allErrs
 }
@@ -142,7 +142,7 @@ func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 func ValidateQualifiedName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
-		allErrs.AppendWithOrigin("QualifiedName", field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).SetOrigin("QualifiedName"))
 	}
 	return allErrs
 }
@@ -354,7 +354,7 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 func ValidatePositiveField(value int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value <= 0 {
-		allErrs.AppendWithOrigin("Minimum", field.Invalid(fldPath, value, isNotPositiveErrorMsg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, isNotPositiveErrorMsg).SetOrigin("Minimum"))
 	}
 	return allErrs
 }
@@ -6275,7 +6275,7 @@ func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationController
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
-	allErrs.AppendWithOrigin("Replicas", ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas")).WithOrigin("Replicas")...)
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
 	return allErrs
 }
@@ -7475,7 +7475,7 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path)
 	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
 	if address.NodeName != nil {
 		for _, msg := range ValidateNodeName(*address.NodeName, false) {
-			allErrs.AppendWithOrigin("NodeName", field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg).SetOrigin("NodeName"))
 		}
 	}
 	allErrs = append(allErrs, ValidateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
@@ -7509,27 +7509,26 @@ func ValidateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList
 	if ip.IsLinkLocalMulticast() {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24, ff02::/10)"))
 	}
-	allErrs.SetOrigin("NonSpecialIP")
-	return allErrs
+	return allErrs.WithOrigin("NonSpecialIP")
 }
 
 func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if requireName && len(port.Name) == 0 {
-		allErrs.Append(field.Required(fldPath.Child("name"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else if len(port.Name) != 0 {
-		allErrs.AppendWithOrigin("DNSLabel", ValidateDNS1123Label(port.Name, fldPath.Child("name"))...)
+		allErrs = append(allErrs, ValidateDNS1123Label(port.Name, fldPath.Child("name"))...)
 	}
 	for _, msg := range validation.IsValidPortNum(int(port.Port)) {
-		allErrs.AppendWithOrigin("PortNum", field.Invalid(fldPath.Child("port"), port.Port, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg).SetOrigin("PortNum"))
 	}
 	if len(port.Protocol) == 0 {
-		allErrs.Append(field.Required(fldPath.Child("protocol"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
 	} else if !supportedPortProtocols.Has(port.Protocol) {
-		allErrs.Append(field.NotSupported(fldPath.Child("protocol"), port.Protocol, sets.List(supportedPortProtocols)))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, sets.List(supportedPortProtocols)))
 	}
 	if port.AppProtocol != nil {
-		allErrs.Append(ValidateQualifiedName(*port.AppProtocol, fldPath.Child("appProtocol"))...)
+		allErrs = append(allErrs, ValidateQualifiedName(*port.AppProtocol, fldPath.Child("appProtocol"))...)
 	}
 	return allErrs
 }
