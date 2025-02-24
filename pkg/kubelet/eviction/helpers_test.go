@@ -32,6 +32,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
+	"k8s.io/utils/ptr"
 
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -841,7 +843,7 @@ func TestOrderedByExceedsRequestMemory(t *testing.T) {
 		return result, found
 	}
 	pods := []*v1.Pod{below, exceeds}
-	orderedBy(exceedMemoryRequests(statsFn)).Sort(pods)
+	orderedBy(exceedMemoryRequests(statsFn, swap.NewNoSwapCalculator())).Sort(pods)
 
 	expected := []*v1.Pod{exceeds, below}
 	for i := range expected {
@@ -1222,7 +1224,7 @@ func TestOrderedByPriorityMemory(t *testing.T) {
 	}
 	pods := []*v1.Pod{pod8, pod7, pod6, pod5, pod4, pod3, pod2, pod1}
 	expected := []*v1.Pod{pod1, pod2, pod3, pod4, pod5, pod6, pod7, pod8}
-	orderedBy(exceedMemoryRequests(statsFn), priority, memory(statsFn)).Sort(pods)
+	orderedBy(exceedMemoryRequests(statsFn, swap.NewNoSwapCalculator()), priority, memory(statsFn)).Sort(pods)
 	for i := range expected {
 		if pods[i] != expected[i] {
 			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
@@ -1453,7 +1455,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc := makeSignalObservations(fakeStats)
+	actualObservations, statsFunc := makeSignalObservations(fakeStats, 0)
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
 		t.Errorf("Expected allocatable memory observation, but didn't find one")
@@ -1567,6 +1569,16 @@ func TestThresholdsMet(t *testing.T) {
 			Quantity: quantityMustParse("500Mi"),
 		},
 	}
+	addFakeCapacity := func(observations signalObservations) signalObservations {
+		for sig := range observations {
+			obs := observations[sig]
+			if obs.capacity == nil {
+				obs.capacity = ptr.To(resource.MustParse("123Gi"))
+				observations[sig] = obs
+			}
+		}
+		return observations
+	}
 	testCases := map[string]struct {
 		enforceMinReclaim bool
 		thresholds        []evictionapi.Threshold
@@ -1621,6 +1633,7 @@ func TestThresholdsMet(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
+		testCase.observations = addFakeCapacity(testCase.observations)
 		actual := thresholdsMet(testCase.thresholds, testCase.observations, testCase.enforceMinReclaim)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
@@ -3388,7 +3401,7 @@ func TestStatsNotFoundForPod(t *testing.T) {
 		},
 		{
 			description: "exceedMemoryRequests",
-			compFunc:    exceedMemoryRequests,
+			compFunc:    func(stats statsFunc) cmpFunc { return exceedMemoryRequests(stats, swap.NewNoSwapCalculator()) },
 		},
 		{
 			description: "exceedDiskRequests",
