@@ -21,13 +21,18 @@ package v1alpha3
 import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resource "k8s.io/apimachinery/pkg/api/resource"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // BasicDeviceApplyConfiguration represents a declarative configuration of the BasicDevice type for use
 // with apply.
 type BasicDeviceApplyConfiguration struct {
-	Attributes map[resourcev1alpha3.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity   map[resourcev1alpha3.QualifiedName]resource.Quantity                 `json:"capacity,omitempty"`
+	Attributes               map[resourcev1alpha3.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
+	Capacity                 map[resourcev1alpha3.QualifiedName]resource.Quantity                 `json:"capacity,omitempty"`
+	UsageRestrictedToNode    *bool                                                                `json:"usageRestrictedToNode,omitempty"`
+	BindingConditions        []string                                                             `json:"bindingConditions,omitempty"`
+	BindingFailureConditions []string                                                             `json:"bindingFailureConditions,omitempty"`
+	BindingTimeout           *v1.Duration                                                         `json:"bindingTimeout,omitempty"`
 }
 
 // BasicDeviceApplyConfiguration constructs a declarative configuration of the BasicDevice type for use with
@@ -61,5 +66,41 @@ func (b *BasicDeviceApplyConfiguration) WithCapacity(entries map[resourcev1alpha
 	for k, v := range entries {
 		b.Capacity[k] = v
 	}
+	return b
+}
+
+// WithUsageRestrictedToNode sets the UsageRestrictedToNode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UsageRestrictedToNode field is set to the value of the last call.
+func (b *BasicDeviceApplyConfiguration) WithUsageRestrictedToNode(value bool) *BasicDeviceApplyConfiguration {
+	b.UsageRestrictedToNode = &value
+	return b
+}
+
+// WithBindingConditions adds the given value to the BindingConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingConditions field.
+func (b *BasicDeviceApplyConfiguration) WithBindingConditions(values ...string) *BasicDeviceApplyConfiguration {
+	for i := range values {
+		b.BindingConditions = append(b.BindingConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingFailureConditions adds the given value to the BindingFailureConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingFailureConditions field.
+func (b *BasicDeviceApplyConfiguration) WithBindingFailureConditions(values ...string) *BasicDeviceApplyConfiguration {
+	for i := range values {
+		b.BindingFailureConditions = append(b.BindingFailureConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingTimeout sets the BindingTimeout field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BindingTimeout field is set to the value of the last call.
+func (b *BasicDeviceApplyConfiguration) WithBindingTimeout(value v1.Duration) *BasicDeviceApplyConfiguration {
+	b.BindingTimeout = &value
 	return b
 }

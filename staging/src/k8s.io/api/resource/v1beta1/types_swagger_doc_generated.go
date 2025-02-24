@@ -28,13 +28,17 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_AllocatedDeviceStatus = map[string]string{
-	"":            "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
-	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
-	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
-	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
-	"conditions":  "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
-	"data":        "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
-	"networkData": "NetworkData contains network-related information specific to the device.",
+	"":                         "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
+	"driver":                   "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
+	"pool":                     "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
+	"device":                   "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
+	"conditions":               "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
+	"data":                     "Data contains arbitrary driver-specific data.\n\nThe length of the raw data must be smaller or equal to 10 Ki.",
+	"networkData":              "NetworkData contains network-related information specific to the device.",
+	"usageRestrictedToNode":    "UsageRestrictedToNode is a copy of the UsageRestrictedToNode as defined for the device at the time when it was allocated. If true, the node selector of the allocation matches exactly the node that was chosen for the pod which triggered allocation.",
+	"bindingConditions":        "BindingConditions is a copy of the BindingConditions as defined for the device at the time when it was allocated. All of these conditions must be to True to proceed with binding the pod to the node while scheduling the pod.",
+	"bindingFailureConditions": "BindingFailureConditions is a copy of the BindingFailureConditions as defined for the device at the time when it was allocated. If any is True, a binding failure occurred.",
+	"bindingTimeout":           "BindingTimeout is a copy of the BindingTimeout as defined for the device at the time when it was allocated. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes.",
 }
 
 func (AllocatedDeviceStatus) SwaggerDoc() map[string]string {
@@ -52,9 +56,13 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 }
 
 var map_BasicDevice = map[string]string{
-	"":           "BasicDevice defines one device instance.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"":                         "BasicDevice defines one device instance.",
+	"attributes":               "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"capacity":                 "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"usageRestrictedToNode":    "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.",
+	"bindingConditions":        "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod. The maximum number of binding conditions is 4.",
+	"bindingFailureConditions": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred. The maximum number of binding failure conditions is 4.",
+	"bindingTimeout":           "BindingTimeout indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {

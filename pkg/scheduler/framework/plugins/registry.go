@@ -48,6 +48,7 @@ func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
 		EnableDRAAdminAccess:                         feature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 		EnableDynamicResourceAllocation:              feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
+		EnableDRADeviceBindingConditions:             feature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions),
 		EnableVolumeCapacityPriority:                 feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
 		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:      feature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),

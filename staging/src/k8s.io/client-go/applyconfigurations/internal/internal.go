@@ -12457,6 +12457,21 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.AllocatedDeviceStatus
   map:
     fields:
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeout
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
     - name: conditions
       type:
         list:
@@ -12483,6 +12498,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1alpha3.AllocationResult
   map:
     fields:
@@ -12501,11 +12519,29 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.DeviceAttribute
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeout
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
     - name: capacity
       type:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1alpha3.CELDeviceSelector
   map:
     fields:
@@ -12890,6 +12926,21 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.AllocatedDeviceStatus
   map:
     fields:
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeout
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
     - name: conditions
       type:
         list:
@@ -12916,6 +12967,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1beta1.AllocationResult
   map:
     fields:
@@ -12934,11 +12988,29 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceAttribute
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeout
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
     - name: capacity
       type:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1beta1.CELDeviceSelector
   map:
     fields:
@@ -14190,6 +14262,8 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: propagationPolicy
       type:
         scalar: string
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
+  scalar: string
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
   map:
     elementType:

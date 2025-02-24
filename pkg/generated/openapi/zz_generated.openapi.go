@@ -46760,12 +46760,55 @@ func schema_k8sio_api_resource_v1alpha3_AllocatedDeviceStatus(ref common.Referen
 							Ref:         ref("k8s.io/api/resource/v1alpha3.NetworkDeviceData"),
 						},
 					},
+					"usageRestrictedToNode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UsageRestrictedToNode is a copy of the UsageRestrictedToNode as defined for the device at the time when it was allocated. If true, the node selector of the allocation matches exactly the node that was chosen for the pod which triggered allocation.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"bindingConditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingConditions is a copy of the BindingConditions as defined for the device at the time when it was allocated. All of these conditions must be to True to proceed with binding the pod to the node while scheduling the pod.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingFailureConditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingFailureConditions is a copy of the BindingFailureConditions as defined for the device at the time when it was allocated. If any is True, a binding failure occurred.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingTimeout is a copy of the BindingTimeout as defined for the device at the time when it was allocated. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
 				Required: []string{"driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.NetworkDeviceData", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/api/resource/v1alpha3.NetworkDeviceData", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 
@@ -46833,11 +46876,64 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 							},
 						},
 					},
+					"usageRestrictedToNode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"bindingConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod. The maximum number of binding conditions is 4.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingFailureConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred. The maximum number of binding failure conditions is 4.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingTimeout indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/apimachinery/pkg/api/resource.Quantity", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
 	}
 }
 
@@ -48234,12 +48330,55 @@ func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.Referenc
 							Ref:         ref("k8s.io/api/resource/v1beta1.NetworkDeviceData"),
 						},
 					},
+					"usageRestrictedToNode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UsageRestrictedToNode is a copy of the UsageRestrictedToNode as defined for the device at the time when it was allocated. If true, the node selector of the allocation matches exactly the node that was chosen for the pod which triggered allocation.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"bindingConditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingConditions is a copy of the BindingConditions as defined for the device at the time when it was allocated. All of these conditions must be to True to proceed with binding the pod to the node while scheduling the pod.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingFailureConditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingFailureConditions is a copy of the BindingFailureConditions as defined for the device at the time when it was allocated. If any is True, a binding failure occurred.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingTimeout is a copy of the BindingTimeout as defined for the device at the time when it was allocated. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
 				Required: []string{"driver", "pool", "device"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.NetworkDeviceData", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			"k8s.io/api/resource/v1beta1.NetworkDeviceData", "k8s.io/apimachinery/pkg/apis/meta/v1.Condition", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
 	}
 }
 
@@ -48308,11 +48447,64 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"usageRestrictedToNode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"bindingConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod. The maximum number of binding conditions is 4.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingFailureConditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred. The maximum number of binding failure conditions is 4.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"bindingTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BindingTimeout indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity"},
+			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
 	}
 }
 

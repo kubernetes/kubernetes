@@ -46,12 +46,13 @@ type deviceClassLister interface {
 // available and the current state of the cluster (claims, classes, resource
 // slices).
 type Allocator struct {
-	adminAccessEnabled bool
-	claimsToAllocate   []*resourceapi.ResourceClaim
-	allocatedDevices   sets.Set[DeviceID]
-	classLister        deviceClassLister
-	slices             []*resourceapi.ResourceSlice
-	celCache           *cel.Cache
+	adminAccessEnabled   bool
+	deviceBindingEnabled bool
+	claimsToAllocate     []*resourceapi.ResourceClaim
+	allocatedDevices     sets.Set[DeviceID]
+	classLister          deviceClassLister
+	slices               []*resourceapi.ResourceSlice
+	celCache             *cel.Cache
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
@@ -60,6 +61,7 @@ type Allocator struct {
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
 	adminAccessEnabled bool,
+	deviceBindingEnabled bool,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister deviceClassLister,
@@ -67,12 +69,13 @@ func NewAllocator(ctx context.Context,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
-		adminAccessEnabled: adminAccessEnabled,
-		claimsToAllocate:   claimsToAllocate,
-		allocatedDevices:   allocatedDevices,
-		classLister:        classLister,
-		slices:             slices,
-		celCache:           celCache,
+		adminAccessEnabled:   adminAccessEnabled,
+		deviceBindingEnabled: deviceBindingEnabled,
+		claimsToAllocate:     claimsToAllocate,
+		allocatedDevices:     allocatedDevices,
+		classLister:          classLister,
+		slices:               slices,
+		celCache:             celCache,
 	}, nil
 }
 
@@ -325,6 +328,18 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				Device:      internal.id.Device.String(),
 				AdminAccess: internal.adminAccess,
 			}
+
+			// If deviceBindingConditions are enabled, we need to populate the AllocatedDeviceStatus.
+			if a.deviceBindingEnabled {
+				for _, device := range internal.slice.Spec.Devices {
+					if device.Name == internal.id.Device && device.Basic.BindingConditions != nil {
+						allocationResult.Devices.Results[i].UsageRestrictedToNode = device.Basic.UsageRestrictedToNode
+						allocationResult.Devices.Results[i].BindingConditions = device.Basic.BindingConditions
+						allocationResult.Devices.Results[i].BindingFailureConditions = device.Basic.BindingFailureConditions
+						allocationResult.Devices.Results[i].BindingTimeout = device.Basic.BindingTimeout
+					}
+				}
+			}
 		}
 
 		// Populate configs.
@@ -349,7 +364,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		}
 
 		// Determine node selector.
-		nodeSelector, err := alloc.createNodeSelector(internalResult.devices)
+		nodeSelector, err := alloc.createNodeSelector(internalResult.devices, node.Name)
 		if err != nil {
 			return nil, fmt.Errorf("create NodeSelector for claim %s: %w", claim.Name, err)
 		}
@@ -809,7 +824,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult, nodename string) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	nodeSelector := &v1.NodeSelector{
@@ -830,6 +845,19 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 					}},
 				}},
 			}, nil
+		}
+		for _, device := range slice.Spec.Devices {
+			if device.Basic.UsageRestrictedToNode {
+				return &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{nodename},
+						}},
+					}},
+				}, nil
+			}
 		}
 		if slice.Spec.NodeSelector != nil {
 			switch len(slice.Spec.NodeSelector.NodeSelectorTerms) {

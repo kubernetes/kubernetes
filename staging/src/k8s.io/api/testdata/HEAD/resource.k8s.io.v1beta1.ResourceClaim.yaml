@@ -94,7 +94,12 @@ status:
           values:
           - valuesValue
   devices:
-  - conditions:
+  - bindingConditions:
+    - bindingConditionsValue
+    bindingFailureConditions:
+    - bindingFailureConditionsValue
+    bindingTimeout: 1ns
+    conditions:
     - lastTransitionTime: "2004-01-01T01:01:01Z"
       message: messageValue
       observedGeneration: 3
@@ -116,6 +121,7 @@ status:
       ips:
       - ipsValue
     pool: poolValue
+    usageRestrictedToNode: true
   reservedFor:
   - apiGroup: apiGroupValue
     name: nameValue

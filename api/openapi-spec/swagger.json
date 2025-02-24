@@ -14749,6 +14749,24 @@
     "io.k8s.api.resource.v1alpha3.AllocatedDeviceStatus": {
       "description": "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
       "properties": {
+        "bindingConditions": {
+          "description": "BindingConditions is a copy of the BindingConditions as defined for the device at the time when it was allocated. All of these conditions must be to True to proceed with binding the pod to the node while scheduling the pod.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "bindingFailureConditions": {
+          "description": "BindingFailureConditions is a copy of the BindingFailureConditions as defined for the device at the time when it was allocated. If any is True, a binding failure occurred.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "bindingTimeout": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Duration",
+          "description": "BindingTimeout is a copy of the BindingTimeout as defined for the device at the time when it was allocated. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes."
+        },
         "conditions": {
           "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
           "items": {
@@ -14779,6 +14797,10 @@
         "pool": {
           "description": "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
           "type": "string"
+        },
+        "usageRestrictedToNode": {
+          "description": "UsageRestrictedToNode is a copy of the UsageRestrictedToNode as defined for the device at the time when it was allocated. If true, the node selector of the allocation matches exactly the node that was chosen for the pod which triggered allocation.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -14812,12 +14834,36 @@
           "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
           "type": "object"
         },
+        "bindingConditions": {
+          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod. The maximum number of binding conditions is 4.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "bindingFailureConditions": {
+          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred. The maximum number of binding failure conditions is 4.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "bindingTimeout": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Duration",
+          "description": "BindingTimeout indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes."
+        },
         "capacity": {
           "additionalProperties": {
             "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
           },
           "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
           "type": "object"
+        },
+        "usageRestrictedToNode": {
+          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -15569,6 +15615,24 @@
     "io.k8s.api.resource.v1beta1.AllocatedDeviceStatus": {
       "description": "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
       "properties": {
+        "bindingConditions": {
+          "description": "BindingConditions is a copy of the BindingConditions as defined for the device at the time when it was allocated. All of these conditions must be to True to proceed with binding the pod to the node while scheduling the pod.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "bindingFailureConditions": {
+          "description": "BindingFailureConditions is a copy of the BindingFailureConditions as defined for the device at the time when it was allocated. If any is True, a binding failure occurred.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "bindingTimeout": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Duration",
+          "description": "BindingTimeout is a copy of the BindingTimeout as defined for the device at the time when it was allocated. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes."
+        },
         "conditions": {
           "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
           "items": {
@@ -15599,6 +15663,10 @@
         "pool": {
           "description": "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
           "type": "string"
+        },
+        "usageRestrictedToNode": {
+          "description": "UsageRestrictedToNode is a copy of the UsageRestrictedToNode as defined for the device at the time when it was allocated. If true, the node selector of the allocation matches exactly the node that was chosen for the pod which triggered allocation.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -15632,12 +15700,36 @@
           "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
           "type": "object"
         },
+        "bindingConditions": {
+          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod. The maximum number of binding conditions is 4.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "bindingFailureConditions": {
+          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred. The maximum number of binding failure conditions is 4.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
+        "bindingTimeout": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Duration",
+          "description": "BindingTimeout indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nThe default timeout if not set is 10 minutes."
+        },
         "capacity": {
           "additionalProperties": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceCapacity"
           },
           "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
           "type": "object"
+        },
+        "usageRestrictedToNode": {
+          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -18703,6 +18795,10 @@
           "version": "v1alpha1"
         }
       ]
+    },
+    "io.k8s.apimachinery.pkg.apis.meta.v1.Duration": {
+      "description": "Duration is a wrapper around time.Duration which supports correct marshaling to YAML and JSON. In particular, it marshals into strings, which can be used as map keys in json.",
+      "type": "string"
     },
     "io.k8s.apimachinery.pkg.apis.meta.v1.FieldSelectorRequirement": {
       "description": "FieldSelectorRequirement is a selector that contains values, a key, and an operator that relates the key and values.",

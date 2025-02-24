@@ -189,7 +189,15 @@
             "ipsValue"
           ],
           "hardwareAddress": "hardwareAddressValue"
-        }
+        },
+        "usageRestrictedToNode": true,
+        "bindingConditions": [
+          "bindingConditionsValue"
+        ],
+        "bindingFailureConditions": [
+          "bindingFailureConditionsValue"
+        ],
+        "bindingTimeout": "1ns"
       }
     ]
   }

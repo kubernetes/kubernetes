@@ -21,6 +21,7 @@ package feature
 // the internal k8s features pkg.
 type Features struct {
 	EnableDRAAdminAccess                         bool
+	EnableDRADeviceBindingConditions             bool
 	EnableDynamicResourceAllocation              bool
 	EnableVolumeCapacityPriority                 bool
 	EnableNodeInclusionPolicyInPodTopologySpread bool

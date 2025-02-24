@@ -188,6 +188,8 @@ type ResourcePool struct {
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+const BindingConditionsMaxSize = 4
+const BindingFailureConditionsMaxSize = 4
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -222,6 +224,40 @@ type BasicDevice struct {
 	//
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
+
+	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	//
+	// +optional
+	UsageRestrictedToNode bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,3,opt,name=usageRestrictedToNode"`
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	// The maximum number of binding conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,4,rep,name=bindingConditions"`
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	// The maximum number of binding failure conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,5,rep,name=bindingFailureConditions"`
+
+	// BindingTimeout indicates the prepare timeout period.
+	// If the timeout period is exceeded before all BindingConditions reach a True state,
+	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
+	//
+	// The default timeout if not set is 10 minutes.
+	//
+	// +optional
+	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty" protobuf:"bytes,6,opt,name=bindingTimeout"`
 }
 
 // DeviceCapacity describes a quantity associated with a device.
@@ -841,6 +877,40 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
+
+	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	//
+	// +optional
+	UsageRestrictedToNode bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,6,opt,name=usageRestrictedToNode"`
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	// The maximum number of binding conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,7,rep,name=bindingConditions"`
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	// The maximum number of binding failure conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
+
+	// BindingTimeout indicates the prepare timeout period.
+	// If the timeout period is exceeded before all BindingConditions reach a True state,
+	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
+	//
+	// The default timeout if not set is 10 minutes.
+	//
+	// +optional
+	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty" protobuf:"bytes,9,opt,name=bindingTimeout"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1055,6 +1125,39 @@ type AllocatedDeviceStatus struct {
 	//
 	// +optional
 	NetworkData *NetworkDeviceData `json:"networkData,omitempty" protobuf:"bytes,6,opt,name=networkData"`
+
+	// UsageRestrictedToNode is a copy of the UsageRestrictedToNode
+	// as defined for the device at the time when it was allocated.
+	// If true, the node selector of the allocation matches exactly
+	// the node that was chosen for the pod which triggered allocation.
+	//
+	// +optional
+	UsageRestrictedToNode bool `json:"usageRestrictedToNode,omitempty" protobuf:"bytes,7,opt,name=usageRestrictedToNode"`
+
+	// BindingConditions is a copy of the BindingConditions
+	// as defined for the device at the time when it was allocated.
+	// All of these conditions must be to True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	//
+	// +optional
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,8,opt,name=bindingConditions"`
+
+	// BindingFailureConditions is a copy of the BindingFailureConditions
+	// as defined for the device at the time when it was allocated.
+	// If any is True, a binding failure occurred.
+	//
+	// +optional
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,9,opt,name=bindingFailureConditions"`
+
+	// BindingTimeout is a copy of the BindingTimeout
+	// as defined for the device at the time when it was allocated.
+	// If the timeout period is exceeded before all BindingConditions reach a True state,
+	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
+	//
+	// The default timeout if not set is 10 minutes.
+	//
+	// +optional
+	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty" protobuf:"bytes,10,opt,name=bindingTimeout"`
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.
