@@ -4376,7 +4376,7 @@ func (m *LinuxContainerUser) GetSupplementalGroups() []int64 {
 // WindowsNamespaceOption provides options for Windows namespaces.
 type WindowsNamespaceOption struct {
 	// Network namespace for this container/sandbox.
-	// Namespaces currently set by the kubelet: POD, NODE
+	// Namespaces currently set by the kubelet: POD
 	Network              NamespaceMode `protobuf:"varint,1,opt,name=network,proto3,enum=runtime.v1.NamespaceMode" json:"network,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
 	XXX_sizecache        int32         `json:"-"`

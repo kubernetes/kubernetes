@@ -989,7 +989,7 @@ message LinuxContainerUser {
 // WindowsNamespaceOption provides options for Windows namespaces.
 message WindowsNamespaceOption {
     // Network namespace for this container/sandbox.
-    // Namespaces currently set by the kubelet: POD, NODE
+    // Namespaces currently set by the kubelet: POD
     NamespaceMode network = 1;
 }
 
