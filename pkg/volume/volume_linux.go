@@ -121,6 +121,8 @@ func (vo *VolumeOwnership) changePermissionsRecursively() error {
 }
 
 func (vo *VolumeOwnership) monitorProgress(ctx context.Context) {
+	msg := fmt.Sprintf("Setting volume ownership for %s is taking longer than expected, consider using OnRootMismatch - https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods", vo.dir)
+	vo.recorder.Event(vo.pod, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, msg)
 	ticker := time.NewTicker(progressReportDuration)
 	defer ticker.Stop()
 	for {
@@ -134,7 +136,7 @@ func (vo *VolumeOwnership) monitorProgress(ctx context.Context) {
 }
 
 func (vo *VolumeOwnership) logWarning() {
-	msg := fmt.Sprintf("Setting volume ownership for %s, processed %d files", vo.dir, vo.fileCounter.Load())
+	msg := fmt.Sprintf("Setting volume ownership for %s, processed %d files.", vo.dir, vo.fileCounter.Load())
 	klog.Warning(msg)
 	vo.recorder.Event(vo.pod, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, msg)
 }

@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -102,6 +103,7 @@ func OperationCompleteHook(plugin, operationName string) func(types.CompleteFunc
 		if c.Migrated != nil {
 			migrated = *c.Migrated
 		}
+		klog.Infof("foobar Operation %s took %f", operationName, timeTaken)
 		StorageOperationMetric.WithLabelValues(plugin, operationName, status, strconv.FormatBool(migrated)).Observe(timeTaken)
 	}
 	return opComplete
