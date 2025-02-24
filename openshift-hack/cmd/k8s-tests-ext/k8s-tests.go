@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 
+	"k8s.io/kubernetes/openshift-hack/e2e/annotate/generated"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/spf13/cobra"
@@ -13,14 +14,13 @@ import (
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension"
 	e "github.com/openshift-eng/openshift-tests-extension/pkg/extension"
-	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	g "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 	v "github.com/openshift-eng/openshift-tests-extension/pkg/version"
 
 	"k8s.io/client-go/pkg/version"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
-	"k8s.io/kubernetes/openshift-hack/e2e/annotate/generated"
 	"k8s.io/kubernetes/test/utils/image"
 
 	// initialize framework extensions
@@ -97,11 +97,18 @@ func main() {
 	//		  the environmental skip code from the enhancement once its implemented.
 	//		- Make sure to account for test renames that occur because of removal of these
 	//		  annotations
-	specs.Walk(func(spec *extensiontests.ExtensionTestSpec) {
+	specs.Walk(func(spec *et.ExtensionTestSpec) {
 		if annotations, ok := generated.Annotations[spec.Name]; ok {
 			spec.Name += annotations
 		}
 	})
+
+	specs = filterOutDisabledSpecs(specs)
+	addLabelsToSpecs(specs)
+
+	// EnvironmentSelectors added to the appropriate specs to facilitate including or excluding them
+	// based on attributes of the cluster they are running on
+	addEnvironmentSelectors(specs)
 
 	kubeTestsExtension.AddSpecs(specs)
 
