@@ -610,7 +610,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 				InitContainers: []v1.Container{
 					{
 						Name:  "fail",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{
 							"/bin/false",
 						},
@@ -625,7 +625,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 				Containers: []v1.Container{
 					{
 						Name:  "blocked",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Command: []string{
 							"/bin/true",
 						},
@@ -654,7 +654,7 @@ func (s podFastDeleteScenario) Pod(worker, attempt int) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "fail",
-					Image: imageutils.GetE2EImage(imageutils.BusyBox),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{
 						"/bin/false",
 					},
