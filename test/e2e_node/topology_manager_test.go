@@ -632,7 +632,7 @@ func teardownSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *
 }
 
 func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
-	threadsPerCore := getSMTLevel()
+	threadsPerCore := smtLevelFromSysFS()
 	sd := setupSRIOVConfigOrFail(ctx, f, configMap)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 
@@ -732,7 +732,7 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework.Framework, sd *sriovData, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
-	threadsPerCore := getSMTLevel()
+	threadsPerCore := smtLevelFromSysFS()
 
 	waitForSRIOVResources(ctx, f, sd)
 
