@@ -1109,6 +1109,17 @@
     and delete the job. Job MUST be deleted successfully.
   release: v1.15
   file: test/e2e/apps/job.go
+- testname: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex
+    despite some failing
+  codename: '[sig-apps] Job should execute all indexes despite some failing when using
+    backoffLimitPerIndex [Conformance]'
+  description: Create an indexed job and ensure that all indexes are either failed
+    or succeeded, depending on the end state of the corresponding pods. Pods with
+    odd indexes fail, while the pods with even indexes succeeded. Also, verify that
+    the number of failed pods doubles the number of failing indexes, as the backoffLimitPerIndex=1,
+    allowing for one pod recreation before marking that indexed failed.
+  release: v1.33
+  file: test/e2e/apps/job.go
 - testname: Jobs, manage lifecycle
   codename: '[sig-apps] Job should manage the lifecycle of a job [Conformance]'
   description: Attempt to create a suspended Job which MUST succeed. Attempt to patch
@@ -1119,12 +1130,29 @@
     via a label selector.
   release: v1.25
   file: test/e2e/apps/job.go
+- testname: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
+  codename: '[sig-apps] Job should mark indexes as failed when the FailIndex action
+    is matched in podFailurePolicy [Conformance]'
+  description: Create an indexed job with backoffLimitPerIndex, and podFailurePolicy
+    with the FailIndex action. Verify the failed pods matching the pod failure policy
+    result in marking the corresponding indexes as failed without restarts, despite
+    backoffLimitPerIndex > 0.
+  release: v1.33
+  file: test/e2e/apps/job.go
 - testname: Jobs, completion after task failure
   codename: '[sig-apps] Job should run a job to completion when tasks sometimes fail
     and are locally restarted [Conformance]'
   description: Explicitly cause the tasks to fail once initially. After restarting,
     the Job MUST execute to completion.
   release: v1.16
+  file: test/e2e/apps/job.go
+- testname: Terminate job execution when the maxFailedIndexes is exceeded
+  codename: '[sig-apps] Job should terminate job execution when the number of failed
+    indexes exceeds maxFailedIndexes [Conformance]'
+  description: Create an indexed job with backoffLimitPerIndex and maxFailedIndexes.
+    Verify the job execution is terminated as soon as the number of failed indexes
+    exceeds maxFailedIndexes.
+  release: v1.33
   file: test/e2e/apps/job.go
 - testname: ReplicaSet, is created, Replaced and Patched
   codename: '[sig-apps] ReplicaSet Replace and Patch tests [Conformance]'
