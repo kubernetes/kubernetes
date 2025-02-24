@@ -149,7 +149,9 @@ func (rc *resourceMetricsCollector) DescribeWithStability(ch chan<- *metrics.Des
 // leak metric collectors for containers or pods that no longer exist.  Instead, implement
 // custom collector in a way that only collects metrics for active containers.
 func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	ctx := context.Background()
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	var errorCount float64
 	defer func() {
 		ch <- metrics.NewLazyConstMetric(resourceScrapeResultDesc, metrics.GaugeValue, errorCount)
@@ -157,8 +159,9 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 	}()
 	statsSummary, err := rc.provider.GetCPUAndMemoryStats(ctx)
 	if err != nil {
+		logger := klog.FromContext(ctx)
 		errorCount = 1
-		klog.ErrorS(err, "Error getting summary for resourceMetric prometheus endpoint")
+		logger.Error(err, "Error getting summary for resourceMetric prometheus endpoint")
 		return
 	}
 
