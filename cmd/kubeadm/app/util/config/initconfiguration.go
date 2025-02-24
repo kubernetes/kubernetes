@@ -291,10 +291,11 @@ func LoadOrDefaultInitConfiguration(cfgPath string, versionedInitCfg *kubeadmapi
 }
 
 // BytesToInitConfiguration converts a byte slice to an internal, defaulted and validated InitConfiguration object.
-// The map may contain many different YAML/JSON documents. These YAML/JSON documents are parsed one-by-one
+// The map may contain many different YAML/JSON documents. These documents are parsed one-by-one
 // and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct.
 // The resulting InitConfiguration is then dynamically defaulted and validated prior to return.
 func BytesToInitConfiguration(b []byte, skipCRIDetect bool) (*kubeadmapi.InitConfiguration, error) {
+	// Split the YAML/JSON documents in the file into a DocumentMap
 	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
 	if err != nil {
 		return nil, err

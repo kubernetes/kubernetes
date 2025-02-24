@@ -91,6 +91,14 @@ func LoadResetConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurat
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
+	return BytesToResetConfiguration(b, opts)
+}
+
+// BytesToResetConfiguration converts a byte slice to an internal, defaulted and validated ResetConfiguration object.
+// The map may contain many different YAML/JSON documents. These documents are parsed one-by-one.
+// The resulting ResetConfiguration is then dynamically defaulted and validated prior to return.
+func BytesToResetConfiguration(b []byte, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.ResetConfiguration, error) {
+	// Split the YAML/JSON documents in the file into a DocumentMap
 	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
 	if err != nil {
 		return nil, err

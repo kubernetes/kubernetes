@@ -18,8 +18,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,29 +31,16 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func TestLoadJoinConfigurationFromFile(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir: %v", err)
-	}
-	defer func() {
-		if err := os.RemoveAll(tmpdir); err != nil {
-			t.Fatalf("Couldn't remove tmpdir: %v", err)
-		}
-	}()
-	filename := "kubeadmJoinConfig"
-	filePath := filepath.Join(tmpdir, filename)
+func TestBytesToJoinConfiguration(t *testing.T) {
 	options := LoadOrDefaultConfigurationOptions{}
 
 	tests := []struct {
-		name    string
-		cfgPath string
-		cfg     *kubeadmapiv1.JoinConfiguration
-		want    *kubeadmapi.JoinConfiguration
+		name string
+		cfg  *kubeadmapiv1.JoinConfiguration
+		want *kubeadmapi.JoinConfiguration
 	}{
 		{
-			name:    "Normal configuration",
-			cfgPath: filePath,
+			name: "Normal configuration",
 			cfg: &kubeadmapiv1.JoinConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -95,8 +80,7 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			},
 		},
 		{
-			name:    "Only contains Discovery configuration",
-			cfgPath: filePath,
+			name: "Only contains Discovery configuration",
 			cfg: &kubeadmapiv1.JoinConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -138,12 +122,8 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Could not marshal test config: %v", err)
 				}
-				err = os.WriteFile(filePath, bytes, 0644)
-				if err != nil {
-					t.Fatalf("Couldn't write content to file: %v", err)
-				}
 
-				got, _ := LoadJoinConfigurationFromFile(tt.cfgPath, options)
+				got, _ := BytesToJoinConfiguration(bytes, options)
 				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.JoinConfiguration{}, "Timeouts"),
 					cmpopts.IgnoreFields(kubeadmapi.Discovery{}, "Timeout"), cmpopts.IgnoreFields(kubeadmapi.NodeRegistrationOptions{}, "Name")); diff != "" {
 					t.Errorf("LoadJoinConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)

@@ -18,8 +18,6 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,29 +31,16 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func TestLoadResetConfigurationFromFile(t *testing.T) {
-	tmpdir, err := os.MkdirTemp("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir: %v", err)
-	}
-	defer func() {
-		if err := os.RemoveAll(tmpdir); err != nil {
-			t.Fatalf("Couldn't remove tmpdir: %v", err)
-		}
-	}()
-	filename := "kubeadmConfig"
-	filePath := filepath.Join(tmpdir, filename)
+func TestBytesToResetConfiguration(t *testing.T) {
 	options := LoadOrDefaultConfigurationOptions{}
 
 	tests := []struct {
-		name    string
-		cfgPath string
-		cfg     *kubeadmapiv1.ResetConfiguration
-		want    *kubeadmapi.ResetConfiguration
+		name string
+		cfg  *kubeadmapiv1.ResetConfiguration
+		want *kubeadmapi.ResetConfiguration
 	}{
 		{
-			name:    "Normal configuration",
-			cfgPath: filePath,
+			name: "Normal configuration",
 			cfg: &kubeadmapiv1.ResetConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -72,8 +57,7 @@ func TestLoadResetConfigurationFromFile(t *testing.T) {
 			},
 		},
 		{
-			name:    "Default configuration",
-			cfgPath: filePath,
+			name: "Default configuration",
 			cfg: &kubeadmapiv1.ResetConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -96,12 +80,7 @@ func TestLoadResetConfigurationFromFile(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Could not marshal test config: %v", err)
 				}
-				err = os.WriteFile(filePath, bytes, 0644)
-				if err != nil {
-					t.Fatalf("Couldn't write content to file: %v", err)
-				}
-
-				got, _ := LoadResetConfigurationFromFile(tt.cfgPath, options)
+				got, _ := BytesToResetConfiguration(bytes, options)
 				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.ResetConfiguration{}, "Timeouts")); diff != "" {
 					t.Errorf("LoadResetConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)
 				}
