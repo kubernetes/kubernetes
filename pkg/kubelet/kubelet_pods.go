@@ -218,7 +218,7 @@ func (kl *Kubelet) getAllocatedPods() []*v1.Pod {
 
 	allocatedPods := make([]*v1.Pod, len(activePods))
 	for i, pod := range activePods {
-		allocatedPods[i], _ = kl.statusManager.UpdatePodFromAllocation(pod)
+		allocatedPods[i], _ = kl.allocationManager.UpdatePodFromAllocation(pod)
 	}
 	return allocatedPods
 }
@@ -1170,9 +1170,9 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// desired pods. Pods that must be restarted due to UID reuse, or leftover
 	// pods from previous runs, are not known to the pod worker.
 
-	allPodsByUID := make(map[types.UID]*v1.Pod)
+	allPodsByUID := make(sets.Set[types.UID])
 	for _, pod := range allPods {
-		allPodsByUID[pod.UID] = pod
+		allPodsByUID.Insert(pod.UID)
 	}
 
 	// Identify the set of pods that have workers, which should be all pods
@@ -1219,6 +1219,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// Remove orphaned pod statuses not in the total list of known config pods
 	klog.V(3).InfoS("Clean up orphaned pod statuses")
 	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
+	kl.allocationManager.RemoveOrphanedPods(allPodsByUID)
 
 	// Remove orphaned pod user namespace allocations (if any).
 	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
@@ -2152,7 +2153,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 
 		// Always set the status to the latest allocated resources, even if it differs from the
 		// allocation used by the current sync loop.
-		alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
+		alloc, found := kl.allocationManager.GetContainerResourceAllocation(string(pod.UID), cName)
 		if !found {
 			// This case is expected for non-resizable containers (ephemeral & non-restartable init containers).
 			// Don't set status.Resources in this case.
@@ -2372,7 +2373,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {
-				if alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName); found {
+				if alloc, found := kl.allocationManager.GetContainerResourceAllocation(string(pod.UID), cName); found {
 					status.AllocatedResources = alloc.Requests
 				}
 			}

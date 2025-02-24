@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -81,16 +80,10 @@ func TestTCPPortExhaustion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testRootDir := ""
-			if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-				t.Fatalf("can't make a temp rootdir: %v", err)
-			} else {
-				testRootDir = tempDir
-			}
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 			m := NewManager(
-				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir),
+				status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
 				results.NewManager(),
 				results.NewManager(),
 				results.NewManager(),

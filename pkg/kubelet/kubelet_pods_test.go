@@ -5093,7 +5093,8 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			} else {
 				tPod.Spec.Containers[0].Resources = tc.Resources
 			}
-			kubelet.statusManager.SetPodAllocation(tPod)
+			err := kubelet.allocationManager.SetPodAllocation(tPod)
+			require.NoError(t, err)
 			resources := tc.ActualResources
 			if resources == nil {
 				resources = &kubecontainer.ContainerResources{

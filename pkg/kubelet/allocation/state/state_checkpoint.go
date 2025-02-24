@@ -22,6 +22,8 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
@@ -139,6 +141,12 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) error {
 	return sc.storeState()
 }
 
+func (sc *stateCheckpoint) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
+	sc.cache.RemoveOrphanedPods(remainingPods)
+	// Don't bother updating the stored state. If Kubelet is restarted before the cache is written,
+	// the orphaned pods will be removed the next time this method is called.
+}
+
 type noopStateCheckpoint struct{}
 
 // NewNoopStateCheckpoint creates a dummy state checkpoint manager
@@ -165,3 +173,5 @@ func (sc *noopStateCheckpoint) SetPodResourceAllocation(_ string, _ map[string]v
 func (sc *noopStateCheckpoint) Delete(_ string, _ string) error {
 	return nil
 }
+
+func (sc *noopStateCheckpoint) RemoveOrphanedPods(_ sets.Set[types.UID]) {}
