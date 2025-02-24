@@ -320,7 +320,7 @@ func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
 	//
 	// However, we allow the user to bypass this check by setting
 	// `KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK` to anything non-empty.
-	if os.Getenv("KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK") != "" {
+	if os.Getenv("KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK") == "" {
 		kernelVersion, err := utilkernel.GetVersion()
 		if err != nil {
 			return nil, fmt.Errorf("could not check kernel version: %w", err)
