@@ -39,9 +39,11 @@ var obj = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
 				},
 			},
 		},
@@ -57,9 +59,11 @@ var objWithStatus = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+					},
 				},
 			},
 		},
@@ -89,10 +93,12 @@ var objWithAdminAccess = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
-					AdminAccess:     ptr.To(true),
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						AdminAccess:     ptr.To(true),
+					},
 				},
 			},
 		},
@@ -108,10 +114,12 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{
 				{
-					Name:            "req-0",
-					DeviceClassName: "class",
-					AllocationMode:  resource.DeviceAllocationModeAll,
-					AdminAccess:     ptr.To(true),
+					Name: "req-0",
+					Exactly: &resource.SpecificDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						AdminAccess:     ptr.To(true),
+					},
 				},
 			},
 		},
@@ -126,6 +134,30 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 						Pool:        "pool-0",
 						Device:      "device-0",
 						AdminAccess: ptr.To(true),
+					},
+				},
+			},
+		},
+	},
+}
+
+var objWithPrioritizedList = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "default",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					FirstAvailable: []resource.DeviceSubRequest{
+						{
+							Name:            "subreq-0",
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeExactCount,
+							Count:           1,
+						},
 					},
 				},
 			},
@@ -155,6 +187,7 @@ func TestStrategyCreate(t *testing.T) {
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaim
 		adminAccess           bool
+		prioritizedList       bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
 	}{
@@ -180,11 +213,22 @@ func TestStrategyCreate(t *testing.T) {
 			adminAccess: true,
 			expectObj:   objWithAdminAccess,
 		},
+		"drop-fields-prioritized-list": {
+			obj:                   objWithPrioritizedList,
+			prioritizedList:       false,
+			expectValidationError: true,
+		},
+		"keep-fields-prioritized-list": {
+			obj:             objWithPrioritizedList,
+			prioritizedList: true,
+			expectObj:       objWithPrioritizedList,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
 
 			obj := tc.obj.DeepCopy()
 			Strategy.PrepareForCreate(ctx, obj)
@@ -212,6 +256,7 @@ func TestStrategyUpdate(t *testing.T) {
 		oldObj                *resource.ResourceClaim
 		newObj                *resource.ResourceClaim
 		adminAccess           bool
+		prioritizedList       bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
 	}{
@@ -247,11 +292,36 @@ func TestStrategyUpdate(t *testing.T) {
 			adminAccess: true,
 			expectObj:   objWithAdminAccess,
 		},
+		"drop-fields-prioritized-list": {
+			oldObj:                obj,
+			newObj:                objWithPrioritizedList,
+			prioritizedList:       false,
+			expectValidationError: true,
+		},
+		"keep-fields-prioritized-list": {
+			oldObj:                obj,
+			newObj:                objWithPrioritizedList,
+			prioritizedList:       true,
+			expectValidationError: true, // Spec is immutable.
+		},
+		"keep-existing-fields-prioritized-list": {
+			oldObj:          objWithPrioritizedList,
+			newObj:          objWithPrioritizedList,
+			prioritizedList: true,
+			expectObj:       objWithPrioritizedList,
+		},
+		"keep-existing-fields-prioritized-list-disabled-feature": {
+			oldObj:          objWithPrioritizedList,
+			newObj:          objWithPrioritizedList,
+			prioritizedList: false,
+			expectObj:       objWithPrioritizedList,
+		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
@@ -344,14 +414,14 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		"keep-fields-admin-access-because-of-status": {
 			oldObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
-				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
+				oldObj.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(false)
 				return oldObj
 			}(),
 			newObj:      objWithAdminAccessStatus,
 			adminAccess: false,
 			expectObj: func() *resource.ResourceClaim {
 				oldObj := objWithAdminAccessStatus.DeepCopy()
-				oldObj.Spec.Devices.Requests[0].AdminAccess = ptr.To(false)
+				oldObj.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(false)
 				return oldObj
 			}(),
 		},

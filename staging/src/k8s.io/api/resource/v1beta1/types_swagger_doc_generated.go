@@ -70,10 +70,66 @@ func (CELDeviceSelector) SwaggerDoc() map[string]string {
 	return map_CELDeviceSelector
 }
 
+var map_CapacityPool = map[string]string{
+	"":         "CapacityPool defines a named pool of capacities that are available to be used by devices defined in the ResourceSlice.\n\nThe capacities are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the capacity it uses will no longer be available for use by other devices.",
+	"name":     "Name defines the name of the capacity pool. It must be a DNS label.",
+	"includes": "Includes defines the set of capacity pool mixins that this capacity pool includes.\n\nThe propertes of each included mixin are applied to this capacity pool in order. Conflicting properties from multiple mixins are taken from the last mixin listed that contains them. Properties set on the capacity pool will always override properties from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of mixins that can be included is 8.",
+	"capacity": "Capacity defines the set of capacities for this capacity pool The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nCapacities listed here will always take precedence over any included from a mixin.\n\nThe maximum number of capacities is 32.",
+}
+
+func (CapacityPool) SwaggerDoc() map[string]string {
+	return map_CapacityPool
+}
+
+var map_CapacityPoolMixin = map[string]string{
+	"":         "CapacityPoolMixin defines a mixin that a capacity pool can include.",
+	"name":     "Name is a unique identifier among all capacity pool mixins in the ResourceSlice. It must be a DNS label.",
+	"capacity": "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting capacities from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of capacities is 32.",
+}
+
+func (CapacityPoolMixin) SwaggerDoc() map[string]string {
+	return map_CapacityPoolMixin
+}
+
+var map_CapacityPoolMixinRef = map[string]string{
+	"":     "CapacityPoolMixinRef defines a reference from a capacity pool to a capacity pool mixin.",
+	"name": "Name is the name of a CapacityPoolMixin.",
+}
+
+func (CapacityPoolMixinRef) SwaggerDoc() map[string]string {
+	return map_CapacityPoolMixinRef
+}
+
+var map_CompositeDevice = map[string]string{
+	"":                 "CompositeDevice defines one device instance.",
+	"includes":         "Includes defines the set of device mixins that this device includes.\n\nThe propertes of each included mixin are applied to this device in order. Conflicting properties from multiple mixins are taken from the last mixin listed that contains them. Properties set on the device will always override properties from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of mixins that can be included is 8.",
+	"attributes":       "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting attributes from those provided via mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"capacity":         "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting capacities from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"consumesCapacity": "ConsumesCapacity defines a list of references to capacity pools and the set of capacities that the device will consume from those pools.\n\nThe capacities can be defined either by referencing one or more DeviceCapacityConsumptionMixins by listing the capacities directly. The latter will always override any capacities coming in from the mixins.\n\nThe maximum number of device capacity consumption entries is 32. This is the same as the maximum number of capacity pools allowed in a ResourceSlice.",
+	"nodeName":         "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+	"nodeSelector":     "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+	"allNodes":         "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+}
+
+func (CompositeDevice) SwaggerDoc() map[string]string {
+	return map_CompositeDevice
+}
+
+var map_CompositeDeviceMixin = map[string]string{
+	"":           "CompositeDeviceMixin defines a mixin that a composite device can include.",
+	"attributes": "Attributes defines the set of attributes for this mixin. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting attributes from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"capacity":   "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nConflicting capacities from those provided via other mixins are overwritten by the ones provided here.\n\nThe maximum number of attributes and capacities combined is 32.",
+}
+
+func (CompositeDeviceMixin) SwaggerDoc() map[string]string {
+	return map_CompositeDeviceMixin
+}
+
 var map_Device = map[string]string{
-	"":      "Device represents one individual hardware instance that can be selected based on its attributes. Besides the name, exactly one field must be set.",
-	"name":  "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
-	"basic": "Basic defines one device instance.",
+	"":          "Device represents one individual hardware instance that can be selected based on its attributes. Besides the name, exactly one field must be set.",
+	"name":      "Name is unique identifier among all devices managed by the driver in the pool. It must be a DNS label.",
+	"basic":     "Basic defines one device instance.",
+	"composite": "Composite defines one composite device instance.",
 }
 
 func (Device) SwaggerDoc() map[string]string {
@@ -83,7 +139,7 @@ func (Device) SwaggerDoc() map[string]string {
 var map_DeviceAllocationConfiguration = map[string]string{
 	"":         "DeviceAllocationConfiguration gets embedded in an AllocationResult.",
 	"source":   "Source records whether the configuration comes from a class and thus is not something that a normal user would have been able to set or from a claim.",
-	"requests": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
+	"requests": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of both the main request and the subrequest using the format <main request>/<subrequest>. If just the main request is given, the configuration applies to all subrequests.",
 }
 
 func (DeviceAllocationConfiguration) SwaggerDoc() map[string]string {
@@ -121,6 +177,36 @@ func (DeviceCapacity) SwaggerDoc() map[string]string {
 	return map_DeviceCapacity
 }
 
+var map_DeviceCapacityConsumption = map[string]string{
+	"":             "DeviceCapacityConsumption defines a set of capacities that a device will consume from a capacity pool.",
+	"capacityPool": "CapacityPool defines the capacity pool from which the capacities defined (either directly or through a mixin) will be consumed from.",
+	"includes":     "Includes defines a list of references to DeviceCapacityConsumptionMixins. The capacities listed in these will be included in among the capacities that will be consumed by the device.\n\nCapacities listed directly will override any capacities coming from mixins.\n\nThe maximum number of mixins that can be included is 8.",
+	"capacity":     "Capacity defines the capacity that will be consumed by the device.\n\nCapacities listed here will override any capacities that are also defined in any of the referenced mixins.\n\nThe maximum number of capacities is 32.",
+}
+
+func (DeviceCapacityConsumption) SwaggerDoc() map[string]string {
+	return map_DeviceCapacityConsumption
+}
+
+var map_DeviceCapacityConsumptionMixin = map[string]string{
+	"":         "DeviceCapacityConsumptionMixin defines a mixin that composite devices can include to adopt the consuption capacity defined in the mixin.",
+	"name":     "Name is a unique identifier among all device capacity consumption mixins in the ResourceSlice. It must be a DNS label.",
+	"capacity": "Capacity defines a set of capacities that a device will consume from a capacity pool.\n\nThe capacity pool is not specified here but is determined from the context in which the DeviceCapacityConsumptionMixin is referenced from the device.\n\nThe maximum number of capacities is 32",
+}
+
+func (DeviceCapacityConsumptionMixin) SwaggerDoc() map[string]string {
+	return map_DeviceCapacityConsumptionMixin
+}
+
+var map_DeviceCapacityConsumptionMixinRef = map[string]string{
+	"":     "DeviceCapacityConsumptionMixinRef defines a reference to a DeviceCapacityConsumptionMixin.",
+	"name": "Name is the name of a DeviceCapacityConsumptionMixin.",
+}
+
+func (DeviceCapacityConsumptionMixinRef) SwaggerDoc() map[string]string {
+	return map_DeviceCapacityConsumptionMixinRef
+}
+
 var map_DeviceClaim = map[string]string{
 	"":            "DeviceClaim defines how to request devices with a ResourceClaim.",
 	"requests":    "Requests represent individual requests for distinct devices which must all be satisfied. If empty, nothing needs to be allocated.",
@@ -134,7 +220,7 @@ func (DeviceClaim) SwaggerDoc() map[string]string {
 
 var map_DeviceClaimConfiguration = map[string]string{
 	"":         "DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.",
-	"requests": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.",
+	"requests": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of both the main request and the subrequest using the format <main request>/<subrequest>. if just the main request is given, the configuration applies to all subrequests.",
 }
 
 func (DeviceClaimConfiguration) SwaggerDoc() map[string]string {
@@ -190,7 +276,7 @@ func (DeviceConfiguration) SwaggerDoc() map[string]string {
 
 var map_DeviceConstraint = map[string]string{
 	"":               "DeviceConstraint must have exactly one field set besides Requests.",
-	"requests":       "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.",
+	"requests":       "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of both the main request and the subrequest using the format <main request>/<subrequest>. If just the main request is given, the constraint applies to all subrequests.",
 	"matchAttribute": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
 }
 
@@ -198,14 +284,34 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 	return map_DeviceConstraint
 }
 
+var map_DeviceMixin = map[string]string{
+	"":          "DeviceMixin defines a specific device mixin for each device type. Besides the name, exactly one field must be set.",
+	"name":      "Name is a unique identifier among all device mixins in the ResourceSlice. It must be a DNS label.",
+	"composite": "Composite defines a mixin usable by a composite device.",
+}
+
+func (DeviceMixin) SwaggerDoc() map[string]string {
+	return map_DeviceMixin
+}
+
+var map_DeviceMixinRef = map[string]string{
+	"":     "DeviceMixinRef defines a reference to a device mixin.",
+	"name": "Name refers to the name of a device mixin in the pool.",
+}
+
+func (DeviceMixinRef) SwaggerDoc() map[string]string {
+	return map_DeviceMixinRef
+}
+
 var map_DeviceRequest = map[string]string{
-	"":                "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
-	"name":            "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
-	"deviceClassName": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+	"":                "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
+	"name":            "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label and unique among all DeviceRequests in a ResourceClaim.",
+	"deviceClassName": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required if no subrequests are specified in the firstAvailable list. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
 	"selectors":       "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
 	"allocationMode":  "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
 	"count":           "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
 	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+	"firstAvailable":  "FirstAvailable contains subrequests, of which exactly one will be satisfied by the scheduler to satisfy this request. It tries to satisfy them in the order in which they are listed here. So if there are two entries in the list, the schduler will only check the second one if it determines that the first one can not be used.\n\nThis field may only be set in the entries of DeviceClaim.Requests.\n\nDRA does not yet implement scoring, so the scheduler will select the first set of devices that satisfies all the requests in the claim. And if the requirements can be satisfied on more than one node, other scheduling features will determine which node is chosen. This means that the set of devices allocated to a claim might not be the optimal set available to the cluster. Scoring will be implemented later.",
 }
 
 func (DeviceRequest) SwaggerDoc() map[string]string {
@@ -214,7 +320,7 @@ func (DeviceRequest) SwaggerDoc() map[string]string {
 
 var map_DeviceRequestAllocationResult = map[string]string{
 	"":            "DeviceRequestAllocationResult contains the allocation result for one request.",
-	"request":     "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+	"request":     "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
 	"driver":      "Driver specifies the name of the DRA driver whose kubelet plugin should be invoked to process the allocation once the claim is needed on a node.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver.",
 	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
 	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
@@ -232,6 +338,19 @@ var map_DeviceSelector = map[string]string{
 
 func (DeviceSelector) SwaggerDoc() map[string]string {
 	return map_DeviceSelector
+}
+
+var map_DeviceSubRequest = map[string]string{
+	"":                "DeviceSubRequest describes a request for device provided in the claim.spec.devices.requests[].firstAvailable array. Each is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nDeviceSubRequest is similar to Request, but doesn't expose the AdminAccess (not supported) or FirstAvailable (recursion not supported) fields, as those can only be set on the top-level request.",
+	"name":            "Name can be used to reference this subrequest in the list of constraints or the list of configurations for the claim. References must use the format <main request>/<subrequest>.\n\nMust be a DNS label.",
+	"deviceClassName": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this subrequest.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+	"selectors":       "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this subrequest. All selectors must be satisfied for a device to be considered.",
+	"allocationMode":  "AllocationMode and its related fields define how devices are allocated to satisfy this subrequest. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This subrequest is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AlloctionMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other subrequests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+	"count":           "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+}
+
+func (DeviceSubRequest) SwaggerDoc() map[string]string {
+	return map_DeviceSubRequest
 }
 
 var map_NetworkDeviceData = map[string]string{
@@ -369,14 +488,28 @@ func (ResourceSliceList) SwaggerDoc() map[string]string {
 	return map_ResourceSliceList
 }
 
+var map_ResourceSliceMixins = map[string]string{
+	"":                          "ResourceSliceMixins defines mixins for the ResourceSlice.",
+	"device":                    "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe main purposes of these mixins is to reduce the memory footprint of devices since they can reference the mixins provided here rather than duplicate them.\n\nThe total number of device mixins, device capacity consumption mixins, capacity pool mixins, basic devices, and composite devices must be less than 128.",
+	"deviceCapacityConsumption": "DeviceCapacityConsumption represents a list of capacity consumption mixins, each of which contains a set of capacities that a device will consume from a capacity pool.\n\nThis makes it possible to define a set of shared capacities that are not tied to a specific pool. The pool is inferred by context in which the DeviceCapacityConsumptionMixin is referenced from the device.\n\nThe total number of device mixins, device capacity consumption mixins, capacity pool mixins, basic devices, and composite devices must be less than 128.",
+	"capacityPool":              "CapacityPool represents a list of capacity pool mixins, i.e. a collection of capacities that a CapacityPool can \"include\" to extend the set of capacities it already defines.\n\nThe main purposes of these mixins is to reduce the memory footprint of capacity pools since they can reference the mixins provided here rather than duplicate them.\n\nThe total number of device mixins, device capacity consumption mixins, capacity pool mixins, basic devices, and composite devices must be less than 128.",
+}
+
+func (ResourceSliceMixins) SwaggerDoc() map[string]string {
+	return map_ResourceSliceMixins
+}
+
 var map_ResourceSliceSpec = map[string]string{
-	"":             "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
-	"driver":       "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
-	"pool":         "Pool describes the pool that this ResourceSlice belongs to.",
-	"nodeName":     "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
-	"nodeSelector": "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
-	"allNodes":     "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
-	"devices":      "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"":                       "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
+	"driver":                 "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
+	"pool":                   "Pool describes the pool that this ResourceSlice belongs to.",
+	"nodeName":               "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
+	"nodeSelector":           "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+	"allNodes":               "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"perDeviceNodeSelection": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+	"capacityPools":          "CapacityPools defines a list of capacity pools, each of which has a name and a list of capacities available in the pool.\n\nThe names of the pools must be unique in the ResourceSlice.\n\nThe maximum number of pools is 32.",
+	"mixins":                 "Mixins defines the mixins available for devices and capacity pools in the ResourceSlice.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {

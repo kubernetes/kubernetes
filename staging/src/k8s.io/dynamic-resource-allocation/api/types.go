@@ -29,12 +29,15 @@ type ResourceSlice struct {
 }
 
 type ResourceSliceSpec struct {
-	Driver       UniqueString
-	Pool         ResourcePool
-	NodeName     UniqueString
-	NodeSelector *v1.NodeSelector
-	AllNodes     bool
-	Devices      []Device
+	Driver                 UniqueString
+	Pool                   ResourcePool
+	NodeName               UniqueString
+	NodeSelector           *v1.NodeSelector
+	AllNodes               bool
+	Devices                []Device
+	PerDeviceNodeSelection bool
+	CapacityPools          []CapacityPool
+	Mixins                 *ResourceSliceMixins
 }
 
 type ResourcePool struct {
@@ -42,14 +45,76 @@ type ResourcePool struct {
 	Generation         int64
 	ResourceSliceCount int64
 }
+
+type CapacityPool struct {
+	Name     UniqueString
+	Includes []CapacityPoolMixinRef
+	Capacity map[QualifiedName]DeviceCapacity
+}
+
+type CapacityPoolMixinRef struct {
+	Name UniqueString
+}
+
+type ResourceSliceMixins struct {
+	Device                    []DeviceMixin
+	DeviceCapacityConsumption []DeviceCapacityConsumptionMixin
+	CapacityPool              []CapacityPoolMixin
+}
+
+type DeviceCapacityConsumptionMixin struct {
+	Name     UniqueString
+	Capacity map[QualifiedName]DeviceCapacity
+}
+
+type CapacityPoolMixin struct {
+	Name     UniqueString
+	Capacity map[QualifiedName]DeviceCapacity
+}
+
+type DeviceMixin struct {
+	Name      UniqueString
+	Composite *CompositeDeviceMixin
+}
+
+type CompositeDeviceMixin struct {
+	Attributes map[QualifiedName]DeviceAttribute
+	Capacity   map[QualifiedName]DeviceCapacity
+}
+
 type Device struct {
-	Name  UniqueString
-	Basic *BasicDevice
+	Name      UniqueString
+	Basic     *BasicDevice
+	Composite *CompositeDevice
 }
 
 type BasicDevice struct {
 	Attributes map[QualifiedName]DeviceAttribute
 	Capacity   map[QualifiedName]DeviceCapacity
+}
+
+type CompositeDevice struct {
+	Includes         []DeviceMixinRef
+	Attributes       map[QualifiedName]DeviceAttribute
+	Capacity         map[QualifiedName]DeviceCapacity
+	ConsumesCapacity []DeviceCapacityConsumption
+	NodeName         string
+	NodeSelector     *v1.NodeSelector
+	AllNodes         bool
+}
+
+type DeviceMixinRef struct {
+	Name UniqueString
+}
+
+type DeviceCapacityConsumption struct {
+	CapacityPool string
+	Includes     []DeviceCapacityConsumptionMixinRef
+	Capacity     map[QualifiedName]DeviceCapacity
+}
+
+type DeviceCapacityConsumptionMixinRef struct {
+	Name UniqueString
 }
 
 type QualifiedName string

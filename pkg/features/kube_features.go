@@ -201,13 +201,23 @@ const (
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
 
-	// owner: @pohly
-	// kep: http://kep.k8s.io/4381
+	// owner: @mortent
+	// kep: http://kep.k8s.io/4815
 	//
-	// Enables support for resources with custom parameters and a lifecycle
-	// that is independent of a Pod. Resource allocation is done by the scheduler
-	// based on "structured parameters".
-	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
+	// Enables support for dynamically partitioning devices based on
+	// which parts of them were allocated during scheduling.
+	//
+	// Additionally, it provides primitives to represent both full devices
+	// and their partitions in a more compact way ("mixins").
+	DRAPartitionableDevices featuregate.Feature = "DRAPartitionableDevices"
+
+	// owner: @mortent
+	// kep: http://kep.k8s.io/4816
+	//
+	// Enables support for providing a prioritized list of requests
+	// for resources. The first entry that can be satisfied will
+	// be selected.
+	DRAPrioritizedList featuregate.Feature = "DRAPrioritizedList"
 
 	// owner: @LionelJouin
 	// kep: http://kep.k8s.io/4817
@@ -215,6 +225,14 @@ const (
 	// Enables support the ResourceClaim.status.devices field and for setting this
 	// status from DRA drivers.
 	DRAResourceClaimDeviceStatus featuregate.Feature = "DRAResourceClaimDeviceStatus"
+
+	// owner: @pohly
+	// kep: http://kep.k8s.io/4381
+	//
+	// Enables support for resources with custom parameters and a lifecycle
+	// that is independent of a Pod. Resource allocation is done by the scheduler
+	// based on "structured parameters".
+	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
 	// owner: @lauralorenz
 	// kep: https://kep.k8s.io/4603

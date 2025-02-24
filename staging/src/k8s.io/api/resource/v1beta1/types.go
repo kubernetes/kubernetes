@@ -142,6 +142,35 @@ type ResourceSliceSpec struct {
 	// +optional
 	// +listType=atomic
 	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
+
+	// PerDeviceNodeSelection defines whether the access from nodes to
+	// resources in the pool is set on the ResourceSlice level or on each
+	// device. If it is set to true, every device defined the ResourceSlice
+	// must specify this individually.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
+	// must be set.
+	//
+	// +optional
+	// +oneOf=NodeSelection
+	PerDeviceNodeSelection bool `json:"perDeviceNodeSelection,omitempty" protobuf:"bytes,7,name=perDeviceNodeSelection"`
+
+	// CapacityPools defines a list of capacity pools, each of which
+	// has a name and a list of capacities available in the pool.
+	//
+	// The names of the pools must be unique in the ResourceSlice.
+	//
+	// The maximum number of pools is 32.
+	//
+	// +optional
+	// +listType=atomic
+	CapacityPools []CapacityPool `json:"capacityPools,omitempty" protobuf:"bytes,8,name=capacityPools"`
+
+	// Mixins defines the mixins available for devices and capacity pools
+	// in the ResourceSlice.
+	//
+	// +optional
+	Mixins *ResourceSliceMixins `json:"mixins,omitempty" protobuf:"bytes,9,name=mixins"`
 }
 
 // DriverNameMaxLength is the maximum valid length of a driver name in the
@@ -189,6 +218,211 @@ const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 
+// CapacityPool defines a named pool of capacities
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The capacities are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the capacity it uses will no longer be available for use
+// by other devices.
+type CapacityPool struct {
+	// Name defines the name of the capacity pool.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Includes defines the set of capacity pool mixins that this capacity
+	// pool includes.
+	//
+	// The propertes of each included mixin are applied to this capacity pool in
+	// order. Conflicting properties from multiple mixins are taken from the
+	// last mixin listed that contains them. Properties set on the capacity pool will
+	// always override properties from mixins.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of mixins that can be included is 8.
+	//
+	// +optional
+	// +listType=atomic
+	Includes []CapacityPoolMixinRef `json:"includes,omitempty" protobuf:"bytes,2,name=includes"`
+
+	// Capacity defines the set of capacities for this capacity pool
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// Capacities listed here will always take precedence over any included
+	// from a mixin.
+	//
+	// The maximum number of capacities is 32.
+	//
+	// +optional
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,3,name=capacity"`
+}
+
+// CapacityPoolMixinRef defines a reference from a capacity pool
+// to a capacity pool mixin.
+type CapacityPoolMixinRef struct {
+	// Name is the name of a CapacityPoolMixin.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+}
+
+// ResourceSliceMixins defines mixins for the ResourceSlice.
+type ResourceSliceMixins struct {
+	// Device represents a list of device mixins, i.e. a collection of
+	// shared attributes and capacities that an actual device can "include"
+	// to extend the set of attributes and capacities it already defines.
+	//
+	// The main purposes of these mixins is to reduce the memory footprint
+	// of devices since they can reference the mixins provided here rather
+	// than duplicate them.
+	//
+	// The total number of device mixins, device capacity consumption mixins,
+	// capacity pool mixins, basic devices, and composite devices must be
+	// less than 128.
+	//
+	// +optional
+	// +listType=atomic
+	Device []DeviceMixin `json:"device,omitempty" protobuf:"bytes,1,name=device"`
+
+	// DeviceCapacityConsumption represents a list of capacity
+	// consumption mixins, each of which contains a set of capacities
+	// that a device will consume from a capacity pool.
+	//
+	// This makes it possible to define a set of shared capacities that
+	// are not tied to a specific pool. The pool is inferred by context
+	// in which the DeviceCapacityConsumptionMixin is referenced from
+	// the device.
+	//
+	// The total number of device mixins, device capacity consumption mixins,
+	// capacity pool mixins, basic devices, and composite devices must be
+	// less than 128.
+	//
+	// +optional
+	// +listType=atomic
+	DeviceCapacityConsumption []DeviceCapacityConsumptionMixin `json:"deviceCapacityConsumption,omitempty" protobuf:"bytes,2,name=deviceCapacityConsumption"`
+
+	// CapacityPool represents a list of capacity pool mixins, i.e.
+	// a collection of capacities that a CapacityPool can "include"
+	// to extend the set of capacities it already defines.
+	//
+	// The main purposes of these mixins is to reduce the memory footprint
+	// of capacity pools since they can reference the mixins provided here rather
+	// than duplicate them.
+	//
+	// The total number of device mixins, device capacity consumption mixins,
+	// capacity pool mixins, basic devices, and composite devices must be
+	// less than 128.
+	//
+	// +optional
+	// +listType=atomic
+	CapacityPool []CapacityPoolMixin `json:"capacityPool,omitempty" protobuf:"bytes,3,name=capacityPool"`
+}
+
+// DeviceMixin defines a specific device mixin for each device type.
+// Besides the name, exactly one field must be set.
+type DeviceMixin struct {
+	// Name is a unique identifier among all device mixins in the ResourceSlice.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Composite defines a mixin usable by a composite device.
+	//
+	// +optional
+	// +oneOf=deviceMixinType
+	Composite *CompositeDeviceMixin `json:"composite,omitempty" protobuf:"bytes,2,name=composite"`
+}
+
+// CompositeDeviceMixin defines a mixin that a composite device can include.
+type CompositeDeviceMixin struct {
+	// Attributes defines the set of attributes for this mixin.
+	// The name of each attribute must be unique in that set.
+	//
+	// To ensure this uniqueness, attributes defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// Conflicting attributes from those provided via other mixins are
+	// overwritten by the ones provided here.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	//
+	// +optional
+	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,1,name=attributes"`
+
+	// Capacity defines the set of capacities for this mixin.
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// Conflicting capacities from those provided via other mixins are
+	// overwritten by the ones provided here.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	//
+	// +optional
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,name=capacity"`
+}
+
+// DeviceCapacityConsumptionMixin defines a mixin that composite
+// devices can include to adopt the consuption capacity defined in
+// the mixin.
+type DeviceCapacityConsumptionMixin struct {
+	// Name is a unique identifier among all device capacity consumption
+	// mixins in the ResourceSlice. It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Capacity defines a set of capacities
+	// that a device will consume from a capacity pool.
+	//
+	// The capacity pool is not specified here but is determined
+	// from the context in which the DeviceCapacityConsumptionMixin
+	// is referenced from the device.
+	//
+	// The maximum number of capacities is 32
+	//
+	// +required
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity" protobuf:"bytes,2,name=capacity"`
+}
+
+// CapacityPoolMixin defines a mixin that a capacity pool can include.
+type CapacityPoolMixin struct {
+	// Name is a unique identifier among all capacity pool mixins in the ResourceSlice.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Capacity defines the set of capacities for this mixin.
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// Conflicting capacities from those provided via other mixins are
+	// overwritten by the ones provided here.
+	//
+	// The maximum number of capacities is 32.
+	//
+	// +required
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity" protobuf:"bytes,2,name=capacity"`
+}
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -203,6 +437,12 @@ type Device struct {
 	// +optional
 	// +oneOf=deviceType
 	Basic *BasicDevice `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
+
+	// Composite defines one composite device instance.
+	//
+	// +optional
+	// +oneOf=deviceType
+	Composite *CompositeDevice `json:"composite,omitempty" protobuf:"bytes,3,opt,name=composite"`
 }
 
 // BasicDevice defines one device instance.
@@ -222,6 +462,153 @@ type BasicDevice struct {
 	//
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
+}
+
+// CompositeDevice defines one device instance.
+type CompositeDevice struct {
+	// Includes defines the set of device mixins that this device includes.
+	//
+	// The propertes of each included mixin are applied to this device in
+	// order. Conflicting properties from multiple mixins are taken from the
+	// last mixin listed that contains them. Properties set on the device will
+	// always override properties from mixins.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of mixins that can be included is 8.
+	//
+	// +optional
+	// +listType=atomic
+	Includes []DeviceMixinRef `json:"includes,omitempty" protobuf:"bytes,1,rep,name=includes"`
+
+	// Attributes defines the set of attributes for this device.
+	// The name of each attribute must be unique in that set.
+	//
+	// To ensure this uniqueness, attributes defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// Conflicting attributes from those provided via mixins are
+	// overwritten by the ones provided here.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	//
+	// +optional
+	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,2,rep,name=attributes"`
+
+	// Capacity defines the set of capacities for this device.
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// Conflicting capacities from those provided via other mixins are
+	// overwritten by the ones provided here.
+	//
+	// The maximum number of attributes and capacities combined is 32.
+	//
+	// +optional
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity"`
+
+	// ConsumesCapacity defines a list of references to capacity
+	// pools and the set of capacities that the device will
+	// consume from those pools.
+	//
+	// The capacities can be defined either by referencing one
+	// or more DeviceCapacityConsumptionMixins by listing
+	// the capacities directly. The latter will always override
+	// any capacities coming in from the mixins.
+	//
+	// The maximum number of device capacity consumption entries
+	// is 32. This is the same as the maximum number of capacity
+	// pools allowed in a ResourceSlice.
+	//
+	// +required
+	// +listType=atomic
+	ConsumesCapacity []DeviceCapacityConsumption `json:"consumesCapacity,omitempty" protobuf:"bytes,4,rep,name=consumesCapacity"`
+
+	// NodeName identifies the node where the device is available.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,5,opt,name=nodeName"`
+
+	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,6,opt,name=nodeSelector"`
+
+	// AllNodes indicates that all nodes have access to the device.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	AllNodes bool `json:"allNodes,omitempty" protobuf:"bytes,7,opt,name=allNodes"`
+}
+
+// DeviceMixinRef defines a reference to a device mixin.
+type DeviceMixinRef struct {
+	// Name refers to the name of a device mixin in the pool.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+}
+
+// DeviceCapacityConsumption defines a set of capacities that
+// a device will consume from a capacity pool.
+type DeviceCapacityConsumption struct {
+	// CapacityPool defines the capacity pool from which the
+	// capacities defined (either directly or through a mixin)
+	// will be consumed from.
+	//
+	// +required
+	CapacityPool string `json:"capacityPool" protobuf:"bytes,1,opt,name=capacityPool"`
+
+	// Includes defines a list of references to DeviceCapacityConsumptionMixins.
+	// The capacities listed in these will be included in among the
+	// capacities that will be consumed by the device.
+	//
+	// Capacities listed directly will override any capacities coming
+	// from mixins.
+	//
+	// The maximum number of mixins that can be included is 8.
+	//
+	// +optional
+	// +listType=atomic
+	Includes []DeviceCapacityConsumptionMixinRef `json:"includes,omitempty" protobuf:"bytes,2,opt,name=includes"`
+
+	// Capacity defines the capacity that will be consumed by
+	// the device.
+	//
+	// Capacities listed here will override any capacities that
+	// are also defined in any of the referenced mixins.
+	//
+	// The maximum number of capacities is 32.
+	//
+	// +optional
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,3,opt,name=capacity"`
+}
+
+// DeviceCapacityConsumptionMixinRef defines a reference to a
+// DeviceCapacityConsumptionMixin.
+type DeviceCapacityConsumptionMixinRef struct {
+	// Name is the name of a DeviceCapacityConsumptionMixin.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
 // DeviceCapacity describes a quantity associated with a device.
@@ -394,16 +781,12 @@ const (
 // DeviceRequest is a request for devices required for a claim.
 // This is typically a request for a single resource like a device, but can
 // also ask for several identical devices.
-//
-// A DeviceClassName is currently required. Clients must check that it is
-// indeed set. It's absence indicates that something changed in a way that
-// is not supported by the client yet, in which case it must refuse to
-// handle the request.
 type DeviceRequest struct {
 	// Name can be used to reference this request in a pod.spec.containers[].resources.claims
 	// entry and in a constraint of the claim.
 	//
-	// Must be a DNS label.
+	// Must be a DNS label and unique among all DeviceRequests in a
+	// ResourceClaim.
 	//
 	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
@@ -412,7 +795,8 @@ type DeviceRequest struct {
 	// additional configuration and selectors to be inherited by this
 	// request.
 	//
-	// A class is required. Which classes are available depends on the cluster.
+	// A class is required if no subrequests are specified in the
+	// firstAvailable list. Which classes are available depends on the cluster.
 	//
 	// Administrators may use this to restrict which devices may get
 	// requested by only installing classes with selectors for permitted
@@ -420,7 +804,8 @@ type DeviceRequest struct {
 	// then administrators can create an empty DeviceClass for users
 	// to reference.
 	//
-	// +required
+	// +optional
+	// +oneOf=deviceRequestType
 	DeviceClassName string `json:"deviceClassName" protobuf:"bytes,2,name=deviceClassName"`
 
 	// Selectors define criteria which must be satisfied by a specific
@@ -474,6 +859,99 @@ type DeviceRequest struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,6,opt,name=adminAccess"`
+
+	// FirstAvailable contains subrequests, of which exactly one will be
+	// satisfied by the scheduler to satisfy this request. It tries to
+	// satisfy them in the order in which they are listed here. So if
+	// there are two entries in the list, the schduler will only check
+	// the second one if it determines that the first one can not be used.
+	//
+	// This field may only be set in the entries of DeviceClaim.Requests.
+	//
+	// DRA does not yet implement scoring, so the scheduler will
+	// select the first set of devices that satisfies all the
+	// requests in the claim. And if the requirements can
+	// be satisfied on more than one node, other scheduling features
+	// will determine which node is chosen. This means that the set of
+	// devices allocated to a claim might not be the optimal set
+	// available to the cluster. Scoring will be implemented later.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	// +listType=atomic
+	// +featureGate=DRAPrioritizedList
+	FirstAvailable []DeviceSubRequest `json:"firstAvailable,omitempty" protobuf:"bytes,7,name=firstAvailable"`
+}
+
+// DeviceSubRequest describes a request for device provided in the
+// claim.spec.devices.requests[].firstAvailable array. Each
+// is typically a request for a single resource like a device, but can
+// also ask for several identical devices.
+//
+// DeviceSubRequest is similar to Request, but doesn't expose the AdminAccess (not
+// supported) or FirstAvailable (recursion not supported) fields, as those can
+// only be set on the top-level request.
+type DeviceSubRequest struct {
+	// Name can be used to reference this subrequest in the list of constraints
+	// or the list of configurations for the claim. References must use the
+	// format <main request>/<subrequest>.
+	//
+	// Must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// DeviceClassName references a specific DeviceClass, which can define
+	// additional configuration and selectors to be inherited by this
+	// subrequest.
+	//
+	// A class is required. Which classes are available depends on the cluster.
+	//
+	// Administrators may use this to restrict which devices may get
+	// requested by only installing classes with selectors for permitted
+	// devices. If users are free to request anything without restrictions,
+	// then administrators can create an empty DeviceClass for users
+	// to reference.
+	//
+	// +required
+	DeviceClassName string `json:"deviceClassName" protobuf:"bytes,2,name=deviceClassName"`
+
+	// Selectors define criteria which must be satisfied by a specific
+	// device in order for that device to be considered for this
+	// subrequest. All selectors must be satisfied for a device to be
+	// considered.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,3,name=selectors"`
+
+	// AllocationMode and its related fields define how devices are allocated
+	// to satisfy this subrequest. Supported values are:
+	//
+	// - ExactCount: This request is for a specific number of devices.
+	//   This is the default. The exact number is provided in the
+	//   count field.
+	//
+	// - All: This subrequest is for all of the matching devices in a pool.
+	//   Allocation will fail if some devices are already allocated,
+	//   unless adminAccess is requested.
+	//
+	// If AlloctionMode is not specified, the default mode is ExactCount. If
+	// the mode is ExactCount and count is not specified, the default count is
+	// one. Any other subrequests must specify this field.
+	//
+	// More modes may get added in the future. Clients must refuse to handle
+	// requests with unknown modes.
+	//
+	// +optional
+	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,4,opt,name=allocationMode"`
+
+	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
+	// If AllocationMode is ExactCount and this field is not specified, the default is one.
+	//
+	// +optional
+	// +oneOf=AllocationMode
+	Count int64 `json:"count,omitempty" protobuf:"bytes,5,opt,name=count"`
 }
 
 const (
@@ -590,6 +1068,10 @@ type DeviceConstraint struct {
 	// constraint. If this is not specified, this constraint applies to all
 	// requests in this claim.
 	//
+	// References to subrequests must include the name of both the main request
+	// and the subrequest using the format <main request>/<subrequest>. If just
+	// the main request is given, the constraint applies to all subrequests.
+	//
 	// +optional
 	// +listType=atomic
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
@@ -626,6 +1108,10 @@ type DeviceConstraint struct {
 type DeviceClaimConfiguration struct {
 	// Requests lists the names of requests where the configuration applies.
 	// If empty, it applies to all requests.
+	//
+	// References to subrequests must include the name of both the main request
+	// and the subrequest using the format <main request>/<subrequest>. if just
+	// the main request is given, the configuration applies to all subrequests.
 	//
 	// +optional
 	// +listType=atomic
@@ -799,8 +1285,12 @@ const AllocationResultsMaxSize = 32
 // DeviceRequestAllocationResult contains the allocation result for one request.
 type DeviceRequestAllocationResult struct {
 	// Request is the name of the request in the claim which caused this
-	// device to be allocated. Multiple devices may have been allocated
-	// per request.
+	// device to be allocated. If it references a subrequest in the
+	// firstAvailable list on a DeviceRequest, this field must
+	// include both the name of the main request and the subrequest
+	// using the format <main request>/<subrequest>.
+	//
+	// Multiple devices may have been allocated per request.
 	//
 	// +required
 	Request string `json:"request" protobuf:"bytes,1,name=request"`
@@ -854,6 +1344,10 @@ type DeviceAllocationConfiguration struct {
 
 	// Requests lists the names of requests where the configuration applies.
 	// If empty, its applies to all requests.
+	//
+	// References to subrequests must include the name of both the main request
+	// and the subrequest using the format <main request>/<subrequest>. If just
+	// the main request is given, the configuration applies to all subrequests.
 	//
 	// +optional
 	// +listType=atomic
