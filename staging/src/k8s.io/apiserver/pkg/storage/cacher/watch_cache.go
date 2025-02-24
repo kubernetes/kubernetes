@@ -151,6 +151,9 @@ type watchCache struct {
 	// Requests progress notification if there are requests waiting for watch
 	// to be fresh
 	waitingUntilFresh *conditionalProgressRequester
+
+	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
+	snapshots *storeSnapshotter
 }
 
 func newWatchCache(
@@ -181,6 +184,9 @@ func newWatchCache(
 		versioner:           versioner,
 		groupResource:       groupResource,
 		waitingUntilFresh:   progressRequester,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+		wc.snapshots = newStoreSnapshotter()
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.String()).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
@@ -310,7 +316,20 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		w.resourceVersion = resourceVersion
 		defer w.cond.Broadcast()
 
-		return updateFunc(elem)
+		err := updateFunc(elem)
+		if err != nil {
+			return err
+		}
+		if w.snapshots != nil {
+			if orderedLister, ordered := w.store.(orderedLister); ordered {
+				if w.isCacheFullLocked() {
+					oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
+					w.snapshots.RemoveLess(oldestRV)
+				}
+				w.snapshots.Add(w.resourceVersion, orderedLister)
+			}
+		}
+		return err
 	}(); err != nil {
 		return err
 	}
@@ -625,6 +644,12 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 
 	if err := w.store.Replace(toReplace, resourceVersion); err != nil {
 		return err
+	}
+	if w.snapshots != nil {
+		w.snapshots.Reset()
+		if orderedLister, ordered := w.store.(orderedLister); ordered {
+			w.snapshots.Add(version, orderedLister)
+		}
 	}
 	w.listResourceVersion = version
 	w.resourceVersion = version

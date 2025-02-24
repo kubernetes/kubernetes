@@ -74,6 +74,8 @@ type storeIndexer interface {
 
 type orderedLister interface {
 	ListPrefix(prefix, continueKey string, limit int) (items []interface{}, hasMore bool)
+	Count(prefix, continueKey string) (count int)
+	Clone() orderedLister
 }
 
 func newStoreIndexer(indexers *cache.Indexers) storeIndexer {
