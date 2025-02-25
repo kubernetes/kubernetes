@@ -235,6 +235,9 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	// Make sure we're caching a deep copy.
 	status = *status.DeepCopy()
 
+	// Set the observedGeneration for this pod status.
+	status.ObservedGeneration = podutil.GetPodObservedGenerationIfEnabled(pod)
+
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
@@ -597,6 +600,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		// if the status has no start time, we need to set an initial time
 		now := metav1.Now()
 		status.StartTime = &now
+	}
+
+	// prevent sending unnecessary patches
+	if oldStatus.ObservedGeneration > status.ObservedGeneration {
+		status.ObservedGeneration = oldStatus.ObservedGeneration
 	}
 
 	normalizeStatus(pod, &status)
