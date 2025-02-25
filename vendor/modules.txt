@@ -704,6 +704,7 @@ github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtes
 github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
 github.com/openshift/library-go/pkg/apiserver/admission/admissiontimeout
 github.com/openshift/library-go/pkg/apiserver/apiserverconfig
+github.com/openshift/library-go/pkg/apiserver/node
 github.com/openshift/library-go/pkg/authorization/authorizationutil
 github.com/openshift/library-go/pkg/authorization/hardcodedauthorizer
 github.com/openshift/library-go/pkg/authorization/scopemetadata
