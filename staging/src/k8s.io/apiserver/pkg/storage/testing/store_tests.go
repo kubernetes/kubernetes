@@ -1609,7 +1609,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 	}
 
 	secondNonConsistentReadRV := lastObjecRV
-	if consistentReadsSupported {
+	if !cacheEnabled || consistentReadsSupported {
 		secondNonConsistentReadRV = currentRV
 	}
 
