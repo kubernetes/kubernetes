@@ -17,6 +17,7 @@ limitations under the License.
 package dns
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -382,7 +383,8 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 }
 
 // GetPodDNS returns DNS settings for the pod.
-func (c *Configurer) GetPodDNS(logger klog.Logger, pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+func (c *Configurer) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+	logger := klog.FromContext(ctx)
 	dnsConfig, err := c.getHostDNSConfig(logger, c.ResolverConfig)
 	if err != nil {
 		return nil, err

@@ -448,7 +448,7 @@ func TestGetPodDNSType(t *testing.T) {
 }
 
 func TestGetPodDNS(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	ctx := ktesting.Init(t)
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -475,7 +475,7 @@ func TestGetPodDNS(t *testing.T) {
 	}, 4)
 	for i, pod := range pods {
 		var err error
-		dnsConfig, err := configurer.GetPodDNS(logger, pod)
+		dnsConfig, err := configurer.GetPodDNS(ctx, pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -511,7 +511,7 @@ func TestGetPodDNS(t *testing.T) {
 
 	for i, pod := range pods {
 		var err error
-		dnsConfig, err := configurer.GetPodDNS(logger, pod)
+		dnsConfig, err := configurer.GetPodDNS(ctx, pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -670,12 +670,12 @@ func TestGetPodDNSCustom(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			ctx := ktesting.Init(t)
 			testPod.Spec.HostNetwork = tc.hostnetwork
 			testPod.Spec.DNSConfig = tc.dnsConfig
 			testPod.Spec.DNSPolicy = tc.dnsPolicy
 
-			resDNSConfig, err := configurer.GetPodDNS(logger, testPod)
+			resDNSConfig, err := configurer.GetPodDNS(ctx, testPod)
 			if err != nil {
 				t.Errorf("%s: GetPodDNS(%v), unexpected error: %v", tc.desc, testPod, err)
 			}
