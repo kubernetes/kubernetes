@@ -38,6 +38,7 @@ import (
 	stats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 var zero time.Time
@@ -626,8 +627,8 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 
 	// Expect 40% usage.
 	imageStats := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(600),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(600)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageStats, imageStats, nil)
 
@@ -659,8 +660,8 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 
 	// Expect 95% usage and most of it gets freed.
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(50),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(50)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
 	fakeRuntime.ImageList = []container.Image{
@@ -681,8 +682,8 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 
 	// Expect 95% usage and little of it gets freed.
 	imageFs := &statsapi.FsStats{
-		AvailableBytes: uint64Ptr(50),
-		CapacityBytes:  uint64Ptr(1000),
+		AvailableBytes: ptr.To(uint64(50)),
+		CapacityBytes:  ptr.To(uint64(1000)),
 	}
 	mockStatsProvider.EXPECT().ImageFsStats(mock.Anything).Return(imageFs, imageFs, nil)
 	fakeRuntime.ImageList = []container.Image{
@@ -915,8 +916,4 @@ func TestValidateImageGCPolicy(t *testing.T) {
 			}
 		}
 	}
-}
-
-func uint64Ptr(i uint64) *uint64 {
-	return &i
 }
