@@ -123,6 +123,12 @@ const (
 	// Enables KMS v1 API for encryption at rest.
 	KMSv1 featuregate.Feature = "KMSv1"
 
+	// owner: @serathius
+	// kep: https://kep.k8s.io/4988
+	//
+	// Enables generating snapshots of watch cache store and using them to serve LIST requests.
+	ListFromCacheSnapshot featuregate.Feature = "ListFromCacheSnapshot"
+
 	// owner: @alexzielenski, @cici37, @jiahuif, @jpbetz
 	// kep: https://kep.k8s.io/3962
 	//
@@ -332,6 +338,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	ListFromCacheSnapshot: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	MutatingAdmissionPolicy: {

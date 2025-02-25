@@ -698,6 +698,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.33"
+- name: ListFromCacheSnapshot
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: LoadBalancerIPMode
   versionedSpecs:
   - default: false
