@@ -49,7 +49,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 	// Record the pods on disk.
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		_, err := m.GetOrCreateUserNamespaceMappings(logger, &pod, "")
+		_, err := m.GetOrCreateUserNamespaceMappings(&pod, "")
 		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
@@ -85,7 +85,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 	// Record the pods on disk.
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		_, err := m.GetOrCreateUserNamespaceMappings(logger, &pod, "")
+		_, err := m.GetOrCreateUserNamespaceMappings(&pod, "")
 		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
@@ -98,7 +98,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		userns, err := m2.GetOrCreateUserNamespaceMappings(logger, &pod, "")
+		userns, err := m2.GetOrCreateUserNamespaceMappings(&pod, "")
 
 		assert.NoError(t, err, "failed to record userns range for pod %v", podUID)
 		assert.Nil(t, userns, "userns range should be nil for pod %v", podUID)
@@ -106,7 +106,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Enable the feature gate to create some pods on disk.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
@@ -123,14 +123,14 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 	// Record the pods on disk.
 	for _, podUID := range pods {
 		pod := v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: podUID}}
-		_, err := m.GetOrCreateUserNamespaceMappings(logger, &pod, "")
+		_, err := m.GetOrCreateUserNamespaceMappings(&pod, "")
 		require.NoError(t, err, "failed to record userns range for pod %v", podUID)
 	}
 
 	// Test cleanup works when the feature gate is disabled and there were some
 	// pods registered.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
-	err = m.CleanupOrphanedPodUsernsAllocations(logger, nil, nil)
+	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil)
 	require.NoError(t, err)
 
 	// The feature gate is off, no pods should be allocated.

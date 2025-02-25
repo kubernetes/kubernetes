@@ -47,7 +47,7 @@ func TestReleaseDisabled(t *testing.T) {
 	m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	require.NoError(t, err)
 
-	m.Release(logger, "some-pod")
+	m.Release("some-pod")
 }
 
 func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
@@ -100,7 +100,7 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 			m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 			require.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(logger, test.pod, "")
+			userns, err := m.GetOrCreateUserNamespaceMappings(test.pod, "")
 			assert.Nil(t, userns)
 			if test.success {
 				assert.NoError(t, err)
@@ -112,13 +112,13 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
 	m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 	require.NoError(t, err)
 
-	err = m.CleanupOrphanedPodUsernsAllocations(logger, nil, nil)
+	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil)
 	assert.NoError(t, err)
 }

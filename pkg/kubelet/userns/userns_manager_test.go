@@ -114,8 +114,8 @@ func TestUserNsManagerAllocate(t *testing.T) {
 	err = m.record(logger, "two", allocated2+1, length2)
 	assert.Error(t, err)
 
-	m.Release(logger, "one")
-	m.Release(logger, "two")
+	m.Release("one")
+	m.Release("two")
 	assert.False(t, m.isSet(allocated), "m.isSet(%d)", allocated)
 	assert.False(t, m.isSet(allocated2), "m.nsSet(%d)", allocated2)
 
@@ -131,12 +131,12 @@ func TestUserNsManagerAllocate(t *testing.T) {
 	}
 	for i, v := range allocs {
 		assert.True(t, m.isSet(v), "m.isSet(%d) should be true", v)
-		m.Release(logger, types.UID(fmt.Sprintf("%d", i)))
+		m.Release(types.UID(fmt.Sprintf("%d", i)))
 		assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
 
 		err = m.record(logger, types.UID(fmt.Sprintf("%d", i)), v, userNsLength)
 		assert.NoError(t, err)
-		m.Release(logger, types.UID(fmt.Sprintf("%d", i)))
+		m.Release(types.UID(fmt.Sprintf("%d", i)))
 		assert.False(t, m.isSet(v), "m.isSet(%d) should be false", v)
 	}
 }
@@ -365,7 +365,7 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 			m, err := MakeUserNsManager(logger, testUserNsPodsManager)
 			assert.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(logger, tc.pod, tc.runtimeHandler)
+			userns, err := m.GetOrCreateUserNamespaceMappings(tc.pod, tc.runtimeHandler)
 			if (tc.success && err != nil) || (!tc.success && err == nil) {
 				t.Errorf("expected success: %v but got error: %v", tc.success, err)
 			}
@@ -378,7 +378,7 @@ func TestGetOrCreateUserNamespaceMappings(t *testing.T) {
 }
 
 func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, true)
 
 	cases := []struct {
@@ -444,7 +444,7 @@ func TestCleanupOrphanedPodUsernsAllocations(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err = m.CleanupOrphanedPodUsernsAllocations(logger, tc.pods, tc.runningPods)
+			err = m.CleanupOrphanedPodUsernsAllocations(ctx, tc.pods, tc.runningPods)
 			require.NoError(t, err)
 
 			for _, pod := range tc.podSetAfterCleanup {

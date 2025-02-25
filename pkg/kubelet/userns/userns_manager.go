@@ -17,19 +17,19 @@ limitations under the License.
 package userns
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"github.com/go-logr/logr"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
@@ -130,7 +130,7 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 	return fstore.Read(mappingsFile)
 }
 
-func MakeUserNsManager(logger logr.Logger, kl userNsPodsManager) (*UsernsManager, error) {
+func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager) (*UsernsManager, error) {
 	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings()
 	if err != nil {
 		return nil, err
@@ -185,7 +185,7 @@ func MakeUserNsManager(logger logr.Logger, kl userNsPodsManager) (*UsernsManager
 
 // recordPodMappings registers the range used for the user namespace if the
 // usernsConfFile exists in the pod directory.
-func (m *UsernsManager) recordPodMappings(logger logr.Logger, pod types.UID) error {
+func (m *UsernsManager) recordPodMappings(logger klog.Logger, pod types.UID) error {
 	content, err := m.readMappingsFromFile(pod)
 	if err != nil && err != utilstore.ErrKeyNotFound {
 		return err
@@ -212,7 +212,7 @@ func (m *UsernsManager) isSet(v uint32) bool {
 // allocateOne finds a free user namespace and allocate it to the specified pod.
 // The first return value is the first ID in the user namespace, the second returns
 // the length for the user namespace range.
-func (m *UsernsManager) allocateOne(logger logr.Logger, pod types.UID) (firstID uint32, length uint32, err error) {
+func (m *UsernsManager) allocateOne(logger klog.Logger, pod types.UID) (firstID uint32, length uint32, err error) {
 	firstZero, found, err := m.used.AllocateNext()
 	if err != nil {
 		return 0, 0, err
@@ -229,7 +229,7 @@ func (m *UsernsManager) allocateOne(logger logr.Logger, pod types.UID) (firstID 
 }
 
 // record stores the user namespace [from; from+length] to the specified pod.
-func (m *UsernsManager) record(logger logr.Logger, pod types.UID, from, length uint32) (err error) {
+func (m *UsernsManager) record(logger klog.Logger, pod types.UID, from, length uint32) (err error) {
 	if length != userNsLength {
 		return fmt.Errorf("wrong user namespace length %v", length)
 	}
@@ -263,7 +263,7 @@ func (m *UsernsManager) record(logger logr.Logger, pod types.UID, from, length u
 }
 
 // Release releases the user namespace allocated to the specified pod.
-func (m *UsernsManager) Release(logger logr.Logger, podUID types.UID) {
+func (m *UsernsManager) Release(podUID types.UID) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return
 	}
@@ -271,7 +271,7 @@ func (m *UsernsManager) Release(logger logr.Logger, podUID types.UID) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.releaseWithLock(logger, podUID)
+	m.releaseWithLock(klog.TODO(), podUID)
 }
 
 // podAllocated returns true if the pod is allocated, false otherwise.
@@ -287,7 +287,7 @@ func (m *UsernsManager) podAllocated(podUID types.UID) bool {
 	return ok
 }
 
-func (m *UsernsManager) releaseWithLock(logger logr.Logger, pod types.UID) {
+func (m *UsernsManager) releaseWithLock(logger klog.Logger, pod types.UID) {
 	v, ok := m.usedBy[pod]
 	if !ok {
 		logger.V(5).Info("pod user namespace allocation not present", "podUID", pod)
@@ -311,7 +311,7 @@ func (m *UsernsManager) releaseWithLock(logger logr.Logger, pod types.UID) {
 	_ = m.used.Release(int(v/userNsLength) - m.off)
 }
 
-func (m *UsernsManager) parseUserNsFileAndRecord(logger logr.Logger, pod types.UID, content []byte) (userNs userNamespace, err error) {
+func (m *UsernsManager) parseUserNsFileAndRecord(logger klog.Logger, pod types.UID, content []byte) (userNs userNamespace, err error) {
 	if err = json.Unmarshal([]byte(content), &userNs); err != nil {
 		err = fmt.Errorf("invalid user namespace mappings file: %w", err)
 		return
@@ -351,7 +351,7 @@ func (m *UsernsManager) parseUserNsFileAndRecord(logger logr.Logger, pod types.U
 	return
 }
 
-func (m *UsernsManager) createUserNs(logger logr.Logger, pod *v1.Pod) (userNs userNamespace, err error) {
+func (m *UsernsManager) createUserNs(logger klog.Logger, pod *v1.Pod) (userNs userNamespace, err error) {
 	firstID, length, err := m.allocateOne(logger, pod.UID)
 	if err != nil {
 		return
@@ -384,7 +384,10 @@ func (m *UsernsManager) createUserNs(logger logr.Logger, pod *v1.Pod) (userNs us
 }
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger logr.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
 
 	// TODO: If the default value for hostUsers ever changes, change the default value of
@@ -467,10 +470,11 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger logr.Logger, pod
 // CleanupOrphanedPodUsernsAllocations reconciliates the state of user namespace
 // allocations with the pods actually running. It frees any user namespace
 // allocation for orphaned pods.
-func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(logger logr.Logger, pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(ctx context.Context, pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return nil
 	}
+	logger := klog.FromContext(ctx)
 
 	m.lock.Lock()
 	defer m.lock.Unlock()
