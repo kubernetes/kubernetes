@@ -916,7 +916,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			},
 			expectErrorPod:                      podWithID("foo", testNode.Name),
 			expectAssumedPod:                    podWithID("foo", testNode.Name),
-			expectError:                         fmt.Errorf(`running Permit plugin "FakePermit": %w`, permitErr),
+			expectError:                         permitErr,
 			eventReason:                         "FailedScheduling",
 			expectedNumCallsToFailureHandler:    1,
 			expectPodIsInFlightAtFailureHandler: true,
@@ -988,7 +988,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			expectBind:                             &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod:                       podWithID("foo", testNode.Name),
 			injectBindError:                        bindingErr,
-			expectError:                            fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", bindingErr),
+			expectError:                            bindingErr,
 			expectErrorPod:                         podWithID("foo", testNode.Name),
 			eventReason:                            "FailedScheduling",
 			mockWaitOnPermitResult:                 framework.NewStatus(framework.Success),
@@ -1068,6 +1068,15 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				fwk.waitOnPermitFn = func(_ context.Context, pod *v1.Pod) *framework.Status {
+					fwk.gotPodIsInFlightAtWaitOnPermit = podListContainsPod(fwk.queue.InFlightPods(), pod)
+					return fwk.waitOnPermitResult
+				}
+				fwk.runPreBindPluginsFn = func(_ context.Context, _ *framework.CycleState, pod *v1.Pod, _ string) *framework.Status {
+					fwk.gotPodIsInFlightAtRunPreBindPlugins = podListContainsPod(fwk.queue.InFlightPods(), pod)
+					return fwk.runPreBindPluginsResult
+				}
+
 				sched := &Scheduler{
 					Cache:           cache,
 					client:          client,
@@ -1116,7 +1125,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					if !errors.Is(gotError, item.expectError) {
 						t.Errorf("Unexpected error. Wanted %v, got %v", item.expectError, gotError)
 					}
-				} else if diff := cmp.Diff(item.expectError.Error(), gotError.Error()); diff != "" {
+				} else if diff := cmp.Diff(item.expectError, gotError, cmpopts.EquateErrors()); diff != "" {
 					t.Errorf("Unexpected error (-want,+got):\n%s", diff)
 				}
 				if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
@@ -1160,6 +1169,8 @@ type FakeFramework struct {
 	queue                               internalqueue.SchedulingQueue
 	gotPodIsInFlightAtWaitOnPermit      bool
 	gotPodIsInFlightAtRunPreBindPlugins bool
+	waitOnPermitFn                      func(context.Context, *v1.Pod) *framework.Status
+	runPreBindPluginsFn                 func(context.Context, *framework.CycleState, *v1.Pod, string) *framework.Status
 }
 
 func NewFakeFramework(ctx context.Context, waitOnPermitRes *framework.Status, runPreBindPluginsRes *framework.Status,
@@ -1174,14 +1185,12 @@ func NewFakeFramework(ctx context.Context, waitOnPermitRes *framework.Status, ru
 		err
 }
 
-func (ff *FakeFramework) WaitOnPermit(_ context.Context, pod *v1.Pod) *framework.Status {
-	ff.gotPodIsInFlightAtWaitOnPermit = podListContainsPod(ff.queue.InFlightPods(), pod)
-	return ff.waitOnPermitResult
+func (ff *FakeFramework) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framework.Status {
+	return ff.waitOnPermitFn(ctx, pod)
 }
 
-func (ff *FakeFramework) RunPreBindPlugins(_ context.Context, _ *framework.CycleState, pod *v1.Pod, _ string) (status *framework.Status) {
-	ff.gotPodIsInFlightAtRunPreBindPlugins = podListContainsPod(ff.queue.InFlightPods(), pod)
-	return ff.runPreBindPluginsResult
+func (ff *FakeFramework) RunPreBindPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	return ff.runPreBindPluginsFn(ctx, state, pod, nodeName)
 }
 
 func podListContainsPod(list []*v1.Pod, pod *v1.Pod) bool {
