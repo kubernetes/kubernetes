@@ -557,13 +557,17 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 	p.activeQ.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
 		if pInfo.Gated {
 			// Add the Pod to unschedulablePods if it's not passing PreEnqueuePlugins.
-			if unlockedActiveQ.Has(pInfo) {
+			if unlockedActiveQ.has(pInfo) {
 				return
 			}
 			if p.backoffQ.has(pInfo) {
 				return
 			}
-			p.unschedulablePods.addOrUpdate(pInfo)
+			if p.unschedulablePods.get(pInfo.Pod) != nil {
+				return
+			}
+			p.unschedulablePods.addOrUpdate(pInfo, event)
+			logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulablePods)
 			return
 		}
 		if pInfo.InitialAttemptTimestamp == nil {
@@ -571,13 +575,12 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 			pInfo.InitialAttemptTimestamp = &now
 		}
 
-		unlockedActiveQ.AddOrUpdate(pInfo)
+		unlockedActiveQ.add(pInfo, event)
 		added = true
 
 		p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
 		p.backoffQ.delete(pInfo)
 		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
 		if event == framework.EventUnscheduledPodAdd.Label() || event == framework.EventUnscheduledPodUpdate.Label() {
 			p.AddNominatedPod(logger, pInfo.PodInfo, nil)
 		}
@@ -721,13 +724,11 @@ func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, 
 		// - No unschedulable plugins are associated with this Pod,
 		//   meaning something unusual (a temporal failure on kube-apiserver, etc) happened and this Pod gets moved back to the queue.
 		//   In this case, we should retry scheduling it because this Pod may not be retried until the next flush.
-		p.backoffQ.add(logger, pInfo)
+		p.backoffQ.add(logger, pInfo, framework.ScheduleAttemptFailure)
 		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", backoffQ)
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", framework.ScheduleAttemptFailure).Inc()
 	} else {
-		p.unschedulablePods.addOrUpdate(pInfo)
+		p.unschedulablePods.addOrUpdate(pInfo, framework.ScheduleAttemptFailure)
 		logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pod), "event", framework.ScheduleAttemptFailure, "queue", unschedulablePods)
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", framework.ScheduleAttemptFailure).Inc()
 	}
 
 	return nil
@@ -933,7 +934,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 			// Pod might have completed its backoff time while being in unschedulablePods,
 			// so we should check isPodBackingoff before moving the pod to backoffQ.
 			if p.backoffQ.isPodBackingoff(pInfo) {
-				p.backoffQ.add(logger, pInfo)
+				p.backoffQ.add(logger, pInfo, framework.EventUnscheduledPodUpdate.Label())
 				p.unschedulablePods.delete(pInfo.Pod, gated)
 				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", framework.EventUnscheduledPodUpdate.Label(), "queue", backoffQ)
 				return
@@ -946,7 +947,7 @@ func (p *PriorityQueue) Update(logger klog.Logger, oldPod, newPod *v1.Pod) {
 		}
 
 		// Pod update didn't make it schedulable, keep it in the unschedulable queue.
-		p.unschedulablePods.addOrUpdate(pInfo)
+		p.unschedulablePods.addOrUpdate(pInfo, framework.EventUnscheduledPodUpdate.Label())
 		return
 	}
 	// If pod is not in any of the queues, we put it in the active queue.
@@ -1036,16 +1037,14 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 // NOTE: this function assumes lock has been acquired in caller
 func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, strategy queueingStrategy, event string) string {
 	if strategy == queueSkip {
-		p.unschedulablePods.addOrUpdate(pInfo)
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Inc()
+		p.unschedulablePods.addOrUpdate(pInfo, event)
 		return unschedulablePods
 	}
 
 	// Pod might have completed its backoff time while being in unschedulablePods,
 	// so we should check isPodBackingoff before moving the pod to backoffQ.
 	if strategy == queueAfterBackoff && p.backoffQ.isPodBackingoff(pInfo) {
-		p.backoffQ.add(logger, pInfo)
-		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+		p.backoffQ.add(logger, pInfo, event)
 		return backoffQ
 	}
 
@@ -1053,13 +1052,7 @@ func (p *PriorityQueue) requeuePodViaQueueingHint(logger klog.Logger, pInfo *fra
 	if added := p.moveToActiveQ(logger, pInfo, event); added {
 		return activeQ
 	}
-	if pInfo.Gated {
-		// In case the pod is gated, the Pod is pushed back to unschedulable Pods pool in moveToActiveQ.
-		return unschedulablePods
-	}
-
-	p.unschedulablePods.addOrUpdate(pInfo)
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", framework.ScheduleAttemptFailure).Inc()
+	// Pod is gated. We don't have to push it back to unschedulable queue, because moveToActiveQ should already have done that.
 	return unschedulablePods
 }
 
@@ -1178,7 +1171,7 @@ func (p *PriorityQueue) GetPod(name, namespace string) (pInfo *framework.QueuedP
 	}
 
 	p.activeQ.underRLock(func(unlockedActiveQ unlockedActiveQueueReader) {
-		pInfo, ok = unlockedActiveQ.Get(pInfoLookup)
+		pInfo, ok = unlockedActiveQ.get(pInfoLookup)
 	})
 	return
 }
@@ -1205,7 +1198,7 @@ func (p *PriorityQueue) nominatedPodToInfo(np podRef, unlockedActiveQ unlockedAc
 	pod := np.toPod()
 	pInfoLookup := newQueuedPodInfoForLookup(pod)
 
-	queuedPodInfo, exists := unlockedActiveQ.Get(pInfoLookup)
+	queuedPodInfo, exists := unlockedActiveQ.get(pInfoLookup)
 	if exists {
 		return queuedPodInfo.PodInfo
 	}
@@ -1275,7 +1268,8 @@ type UnschedulablePods struct {
 }
 
 // addOrUpdate adds a pod to the unschedulable podInfoMap.
-func (u *UnschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo) {
+// The event should show which event triggered the addition and is used for the metric recording.
+func (u *UnschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo, event string) {
 	podID := u.keyFunc(pInfo.Pod)
 	if _, exists := u.podInfoMap[podID]; !exists {
 		if pInfo.Gated && u.gatedRecorder != nil {
@@ -1283,6 +1277,7 @@ func (u *UnschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo) {
 		} else if !pInfo.Gated && u.unschedulableRecorder != nil {
 			u.unschedulableRecorder.Inc()
 		}
+		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Inc()
 	}
 	u.podInfoMap[podID] = pInfo
 }

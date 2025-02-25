@@ -152,7 +152,7 @@ func TestBackoffQueue_popEachBackoffCompleted(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration)
 			for _, podName := range tt.podsInBackoff {
-				bq.add(logger, podInfos[podName])
+				bq.add(logger, podInfos[podName], framework.EventUnscheduledPodAdd.Label())
 			}
 			var gotPods []string
 			bq.popEachBackoffCompleted(logger, func(pInfo *framework.QueuedPodInfo) {
