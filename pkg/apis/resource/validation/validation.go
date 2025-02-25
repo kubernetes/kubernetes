@@ -550,7 +550,7 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field
 		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
 	}
 	if len(device.BindingConditions) > resource.BindingConditionsMaxSize {
-		allErrs = append(allErrs, field.TooMany(fldPath.Child("BindingConditions"), len(device.BindingConditions), resource.BindingConditionsMaxSize))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingConditions"), len(device.BindingConditions), resource.BindingConditionsMaxSize))
 	}
 	if len(device.BindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), resource.BindingFailureConditionsMaxSize))

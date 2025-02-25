@@ -1156,7 +1156,7 @@ type AllocatedDeviceStatus struct {
 
 	// BindingConditions is a copy of the BindingConditions
 	// as defined for the device at the time when it was allocated.
-	// All of these conditions must be to True to proceed with binding the pod to the node
+	// All of these conditions must be True to proceed with binding the pod to the node
 	// while scheduling the pod.
 	//
 	// +optional
