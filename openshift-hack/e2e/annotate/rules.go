@@ -179,9 +179,6 @@ var (
 			// https://issues.redhat.com/browse/OCPBUGS-45274
 			// https://github.com/kubernetes/kubernetes/issues/129056
 			`\[sig-node\] PodRejectionStatus Kubelet should reject pod when the node didn't have enough resource`,
-
-			// https://issues.redhat.com/browse/OCPBUGS-45359
-			`\[Feature:RecoverVolumeExpansionFailure\]`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

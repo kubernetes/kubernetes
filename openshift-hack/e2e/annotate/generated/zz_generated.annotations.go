@@ -2223,17 +2223,17 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Mock volume expansion CSI online volume expansion with secret should expand volume without restarting pod if attach=on, nodeExpansion=on, csiNodeExpandSecret=on": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should be possible for node-only expanded volumes with final error": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should be possible for node-only expanded volumes with final error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should be possible for node-only expanded volumes with infeasible error": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should be possible for node-only expanded volumes with infeasible error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should not be possible in partially expanded volumes": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] recovery should not be possible in partially expanded volumes": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should allow recovery if controller expansion fails with final error": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should allow recovery if controller expansion fails with final error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should allow recovery if controller expansion fails with infeasible error": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should allow recovery if controller expansion fails with infeasible error": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should record target size in allocated resources": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-storage] CSI Mock volume expansion Expansion with recovery [Feature:RecoverVolumeExpansionFailure] should record target size in allocated resources": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock volume fsgroup policies CSI FSGroupPolicy Update [LinuxOnly] should not update fsGroup if update from File to None": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
