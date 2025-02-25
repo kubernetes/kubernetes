@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package progress
 
 import (
 	"context"
@@ -115,12 +115,12 @@ func TestConditionalProgressRequester(t *testing.T) {
 
 func newTestConditionalProgressRequester(clock clock.WithTicker) *testConditionalProgressRequester {
 	pr := &testConditionalProgressRequester{}
-	pr.conditionalProgressRequester = newConditionalProgressRequester(pr.RequestWatchProgress, clock, nil)
+	pr.ConditionalProgressRequester = NewConditionalProgressRequester(pr.RequestWatchProgress, clock, nil)
 	return pr
 }
 
 type testConditionalProgressRequester struct {
-	*conditionalProgressRequester
+	*ConditionalProgressRequester
 	progressRequestsSentCount atomic.Int32
 }
 
