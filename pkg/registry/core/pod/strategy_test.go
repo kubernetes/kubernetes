@@ -3307,3 +3307,216 @@ func TestEphemeralContainersPrepareForUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestStatusPrepareForUpdate(t *testing.T) {
+	testCases := []struct {
+		description string
+		oldPod      *api.Pod
+		newPod      *api.Pod
+		expected    *api.Pod
+	}{
+		{
+			description: "preserve old owner references",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod",
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "ReplicaSet", Name: "rs-1"}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod",
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "ReplicaSet", Name: "rs-2"}},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod",
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "ReplicaSet", Name: "rs-1"}},
+				},
+			},
+		},
+		{
+			description: "preserve old qos if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					QOSClass: "Guaranteed",
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					QOSClass: "Guaranteed",
+				},
+			},
+		},
+		{
+			description: "preserve old status.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+		},
+		{
+			description: "preserve old conditions.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:   "old=without,new=with",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "removed-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   "old=with,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
+			if !cmp.Equal(tc.expected, tc.newPod) {
+				t.Errorf("StatusStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
+			}
+		})
+	}
+}
