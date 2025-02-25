@@ -333,7 +333,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			if a.deviceBindingEnabled {
 				for _, device := range internal.slice.Spec.Devices {
 					if device.Name == internal.id.Device && device.Basic.BindingConditions != nil {
-						allocationResult.Devices.Results[i].UsageRestrictedToNode = device.Basic.UsageRestrictedToNode
+						allocationResult.Devices.Results[i].UsageRestrictedToNode = &device.Basic.UsageRestrictedToNode
 						allocationResult.Devices.Results[i].BindingConditions = device.Basic.BindingConditions
 						allocationResult.Devices.Results[i].BindingFailureConditions = device.Basic.BindingFailureConditions
 						allocationResult.Devices.Results[i].BindingTimeout = device.Basic.BindingTimeout
