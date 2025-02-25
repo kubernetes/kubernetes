@@ -451,10 +451,9 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 			continue
 		}
 
-		// Ignore how the volume is going to be mounted.
-		// Report any errors when a volume is used by two pods with different SELinux labels regardless of their
-		// SELinuxChangePolicy
-		seLinuxLabel := mountInfo.SELinuxProcessLabel
+		// Use the same label as kubelet will use for mount -o context.
+		// If the Pod has opted in to Recursive policy, it will be empty string here and no conflicts will be reported for it.
+		seLinuxLabel := mountInfo.SELinuxMountLabel
 
 		err = c.syncVolume(logger, pod, spec, seLinuxLabel, mountInfo.PluginSupportsSELinuxContextMount)
 		if err != nil {
