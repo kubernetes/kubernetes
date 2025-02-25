@@ -503,7 +503,7 @@ github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests
 github.com/openshift-eng/openshift-tests-extension/pkg/flags
 github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo
 github.com/openshift-eng/openshift-tests-extension/pkg/version
-# github.com/openshift/api v0.0.0-20250124212313-a770960d61e0
+# github.com/openshift/api v0.0.0-20250129162653-107848b719c5
 ## explicit; go 1.23.0
 github.com/openshift/api/apiserver/v1
 github.com/openshift/api/apps/v1

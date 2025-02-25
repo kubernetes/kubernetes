@@ -180,6 +180,7 @@ ingresscontrollers.operator.openshift.io:
   FeatureGates:
   - IngressControllerLBSubnetsAWS
   - SetEIPForNLBIngressController
+  - SetEIPForNLBIngressController+IngressControllerLBSubnetsAWS
   FilenameOperatorName: ingress
   FilenameOperatorOrdering: "00"
   FilenameRunLevel: "0000_50"
