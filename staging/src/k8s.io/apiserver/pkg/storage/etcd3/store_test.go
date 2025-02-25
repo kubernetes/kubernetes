@@ -172,7 +172,7 @@ func TestListPaging(t *testing.T) {
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(client.Client), store)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(client.Client), store)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
@@ -249,12 +249,12 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, compactStorage(client.Client), false)
+	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false)
 }
 
 func TestConsistentList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, store, compactStorage(client.Client), false, true)
+	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -313,15 +313,23 @@ func TestNamespaceScopedList(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedList(ctx, t, store)
 }
 
-func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
+func compactStorage(client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err = compact(ctx, etcdClient, 0, int64(rv)); err != nil {
+		if _, err = client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Unable to compact, %v", err)
+		}
+	}
+}
+
+func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) {
+		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+			t.Fatalf("Could not update increaseRV: %v", err)
 		}
 	}
 }

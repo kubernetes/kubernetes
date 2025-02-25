@@ -182,7 +182,7 @@ func TestList(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
 			ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 			t.Cleanup(terminate)
-			storagetesting.RunTestList(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client), true)
+			storagetesting.RunTestList(ctx, t, cacher, increaseRV(server.V3Client.Client), true)
 		})
 	}
 }
@@ -192,7 +192,7 @@ func TestConsistentList(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
 			ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 			t.Cleanup(terminate)
-			storagetesting.RunTestConsistentList(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client), true, consistentRead)
+			storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRV(server.V3Client.Client), true, consistentRead)
 		})
 	}
 }
@@ -203,7 +203,7 @@ func TestGetListNonRecursive(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
 			ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 			t.Cleanup(terminate)
-			storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(cacher, server.V3Client.Client), cacher)
+			storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(server.V3Client.Client), cacher)
 		})
 	}
 }
@@ -297,7 +297,7 @@ func TestWatch(t *testing.T) {
 func TestWatchFromZero(t *testing.T) {
 	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 	t.Cleanup(terminate)
-	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactStorage(cacher, server.V3Client.Client))
+	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatchCache(cacher, server.V3Client.Client))
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
