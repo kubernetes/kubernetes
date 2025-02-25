@@ -148,7 +148,9 @@ func testBuiltinResourceRead(t *testing.T, cfg *rest.Config, shouldBlock bool) {
 func TestStorageVersionBootstrap(t *testing.T) {
 	// Start server and create CRD
 	etcdConfig := framework.SharedEtcd()
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), etcdConfig)
+	flags := framework.DefaultTestServerFlags()
+	flags = append(flags, "--runtime-config=api/all=true")
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, etcdConfig)
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()[0])
 	server.TearDownFn()
 
