@@ -939,7 +939,7 @@ func TestSuccessPolicy_ReEnabling(t *testing.T) {
 		Active:      0,
 		Succeeded:   3,
 		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](2),
+		Terminating: ptr.To[int32](0),
 	})
 	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New[int](), "0-2", nil)
 
