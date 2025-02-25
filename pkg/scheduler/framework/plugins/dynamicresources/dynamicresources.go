@@ -641,7 +641,6 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 			claim.Status.ReservedFor = nil
 			claim.Status.Allocation = nil
 			claim.Status.Devices = nil
-			klog.InfoS("Deallocating ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 			logger.V(5).Info("Deallocation of ResourceClaim", "pod", klog.KObj(pod), "resourceclaim", klog.KObj(claim))
 			if _, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{}); err != nil {
 				return nil, statusError(logger, err)
@@ -837,7 +836,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	// We need to wait for the device to be attached to the node.
-	err = wait.PollUntilContextTimeout(ctx, 30*time.Second, timeout, true,
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true,
 		func(ctx context.Context) (bool, error) {
 			for claimIndex, claim := range state.claims {
 				claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
