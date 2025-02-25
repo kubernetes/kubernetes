@@ -30,7 +30,11 @@ import (
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
-const cgroupv2MemLimitFile string = "memory.max"
+const (
+	cgroupv2MemLimitFile  = "memory.max"
+	cgroupv2CpuMaxFile    = "cpu.max"
+	cgroupv2CpuWeightFile = "cpu.weight"
+)
 
 // cgroupV2impl implements the CgroupManager interface
 // for cgroup v2.
@@ -100,14 +104,14 @@ func (c *cgroupV2impl) GetCgroupConfig(name CgroupName, resource v1.ResourceName
 
 func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, error) {
 	var cpuLimitStr, cpuPeriodStr string
-	cpuLimitAndPeriod, err := fscommon.GetCgroupParamString(cgroupPath, "cpu.max")
+	cpuLimitAndPeriod, err := fscommon.GetCgroupParamString(cgroupPath, cgroupv2CpuMaxFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read cpu.max file for cgroup %v: %w", cgroupPath, err)
+		return nil, fmt.Errorf("failed to read %s file for cgroup %v: %w", cgroupv2CpuMaxFile, cgroupPath, err)
 	}
 	numItems, errScan := fmt.Sscanf(cpuLimitAndPeriod, "%s %s", &cpuLimitStr, &cpuPeriodStr)
 	if errScan != nil || numItems != 2 {
-		return nil, fmt.Errorf("failed to correctly parse content of cpu.max file ('%s') for cgroup %v: %w",
-			cpuLimitAndPeriod, cgroupPath, errScan)
+		return nil, fmt.Errorf("failed to correctly parse content of %s file ('%s') for cgroup %v: %w",
+			cgroupv2CpuMaxFile, cpuLimitAndPeriod, cgroupPath, errScan)
 	}
 	cpuLimit := int64(-1)
 	if cpuLimitStr != Cgroup2MaxCpuLimit {
@@ -120,7 +124,7 @@ func (c *cgroupV2impl) getCgroupCPUConfig(cgroupPath string) (*ResourceConfig, e
 	if errPeriod != nil {
 		return nil, fmt.Errorf("failed to convert CPU period as integer for cgroup %v: %w", cgroupPath, errPeriod)
 	}
-	cpuWeight, errWeight := fscommon.GetCgroupParamUint(cgroupPath, "cpu.weight")
+	cpuWeight, errWeight := fscommon.GetCgroupParamUint(cgroupPath, cgroupv2CpuWeightFile)
 	if errWeight != nil {
 		return nil, fmt.Errorf("failed to read CPU weight for cgroup %v: %w", cgroupPath, errWeight)
 	}
