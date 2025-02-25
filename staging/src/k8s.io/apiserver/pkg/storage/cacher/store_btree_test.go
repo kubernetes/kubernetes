@@ -41,40 +41,30 @@ func TestStoreListPrefix(t *testing.T) {
 	assert.NoError(t, store.Add(testStorageElement("foo2", "bar1", 3)))
 	assert.NoError(t, store.Add(testStorageElement("bar", "baz", 4)))
 
-	items, hasMore := store.ListPrefix("foo", "", 0)
-	assert.False(t, hasMore)
+	items := store.ListPrefix("foo", "")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo1", "bar2", 2),
 		testStorageElement("foo2", "bar1", 3),
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, hasMore = store.ListPrefix("foo2", "", 0)
-	assert.False(t, hasMore)
+	items = store.ListPrefix("foo2", "")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
 	}, items)
 
-	items, hasMore = store.ListPrefix("foo", "", 1)
-	assert.True(t, hasMore)
-	assert.Equal(t, []interface{}{
-		testStorageElement("foo1", "bar2", 2),
-	}, items)
-
-	items, hasMore = store.ListPrefix("foo", "foo1\x00", 1)
-	assert.True(t, hasMore)
+	items = store.ListPrefix("foo", "foo1\x00")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo2", "bar1", 3),
+		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, hasMore = store.ListPrefix("foo", "foo2\x00", 1)
-	assert.False(t, hasMore)
+	items = store.ListPrefix("foo", "foo2\x00")
 	assert.Equal(t, []interface{}{
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
-	items, hasMore = store.ListPrefix("bar", "", 0)
-	assert.False(t, hasMore)
+	items = store.ListPrefix("bar", "")
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
 	}, items)
@@ -143,7 +133,7 @@ func (f fakeOrderedLister) Add(obj interface{}) error    { return nil }
 func (f fakeOrderedLister) Update(obj interface{}) error { return nil }
 func (f fakeOrderedLister) Delete(obj interface{}) error { return nil }
 func (f fakeOrderedLister) Clone() orderedLister         { return f }
-func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string, limit int) ([]interface{}, bool) {
-	return nil, false
+func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string) []interface{} {
+	return nil
 }
 func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }

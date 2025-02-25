@@ -523,7 +523,7 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 		}
 	}
 	if store, ok := w.store.(orderedLister); ok {
-		result, _ := store.ListPrefix(key, "", 0)
+		result := store.ListPrefix(key, "")
 		return listResp{
 			Items:           result,
 			ResourceVersion: w.resourceVersion,
