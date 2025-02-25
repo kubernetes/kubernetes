@@ -17,7 +17,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.6.0
-	github.com/openshift/api v0.0.0-20250124212313-a770960d61e0
+	github.com/openshift/api v0.0.0-20250129162653-107848b719c5
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
