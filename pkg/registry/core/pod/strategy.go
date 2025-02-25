@@ -226,6 +226,11 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if newPod.Status.QOSClass == "" {
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
+	// If a client request tries to clear `status.observedGeneration`, we
+	// preserve the original value.
+	if newPod.Status.ObservedGeneration == 0 {
+		newPod.Status.ObservedGeneration = oldPod.Status.ObservedGeneration
+	}
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
