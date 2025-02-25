@@ -13,8 +13,6 @@
 
 run:
   timeout: 30m
-  skip-files:
-    - "^zz_generated.*"
 
 output:
   sort-results: true
@@ -30,6 +28,9 @@ issues:
   exclude:
     # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
     - ineffective break statement. Did you mean to break out of the outer loop
+
+  exclude-files:
+    - "^zz_generated.*"
 
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
