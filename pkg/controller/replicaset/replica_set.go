@@ -30,6 +30,7 @@ package replicaset
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -56,12 +57,15 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	metrics2 "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -115,6 +119,9 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
+
+	// clock can be used by the tests to fake the time.
+	clock clock.PassiveClock
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
@@ -152,6 +159,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
 		),
+		clock: clock.RealClock{},
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -568,20 +576,36 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 }
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
-// Does NOT modify <activePods>.
-// It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods []*v1.Pod, rs *apps.ReplicaSet) error {
+// Does NOT modify <activePods> and <failedPods>.
+// It will requeue (return error) the replica set in case of an error while creating/deleting pods.
+// The second argument can return a duration in seconds that the ReplicaSet should be synced again to handle failed pods.
+func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods, failedPods []*v1.Pod, rs *apps.ReplicaSet) (*int, error) {
 	diff := len(activePods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
-		return nil
+		return nil, nil
 	}
 	logger := klog.FromContext(ctx)
 	if diff < 0 {
 		diff *= -1
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ReplicaSetFailedPodsBackoff) {
+			// Slow down the creation of new pods if there are recently failed pods,
+			// to make sure we do not get into a hot feedback loop with kubelet and not overwhelm the apiserver/etcd.
+			weightedFailedPodCount, nextBucketPromotion := calculateTimeWeightedFailedPodsCount(rsc.clock, diff, failedPods)
+			if weightedFailedPodCount > 0 {
+				logger.V(4).Info("Recently failed pods found", "replicaSet", klog.KObj(rs), "failedPodCount", len(failedPods), "weightedFailedPodCount", weightedFailedPodCount, "nextSync", nextBucketPromotion)
+				diff -= weightedFailedPodCount
+				if diff <= 0 {
+					// We do not delete the failed pods directly,
+					// if there are a large number of them, the pod garbage collector will kick in.
+					return nextBucketPromotion, nil
+				}
+			}
+
 		}
 		// TODO: Track UIDs of creates just like deletes. The problem currently
 		// is we'd need to wait on the result of a create to record the pod's
@@ -620,7 +644,7 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 				rsc.expectations.CreationObserved(logger, rsKey)
 			}
 		}
-		return err
+		return nil, err
 	} else if diff > 0 {
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
@@ -664,13 +688,13 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		case err := <-errCh:
 			// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
 			if err != nil {
-				return err
+				return nil, err
 			}
 		default:
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // getRSPods returns the Pods that a given RS should manage.
@@ -747,10 +771,15 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		allTerminatingPods := controller.FilterTerminatingPods(allRSPods)
 		terminatingPods = controller.FilterClaimedPods(rs, selector, allTerminatingPods)
 	}
+	var failedPods []*v1.Pod
+	if utilfeature.DefaultFeatureGate.Enabled(features.ReplicaSetFailedPodsBackoff) {
+		failedPods = controller.FilterFailedPods(allRSPods)
+	}
 
 	var manageReplicasErr error
+	var nextSyncInSeconds *int
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
-		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
+		nextSyncInSeconds, manageReplicasErr = rsc.manageReplicas(ctx, activePods, failedPods, rs)
 	}
 	rs = rs.DeepCopy()
 	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr)
@@ -766,8 +795,14 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if manageReplicasErr == nil && updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
 		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
-		rsc.queue.AddAfter(key, time.Duration(updatedRS.Spec.MinReadySeconds)*time.Second)
+		if nextSyncInSeconds == nil || int(updatedRS.Spec.MinReadySeconds) < *nextSyncInSeconds {
+			nextSyncInSeconds = ptr.To(int(updatedRS.Spec.MinReadySeconds))
+		}
 	}
+	if manageReplicasErr == nil && nextSyncInSeconds != nil {
+		rsc.queue.AddAfter(key, time.Duration(*nextSyncInSeconds)*time.Second)
+	}
+
 	return manageReplicasErr
 }
 
@@ -900,6 +935,110 @@ func getPodsRankedByRelatedPodsOnSameNode(podsToRank, relatedPods []*v1.Pod) con
 		ranks[i] = podsOnNode[pod.Spec.NodeName]
 	}
 	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks, Now: metav1.Now()}
+}
+
+// calculateTimeWeightedFailedPodsCount calculates the weighted pod count for failed pods according to the number of
+// replicasToCreate and the age of the failed pods.
+// Older pods have a lower weight to allow the ReplicaSet to recover gradually in case its pods start to be suddenly
+// scheduled on nodes where the kubelet will not reject the pods.
+//
+// For example replicasToCreate == 50 will create 50, 70, 90, 110, 130, 150 buckets.
+// 1 failed pod in the 50s bucket corresponds to 1 weighted failed pod.
+// 1 failed pod in the 70s bucket corresponds to 5/6 weighted failed pod.
+// 1 failed pod in the 90s bucket corresponds to 4/6 weighted failed pod.
+// ...
+// 1 failed pod in the 150s bucket corresponds to 1/6 weighted failed pod.
+// Failed pods older than 150s are not included in the count.
+//
+// For a ReplicaSet with .spec.replicas >= 10, the generation rate should be slightly higher than .spec.replicas over
+// the period of 2 * .spec.replicas seconds == 0.5 pods/s == 30 pods / minute.
+//
+// The following measurements were obtained experimentally:
+// ReplicaSet with .spec.replicas == 1 generates approx 4 failed pods / minute.
+// ReplicaSet with .spec.replicas == 5 generates approx 15 failed pods / minute.
+// ReplicaSet with .spec.replicas == 10 generates approx 30 failed pods / minute. First retry happens in 10s. Subsequent retries may be less.
+// ReplicaSet with .spec.replicas == 25 generates approx 36 failed pods / minute.
+// ReplicaSet with .spec.replicas == 100 generates approx 36 failed pods / minute. First retry happens in (100s - time to create the first batch of pods), subsequent retries in 200s or less.
+// ReplicaSet with .spec.replicas >= 500 generates approx 30-35 failed pods / minute. First retry happens in (500s - time to create the first batch of pods), subsequent retries in 200s or less.
+//
+// This function/feature does not fully solve the ReplicaSet controller - kubelet feedback loop, but it slows it down
+// considerably. Now it will usually take 12500/36 == 379m == 6h19m until there are 12500 (default) failed pods. Then
+// the pod garbage collector will kick in and clean up the extra pods after the replica set controller.
+//
+// Returns the time-weighted failed pod count
+// and the next time a pod should be promoted from one bucket to the next.
+func calculateTimeWeightedFailedPodsCount(clock clock.PassiveClock, replicasToCreate int, failedPods []*v1.Pod) (int, *int) {
+	if replicasToCreate <= 0 {
+		return 0, nil
+	}
+	now := clock.Now()
+	// Our ability to detect that the ReplicaSet controller is creating too many failed replicas, depends on how fast
+	// the controller can generate them. The controller can usually generate anywhere from 1 to 30+ replicas per second,
+	// depending on the machine, active utilization and total number of pods.
+	//
+	// Let's consider the scenario of congested ReplicaSet controller that can generate 1 replica per second or less.
+	// Also, let's consider a worst-case scenario, where a kubelet(s) reject all ReplicaSet pods:
+	//
+	// We have to first wait for a first batch of pods (usually .spec.replicas count) to be generated to use as data for
+	// our timeWeightedFailedPodCount calculation to slow down pod generation. We will do this by assigning weights to
+	// these pods according to their age.
+	// So let's wait for at least replicasToCreate seconds (aka firstUpperBound and usually .spec.replicas). The
+	// ReplicaSet controller should generate at least replicasToCreate number of pods, before we can limit the creation
+	// of additional pods. Let's assign these pods a weight of 1. The first bucket should be at least replicasToCreate
+	// and the second bucket should be equal to 0, until we can promote pods from the first bucket.
+	//
+	// To ensure that we do not burst create replicas periodically in these intervals, we should also consider old pods,
+	// but with a lower weight. We can consider pods that are younger than the 3 * firstUpperBound seconds. This should
+	// give us some buffer in case the controller is slower than 1 replica per second.
+	//
+	// Let's consider 6 buckets and decrease the weight in each bucket by 1/6. This means that when the firstUpperBound
+	// time is reached for the first time, 1/6 of the replicasToCreate can be retried.
+	//
+	// The manageReplicas function limits this value to burstReplicas, which is usually 500,
+	// so this is our maximum for the firstUpperBound.
+	firstUpperBound := replicasToCreate
+	// The minimum is 10s, which means our first retry is in 10s, and the failed pods blocking window is only 30s.
+	// Smaller ReplicaSets will reconcile faster because they are not limited by the time ot takes the controller to
+	// create all the pods.
+	if firstUpperBound < 10 {
+		firstUpperBound = 10
+	}
+	lastUpperBound := firstUpperBound * 3
+	bucketsCount := 6
+	bucketsWidth := float64(lastUpperBound-firstUpperBound) / float64(bucketsCount-1)
+	bucketUpperBounds := metrics2.LinearBuckets(float64(firstUpperBound), bucketsWidth, bucketsCount)
+	timeBuckets := make([]int, bucketsCount)
+	var nextTimeToPromoteBucket *int
+
+	// Create a histogram of failed pods.
+	for _, failedPod := range failedPods {
+		if failedPod.Status.Phase == v1.PodFailed && failedPod.Status.StartTime != nil {
+			podStartedBeforeSeconds := now.Sub(failedPod.Status.StartTime.Time).Seconds()
+			bucketIdx := sort.SearchFloat64s(bucketUpperBounds, podStartedBeforeSeconds)
+			// Ignore pods older than the last bucket.
+			if bucketIdx != len(bucketUpperBounds) {
+				timeBuckets[bucketIdx]++
+				bucketUpperBound := bucketUpperBounds[bucketIdx]
+				timeToPromoteBucket := int(math.Ceil(bucketUpperBound - podStartedBeforeSeconds))
+				if nextTimeToPromoteBucket == nil || timeToPromoteBucket < *nextTimeToPromoteBucket {
+					nextTimeToPromoteBucket = &timeToPromoteBucket
+				}
+			}
+		}
+	}
+	// Compute the count with decreasing significance.
+	var timeWeightedFailedPodCount float64
+	for i, failedPodCount := range timeBuckets {
+		weight := float64(bucketsCount-i) / float64(bucketsCount)
+		timeWeightedFailedPodCount += float64(failedPodCount) * weight
+	}
+	if nextTimeToPromoteBucket != nil && *nextTimeToPromoteBucket < 5 {
+		// nextTimeToPromoteBucket can equal to 0, but we need a positive time period to move it to the next bucket.
+		// Large ReplicaSets can result in repeated 1s periods which is too often.
+		nextTimeToPromoteBucket = ptr.To[int](5)
+	}
+	// Ignore decimals to speed up the pod replacement in small ReplicaSets.
+	return int(timeWeightedFailedPodCount), nextTimeToPromoteBucket
 }
 
 func getPodKeys(pods []*v1.Pod) []string {
