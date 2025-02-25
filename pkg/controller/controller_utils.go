@@ -1012,6 +1012,16 @@ func FilterTerminatingPods(pods []*v1.Pod) []*v1.Pod {
 	return result
 }
 
+func FilterFailedPods(pods []*v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
+	for _, p := range pods {
+		if v1.PodFailed == p.Status.Phase {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
 func CountTerminatingPods(pods []*v1.Pod) int32 {
 	numberOfTerminatingPods := 0
 	for _, p := range pods {

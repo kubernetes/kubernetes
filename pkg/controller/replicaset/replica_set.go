@@ -62,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -71,6 +72,8 @@ const (
 
 	// The number of times we retry updating a ReplicaSet's status.
 	statusUpdateRetries = 1
+
+	podFailureDetectionWindow = time.Second * 5
 
 	// controllerUIDIndex is the name for the ReplicaSet store's index function,
 	// which is to index by ReplicaSet's controllerUID.
@@ -114,6 +117,9 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
+
+	// clock can be used by the tests to fake the time.
+	clock clock.PassiveClock
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
@@ -151,6 +157,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
 		),
+		clock: clock.RealClock{},
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -567,7 +574,7 @@ func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 // Does NOT modify <activePods>.
-// It will requeue the replica set in case of an error while creating/deleting pods.
+// It will requeue (return error) the replica set in case of an error while creating/deleting pods.
 func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods []*v1.Pod, rs *apps.ReplicaSet) error {
 	diff := len(activePods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
@@ -596,7 +603,55 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 		// prevented from spamming the API service with the pod create requests
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
-		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
+		// Smaller ReplicaSets are created faster than we can observe the kubelet rejection failures.
+		// So we need a small delay to observe them.
+		detectFailuresAfter := rsc.clock.Now().Add(-podFailureDetectionWindow)
+		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func(batchSizes []int) error {
+			if utilfeature.DefaultFeatureGate.Enabled(features.ReplicaSetFailedPodsBackoff) {
+				allPods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
+				if err != nil {
+					return err
+				}
+				allFailedPods := controller.FilterFailedPods(allPods)
+				selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+				if err != nil {
+					return fmt.Errorf("error converting pod selector to selector for rs %v/%v: %w", rs.Namespace, rs.Name, err)
+				}
+				failedPods := controller.FilterClaimedPods(rs, selector, allFailedPods)
+
+				var currentFailedPods []*v1.Pod
+				for _, failedPod := range failedPods {
+					if failedPod.Status.Phase == v1.PodFailed && failedPod.Status.StartTime != nil && failedPod.Status.StartTime.Time.After(detectFailuresAfter) {
+						currentFailedPods = append(currentFailedPods, failedPod)
+					}
+				}
+				logger.V(4).Info("Recently failed pods found", "replicaSet", klog.KObj(rs), "failedPodCount", len(currentFailedPods))
+
+				// Each batch is increased by the power of 2.
+				// batchSizes := [... ,pre-previous, previous, future]
+				// Since there is a delay for the kubelet rejection, we can observe only the old iterations/batches.
+				// Looking back at the pre-previous batchSize gives us the following behavior:
+				// - If more than 50% of pods failed in the previous batch, we stop creating new pods.
+				// - Since there is a high chance that the pods of the previous batch were still not
+				// accepted by kubelet, we can check all the iterations/batches before the previous one. If at
+				// least 50% of pods failed in all the iterations/batches before the previous one
+				// (equal to batchSizes[len(batchSizes)-3]), we stop creating new pods.
+				//
+				var failThreshold int
+				if len(batchSizes) >= 3 {
+					failThreshold = batchSizes[len(batchSizes)-3]
+				}
+				if failThreshold < 1 {
+					failThreshold = 1
+				}
+				if len(currentFailedPods) >= failThreshold {
+					// return err and let the queue backoff handle it.
+					logger.V(4).Info("Backoff activated", "replicaSet", klog.KObj(rs), "failThreshold", failThreshold)
+					return fmt.Errorf("observed %d pod(s) with Failed status", len(currentFailedPods))
+				}
+			}
+			return nil
+		}, func() error {
 			err := rsc.podControl.CreatePods(ctx, rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
 				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
@@ -775,10 +830,17 @@ func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.Replica
 // after waiting for the current batch to complete.
 //
 // It returns the number of successful calls to the function.
-func slowStartBatch(count int, initialBatchSize int, fn func() error) (int, error) {
+func slowStartBatch(count int, initialBatchSize int, batchPrecondition func(batchSizes []int) error, fn func() error) (int, error) {
+	var batchSizes []int
 	remaining := count
 	successes := 0
 	for batchSize := min(remaining, initialBatchSize); batchSize > 0; batchSize = min(2*batchSize, remaining) {
+		batchSizes = append(batchSizes, batchSize)
+		if batchPrecondition != nil {
+			if err := batchPrecondition(batchSizes); err != nil {
+				return successes, err
+			}
+		}
 		errCh := make(chan error, batchSize)
 		var wg sync.WaitGroup
 		wg.Add(batchSize)

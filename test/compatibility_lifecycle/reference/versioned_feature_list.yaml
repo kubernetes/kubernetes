@@ -1161,6 +1161,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: ReplicaSetFailedPodsBackoff
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: ResilientWatchCacheInitialization
   versionedSpecs:
   - default: true

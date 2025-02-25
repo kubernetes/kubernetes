@@ -1829,7 +1829,7 @@ func TestSlowStartBatch(t *testing.T) {
 	for _, test := range tests {
 		callCnt = 0
 		callLimit = test.callLimit
-		successes, err := slowStartBatch(test.count, 1, test.fn)
+		successes, err := slowStartBatch(test.count, 1, nil, test.fn)
 		if successes != test.expectedSuccesses {
 			t.Errorf("%s: unexpected processed batch size, expected %d, got %d", test.name, test.expectedSuccesses, successes)
 		}
