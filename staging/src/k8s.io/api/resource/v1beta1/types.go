@@ -229,7 +229,7 @@ type BasicDevice struct {
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
 	// +optional
-	UsageRestrictedToNode bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,3,opt,name=usageRestrictedToNode"`
+	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,3,opt,name=usageRestrictedToNode"`
 
 	// BindingConditions defines the conditions for proceeding with binding.
 	// All of these conditions must be set in the per-device status
@@ -882,7 +882,7 @@ type DeviceRequestAllocationResult struct {
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
 	// +optional
-	UsageRestrictedToNode bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,6,opt,name=usageRestrictedToNode"`
+	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,6,opt,name=usageRestrictedToNode"`
 
 	// BindingConditions defines the conditions for proceeding with binding.
 	// All of these conditions must be set in the per-device status
@@ -1132,7 +1132,7 @@ type AllocatedDeviceStatus struct {
 	// the node that was chosen for the pod which triggered allocation.
 	//
 	// +optional
-	UsageRestrictedToNode bool `json:"usageRestrictedToNode,omitempty" protobuf:"bytes,7,opt,name=usageRestrictedToNode"`
+	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"bytes,7,opt,name=usageRestrictedToNode"`
 
 	// BindingConditions is a copy of the BindingConditions
 	// as defined for the device at the time when it was allocated.

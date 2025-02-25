@@ -523,31 +523,32 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 			continue
 		}
 
-		// If the claim is not completed to bind, cannot use this allocation.
-		if claim.Status.Allocation != nil {
-			bindingFailed := false
-			for _, device := range claim.Status.Devices {
-				if bindingFailed {
+		// If the claim is not ready to bind, cannot use this allocation.
+		if claim.Status.Allocation == nil {
+			continue
+		}
+		bindingFailed := false
+		for _, device := range claim.Status.Devices {
+			if bindingFailed {
+				break
+			}
+			for _, cond := range device.BindingFailureConditions {
+				if apimeta.IsStatusConditionTrue(device.Conditions, cond) {
+					logger.V(5).Info("device binding failed", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "device", device.Device, "condition", cond)
+					bindingFailed = true
 					break
 				}
-				for _, cond := range device.BindingFailureConditions {
-					if apimeta.IsStatusConditionTrue(device.Conditions, cond) {
-						logger.V(5).Info("device binding failed", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "device", device.Device, "condition", cond)
-						bindingFailed = true
-						break
-					}
-				}
-				for _, cond := range device.BindingConditions {
-					if !apimeta.IsStatusConditionTrue(device.Conditions, cond) {
-						logger.V(5).Info("device binding condition not met", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "device", device.Device, "condition", cond)
-						bindingFailed = true
-						break
-					}
+			}
+			for _, cond := range device.BindingConditions {
+				if !apimeta.IsStatusConditionTrue(device.Conditions, cond) {
+					logger.V(5).Info("device binding condition not met", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaim", klog.KObj(claim), "device", device.Device, "condition", cond)
+					bindingFailed = true
+					break
 				}
 			}
-			if bindingFailed {
-				unavailableClaims = append(unavailableClaims, index)
-			}
+		}
+		if bindingFailed {
+			unavailableClaims = append(unavailableClaims, index)
 		}
 	}
 
