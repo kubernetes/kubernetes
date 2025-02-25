@@ -2,9 +2,9 @@
 
 module k8s.io/apimachinery
 
-go 1.23.0
+go 1.24.0
 
-godebug default=go1.23
+godebug default=go1.24
 
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
