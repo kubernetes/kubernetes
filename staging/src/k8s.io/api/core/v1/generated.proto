@@ -3712,6 +3712,12 @@ message PodCondition {
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
   optional string type = 1;
 
+  // If set, this represents the .metadata.generation that the pod condition was set based upon.
+  // This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 7;
+
   // Status is the status of the condition.
   // Can be True, False, Unknown.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
@@ -4497,6 +4503,12 @@ message PodSpec {
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
 message PodStatus {
+  // If set, this represents the .metadata.generation that the pod status was set based upon.
+  // This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 17;
+
   // The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
   // The conditions array, the reason and message fields, and the individual container status
   // arrays contain more detail about the pod's status.

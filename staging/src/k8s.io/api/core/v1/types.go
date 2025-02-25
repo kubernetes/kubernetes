@@ -3312,7 +3312,7 @@ type PodCondition struct {
 	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
 	// +featureGate=PodObservedGenerationTracking
 	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,7,opt,name=observedGeneration"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
@@ -4850,7 +4850,7 @@ type PodStatus struct {
 	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
 	// +featureGate=PodObservedGenerationTracking
 	// +optional
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,17,opt,name=observedGeneration"`
 	// The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
 	// The conditions array, the reason and message fields, and the individual container status
 	// arrays contain more detail about the pod's status.
