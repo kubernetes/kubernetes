@@ -653,12 +653,12 @@ func allowInvalidWildcardHostRule(oldIngress *networking.Ingress) bool {
 // IPAddress does not support generating names, prefix is not considered.
 func ValidateIPAddressName(name string, prefix bool) []string {
 	var errs []string
-	ip, err := netip.ParseAddr(name)
-	if err != nil {
-		errs = append(errs, err.Error())
-	} else if ip.String() != name {
-		errs = append(errs, "must be a canonical format IP address")
 
+	allErrs := validation.IsValidIP(&field.Path{}, name, validation.IPIsCanonical)
+	// Need to unconvert the field.Error from IsValidIP back to a string so our caller
+	// can convert it back to a field.Error!
+	for _, err := range allErrs {
+		errs = append(errs, err.Detail)
 	}
 	return errs
 }

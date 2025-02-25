@@ -35,6 +35,9 @@ const (
 
 	// IPIsIPv6 validates that the IP is IPv6
 	IPIsIPv6 IPValidationFlag = "IPIsIPv6"
+
+	// IPIsCanonical validates that the IP is in canonical form.
+	IPIsCanonical IPValidationFlag = "IPIsCanonical"
 )
 
 // IsValidIP tests that the argument is a valid IP address according to flags
@@ -48,6 +51,12 @@ func IsValidIP(fldPath *field.Path, value string, flags ...IPValidationFlag) fie
 	}
 
 	flagSet := sets.New(flags...)
+
+	if flagSet.Has(IPIsCanonical) {
+		if value != ip.String() {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", ip.String())))
+		}
+	}
 
 	if flagSet.Has(IPIsIPv4) && !netutils.IsIPv4(ip) {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv4 address"))
@@ -98,18 +107,29 @@ const (
 
 	// CIDRIsIPv6 validates that the CIDR is IPv6
 	CIDRIsIPv6 CIDRValidationFlag = "CIDRIsIPv6"
+
+	// CIDRIsCanonical validates that the CIDR is in canonical form.
+	CIDRIsCanonical CIDRValidationFlag = "CIDRIsCanonical"
 )
 
 // IsValidCIDR tests that the argument is a valid CIDR value according to flags.
 func IsValidCIDR(fldPath *field.Path, value string, flags ...CIDRValidationFlag) field.ErrorList {
 	var allErrors field.ErrorList
-	ip, _, err := netutils.ParseCIDRSloppy(value)
+	ip, ipnet, err := netutils.ParseCIDRSloppy(value)
 	if err != nil {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
 		return allErrors
 	}
 
 	flagSet := sets.New(flags...)
+
+	if flagSet.Has(CIDRIsCanonical) {
+		maskSize, _ := ipnet.Mask.Size()
+		canonical := fmt.Sprintf("%s/%d", ip.String(), maskSize)
+		if value != canonical {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", canonical)))
+		}
+	}
 
 	if flagSet.Has(CIDRIsIPv4) && !netutils.IsIPv4(ip) {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv4 CIDR"))

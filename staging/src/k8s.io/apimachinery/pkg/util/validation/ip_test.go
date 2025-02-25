@@ -42,6 +42,11 @@ func TestIsValidIP(t *testing.T) {
 			flags: []IPValidationFlag{IPIsIPv4},
 		},
 		{
+			name:  "ipv4 (with IPIsCanonical)",
+			in:    "1.2.3.4",
+			flags: []IPValidationFlag{IPIsCanonical},
+		},
+		{
 			name: "ipv4, all zeros",
 			in:   "0.0.0.0",
 		},
@@ -59,6 +64,11 @@ func TestIsValidIP(t *testing.T) {
 			flags: []IPValidationFlag{IPIsIPv6},
 		},
 		{
+			name:  "ipv6 (with IPIsCanonical)",
+			in:    "1234::abcd",
+			flags: []IPValidationFlag{IPIsCanonical},
+		},
+		{
 			name: "ipv6, all zeros, collapsed",
 			in:   "::",
 		},
@@ -73,12 +83,30 @@ func TestIsValidIP(t *testing.T) {
 			in:   "0:0:0:0:0:0:0:0",
 		},
 		{
+			name:  "ipv6, all zeros, expanded (with IPIsCanonical)",
+			in:    "0:0:0:0:0:0:0:0",
+			flags: []IPValidationFlag{IPIsCanonical},
+			err:   `must be in canonical form ("::")`,
+		},
+		{
 			name: "ipv6, leading 0s (non-canonical)",
 			in:   "0001:002:03:4::",
 		},
 		{
+			name:  "ipv6, leading 0s (with IPIsCanonical)",
+			in:    "0001:002:03:4::",
+			flags: []IPValidationFlag{IPIsCanonical},
+			err:   `must be in canonical form ("1:2:3:4::")`,
+		},
+		{
 			name: "ipv6, capital letters (non-canonical)",
 			in:   "1234::ABCD",
+		},
+		{
+			name:  "ipv6, capital letters (with IPIsCanonical)",
+			in:    "1234::ABCD",
+			flags: []IPValidationFlag{IPIsCanonical},
+			err:   `must be in canonical form ("1234::abcd")`,
 		},
 
 		// BAD VALUES WE CURRENTLY CONSIDER GOOD
@@ -258,6 +286,11 @@ func TestIsValidCIDR(t *testing.T) {
 			flags: []CIDRValidationFlag{CIDRIsIPv4},
 		},
 		{
+			name:  "ipv4 (with CIDRIsCanonical)",
+			in:    "1.0.0.0/8",
+			flags: []CIDRValidationFlag{CIDRIsCanonical},
+		},
+		{
 			name: "ipv4, all IPs",
 			in:   "0.0.0.0/0",
 		},
@@ -270,6 +303,11 @@ func TestIsValidCIDR(t *testing.T) {
 			in:   "1.2.3.4/24",
 		},
 		{
+			name:  "ipv4 ifaddr (with CIDRIsCanonical)",
+			in:    "1.2.3.4/24",
+			flags: []CIDRValidationFlag{CIDRIsCanonical},
+		},
+		{
 			name: "ipv6",
 			in:   "2001:4860:4860::/48",
 		},
@@ -277,6 +315,11 @@ func TestIsValidCIDR(t *testing.T) {
 			name:  "ipv6 (with CIDRIsIPv6)",
 			in:    "2001:4860:4860::/48",
 			flags: []CIDRValidationFlag{CIDRIsIPv6},
+		},
+		{
+			name:  "ipv6 (with CIDRIsCanonical)",
+			in:    "2001:4860:4860::/48",
+			flags: []CIDRValidationFlag{CIDRIsCanonical},
 		},
 		{
 			name: "ipv6, all IPs",
@@ -290,6 +333,11 @@ func TestIsValidCIDR(t *testing.T) {
 			name: "ipv6 ifaddr",
 			in:   "2001:db8::1/64",
 		},
+		{
+			name:  "ipv6 ifaddr (with CIDRIsCanonical)",
+			in:    "2001:db8::1/64",
+			flags: []CIDRValidationFlag{CIDRIsCanonical},
+		},
 
 		// GOOD, THOUGH NON-CANONICAL, VALUES
 		{
@@ -297,12 +345,30 @@ func TestIsValidCIDR(t *testing.T) {
 			in:   "2a00:79e0:2:0::/64",
 		},
 		{
+			name:  "ipv6, extra0s (with CIDRIsCanonical)",
+			in:    "2a00:79e0:2:0::/64",
+			flags: []CIDRValidationFlag{CIDRIsCanonical},
+			err:   `must be in canonical form ("2a00:79e0:2::/64")`,
+		},
+		{
 			name: "ipv6, capital letters (non-canonical)",
 			in:   "2001:DB8::/64",
 		},
 		{
+			name:  "ipv6, capital letters (with CIDRIsCanonical)",
+			in:    "2001:DB8::/64",
+			flags: []CIDRValidationFlag{CIDRIsCanonical},
+			err:   `must be in canonical form ("2001:db8::/64")`,
+		},
+		{
 			name: "non-canonical ifaddr",
 			in:   "2a00:79e0:2:0::1/64",
+		},
+		{
+			name:  "non-canonical ifaddr (with CIDRIsCanonical)",
+			in:    "2a00:79e0:2:0::1/64",
+			flags: []CIDRValidationFlag{CIDRIsCanonical},
+			err:   `must be in canonical form ("2a00:79e0:2::1/64")`,
 		},
 
 		// BAD VALUES WE CURRENTLY CONSIDER GOOD
