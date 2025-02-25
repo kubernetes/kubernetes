@@ -1033,7 +1033,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
-	klet.nodeResourceManager = noderesource.NewNodeResourceManager(klet, klet.cadvisor)
+	klet.nodeResourceManager = noderesource.NewNodeResourceManager(&noderesource.Config{
+		Host:               klet,
+		CAdvisor:           klet.cadvisor,
+		SyncNodeStatusFunc: klet.syncNodeStatus,
+	})
 
 	return klet, nil
 }

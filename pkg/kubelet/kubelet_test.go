@@ -290,7 +290,7 @@ func newTestKubeletWithImageList(
 	kubelet.livenessManager = proberesults.NewManager()
 	kubelet.readinessManager = proberesults.NewManager()
 	kubelet.startupManager = proberesults.NewManager()
-	kubelet.nodeResourceManager = noderesource.NewNodeResourceManager(kubelet, kubelet.cadvisor)
+	kubelet.nodeResourceManager = noderesource.NewNodeResourceManager(nil)
 
 	fakeContainerManager := cm.NewFakeContainerManager()
 	kubelet.containerManager = fakeContainerManager
