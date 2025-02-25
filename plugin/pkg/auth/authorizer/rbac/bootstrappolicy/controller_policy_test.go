@@ -93,7 +93,7 @@ func TestControllerRoleLabel(t *testing.T) {
 	}
 }
 
-func TestControllerRoleVerbsConsistensy(t *testing.T) {
+func TestControllerRoleVerbsConsistency(t *testing.T) {
 	roles := ControllerRoles()
 	for _, role := range roles {
 		for _, rule := range role.Rules {
