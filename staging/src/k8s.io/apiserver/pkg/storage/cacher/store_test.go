@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -154,6 +156,13 @@ func assertStoreSingleKey(t *testing.T, store storeIndexer, expectKey, expectVal
 
 func testStorageElement(key, value string, rv int) *storeElement {
 	return &storeElement{Key: key, Object: fakeObj{value: value, rv: rv}}
+}
+
+func testStorageElementWithFieldsLabels(key, value string, rv int, labels labels.Set, fields fields.Set) *storeElement {
+	e := testStorageElement(key, value, rv)
+	e.Labels = labels
+	e.Fields = fields
+	return e
 }
 
 type fakeObj struct {

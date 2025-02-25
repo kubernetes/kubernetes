@@ -760,7 +760,7 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred 
 		}
 		return listResp{ResourceVersion: readResourceVersion}, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, pred.MatcherIndex(ctx))
+	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, pred.MatcherIndex(ctx), pred)
 }
 
 type listResp struct {

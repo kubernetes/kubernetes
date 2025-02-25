@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/google/btree"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -100,10 +101,10 @@ func (si *threadedStoreIndexer) List() []interface{} {
 	return si.store.List()
 }
 
-func (si *threadedStoreIndexer) ListPrefix(prefix, continueKey string, limit int) ([]interface{}, bool) {
+func (si *threadedStoreIndexer) ListPrefix(prefix, continueKey string, limit int, pred storage.SelectionPredicate) ([]interface{}, bool) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
-	return si.store.ListPrefix(prefix, continueKey, limit)
+	return si.store.ListPrefix(prefix, continueKey, limit, pred)
 }
 
 func (si *threadedStoreIndexer) ListKeys() []string {
@@ -254,21 +255,22 @@ func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err er
 	return item, exists, nil
 }
 
-func (s *btreeStore) ListPrefix(prefix, continueKey string, limit int) ([]interface{}, bool) {
+func (s *btreeStore) ListPrefix(prefix, continueKey string, limit int, pred storage.SelectionPredicate) (result []interface{}, hasMore bool) {
 	if limit < 0 {
 		return nil, false
 	}
 	if continueKey == "" {
 		continueKey = prefix
 	}
-	var result []interface{}
-	var hasMore bool
 	if limit == 0 {
 		limit = math.MaxInt
 	}
 	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(item *storeElement) bool {
 		if !strings.HasPrefix(item.Key, prefix) {
 			return false
+		}
+		if !pred.MatchesObjectAttributes(item.Labels, item.Fields) {
+			return true
 		}
 		// TODO: Might be worth to lookup one more item to provide more accurate HasMore.
 		if len(result) >= limit {
