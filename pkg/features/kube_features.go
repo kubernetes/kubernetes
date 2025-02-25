@@ -545,6 +545,11 @@ const (
 	// No effect for other cases such as using serverTLSbootstap.
 	ReloadKubeletServerCertificateFile featuregate.Feature = "ReloadKubeletServerCertificateFile"
 
+	// owner: @atiratree
+	//
+	// ReplicaSets will limit pod creation when kubelet moves pods to a Failed phase.
+	ReplicaSetFailedPodsBackoff featuregate.Feature = "ReplicaSetFailedPodsBackoff"
+
 	// owner: @SergeyKanzhelev
 	// kep: https://kep.k8s.io/4680
 	//
