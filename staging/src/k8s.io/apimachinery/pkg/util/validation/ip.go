@@ -20,17 +20,42 @@ import (
 	"fmt"
 	"net/netip"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 )
 
-// IsValidIP tests that the argument is a valid IP address.
-func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
+// IPValidationFlag is an option for IsValidIP
+type IPValidationFlag string
+
+const (
+	// IPIsIPv4 validates that the IP is IPv4
+	IPIsIPv4 IPValidationFlag = "IPIsIPv4"
+
+	// IPIsIPv6 validates that the IP is IPv6
+	IPIsIPv6 IPValidationFlag = "IPIsIPv6"
+)
+
+// IsValidIP tests that the argument is a valid IP address according to flags
+func IsValidIP(fldPath *field.Path, value string, flags ...IPValidationFlag) field.ErrorList {
 	var allErrors field.ErrorList
-	if netutils.ParseIPSloppy(value) == nil {
+
+	ip := netutils.ParseIPSloppy(value)
+	if ip == nil {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"))
+		return allErrors
 	}
+
+	flagSet := sets.New(flags...)
+
+	if flagSet.Has(IPIsIPv4) && !netutils.IsIPv4(ip) {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv4 address"))
+	}
+	if flagSet.Has(IPIsIPv6) && !netutils.IsIPv6(ip) {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv6 address"))
+	}
+
 	return allErrors
 }
 
@@ -64,33 +89,35 @@ func GetWarningsForIP(fldPath *field.Path, value string) []string {
 	return nil
 }
 
-// IsValidIPv4Address tests that the argument is a valid IPv4 address.
-func IsValidIPv4Address(fldPath *field.Path, value string) field.ErrorList {
-	var allErrors field.ErrorList
-	ip := netutils.ParseIPSloppy(value)
-	if ip == nil || ip.To4() == nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv4 address"))
-	}
-	return allErrors
-}
+// CIDRValidationFlag is an option for IsValidCIDR
+type CIDRValidationFlag string
 
-// IsValidIPv6Address tests that the argument is a valid IPv6 address.
-func IsValidIPv6Address(fldPath *field.Path, value string) field.ErrorList {
-	var allErrors field.ErrorList
-	ip := netutils.ParseIPSloppy(value)
-	if ip == nil || ip.To4() != nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IPv6 address"))
-	}
-	return allErrors
-}
+const (
+	// CIDRIsIPv4 validates that the CIDR is IPv4
+	CIDRIsIPv4 CIDRValidationFlag = "CIDRIsIPv4"
 
-// IsValidCIDR tests that the argument is a valid CIDR value.
-func IsValidCIDR(fldPath *field.Path, value string) field.ErrorList {
+	// CIDRIsIPv6 validates that the CIDR is IPv6
+	CIDRIsIPv6 CIDRValidationFlag = "CIDRIsIPv6"
+)
+
+// IsValidCIDR tests that the argument is a valid CIDR value according to flags.
+func IsValidCIDR(fldPath *field.Path, value string, flags ...CIDRValidationFlag) field.ErrorList {
 	var allErrors field.ErrorList
-	_, _, err := netutils.ParseCIDRSloppy(value)
+	ip, _, err := netutils.ParseCIDRSloppy(value)
 	if err != nil {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
+		return allErrors
 	}
+
+	flagSet := sets.New(flags...)
+
+	if flagSet.Has(CIDRIsIPv4) && !netutils.IsIPv4(ip) {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv4 CIDR"))
+	}
+	if flagSet.Has(CIDRIsIPv6) && !netutils.IsIPv6(ip) {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be an IPv6 CIDR"))
+	}
+
 	return allErrors
 }
 

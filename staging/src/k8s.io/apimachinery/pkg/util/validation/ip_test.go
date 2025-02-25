@@ -26,70 +26,69 @@ import (
 
 func TestIsValidIP(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		in     string
-		family int
-		err    string
+		name  string
+		in    string
+		flags []IPValidationFlag
+		err   string
 	}{
 		// GOOD VALUES
 		{
-			name:   "ipv4",
-			in:     "1.2.3.4",
-			family: 4,
+			name: "ipv4",
+			in:   "1.2.3.4",
 		},
 		{
-			name:   "ipv4, all zeros",
-			in:     "0.0.0.0",
-			family: 4,
+			name:  "ipv4 (with IPIsIPv4)",
+			in:    "1.2.3.4",
+			flags: []IPValidationFlag{IPIsIPv4},
 		},
 		{
-			name:   "ipv4, max",
-			in:     "255.255.255.255",
-			family: 4,
+			name: "ipv4, all zeros",
+			in:   "0.0.0.0",
 		},
 		{
-			name:   "ipv6",
-			in:     "1234::abcd",
-			family: 6,
+			name: "ipv4, max",
+			in:   "255.255.255.255",
 		},
 		{
-			name:   "ipv6, all zeros, collapsed",
-			in:     "::",
-			family: 6,
+			name: "ipv6",
+			in:   "1234::abcd",
 		},
 		{
-			name:   "ipv6, max",
-			in:     "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-			family: 6,
+			name:  "ipv6 (with IPIsIPv6)",
+			in:    "1234::abcd",
+			flags: []IPValidationFlag{IPIsIPv6},
+		},
+		{
+			name: "ipv6, all zeros, collapsed",
+			in:   "::",
+		},
+		{
+			name: "ipv6, max",
+			in:   "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
 		},
 
 		// GOOD, THOUGH NON-CANONICAL, VALUES
 		{
-			name:   "ipv6, all zeros, expanded (non-canonical)",
-			in:     "0:0:0:0:0:0:0:0",
-			family: 6,
+			name: "ipv6, all zeros, expanded (non-canonical)",
+			in:   "0:0:0:0:0:0:0:0",
 		},
 		{
-			name:   "ipv6, leading 0s (non-canonical)",
-			in:     "0001:002:03:4::",
-			family: 6,
+			name: "ipv6, leading 0s (non-canonical)",
+			in:   "0001:002:03:4::",
 		},
 		{
-			name:   "ipv6, capital letters (non-canonical)",
-			in:     "1234::ABCD",
-			family: 6,
+			name: "ipv6, capital letters (non-canonical)",
+			in:   "1234::ABCD",
 		},
 
 		// BAD VALUES WE CURRENTLY CONSIDER GOOD
 		{
-			name:   "ipv4 with leading 0s",
-			in:     "1.1.1.01",
-			family: 4,
+			name: "ipv4 with leading 0s",
+			in:   "1.1.1.01",
 		},
 		{
-			name:   "ipv4-in-ipv6 value",
-			in:     "::ffff:1.1.1.1",
-			family: 4,
+			name: "ipv4-in-ipv6 value",
+			in:   "::ffff:1.1.1.1",
 		},
 
 		// BAD VALUES
@@ -158,9 +157,21 @@ func TestIsValidIP(t *testing.T) {
 			in:   "169.254.0.0%eth0",
 			err:  "must be a valid IP address",
 		},
+		{
+			name:  "not ipv4",
+			in:    "1234::abcd",
+			flags: []IPValidationFlag{IPIsIPv4},
+			err:   "must be an IPv4 address",
+		},
+		{
+			name:  "not ipv6",
+			in:    "1.2.3.4",
+			flags: []IPValidationFlag{IPIsIPv6},
+			err:   "must be an IPv6 address",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := IsValidIP(field.NewPath(""), tc.in)
+			errs := IsValidIP(field.NewPath(""), tc.in, tc.flags...)
 			if tc.err == "" {
 				if len(errs) != 0 {
 					t.Errorf("expected %q to be valid but got: %v", tc.in, errs)
@@ -170,28 +181,6 @@ func TestIsValidIP(t *testing.T) {
 					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
 				} else if !strings.Contains(errs[0].Detail, tc.err) {
 					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
-				}
-			}
-
-			errs = IsValidIPv4Address(field.NewPath(""), tc.in)
-			if tc.family == 4 {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to pass IsValidIPv4Address but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) == 0 {
-					t.Errorf("expected %q to fail IsValidIPv4Address", tc.in)
-				}
-			}
-
-			errs = IsValidIPv6Address(field.NewPath(""), tc.in)
-			if tc.family == 6 {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to pass IsValidIPv6Address but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) == 0 {
-					t.Errorf("expected %q to fail IsValidIPv6Address", tc.in)
 				}
 			}
 		})
@@ -253,14 +242,20 @@ func TestGetWarningsForIP(t *testing.T) {
 
 func TestIsValidCIDR(t *testing.T) {
 	for _, tc := range []struct {
-		name string
-		in   string
-		err  string
+		name  string
+		in    string
+		flags []CIDRValidationFlag
+		err   string
 	}{
 		// GOOD VALUES
 		{
 			name: "ipv4",
 			in:   "1.0.0.0/8",
+		},
+		{
+			name:  "ipv4 (with CIDRIsIPv4)",
+			in:    "1.0.0.0/8",
+			flags: []CIDRValidationFlag{CIDRIsIPv4},
 		},
 		{
 			name: "ipv4, all IPs",
@@ -277,6 +272,11 @@ func TestIsValidCIDR(t *testing.T) {
 		{
 			name: "ipv6",
 			in:   "2001:4860:4860::/48",
+		},
+		{
+			name:  "ipv6 (with CIDRIsIPv6)",
+			in:    "2001:4860:4860::/48",
+			flags: []CIDRValidationFlag{CIDRIsIPv6},
 		},
 		{
 			name: "ipv6, all IPs",
@@ -359,9 +359,21 @@ func TestIsValidCIDR(t *testing.T) {
 			in:   "192.168.0.0/+16",
 			err:  "must be a valid CIDR value",
 		},
+		{
+			name:  "not ipv4",
+			in:    "2001:4860:4860::/48",
+			flags: []CIDRValidationFlag{CIDRIsIPv4},
+			err:   "must be an IPv4 CIDR",
+		},
+		{
+			name:  "not ipv6",
+			in:    "1.0.0.0/8",
+			flags: []CIDRValidationFlag{CIDRIsIPv6},
+			err:   "must be an IPv6 CIDR",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := IsValidCIDR(field.NewPath(""), tc.in)
+			errs := IsValidCIDR(field.NewPath(""), tc.in, tc.flags...)
 			if tc.err == "" {
 				if len(errs) != 0 {
 					t.Errorf("expected %q to be valid but got: %v", tc.in, errs)
