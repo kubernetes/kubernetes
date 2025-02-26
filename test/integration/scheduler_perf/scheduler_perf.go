@@ -1551,7 +1551,6 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 			executor.runSleepOp(concreteOp)
 		case *startCollectingMetricsOp:
 			executor.runStartCollectingMetricsOp(opIndex, concreteOp)
-			defer executor.collectorCtx.Cancel("cleaning up")
 		case *stopCollectingMetricsOp:
 			executor.runStopCollectingMetrics(opIndex)
 		default:
@@ -1661,7 +1660,11 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) {
 			e.tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 		}
 		e.collectorCtx, e.collectors = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
-		defer e.collectorCtx.Cancel("cleaning up")
+		e.tCtx.TB().Cleanup(func() {
+			if e.collectorCtx != nil {
+				e.collectorCtx.Cancel("cleaning up")
+			}
+		})
 	}
 	if err := createPodsRapidly(e.tCtx, namespace, op); err != nil {
 		e.tCtx.Fatalf("op %d: %v", opIndex, err)
@@ -1862,6 +1865,11 @@ func (e *WorkloadExecutor) runStartCollectingMetricsOp(opIndex int, op *startCol
 		e.tCtx.Fatalf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
 	}
 	e.collectorCtx, e.collectors = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, op.Name, op.Namespaces, op.LabelSelector)
+	e.tCtx.TB().Cleanup(func() {
+		if e.collectorCtx != nil {
+			e.collectorCtx.Cancel("cleaning up")
+		}
+	})
 }
 
 func createNamespaceIfNotPresent(tCtx ktesting.TContext, namespace string, podsPerNamespace *map[string]int) {
