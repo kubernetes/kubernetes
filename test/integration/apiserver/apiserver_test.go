@@ -526,6 +526,12 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 		}
 		return
 	}
+	if opts.Continue != "" && opts.ResourceVersion != "" && opts.ResourceVersion != "0" {
+		if err == nil || !strings.Contains(err.Error(), "specifying resource version is not allowed when using continue") {
+			t.Fatalf("expected forbidden error, but got: %v", err)
+		}
+		return
+	}
 	if opts.ResourceVersionMatch == invalidResourceVersionMatch {
 		if err == nil || !strings.Contains(err.Error(), "supported values") {
 			t.Fatalf("expected not supported error, but got: %v", err)

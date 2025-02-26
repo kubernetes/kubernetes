@@ -44,6 +44,9 @@ func ValidateListOptions(options *internalversion.ListOptions, isWatchListFeatur
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("resourceVersionMatch"), "resourceVersionMatch \"exact\" is forbidden for resourceVersion \"0\""))
 		}
 	}
+	if len(options.Continue) > 0 && len(options.ResourceVersion) > 0 && options.ResourceVersion != "0" {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("resourceVersion"), "specifying resource version is not allowed when using continue"))
+	}
 	if options.SendInitialEvents != nil {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("sendInitialEvents"), "sendInitialEvents is forbidden for list"))
 	}
