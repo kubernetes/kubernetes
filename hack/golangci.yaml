@@ -73,6 +73,24 @@ issues:
        - ginkgolinter
       text: use a function call in (Eventually|Consistently)
 
+    # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
+
+    - linters:
+        - govet
+      text: "lostcancel|printf"
+
+    - linters:
+        - ginkgolinter
+      text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
+
+    - linters:
+        - testifylint
+      text: "encoded-compare|error-nil|formatter"
+
+    - linters:
+        - gocritic
+      text: "append result not assigned to the same slice|put a space between `//` and comment text|sloppyLen|elseif|should rewrite switch statement to if statement|regexpMust|wrapperFunc: use strings.ReplaceAll|singleCaseSwitch|deprecatedComment|exitAfterDefer|captLocal|unlambda|underef|unslice|valSwap|typeSwitchVar"
+
     # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
     - linters:
         - gocritic
