@@ -827,10 +827,10 @@ func thresholdEqual(a evictionapi.Threshold, b evictionapi.Threshold) bool {
 
 func TestOrderedByExceedsRequestMemory(t *testing.T) {
 	below := newPod("below-requests", -1, []v1.Container{
-		newContainer("below-requests", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+		newContainer("below-requests", newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	exceeds := newPod("exceeds-requests", 1, []v1.Container{
-		newContainer("exceeds-requests", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+		newContainer("exceeds-requests", newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	stats := map[*v1.Pod]statsapi.PodStats{
 		below:   newPodMemoryStats(below, resource.MustParse("199Mi")),   // -1 relative to request
@@ -853,10 +853,10 @@ func TestOrderedByExceedsRequestMemory(t *testing.T) {
 
 func TestOrderedByExceedsRequestDisk(t *testing.T) {
 	below := newPod("below-requests", -1, []v1.Container{
-		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", "")),
+		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", ""), nil),
 	}, nil)
 	exceeds := newPod("exceeds-requests", 1, []v1.Container{
-		newContainer("exceeds-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")}, newResourceList("", "", "")),
+		newContainer("exceeds-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("100Mi")}, newResourceList("", "", ""), nil),
 	}, nil)
 	stats := map[*v1.Pod]statsapi.PodStats{
 		below:   newPodDiskStats(below, resource.MustParse("100Mi"), resource.MustParse("99Mi"), resource.MustParse("0Mi")),  // -1 relative to request
@@ -879,13 +879,13 @@ func TestOrderedByExceedsRequestDisk(t *testing.T) {
 
 func TestOrderedByPriority(t *testing.T) {
 	low := newPod("low-priority", -134, []v1.Container{
-		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	medium := newPod("medium-priority", 1, []v1.Container{
-		newContainer("medium-priority", newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", "")),
+		newContainer("medium-priority", newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", ""), nil),
 	}, nil)
 	high := newPod("high-priority", 12534, []v1.Container{
-		newContainer("high-priority", newResourceList("200m", "200Mi", ""), newResourceList("200m", "200Mi", "")),
+		newContainer("high-priority", newResourceList("200m", "200Mi", ""), newResourceList("200m", "200Mi", ""), nil),
 	}, nil)
 
 	pods := []*v1.Pod{high, medium, low}
@@ -901,42 +901,42 @@ func TestOrderedByPriority(t *testing.T) {
 
 func TestOrderedbyDisk(t *testing.T) {
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
-		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod2 := newPod("best-effort-low", defaultPriority, []v1.Container{
-		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod3 := newPod("burstable-high", defaultPriority, []v1.Container{
-		newContainer("burstable-high", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
+		newContainer("burstable-high", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi"), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod4 := newPod("burstable-low", defaultPriority, []v1.Container{
-		newContainer("burstable-low", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi")),
+		newContainer("burstable-low", newResourceList("", "", "100Mi"), newResourceList("", "", "400Mi"), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod5 := newPod("guaranteed-high", defaultPriority, []v1.Container{
-		newContainer("guaranteed-high", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
+		newContainer("guaranteed-high", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi"), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod6 := newPod("guaranteed-low", defaultPriority, []v1.Container{
-		newContainer("guaranteed-low", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi")),
+		newContainer("guaranteed-low", newResourceList("", "", "400Mi"), newResourceList("", "", "400Mi"), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
@@ -966,21 +966,21 @@ func TestOrderedbyDisk(t *testing.T) {
 
 func TestOrderedbyInodes(t *testing.T) {
 	low := newPod("low", defaultPriority, []v1.Container{
-		newContainer("low", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("low", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	medium := newPod("medium", defaultPriority, []v1.Container{
-		newContainer("medium", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("medium", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	high := newPod("high", defaultPriority, []v1.Container{
-		newContainer("high", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("high", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
@@ -1008,56 +1008,56 @@ func TestOrderedbyInodes(t *testing.T) {
 // TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityDisk(t *testing.T) {
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod2 := newPod("above-requests-low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("above-requests-low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("above-requests-low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod3 := newPod("above-requests-high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("above-requests-high-priority-high-usage", newResourceList("", "", "100Mi"), newResourceList("", "", "")),
+		newContainer("above-requests-high-priority-high-usage", newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod4 := newPod("above-requests-high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("above-requests-high-priority-low-usage", newResourceList("", "", "100Mi"), newResourceList("", "", "")),
+		newContainer("above-requests-high-priority-low-usage", newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod5 := newPod("below-requests-low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("below-requests-low-priority-high-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+		newContainer("below-requests-low-priority-high-usage", newResourceList("", "", "1Gi"), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod6 := newPod("below-requests-low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("below-requests-low-priority-low-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+		newContainer("below-requests-low-priority-low-usage", newResourceList("", "", "1Gi"), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod7 := newPod("below-requests-high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("below-requests-high-priority-high-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+		newContainer("below-requests-high-priority-high-usage", newResourceList("", "", "1Gi"), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod8 := newPod("below-requests-high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("below-requests-high-priority-low-usage", newResourceList("", "", "1Gi"), newResourceList("", "", "")),
+		newContainer("below-requests-high-priority-low-usage", newResourceList("", "", "1Gi"), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
@@ -1091,28 +1091,28 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 // TestOrderedByPriorityInodes ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityInodes(t *testing.T) {
 	pod1 := newPod("low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod2 := newPod("low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod3 := newPod("high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("high-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("high-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}),
 	})
 	pod4 := newPod("high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("high-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("high-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, []v1.Volume{
 		newVolume("local-volume", v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
@@ -1141,22 +1141,22 @@ func TestOrderedByPriorityInodes(t *testing.T) {
 // TestOrderedByMemory ensures we order pods by greediest memory consumer relative to request.
 func TestOrderedByMemory(t *testing.T) {
 	pod1 := newPod("best-effort-high", defaultPriority, []v1.Container{
-		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("best-effort-high", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod2 := newPod("best-effort-low", defaultPriority, []v1.Container{
-		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("best-effort-low", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod3 := newPod("burstable-high", defaultPriority, []v1.Container{
-		newContainer("burstable-high", newResourceList("", "100Mi", ""), newResourceList("", "1Gi", "")),
+		newContainer("burstable-high", newResourceList("", "100Mi", ""), newResourceList("", "1Gi", ""), nil),
 	}, nil)
 	pod4 := newPod("burstable-low", defaultPriority, []v1.Container{
-		newContainer("burstable-low", newResourceList("", "100Mi", ""), newResourceList("", "1Gi", "")),
+		newContainer("burstable-low", newResourceList("", "100Mi", ""), newResourceList("", "1Gi", ""), nil),
 	}, nil)
 	pod5 := newPod("guaranteed-high", defaultPriority, []v1.Container{
-		newContainer("guaranteed-high", newResourceList("", "1Gi", ""), newResourceList("", "1Gi", "")),
+		newContainer("guaranteed-high", newResourceList("", "1Gi", ""), newResourceList("", "1Gi", ""), nil),
 	}, nil)
 	pod6 := newPod("guaranteed-low", defaultPriority, []v1.Container{
-		newContainer("guaranteed-low", newResourceList("", "1Gi", ""), newResourceList("", "1Gi", "")),
+		newContainer("guaranteed-low", newResourceList("", "1Gi", ""), newResourceList("", "1Gi", ""), nil),
 	}, nil)
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
@@ -1183,28 +1183,28 @@ func TestOrderedByMemory(t *testing.T) {
 // TestOrderedByPriorityMemory ensures we order by priority and then memory consumption relative to request.
 func TestOrderedByPriorityMemory(t *testing.T) {
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod2 := newPod("above-requests-low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("above-requests-low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("above-requests-low-priority-low-usage", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod3 := newPod("above-requests-high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("above-requests-high-priority-high-usage", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+		newContainer("above-requests-high-priority-high-usage", newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod4 := newPod("above-requests-high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("above-requests-high-priority-low-usage", newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+		newContainer("above-requests-high-priority-low-usage", newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod5 := newPod("below-requests-low-priority-high-usage", lowPriority, []v1.Container{
-		newContainer("below-requests-low-priority-high-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
+		newContainer("below-requests-low-priority-high-usage", newResourceList("", "1Gi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod6 := newPod("below-requests-low-priority-low-usage", lowPriority, []v1.Container{
-		newContainer("below-requests-low-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
+		newContainer("below-requests-low-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod7 := newPod("below-requests-high-priority-high-usage", highPriority, []v1.Container{
-		newContainer("below-requests-high-priority-high-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
+		newContainer("below-requests-high-priority-high-usage", newResourceList("", "1Gi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod8 := newPod("below-requests-high-priority-low-usage", highPriority, []v1.Container{
-		newContainer("below-requests-high-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", "")),
+		newContainer("below-requests-high-priority-low-usage", newResourceList("", "1Gi", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	stats := map[*v1.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
@@ -3289,16 +3289,17 @@ func newResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequir
 	return res
 }
 
-func newContainer(name string, requests v1.ResourceList, limits v1.ResourceList) v1.Container {
+func newContainer(name string, requests v1.ResourceList, limits v1.ResourceList, volumeMounts []v1.VolumeMount) v1.Container {
 	return v1.Container{
-		Name:      name,
-		Resources: newResourceRequirements(requests, limits),
+		Name:         name,
+		Resources:    newResourceRequirements(requests, limits),
+		VolumeMounts: volumeMounts,
 	}
 }
 
-func newRestartableInitContainer(name string, requests v1.ResourceList, limits v1.ResourceList) v1.Container {
+func newRestartableInitContainer(name string, requests v1.ResourceList, limits v1.ResourceList, volumeMounts []v1.VolumeMount) v1.Container {
 	restartAlways := v1.ContainerRestartPolicyAlways
-	container := newContainer(name, requests, limits)
+	container := newContainer(name, requests, limits, volumeMounts)
 	container.RestartPolicy = &restartAlways
 	return container
 }
@@ -3365,10 +3366,10 @@ func (s1 thresholdList) Equal(s2 thresholdList) bool {
 
 func TestStatsNotFoundForPod(t *testing.T) {
 	pod1 := newPod("fake-pod1", defaultPriority, []v1.Container{
-		newContainer("fake-container1", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("fake-container1", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	pod2 := newPod("fake-pod2", defaultPriority, []v1.Container{
-		newContainer("fake-container2", newResourceList("", "", ""), newResourceList("", "", "")),
+		newContainer("fake-container2", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 	}, nil)
 	statsFn := func(pod *v1.Pod) (statsapi.PodStats, bool) {
 		return statsapi.PodStats{}, false
@@ -3414,13 +3415,16 @@ func TestEvictionMessage(t *testing.T) {
 		name  string
 		usage string
 	}
-	type memoryExceededContainer struct {
+	type localVolumeStat struct {
+		volumeName string
+		usage      string
+	}
+	type resourceExceededContainer struct {
 		name    string
 		request string
 		usage   string
 	}
-	memoryExceededEvictionMessage := func(containers []memoryExceededContainer) string {
-		resourceToReclaim := v1.ResourceMemory
+	resourceExceededEvictionMessage := func(containers []resourceExceededContainer, resourceToReclaim v1.ResourceName) string {
 		msg := fmt.Sprintf(nodeLowMessageFmt, resourceToReclaim)
 		for _, container := range containers {
 			msg += fmt.Sprintf(containerMessageFmt, container.name, container.usage, container.request, resourceToReclaim)
@@ -3439,6 +3443,9 @@ func TestEvictionMessage(t *testing.T) {
 		regular2         = "regular2"
 		regular3         = "regular3"
 		ephemeral1       = "ephemeral1"
+
+		localVolume1 = "local-volume-1"
+		localVolume2 = "local-volume-2"
 	)
 
 	testcase := []struct {
@@ -3447,56 +3454,62 @@ func TestEvictionMessage(t *testing.T) {
 		containers               []v1.Container
 		ephemeralContainers      []v1.EphemeralContainer
 		containerMemoryStats     []containerMemoryStat
+		localVolumes             []v1.Volume
+		localVolumeStats         []localVolumeStat
 		expectedContainerMessage string
 		expectedAnnotations      map[string]string
+		resourceName             v1.ResourceName
 	}{
+		// for v1.ResourceMemory
 		{
 			name: "No container exceeds memory usage",
 			initContainers: []v1.Container{
-				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			containers: []v1.Container{
-				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			// Terminated init containers aren't included in the containerMemoryStats
 			containerMemoryStats: []containerMemoryStat{
 				{name: restartableInit1, usage: "150Mi"},
 				{name: regular1, usage: "100Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage(nil),
+			expectedContainerMessage: resourceExceededEvictionMessage(nil, v1.ResourceMemory),
+			resourceName:             v1.ResourceMemory,
 		},
 		{
 			name: "Init container exceeds memory usage",
 			initContainers: []v1.Container{
-				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
-				newContainer(init2, newResourceList("", "150Mi", ""), newResourceList("", "", "")),
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
+				newContainer(init2, newResourceList("", "150Mi", ""), newResourceList("", "", ""), nil),
 			},
 			containers: []v1.Container{
-				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			// An eviction occurred while the init container was running
 			containerMemoryStats: []containerMemoryStat{
 				{name: init1, usage: "150Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
 				{name: init1, request: "100Mi", usage: "150Mi"},
-			}),
+			}, v1.ResourceMemory),
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      init1,
 				OffendingContainersUsageKey: "150Mi",
 			},
+			resourceName: v1.ResourceMemory,
 		},
 		{
 			name: "Restartable init container exceeds memory usage",
 			initContainers: []v1.Container{
-				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit2, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			containers: []v1.Container{
-				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			// Terminated init containers aren't included in the containerMemoryStats
 			containerMemoryStats: []containerMemoryStat{
@@ -3504,23 +3517,24 @@ func TestEvictionMessage(t *testing.T) {
 				{name: restartableInit2, usage: "150Mi"},
 				{name: regular1, usage: "200Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
 				{name: restartableInit1, request: "200Mi", usage: "250Mi"},
-			}),
+			}, v1.ResourceMemory),
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      restartableInit1,
 				OffendingContainersUsageKey: "250Mi",
 			},
+			resourceName: v1.ResourceMemory,
 		},
 		{
 			name: "Regular container exceeds memory usage",
 			initContainers: []v1.Container{
-				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			containers: []v1.Container{
-				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
-				newContainer(regular2, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
+				newContainer(regular2, newResourceList("", "300Mi", ""), newResourceList("", "", ""), nil),
 			},
 			// Terminated init containers aren't included in the containerMemoryStats
 			containerMemoryStats: []containerMemoryStat{
@@ -3528,22 +3542,23 @@ func TestEvictionMessage(t *testing.T) {
 				{name: regular1, usage: "250Mi"},
 				{name: regular2, usage: "250Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
 				{name: regular1, request: "200Mi", usage: "250Mi"},
-			}),
+			}, v1.ResourceMemory),
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      regular1,
 				OffendingContainersUsageKey: "250Mi",
 			},
+			resourceName: v1.ResourceMemory,
 		},
 		{
 			name: "Ephemeral container exceeds memory usage",
 			initContainers: []v1.Container{
-				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			containers: []v1.Container{
-				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
+				newContainer(regular1, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
 			},
 			ephemeralContainers: []v1.EphemeralContainer{
 				{TargetContainerName: regular1, EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: ephemeral1}},
@@ -3554,17 +3569,18 @@ func TestEvictionMessage(t *testing.T) {
 				{name: regular1, usage: "150Mi"},
 				{name: ephemeral1, usage: "250Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage(nil),
+			expectedContainerMessage: resourceExceededEvictionMessage(nil, v1.ResourceMemory),
+			resourceName:             v1.ResourceMemory,
 		},
 		{
 			name: "Both regular and restartable init containers exceed memory usage due to missing memory requests",
 			initContainers: []v1.Container{
-				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit1, newResourceList("", "", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit2, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "300Mi", ""), newResourceList("", "", ""), nil),
 			},
 			containers: []v1.Container{
-				newContainer("regular1", newResourceList("", "", ""), newResourceList("", "", "")),
+				newContainer("regular1", newResourceList("", "", ""), newResourceList("", "", ""), nil),
 			},
 			// Terminated init containers aren't included in the containerMemoryStats
 			containerMemoryStats: []containerMemoryStat{
@@ -3572,29 +3588,30 @@ func TestEvictionMessage(t *testing.T) {
 				{name: restartableInit2, usage: "250Mi"},
 				{name: regular1, usage: "200Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
 				{name: restartableInit1, request: "0", usage: "250Mi"},
 				{name: regular1, request: "0", usage: "200Mi"},
-			}),
+			}, v1.ResourceMemory),
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      strings.Join([]string{restartableInit1, regular1}, ","),
 				OffendingContainersUsageKey: "250Mi,200Mi",
 			},
+			resourceName: v1.ResourceMemory,
 		},
 		{
 			name: "Multiple regular and restartable init containers exceed memory usage",
 			initContainers: []v1.Container{
-				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newContainer(init2, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newContainer(init3, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit1, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit2, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
-				newRestartableInitContainer(restartableInit3, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
+				newContainer(init1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newContainer(init2, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newContainer(init3, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit3, newResourceList("", "300Mi", ""), newResourceList("", "", ""), nil),
 			},
 			containers: []v1.Container{
-				newContainer(regular1, newResourceList("", "300Mi", ""), newResourceList("", "", "")),
-				newContainer(regular2, newResourceList("", "200Mi", ""), newResourceList("", "", "")),
-				newContainer(regular3, newResourceList("", "100Mi", ""), newResourceList("", "", "")),
+				newContainer(regular1, newResourceList("", "300Mi", ""), newResourceList("", "", ""), nil),
+				newContainer(regular2, newResourceList("", "200Mi", ""), newResourceList("", "", ""), nil),
+				newContainer(regular3, newResourceList("", "100Mi", ""), newResourceList("", "", ""), nil),
 			},
 			// Terminated init containers aren't included in the containerMemoryStats
 			containerMemoryStats: []containerMemoryStat{
@@ -3605,41 +3622,348 @@ func TestEvictionMessage(t *testing.T) {
 				{name: regular2, usage: "250Mi"},
 				{name: regular3, usage: "400Mi"},
 			},
-			expectedContainerMessage: memoryExceededEvictionMessage([]memoryExceededContainer{
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
 				{name: restartableInit1, request: "100Mi", usage: "150Mi"},
 				{name: restartableInit2, request: "200Mi", usage: "250Mi"},
 				{name: regular2, request: "200Mi", usage: "250Mi"},
 				{name: regular3, request: "100Mi", usage: "400Mi"},
-			}),
+			}, v1.ResourceMemory),
 			expectedAnnotations: map[string]string{
 				OffendingContainersKey:      strings.Join([]string{restartableInit1, restartableInit2, regular2, regular3}, ","),
 				OffendingContainersUsageKey: "150Mi,250Mi,250Mi,400Mi",
 			},
+			resourceName: v1.ResourceMemory,
+		},
+
+		// for v1.ResourceEphemeralStorage
+		{
+			name: "No container exceeds ephemeral storage usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+					{Name: localVolume2},
+				}),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+				}),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), nil),
+			},
+			localVolumes: []v1.Volume{
+				{
+					Name: localVolume1,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: localVolume2,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			// Terminated init containers aren't included in the containerMemoryStats
+			localVolumeStats: []localVolumeStat{
+				{volumeName: localVolume1, usage: "50Mi"},
+				{volumeName: localVolume2, usage: "40Mi"},
+			},
+			expectedContainerMessage: resourceExceededEvictionMessage(nil, v1.ResourceEphemeralStorage),
+			resourceName:             v1.ResourceEphemeralStorage,
+		},
+		{
+			name: "Init container exceeds ephemeral storage usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+				}),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), nil),
+				newContainer(init2, newResourceList("", "", "150Mi"), newResourceList("", "", ""), nil),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), nil),
+			},
+			localVolumes: []v1.Volume{
+				{
+					Name: localVolume1,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			// An eviction occurred while the init container was running
+			localVolumeStats: []localVolumeStat{
+				{volumeName: localVolume1, usage: "150Mi"},
+			},
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
+				{name: init1, request: "100Mi", usage: "150Mi"},
+			}, v1.ResourceEphemeralStorage),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      init1,
+				OffendingContainersUsageKey: "150Mi",
+			},
+			resourceName: v1.ResourceEphemeralStorage,
+		},
+		{
+			name: "Restartable init container exceeds ephemeral storage usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+					{Name: localVolume2},
+				}),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "", "200Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+				}),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+				}),
+			},
+			localVolumes: []v1.Volume{
+				{
+					Name: localVolume1,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: localVolume2,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			localVolumeStats: []localVolumeStat{
+				{volumeName: localVolume1, usage: "125Mi"},
+				{volumeName: localVolume2, usage: "125Mi"},
+			},
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
+				{name: restartableInit1, request: "200Mi", usage: "250Mi"},
+			}, v1.ResourceEphemeralStorage),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      restartableInit1,
+				OffendingContainersUsageKey: "250Mi",
+			},
+			resourceName: v1.ResourceEphemeralStorage,
+		},
+		{
+			name: "Regular container exceeds ephemeral storage usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), nil),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+				}),
+				newContainer(regular2, newResourceList("", "", "300Mi"), newResourceList("", "", ""), nil),
+			},
+			localVolumes: []v1.Volume{
+				{
+					Name: localVolume1,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: localVolume2,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			localVolumeStats: []localVolumeStat{
+				{volumeName: localVolume1, usage: "400Mi"},
+			},
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
+				{name: regular1, request: "200Mi", usage: "400Mi"},
+			}, v1.ResourceEphemeralStorage),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      regular1,
+				OffendingContainersUsageKey: "400Mi",
+			},
+			resourceName: v1.ResourceEphemeralStorage,
+		},
+		{
+			name: "Ephemeral container exceeds ephemeral storage usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), nil),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "", "200Mi"), newResourceList("", "", ""), nil),
+			},
+			ephemeralContainers: []v1.EphemeralContainer{
+				{TargetContainerName: regular1, EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: ephemeral1, VolumeMounts: []v1.VolumeMount{
+					{Name: localVolume1},
+				}}},
+			},
+			localVolumes: []v1.Volume{
+				{
+					Name: localVolume1,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			// Terminated init containers aren't included in the ephemeral storage usage of pod
+			localVolumeStats: []localVolumeStat{
+				{volumeName: localVolume1, usage: "200Mi"},
+			},
+			expectedContainerMessage: resourceExceededEvictionMessage(nil, v1.ResourceEphemeralStorage),
+			resourceName:             v1.ResourceEphemeralStorage,
+		},
+		{
+			name: "Both regular and restartable init containers exceed memory usage due to missing memory requests",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", "250Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+					{Name: localVolume2},
+				}),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "", "300Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+				}),
+			},
+			containers: []v1.Container{
+				newContainer("regular1", newResourceList("", "", ""), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+				}),
+			},
+			localVolumes: []v1.Volume{
+				{
+					Name: localVolume1,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: localVolume2,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			localVolumeStats: []localVolumeStat{
+				{volumeName: localVolume1, usage: "250Mi"},
+				{volumeName: localVolume2, usage: "50Mi"},
+			},
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
+				{name: restartableInit1, request: "250Mi", usage: "300Mi"},
+				{name: regular1, request: "0", usage: "250Mi"},
+			}, v1.ResourceEphemeralStorage),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      strings.Join([]string{restartableInit1, regular1}, ","),
+				OffendingContainersUsageKey: "300Mi,250Mi",
+			},
+			resourceName: v1.ResourceEphemeralStorage,
+		},
+		{
+			name: "Multiple regular and restartable init containers exceed memory usage",
+			initContainers: []v1.Container{
+				newContainer(init1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
+				newContainer(init2, newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
+				newContainer(init3, newResourceList("", "", "100Mi"), newResourceList("", "", ""), nil),
+				newRestartableInitContainer(restartableInit1, newResourceList("", "", "100Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+					{Name: localVolume2},
+				}),
+				newRestartableInitContainer(restartableInit2, newResourceList("", "", "200Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume1},
+					{Name: localVolume2},
+				}),
+				newRestartableInitContainer(restartableInit3, newResourceList("", "", "300Mi"), newResourceList("", "", ""), nil),
+			},
+			containers: []v1.Container{
+				newContainer(regular1, newResourceList("", "", "300Mi"), newResourceList("", "", ""), nil),
+				newContainer(regular2, newResourceList("", "", "200Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume2},
+				}),
+				newContainer(regular3, newResourceList("", "", "100Mi"), newResourceList("", "", ""), []v1.VolumeMount{
+					{Name: localVolume2},
+				}),
+			},
+			localVolumes: []v1.Volume{
+				{
+					Name: localVolume1,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: localVolume2,
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+			localVolumeStats: []localVolumeStat{
+				{volumeName: localVolume1, usage: "50Mi"},
+				{volumeName: localVolume2, usage: "250Mi"},
+			},
+			expectedContainerMessage: resourceExceededEvictionMessage([]resourceExceededContainer{
+				{name: restartableInit1, request: "100Mi", usage: "300Mi"},
+				{name: restartableInit2, request: "200Mi", usage: "300Mi"},
+				{name: regular2, request: "200Mi", usage: "250Mi"},
+				{name: regular3, request: "100Mi", usage: "250Mi"},
+			}, v1.ResourceEphemeralStorage),
+			expectedAnnotations: map[string]string{
+				OffendingContainersKey:      strings.Join([]string{restartableInit1, restartableInit2, regular2, regular3}, ","),
+				OffendingContainersUsageKey: "300Mi,300Mi,250Mi,250Mi",
+			},
+			resourceName: v1.ResourceEphemeralStorage,
 		},
 	}
 
 	threshold := []evictionapi.Threshold{}
 	observations := signalObservations{}
 	for _, tc := range testcase {
-		pod := newPodWithInitContainers("pod", 1, tc.initContainers, tc.containers, nil)
+		pod := newPodWithInitContainers("pod", 1, tc.initContainers, tc.containers, tc.localVolumes)
 		if len(tc.ephemeralContainers) > 0 {
 			pod.Spec.EphemeralContainers = tc.ephemeralContainers
 		}
-		// Create PodMemoryStats with dummy container memory
-		// and override container stats with the provided values.
-		dummyContainerMemory := resource.MustParse("1Mi")
-		podStats := newPodMemoryStats(pod, dummyContainerMemory)
-		podStats.Containers = make([]statsapi.ContainerStats, len(tc.containerMemoryStats))
-		for _, stat := range tc.containerMemoryStats {
-			memoryStat := resource.MustParse(stat.usage)
-			memoryBytes := uint64(memoryStat.Value())
-			podStats.Containers = append(podStats.Containers, statsapi.ContainerStats{
-				Name: stat.name,
-				Memory: &statsapi.MemoryStats{
-					WorkingSetBytes: &memoryBytes,
-				},
-			})
+		podStats := statsapi.PodStats{}
+		switch tc.resourceName {
+		case v1.ResourceMemory:
+			// Create PodMemoryStats with dummy container memory
+			// and override container stats with the provided values.
+			dummyContainerMemory := resource.MustParse("1Mi")
+			podStats = newPodMemoryStats(pod, dummyContainerMemory)
+			podStats.Containers = make([]statsapi.ContainerStats, len(tc.containerMemoryStats))
+			for _, stat := range tc.containerMemoryStats {
+				memoryStat := resource.MustParse(stat.usage)
+				memoryBytes := uint64(memoryStat.Value())
+				podStats.Containers = append(podStats.Containers, statsapi.ContainerStats{
+					Name: stat.name,
+					Memory: &statsapi.MemoryStats{
+						WorkingSetBytes: &memoryBytes,
+					},
+				})
+			}
+		case v1.ResourceEphemeralStorage:
+			for _, volStat := range tc.localVolumeStats {
+				usageStat := resource.MustParse(volStat.usage)
+				usageBytes := uint64(usageStat.Value())
+				podStats.VolumeStats = append(podStats.VolumeStats, statsapi.VolumeStats{
+					Name: volStat.volumeName,
+					FsStats: statsapi.FsStats{
+						UsedBytes: &usageBytes,
+					},
+				})
+			}
+
+			for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+				podStats.Containers = append(podStats.Containers, statsapi.ContainerStats{
+					Name: container.Name,
+				})
+			}
+		default:
+			t.Errorf("Unexpected resourceName: %s, only generate eviction message for memory and ephemeral storage", tc.resourceName)
 		}
+
 		stats := map[*v1.Pod]statsapi.PodStats{
 			pod: podStats,
 		}
@@ -3649,9 +3973,9 @@ func TestEvictionMessage(t *testing.T) {
 		}
 
 		t.Run(tc.name, func(t *testing.T) {
-			msg, annotations := evictionMessage(v1.ResourceMemory, pod, statsFn, threshold, observations)
+			msg, annotations := evictionMessage(tc.resourceName, pod, statsFn, threshold, observations)
 			if msg != tc.expectedContainerMessage {
-				t.Errorf("Unexpected memory exceeded eviction message found, got: %s, want : %s", msg, tc.expectedContainerMessage)
+				t.Errorf("Unexpected %s exceeded eviction message found, got: %s, want : %s", tc.resourceName, msg, tc.expectedContainerMessage)
 			}
 			for _, key := range []string{OffendingContainersKey, OffendingContainersUsageKey} {
 				val, ok := annotations[key]
