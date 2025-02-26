@@ -436,6 +436,12 @@ const (
 	// Permits kubelet to run with swap enabled.
 	NodeSwap featuregate.Feature = "NodeSwap"
 
+	// owner: @cici37
+	// kep: https://kep.k8s.io/5080
+	//
+	// Enables ordered namespace deletion.
+	OrderedNamespaceDeletion featuregate.Feature = "OrderedNamespaceDeletion"
+
 	// owner: @RomanBednar
 	// kep: https://kep.k8s.io/3762
 	//

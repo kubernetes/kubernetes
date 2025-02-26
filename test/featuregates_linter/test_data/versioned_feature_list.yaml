@@ -866,6 +866,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: OrderedNamespaceDeletion
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: PersistentVolumeLastPhaseTransitionTime
   versionedSpecs:
   - default: false

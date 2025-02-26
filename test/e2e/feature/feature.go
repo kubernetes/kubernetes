@@ -334,6 +334,10 @@ var (
 	// Tests aiming to verify oom_score functionality
 	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
 
+	// Owner: sig-api-machinery
+	// Marks tests that enforce ordered namespace deletion.
+	OrderedNamespaceDeletion = framework.WithFeature(framework.ValidFeatures.Add("OrderedNamespaceDeletion"))
+
 	// Owner: sig-node
 	// Verify ProcMount feature.
 	// Used in combination with user namespaces
