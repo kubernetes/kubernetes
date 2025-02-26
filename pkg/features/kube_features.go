@@ -58,6 +58,16 @@ const (
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
+	// owner: @MikeSpreitzer, @tkashem, @linxiulei
+	// beta: 1.33
+	//
+	// Make API Priority and Fairness use modern configuration, which
+	// differs from the old in these ways:
+	// - introduce priority level and flow schema for events;
+	// - generally reorganize to stop working around lack of borrowing;
+	// - increase the nominal concurrency shares for leader election.
+	APFNewConfig featuregate.Feature = "APFNewConifg"
+
 	// owner: @tallclair
 	AppArmor featuregate.Feature = "AppArmor"
 

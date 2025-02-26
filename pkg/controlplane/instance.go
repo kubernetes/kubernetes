@@ -419,7 +419,7 @@ func (c CompletedConfig) StorageProviders(discovery clientdiscovery.DiscoveryInt
 		schedulingrest.RESTStorageProvider{},
 		storagerest.RESTStorageProvider{},
 		svmrest.RESTStorageProvider{},
-		flowcontrolrest.RESTStorageProvider{InformerFactory: c.ControlPlane.Generic.SharedInformerFactory},
+		flowcontrolrest.RESTStorageProvider{InformerFactory: c.ControlPlane.Generic.SharedInformerFactory, FeatureGate: c.ControlPlane.Generic.FeatureGate},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.
 		// See https://github.com/kubernetes/kubernetes/issues/42392
 		appsrest.StorageProvider{},

@@ -28,7 +28,7 @@ import (
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-new"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"

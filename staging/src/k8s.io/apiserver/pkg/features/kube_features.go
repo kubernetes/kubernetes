@@ -68,6 +68,16 @@ const (
 	// resources using the Kubernetes API only.
 	AllowUnsafeMalformedObjectDeletion featuregate.Feature = "AllowUnsafeMalformedObjectDeletion"
 
+	// owner: @MikeSpreitzer, @tkashem, @linxiulei
+	// beta: 1.33
+	//
+	// Make API Priority and Fairness use modern configuration, which
+	// differs from the old in these ways:
+	// - introduce priority level and flow schema for events;
+	// - generally reorganize to stop working around lack of borrowing;
+	// - increase the nominal concurrency shares for leader election.
+	APFNewConfig featuregate.Feature = "APFNewConifg"
+
 	// owner: @ilackams
 	//
 	// Enables compression of REST responses (GET and LIST only)
@@ -281,6 +291,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AllowUnsafeMalformedObjectDeletion: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	APFNewConfig: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	AnonymousAuthConfigurableEndpoints: {
