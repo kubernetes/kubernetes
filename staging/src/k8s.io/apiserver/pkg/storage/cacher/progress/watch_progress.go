@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cacher
+package progress
 
 import (
 	"context"
@@ -36,8 +36,8 @@ const (
 	progressRequestPeriod = 100 * time.Millisecond
 )
 
-func newConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock TickerFactory, contextMetadata metadata.MD) *conditionalProgressRequester {
-	pr := &conditionalProgressRequester{
+func NewConditionalProgressRequester(requestWatchProgress WatchProgressRequester, clock TickerFactory, contextMetadata metadata.MD) *ConditionalProgressRequester {
+	pr := &ConditionalProgressRequester{
 		clock:                clock,
 		requestWatchProgress: requestWatchProgress,
 		contextMetadata:      contextMetadata,
@@ -52,9 +52,9 @@ type TickerFactory interface {
 	NewTimer(time.Duration) clock.Timer
 }
 
-// conditionalProgressRequester will request progress notification if there
+// ConditionalProgressRequester will request progress notification if there
 // is a request waiting for watch cache to be fresh.
-type conditionalProgressRequester struct {
+type ConditionalProgressRequester struct {
 	clock                TickerFactory
 	requestWatchProgress WatchProgressRequester
 	contextMetadata      metadata.MD
@@ -65,7 +65,7 @@ type conditionalProgressRequester struct {
 	stopped bool
 }
 
-func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
+func (pr *ConditionalProgressRequester) Run(stopCh <-chan struct{}) {
 	ctx := wait.ContextForChannel(stopCh)
 	if pr.contextMetadata != nil {
 		ctx = metadata.NewOutgoingContext(ctx, pr.contextMetadata)
@@ -115,14 +115,14 @@ func (pr *conditionalProgressRequester) Run(stopCh <-chan struct{}) {
 	}
 }
 
-func (pr *conditionalProgressRequester) Add() {
+func (pr *ConditionalProgressRequester) Add() {
 	pr.mux.Lock()
 	defer pr.mux.Unlock()
 	pr.waiting += 1
 	pr.cond.Signal()
 }
 
-func (pr *conditionalProgressRequester) Remove() {
+func (pr *ConditionalProgressRequester) Remove() {
 	pr.mux.Lock()
 	defer pr.mux.Unlock()
 	pr.waiting -= 1

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -150,7 +151,7 @@ type watchCache struct {
 
 	// Requests progress notification if there are requests waiting for watch
 	// to be fresh
-	waitingUntilFresh *conditionalProgressRequester
+	waitingUntilFresh *progress.ConditionalProgressRequester
 
 	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
 	snapshots *storeSnapshotter
@@ -165,7 +166,7 @@ func newWatchCache(
 	clock clock.WithTicker,
 	eventFreshDuration time.Duration,
 	groupResource schema.GroupResource,
-	progressRequester *conditionalProgressRequester) *watchCache {
+	progressRequester *progress.ConditionalProgressRequester) *watchCache {
 	wc := &watchCache{
 		capacity:            defaultLowerBoundCapacity,
 		keyFunc:             keyFunc,

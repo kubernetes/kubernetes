@@ -40,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -128,7 +129,7 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 	wc := &testWatchCache{}
 	wc.bookmarkRevision = make(chan int64, 1)
 	wc.stopCh = make(chan struct{})
-	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
+	pr := progress.NewConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
 	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr)
 	// To preserve behavior of tests that assume a given capacity,

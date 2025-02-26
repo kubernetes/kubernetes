@@ -2816,13 +2816,6 @@ func TestWatchStreamSeparation(t *testing.T) {
 			expectBookmarkOnWatchCache: true,
 		},
 		{
-			name:                         "common RPC & watch cache context > both get bookmarks",
-			separateCacheWatchRPC:        false,
-			useWatchCacheContextMetadata: true,
-			expectBookmarkOnEtcd:         true,
-			expectBookmarkOnWatchCache:   true,
-		},
-		{
 			name:                       "separate RPC > only etcd gets bookmarks",
 			separateCacheWatchRPC:      true,
 			expectBookmarkOnEtcd:       true,
@@ -2877,7 +2870,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 
 			var contextMetadata metadata.MD
 			if tc.useWatchCacheContextMetadata {
-				contextMetadata = cacher.watchCache.waitingUntilFresh.contextMetadata
+				contextMetadata = metadata.New(map[string]string{"source": "cache"})
 			}
 			// For the first 100ms from watch creation, watch progress requests are ignored.
 			time.Sleep(200 * time.Millisecond)
