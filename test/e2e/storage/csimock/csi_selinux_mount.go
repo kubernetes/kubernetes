@@ -506,7 +506,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				volumeMode:                       v1.ReadWriteOnce,
 				waitForSecondPodStart:            true,
 				expectNodeIncreases:              sets.New[string]( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
-				expectControllerConflictProperty: "SELinuxLabel", /* SELinuxController does emit a warning for Recursive policy, while kubelet does not! */
+				expectControllerConflictProperty: "", /* SELinuxController does not emit any warning either */
 				testTags:                         []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod), framework.WithFeatureGate(features.SELinuxChangePolicy), feature.SELinuxMountReadWriteOncePodOnly},
 			},
 			{
@@ -595,7 +595,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 				volumeMode:                       v1.ReadWriteMany,
 				waitForSecondPodStart:            true,
 				expectNodeIncreases:              sets.New[string]( /* no metric is increased, admitted_total was already increased when the first pod started */ ),
-				expectControllerConflictProperty: "SELinuxLabel", /* SELinuxController does emit a warning for Recursive policy, while kubelet does not! */
+				expectControllerConflictProperty: "", /* SELinuxController does not emit any warning either */
 				testTags:                         []interface{}{framework.WithFeatureGate(features.SELinuxMountReadWriteOncePod), framework.WithFeatureGate(features.SELinuxChangePolicy), framework.WithFeatureGate(features.SELinuxMount)},
 			},
 			{

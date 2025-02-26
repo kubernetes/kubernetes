@@ -25,14 +25,17 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/cache"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/utils/ptr"
@@ -117,7 +120,7 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 				{
 					volumeName:   "fake-plugin/pv1",
 					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
-					label:        ":::s0:c1,c2",
+					label:        "", // Label is cleared with the Recursive policy
 					changePolicy: v1.SELinuxChangePolicyRecursive,
 					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
 				},
@@ -222,6 +225,75 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 			},
 		},
 		{
+			name: "existing pod with Recursive policy does not generate conflicts",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				podWithPVC("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive), "pvc1", "vol1"),
+				pod("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyRecursive)),
+			},
+			pod:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			conflicts: []volumecache.Conflict{},
+			expectedAddedVolumes: []addedVolume{
+				{
+					volumeName:   "fake-plugin/pv1",
+					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					label:        "", // Label is cleared with the Recursive policy
+					changePolicy: v1.SELinuxChangePolicyRecursive,
+					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
+				},
+			},
+		},
+		{
+			name: "existing pod with Recursive policy does not conflict with pod with MountOption policy label, only with the policy",
+			existingPVCs: []*v1.PersistentVolumeClaim{
+				pvcBoundToPV("pv1", "pvc1"),
+			},
+			existingPVs: []*v1.PersistentVolume{
+				pvBoundToPVC("pv1", "pvc1"),
+			},
+			existingPods: []*v1.Pod{
+				podWithPVC("pod1", "s0:c1,c2", ptr.To(v1.SELinuxChangePolicyRecursive), "pvc1", "vol1"),
+				podWithPVC("pod2", "s0:c98,c99", ptr.To(v1.SELinuxChangePolicyMountOption), "pvc1", "vol1"),
+			},
+			pod: cache.ObjectName{Namespace: namespace, Name: "pod1"},
+			conflicts: []volumecache.Conflict{
+				{
+					PropertyName:       "SELinuxChangePolicy",
+					EventReason:        "SELinuxChangePolicyConflict",
+					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					PropertyValue:      string(v1.SELinuxChangePolicyRecursive),
+					OtherPod:           cache.ObjectName{Namespace: namespace, Name: "pod2"},
+					OtherPropertyValue: string(v1.SELinuxChangePolicyMountOption),
+				},
+				{
+					PropertyName:       "SELinuxChangePolicy",
+					EventReason:        "SELinuxChangePolicyConflict",
+					Pod:                cache.ObjectName{Namespace: namespace, Name: "pod2"},
+					PropertyValue:      string(v1.SELinuxChangePolicyMountOption),
+					OtherPod:           cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					OtherPropertyValue: string(v1.SELinuxChangePolicyRecursive),
+				},
+			},
+			expectedAddedVolumes: []addedVolume{
+				{
+					volumeName:   "fake-plugin/pv1",
+					podKey:       cache.ObjectName{Namespace: namespace, Name: "pod1"},
+					label:        "", // Label is cleared with the Recursive policy
+					changePolicy: v1.SELinuxChangePolicyRecursive,
+					csiDriver:    "ebs.csi.aws.com", // The PV is a fake EBS volume
+				},
+			},
+			expectedEvents: []string{
+				`Normal SELinuxChangePolicyConflict SELinuxChangePolicy "Recursive" conflicts with pod pod2 that uses the same volume as this pod with SELinuxChangePolicy "MountOption". If both pods land on the same node, only one of them may access the volume.`,
+				`Normal SELinuxChangePolicyConflict SELinuxChangePolicy "MountOption" conflicts with pod pod1 that uses the same volume as this pod with SELinuxChangePolicy "Recursive". If both pods land on the same node, only one of them may access the volume.`,
+			},
+		},
+		{
 			name: "existing pod with PVC generates conflict, the other pod doesn't exist",
 			existingPVCs: []*v1.PersistentVolumeClaim{
 				pvcBoundToPV("pv1", "pvc1"),
@@ -281,6 +353,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxChangePolicy, true)
+
 			_, ctx := ktesting.NewTestContext(t)
 			_, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 			plugin.SupportsSELinux = true
