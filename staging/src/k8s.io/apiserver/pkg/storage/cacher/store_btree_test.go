@@ -49,6 +49,14 @@ func TestStoreListPrefix(t *testing.T) {
 		testStorageElement("foo3", "bar3", 1),
 	}, items)
 
+	items, hasMore = store.ListPrefix("foo", "", 3)
+	assert.False(t, hasMore, "hasMore should be false when limit equals the # of queried items.")
+	assert.Equal(t, []interface{}{
+		testStorageElement("foo1", "bar2", 2),
+		testStorageElement("foo2", "bar1", 3),
+		testStorageElement("foo3", "bar3", 1),
+	}, items)
+
 	items, hasMore = store.ListPrefix("foo2", "", 0)
 	assert.False(t, hasMore)
 	assert.Equal(t, []interface{}{
