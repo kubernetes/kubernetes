@@ -18,7 +18,6 @@ package cacher
 
 import (
 	"fmt"
-	"math"
 	"strings"
 	"sync"
 
@@ -100,10 +99,10 @@ func (si *threadedStoreIndexer) List() []interface{} {
 	return si.store.List()
 }
 
-func (si *threadedStoreIndexer) ListPrefix(prefix, continueKey string, limit int) ([]interface{}, bool) {
+func (si *threadedStoreIndexer) ListPrefix(prefix, continueKey string) []interface{} {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
-	return si.store.ListPrefix(prefix, continueKey, limit)
+	return si.store.ListPrefix(prefix, continueKey)
 }
 
 func (si *threadedStoreIndexer) ListKeys() []string {
@@ -254,31 +253,19 @@ func (s *btreeStore) getByKey(key string) (item interface{}, exists bool, err er
 	return item, exists, nil
 }
 
-func (s *btreeStore) ListPrefix(prefix, continueKey string, limit int) ([]interface{}, bool) {
-	if limit < 0 {
-		return nil, false
-	}
+func (s *btreeStore) ListPrefix(prefix, continueKey string) []interface{} {
 	if continueKey == "" {
 		continueKey = prefix
 	}
 	var result []interface{}
-	var hasMore bool
-	if limit == 0 {
-		limit = math.MaxInt
-	}
 	s.tree.AscendGreaterOrEqual(&storeElement{Key: continueKey}, func(item *storeElement) bool {
 		if !strings.HasPrefix(item.Key, prefix) {
-			return false
-		}
-		// TODO: Might be worth to lookup one more item to provide more accurate HasMore.
-		if len(result) >= limit {
-			hasMore = true
 			return false
 		}
 		result = append(result, item)
 		return true
 	})
-	return result, hasMore
+	return result
 }
 
 func (s *btreeStore) Count(prefix, continueKey string) (count int) {

@@ -73,7 +73,7 @@ type storeIndexer interface {
 }
 
 type orderedLister interface {
-	ListPrefix(prefix, continueKey string, limit int) (items []interface{}, hasMore bool)
+	ListPrefix(prefix, continueKey string) []interface{}
 	Count(prefix, continueKey string) (count int)
 	Clone() orderedLister
 }
