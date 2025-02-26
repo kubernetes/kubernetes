@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 )
@@ -72,9 +73,10 @@ type storeIndexer interface {
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 }
 
+// orderedLister is interface wrapping btree implementation of store, allowing for fast prefix listing and fast lazy cloning.
 type orderedLister interface {
-	ListPrefix(prefix, continueKey string, limit int) (items []interface{}, hasMore bool)
 	Count(prefix, continueKey string) (count int)
+	ListPrefix(prefix, continueKey string, limit int, pred storage.SelectionPredicate) (items []interface{}, hasMore bool)
 	Clone() orderedLister
 }
 

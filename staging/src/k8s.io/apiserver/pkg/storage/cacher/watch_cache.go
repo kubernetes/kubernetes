@@ -495,7 +495,7 @@ func (s sortableStoreElements) Swap(i, j int) {
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, key string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, key string, matchValues []storage.MatchValue, pred storage.SelectionPredicate) (resp listResp, index string, err error) {
 	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported && w.notFresh(resourceVersion) {
 		w.waitingUntilFresh.Add()
@@ -518,14 +518,18 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 			result, err = filterPrefixAndOrder(key, result)
 			return listResp{
 				Items:           result,
+				HasMore:         false,
+				ItemCount:       int64(len(result)),
 				ResourceVersion: w.resourceVersion,
 			}, matchValue.IndexName, err
 		}
 	}
 	if store, ok := w.store.(orderedLister); ok {
-		result, _ := store.ListPrefix(key, "", 0)
+		result, hasMore := store.ListPrefix(key, "", 0, pred)
 		return listResp{
 			Items:           result,
+			HasMore:         hasMore,
+			ItemCount:       int64(len(result)),
 			ResourceVersion: w.resourceVersion,
 		}, "", nil
 	}
@@ -533,6 +537,8 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 	result, err = filterPrefixAndOrder(key, result)
 	return listResp{
 		Items:           result,
+		HasMore:         false,
+		ItemCount:       int64(len(result)),
 		ResourceVersion: w.resourceVersion,
 	}, "", err
 }
