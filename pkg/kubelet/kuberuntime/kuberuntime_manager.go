@@ -993,7 +993,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// there may be a delay in container events reported by the container runtime.
 		// This can result in the inability to obtain the latest pod status when entering syncPod again.
 		// This aims to prevent delayed states from interfering with the behavior of syncPod.
-		if containerStatus != nil && pleg.IsEventedPLEGInUse() && kubecontainer.IsContainerPendingStart(containerStatus) {
+		if containerStatus != nil && utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && pleg.IsEventedPLEGInUse() && kubecontainer.IsContainerPendingStart(containerStatus) {
 			klog.V(4).InfoS("The container's status is Created, but it did not enter the Running state within the grace period. Waiting for the next cycle.", "pod", klog.KObj(pod), "containerName", container.Name)
 			keepCount++
 			continue
@@ -1614,7 +1614,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
 
-		if idx == 0 && pleg.IsEventedPLEGInUse() {
+		if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && idx == 0 && pleg.IsEventedPLEGInUse() {
 			if resp.Timestamp != 0 && len(resp.ContainersStatuses) != 0 {
 				// Get the statuses of all containers visible to the pod and
 				// timestamp from sandboxStatus.
@@ -1641,7 +1641,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(ctx context.Context, uid kubety
 		}
 	}
 
-	if !pleg.IsEventedPLEGInUse() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
 		// Get statuses of all containers visible in the pod.
 		containerStatuses, err = m.getPodContainerStatuses(ctx, uid, name, namespace)
 		if err != nil {
