@@ -114,6 +114,38 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 	// charge for claim
 	result[ClaimObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	for _, request := range claim.Spec.Devices.Requests {
+		if len(request.FirstAvailable) > 0 {
+			// If there are subrequests, we want to use the worst case per device class
+			// to quota. So for each device class, we need to find the max number of
+			// devices that might be allocated.
+			maxQuantityByDeviceClassClaim := make(map[corev1.ResourceName]resource.Quantity)
+			for _, subrequest := range request.FirstAvailable {
+				deviceClassClaim := V1ResourceByDeviceClass(subrequest.DeviceClassName)
+				var numDevices int64
+				switch subrequest.AllocationMode {
+				case resourceapi.DeviceAllocationModeExactCount:
+					numDevices = subrequest.Count
+				case resourceapi.DeviceAllocationModeAll:
+					// Worst case...
+					numDevices = resourceapi.AllocationResultsMaxSize
+				default:
+					// Could happen after a downgrade. Unknown modes
+					// don't count towards the quota and users shouldn't
+					// expect that when downgrading.
+				}
+
+				q := resource.NewQuantity(numDevices, resource.DecimalSI)
+				if q.Cmp(maxQuantityByDeviceClassClaim[deviceClassClaim]) > 0 {
+					maxQuantityByDeviceClassClaim[deviceClassClaim] = *q
+				}
+			}
+			for deviceClassClaim, q := range maxQuantityByDeviceClassClaim {
+				quantity := result[deviceClassClaim]
+				quantity.Add(q)
+				result[deviceClassClaim] = quantity
+			}
+			continue
+		}
 		deviceClassClaim := V1ResourceByDeviceClass(request.DeviceClassName)
 		var numDevices int64
 		switch request.AllocationMode {
