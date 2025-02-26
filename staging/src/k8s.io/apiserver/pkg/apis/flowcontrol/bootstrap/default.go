@@ -177,8 +177,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(30)),
-				LendablePercent:          ptr.To(int32(33)),
+				NominalConcurrencyShares: ptr.To(int32(40)),
+				LendablePercent:          ptr.To(int32(50)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -194,8 +194,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(40)),
-				LendablePercent:          ptr.To(int32(25)),
+				NominalConcurrencyShares: ptr.To(int32(60)),
+				LendablePercent:          ptr.To(int32(50)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -212,8 +212,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(40)),
-				LendablePercent:          ptr.To(int32(75)),
+				NominalConcurrencyShares: ptr.To(int32(50)),
+				LendablePercent:          ptr.To(int32(80)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -268,8 +268,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(100)),
-				LendablePercent:          ptr.To(int32(90)),
+				NominalConcurrencyShares: ptr.To(int32(40)),
+				LendablePercent:          ptr.To(int32(75)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -286,7 +286,7 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(20)),
+				NominalConcurrencyShares: ptr.To(int32(10)),
 				LendablePercent:          ptr.To(int32(50)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
