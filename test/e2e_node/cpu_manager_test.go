@@ -48,6 +48,7 @@ type ctnAttribute struct {
 	cpuRequest    string
 	cpuLimit      string
 	restartPolicy *v1.ContainerRestartPolicy
+	ctnCommand    string
 }
 
 // makeCPUMangerPod returns a pod with the provided ctnAttributes.
