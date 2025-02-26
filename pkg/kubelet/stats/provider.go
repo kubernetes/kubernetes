@@ -120,8 +120,11 @@ func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsap
 		}
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
-	s := cadvisorInfoToContainerStats(cgroupName, info, nil, nil)
+	s := cadvisorInfoToContainerStats(ctx, cgroupName, info, nil, nil)
 	n := cadvisorInfoToNetworkStats(info)
 	return s, n, nil
 }

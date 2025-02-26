@@ -27,10 +27,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestCustomMetrics(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	spec := []cadvisorapiv1.MetricSpec{
 		{
 			Name:   "qos",
@@ -79,7 +81,7 @@ func TestCustomMetrics(t *testing.T) {
 			},
 		},
 	}
-	assert.Contains(t, cadvisorInfoToUserDefinedMetrics(&cInfo),
+	assert.Contains(t, cadvisorInfoToUserDefinedMetrics(tCtx, &cInfo),
 		statsapi.UserDefinedMetric{
 			UserDefinedMetricDescriptor: statsapi.UserDefinedMetricDescriptor{
 				Name:  "qos",

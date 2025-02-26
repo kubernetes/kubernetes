@@ -17,6 +17,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -82,7 +83,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 
 // cadvisorInfoToContainerStats returns the statsapi.ContainerStats converted
 // from the container and filesystem info.
-func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo, rootFs, imageFs *cadvisorapiv2.FsInfo) *statsapi.ContainerStats {
+func cadvisorInfoToContainerStats(ctx context.Context, name string, info *cadvisorapiv2.ContainerInfo, rootFs, imageFs *cadvisorapiv2.FsInfo) *statsapi.ContainerStats {
 	result := &statsapi.ContainerStats{
 		StartTime: metav1.NewTime(info.Spec.CreationTime),
 		Name:      name,
@@ -139,7 +140,7 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 		})
 	}
 
-	result.UserDefinedMetrics = cadvisorInfoToUserDefinedMetrics(info)
+	result.UserDefinedMetrics = cadvisorInfoToUserDefinedMetrics(ctx, info)
 
 	return result
 }
@@ -235,7 +236,7 @@ func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.Net
 
 // cadvisorInfoToUserDefinedMetrics returns the statsapi.UserDefinedMetric
 // converted from the container info from cadvisor.
-func cadvisorInfoToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []statsapi.UserDefinedMetric {
+func cadvisorInfoToUserDefinedMetrics(ctx context.Context, info *cadvisorapiv2.ContainerInfo) []statsapi.UserDefinedMetric {
 	type specVal struct {
 		ref     statsapi.UserDefinedMetricDescriptor
 		valType cadvisorapiv1.DataType
@@ -253,11 +254,12 @@ func cadvisorInfoToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []stats
 			valType: spec.Format,
 		}
 	}
+	logger := klog.FromContext(ctx)
 	for _, stat := range info.Stats {
 		for name, values := range stat.CustomMetrics {
 			specVal, ok := udmMap[name]
 			if !ok {
-				klog.InfoS("Spec for custom metric is missing from cAdvisor output", "metric", name, "spec", info.Spec, "metrics", stat.CustomMetrics)
+				logger.Info("Spec for custom metric is missing from cAdvisor output", "metric", name, "spec", info.Spec, "metrics", stat.CustomMetrics)
 				continue
 			}
 			for _, value := range values {
@@ -468,7 +470,7 @@ func addUsage(first, second *uint64) *uint64 {
 	return &total
 }
 
-func makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo, resourceAnalyzer stats.ResourceAnalyzer, hostStatsProvider HostStatsProvider, isCRIStatsProvider bool) {
+func makePodStorageStats(ctx context.Context, s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo, resourceAnalyzer stats.ResourceAnalyzer, hostStatsProvider HostStatsProvider, isCRIStatsProvider bool) {
 	podNs := s.PodRef.Namespace
 	podName := s.PodRef.Name
 	podUID := types.UID(s.PodRef.UID)
@@ -477,11 +479,11 @@ func makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo,
 		ephemeralStats = make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
 		copy(ephemeralStats, vstats.EphemeralVolumes)
 		s.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
-
 	}
+	logger := klog.FromContext(ctx)
 	logStats, err := hostStatsProvider.getPodLogStats(podNs, podName, podUID, rootFsInfo)
 	if err != nil {
-		klog.V(6).ErrorS(err, "Unable to fetch pod log stats", "pod", klog.KRef(podNs, podName))
+		logger.V(6).Error(err, "Unable to fetch pod log stats", "pod", klog.KRef(podNs, podName))
 		// If people do in-place upgrade, there might be pods still using
 		// the old log path. For those pods, no pod log stats is returned.
 		// We should continue generating other stats in that case.
@@ -489,7 +491,7 @@ func makePodStorageStats(s *statsapi.PodStats, rootFsInfo *cadvisorapiv2.FsInfo,
 	}
 	etcHostsStats, err := hostStatsProvider.getPodEtcHostsStats(podUID, rootFsInfo)
 	if err != nil {
-		klog.V(6).ErrorS(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podNs, podName))
+		logger.V(6).Error(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podNs, podName))
 	}
 	s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, etcHostsStats, isCRIStatsProvider)
 }
