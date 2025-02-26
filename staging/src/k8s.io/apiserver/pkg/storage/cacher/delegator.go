@@ -57,6 +57,10 @@ func (c *CacheDelegator) Create(ctx context.Context, key string, obj, out runtim
 	return c.storage.Create(ctx, key, obj, out, ttl)
 }
 
+func (c *CacheDelegator) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
+	return c.storage.GetCurrentResourceVersion(ctx)
+}
+
 func (c *CacheDelegator) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc, cachedExistingObject runtime.Object, opts storage.DeleteOptions) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
@@ -160,7 +164,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 	consistentRead := opts.ResourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported
 	if consistentRead {
-		listRV, err = storage.GetCurrentResourceVersionFromStorage(ctx, c.storage, c.cacher.newListFunc, c.cacher.resourcePrefix, c.cacher.objectType.String())
+		listRV, err = c.storage.GetCurrentResourceVersion(ctx)
 		if err != nil {
 			return err
 		}
