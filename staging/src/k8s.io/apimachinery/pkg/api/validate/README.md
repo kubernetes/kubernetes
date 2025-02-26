@@ -8,16 +8,19 @@ pattern, which is assumed by automation and code-generation:
 
 ```
 import (
+        "context"
         "k8s.io/apimachinery/pkg/api/operation"
         "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-func <Name>(opCtx operation.Context, fldPath *field.Path, value, oldValue <ValueType>, <OtherArgs...>) field.ErrorList
+func <Name>(ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, oldValue <ValueType>, <OtherArgs...>) field.ErrorList
 ```
 
 The name of validator functions should consider that callers will generally be
 spelling out the package name and the function name, and so should aim for
 legibility.  E.g. `validate.Concept()`.
+
+The `ctx` argument is Go's usual Context.
 
 The `opCtx` argument provides information about the API operation in question.
 
@@ -42,14 +45,14 @@ Examples:
 
 ```
 // NonEmpty validates that a string is not empty.
-func NonEmpty(opCtx operation.Context, fldPath *field.Path, value, _ *string) field.ErrorList
+func NonEmpty(ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, _ *string) field.ErrorList
 
 // Even validates that a slice has an even number of items.
-func Even[T any](opCtx operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList
+func Even[T any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList
 
 // KeysMaxLen validates that all of the string keys in a map are under the
 // specified length.
-func KeysMaxLen[T any](opCtx operation.Context, fldPath *field.Path, value, _ map[string]T, maxLen int) field.ErrorList
+func KeysMaxLen[T any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, _ map[string]T, maxLen int) field.ErrorList
 ```
 
 Validator functions always return an `ErrorList` where each item is a distinct

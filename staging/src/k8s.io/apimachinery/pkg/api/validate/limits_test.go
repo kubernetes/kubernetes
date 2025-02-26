@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"context"
 	"regexp"
 	"testing"
 
@@ -51,7 +52,7 @@ func TestMaxLength(t *testing.T) {
 
 	for i, tc := range cases {
 		v := tc.value
-		result := MaxLength(operation.Context{}, field.NewPath("fldpath"), &v, nil, tc.max)
+		result := MaxLength(context.Background(), operation.Context{}, field.NewPath("fldpath"), &v, nil, tc.max)
 		if len(result) > 0 && tc.err == "" {
 			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
 			continue
@@ -74,39 +75,39 @@ func TestMaxLength(t *testing.T) {
 
 func TestMaxItems(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := make([]string, 0)
 			max := 0
-			return MaxItems(c, fp, value, nil, max)
+			return MaxItems(context.Background(), opCtx, fp, value, nil, max)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := make([]string, 1)
 			max := 0
-			return MaxItems(c, fp, value, nil, max)
+			return MaxItems(context.Background(), opCtx, fp, value, nil, max)
 		},
 		err: "fldpath: Too many.*must have at most",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := make([]int, 1)
 			max := 1
-			return MaxItems(c, fp, value, nil, max)
+			return MaxItems(context.Background(), opCtx, fp, value, nil, max)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := make([]int, 2)
 			max := 1
-			return MaxItems(c, fp, value, nil, max)
+			return MaxItems(context.Background(), opCtx, fp, value, nil, max)
 		},
 		err: "fldpath: Too many.*must have at most",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := make([]bool, 0)
 			max := -1
-			return MaxItems(c, fp, value, nil, max)
+			return MaxItems(context.Background(), opCtx, fp, value, nil, max)
 		},
 		err: "fldpath: Too many.*too many items",
 	}}

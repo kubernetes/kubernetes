@@ -17,13 +17,15 @@ limitations under the License.
 package validate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // FixedResult asserts a fixed boolean result.  This is mostly useful for
 // testing.
-func FixedResult[T any](opCtx operation.Context, fldPath *field.Path, value, _ T, result bool, arg string) field.ErrorList {
+func FixedResult[T any](_ context.Context, opCtx operation.Context, fldPath *field.Path, value, _ T, result bool, arg string) field.ErrorList {
 	if result {
 		return nil
 	}

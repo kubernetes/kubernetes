@@ -17,13 +17,15 @@ limitations under the License.
 package validate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // RequiredValue verifies that the specified value is not the zero-value for
 // its type.
-func RequiredValue[T comparable](_ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func RequiredValue[T comparable](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
 	var zero T
 	if *value != zero {
 		return nil
@@ -32,7 +34,7 @@ func RequiredValue[T comparable](_ operation.Context, fldPath *field.Path, value
 }
 
 // RequiredPointer verifies that the specified pointer is not nil.
-func RequiredPointer[T any](_ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func RequiredPointer[T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value != nil {
 		return nil
 	}
@@ -40,7 +42,7 @@ func RequiredPointer[T any](_ operation.Context, fldPath *field.Path, value, _ *
 }
 
 // RequiredSlice verifies that the specified slice is not empty.
-func RequiredSlice[T any](_ operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList {
+func RequiredSlice[T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList {
 	if len(value) > 0 {
 		return nil
 	}
@@ -48,7 +50,7 @@ func RequiredSlice[T any](_ operation.Context, fldPath *field.Path, value, _ []T
 }
 
 // RequiredMap verifies that the specified map is not empty.
-func RequiredMap[K comparable, T any](_ operation.Context, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
+func RequiredMap[K comparable, T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
 	if len(value) > 0 {
 		return nil
 	}
@@ -57,7 +59,7 @@ func RequiredMap[K comparable, T any](_ operation.Context, fldPath *field.Path, 
 
 // ForbiddenValue verifies that the specified value is the zero-value for its
 // type.
-func ForbiddenValue[T comparable](_ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func ForbiddenValue[T comparable](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
 	var zero T
 	if *value == zero {
 		return nil
@@ -66,7 +68,7 @@ func ForbiddenValue[T comparable](_ operation.Context, fldPath *field.Path, valu
 }
 
 // ForbiddenPointer verifies that the specified pointer is nil.
-func ForbiddenPointer[T any](_ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func ForbiddenPointer[T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
 		return nil
 	}
@@ -74,7 +76,7 @@ func ForbiddenPointer[T any](_ operation.Context, fldPath *field.Path, value, _ 
 }
 
 // ForbiddenSlice verifies that the specified slice is empty.
-func ForbiddenSlice[T any](_ operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList {
+func ForbiddenSlice[T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList {
 	if len(value) == 0 {
 		return nil
 	}
@@ -82,7 +84,7 @@ func ForbiddenSlice[T any](_ operation.Context, fldPath *field.Path, value, _ []
 }
 
 // RequiredMap verifies that the specified map is empty.
-func ForbiddenMap[K comparable, T any](_ operation.Context, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
+func ForbiddenMap[K comparable, T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
 	if len(value) == 0 {
 		return nil
 	}
@@ -92,7 +94,7 @@ func ForbiddenMap[K comparable, T any](_ operation.Context, fldPath *field.Path,
 // OptionalValue verifies that the specified value is not the zero-value for
 // its type. This is identical to RequiredValue, but the caller should treat an
 // error here as an indication that the optional value was not specified.
-func OptionalValue[T comparable](_ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func OptionalValue[T comparable](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
 	var zero T
 	if *value != zero {
 		return nil
@@ -103,7 +105,7 @@ func OptionalValue[T comparable](_ operation.Context, fldPath *field.Path, value
 // OptionalPointer verifies that the specified pointer is not nil. This is
 // identical to RequiredPointer, but the caller should treat an error here as an
 // indication that the optional value was not specified.
-func OptionalPointer[T any](_ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func OptionalPointer[T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value != nil {
 		return nil
 	}
@@ -113,7 +115,7 @@ func OptionalPointer[T any](_ operation.Context, fldPath *field.Path, value, _ *
 // OptionalSlice verifies that the specified slice is not empty. This is
 // identical to RequiredSlice, but the caller should treat an error here as an
 // indication that the optional value was not specified.
-func OptionalSlice[T any](_ operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList {
+func OptionalSlice[T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList {
 	if len(value) > 0 {
 		return nil
 	}
@@ -123,7 +125,7 @@ func OptionalSlice[T any](_ operation.Context, fldPath *field.Path, value, _ []T
 // OptionalMap verifies that the specified map is not empty. This is identical
 // to RequiredMap, but the caller should treat an error here as an indication that
 // the optional value was not specified.
-func OptionalMap[K comparable, T any](_ operation.Context, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
+func OptionalMap[K comparable, T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ map[K]T) field.ErrorList {
 	if len(value) > 0 {
 		return nil
 	}

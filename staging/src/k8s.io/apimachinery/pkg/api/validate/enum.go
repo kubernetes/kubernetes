@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"context"
 	"slices"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -26,7 +27,7 @@ import (
 
 // Enum verifies that the specified value is one of the valid symbols.
 // This is for string enums only.
-func Enum[T ~string](opCtx operation.Context, fldPath *field.Path, value, _ *T, symbols sets.Set[T]) field.ErrorList {
+func Enum[T ~string](_ context.Context, opCtx operation.Context, fldPath *field.Path, value, _ *T, symbols sets.Set[T]) field.ErrorList {
 	if value == nil {
 		return nil
 	}

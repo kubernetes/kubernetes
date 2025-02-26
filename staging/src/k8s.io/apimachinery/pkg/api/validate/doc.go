@@ -18,7 +18,8 @@ limitations under the License.
 // with the k8s.io/code-generator/cmd/validation-gen tool.  Each validation
 // function has a similar fingerprint:
 //
-//	func <Name>(opCtx operation.Context,
+//	func <Name>(ctx context.Context,
+//	            opCtx operation.Context,
 //	            fldPath *field.Path,
 //	            value, oldValue <nilable type>,
 //	            <other args...>) field.ErrorList
@@ -35,12 +36,12 @@ limitations under the License.
 // Tightened validation (also known as ratcheting validation) is supported by
 // defining a new validation function. For example:
 //
-//	func TightenedMaxLength(opCtx operation.Context, fldPath *field.Path, value, oldValue *string) field.ErrorList {
-//	  if oldValue != nil && len(MaxLength(opCtx, fldPath, oldValue, nil)) > 0 {
+//	func TightenedMaxLength(ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, oldValue *string) field.ErrorList {
+//	  if oldValue != nil && len(MaxLength(ctx, opCtx, fldPath, oldValue, nil)) > 0 {
 //	    // old value is not valid, so this value skips the tightened validation
 //	    return nil
 //	  }
-//	  return MaxLength(opCtx, fldPath, value, nil)
+//	  return MaxLength(ctx, opCtx, fldPath, value, nil)
 //	}
 //
 // In general, we cannot distinguish a non-specified slice or map from one that

@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"context"
 	"regexp"
 	"testing"
 
@@ -27,61 +28,61 @@ import (
 
 func TestRequiredValue(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := "value"
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := "" // zero-value
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 123
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 0 // zero-value
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := true
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := false // zero-value
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{"value"}
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{} // zero-value
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := ptr.To("")
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := (*string)(nil) // zero-value
-			return RequiredValue(c, fp, &value, nil)
+			return RequiredValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Required value",
 	}}
@@ -110,61 +111,61 @@ func TestRequiredValue(t *testing.T) {
 
 func TestRequiredPointer(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := ""
-			return RequiredPointer(c, fp, &value, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*string)(nil)
-			return RequiredPointer(c, fp, pointer, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 0
-			return RequiredPointer(c, fp, &value, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*int)(nil)
-			return RequiredPointer(c, fp, pointer, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := false
-			return RequiredPointer(c, fp, &value, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*bool)(nil)
-			return RequiredPointer(c, fp, pointer, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{}
-			return RequiredPointer(c, fp, &value, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*struct{ S string })(nil)
-			return RequiredPointer(c, fp, pointer, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := (*string)(nil)
-			return RequiredPointer(c, fp, &value, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (**string)(nil)
-			return RequiredPointer(c, fp, pointer, nil)
+			return RequiredPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath: Required value",
 	}}
@@ -193,50 +194,50 @@ func TestRequiredPointer(t *testing.T) {
 
 func TestRequiredSlice(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []string{""}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []string{}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []int{0}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []int{}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []bool{false}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []bool{}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []*string{nil}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []*string{}
-			return RequiredSlice(c, fp, value, nil)
+			return RequiredSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Required value",
 	}}
@@ -265,39 +266,39 @@ func TestRequiredSlice(t *testing.T) {
 
 func TestRequiredMap(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]string{"": ""}
-			return RequiredMap(c, fp, value, nil)
+			return RequiredMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]string{}
-			return RequiredMap(c, fp, value, nil)
+			return RequiredMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[int]int{0: 0}
-			return RequiredMap(c, fp, value, nil)
+			return RequiredMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[int]int{}
-			return RequiredMap(c, fp, value, nil)
+			return RequiredMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Required value",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[bool]bool{false: false}
-			return RequiredMap(c, fp, value, nil)
+			return RequiredMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]bool{}
-			return RequiredMap(c, fp, value, nil)
+			return RequiredMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Required value",
 	}}
@@ -326,61 +327,61 @@ func TestRequiredMap(t *testing.T) {
 
 func TestOptionalValue(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := "value"
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := "" // zero-value
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 123
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 0 // zero-value
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := true
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := false // zero-value
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{"value"}
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{} // zero-value
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := ptr.To("")
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := (*string)(nil) // zero-value
-			return OptionalValue(c, fp, &value, nil)
+			return OptionalValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}}
@@ -409,61 +410,61 @@ func TestOptionalValue(t *testing.T) {
 
 func TestOptionalPointer(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := ""
-			return OptionalPointer(c, fp, &value, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*string)(nil)
-			return OptionalPointer(c, fp, pointer, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 0
-			return OptionalPointer(c, fp, &value, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*int)(nil)
-			return OptionalPointer(c, fp, pointer, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := false
-			return OptionalPointer(c, fp, &value, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*bool)(nil)
-			return OptionalPointer(c, fp, pointer, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{}
-			return OptionalPointer(c, fp, &value, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*struct{ S string })(nil)
-			return OptionalPointer(c, fp, pointer, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := (*string)(nil)
-			return OptionalPointer(c, fp, &value, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (**string)(nil)
-			return OptionalPointer(c, fp, pointer, nil)
+			return OptionalPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}}
@@ -492,50 +493,50 @@ func TestOptionalPointer(t *testing.T) {
 
 func TestOptionalSlice(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []string{""}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []string{}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []int{0}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []int{}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []bool{false}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []bool{}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []*string{nil}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []*string{}
-			return OptionalSlice(c, fp, value, nil)
+			return OptionalSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}}
@@ -564,39 +565,39 @@ func TestOptionalSlice(t *testing.T) {
 
 func TestOptionalMap(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]string{"": ""}
-			return OptionalMap(c, fp, value, nil)
+			return OptionalMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]string{}
-			return OptionalMap(c, fp, value, nil)
+			return OptionalMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[int]int{0: 0}
-			return OptionalMap(c, fp, value, nil)
+			return OptionalMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[int]int{}
-			return OptionalMap(c, fp, value, nil)
+			return OptionalMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[bool]bool{false: false}
-			return OptionalMap(c, fp, value, nil)
+			return OptionalMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]bool{}
-			return OptionalMap(c, fp, value, nil)
+			return OptionalMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath:.*optional value was not specified",
 	}}
@@ -625,61 +626,61 @@ func TestOptionalMap(t *testing.T) {
 
 func TestForbiddenValue(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := ""
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := "value"
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 0
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 123
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := false
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := true
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{}
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{"value"}
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := (*string)(nil)
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := ptr.To("")
-			return ForbiddenValue(c, fp, &value, nil)
+			return ForbiddenValue(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}}
@@ -708,61 +709,61 @@ func TestForbiddenValue(t *testing.T) {
 
 func TestForbiddenPointer(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*string)(nil)
-			return ForbiddenPointer(c, fp, pointer, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := ""
-			return ForbiddenPointer(c, fp, &value, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*int)(nil)
-			return ForbiddenPointer(c, fp, pointer, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := 0
-			return ForbiddenPointer(c, fp, &value, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*bool)(nil)
-			return ForbiddenPointer(c, fp, pointer, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := false
-			return ForbiddenPointer(c, fp, &value, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (*struct{ S string })(nil)
-			return ForbiddenPointer(c, fp, pointer, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := struct{ S string }{}
-			return ForbiddenPointer(c, fp, &value, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			pointer := (**string)(nil)
-			return ForbiddenPointer(c, fp, pointer, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, pointer, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := (*string)(nil)
-			return ForbiddenPointer(c, fp, &value, nil)
+			return ForbiddenPointer(context.Background(), opCtx, fp, &value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}}
@@ -791,50 +792,50 @@ func TestForbiddenPointer(t *testing.T) {
 
 func TestForbiddenSlice(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []string{}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []string{""}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []int{}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []int{0}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []bool{}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []bool{false}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []*string{}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := []*string{nil}
-			return ForbiddenSlice(c, fp, value, nil)
+			return ForbiddenSlice(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}}
@@ -863,39 +864,39 @@ func TestForbiddenSlice(t *testing.T) {
 
 func TestForbiddenMap(t *testing.T) {
 	cases := []struct {
-		fn  func(c operation.Context, fp *field.Path) field.ErrorList
+		fn  func(opCtx operation.Context, fp *field.Path) field.ErrorList
 		err string // regex
 	}{{
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]string{}
-			return ForbiddenMap(c, fp, value, nil)
+			return ForbiddenMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]string{"": ""}
-			return ForbiddenMap(c, fp, value, nil)
+			return ForbiddenMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[int]int{}
-			return ForbiddenMap(c, fp, value, nil)
+			return ForbiddenMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[int]int{0: 0}
-			return ForbiddenMap(c, fp, value, nil)
+			return ForbiddenMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[string]bool{}
-			return ForbiddenMap(c, fp, value, nil)
+			return ForbiddenMap(context.Background(), opCtx, fp, value, nil)
 		},
 	}, {
-		fn: func(c operation.Context, fp *field.Path) field.ErrorList {
+		fn: func(opCtx operation.Context, fp *field.Path) field.ErrorList {
 			value := map[bool]bool{false: false}
-			return ForbiddenMap(c, fp, value, nil)
+			return ForbiddenMap(context.Background(), opCtx, fp, value, nil)
 		},
 		err: "fldpath: Forbidden",
 	}}

@@ -17,6 +17,8 @@ limitations under the License.
 package validate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -26,7 +28,7 @@ import (
 // an update operation.  It does nothing if the old value is not provided. If
 // the caller needs to compare types that are not trivially comparable, they
 // should use ImmutableNonComparable instead.
-func Immutable[T comparable](opCtx operation.Context, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+func Immutable[T comparable](_ context.Context, opCtx operation.Context, fldPath *field.Path, value, oldValue *T) field.ErrorList {
 	if opCtx.Operation != operation.Update {
 		return nil
 	}
@@ -45,7 +47,7 @@ func Immutable[T comparable](opCtx operation.Context, fldPath *field.Path, value
 // the course of an update operation.  It does nothing if the old value is not
 // provided. Unlike Immutable, this function can be used with types that are
 // not directly comparable, at the cost of performance.
-func ImmutableNonComparable[T any](opCtx operation.Context, fldPath *field.Path, value, oldValue T) field.ErrorList {
+func ImmutableNonComparable[T any](_ context.Context, opCtx operation.Context, fldPath *field.Path, value, oldValue T) field.ErrorList {
 	if opCtx.Operation != operation.Update {
 		return nil
 	}

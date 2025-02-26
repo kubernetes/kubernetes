@@ -17,6 +17,8 @@ limitations under the License.
 package validate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -31,7 +33,7 @@ import (
 // All errors returned by this function will be "invalid" type errors. If the
 // caller wants better errors, it must take responsibility for checking things
 // like required/optional and max-length.
-func DNSLabel[T ~string](opCtx operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func DNSLabel[T ~string](_ context.Context, opCtx operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
 		return nil
 	}

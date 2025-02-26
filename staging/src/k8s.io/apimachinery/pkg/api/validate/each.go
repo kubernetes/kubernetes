@@ -17,6 +17,8 @@ limitations under the License.
 package validate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -28,7 +30,7 @@ type CompareFunc[T any] func(T, T) bool
 // validation function.  The comparison function is used to find the
 // corresponding value in oldSlice.  The value-type of the slices is assumed to
 // not be nilable.
-func EachSliceVal[T any](opCtx operation.Context, fldPath *field.Path, newSlice, oldSlice []T,
+func EachSliceVal[T any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, newSlice, oldSlice []T,
 	cmp CompareFunc[T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
 	for i, val := range newSlice {
@@ -36,7 +38,7 @@ func EachSliceVal[T any](opCtx operation.Context, fldPath *field.Path, newSlice,
 		if cmp != nil && len(oldSlice) > 0 {
 			old = lookup(oldSlice, val, cmp)
 		}
-		errs = append(errs, validator(opCtx, fldPath.Index(i), &val, old)...)
+		errs = append(errs, validator(ctx, opCtx, fldPath.Index(i), &val, old)...)
 	}
 	return errs
 }
@@ -45,7 +47,7 @@ func EachSliceVal[T any](opCtx operation.Context, fldPath *field.Path, newSlice,
 // validation function.  The comparison function is used to find the
 // corresponding value in oldSlice.  The value-type of the slices is assumed to
 // be nilable.
-func EachSliceValNilable[T any](opCtx operation.Context, fldPath *field.Path, newSlice, oldSlice []T,
+func EachSliceValNilable[T any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, newSlice, oldSlice []T,
 	cmp CompareFunc[T], validator ValidateFunc[T]) field.ErrorList {
 	var errs field.ErrorList
 	for i, val := range newSlice {
@@ -56,7 +58,7 @@ func EachSliceValNilable[T any](opCtx operation.Context, fldPath *field.Path, ne
 				old = *p
 			}
 		}
-		errs = append(errs, validator(opCtx, fldPath.Index(i), val, old)...)
+		errs = append(errs, validator(ctx, opCtx, fldPath.Index(i), val, old)...)
 	}
 	return errs
 }
@@ -75,7 +77,7 @@ func lookup[T any](list []T, target T, cmp func(T, T) bool) *T {
 // EachMapVal validates each element of newMap with the specified validation
 // function and, if the corresponding key is found in oldMap, the old value.
 // The value-type of the slices is assumed to not be nilable.
-func EachMapVal[K ~string, V any](opCtx operation.Context, fldPath *field.Path, newMap, oldMap map[K]V,
+func EachMapVal[K ~string, V any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, newMap, oldMap map[K]V,
 	validator ValidateFunc[*V]) field.ErrorList {
 	var errs field.ErrorList
 	for key, val := range newMap {
@@ -83,7 +85,7 @@ func EachMapVal[K ~string, V any](opCtx operation.Context, fldPath *field.Path, 
 		if o, found := oldMap[key]; found {
 			old = &o
 		}
-		errs = append(errs, validator(opCtx, fldPath.Key(string(key)), &val, old)...)
+		errs = append(errs, validator(ctx, opCtx, fldPath.Key(string(key)), &val, old)...)
 	}
 	return errs
 }
@@ -91,7 +93,7 @@ func EachMapVal[K ~string, V any](opCtx operation.Context, fldPath *field.Path, 
 // EachMapValNilable validates each element of newMap with the specified
 // validation function and, if the corresponding key is found in oldMap, the
 // old value. The value-type of the slices is assumed to be nilable.
-func EachMapValNilable[K ~string, V any](opCtx operation.Context, fldPath *field.Path, newMap, oldMap map[K]V,
+func EachMapValNilable[K ~string, V any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, newMap, oldMap map[K]V,
 	validator ValidateFunc[V]) field.ErrorList {
 	var errs field.ErrorList
 	for key, val := range newMap {
@@ -99,19 +101,19 @@ func EachMapValNilable[K ~string, V any](opCtx operation.Context, fldPath *field
 		if o, found := oldMap[key]; found {
 			old = o
 		}
-		errs = append(errs, validator(opCtx, fldPath.Key(string(key)), val, old)...)
+		errs = append(errs, validator(ctx, opCtx, fldPath.Key(string(key)), val, old)...)
 	}
 	return errs
 }
 
 // EachMapKey validates each element of newMap with the specified
 // validation function.  The oldMap argument is not used.
-func EachMapKey[K ~string, T any](opCtx operation.Context, fldPath *field.Path, newMap, oldMap map[K]T,
+func EachMapKey[K ~string, T any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, newMap, oldMap map[K]T,
 	validator ValidateFunc[*K]) field.ErrorList {
 	var errs field.ErrorList
 	for key := range newMap {
 		// Note: the field path is the field, not the key.
-		errs = append(errs, validator(opCtx, fldPath, &key, nil)...)
+		errs = append(errs, validator(ctx, opCtx, fldPath, &key, nil)...)
 	}
 	return errs
 }

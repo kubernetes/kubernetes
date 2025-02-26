@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -41,62 +42,62 @@ func TestImmutable(t *testing.T) {
 	}{{
 		name: "nil both values",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable[int](op, fld, nil, nil)
+			return Immutable[int](context.Background(), op, fld, nil, nil)
 		},
 	}, {
 		name: "nil value",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, nil, ptr.To(123))
+			return Immutable(context.Background(), op, fld, nil, ptr.To(123))
 		},
 		fail: true,
 	}, {
 		name: "nil oldValue",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To(123), nil)
+			return Immutable(context.Background(), op, fld, ptr.To(123), nil)
 		},
 		fail: true,
 	}, {
 		name: "int",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To(123), ptr.To(123))
+			return Immutable(context.Background(), op, fld, ptr.To(123), ptr.To(123))
 		},
 	}, {
 		name: "int fail",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To(123), ptr.To(456))
+			return Immutable(context.Background(), op, fld, ptr.To(123), ptr.To(456))
 		},
 		fail: true,
 	}, {
 		name: "string",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To("abc"), ptr.To("abc"))
+			return Immutable(context.Background(), op, fld, ptr.To("abc"), ptr.To("abc"))
 		},
 	}, {
 		name: "string fail",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To("abc"), ptr.To("xyz"))
+			return Immutable(context.Background(), op, fld, ptr.To("abc"), ptr.To("xyz"))
 		},
 		fail: true,
 	}, {
 		name: "bool",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To(true), ptr.To(true))
+			return Immutable(context.Background(), op, fld, ptr.To(true), ptr.To(true))
 		},
 	}, {
 		name: "bool fail",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To(true), ptr.To(false))
+			return Immutable(context.Background(), op, fld, ptr.To(true), ptr.To(false))
 		},
 		fail: true,
 	}, {
 		name: "struct",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To(structA), ptr.To(structA))
+			return Immutable(context.Background(), op, fld, ptr.To(structA), ptr.To(structA))
 		},
 	}, {
 		name: "struct fail",
 		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
-			return Immutable(op, fld, ptr.To(structA), ptr.To(structB))
+			return Immutable(context.Background(), op, fld, ptr.To(structA), ptr.To(structB))
 		},
 		fail: true,
 	}} {

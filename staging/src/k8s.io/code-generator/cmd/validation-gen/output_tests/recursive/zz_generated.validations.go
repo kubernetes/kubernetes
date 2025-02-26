@@ -22,6 +22,7 @@ limitations under the License.
 package recursive
 
 import (
+	context "context"
 	fmt "fmt"
 
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -36,98 +37,98 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((E1)(nil), func(opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc((E1)(nil), func(ctx context.Context, opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			return Validate_E1(opCtx, nil /* fldPath */, obj.(E1), safe.Cast[E1](oldObj))
+			return Validate_E1(ctx, opCtx, nil /* fldPath */, obj.(E1), safe.Cast[E1](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
 	})
-	scheme.AddValidationFunc((*T1)(nil), func(opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			return Validate_T1(opCtx, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
+			return Validate_T1(ctx, opCtx, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
 	})
-	scheme.AddValidationFunc((*T2)(nil), func(opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc((*T2)(nil), func(ctx context.Context, opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			return Validate_T2(opCtx, nil /* fldPath */, obj.(*T2), safe.Cast[*T2](oldObj))
+			return Validate_T2(ctx, opCtx, nil /* fldPath */, obj.(*T2), safe.Cast[*T2](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
 	})
 	return nil
 }
 
-func Validate_E1(opCtx operation.Context, fldPath *field.Path, obj, oldObj E1) (errs field.ErrorList) {
+func Validate_E1(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj E1) (errs field.ErrorList) {
 	// type E1
-	errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "type E1")...)
-	errs = append(errs, validate.EachSliceValNilable(opCtx, fldPath, obj, oldObj, nil, func(opCtx operation.Context, fldPath *field.Path, obj, oldObj E1) field.ErrorList {
-		return validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "type E1 values")
+	errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "type E1")...)
+	errs = append(errs, validate.EachSliceValNilable(ctx, opCtx, fldPath, obj, oldObj, nil, func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj E1) field.ErrorList {
+		return validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "type E1 values")
 	})...)
-	errs = append(errs, validate.EachSliceValNilable(opCtx, fldPath, obj, oldObj, nil, Validate_E1)...)
+	errs = append(errs, validate.EachSliceValNilable(ctx, opCtx, fldPath, obj, oldObj, nil, Validate_E1)...)
 
 	return errs
 }
 
-func Validate_T1(opCtx operation.Context, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
+func Validate_T1(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// type T1
-	errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "type T1")...)
+	errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "type T1")...)
 
 	// field T1.PT1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field T1.PT1")...)
-			errs = append(errs, Validate_T1(opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field T1.PT1")...)
+			errs = append(errs, Validate_T1(ctx, opCtx, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("pt1"), obj.PT1, safe.Field(oldObj, func(oldObj *T1) *T1 { return oldObj.PT1 }))...)
 
 	// field T1.T2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field T1.T2")...)
-			errs = append(errs, Validate_T2(opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field T1.T2")...)
+			errs = append(errs, Validate_T2(ctx, opCtx, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("t2"), &obj.T2, safe.Field(oldObj, func(oldObj *T1) *T2 { return &oldObj.T2 }))...)
 
 	// field T1.PT2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field T1.PT2")...)
-			errs = append(errs, Validate_T2(opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field T1.PT2")...)
+			errs = append(errs, Validate_T2(ctx, opCtx, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("pt2"), obj.PT2, safe.Field(oldObj, func(oldObj *T1) *T2 { return oldObj.PT2 }))...)
 
 	return errs
 }
 
-func Validate_T2(opCtx operation.Context, fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
+func Validate_T2(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
 	// type T2
-	errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "type T2")...)
+	errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "type T2")...)
 
 	// field T2.PT1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field T2.PT1")...)
-			errs = append(errs, Validate_T1(opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field T2.PT1")...)
+			errs = append(errs, Validate_T1(ctx, opCtx, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("pt1"), obj.PT1, safe.Field(oldObj, func(oldObj *T2) *T1 { return oldObj.PT1 }))...)
 
 	// field T2.PT2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field T2.PT2")...)
-			errs = append(errs, Validate_T2(opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field T2.PT2")...)
+			errs = append(errs, Validate_T2(ctx, opCtx, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("pt2"), obj.PT2, safe.Field(oldObj, func(oldObj *T2) *T2 { return oldObj.PT2 }))...)
 

@@ -19,6 +19,7 @@ package testscheme
 import (
 	"bytes"
 	stdcmp "cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,39 +47,39 @@ import (
 // to also be used as a scheme builder.
 // Must only be used with tests that perform all registration before calls to validate.
 type Scheme struct {
-	validationFuncs    map[reflect.Type]func(opCtx operation.Context, object, oldObject interface{}, subresources ...string) field.ErrorList
+	validationFuncs    map[reflect.Type]func(ctx context.Context, opCtx operation.Context, object, oldObject interface{}, subresources ...string) field.ErrorList
 	registrationErrors field.ErrorList
 }
 
 // New creates a new Scheme.
 func New() *Scheme {
-	return &Scheme{validationFuncs: map[reflect.Type]func(opCtx operation.Context, object interface{}, oldObject interface{}, subresources ...string) field.ErrorList{}}
+	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, opCtx operation.Context, object interface{}, oldObject interface{}, subresources ...string) field.ErrorList{}}
 }
 
 // AddValidationFunc registers a validation function.
 // Last writer wins.
-func (s *Scheme) AddValidationFunc(srcType any, fn func(opCtx operation.Context, object, oldObject interface{}, subresources ...string) field.ErrorList) {
+func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, opCtx operation.Context, object, oldObject interface{}, subresources ...string) field.ErrorList) {
 	s.validationFuncs[reflect.TypeOf(srcType)] = fn
 }
 
 // Validate validates an object using the registered validation function.
-func (s *Scheme) Validate(opts sets.Set[string], object any, subresources ...string) field.ErrorList {
+func (s *Scheme) Validate(ctx context.Context, opts sets.Set[string], object any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(operation.Context{Operation: operation.Create, Options: opts}, object, nil, subresources...)
+		return fn(ctx, operation.Context{Operation: operation.Create, Options: opts}, object, nil, subresources...)
 	}
 	return nil
 }
 
 // ValidateUpdate validates an update to an object using the registered validation function.
-func (s *Scheme) ValidateUpdate(opts sets.Set[string], object, oldObject any, subresources ...string) field.ErrorList {
+func (s *Scheme) ValidateUpdate(ctx context.Context, opts sets.Set[string], object, oldObject any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(operation.Context{Operation: operation.Update}, object, oldObject, subresources...)
+		return fn(ctx, operation.Context{Operation: operation.Update}, object, oldObject, subresources...)
 	}
 	return nil
 }
@@ -521,9 +522,9 @@ func byFullError(err *field.Error) string {
 func (v *ValidationTester) validate() field.ErrorList {
 	var errs field.ErrorList
 	if v.oldValue == nil {
-		errs = v.s.Validate(v.opts, v.value)
+		errs = v.s.Validate(context.Background(), v.opts, v.value)
 	} else {
-		errs = v.s.ValidateUpdate(v.opts, v.value, v.oldValue)
+		errs = v.s.ValidateUpdate(context.Background(), v.opts, v.value, v.oldValue)
 	}
 	return errs
 }

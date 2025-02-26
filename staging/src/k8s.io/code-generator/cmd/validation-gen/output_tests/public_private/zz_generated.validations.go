@@ -22,6 +22,7 @@ limitations under the License.
 package publicprivate
 
 import (
+	context "context"
 	fmt "fmt"
 
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -36,20 +37,20 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*T1)(nil), func(opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			return Validate_T1(opCtx, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
+			return Validate_T1(ctx, opCtx, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
 	})
 	return nil
 }
 
-func Validate_T1(opCtx operation.Context, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
+func Validate_T1(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// field T1.Public
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field T1.Public")...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field T1.Public")...)
 			return
 		}(fldPath.Child("public"), &obj.Public, safe.Field(oldObj, func(oldObj *T1) *string { return &oldObj.Public }))...)
 

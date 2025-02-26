@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -40,7 +41,7 @@ func TestEnum(t *testing.T) {
 	}}
 
 	for i, tc := range cases {
-		result := Enum(operation.Context{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
+		result := Enum(context.Background(), operation.Context{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
 		if len(result) > 0 && !tc.err {
 			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
 			continue
@@ -84,7 +85,7 @@ func TestEnumTypedef(t *testing.T) {
 	}}
 
 	for i, tc := range cases {
-		result := Enum(operation.Context{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
+		result := Enum(context.Background(), operation.Context{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
 		if len(result) > 0 && !tc.err {
 			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
 			continue

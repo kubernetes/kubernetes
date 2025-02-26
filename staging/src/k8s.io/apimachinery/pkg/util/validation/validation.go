@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"regexp"
@@ -302,7 +303,7 @@ func IsValidPortName(port string) []string {
 
 // IsValidIP tests that the argument is a valid IP address.
 func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
-	return validate.IPSloppy(operation.Context{}, fldPath, &value, nil)
+	return validate.IPSloppy(context.TODO(), operation.Context{}, fldPath, &value, nil)
 }
 
 // IsValidIPv4Address tests that the argument is a valid IPv4 address.

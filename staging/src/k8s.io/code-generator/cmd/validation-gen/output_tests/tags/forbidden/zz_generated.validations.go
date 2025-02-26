@@ -22,6 +22,7 @@ limitations under the License.
 package forbidden
 
 import (
+	context "context"
 	fmt "fmt"
 
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -36,93 +37,93 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*Struct)(nil), func(opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			return Validate_Struct(opCtx, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
+			return Validate_Struct(ctx, opCtx, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
 	})
 	return nil
 }
 
-func Validate_OtherStruct(opCtx operation.Context, fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
+func Validate_OtherStruct(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
 	// type OtherStruct
-	errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "type OtherStruct")...)
+	errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "type OtherStruct")...)
 
 	return errs
 }
 
-func Validate_Struct(opCtx operation.Context, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
 	// field Struct.StringField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			if e := validate.ForbiddenValue(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.ForbiddenValue(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				return // do not proceed
 			}
-			if e := validate.OptionalValue(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field Struct.StringField")...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field Struct.StringField")...)
 			return
 		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }))...)
 
 	// field Struct.StringPtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			if e := validate.ForbiddenPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.ForbiddenPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				return // do not proceed
 			}
-			if e := validate.OptionalPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field Struct.StringPtrField")...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field Struct.StringPtrField")...)
 			return
 		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }))...)
 
 	// field Struct.OtherStructPtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
-			if e := validate.ForbiddenPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.ForbiddenPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				return // do not proceed
 			}
-			if e := validate.OptionalPointer(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field Struct.OtherStructPtrField")...)
-			errs = append(errs, Validate_OtherStruct(opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field Struct.OtherStructPtrField")...)
+			errs = append(errs, Validate_OtherStruct(ctx, opCtx, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("otherStructPtrField"), obj.OtherStructPtrField, safe.Field(oldObj, func(oldObj *Struct) *OtherStruct { return oldObj.OtherStructPtrField }))...)
 
 	// field Struct.SliceField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
-			if e := validate.ForbiddenSlice(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.ForbiddenSlice(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				return // do not proceed
 			}
-			if e := validate.OptionalSlice(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field Struct.SliceField")...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field Struct.SliceField")...)
 			return
 		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceField }))...)
 
 	// field Struct.MapField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
-			if e := validate.ForbiddenMap(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.ForbiddenMap(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				return // do not proceed
 			}
-			if e := validate.OptionalMap(opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalMap(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
-			errs = append(errs, validate.FixedResult(opCtx, fldPath, obj, oldObj, false, "field Struct.MapField")...)
+			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field Struct.MapField")...)
 			return
 		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }))...)
 

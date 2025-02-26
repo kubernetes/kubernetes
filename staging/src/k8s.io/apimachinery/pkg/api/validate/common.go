@@ -17,10 +17,12 @@ limitations under the License.
 package validate
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // ValidateFunc is a function that validates a value, possibly considering the
 // old value (if any).
-type ValidateFunc[T any] func(opCtx operation.Context, fldPath *field.Path, newValue, oldValue T) field.ErrorList
+type ValidateFunc[T any] func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newValue, oldValue T) field.ErrorList
