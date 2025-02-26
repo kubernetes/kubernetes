@@ -50,7 +50,7 @@ type SharedLister interface {
 
 // ResourceSliceLister can be used to obtain ResourceSlices.
 type ResourceSliceLister interface {
-	// List returns a list of all ResourceSlices.
+	// List returns a list of all ResourceSlices with patches from ResourceSlicePatches applied.
 	List() ([]*resourceapi.ResourceSlice, error)
 }
 
