@@ -1,9 +1,8 @@
 package extensiontests
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/openshift-eng/openshift-tests-extension/pkg/dbtime"
+	"github.com/openshift-eng/openshift-tests-extension/pkg/util/sets"
 )
 
 type Lifecycle string

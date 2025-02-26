@@ -51,6 +51,10 @@ func OptionalCapabilityExists(optionalCapability string) string {
 	return fmt.Sprintf(`optionalCapabilities.exists(oc, oc=="%s")`, optionalCapability)
 }
 
+func NoOptionalCapabilitiesExist() string {
+	return "size(optionalCapabilities) == 0"
+}
+
 func InstallerEquals(installer string) string {
 	return fmt.Sprintf(`installer=="%s"`, installer)
 }

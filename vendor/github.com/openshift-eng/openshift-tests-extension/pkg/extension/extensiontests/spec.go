@@ -456,14 +456,26 @@ func (specs ExtensionTestSpecs) Exclude(excludeCEL string) ExtensionTestSpecs {
 	return specs
 }
 
-// Include adds the specified CEL expression to explicitly include tests by environment
+// Include adds the specified CEL expression to explicitly include tests by environment.
+// If there is already an "include" defined, it will OR the expressions together
 func (spec *ExtensionTestSpec) Include(includeCEL string) *ExtensionTestSpec {
+	existingInclude := spec.EnvironmentSelector.Include
+	if existingInclude != "" {
+		includeCEL = fmt.Sprintf("(%s) || (%s)", existingInclude, includeCEL)
+	}
+
 	spec.EnvironmentSelector.Include = includeCEL
 	return spec
 }
 
-// Exclude adds the specified CEL expression to explicitly exclude tests by environment
+// Exclude adds the specified CEL expression to explicitly exclude tests by environment.
+// If there is already an "exclude" defined, it will OR the expressions together
 func (spec *ExtensionTestSpec) Exclude(excludeCEL string) *ExtensionTestSpec {
+	existingExclude := spec.EnvironmentSelector.Exclude
+	if existingExclude != "" {
+		excludeCEL = fmt.Sprintf("(%s) || (%s)", existingExclude, excludeCEL)
+	}
+
 	spec.EnvironmentSelector.Exclude = excludeCEL
 	return spec
 }
