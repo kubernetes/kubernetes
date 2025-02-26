@@ -694,36 +694,6 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	return nil
 }
 
-// NOTICE: Keep in sync with shouldListFromStorage function in
-//
-//	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) bool {
-	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	switch opts.ResourceVersionMatch {
-	case metav1.ResourceVersionMatchExact:
-		return true
-	case metav1.ResourceVersionMatchNotOlderThan:
-	case "":
-		// Legacy exact match
-		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true
-		}
-	default:
-		return true
-	}
-	// Continue
-	if len(opts.Predicate.Continue) > 0 {
-		return true
-	}
-	// Consistent Read
-	if opts.ResourceVersion == "" {
-		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
-	}
-	return false
-}
-
 // computeListLimit determines whether the cacher should
 // apply a limit to an incoming LIST request and returns its value.
 //
@@ -736,14 +706,6 @@ func computeListLimit(opts storage.ListOptions) int64 {
 		return 0
 	}
 	return opts.Predicate.Limit
-}
-
-func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
-	pred := opts.Predicate
-	noLabelSelector := pred.Label == nil || pred.Label.Empty()
-	noFieldSelector := pred.Field == nil || pred.Field.Empty()
-	hasLimit := pred.Limit > 0
-	return noLabelSelector && noFieldSelector && hasLimit
 }
 
 func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) (listResp, string, error) {
