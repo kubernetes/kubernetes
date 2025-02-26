@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
@@ -277,7 +279,18 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), informerFactory)
+	resourceSliceTrackerOpts := resourceslicetracker.Options{
+		EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+		SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+		KubeClient:         tCtx.Client(),
+	}
+	if resourceSliceTrackerOpts.EnableDeviceTaints {
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+	}
+	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
+	tCtx.ExpectNoError(err, "start resource slice tracker")
+	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), resourceSliceTracker, informerFactory)
 	informerFactory.Start(tCtx.Done())
 	defer func() {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
@@ -290,13 +303,17 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
 		reflect.TypeOf(&v1.Node{}):                   true,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
+		expectSyncedInformers[reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{})] = true
+	}
+
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
 	celCache := cel.NewCache(10)
 
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
 	tCtx.ExpectNoError(err, "list nodes")
-	slices, err := draManager.ResourceSlices().List()
+	slices, err := draManager.ResourceSlices().ListWithDeviceTaintRules()
 	tCtx.ExpectNoError(err, "list slices")
 
 	// Allocate one claim at a time, picking nodes randomly. Each
@@ -321,7 +338,10 @@ claims:
 			}
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+		allocator, err := structured.NewAllocator(tCtx,
+			utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 			[]*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 

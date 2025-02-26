@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
+	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
@@ -49,6 +50,7 @@ type deviceClassLister interface {
 type Allocator struct {
 	adminAccessEnabled     bool
 	prioritizedListEnabled bool
+	deviceTaintsEnabled    bool
 	claimsToAllocate       []*resourceapi.ResourceClaim
 	allocatedDevices       sets.Set[DeviceID]
 	classLister            deviceClassLister
@@ -63,6 +65,7 @@ type Allocator struct {
 func NewAllocator(ctx context.Context,
 	adminAccessEnabled bool,
 	prioritizedListEnabled bool,
+	deviceTaintsEnabled bool,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister deviceClassLister,
@@ -72,6 +75,7 @@ func NewAllocator(ctx context.Context,
 	return &Allocator{
 		adminAccessEnabled:     adminAccessEnabled,
 		prioritizedListEnabled: prioritizedListEnabled,
+		deviceTaintsEnabled:    deviceTaintsEnabled,
 		claimsToAllocate:       claimsToAllocate,
 		allocatedDevices:       allocatedDevices,
 		classLister:            classLister,
@@ -956,6 +960,12 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		subRequestName = requestData.request.name()
 	}
 
+	// Might be tainted, in which case the taint has to be tolerated.
+	// The check is skipped if the feature is disabled.
+	if alloc.deviceTaintsEnabled && !allTaintsTolerated(device.basic, request) {
+		return false, nil, nil
+	}
+
 	// It's available. Now check constraints.
 	for i, constraint := range alloc.constraints[r.claimIndex] {
 		added := constraint.add(baseRequestName, subRequestName, device.basic, device.id)
@@ -1003,6 +1013,24 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:previousNumResults]
 		alloc.logger.V(7).Info("Device deallocated", "device", device.id)
 	}, nil
+}
+
+func allTaintsTolerated(device *draapi.BasicDevice, request requestAccessor) bool {
+	for _, taint := range device.Taints {
+		if !taintTolerated(taint, request) {
+			return false
+		}
+	}
+	return true
+}
+
+func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool {
+	for _, toleration := range request.tolerations() {
+		if resourceclaim.ToleratesTaint(toleration, taint) {
+			return true
+		}
+	}
+	return false
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
@@ -1065,6 +1093,7 @@ type requestAccessor interface {
 	adminAccess() bool
 	hasAdminAccess() bool
 	selectors() []resourceapi.DeviceSelector
+	tolerations() []resourceapi.DeviceToleration
 }
 
 // deviceRequestAccessor is an implementation of the
@@ -1101,6 +1130,10 @@ func (d *deviceRequestAccessor) selectors() []resourceapi.DeviceSelector {
 	return d.request.Selectors
 }
 
+func (d *deviceRequestAccessor) tolerations() []resourceapi.DeviceToleration {
+	return d.request.Tolerations
+}
+
 // deviceSubRequestAccessor is an implementation of the
 // requestAccessor interface for DeviceSubRequests.
 type deviceSubRequestAccessor struct {
@@ -1133,6 +1166,10 @@ func (d *deviceSubRequestAccessor) hasAdminAccess() bool {
 
 func (d *deviceSubRequestAccessor) selectors() []resourceapi.DeviceSelector {
 	return d.subRequest.Selectors
+}
+
+func (d *deviceSubRequestAccessor) tolerations() []resourceapi.DeviceToleration {
+	return d.subRequest.Tolerations
 }
 
 func addNewNodeSelectorRequirements(from []v1.NodeSelectorRequirement, to *[]v1.NodeSelectorRequirement) {

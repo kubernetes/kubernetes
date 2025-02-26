@@ -106,6 +106,7 @@ type DynamicResources struct {
 	enableAdminAccess         bool
 	enablePrioritizedList     bool
 	enableSchedulingQueueHint bool
+	enableDeviceTaints        bool
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -123,6 +124,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	pl := &DynamicResources{
 		enabled:                   true,
 		enableAdminAccess:         fts.EnableDRAAdminAccess,
+		enableDeviceTaints:        fts.EnableDRADeviceTaints,
 		enablePrioritizedList:     fts.EnableDRAPrioritizedList,
 		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
 
@@ -448,11 +450,11 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		slices, err := pl.draManager.ResourceSlices().List()
+		slices, err := pl.draManager.ResourceSlices().ListWithDeviceTaintRules()
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, pl.enablePrioritizedList, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, pl.enablePrioritizedList, pl.enableDeviceTaints, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}

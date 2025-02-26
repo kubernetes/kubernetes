@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -366,6 +367,7 @@ func addAllEventHandlers(
 	informerFactory informers.SharedInformerFactory,
 	dynInformerFactory dynamicinformer.DynamicSharedInformerFactory,
 	resourceClaimCache *assumecache.AssumeCache,
+	resourceSliceTracker *resourceslicetracker.Tracker,
 	gvkMap map[framework.EventResource]framework.ActionType,
 ) error {
 	var (
@@ -555,7 +557,7 @@ func addAllEventHandlers(
 			}
 		case framework.ResourceSlice:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if handlerRegistration, err = informerFactory.Resource().V1beta1().ResourceSlices().Informer().AddEventHandler(
+				if handlerRegistration, err = resourceSliceTracker.AddEventHandler(
 					buildEvtResHandler(at, framework.ResourceSlice),
 				); err != nil {
 					return err
