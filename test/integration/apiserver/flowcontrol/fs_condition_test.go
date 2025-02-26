@@ -38,7 +38,7 @@ func TestConditionIsolation(t *testing.T) {
 
 	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
 
-	fsOrig := fcboot.SuggestedFlowSchemas[0]
+	fsOrig := fcboot.GetV1ConfigCollection(true).Suggested.FlowSchemas[0]
 	t.Logf("Testing Status Condition isolation in FlowSchema %q", fsOrig.Name)
 	fsClient := loopbackClient.FlowcontrolV1().FlowSchemas()
 	var dangleOrig *flowcontrol.FlowSchemaCondition

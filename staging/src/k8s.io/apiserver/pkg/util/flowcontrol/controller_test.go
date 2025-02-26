@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 
 var mandPLs = func() map[string]*flowcontrol.PriorityLevelConfiguration {
 	ans := make(map[string]*flowcontrol.PriorityLevelConfiguration)
-	for _, mand := range fcboot.MandatoryPriorityLevelConfigurations {
+	for _, mand := range fcboot.GetV1ConfigCollection(true).Mandatory.PriorityLevelConfigurations {
 		ans[mand.Name] = mand
 	}
 	return ans
@@ -224,7 +224,7 @@ func (cts *ctlrTestState) popHeldRequest() (plName string, hr *heldRequest, nCou
 
 var mandQueueSetNames = func() sets.String {
 	mandQueueSetNames := sets.NewString()
-	for _, mpl := range fcboot.MandatoryPriorityLevelConfigurations {
+	for _, mpl := range fcboot.GetV1ConfigCollection(true).Mandatory.PriorityLevelConfigurations {
 		mandQueueSetNames.Insert(mpl.Name)
 	}
 	return mandQueueSetNames
@@ -523,8 +523,8 @@ func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []
 func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*flowcontrol.FlowSchema, newFSMap map[string]*flowcontrol.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
 	newFTRs = map[string]*fsTestingRecord{}
 	catchAlls = map[bool]*flowcontrol.FlowSchema{
-		false: fcboot.MandatoryFlowSchemaCatchAll,
-		true:  fcboot.MandatoryFlowSchemaCatchAll}
+		false: fcboot.GetV1ConfigCollection(true).FlowSchemaCatchAll,
+		true:  fcboot.GetV1ConfigCollection(true).FlowSchemaCatchAll}
 	newFSMap = map[string]*flowcontrol.FlowSchema{}
 	add := func(ftr *fsTestingRecord) {
 		newFSs = append(newFSs, ftr.fs)

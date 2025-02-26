@@ -78,7 +78,7 @@ func (c *CompletedConfig) GenericStorageProviders(discovery discovery.DiscoveryI
 		coordinationrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer},
 		svmrest.RESTStorageProvider{},
-		flowcontrolrest.RESTStorageProvider{InformerFactory: c.Generic.SharedInformerFactory},
+		flowcontrolrest.RESTStorageProvider{InformerFactory: c.Generic.SharedInformerFactory, FeatureGate: c.Generic.FeatureGate},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.Generic.Authorization.Authorizer, DiscoveryClient: discovery},
 		eventsrest.RESTStorageProvider{TTL: c.EventTTL},
 	}, nil

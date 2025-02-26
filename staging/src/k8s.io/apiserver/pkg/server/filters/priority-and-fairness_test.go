@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	bootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-v134"
 	"k8s.io/apiserver/pkg/authentication/user"
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
@@ -1138,7 +1138,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1(), serverConcurrency)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1(), serverConcurrency, true)
 
 	factory.Start(stopCh)
 

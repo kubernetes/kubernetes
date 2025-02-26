@@ -24,30 +24,48 @@ import (
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/install"
 )
 
-// MandatoryFlowSchemas holds the untyped renditions of the mandatory
-// flow schemas.  In this map the key is the schema's name and the
-// value is the `*FlowSchema`.  Nobody should mutate anything
-// reachable from this map.
-var MandatoryFlowSchemas = internalizeFSes(bootstrap.MandatoryFlowSchemas)
+// FlowSchemasMap is a collection of unversioned (internal) FlowSchema objects indexed by name.
+type FlowSchemasMap = map[string]*flowcontrol.FlowSchema
 
-// MandatoryPriorityLevelConfigurations holds the untyped renditions of the
-// mandatory priority level configuration objects.  In this map the
-// key is the object's name and the value is the
-// `*PriorityLevelConfiguration`.  Nobody should mutate anything
-// reachable from this map.
-var MandatoryPriorityLevelConfigurations = internalizePLs(bootstrap.MandatoryPriorityLevelConfigurations)
-
-// NewAPFScheme constructs and returns a Scheme configured to handle
-// the API object types that are used to configure API Priority and
-// Fairness
-func NewAPFScheme() *runtime.Scheme {
-	scheme := runtime.NewScheme()
-	install.Install(scheme)
-	return scheme
+// GetMandatoryFlowSchemasMap returns the unversioned (internal) mandatory FlowSchema objects,
+// as a deeply immutable map.
+// The arguments are the values of the features that control which config collection to use.
+func GetMandatoryFlowSchemasMap(v134 bool) FlowSchemasMap {
+	return MandatoryFlowSchemasMap[bootstrap.CollectionID{V134: v134}]
 }
 
-func internalizeFSes(exts []*flowcontrolv1.FlowSchema) map[string]*flowcontrol.FlowSchema {
-	ans := make(map[string]*flowcontrol.FlowSchema, len(exts))
+// MandatoryFlowSchemasMap holds the unversioned (internal) renditions of the mandatory
+// flow schemas.  In the outer map the key is CollectionId and
+// in the inner map the key is the schema's name and the
+// value is the `*FlowSchema`.  Nobody should mutate anything
+// reachable from this map.
+var MandatoryFlowSchemasMap = map[bootstrap.CollectionID]FlowSchemasMap{
+	{V134: false}: internalizeFSes(bootstrap.GetV1ConfigCollection(false).Mandatory.FlowSchemas),
+	{V134: true}:  internalizeFSes(bootstrap.GetV1ConfigCollection(true).Mandatory.FlowSchemas),
+}
+
+// PriorityLevelConfigurationsMap is a collection of unversioned (internal) PriorityLevelConfiguration objects, indexed by name.
+type PriorityLevelConfigurationsMap = map[string]*flowcontrol.PriorityLevelConfiguration
+
+// GetMandatoryPriorityLevelConfigurationsMap returns the mandatory PriorityLevelConfiguration objects,
+// as a deeply immutable map.
+// The arguments are the values of the features that control which config collection to use.
+func GetMandatoryPriorityLevelConfigurationsMap(v134 bool) PriorityLevelConfigurationsMap {
+	return MandatoryPriorityLevelConfigurationsMap[bootstrap.CollectionID{V134: v134}]
+}
+
+// MandatoryPriorityLevelConfigurationsMap holds the untyped renditions of the
+// mandatory priority level configuration objects.  In the outer map the key is `bootstrap.CollectionID` and
+// in the inner map the key is the object's name and the value is the
+// `*PriorityLevelConfiguration`.  Nobody should mutate anything
+// reachable from this map.
+var MandatoryPriorityLevelConfigurationsMap = map[bootstrap.CollectionID]PriorityLevelConfigurationsMap{
+	{V134: false}: internalizePLs(bootstrap.GetV1ConfigCollection(false).Mandatory.PriorityLevelConfigurations),
+	{V134: true}:  internalizePLs(bootstrap.GetV1ConfigCollection(true).Mandatory.PriorityLevelConfigurations),
+}
+
+func internalizeFSes(exts []*flowcontrolv1.FlowSchema) FlowSchemasMap {
+	ans := make(FlowSchemasMap, len(exts))
 	scheme := NewAPFScheme()
 	for _, ext := range exts {
 		var untyped flowcontrol.FlowSchema
@@ -59,8 +77,8 @@ func internalizeFSes(exts []*flowcontrolv1.FlowSchema) map[string]*flowcontrol.F
 	return ans
 }
 
-func internalizePLs(exts []*flowcontrolv1.PriorityLevelConfiguration) map[string]*flowcontrol.PriorityLevelConfiguration {
-	ans := make(map[string]*flowcontrol.PriorityLevelConfiguration, len(exts))
+func internalizePLs(exts []*flowcontrolv1.PriorityLevelConfiguration) PriorityLevelConfigurationsMap {
+	ans := make(PriorityLevelConfigurationsMap, len(exts))
 	scheme := NewAPFScheme()
 	for _, ext := range exts {
 		var untyped flowcontrol.PriorityLevelConfiguration
@@ -70,4 +88,13 @@ func internalizePLs(exts []*flowcontrolv1.PriorityLevelConfiguration) map[string
 		ans[ext.Name] = &untyped
 	}
 	return ans
+}
+
+// NewAPFScheme constructs and returns a Scheme configured to handle
+// the API object types that are used to configure API Priority and
+// Fairness
+func NewAPFScheme() *runtime.Scheme {
+	scheme := runtime.NewScheme()
+	install.Install(scheme)
+	return scheme
 }

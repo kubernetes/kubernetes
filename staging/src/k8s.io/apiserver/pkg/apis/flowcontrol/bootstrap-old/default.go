@@ -19,73 +19,69 @@ package bootstrap
 import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
-	eventsv1 "k8s.io/api/events/v1"
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/apis/flowcontrol/base"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/utils/ptr"
 )
 
-// The objects that define an apiserver's initial behavior.  The
-// registered defaulting procedures make no changes to these
-// particular objects (this is verified in the unit tests of the
-// internalbootstrap package; it can not be verified in this package
-// because that would require importing k8s.io/kubernetes).
-var (
-	MandatoryPriorityLevelConfigurations = []*flowcontrol.PriorityLevelConfiguration{
-		MandatoryPriorityLevelConfigurationCatchAll,
-		MandatoryPriorityLevelConfigurationExempt,
-	}
-	MandatoryFlowSchemas = []*flowcontrol.FlowSchema{
-		MandatoryFlowSchemaExempt,
-		MandatoryFlowSchemaCatchAll,
-	}
-)
-
-// The objects that define the current suggested additional configuration
-var (
-	SuggestedPriorityLevelConfigurations = []*flowcontrol.PriorityLevelConfiguration{
-		// "system" priority-level is for the system components that affects self-maintenance of the
-		// cluster and the availability of those running pods in the cluster, including kubelet and
-		// kube-proxy.
-		SuggestedPriorityLevelConfigurationSystem,
-		// "node-high" priority-level is for the node health reporting. It is separated from "system"
-		// to make sure that nodes are able to report their health even if kube-apiserver is not capable of
-		// handling load caused by pod startup (fetching secrets, events etc).
-		// NOTE: In large clusters 50% - 90% of all API calls use this priority-level.
-		SuggestedPriorityLevelConfigurationNodeHigh,
-		// "leader-election" is dedicated for controllers' leader-election, which majorly affects the
-		// availability of any controller runs in the cluster.
-		SuggestedPriorityLevelConfigurationLeaderElection,
-		// "workload-high" is used by those workloads with higher priority but their failure won't directly
-		// impact the existing running pods in the cluster, which includes kube-scheduler, and those well-known
-		// built-in workloads such as "deployments", "replicasets" and other low-level custom workload which
-		// is important for the cluster.
-		SuggestedPriorityLevelConfigurationWorkloadHigh,
-		// "events" is used for requests that create/update/delete Event objects.
-		SuggestedPriorityLevelConfigurationEvent,
-		// "workload-low" is used by those workloads with lower priority which availability only has a
-		// minor impact on the cluster.
-		SuggestedPriorityLevelConfigurationWorkloadLow,
-		// "global-default" serves the rest traffic not handled by the other suggested flow-schemas above.
-		SuggestedPriorityLevelConfigurationGlobalDefault,
-	}
-	SuggestedFlowSchemas = []*flowcontrol.FlowSchema{
-		SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
-		SuggestedFlowSchemaEvents,                    // references "events" priority-level
-		SuggestedFlowSchemaSystemNodeHigh,            // references "node-high" priority-level
-		SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
-		SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
-		SuggestedFlowSchemaWorkloadLeaderElection,    // references "leader-election" priority-level
-		SuggestedFlowSchemaEndpointsController,       // references "workload-high" priority-level
-		SuggestedFlowSchemaKubeControllerManager,     // references "workload-high" priority-level
-		SuggestedFlowSchemaKubeScheduler,             // references "workload-high" priority-level
-		SuggestedFlowSchemaKubeSystemServiceAccounts, // references "workload-high" priority-level
-		SuggestedFlowSchemaServiceAccounts,           // references "workload-low" priority-level
-		SuggestedFlowSchemaGlobalDefault,             // references "global-default" priority-level
-	}
-)
+var V1ConfigCollection = base.V1ConfigCollection{
+	Mandatory: base.V1ConfigSlices{
+		PriorityLevelConfigurations: []*flowcontrol.PriorityLevelConfiguration{
+			MandatoryPriorityLevelConfigurationCatchAll,
+			MandatoryPriorityLevelConfigurationExempt,
+		},
+		FlowSchemas: []*flowcontrol.FlowSchema{
+			MandatoryFlowSchemaExempt,
+			MandatoryFlowSchemaCatchAll,
+		},
+	},
+	PriorityLevelConfigurationExempt:   MandatoryPriorityLevelConfigurationExempt,
+	PriorityLevelConfigurationCatchAll: MandatoryPriorityLevelConfigurationCatchAll,
+	FlowSchemaExempt:                   MandatoryFlowSchemaExempt,
+	FlowSchemaCatchAll:                 MandatoryFlowSchemaCatchAll,
+	Suggested: base.V1ConfigSlices{
+		PriorityLevelConfigurations: []*flowcontrol.PriorityLevelConfiguration{
+			// "system" priority-level is for the system components that affects self-maintenance of the
+			// cluster and the availability of those running pods in the cluster, including kubelet and
+			// kube-proxy.
+			SuggestedPriorityLevelConfigurationSystem,
+			// "node-high" priority-level is for the node health reporting. It is separated from "system"
+			// to make sure that nodes are able to report their health even if kube-apiserver is not capable of
+			// handling load caused by pod startup (fetching secrets, events etc).
+			// NOTE: In large clusters 50% - 90% of all API calls use this priority-level.
+			SuggestedPriorityLevelConfigurationNodeHigh,
+			// "leader-election" is dedicated for controllers' leader-election, which majorly affects the
+			// availability of any controller runs in the cluster.
+			SuggestedPriorityLevelConfigurationLeaderElection,
+			// "workload-high" is used by those workloads with higher priority but their failure won't directly
+			// impact the existing running pods in the cluster, which includes kube-scheduler, and those well-known
+			// built-in workloads such as "deployments", "replicasets" and other low-level custom workload which
+			// is important for the cluster.
+			SuggestedPriorityLevelConfigurationWorkloadHigh,
+			// "workload-low" is used by those workloads with lower priority which availability only has a
+			// minor impact on the cluster.
+			SuggestedPriorityLevelConfigurationWorkloadLow,
+			// "global-default" serves the rest traffic not handled by the other suggested flow-schemas above.
+			SuggestedPriorityLevelConfigurationGlobalDefault,
+		},
+		FlowSchemas: []*flowcontrol.FlowSchema{
+			SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
+			SuggestedFlowSchemaSystemNodeHigh,            // references "node-high" priority-level
+			SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
+			SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
+			SuggestedFlowSchemaWorkloadLeaderElection,    // references "leader-election" priority-level
+			SuggestedFlowSchemaEndpointsController,       // references "workload-high" priority-level
+			SuggestedFlowSchemaKubeControllerManager,     // references "workload-high" priority-level
+			SuggestedFlowSchemaKubeScheduler,             // references "workload-high" priority-level
+			SuggestedFlowSchemaKubeSystemServiceAccounts, // references "workload-high" priority-level
+			SuggestedFlowSchemaServiceAccounts,           // references "workload-low" priority-level
+			SuggestedFlowSchemaGlobalDefault,             // references "global-default" priority-level
+		},
+	},
+}
 
 // Mandatory PriorityLevelConfiguration objects
 var (
@@ -177,8 +173,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(40)),
-				LendablePercent:          ptr.To(int32(50)),
+				NominalConcurrencyShares: ptr.To(int32(30)),
+				LendablePercent:          ptr.To(int32(33)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -194,8 +190,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(60)),
-				LendablePercent:          ptr.To(int32(50)),
+				NominalConcurrencyShares: ptr.To(int32(40)),
+				LendablePercent:          ptr.To(int32(25)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -212,8 +208,8 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(50)),
-				LendablePercent:          ptr.To(int32(80)),
+				NominalConcurrencyShares: ptr.To(int32(10)),
+				LendablePercent:          ptr.To(int32(0)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -242,34 +238,14 @@ var (
 				},
 			},
 		})
-	// event priority-level. This is a relatively low priority configuration, loss of events
-	// is a relatively low harm thing.
-	SuggestedPriorityLevelConfigurationEvent = newPriorityLevelConfiguration(
-		"event",
-		flowcontrol.PriorityLevelConfigurationSpec{
-			Type: flowcontrol.PriorityLevelEnablementLimited,
-			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(5)),
-				LendablePercent:          ptr.To(int32(0)),
-				BorrowingLimitPercent:    ptr.To(int32(100)),
-				LimitResponse: flowcontrol.LimitResponse{
-					Type: flowcontrol.LimitResponseTypeQueue,
-					Queuing: &flowcontrol.QueuingConfiguration{
-						Queues:           31,
-						HandSize:         3,
-						QueueLengthLimit: 50,
-					},
-				},
-			},
-		})
 	// workload-low priority-level
 	SuggestedPriorityLevelConfigurationWorkloadLow = newPriorityLevelConfiguration(
 		"workload-low",
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(40)),
-				LendablePercent:          ptr.To(int32(75)),
+				NominalConcurrencyShares: ptr.To(int32(100)),
+				LendablePercent:          ptr.To(int32(90)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
 					Queuing: &flowcontrol.QueuingConfiguration{
@@ -286,7 +262,7 @@ var (
 		flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementLimited,
 			Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
-				NominalConcurrencyShares: ptr.To(int32(10)),
+				NominalConcurrencyShares: ptr.To(int32(20)),
 				LendablePercent:          ptr.To(int32(50)),
 				LimitResponse: flowcontrol.LimitResponse{
 					Type: flowcontrol.LimitResponseTypeQueue,
@@ -396,21 +372,6 @@ var (
 					[]string{flowcontrol.VerbAll},
 					[]string{coordinationv1.GroupName},
 					[]string{"leases"},
-					[]string{flowcontrol.NamespaceEvery},
-					false),
-			},
-		},
-	)
-	SuggestedFlowSchemaEvents = newFlowSchema(
-		"events", SuggestedPriorityLevelConfigurationEvent.Name, 450,
-		flowcontrol.FlowDistinguisherMethodByUserType,
-		flowcontrol.PolicyRulesWithSubjects{
-			Subjects: groups(user.AllAuthenticated), // the nodes group
-			ResourceRules: []flowcontrol.ResourcePolicyRule{
-				resourceRule(
-					[]string{"create", "update", "patch", "delete"},
-					[]string{corev1.GroupName, eventsv1.GroupName},
-					[]string{"events"},
 					[]string{flowcontrol.NamespaceEvery},
 					false),
 			},

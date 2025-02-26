@@ -76,8 +76,8 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 
 	bootstrapPLs := func() map[string]*flowcontrol.PriorityLevelConfiguration {
 		list := make([]*flowcontrol.PriorityLevelConfiguration, 0)
-		list = append(list, MandatoryPriorityLevelConfigurations...)
-		list = append(list, SuggestedPriorityLevelConfigurations...)
+		list = append(list, V1ConfigCollection.Mandatory.PriorityLevelConfigurations...)
+		list = append(list, V1ConfigCollection.Suggested.PriorityLevelConfigurations...)
 
 		m := map[string]*flowcontrol.PriorityLevelConfiguration{}
 		for i := range list {
@@ -102,7 +102,7 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected NominalConcurrencyShares: %d, but got: %d", test.name, test.nominalSharesExpected, bootstrapPL.Spec.Limited.NominalConcurrencyShares)
 		}
 		if test.lendablePercentexpected != *bootstrapPL.Spec.Limited.LendablePercent {
-			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected LendablePercent: %d, but got: %d", test.name, test.lendablePercentexpected, bootstrapPL.Spec.Limited.LendablePercent)
+			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected LendablePercent: %d, but got: %s", test.name, test.lendablePercentexpected, fmtPtr(bootstrapPL.Spec.Limited.LendablePercent))
 		}
 		if !ptr.Equal(test.borrowingLimitPercent, bootstrapPL.Spec.Limited.BorrowingLimitPercent) {
 			t.Errorf("bootstrap PriorityLevelConfiguration %q: expected BorrowingLimitPercent to be %s, but got: %s", test.name, fmtPtr(test.borrowingLimitPercent), fmtPtr(bootstrapPL.Spec.Limited.BorrowingLimitPercent))

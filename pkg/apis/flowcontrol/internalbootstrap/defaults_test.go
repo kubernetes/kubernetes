@@ -28,35 +28,37 @@ import (
 )
 
 func TestBootstrapConfigurationWithDefaulted(t *testing.T) {
-	scheme := NewAPFScheme()
+	t.Run("false", caseFn(false))
+	t.Run("true", caseFn(true))
+}
 
-	bootstrapFlowSchemas := make([]*flowcontrol.FlowSchema, 0)
-	bootstrapFlowSchemas = append(bootstrapFlowSchemas, bootstrap.MandatoryFlowSchemas...)
-	bootstrapFlowSchemas = append(bootstrapFlowSchemas, bootstrap.SuggestedFlowSchemas...)
-	for _, original := range bootstrapFlowSchemas {
-		t.Run(fmt.Sprintf("FlowSchema/%s", original.Name), func(t *testing.T) {
-			defaulted := original.DeepCopyObject().(*flowcontrol.FlowSchema)
-			scheme.Default(defaulted)
-			if apiequality.Semantic.DeepEqual(original, defaulted) {
-				t.Logf("Defaulting makes no change to FlowSchema: %q", original.Name)
-				return
-			}
-			t.Errorf("Expected defaulting to not change FlowSchema: %q, diff: %s", original.Name, cmp.Diff(original, defaulted))
-		})
-	}
+func caseFn(v134 bool) func(*testing.T) {
+	return func(t *testing.T) {
+		scheme := NewAPFScheme()
+		bootstrapFlowSchemas := bootstrap.GetFlowSchemas(v134)
+		for _, original := range bootstrapFlowSchemas {
+			t.Run(fmt.Sprintf("FlowSchema/%s", original.Name), func(t *testing.T) {
+				defaulted := original.DeepCopyObject().(*flowcontrol.FlowSchema)
+				scheme.Default(defaulted)
+				if apiequality.Semantic.DeepEqual(original, defaulted) {
+					t.Logf("Defaulting makes no change to FlowSchema: %q", original.Name)
+					return
+				}
+				t.Errorf("Expected defaulting to not change FlowSchema: %q, diff: %s", original.Name, cmp.Diff(original, defaulted))
+			})
+		}
 
-	bootstrapPriorityLevels := make([]*flowcontrol.PriorityLevelConfiguration, 0)
-	bootstrapPriorityLevels = append(bootstrapPriorityLevels, bootstrap.MandatoryPriorityLevelConfigurations...)
-	bootstrapPriorityLevels = append(bootstrapPriorityLevels, bootstrap.SuggestedPriorityLevelConfigurations...)
-	for _, original := range bootstrapPriorityLevels {
-		t.Run(fmt.Sprintf("PriorityLevelConfiguration/%s", original.Name), func(t *testing.T) {
-			defaulted := original.DeepCopyObject().(*flowcontrol.PriorityLevelConfiguration)
-			scheme.Default(defaulted)
-			if apiequality.Semantic.DeepEqual(original, defaulted) {
-				t.Logf("Defaulting makes no change to PriorityLevelConfiguration: %q", original.Name)
-				return
-			}
-			t.Errorf("Expected defaulting to not change PriorityLevelConfiguration: %q, diff: %s", original.Name, cmp.Diff(original, defaulted))
-		})
+		bootstrapPriorityLevels := bootstrap.GetPrioritylevelConfigurations(v134)
+		for _, original := range bootstrapPriorityLevels {
+			t.Run(fmt.Sprintf("PriorityLevelConfiguration/%s", original.Name), func(t *testing.T) {
+				defaulted := original.DeepCopyObject().(*flowcontrol.PriorityLevelConfiguration)
+				scheme.Default(defaulted)
+				if apiequality.Semantic.DeepEqual(original, defaulted) {
+					t.Logf("Defaulting makes no change to PriorityLevelConfiguration: %q", original.Name)
+					return
+				}
+				t.Errorf("Expected defaulting to not change PriorityLevelConfiguration: %q, diff: %s", original.Name, cmp.Diff(original, defaulted))
+			})
+		}
 	}
 }

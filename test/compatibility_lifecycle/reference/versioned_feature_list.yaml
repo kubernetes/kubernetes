@@ -91,6 +91,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: APFv134Config
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: APIResponseCompression
   versionedSpecs:
   - default: false

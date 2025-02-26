@@ -62,6 +62,15 @@ const (
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
+	// owner: @MikeSpreitzer, @tkashem, @linxiulei
+	//
+	// Make API Priority and Fairness use modern configuration, which
+	// differs from the old in these ways:
+	// - introduce priority level and flow schema for events;
+	// - generally reorganize to stop working around lack of borrowing;
+	// - increase the nominal concurrency shares for leader election.
+	APFv134Config featuregate.Feature = "APFv134Config"
+
 	// owner: @liggitt
 	// kep: https://kep.k8s.io/4601
 	//
@@ -1002,6 +1011,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.18"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.33 -> remove in 1.36
+	},
+
+	APFv134Config: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	AuthorizeNodeWithSelectors: {

@@ -90,6 +90,7 @@ func New(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient flowcontrolclient.FlowcontrolV1Interface,
 	serverConcurrencyLimit int,
+	v134Config bool,
 ) Interface {
 	clk := eventclock.Real{}
 	return NewTestable(TestableConfig{
@@ -103,6 +104,7 @@ func New(
 		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
+		V134Config:             v134Config,
 	})
 }
 
@@ -145,6 +147,9 @@ type TestableConfig struct {
 
 	// QueueSetFactory for the queuing implementation
 	QueueSetFactory fq.QueueSetFactory
+
+	// Whether to use modern default config objects
+	V134Config bool
 }
 
 // NewTestable is extra flexible to facilitate testing

@@ -124,6 +124,7 @@ type configController struct {
 	queueSetFactory   fq.QueueSetFactory
 	reqsGaugeVec      metrics.RatioedGaugeVec
 	execSeatsGaugeVec metrics.RatioedGaugeVec
+	newConfig         bool
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -276,6 +277,7 @@ func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
 // NewTestableController is extra flexible to facilitate testing
 func newTestableController(config TestableConfig) *configController {
 	cfgCtlr := &configController{
+		newConfig:              config.V134Config,
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
@@ -690,10 +692,10 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 
 	// Supply missing mandatory PriorityLevelConfiguration objects
 	if !meal.haveExemptPL {
-		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationExempt)
+		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.newConfig).PriorityLevelConfigurationExempt)
 	}
 	if !meal.haveCatchAllPL {
-		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationCatchAll)
+		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.newConfig).PriorityLevelConfigurationCatchAll)
 	}
 
 	meal.finishQueueSetReconfigsLocked()
@@ -785,10 +787,10 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*flowcontrol.FlowSchema) {
 
 	// Supply missing mandatory FlowSchemas, in correct position
 	if !haveExemptFS {
-		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.MandatoryFlowSchemaExempt}, fsSeq...)
+		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.GetV1ConfigCollection(meal.cfgCtlr.newConfig).FlowSchemaExempt}, fsSeq...)
 	}
 	if !haveCatchAllFS {
-		fsSeq = append(fsSeq, fcboot.MandatoryFlowSchemaCatchAll)
+		fsSeq = append(fsSeq, fcboot.GetV1ConfigCollection(meal.cfgCtlr.newConfig).FlowSchemaCatchAll)
 	}
 
 	meal.cfgCtlr.flowSchemas = fsSeq
