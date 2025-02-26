@@ -241,7 +241,7 @@ var map_DeviceTaint = map[string]string{
 	"key":       "The taint key to be applied to a device. Must be a label name.",
 	"value":     "The taint value corresponding to the taint key. Must be a label value.",
 	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
-	"timeAdded": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added. For NoExecute taints, the current time is set automatically when adding such a taint. There is no default for other taints.",
 }
 
 func (DeviceTaint) SwaggerDoc() map[string]string {

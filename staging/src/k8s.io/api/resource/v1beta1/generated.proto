@@ -598,7 +598,8 @@ message DeviceTaint {
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
-  // It is only written for NoExecute taints.
+  // For NoExecute taints, the current time is set automatically
+  // when adding such a taint. There is no default for other taints.
   //
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;

@@ -47766,7 +47766,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref common.ReferenceCallback
 					},
 					"timeAdded": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+							Description: "TimeAdded represents the time at which the taint was added. For NoExecute taints, the current time is set automatically when adding such a taint. There is no default for other taints.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
@@ -49575,7 +49575,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceTaint(ref common.ReferenceCallback)
 					},
 					"timeAdded": {
 						SchemaProps: spec.SchemaProps{
-							Description: "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints.",
+							Description: "TimeAdded represents the time at which the taint was added. For NoExecute taints, the current time is set automatically when adding such a taint. There is no default for other taints.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
