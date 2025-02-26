@@ -27,9 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -1252,7 +1254,7 @@ func (p *podWorkers) podWorkerLoop(podUID types.UID, podUpdates <-chan struct{})
 				// runtime are parallel. This may lead to situations where sync*pod hasn't finished executing, but
 				// the container runtime has already reported container events. If we continue using GetNewerThan,
 				// we might miss some container events unless we force cache refresh for the pod.
-				if pleg.IsEventedPLEGInUse() {
+				if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) && pleg.IsEventedPLEGInUse() {
 					status, err = p.podCache.Get(update.Options.Pod.UID)
 				} else {
 					status, err = p.podCache.GetNewerThan(update.Options.Pod.UID, lastSyncTime)
