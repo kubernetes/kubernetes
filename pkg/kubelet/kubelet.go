@@ -1019,6 +1019,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
 
+	klet.nodeResourceManager = noderesource.NewNodeResourceManager(&noderesource.Config{
+		Host:               klet,
+		CAdvisor:           klet.cadvisor,
+		SyncNodeStatusFunc: klet.syncNodeStatus,
+	})
+
 	// Generating the status funcs should be the last thing we do,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
@@ -1032,13 +1038,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			return nil, fmt.Errorf("create health checker: %w", err)
 		}
 	}
-
-	klet.nodeResourceManager = noderesource.NewNodeResourceManager(&noderesource.Config{
-		Host:               klet,
-		CAdvisor:           klet.cadvisor,
-		SyncNodeStatusFunc: klet.syncNodeStatus,
-	})
-
 	return klet, nil
 }
 
@@ -2585,18 +2584,23 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 				klog.ErrorS(err, "Kubelet failed to retrieve running pods from runtime")
 				return err
 			}
-			klog.InfoS("Running pods returned by runtime", "RuntimePods", klog.KObjSlice(runningPods))
 
 			runningPodsByUID := make(map[types.UID]*kubecontainer.Pod)
 			for _, pod := range runningPods {
+				klog.InfoS("runningPods pod name", pod.Name, "pod id", pod.ID)
 				runningPodsByUID[pod.ID] = pod
+				for _, container := range pod.Containers {
+					klog.InfoS("running containers", "name", container.Name, "ID", container.ID)
+				}
 			}
 
 			// Fetch all the allocated pods.
 			allocatedPods := kl.getAllocatedPods()
-			klog.InfoS("Allocated pods", "AllocatedPods", klog.KObjSlice(allocatedPods))
+
+			klog.Info("Total running pods", len(runningPods), "Total allocatedPods", len(allocatedPods))
 
 			for _, pod := range allocatedPods {
+				klog.InfoS("allocated pods", "name", pod.Name, "UID", pod.UID)
 				runningPod, knownPod := runningPodsByUID[pod.UID]
 				if !knownPod {
 					klog.InfoS("Ignoring pod as its not reported in runtime", "pod", pod.Name)
@@ -2604,7 +2608,6 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 				}
 
 				for _, container := range pod.Spec.Containers {
-
 					// Calculate update OOMScoreAdj and Swap limit.
 					//containerMemReq := container.Resources.Requests.Memory().Value()
 					//
@@ -2624,6 +2627,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 						klog.InfoS("Skipping resizing container as not able to find its ID", "container", container.Name)
 						continue
 					}
+					klog.Info("container name", container.Name, "ID", containerDetails.ID)
 
 					// Update the container resource.
 					err = kl.containerRuntime.UpdateContainerResources(pod, &container, containerDetails.ID)

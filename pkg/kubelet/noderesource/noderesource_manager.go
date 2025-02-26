@@ -55,6 +55,10 @@ type manager struct {
 
 	machineInfoDecreaseMutex sync.Mutex
 	machineInfoDecreased     bool
+
+	// storing it here to report it in node event
+	machineInfo       *cadvisorapi.MachineInfo
+	cachedMachineInfo *cadvisorapi.MachineInfo
 }
 
 // managerStub is a fake node resource managerImpl.
@@ -88,7 +92,9 @@ func (m *manager) Start() {
 		if err != nil {
 			klog.ErrorS(err, "Error fetching machine info")
 		} else {
+			m.machineInfo = machineInfo
 			cachedMachineInfo, _ := m.host.GetCachedMachineInfo()
+			m.cachedMachineInfo = cachedMachineInfo
 			// Avoid collector collects it as a timestamped metric
 			// See PR #95210 and #97006 for more details.
 			machineInfo.Timestamp = time.Time{}
@@ -109,9 +115,9 @@ func (m *manager) Start() {
 			m.machineInfoDecreased = machineInfoDecreased
 			m.machineInfoDecreaseMutex.Unlock()
 			if previousMachineState || machineInfoDecreased {
+				klog.Info("Updating node status from node resource manager")
 				m.syncNodeStatus()
 			}
-
 		}
 		// cadvisor updates its cache in `update_machine_info_interval` defaulted to 5 minutes.
 	}, 1*time.Second)
@@ -127,7 +133,11 @@ func (m *manager) NodeCapacityDecreasedStatus() error {
 	defer m.machineInfoDecreaseMutex.Unlock()
 
 	if m.machineInfoDecreased {
-		return fmt.Errorf("node capacity has decreased")
+		errMessage := fmt.Errorf("expected CPU: %d Memory:%d Actual: CPU: %d Memory:%d",
+			m.cachedMachineInfo.NumCores, m.cachedMachineInfo.MemoryCapacity,
+			m.machineInfo.NumCores, m.machineInfo.MemoryCapacity)
+		klog.ErrorS(errMessage, "Node capacity decreased")
+		return fmt.Errorf("node capacity has decreased %s", errMessage)
 	}
 	return nil
 }
@@ -145,9 +155,8 @@ func (m *managerStub) NodeCapacityDecreasedStatus() error {
 }
 
 func isNodeCapacityDecreased(currentMachineInfo, newMachineInfo *cadvisorapi.MachineInfo) bool {
-	if currentMachineInfo.MemoryCapacity < newMachineInfo.MemoryCapacity ||
-		currentMachineInfo.NumCores < newMachineInfo.NumCores ||
-		currentMachineInfo.SwapCapacity < newMachineInfo.SwapCapacity {
+	if newMachineInfo.MemoryCapacity < currentMachineInfo.MemoryCapacity ||
+		newMachineInfo.NumCores < currentMachineInfo.NumCores {
 		return true
 	}
 	return false
@@ -155,8 +164,7 @@ func isNodeCapacityDecreased(currentMachineInfo, newMachineInfo *cadvisorapi.Mac
 
 func isNodeCapacityIncreased(currentMachineInfo, newMachineInfo *cadvisorapi.MachineInfo) bool {
 	if newMachineInfo.MemoryCapacity > currentMachineInfo.MemoryCapacity ||
-		newMachineInfo.NumCores > currentMachineInfo.NumCores ||
-		newMachineInfo.SwapCapacity > currentMachineInfo.SwapCapacity {
+		newMachineInfo.NumCores > currentMachineInfo.NumCores {
 		return true
 	}
 	return false
