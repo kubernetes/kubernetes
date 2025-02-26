@@ -33,18 +33,18 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 	}{
 		{
 			name:                    "leader-election",
-			nominalSharesExpected:   40,
-			lendablePercentexpected: 75,
+			nominalSharesExpected:   50,
+			lendablePercentexpected: 80,
 		},
 		{
 			name:                    "node-high",
-			nominalSharesExpected:   40,
-			lendablePercentexpected: 25,
+			nominalSharesExpected:   60,
+			lendablePercentexpected: 50,
 		},
 		{
 			name:                    "system",
-			nominalSharesExpected:   30,
-			lendablePercentexpected: 33,
+			nominalSharesExpected:   40,
+			lendablePercentexpected: 50,
 		},
 		{
 			name:                    "workload-high",
@@ -59,12 +59,12 @@ func TestBootstrapPriorityLevelConfigurationWithBorrowing(t *testing.T) {
 		},
 		{
 			name:                    "workload-low",
-			nominalSharesExpected:   100,
-			lendablePercentexpected: 90,
+			nominalSharesExpected:   40,
+			lendablePercentexpected: 75,
 		},
 		{
 			name:                    "global-default",
-			nominalSharesExpected:   20,
+			nominalSharesExpected:   10,
 			lendablePercentexpected: 50,
 		},
 		{
