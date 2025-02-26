@@ -1460,57 +1460,42 @@ func TestSelectBestCandidate(t *testing.T) {
 }
 
 func TestCustomSelection(t *testing.T) {
-	labelIsEligible := func(key, val string) EligiblePodsFunc {
-		return func(nodeInfo *framework.NodeInfo, preemptor *v1.Pod) []*framework.PodInfo {
-			eligible := []*framework.PodInfo{}
-			for _, p := range nodeInfo.Pods {
-				pval, ok := p.Pod.Labels[key]
-				if !ok {
-					continue
-				}
-				if pval == val {
-					eligible = append(eligible, p)
-				}
+	podLabelIsEligible := func(key, val string) EligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			pval, ok := victim.Pod.Labels[key]
+			if !ok {
+				return false
 			}
-			return eligible
+			return pval == val
 		}
 	}
-	priorityBelowThresholdCannotPreempt := func(minPreempting int32) EligiblePodsFunc {
-		return func(nodeInfo *framework.NodeInfo, preemptor *v1.Pod) []*framework.PodInfo {
-			priority := corev1helpers.PodPriority(preemptor)
-			if priority >= minPreempting {
-				// For this example we allow all pods to be preempted, regardless of their priority
-				return nodeInfo.Pods
-			}
-			return []*framework.PodInfo{}
+	nodeNameIsEligible := func(name string) EligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			return nodeInfo.Node().Name == name
 		}
 	}
-	priorityAboveThresholdCannotBePreempted := func(maxPreemptible int32) EligiblePodsFunc {
-		return func(nodeInfo *framework.NodeInfo, _ *v1.Pod) []*framework.PodInfo {
-			eligible := []*framework.PodInfo{}
-			for _, p := range nodeInfo.Pods {
-				if corev1helpers.PodPriority(p.Pod) <= maxPreemptible {
-					// For this example we allow all pods to be preempted, regardless of preemptor priority
-					eligible = append(eligible, p)
-				}
-			}
-			return eligible
+	priorityBelowThresholdCannotPreempt := func(minPreempting int32) EligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			return corev1helpers.PodPriority(preemptor) >= minPreempting
+		}
+	}
+	priorityAboveThresholdCannotBePreempted := func(maxPreemptible int32) EligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			return corev1helpers.PodPriority(victim.Pod) <= maxPreemptible
 		}
 	}
 
-	orderByOldestStart := func(eligible []*framework.PodInfo) {
-		sort.Slice(eligible, func(i, j int) bool {
-			return util.GetPodStartTime(eligible[i].Pod).Before(util.GetPodStartTime(eligible[j].Pod))
-		})
+	orderByOldestStart := func(pod1, pod2 *v1.Pod) bool {
+		return util.GetPodStartTime(pod1).Before(util.GetPodStartTime(pod2))
 	}
-	orderByPodName := func(eligible []*framework.PodInfo) {
-		sort.Slice(eligible, func(i, j int) bool { return eligible[i].Pod.Name < eligible[j].Pod.Name })
+	orderByPodName := func(pod1, pod2 *v1.Pod) bool {
+		return pod1.Name < pod2.Name
 	}
 
 	tests := []struct {
 		name         string
-		eligiblePods EligiblePodsFunc
-		orderPods    OrderPodsFunc
+		eligiblePods EligiblePodFunc
+		orderPods    MoreImportantPodFunc
 		nodeNames    []string
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -1518,7 +1503,7 @@ func TestCustomSelection(t *testing.T) {
 	}{
 		{
 			name:         "only pods with specified label are preemptable: high priority",
-			eligiblePods: labelIsEligible("preemptible", "yes"),
+			eligiblePods: podLabelIsEligible("preemptible", "yes"),
 			nodeNames:    []string{"node1", "node2", "node3"},
 			pod:          st.MakePod().Name("p1").UID("p1").Priority(highPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1526,12 +1511,12 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// must have "preemptible"="yes" label
+			// must have "preemptible"="yes" label, others are not preemptible despite high priority
 			expected: map[string][]string{"node2": {"v2"}},
 		},
 		{
 			name:         "only pods with specified label are preemptable: mid priority",
-			eligiblePods: labelIsEligible("preemptible", "yes"),
+			eligiblePods: podLabelIsEligible("preemptible", "yes"),
 			nodeNames:    []string{"node1", "node2", "node3"},
 			pod:          st.MakePod().Name("p2").UID("p2").Priority(midPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1539,12 +1524,12 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// midPriority can preempt equal priority
+			// midPriority can preempt equal priority since we only look for matching pod label
 			expected: map[string][]string{"node2": {"v2"}},
 		},
 		{
 			name:         "only pods with specified label are preemptable: low priority",
-			eligiblePods: labelIsEligible("preemptible", "yes"),
+			eligiblePods: podLabelIsEligible("preemptible", "yes"),
 			nodeNames:    []string{"node1", "node2", "node3"},
 			pod:          st.MakePod().Name("p3").UID("p3").Priority(lowPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
@@ -1552,8 +1537,21 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// lowPriority can preempt higher priority
+			// lowPriority can preempt higher priority since we only look for matching pod label
 			expected: map[string][]string{"node2": {"v2"}},
+		},
+		{
+			name:         "only pods on specified node name are preemptable",
+			eligiblePods: nodeNameIsEligible("node1"),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p3").UID("p3").Priority(lowPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			// lowPriority can preempt higher priority since we only look for matching node name
+			expected: map[string][]string{"node1": {"v1"}},
 		},
 		{
 			name:         "only pods at or above specified priority can preempted: high priority",
@@ -1701,10 +1699,10 @@ func TestCustomSelection(t *testing.T) {
 			}
 			// Override selection logic
 			if tt.eligiblePods != nil {
-				pl.EligiblePods = tt.eligiblePods
+				pl.EligiblePod = tt.eligiblePods
 			}
 			if tt.orderPods != nil {
-				pl.OrderPods = tt.orderPods
+				pl.MoreImportantPod = tt.orderPods
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
