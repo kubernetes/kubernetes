@@ -443,7 +443,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		slices, err := pl.draManager.ResourceSlices().List()
+		slices, err := pl.draManager.ResourceSlices().ListWithPatches()
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
