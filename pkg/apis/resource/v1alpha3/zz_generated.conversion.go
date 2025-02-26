@@ -202,16 +202,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceRequest)(nil), (*resource.DeviceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(a.(*resourcev1alpha3.DeviceRequest), b.(*resource.DeviceRequest), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*resource.DeviceRequest)(nil), (*resourcev1alpha3.DeviceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(a.(*resource.DeviceRequest), b.(*resourcev1alpha3.DeviceRequest), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceRequestAllocationResult)(nil), (*resource.DeviceRequestAllocationResult)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha3_DeviceRequestAllocationResult_To_resource_DeviceRequestAllocationResult(a.(*resourcev1alpha3.DeviceRequestAllocationResult), b.(*resource.DeviceRequestAllocationResult), scope)
 	}); err != nil {
@@ -387,8 +377,18 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*resource.DeviceRequest)(nil), (*resourcev1alpha3.DeviceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(a.(*resource.DeviceRequest), b.(*resourcev1alpha3.DeviceRequest), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*apiresource.Quantity)(nil), (*resource.DeviceCapacity)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_Quantity_To_resource_DeviceCapacity(a.(*apiresource.Quantity), b.(*resource.DeviceCapacity), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*resourcev1alpha3.DeviceRequest)(nil), (*resource.DeviceRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(a.(*resourcev1alpha3.DeviceRequest), b.(*resource.DeviceRequest), scope)
 	}); err != nil {
 		return err
 	}
@@ -632,7 +632,17 @@ func Convert_resource_DeviceAttribute_To_v1alpha3_DeviceAttribute(in *resource.D
 }
 
 func autoConvert_v1alpha3_DeviceClaim_To_resource_DeviceClaim(in *resourcev1alpha3.DeviceClaim, out *resource.DeviceClaim, s conversion.Scope) error {
-	out.Requests = *(*[]resource.DeviceRequest)(unsafe.Pointer(&in.Requests))
+	if in.Requests != nil {
+		in, out := &in.Requests, &out.Requests
+		*out = make([]resource.DeviceRequest, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Requests = nil
+	}
 	out.Constraints = *(*[]resource.DeviceConstraint)(unsafe.Pointer(&in.Constraints))
 	out.Config = *(*[]resource.DeviceClaimConfiguration)(unsafe.Pointer(&in.Config))
 	return nil
@@ -644,7 +654,17 @@ func Convert_v1alpha3_DeviceClaim_To_resource_DeviceClaim(in *resourcev1alpha3.D
 }
 
 func autoConvert_resource_DeviceClaim_To_v1alpha3_DeviceClaim(in *resource.DeviceClaim, out *resourcev1alpha3.DeviceClaim, s conversion.Scope) error {
-	out.Requests = *(*[]resourcev1alpha3.DeviceRequest)(unsafe.Pointer(&in.Requests))
+	if in.Requests != nil {
+		in, out := &in.Requests, &out.Requests
+		*out = make([]resourcev1alpha3.DeviceRequest, len(*in))
+		for i := range *in {
+			if err := Convert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Requests = nil
+	}
 	out.Constraints = *(*[]resourcev1alpha3.DeviceConstraint)(unsafe.Pointer(&in.Constraints))
 	out.Config = *(*[]resourcev1alpha3.DeviceClaimConfiguration)(unsafe.Pointer(&in.Config))
 	return nil
@@ -819,34 +839,20 @@ func Convert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource
 
 func autoConvert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *resourcev1alpha3.DeviceRequest, out *resource.DeviceRequest, s conversion.Scope) error {
 	out.Name = in.Name
-	out.DeviceClassName = in.DeviceClassName
-	out.Selectors = *(*[]resource.DeviceSelector)(unsafe.Pointer(&in.Selectors))
-	out.AllocationMode = resource.DeviceAllocationMode(in.AllocationMode)
-	out.Count = in.Count
-	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	// WARNING: in.DeviceClassName requires manual conversion: does not exist in peer-type
+	// WARNING: in.Selectors requires manual conversion: does not exist in peer-type
+	// WARNING: in.AllocationMode requires manual conversion: does not exist in peer-type
+	// WARNING: in.Count requires manual conversion: does not exist in peer-type
+	// WARNING: in.AdminAccess requires manual conversion: does not exist in peer-type
 	out.FirstAvailable = *(*[]resource.DeviceSubRequest)(unsafe.Pointer(&in.FirstAvailable))
 	return nil
 }
 
-// Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest is an autogenerated conversion function.
-func Convert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *resourcev1alpha3.DeviceRequest, out *resource.DeviceRequest, s conversion.Scope) error {
-	return autoConvert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in, out, s)
-}
-
 func autoConvert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(in *resource.DeviceRequest, out *resourcev1alpha3.DeviceRequest, s conversion.Scope) error {
 	out.Name = in.Name
-	out.DeviceClassName = in.DeviceClassName
-	out.Selectors = *(*[]resourcev1alpha3.DeviceSelector)(unsafe.Pointer(&in.Selectors))
-	out.AllocationMode = resourcev1alpha3.DeviceAllocationMode(in.AllocationMode)
-	out.Count = in.Count
-	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	// WARNING: in.Exactly requires manual conversion: does not exist in peer-type
 	out.FirstAvailable = *(*[]resourcev1alpha3.DeviceSubRequest)(unsafe.Pointer(&in.FirstAvailable))
 	return nil
-}
-
-// Convert_resource_DeviceRequest_To_v1alpha3_DeviceRequest is an autogenerated conversion function.
-func Convert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(in *resource.DeviceRequest, out *resourcev1alpha3.DeviceRequest, s conversion.Scope) error {
-	return autoConvert_resource_DeviceRequest_To_v1alpha3_DeviceRequest(in, out, s)
 }
 
 func autoConvert_v1alpha3_DeviceRequestAllocationResult_To_resource_DeviceRequestAllocationResult(in *resourcev1alpha3.DeviceRequestAllocationResult, out *resource.DeviceRequestAllocationResult, s conversion.Scope) error {
@@ -1031,7 +1037,17 @@ func Convert_resource_ResourceClaimConsumerReference_To_v1alpha3_ResourceClaimCo
 
 func autoConvert_v1alpha3_ResourceClaimList_To_resource_ResourceClaimList(in *resourcev1alpha3.ResourceClaimList, out *resource.ResourceClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resource.ResourceClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resource.ResourceClaim, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha3_ResourceClaim_To_resource_ResourceClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1042,7 +1058,17 @@ func Convert_v1alpha3_ResourceClaimList_To_resource_ResourceClaimList(in *resour
 
 func autoConvert_resource_ResourceClaimList_To_v1alpha3_ResourceClaimList(in *resource.ResourceClaimList, out *resourcev1alpha3.ResourceClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resourcev1alpha3.ResourceClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resourcev1alpha3.ResourceClaim, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceClaim_To_v1alpha3_ResourceClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1127,7 +1153,17 @@ func Convert_resource_ResourceClaimTemplate_To_v1alpha3_ResourceClaimTemplate(in
 
 func autoConvert_v1alpha3_ResourceClaimTemplateList_To_resource_ResourceClaimTemplateList(in *resourcev1alpha3.ResourceClaimTemplateList, out *resource.ResourceClaimTemplateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resource.ResourceClaimTemplate)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resource.ResourceClaimTemplate, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha3_ResourceClaimTemplate_To_resource_ResourceClaimTemplate(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -1138,7 +1174,17 @@ func Convert_v1alpha3_ResourceClaimTemplateList_To_resource_ResourceClaimTemplat
 
 func autoConvert_resource_ResourceClaimTemplateList_To_v1alpha3_ResourceClaimTemplateList(in *resource.ResourceClaimTemplateList, out *resourcev1alpha3.ResourceClaimTemplateList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]resourcev1alpha3.ResourceClaimTemplate)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]resourcev1alpha3.ResourceClaimTemplate, len(*in))
+		for i := range *in {
+			if err := Convert_resource_ResourceClaimTemplate_To_v1alpha3_ResourceClaimTemplate(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
