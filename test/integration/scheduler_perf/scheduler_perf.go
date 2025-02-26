@@ -1497,27 +1497,13 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	// Everything else started by this function gets stopped before it returns.
 	tCtx = ktesting.WithCancel(tCtx)
 
-	var dataItems []DataItem
-
-	var collectors []testDataCollector
-	// This needs a separate context and wait group because
-	// the metrics collecting needs to be sure that the goroutines
-	// are stopped.
-	var collectorCtx ktesting.TContext
-
 	executor := WorkloadExecutor{
 		tCtx:                         tCtx,
-		wg:                           sync.WaitGroup{},
-		collectorCtx:                 collectorCtx,
-		collectorWG:                  sync.WaitGroup{},
-		collectors:                   collectors,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,
-		nextNodeIndex:                0,
-		dataItems:                    dataItems,
 	}
 
 	defer executor.wg.Wait()
@@ -1566,7 +1552,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
-	return dataItems
+	return executor.dataItems
 }
 
 func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) {
@@ -1715,7 +1701,7 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) {
 						}
 						e.tCtx.Errorf("op %d: unable to delete pod %v: %v", opIndex, podsToDelete[i].Name, err)
 					}
-				case <-(e.tCtx).Done():
+				case <-e.tCtx.Done():
 					return
 				}
 			}
