@@ -79,6 +79,7 @@ const (
 	FailedPrepareDynamicResources        = "FailedPrepareDynamicResources"
 	PossibleMemoryBackedVolumesOnDisk    = "PossibleMemoryBackedVolumesOnDisk"
 	CgroupV1                             = "CgroupV1"
+	FailedNodeResize                     = "FailedNodeResize"
 )
 
 // Image manager event reason list
