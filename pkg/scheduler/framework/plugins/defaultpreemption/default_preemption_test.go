@@ -1460,7 +1460,7 @@ func TestSelectBestCandidate(t *testing.T) {
 }
 
 func TestCustomSelection(t *testing.T) {
-	podLabelIsEligible := func(key, val string) EligiblePodFunc {
+	podLabelIsEligible := func(key, val string) IsEligiblePodFunc {
 		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
 			pval, ok := victim.Pod.Labels[key]
 			if !ok {
@@ -1469,17 +1469,17 @@ func TestCustomSelection(t *testing.T) {
 			return pval == val
 		}
 	}
-	nodeNameIsEligible := func(name string) EligiblePodFunc {
+	nodeNameIsEligible := func(name string) IsEligiblePodFunc {
 		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
 			return nodeInfo.Node().Name == name
 		}
 	}
-	priorityBelowThresholdCannotPreempt := func(minPreempting int32) EligiblePodFunc {
+	priorityBelowThresholdCannotPreempt := func(minPreempting int32) IsEligiblePodFunc {
 		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
 			return corev1helpers.PodPriority(preemptor) >= minPreempting
 		}
 	}
-	priorityAboveThresholdCannotBePreempted := func(maxPreemptible int32) EligiblePodFunc {
+	priorityAboveThresholdCannotBePreempted := func(maxPreemptible int32) IsEligiblePodFunc {
 		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
 			return corev1helpers.PodPriority(victim.Pod) <= maxPreemptible
 		}
@@ -1494,7 +1494,7 @@ func TestCustomSelection(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		eligiblePods EligiblePodFunc
+		eligiblePods IsEligiblePodFunc
 		orderPods    MoreImportantPodFunc
 		nodeNames    []string
 		pod          *v1.Pod
@@ -1699,7 +1699,7 @@ func TestCustomSelection(t *testing.T) {
 			}
 			// Override selection logic
 			if tt.eligiblePods != nil {
-				pl.EligiblePod = tt.eligiblePods
+				pl.IsEligiblePod = tt.eligiblePods
 			}
 			if tt.orderPods != nil {
 				pl.MoreImportantPod = tt.orderPods
