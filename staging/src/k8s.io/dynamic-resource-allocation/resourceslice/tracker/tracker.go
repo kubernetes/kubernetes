@@ -32,7 +32,8 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
+	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -61,20 +62,15 @@ type Tracker struct {
 	eventQueue          queue.FIFO[func()]
 }
 
-func StartTracker(ctx context.Context, kubeClient kubernetes.Interface, informerFactory informers.SharedInformerFactory) (*Tracker, error) {
-	t := newTracker(informerFactory)
-	return t, t.start(ctx, kubeClient)
-}
-
-func newTracker(informerFactory informers.SharedInformerFactory) *Tracker {
+func StartTracker(ctx context.Context, kubeClient kubernetes.Interface, sliceInformer resourceinformers.ResourceSliceInformer, slicePatchInformer resourcealphainformers.ResourceSlicePatchInformer, classInformer resourceinformers.DeviceClassInformer) (*Tracker, error) {
 	t := &Tracker{
-		resourceSlices:        informerFactory.Resource().V1beta1().ResourceSlices().Informer(),
-		resourceSlicePatches:  informerFactory.Resource().V1alpha3().ResourceSlicePatches().Informer(),
-		deviceClasses:         informerFactory.Resource().V1beta1().DeviceClasses().Informer(),
+		resourceSlices:        sliceInformer.Informer(),
+		resourceSlicePatches:  slicePatchInformer.Informer(),
+		deviceClasses:         classInformer.Informer(),
 		celCache:              cel.NewCache(10), // TODO: share cache with scheduler
 		patchedResourceSlices: cache.NewStore(cache.MetaNamespaceKeyFunc),
 	}
-	return t
+	return t, t.start(ctx, kubeClient)
 }
 
 func (t *Tracker) start(ctx context.Context, kubeClient kubernetes.Interface) error {
