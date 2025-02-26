@@ -32,7 +32,8 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/informers"
+	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
+	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -111,8 +112,8 @@ type Options struct {
 }
 
 // StartTracker creates and initializes informers for a new [Tracker].
-func StartTracker(ctx context.Context, informerFactory informers.SharedInformerFactory, opts Options) (*Tracker, error) {
-	t, err := newTracker(ctx, informerFactory, opts)
+func StartTracker(ctx context.Context, sliceInformer resourceinformers.ResourceSliceInformer, slicePatchInformer resourcealphainformers.ResourceSlicePatchInformer, classInformer resourceinformers.DeviceClassInformer, opts Options) (*Tracker, error) {
+	t, err := newTracker(ctx, sliceInformer, slicePatchInformer, classInformer, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -123,13 +124,13 @@ func StartTracker(ctx context.Context, informerFactory informers.SharedInformerF
 	return t, nil
 }
 
-func newTracker(ctx context.Context, informerFactory informers.SharedInformerFactory, opts Options) (*Tracker, error) {
+func newTracker(ctx context.Context, sliceInformer resourceinformers.ResourceSliceInformer, slicePatchInformer resourcealphainformers.ResourceSlicePatchInformer, classInformer resourceinformers.DeviceClassInformer, opts Options) (*Tracker, error) {
 	t := &Tracker{
 		enableAdminControlledAttributes: opts.EnableAdminControlledAttributes,
 		enableDeviceTaints:              opts.EnableDeviceTaints,
-		resourceSlices:                  informerFactory.Resource().V1beta1().ResourceSlices().Informer(),
-		resourceSlicePatches:            informerFactory.Resource().V1alpha3().ResourceSlicePatches().Informer(),
-		deviceClasses:                   informerFactory.Resource().V1beta1().DeviceClasses().Informer(),
+		resourceSlices:                  sliceInformer.Informer(),
+		resourceSlicePatches:            slicePatchInformer.Informer(),
+		deviceClasses:                   classInformer.Informer(),
 		celCache:                        cel.NewCache(10),
 		patchedResourceSlices:           cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:                     utilruntime.HandleErrorWithContext,

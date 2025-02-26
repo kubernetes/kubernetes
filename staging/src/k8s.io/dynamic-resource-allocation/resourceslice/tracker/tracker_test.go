@@ -2098,7 +2098,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				EnableDeviceTaints:              !test.deviceTaintsDisabled,
 				KubeClient:                      kubeClient,
 			}
-			tracker, err := newTracker(ctx, informerFactory, opts)
+			tracker, err := newTracker(ctx,
+				informerFactory.Resource().V1beta1().ResourceSlices(),
+				informerFactory.Resource().V1alpha3().ResourceSlicePatches(),
+				informerFactory.Resource().V1beta1().DeviceClasses(),
+				opts)
 			require.NoError(t, err)
 			var unhandledErrors []error
 			tracker.handleError = func(_ context.Context, err error, _ string, _ ...any) {
@@ -2444,7 +2448,11 @@ func BenchmarkEventHandlers(b *testing.B) {
 			EnableAdminControlledAttributes: true,
 			KubeClient:                      kubeClient,
 		}
-		tracker, err := newTracker(ctx, informerFactory, opts)
+		tracker, err := newTracker(ctx,
+			informerFactory.Resource().V1beta1().ResourceSlices(),
+			informerFactory.Resource().V1alpha3().ResourceSlicePatches(),
+			informerFactory.Resource().V1beta1().DeviceClasses(),
+			opts)
 		require.NoError(b, err)
 		tracker.handleError = func(_ context.Context, err error, _ string, _ ...any) {
 			b.Error("unexpected unhandled error:", err)
