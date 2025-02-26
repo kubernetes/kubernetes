@@ -47,18 +47,18 @@ import (
 // to also be used as a scheme builder.
 // Must only be used with tests that perform all registration before calls to validate.
 type Scheme struct {
-	validationFuncs    map[reflect.Type]func(ctx context.Context, opCtx operation.Context, object, oldObject interface{}, subresources ...string) field.ErrorList
+	validationFuncs    map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList
 	registrationErrors field.ErrorList
 }
 
 // New creates a new Scheme.
 func New() *Scheme {
-	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, opCtx operation.Context, object interface{}, oldObject interface{}, subresources ...string) field.ErrorList{}}
+	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, op operation.Operation, object interface{}, oldObject interface{}, subresources ...string) field.ErrorList{}}
 }
 
 // AddValidationFunc registers a validation function.
 // Last writer wins.
-func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, opCtx operation.Context, object, oldObject interface{}, subresources ...string) field.ErrorList) {
+func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList) {
 	s.validationFuncs[reflect.TypeOf(srcType)] = fn
 }
 
@@ -68,7 +68,7 @@ func (s *Scheme) Validate(ctx context.Context, opts sets.Set[string], object any
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Context{Operation: operation.Create, Options: opts}, object, nil, subresources...)
+		return fn(ctx, operation.Operation{Code: operation.Create, Options: opts}, object, nil, subresources...)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func (s *Scheme) ValidateUpdate(ctx context.Context, opts sets.Set[string], obje
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Context{Operation: operation.Update}, object, oldObject, subresources...)
+		return fn(ctx, operation.Operation{Code: operation.Update}, object, oldObject, subresources...)
 	}
 	return nil
 }

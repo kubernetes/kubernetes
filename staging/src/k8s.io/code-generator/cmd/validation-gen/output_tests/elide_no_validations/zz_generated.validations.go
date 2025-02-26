@@ -37,48 +37,48 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			return Validate_T1(ctx, opCtx, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
+			return Validate_T1(ctx, op, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
 	})
 	return nil
 }
 
-func Validate_HasFieldVal(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *HasFieldVal) (errs field.ErrorList) {
+func Validate_HasFieldVal(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *HasFieldVal) (errs field.ErrorList) {
 	// field HasFieldVal.S
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field HasFieldVal.S")...)
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field HasFieldVal.S")...)
 			return
 		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *HasFieldVal) *string { return &oldObj.S }))...)
 
 	return errs
 }
 
-func Validate_HasTypeVal(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *HasTypeVal) (errs field.ErrorList) {
+func Validate_HasTypeVal(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *HasTypeVal) (errs field.ErrorList) {
 	// type HasTypeVal
-	errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "type HasTypeVal")...)
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type HasTypeVal")...)
 
 	// field HasTypeVal.S has no validation
 	return errs
 }
 
-func Validate_T1(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
+func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// field T1.TypeMeta has no validation
 
 	// field T1.HasTypeVal
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *HasTypeVal) (errs field.ErrorList) {
-			errs = append(errs, Validate_HasTypeVal(ctx, opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, Validate_HasTypeVal(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("hasTypeVal"), &obj.HasTypeVal, safe.Field(oldObj, func(oldObj *T1) *HasTypeVal { return &oldObj.HasTypeVal }))...)
 
 	// field T1.HasFieldVal
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *HasFieldVal) (errs field.ErrorList) {
-			errs = append(errs, Validate_HasFieldVal(ctx, opCtx, fldPath, obj, oldObj)...)
+			errs = append(errs, Validate_HasFieldVal(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("hasFieldVal"), &obj.HasFieldVal, safe.Field(oldObj, func(oldObj *T1) *HasFieldVal { return &oldObj.HasFieldVal }))...)
 
@@ -87,7 +87,7 @@ func Validate_T1(ctx context.Context, opCtx operation.Context, fldPath *field.Pa
 	// field T1.HasNoValFieldVal
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *HasNoVal) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, opCtx, fldPath, obj, oldObj, false, "field T1.HasNoValFieldVal")...)
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.HasNoValFieldVal")...)
 			return
 		}(fldPath.Child("hasNoValFieldVal"), &obj.HasNoValFieldVal, safe.Field(oldObj, func(oldObj *T1) *HasNoVal { return &oldObj.HasNoValFieldVal }))...)
 

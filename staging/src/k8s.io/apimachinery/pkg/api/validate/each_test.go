@@ -63,14 +63,14 @@ func testEachSliceVal[T any](t *testing.T, name string, input []T) {
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
-		vfn := func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
 			if oldVal != nil {
 				t.Errorf("expected nil oldVal, got %v", *oldVal)
 			}
 			calls++
 			return nil
 		}
-		_ = EachSliceVal(context.Background(), operation.Context{}, field.NewPath("test"), input, nil, nil, vfn)
+		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -81,7 +81,7 @@ func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
-		vfn := func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
 			if oldVal == nil {
 				t.Fatalf("expected non-nil oldVal")
 			}
@@ -95,7 +95,7 @@ func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
 		copy(old, input)
 		slices.Reverse(old)
 		cmp := func(a, b T) bool { return reflect.DeepEqual(a, b) }
-		_ = EachSliceVal(context.Background(), operation.Context{}, field.NewPath("test"), input, old, cmp, vfn)
+		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, cmp, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -164,14 +164,14 @@ func testEachSliceValNilable[T any](t *testing.T, name string, input []T) {
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
-		vfn := func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newVal, oldVal T) field.ErrorList {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal T) field.ErrorList {
 			if !reflect.DeepEqual(oldVal, zero) {
 				t.Errorf("expected nil oldVal, got %v", oldVal)
 			}
 			calls++
 			return nil
 		}
-		_ = EachSliceValNilable(context.Background(), operation.Context{}, field.NewPath("test"), input, nil, nil, vfn)
+		_ = EachSliceValNilable(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -182,7 +182,7 @@ func testEachSliceValNilableUpdate[T any](t *testing.T, name string, input []T) 
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
-		vfn := func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newVal, oldVal T) field.ErrorList {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal T) field.ErrorList {
 			if reflect.DeepEqual(oldVal, zero) {
 				t.Fatalf("expected non-nil oldVal")
 			}
@@ -196,7 +196,7 @@ func testEachSliceValNilableUpdate[T any](t *testing.T, name string, input []T) 
 		copy(old, input)
 		slices.Reverse(old)
 		cmp := func(a, b T) bool { return reflect.DeepEqual(a, b) }
-		_ = EachSliceValNilable(context.Background(), operation.Context{}, field.NewPath("test"), input, old, cmp, vfn)
+		_ = EachSliceValNilable(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, cmp, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -221,14 +221,14 @@ func testEachMapVal[T any](t *testing.T, name string, input map[string]T) {
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
-		vfn := func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
 			if oldVal != nil {
 				t.Errorf("expected nil oldVal, got %v", *oldVal)
 			}
 			calls++
 			return nil
 		}
-		_ = EachMapVal(context.Background(), operation.Context{}, field.NewPath("test"), input, nil, vfn)
+		_ = EachMapVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -276,14 +276,14 @@ func testEachMapValNilable[T any](t *testing.T, name string, input map[string]T)
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
-		vfn := func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newVal, oldVal T) field.ErrorList {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal T) field.ErrorList {
 			if !reflect.DeepEqual(oldVal, zero) {
 				t.Errorf("expected nil oldVal, got %v", oldVal)
 			}
 			calls++
 			return nil
 		}
-		_ = EachMapValNilable(context.Background(), operation.Context{}, field.NewPath("test"), input, nil, vfn)
+		_ = EachMapValNilable(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -301,14 +301,14 @@ func testEachMapKey[K ~string, V any](t *testing.T, name string, input map[K]V) 
 	var zero K
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
-		vfn := func(ctx context.Context, opCtx operation.Context, fldPath *field.Path, newVal, oldVal *K) field.ErrorList {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *K) field.ErrorList {
 			if oldVal != nil {
 				t.Errorf("expected nil oldVal, got %v", *oldVal)
 			}
 			calls++
 			return nil
 		}
-		_ = EachMapKey(context.Background(), operation.Context{}, field.NewPath("test"), input, nil, vfn)
+		_ = EachMapKey(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}

@@ -13,7 +13,7 @@ import (
         "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-func <Name>(ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, oldValue <ValueType>, <OtherArgs...>) field.ErrorList
+func <Name>(ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue <ValueType>, <OtherArgs...>) field.ErrorList
 ```
 
 The name of validator functions should consider that callers will generally be
@@ -45,14 +45,14 @@ Examples:
 
 ```
 // NonEmpty validates that a string is not empty.
-func NonEmpty(ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, _ *string) field.ErrorList
+func NonEmpty(ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ *string) field.ErrorList
 
 // Even validates that a slice has an even number of items.
-func Even[T any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, _ []T) field.ErrorList
+func Even[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ []T) field.ErrorList
 
 // KeysMaxLen validates that all of the string keys in a map are under the
 // specified length.
-func KeysMaxLen[T any](ctx context.Context, opCtx operation.Context, fldPath *field.Path, value, _ map[string]T, maxLen int) field.ErrorList
+func KeysMaxLen[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, value, _ map[string]T, maxLen int) field.ErrorList
 ```
 
 Validator functions always return an `ErrorList` where each item is a distinct

@@ -151,7 +151,7 @@ func TestIPSloppy(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			in := tc.in
-			ip, errs := ipSloppy(context.Background(), operation.Context{}, field.NewPath(""), &in, nil)
+			ip, errs := ipSloppy(context.Background(), operation.Operation{}, field.NewPath(""), &in, nil)
 			if tc.err == "" {
 				if len(errs) != 0 {
 					t.Errorf("%q: expected valid, got: %v", tc.in, errs)

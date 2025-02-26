@@ -33,11 +33,11 @@ import (
 // For example:
 //
 //	var abcUnionMembership := schema.NewUnionMembership("a", "b", "c")
-//	func ValidateABC(ctx context.Context, opCtx operation.Context, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, Union(ctx, opCtx, fldPath, in, abcUnionMembership, in.A, in.B, in.C)...)
+//	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
+//		errs = append(errs, Union(ctx, op, fldPath, in, abcUnionMembership, in.A, in.B, in.C)...)
 //		return errs
 //	}
-func Union(_ context.Context, opCtx operation.Context, fldPath *field.Path, _, _ any, union *UnionMembership, fieldValues ...any) field.ErrorList {
+func Union(_ context.Context, op operation.Operation, fldPath *field.Path, _, _ any, union *UnionMembership, fieldValues ...any) field.ErrorList {
 	if len(union.members) != len(fieldValues) {
 		return field.ErrorList{
 			field.InternalError(fldPath,
@@ -75,14 +75,14 @@ func Union(_ context.Context, opCtx operation.Context, fldPath *field.Path, _, _
 // For example:
 //
 //	var abcUnionMembership := schema.NewDiscriminatedUnionMembership("type", "a", "b", "c")
-//	func ValidateABC(ctx context.Context, opCtx operation.Context, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, DiscriminatedUnion(ctx, opCtx, fldPath, in, abcUnionMembership, in.Type, in.A, in.B, in.C)...)
+//	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
+//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, abcUnionMembership, in.Type, in.A, in.B, in.C)...)
 //		return errs
 //	}
 //
 // It is not an error for the discriminatorValue to be unknown.  That must be
 // validated on its own.
-func DiscriminatedUnion[T ~string](_ context.Context, opCtx operation.Context, fldPath *field.Path, _, _ any, union *UnionMembership, discriminatorValue T, fieldValues ...any) (errs field.ErrorList) {
+func DiscriminatedUnion[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, _, _ any, union *UnionMembership, discriminatorValue T, fieldValues ...any) (errs field.ErrorList) {
 	discriminatorStrValue := string(discriminatorValue)
 	if len(union.members) != len(fieldValues) {
 		return field.ErrorList{

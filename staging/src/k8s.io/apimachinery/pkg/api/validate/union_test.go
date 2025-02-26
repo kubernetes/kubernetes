@@ -81,7 +81,7 @@ func TestUnion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Union(context.Background(), operation.Context{Operation: operation.Update}, nil, nil, nil, NewUnionMembership(tc.fields...), tc.fieldValues...)
+			got := Union(context.Background(), operation.Operation{Code: operation.Update}, nil, nil, nil, NewUnionMembership(tc.fields...), tc.fieldValues...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
 			}
@@ -120,7 +120,7 @@ func TestDiscriminatedUnion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := DiscriminatedUnion(context.Background(), operation.Context{Operation: operation.Update}, nil, nil, nil, NewDiscriminatedUnionMembership(tc.discriminatorField, tc.fields...), tc.discriminatorValue, tc.fieldValues...)
+			got := DiscriminatedUnion(context.Background(), operation.Operation{Code: operation.Update}, nil, nil, nil, NewDiscriminatedUnionMembership(tc.discriminatorField, tc.fields...), tc.discriminatorValue, tc.fieldValues...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got.ToAggregate(), tc.expected.ToAggregate())
 			}

@@ -41,7 +41,7 @@ func TestEnum(t *testing.T) {
 	}}
 
 	for i, tc := range cases {
-		result := Enum(context.Background(), operation.Context{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
+		result := Enum(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
 		if len(result) > 0 && !tc.err {
 			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
 			continue
@@ -85,7 +85,7 @@ func TestEnumTypedef(t *testing.T) {
 	}}
 
 	for i, tc := range cases {
-		result := Enum(context.Background(), operation.Context{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
+		result := Enum(context.Background(), operation.Operation{}, field.NewPath("fldpath"), &tc.value, nil, tc.valid)
 		if len(result) > 0 && !tc.err {
 			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
 			continue

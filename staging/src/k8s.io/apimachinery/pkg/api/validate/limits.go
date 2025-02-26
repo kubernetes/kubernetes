@@ -26,7 +26,7 @@ import (
 
 // MaxLength verifies that the specified value is not longer than max
 // characters.
-func MaxLength[T ~string](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ *T, max int) field.ErrorList {
+func MaxLength[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T, max int) field.ErrorList {
 	if value == nil {
 		return nil
 	}
@@ -37,7 +37,7 @@ func MaxLength[T ~string](_ context.Context, _ operation.Context, fldPath *field
 }
 
 // MaxItems verifies that the specified slice is not longer than max items.
-func MaxItems[T any](_ context.Context, _ operation.Context, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
+func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, max int) field.ErrorList {
 	if len(value) > max {
 		return field.ErrorList{field.TooMany(fldPath, len(value), max)}
 	}

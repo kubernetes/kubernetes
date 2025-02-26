@@ -50,9 +50,9 @@ var (
 	fieldPkgSymbols     = mkPkgNames(fieldPkg, "ErrorList", "InternalError", "Path")
 	fmtPkgSymbols       = mkPkgNames("fmt", "Errorf")
 	safePkg             = "k8s.io/apimachinery/pkg/api/safe"
-	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Lookup", "Cast", "PtrTo", "Deref", "Ident")
+	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast")
 	operationPkg        = "k8s.io/apimachinery/pkg/api/operation"
-	operationPkgSymbols = mkPkgNames(operationPkg, "Context", "Update")
+	operationPkgSymbols = mkPkgNames(operationPkg, "Operation")
 	contextPkg          = "context"
 	contextPkgSymbols   = mkPkgNames(contextPkg, "Context")
 )
@@ -766,12 +766,12 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 		// we need the type information, but not an instance of the type.
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
-		sw.Do("    func(ctx $.context.Context$, opCtx $.operation.Context|raw$, obj, oldObj interface{}, ", targs)
+		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}, ", targs)
 		sw.Do("    subresources ...string) $.field.ErrorList|raw$ {\n", targs)
 		sw.Do("  if len(subresources) == 0 {\n", targs)
 		sw.Do("    return $.rootType|objectvalidationfn$(", targs)
 		sw.Do("               ctx, ", targs)
-		sw.Do("               opCtx, ", targs)
+		sw.Do("               op, ", targs)
 		sw.Do("               nil /* fldPath */, ", targs)
 		sw.Do("               obj.($.typePfx$$.rootType|raw$), ", targs)
 		sw.Do("               $.safe.Cast|raw$[$.typePfx$$.rootType|raw$](oldObj))\n", targs)
@@ -789,7 +789,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 				sw.Do("    root := obj.($.typePfx$$.rootType|raw$)\n", targs)
 				sw.Do("    return $.statusType|objectvalidationfn$(", targs)
 				sw.Do("               ctx, ", targs)
-				sw.Do("               opCtx, ", targs)
+				sw.Do("               op, ", targs)
 				sw.Do("               nil /* fldPath */, ", targs)
 				sw.Do("               &root.$.statusField$, ", targs)
 				sw.Do("               $.safe.Field|raw$(", targs)
@@ -836,7 +836,7 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 	}
 	sw.Do("func $.inType|objectvalidationfn$(", targs)
 	sw.Do("    ctx $.context.Context|raw$, ", targs)
-	sw.Do("    opCtx $.operation.Context|raw$, ", targs)
+	sw.Do("    op $.operation.Operation|raw$, ", targs)
 	sw.Do("    fldPath *$.field.Path|raw$, ", targs)
 	sw.Do("    obj, oldObj $.objTypePfx$$.inType|raw$) ", targs)
 	sw.Do("(errs $.field.ErrorList|raw$) {\n", targs)
@@ -989,7 +989,7 @@ func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typ
 	targs := generator.Args{
 		"funcName": c.Universe.Type(node.funcName),
 	}
-	sw.Do("errs = append(errs, $.funcName|raw$(ctx, opCtx, fldPath, obj, oldObj)...)\n", targs)
+	sw.Do("errs = append(errs, $.funcName|raw$(ctx, op, fldPath, obj, oldObj)...)\n", targs)
 }
 
 // emitCallsToValidators emits calls to a list of validation functions for
@@ -1050,7 +1050,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				}
 				sw.Do("]", nil)
 			}
-			sw.Do("(ctx, opCtx, fldPath, obj, oldObj", targs)
+			sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
 			for _, arg := range extraArgs {
 				sw.Do(", ", nil)
 				toGolangSourceDataLiteral(sw, c, arg)
@@ -1066,14 +1066,14 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				sw.Do("  if ", nil)
 				firstCondition := true
 				if len(v.Conditions().OptionEnabled) > 0 {
-					sw.Do("opCtx.Options.Has($.$)", strconv.Quote(v.Conditions().OptionEnabled))
+					sw.Do("op.Options.Has($.$)", strconv.Quote(v.Conditions().OptionEnabled))
 					firstCondition = false
 				}
 				if len(v.Conditions().OptionDisabled) > 0 {
 					if !firstCondition {
 						sw.Do(" && ", nil)
 					}
-					sw.Do("!opCtx.Options.Has($.$)", strconv.Quote(v.Conditions().OptionDisabled))
+					sw.Do("!op.Options.Has($.$)", strconv.Quote(v.Conditions().OptionDisabled))
 				}
 				sw.Do(" {\n", nil)
 				sw.Do("    return ", nil)
@@ -1218,7 +1218,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 					}
 					sw.Do("]", nil)
 				}
-				sw.Do("(ctx, opCtx, fldPath, obj, oldObj", targs)
+				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
 				for _, arg := range extraArgs {
 					sw.Do(", ", nil)
 					toGolangSourceDataLiteral(sw, c, arg)
@@ -1227,7 +1227,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			}
 			sw.Do("func(", targs)
 			sw.Do("    ctx $.context.Context|raw$, ", targs)
-			sw.Do("    opCtx $.operation.Context|raw$, ", targs)
+			sw.Do("    op $.operation.Operation|raw$, ", targs)
 			sw.Do("    fldPath *$.field.Path|raw$, ", targs)
 			sw.Do("    obj, oldObj $.objTypePfx$$.objType|raw$ ", targs)
 			sw.Do(")    $.field.ErrorList|raw$ {\n", targs)

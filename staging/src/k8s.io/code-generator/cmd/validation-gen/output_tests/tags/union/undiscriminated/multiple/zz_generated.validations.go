@@ -37,9 +37,9 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, opCtx operation.Context, obj, oldObj interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
 		if len(subresources) == 0 {
-			return Validate_Struct(ctx, opCtx, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
+			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
 	})
@@ -49,10 +49,10 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 var unionMembershipForStructunion1 = validate.NewUnionMembership([2]string{"u1m1", "U1M1"}, [2]string{"u1m2", "U1M2"})
 var unionMembershipForStructunion2 = validate.NewUnionMembership([2]string{"u2m1", "U2M1"}, [2]string{"u2m2", "U2M2"})
 
-func Validate_Struct(ctx context.Context, opCtx operation.Context, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// type Struct
-	errs = append(errs, validate.Union(ctx, opCtx, fldPath, obj, oldObj, unionMembershipForStructunion1, obj.U1M1, obj.U1M2)...)
-	errs = append(errs, validate.Union(ctx, opCtx, fldPath, obj, oldObj, unionMembershipForStructunion2, obj.U2M1, obj.U2M2)...)
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion1, obj.U1M1, obj.U1M2)...)
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion2, obj.U2M1, obj.U2M2)...)
 
 	// field Struct.TypeMeta has no validation
 	// field Struct.NonUnionField has no validation
@@ -60,7 +60,7 @@ func Validate_Struct(ctx context.Context, opCtx operation.Context, fldPath *fiel
 	// field Struct.U1M1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M1) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
 			return
@@ -69,7 +69,7 @@ func Validate_Struct(ctx context.Context, opCtx operation.Context, fldPath *fiel
 	// field Struct.U1M2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M2) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
 			return
@@ -78,7 +78,7 @@ func Validate_Struct(ctx context.Context, opCtx operation.Context, fldPath *fiel
 	// field Struct.U2M1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M1) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
 			return
@@ -87,7 +87,7 @@ func Validate_Struct(ctx context.Context, opCtx operation.Context, fldPath *fiel
 	// field Struct.U2M2
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *M2) (errs field.ErrorList) {
-			if e := validate.OptionalPointer(ctx, opCtx, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				return // do not proceed
 			}
 			return

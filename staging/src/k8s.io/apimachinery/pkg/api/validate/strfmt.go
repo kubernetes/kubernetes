@@ -33,7 +33,7 @@ import (
 // All errors returned by this function will be "invalid" type errors. If the
 // caller wants better errors, it must take responsibility for checking things
 // like required/optional and max-length.
-func DNSLabel[T ~string](_ context.Context, opCtx operation.Context, fldPath *field.Path, value, _ *T) field.ErrorList {
+func DNSLabel[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
 		return nil
 	}

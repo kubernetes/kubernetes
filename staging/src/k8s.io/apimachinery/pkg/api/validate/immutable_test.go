@@ -37,76 +37,76 @@ func TestImmutable(t *testing.T) {
 
 	for _, tc := range []struct {
 		name string
-		fn   func(operation.Context, *field.Path) field.ErrorList
+		fn   func(operation.Operation, *field.Path) field.ErrorList
 		fail bool
 	}{{
 		name: "nil both values",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable[int](context.Background(), op, fld, nil, nil)
 		},
 	}, {
 		name: "nil value",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, nil, ptr.To(123))
 		},
 		fail: true,
 	}, {
 		name: "nil oldValue",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(123), nil)
 		},
 		fail: true,
 	}, {
 		name: "int",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(123), ptr.To(123))
 		},
 	}, {
 		name: "int fail",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(123), ptr.To(456))
 		},
 		fail: true,
 	}, {
 		name: "string",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To("abc"), ptr.To("abc"))
 		},
 	}, {
 		name: "string fail",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To("abc"), ptr.To("xyz"))
 		},
 		fail: true,
 	}, {
 		name: "bool",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(true), ptr.To(true))
 		},
 	}, {
 		name: "bool fail",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(true), ptr.To(false))
 		},
 		fail: true,
 	}, {
 		name: "struct",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(structA), ptr.To(structA))
 		},
 	}, {
 		name: "struct fail",
-		fn: func(op operation.Context, fld *field.Path) field.ErrorList {
+		fn: func(op operation.Operation, fld *field.Path) field.ErrorList {
 			return Immutable(context.Background(), op, fld, ptr.To(structA), ptr.To(structB))
 		},
 		fail: true,
 	}} {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := tc.fn(operation.Context{Operation: operation.Create}, field.NewPath(""))
+			errs := tc.fn(operation.Operation{Code: operation.Create}, field.NewPath(""))
 			if len(errs) != 0 { // Create should always succeed
 				t.Errorf("case %q (create): expected success: %v", tc.name, errs)
 			}
-			errs = tc.fn(operation.Context{Operation: operation.Update}, field.NewPath(""))
+			errs = tc.fn(operation.Operation{Code: operation.Update}, field.NewPath(""))
 			if tc.fail && len(errs) == 0 {
 				t.Errorf("case %q (update): expected failure", tc.name)
 			} else if !tc.fail && len(errs) != 0 {

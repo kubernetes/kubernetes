@@ -272,7 +272,7 @@ type FunctionGen interface {
 	// invocation is generated.
 	//
 	// The function signature must be of the form:
-	//   func(opCtx operation.Context,
+	//   func(op operation.Operation,
 	//        fldPath field.Path,
 	//        value, oldValue <ValueType>,     // always nilable
 	//        extraArgs[0] <extraArgs[0]Type>, // optional
@@ -411,7 +411,7 @@ func (v variableGen) Init() FunctionGen {
 }
 
 // WrapperFunction describes a function literal which has the fingerprint of a
-// regular validation function (opCtx, fldPath, obj, oldObj) and calls another
+// regular validation function (op, fldPath, obj, oldObj) and calls another
 // validation function with the same signature, plus extra args if needed.
 type WrapperFunction struct {
 	Function FunctionGen

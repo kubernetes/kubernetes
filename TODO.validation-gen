@@ -79,7 +79,6 @@ P2:
 - Linear or bin-search ListMap rather thsan build a map?
 - enums: pass the sorted list of value rather than a set, do a linear/binary search
 - Revisit whether eachKey/eachVal can be a single function call
-- Think of a better name and home for operation.Context
 - Add a way to store a comment with a FunctionGen, so we could emit things like
   the which tag caused it
 

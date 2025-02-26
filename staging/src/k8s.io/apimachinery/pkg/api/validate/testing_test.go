@@ -122,7 +122,7 @@ func TestFixedResult(t *testing.T) {
 	}}
 
 	for i, tc := range cases {
-		result := FixedResult(context.Background(), operation.Context{}, field.NewPath("fldpath"), tc.value, nil, tc.pass, "detail string")
+		result := FixedResult(context.Background(), operation.Operation{}, field.NewPath("fldpath"), tc.value, nil, tc.pass, "detail string")
 		if len(result) != 0 && tc.pass {
 			t.Errorf("case %d: unexpected failure: %v", i, fmtErrs(result))
 			continue
