@@ -94,7 +94,7 @@ var flowDistinguisherMethodTypes = sets.NewString(
 )
 
 var mandFTRExempt = &fsTestingRecord{
-	fs:         fcboot.MandatoryFlowSchemaExempt,
+	fs:         fcboot.GetV1ConfigCollection(true).FlowSchemaExempt,
 	wellFormed: true,
 	digests: map[bool]map[bool][]RequestDigest{
 		false: {
@@ -151,7 +151,7 @@ var mandFTRExempt = &fsTestingRecord{
 }
 
 var mandFTRCatchAll = &fsTestingRecord{
-	fs:         fcboot.MandatoryFlowSchemaCatchAll,
+	fs:         fcboot.GetV1ConfigCollection(true).FlowSchemaCatchAll,
 	wellFormed: true,
 	digests: map[bool]map[bool][]RequestDigest{
 		false: {},
