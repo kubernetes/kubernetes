@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"os"
@@ -39,8 +40,14 @@ const (
 	rwMask   = os.FileMode(0660)
 	roMask   = os.FileMode(0440)
 	execMask = os.FileMode(0110)
+)
 
-	progressReportDuration = 60 * time.Second
+var (
+	// function that will be used for changing file permissions on linux
+	// mainly stored here as a variable so as it can replaced in tests
+	filePermissionChangeFunc = changeFilePermission
+	progressReportDuration   = 60 * time.Second
+	firstEventReportDuration = 30 * time.Second
 )
 
 // NewVolumeOwnership returns an interface that can be used to recursively change volume permissions and ownership
@@ -75,7 +82,7 @@ func (vo *VolumeOwnership) ChangePermissions() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	timer := time.AfterFunc(30*time.Second, func() {
+	timer := time.AfterFunc(firstEventReportDuration, func() {
 		vo.initiateProgressMonitor(ctx)
 	})
 	defer timer.Stop()
@@ -96,7 +103,7 @@ func (vo *VolumeOwnership) changePermissionsRecursively() error {
 			return err
 		}
 		vo.fileCounter.Add(1)
-		return changeFilePermission(path, vo.fsGroup, vo.mounter.GetAttributes().ReadOnly, info)
+		return filePermissionChangeFunc(path, vo.fsGroup, vo.mounter.GetAttributes().ReadOnly, info)
 	})
 
 	if vo.completionCallback != nil {
@@ -108,7 +115,8 @@ func (vo *VolumeOwnership) changePermissionsRecursively() error {
 }
 
 func (vo *VolumeOwnership) monitorProgress(ctx context.Context) {
-	msg := fmt.Sprintf("Setting volume ownership for %s is taking longer than expected, consider using OnRootMismatch - https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods", vo.dir)
+	dirName := getDirnameToReport(vo.dir, string(vo.pod.UID))
+	msg := fmt.Sprintf("Setting volume ownership for %s is taking longer than expected, consider using OnRootMismatch - https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#configure-volume-permission-and-ownership-change-policy-for-pods", dirName)
 	vo.recorder.Event(vo.pod, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, msg)
 	ticker := time.NewTicker(progressReportDuration)
 	defer ticker.Stop()
@@ -122,8 +130,18 @@ func (vo *VolumeOwnership) monitorProgress(ctx context.Context) {
 	}
 }
 
+// report everything after podUID in dir string, including podUID
+func getDirnameToReport(dir, podUID string) string {
+	podUIDIndex := strings.Index(dir, podUID)
+	if podUIDIndex == -1 {
+		return dir
+	}
+	return dir[podUIDIndex:]
+}
+
 func (vo *VolumeOwnership) logWarning() {
-	msg := fmt.Sprintf("Setting volume ownership for %s, processed %d files.", vo.dir, vo.fileCounter.Load())
+	dirName := getDirnameToReport(vo.dir, string(vo.pod.UID))
+	msg := fmt.Sprintf("Setting volume ownership for %s, processed %d files.", dirName, vo.fileCounter.Load())
 	klog.Warning(msg)
 	vo.recorder.Event(vo.pod, v1.EventTypeWarning, events.VolumePermissionChangeInProgress, msg)
 }
