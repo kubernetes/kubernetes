@@ -466,3 +466,13 @@ func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
 	defer kl.machineInfoLock.Unlock()
 	kl.machineInfo = info
 }
+
+// getLastStableNodeAddresses returns the last observed node addresses.
+func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
+	node, err := kl.GetNode()
+	if err != nil || node == nil {
+		klog.ErrorS(err, "fail to obtain node from local cache", "node", kl.nodeName)
+		return nil
+	}
+	return node.Status.Addresses
+}
