@@ -413,9 +413,7 @@ func TestPolicyAdmission(t *testing.T) {
 			},
 		}
 	
-		server := apiservertesting.StartTestServerOrDie(t, &apiservertesting.TestServerInstanceOptions{
-			BinaryVersion: "1.33.0",
-		}, []string{
+		server := apiservertesting.StartTestServerOrDie(t, nil, []string{
 			"--enable-admission-plugins", "ValidatingAdmissionPolicy",
 			// turn off admission plugins that add finalizers
 			"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
