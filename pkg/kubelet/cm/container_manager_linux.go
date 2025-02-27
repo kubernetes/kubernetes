@@ -240,6 +240,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	for k, v := range capacity {
 		internalCapacity[k] = v
 	}
+	// remove hugePage capacity from memory capacity
+	internalCapacity[v1.ResourceMemory] = GetAllocatableMemory(capacity)
 	pidlimits, err := pidlimit.Stats()
 	if err == nil && pidlimits != nil && pidlimits.MaxPID != nil {
 		internalCapacity[pidlimit.PIDs] = *resource.NewQuantity(
