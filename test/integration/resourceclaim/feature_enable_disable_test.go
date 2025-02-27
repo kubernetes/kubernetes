@@ -82,7 +82,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "foo",
 				Pool:   "foo",
 				Device: "foo",
-				Data: runtime.RawExtension{
+				Data: &runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
 				NetworkData: &v1beta1.NetworkDeviceData{
@@ -155,7 +155,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "bar",
 				Pool:   "bar",
 				Device: "bar",
-				Data: runtime.RawExtension{
+				Data: &runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
 				NetworkData: &v1beta1.NetworkDeviceData{
@@ -191,7 +191,7 @@ func TestEnableDisableDRAResourceClaimDeviceStatus(t *testing.T) {
 				Driver: "bar",
 				Pool:   "bar",
 				Device: "bar",
-				Data: runtime.RawExtension{
+				Data: &runtime.RawExtension{
 					Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
 				},
 				NetworkData: &v1beta1.NetworkDeviceData{
