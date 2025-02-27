@@ -173,3 +173,41 @@ func TestNotSupported(t *testing.T) {
 		t.Errorf("Expected: %s\n, but got: %s\n", expected, notSupported.ErrorBody())
 	}
 }
+
+func TestErrorOrigin(t *testing.T) {
+	err := Invalid(NewPath("field"), "value", "detail")
+
+	// Test WithOrigin
+	newErr := err.WithOrigin("origin1")
+	if newErr.Origin != "origin1" {
+		t.Errorf("Expected Origin to be 'origin1', got '%s'", newErr.Origin)
+	}
+	if err.Origin != "origin1" {
+		t.Errorf("Expected Origin to be 'origin1', got '%s'", err.Origin)
+	}
+}
+
+func TestErrorListOrigin(t *testing.T) {
+	// Create an ErrorList with multiple errors
+	list := ErrorList{
+		Invalid(NewPath("field1"), "value1", "detail1"),
+		Invalid(NewPath("field2"), "value2", "detail2"),
+		Required(NewPath("field3"), "detail3"),
+	}
+
+	// Test WithOrigin
+	newList := list.WithOrigin("origin1")
+	// Check that WithOrigin returns the modified list
+	for i, err := range newList {
+		if err.Origin != "origin1" {
+			t.Errorf("Error %d: Expected Origin to be 'origin2', got '%s'", i, err.Origin)
+		}
+	}
+
+	// Check that the original list was also modified (WithOrigin modifies and returns the same list)
+	for i, err := range list {
+		if err.Origin != "origin1" {
+			t.Errorf("Error %d: Expected original list Origin to be 'origin2', got '%s'", i, err.Origin)
+		}
+	}
+}

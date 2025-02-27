@@ -19,9 +19,12 @@ package validation
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/dynamic-resource-allocation/api"
 )
 
 // assertFailures compares the expected against the actual errors.
@@ -31,20 +34,11 @@ import (
 // is informative.
 func assertFailures(tb testing.TB, want, got field.ErrorList) bool {
 	tb.Helper()
-	if !assert.Equal(tb, want, got) {
-		logFailures(tb, "Wanted failures", want)
-		logFailures(tb, "Got failures", got)
+	if diff := cmp.Diff(want, got, cmpopts.IgnoreFields(field.Error{}, "Origin"), cmp.AllowUnexported(api.UniqueString{})); diff != "" {
+		tb.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 		return false
 	}
 	return true
-}
-
-func logFailures(tb testing.TB, header string, errs field.ErrorList) {
-	tb.Helper()
-	tb.Logf("%s:\n", header)
-	for _, err := range errs {
-		tb.Logf("- %s\n", err)
-	}
 }
 
 func TestTruncateIfTooLong(t *testing.T) {
