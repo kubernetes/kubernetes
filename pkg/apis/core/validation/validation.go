@@ -5741,7 +5741,7 @@ func dropMustKeepCPUsEnvFromContainer(container *core.Container, oldPodSpecConta
 			for _, oldEnv := range oldPodSpecContainer.Env {
 				if oldEnv.Name == "mustKeepCPUs" {
 					existOldMustKeepCPUs = true
-					container.Env[jx] = oldEnv // +k8s:verify-mutation:reason=clone
+					container.Env[jx] = oldEnv 
 					break
 				}
 			}
@@ -5755,7 +5755,7 @@ func dropMustKeepCPUsEnvFromContainer(container *core.Container, oldPodSpecConta
 	}
 	// Delete mustKeepCPUs
 	if !existNewMustKeepCPUs && (len(oldPodSpecContainer.Env)-len(container.Env)) == 1 {
-		oldPodSpecContainer.Env = removeEnvVar(oldPodSpecContainer.Env, "mustKeepCPUs") // +k8s:verify-mutation:reason=clone
+		oldPodSpecContainer.Env = removeEnvVar(oldPodSpecContainer.Env, "mustKeepCPUs") 
 	}
 	return allErrs
 }
