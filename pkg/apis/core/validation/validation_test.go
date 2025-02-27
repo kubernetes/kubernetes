@@ -9951,16 +9951,18 @@ func TestValidatePodDNSConfig(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.dnsPolicy == nil {
-			tc.dnsPolicy = &testDNSClusterFirst
-		}
+		t.Run("", func(t *testing.T) {
+			if tc.dnsPolicy == nil {
+				tc.dnsPolicy = &testDNSClusterFirst
+			}
 
-		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
-		if len(errs) != 0 && !tc.expectedError {
-			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
-		} else if len(errs) == 0 && tc.expectedError {
-			t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
-		}
+			errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
+			if len(errs) != 0 && !tc.expectedError {
+				t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
+			} else if len(errs) == 0 && tc.expectedError {
+				t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
+			}
+		})
 	}
 }
 
@@ -10304,12 +10306,14 @@ func TestValidatePodSpec(t *testing.T) {
 		),
 	}
 	for k, v := range failureCases {
-		opts := PodValidationOptions{
-			ResourceIsPod: true,
-		}
-		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
-			t.Errorf("expected failure for %q", k)
-		}
+		t.Run(k, func(t *testing.T) {
+			opts := PodValidationOptions{
+				ResourceIsPod: true,
+			}
+			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
+				t.Errorf("expected failure")
+			}
+		})
 	}
 }
 
@@ -15302,35 +15306,35 @@ func TestValidateServiceCreate(t *testing.T) {
 		// numErrs: 1,
 		numErrs: 0,
 	}, {
-		name: "invalid publicIPs localhost",
+		name: "invalid externalIPs localhost",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs unspecified",
+		name: "invalid externalIPs unspecified",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"0.0.0.0"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs loopback",
+		name: "invalid externalIPs loopback",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs host",
+		name: "invalid externalIPs host",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"myhost.mydomain"}
 		},
 		numErrs: 1,
 	}, {
-		name: "valid publicIPs",
+		name: "valid externalIPs",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"1.2.3.4"}
@@ -16989,9 +16993,11 @@ func TestValidateNode(t *testing.T) {
 	},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateNode(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
+		t.Run("", func(t *testing.T) {
+			if errs := ValidateNode(&successCase); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
 	}
 
 	errorCases := map[string]core.Node{
@@ -17195,30 +17201,32 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateNode(&v)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-		for i := range errs {
-			field := errs[i].Field
-			expectedFields := map[string]bool{
-				"metadata.name":         true,
-				"metadata.labels":       true,
-				"metadata.annotations":  true,
-				"metadata.namespace":    true,
-				"spec.externalID":       true,
-				"spec.taints[0].key":    true,
-				"spec.taints[0].value":  true,
-				"spec.taints[0].effect": true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateNode(&v)
+			if len(errs) == 0 {
+				t.Errorf("expected failure")
 			}
-			if val, ok := expectedFields[field]; ok {
-				if !val {
-					t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			for i := range errs {
+				field := errs[i].Field
+				expectedFields := map[string]bool{
+					"metadata.name":         true,
+					"metadata.labels":       true,
+					"metadata.annotations":  true,
+					"metadata.namespace":    true,
+					"spec.externalID":       true,
+					"spec.taints[0].key":    true,
+					"spec.taints[0].value":  true,
+					"spec.taints[0].effect": true,
+					"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
+					"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
+				}
+				if val, ok := expectedFields[field]; ok {
+					if !val {
+						t.Errorf("missing prefix for: %v", errs[i])
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -22825,28 +22833,32 @@ func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod 
 	}
 }
 func TestPodIPsValidation(t *testing.T) {
+	// We test updating every pod in testCases to every other pod in testCases.
+	// expectError is true if we expect an error when updating *to* that pod.
+
 	testCases := []struct {
 		pod         core.Pod
 		expectError bool
-	}{{
-		expectError: false,
-		pod:         makePod("nil-ips", "ns", nil),
-	}, {
-		expectError: false,
-		pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
-	}, {
-		expectError: false,
-		pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
-	},
+	}{
+		{
+			expectError: false,
+			pod:         makePod("nil-ips", "ns", nil),
+		}, {
+			expectError: false,
+			pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
+		}, {
+			expectError: false,
+			pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
 		/* failure cases start here */
 		{
 			expectError: true,
@@ -22887,10 +22899,10 @@ func TestPodIPsValidation(t *testing.T) {
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
 				if len(errs) == 0 && testCase.expectError {
-					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
-					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+					t.Fatalf("expected success updating from %s, but there were errors: %v", oldTestCase.pod.Name, errs)
 				}
 			}
 		})
@@ -22921,6 +22933,9 @@ func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.Host
 }
 
 func TestHostIPsValidation(t *testing.T) {
+	// We test updating every pod in testCases to every other pod in testCases.
+	// expectError is true if we expect an error when updating *to* that pod.
+
 	testCases := []struct {
 		pod         core.Pod
 		expectError bool
@@ -22952,7 +22967,7 @@ func TestHostIPsValidation(t *testing.T) {
 		/* failure cases start here */
 		{
 			expectError: true,
-			pod:         makePodWithHostIPs("invalid-pod-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+			pod:         makePodWithHostIPs("invalid-host-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
 		},
 		{
 			expectError: true,
@@ -22994,10 +23009,10 @@ func TestHostIPsValidation(t *testing.T) {
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
 				if len(errs) == 0 && testCase.expectError {
-					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
-					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+					t.Fatalf("expected success updating from %s, but there were errors: %v", oldTestCase.pod.Name, errs)
 				}
 			}
 		})
