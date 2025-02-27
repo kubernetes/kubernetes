@@ -486,7 +486,6 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 	hints := map[string][]topologymanager.TopologyHint{}
 	bitmask.IterateBitMasks(numaNodes, func(mask bitmask.BitMask) {
 		maskBits := mask.GetBits()
-		singleNUMAHint := len(maskBits) == 1
 
 		totalFreeSize := map[v1.ResourceName]uint64{}
 		totalAllocatableSize := map[v1.ResourceName]uint64{}
@@ -517,23 +516,10 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 			minAffinitySize = mask.Count()
 		}
 
-		// the node already in group with another node, it can not be used for the single NUMA node allocation
-		if singleNUMAHint && len(machineState[maskBits[0]].Cells) > 1 {
-			return
-		}
-
 		for _, nodeID := range maskBits {
-			// the node already used for the memory allocation
-			if !singleNUMAHint && machineState[nodeID].NumberOfAssignments > 0 {
-				// the node used for the single NUMA memory allocation, it can not be used for the multi NUMA node allocation
-				if len(machineState[nodeID].Cells) == 1 {
-					return
-				}
-
-				// the node already used with different group of nodes, it can not be use with in the current hint
-				if !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
-					return
-				}
+			// the node already used with different group of nodes, it can not be use with in the current hint
+			if machineState[nodeID].NumberOfAssignments > 0 && !areGroupsEqual(machineState[nodeID].Cells, maskBits) {
+				return
 			}
 		}
 
