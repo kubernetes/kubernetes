@@ -233,6 +233,12 @@ const (
 	// Enables Structured Authorization Configuration
 	StructuredAuthorizationConfiguration featuregate.Feature = "StructuredAuthorizationConfiguration"
 
+	// owner: @serathius
+	// kep: https://kep.k8s.io/4988
+	//
+	// Enables checking watch cache consistency by comparing its LIST response with etcd response.
+	WatchCacheConsistenyChecking featuregate.Feature = "WatchCacheConsistenyChecking"
+
 	// owner: @wojtek-t
 	//
 	// Enables post-start-hook for storage readiness
@@ -419,6 +425,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	UnauthenticatedHTTP2DOSMitigation: {
 		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	WatchCacheConsistenyChecking: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	WatchCacheInitializationPostStartHook: {
