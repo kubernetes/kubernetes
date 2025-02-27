@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	codes "google.golang.org/grpc/codes"
 	crierror "k8s.io/cri-api/pkg/errors"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -403,6 +404,25 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, contai
 		klog.ErrorS(err, "UpdateContainerResources failed", "container", containerID.String())
 	}
 	return err
+}
+
+func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, pod *v1.Pod) error {
+	podResourcesRequest := m.generateUpdatePodSandboxResourcesRequest(sandboxID, pod)
+	if podResourcesRequest == nil {
+		return fmt.Errorf("sandboxID %q updatePodSandboxResources failed: cannot generate resources config", sandboxID)
+	}
+
+	ctx := context.Background()
+	_, err := m.runtimeService.UpdatePodSandboxResources(ctx, podResourcesRequest)
+	if err != nil {
+		stat, _ := grpcstatus.FromError(err)
+		if stat.Code() == codes.Unimplemented {
+			klog.InfoS("updatePodSandboxResources failed: method unimplemented on runtime service", "sandboxID", sandboxID)
+			return nil
+		}
+		klog.ErrorS(err, "updatePodSandboxResources failed", "sandboxID", sandboxID)
+	}
+	return nil
 }
 
 // makeDevices generates container devices for kubelet runtime v1.
