@@ -484,10 +484,6 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 		t.Fatalf("Failed to initialize cacher: %v", err)
 	}
 	ctx := context.Background()
-	terminate := func() {
-		cacher.Stop()
-		server.Terminate(t)
-	}
 
 	// Since some tests depend on the fact that GetList shouldn't fail,
 	// we wait until the error from the underlying storage is consumed.
@@ -503,8 +499,14 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 			t.Fatal(err)
 		}
 	}
+	delegator := NewCacheDelegator(cacher, wrappedStorage)
+	terminate := func() {
+		delegator.Stop()
+		cacher.Stop()
+		server.Terminate(t)
+	}
 
-	return ctx, NewCacheDelegator(cacher, wrappedStorage), server, terminate
+	return ctx, delegator, server, terminate
 }
 
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
