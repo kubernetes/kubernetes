@@ -37,7 +37,7 @@ func (discoveryEndpointRestrictions) AllowsStreamSchema(s string) bool { return 
 // IsAggregatedDiscoveryGVK checks if a provided GVK is the GVK for serving aggregated discovery.
 func IsAggregatedDiscoveryGVK(gvk *schema.GroupVersionKind) bool {
 	if gvk != nil {
-		return gvk.Group == "apidiscovery.k8s.io" && (gvk.Version == "v2beta1" || gvk.Version == "v2") && gvk.Kind == "APIGroupDiscoveryList"
+		return gvk.Group == "apidiscovery.k8s.io" && gvk.Version == "v2" && gvk.Kind == "APIGroupDiscoveryList"
 	}
 	return false
 }
