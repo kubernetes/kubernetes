@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
+var supportedQoSComputeResources = sets.New(string(core.ResourceCPU), string(core.ResourceMemory))
 
 // QOSList is a set of (resource name, QoS class) pairs.
 type QOSList map[v1.ResourceName]v1.PodQOSClass
@@ -131,7 +131,7 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 				}
 			}
 			// process limits
-			qosLimitsFound := sets.NewString()
+			qosLimitsFound := sets.New[string]()
 			for name, quantity := range container.Resources.Limits {
 				if !isSupportedQoSComputeResource(name) {
 					continue
