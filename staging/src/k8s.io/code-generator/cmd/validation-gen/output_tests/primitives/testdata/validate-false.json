@@ -1,0 +1,43 @@
+{
+    "*primitives.T1": {
+      "anothert2.b": [
+        "field T2.B"
+      ],
+      "anothert2.f": [
+        "field T2.F"
+      ],
+      "anothert2.i": [
+        "field T2.I"
+      ],
+      "anothert2.s": [
+        "field T2.S"
+      ],
+      "b": [
+        "field T1.B"
+      ],
+      "f": [
+        "field T1.F"
+      ],
+      "i": [
+        "field T1.I"
+      ],
+      "s": [
+        "field T1.S"
+      ],
+      "t2": [
+        "field T1.T2"
+      ],
+      "t2.b": [
+        "field T2.B"
+      ],
+      "t2.f": [
+        "field T2.F"
+      ],
+      "t2.i": [
+        "field T2.I"
+      ],
+      "t2.s": [
+        "field T2.S"
+      ]
+    }
+  }

@@ -52,7 +52,11 @@ fi
 # Generate a list of directories we don't want to play in.
 DIRS_TO_AVOID=()
 kube::util::read-array DIRS_TO_AVOID < <(
-    git ls-files -cmo --exclude-standard -- ':!:vendor/*' ':(glob)*/**/go.work' \
+    git ls-files -cmo --exclude-standard \
+        -- \
+        ':!:vendor/*' \
+        ':(glob)*/**/go.work' \
+        ':(glob)**/_codegenignore/**' \
         | while read -r F; do \
             echo ':!:'"$(dirname "${F}")"; \
         done
@@ -62,7 +66,10 @@ function git_find() {
     # Similar to find but faster and easier to understand.  We want to include
     # modified and untracked files because this might be running against code
     # which is not tracked by git yet.
-    git ls-files -cmo --exclude-standard ':!:vendor/*' "${DIRS_TO_AVOID[@]}" "$@"
+    git ls-files -cmo --exclude-standard \
+        ':!:vendor/*' \
+        "${DIRS_TO_AVOID[@]}" \
+        "$@"
 }
 
 function git_grep() {
@@ -70,7 +77,9 @@ function git_grep() {
     # running against code which is not tracked by git yet.
     # We need vendor exclusion added at the end since it has to be part of
     # the pathspecs which are specified last.
-    git grep --untracked "$@" ':!:vendor/*' "${DIRS_TO_AVOID[@]}"
+    git grep --untracked "$@" \
+        ':!:vendor/*' \
+        "${DIRS_TO_AVOID[@]}"
 }
 
 # Generate a list of all files that have a `+k8s:` comment-tag.  This will be
@@ -377,6 +386,74 @@ function codegen::defaults() {
 
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "Generated defaulter code"
+    fi
+}
+
+# Validation generation
+#
+# Any package that wants validation functions generated must include a
+# comment-tag in column 0 of one file of the form:
+#     // +k8s:validation-gen=<VALUE>
+#
+# The <VALUE> depends on context:
+#     on packages:
+#       *: all exported types are candidates for having validation generated
+#       FIELDNAME: any type with a field of this name is a candidate for
+#                  having validation generated
+#     on types:
+#       true:  always generate validation for this type
+#       false: never generate validation for this type
+function codegen::validation() {
+    # Build the tool.
+    GOPROXY=off go install \
+        k8s.io/code-generator/cmd/validation-gen
+
+    # TODO: Where do we want these output?  It should be somewhere internal..
+    # The result file, in each pkg, of validation generation.
+    local output_file="${GENERATED_FILE_PREFIX}validations.go"
+
+    # All directories that request any form of validation generation.
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: finding all +k8s:validation-gen tags"
+    fi
+    local tag_dirs=()
+    kube::util::read-array tag_dirs < <( \
+        grep -l --null '+k8s:validation-gen=' "${ALL_K8S_TAG_FILES[@]}" \
+            | while read -r -d $'\0' F; do dirname "${F}"; done \
+            | sort -u)
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:validation-gen tagged dirs"
+    fi
+
+    local tag_pkgs=()
+    for dir in "${tag_dirs[@]}"; do
+        tag_pkgs+=("./$dir")
+    done
+
+    local extra_pkgs=(
+        k8s.io/apimachinery/pkg/apis/meta/v1
+    )
+
+    kube::log::status "Generating validation code for ${#tag_pkgs[@]} targets"
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "DBG: running validation-gen for:"
+        for dir in "${tag_dirs[@]}"; do
+            kube::log::status "DBG:     $dir"
+        done
+    fi
+
+    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+
+    validation-gen \
+        -v "${KUBE_VERBOSE}" \
+        --go-header-file "${BOILERPLATE_FILENAME}" \
+        --output-file "${output_file}" \
+        $(printf -- " --extra-pkg %s" "${extra_pkgs[@]}") \
+        "${tag_pkgs[@]}" \
+        "$@"
+
+    if [[ "${DBG_CODEGEN}" == 1 ]]; then
+        kube::log::status "Generated validation code"
     fi
 }
 

@@ -1,0 +1,20 @@
+{
+    "*multiplevalidations.Struct": {
+      "": [
+        "type Struct #1",
+        "type Struct #2"
+      ],
+      "listField": [
+        "field Struct.ListField #1",
+        "field Struct.ListField #2"
+      ],
+      "listField[0]": [
+        "field Struct.ListField[*] #1",
+        "field Struct.ListField[*] #2"
+      ],
+      "listField[1]": [
+        "field Struct.ListField[*] #1",
+        "field Struct.ListField[*] #2"
+      ]
+    }
+  }
