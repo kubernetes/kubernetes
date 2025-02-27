@@ -47,13 +47,12 @@ import (
 const Name = names.DefaultPreemption
 
 // IsEligiblePodFunc is a function which may be assigned to the DefaultPreemption plugin.
-// Implemenmtations should return whether a given victim pod on the provided nodeInfo is eligible
+// Implementations should return whether a given victim pod on the provided nodeInfo is eligible
 // to be preempted by the provided preemptor.
 type IsEligiblePodFunc func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool
 
 // MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
 // The implementations should return true if the first pod is more important than the second pod and the second one should be considered for preemption before the first one.
-// If the two pods are of equal priority then this will return false.
 type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
