@@ -814,7 +814,7 @@ func applyMatchLabelKeysAndMismatchLabelKeys(term *api.PodAffinityTerm, label ma
 }
 
 func mutatePodAffinity(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodAffinity) || pod.Spec.Affinity == nil {
+	if pod.Spec.Affinity == nil {
 		return
 	}
 	if affinity := pod.Spec.Affinity.PodAffinity; affinity != nil {
