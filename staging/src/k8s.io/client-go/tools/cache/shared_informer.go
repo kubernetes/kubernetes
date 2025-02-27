@@ -303,8 +303,14 @@ func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defa
 func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, options SharedIndexInformerOptions) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 
+	// Use custom KeyFunction if provided, otherwise fall back to default
+	keyFunc := options.KeyFunction
+	if keyFunc == nil {
+		keyFunc = DeletionHandlingMetaNamespaceKeyFunc
+	}
+
 	return &sharedIndexInformer{
-		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
+		indexer:                         NewIndexer(keyFunc, options.Indexers),
 		processor:                       &sharedProcessor{clock: realClock},
 		listerWatcher:                   lw,
 		objectType:                      exampleObject,
@@ -312,6 +318,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		resyncCheckPeriod:               options.ResyncPeriod,
 		defaultEventHandlerResyncPeriod: options.ResyncPeriod,
 		clock:                           realClock,
+		keyFunction:                     keyFunc,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 	}
 }
@@ -328,6 +335,10 @@ type SharedIndexInformerOptions struct {
 	// ObjectDescription is the sharedIndexInformer's object description. This is passed through to the
 	// underlying Reflector's type description.
 	ObjectDescription string
+
+	// KeyFunction is used to generate keys for objects in the informer.
+	// Defaults to MetaNamespaceKeyFunc if unspecified.
+	KeyFunction KeyFunc
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -450,6 +461,10 @@ type sharedIndexInformer struct {
 	watchErrorHandler WatchErrorHandlerWithContext
 
 	transform TransformFunc
+
+	// keyFunction is used to generate keys for objects in the informer.
+	// Defaults to MetaNamespaceKeyFunc if unspecified.
+	keyFunction KeyFunc
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -548,6 +563,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 				KnownObjects:          s.indexer,
 				EmitDeltaTypeReplaced: true,
 				Transformer:           s.transform,
+				KeyFunction:           s.keyFunction,
 			})
 		}
 
