@@ -18,12 +18,19 @@ package cacher
 
 import (
 	"context"
+	"fmt"
+	"hash"
+	"hash/fnv"
+	"math/rand"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
@@ -33,18 +40,35 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegator {
+	return newCacheDelegator(cacher, storage, clock.RealClock{})
+}
+
+func newCacheDelegator(cacher *Cacher, storage storage.Interface, clock clock.Clock) *CacheDelegator {
+	consistency := &consistencyChecker{
+		cacher: cacher,
+		etcd:   storage,
+		clock:  clock,
+	}
+	stopCh := make(chan struct{})
+	consistency.startChecking(stopCh)
 	return &CacheDelegator{
-		cacher:  cacher,
-		storage: storage,
+		cacher:      cacher,
+		storage:     storage,
+		consistency: consistency,
+		stopCh:      stopCh,
 	}
 }
 
 type CacheDelegator struct {
-	cacher  *Cacher
-	storage storage.Interface
+	cacher      *Cacher
+	storage     storage.Interface
+	consistency *consistencyChecker
+	stopOnce    sync.Once
+	stopCh      chan struct{}
 }
 
 var _ storage.Interface = (*CacheDelegator)(nil)
@@ -257,4 +281,126 @@ func (c *CacheDelegator) ReadinessCheck() error {
 
 func (c *CacheDelegator) RequestWatchProgress(ctx context.Context) error {
 	return c.storage.RequestWatchProgress(ctx)
+}
+
+func (c *CacheDelegator) Stop() {
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+	})
+}
+
+type consistencyChecker struct {
+	cacher *Cacher
+	etcd   storage.Interface
+	clock  clock.Clock
+}
+
+func (c consistencyChecker) startChecking(stopCh <-chan struct{}) {
+	period := 5 * time.Minute
+	minDelay := time.Minute
+	delay := minDelay + time.Duration(rand.Int63n(int64(period-minDelay)))
+	select {
+	case <-stopCh:
+		return
+	case <-c.clock.After(delay):
+	}
+	ctx := wait.ContextForChannel(stopCh)
+	for {
+		c.check(ctx)
+		select {
+		case <-stopCh:
+			return
+		case <-c.clock.After(period):
+		}
+	}
+}
+
+func (c *consistencyChecker) check(ctx context.Context) {
+	digests, err := c.calculateDigests(ctx)
+	if err != nil {
+		klog.ErrorS(err, "Cache consistentency check error")
+	}
+	if digests.CacheDigest == digests.EtcdDigest {
+		klog.InfoS("Cache consistentency check passed", "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
+	} else {
+		klog.InfoS("Cache consistentency check failed", "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
+	}
+	metrics.RecordStorageDigest(c.cacher.resourcePrefix, *digests)
+}
+
+func (c *consistencyChecker) calculateDigests(ctx context.Context) (*metrics.StorageDigest, error) {
+	if !c.cacher.Ready() {
+		return nil, fmt.Errorf("cache is not ready")
+	}
+	opts := storage.ListOptions{ResourceVersion: "0"}
+	cacheResp := c.cacher.newListFunc()
+	err := c.cacher.GetList(ctx, "", opts, cacheResp, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed GetList on cache: %w", err)
+	}
+	cacheDigest := fnv.New64()
+	err = addListToDigest(cacheDigest, cacheResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
+	}
+
+	list, err := meta.ListAccessor(cacheResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed accessing list: %w", err)
+	}
+	opts.ResourceVersion = list.GetResourceVersion()
+	storageResp := c.cacher.newListFunc()
+	err = c.etcd.GetList(ctx, "", opts, storageResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed GetList on storage: %w", err)
+	}
+	storageDigest := fnv.New64()
+	err = addListToDigest(cacheDigest, storageResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating storage digest: %w", err)
+	}
+	return &metrics.StorageDigest{
+		ResourceVersion: opts.ResourceVersion,
+		CacheDigest:     fmt.Sprintf("%x", cacheDigest.Sum64()),
+		EtcdDigest:      fmt.Sprintf("%x", storageDigest.Sum64()),
+	}, nil
+}
+
+func addListToDigest(h hash.Hash64, list runtime.Object) error {
+	err := meta.EachListItem(list, func(obj runtime.Object) error {
+		objectMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+		err = addObjectToDigest(h, objectMeta)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return err
+}
+
+func addObjectToDigest(h hash.Hash64, objectMeta metav1.Object) error {
+	_, err := h.Write([]byte(objectMeta.GetNamespace()))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte("/"))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte(objectMeta.GetName()))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte("/"))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte(objectMeta.GetResourceVersion()))
+	if err != nil {
+		return err
+	}
+	return nil
 }
