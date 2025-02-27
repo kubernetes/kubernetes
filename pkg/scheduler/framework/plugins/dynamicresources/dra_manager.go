@@ -84,7 +84,7 @@ type resourceSliceLister struct {
 	tracker *resourceslicetracker.Tracker
 }
 
-func (l *resourceSliceLister) List() ([]*resourceapi.ResourceSlice, error) {
+func (l *resourceSliceLister) ListWithPatches() ([]*resourceapi.ResourceSlice, error) {
 	return l.tracker.ListPatchedResourceSlices()
 }
 

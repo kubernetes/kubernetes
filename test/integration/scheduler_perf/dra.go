@@ -305,7 +305,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
 	tCtx.ExpectNoError(err, "list nodes")
-	slices, err := draManager.ResourceSlices().List()
+	slices, err := draManager.ResourceSlices().ListWithPatches()
 	tCtx.ExpectNoError(err, "list slices")
 
 	// Allocate one claim at a time, picking nodes randomly. Each
