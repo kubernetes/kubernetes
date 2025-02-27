@@ -128,7 +128,8 @@ func TestInFlightEventAsync(t *testing.T) {
 		t.Errorf("unexpected aggregatedInflightEventMetric: %s", d)
 	}
 
-	r.aggregatedInflightEventMetricLastFlushTime = time.Now().Add(-time.Hour) // to test flush
+	// The extra 15 milliseconds are added to compensate for a lower time.Now() resolution on some platforms.
+	r.aggregatedInflightEventMetricLastFlushTime = time.Now().Add(-time.Hour).Add(-time.Millisecond * 15) // to test flush
 
 	// It adds -4 and flushes the metric to the channel.
 	r.ObserveInFlightEventsAsync(podAddLabel, -4, false)
