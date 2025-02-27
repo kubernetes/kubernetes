@@ -26,15 +26,17 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/configz"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeschedulerconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-
-	"k8s.io/klog/v2"
 )
 
 func init() {
@@ -98,6 +100,16 @@ func StartTestServer(ctx context.Context, customFlags []string) (result TestServ
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	opts := options.NewOptions()
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	featureGate := utilfeature.DefaultMutableFeatureGate.DeepCopy()
+	effectiveVersion := utilcompatibility.DefaultKubeEffectiveVersionForTest()
+	effectiveVersion.SetEmulationVersion(featureGate.EmulationVersion())
+	componentGlobalsRegistry := compatibility.NewComponentGlobalsRegistry()
+	if err := componentGlobalsRegistry.Register(compatibility.DefaultKubeComponent, effectiveVersion, featureGate); err != nil {
+		return result, err
+	}
+	opts.ComponentGlobalsRegistry = componentGlobalsRegistry
+
 	nfs := opts.Flags
 	for _, f := range nfs.FlagSets {
 		fs.AddFlagSet(f)
