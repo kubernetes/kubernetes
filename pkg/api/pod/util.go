@@ -854,6 +854,13 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropUserField(podStatus.ContainerStatuses)
 		dropUserField(podStatus.EphemeralContainerStatuses)
 	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking) && !podObservedGenerationTrackigInUse(oldPodStatus) {
+		podStatus.ObservedGeneration = 0
+		for i := range podStatus.Conditions {
+			podStatus.Conditions[i].ObservedGeneration = 0
+		}
+	}
 }
 
 // dropDisabledDynamicResourceAllocationFields removes pod claim references from
@@ -1050,19 +1057,25 @@ func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
 
 // hostUsersInUse returns true if the pod spec has spec.hostUsers field set.
 func hostUsersInUse(podSpec *api.PodSpec) bool {
-	if podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.HostUsers != nil {
-		return true
-	}
-
-	return false
+	return podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.HostUsers != nil
 }
 
 func supplementalGroupsPolicyInUse(podSpec *api.PodSpec) bool {
-	if podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.SupplementalGroupsPolicy != nil {
-		return true
+	return podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.SupplementalGroupsPolicy != nil
+}
+
+func podObservedGenerationTrackigInUse(podStatus *api.PodStatus) bool {
+	if podStatus == nil {
+		return false
 	}
 
-	return false
+	for _, condition := range podStatus.Conditions {
+		if condition.ObservedGeneration != 0 {
+			return true
+		}
+	}
+
+	return podStatus.ObservedGeneration != 0
 }
 
 // podLevelResourcesInUse returns true if pod-spec is non-nil and Resources field at

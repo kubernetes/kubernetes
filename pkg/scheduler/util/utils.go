@@ -29,6 +29,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetPodFullName returns a name that uniquely identifies a pod.
@@ -138,7 +140,7 @@ func DeletePod(ctx context.Context, cs kubernetes.Interface, pod *v1.Pod) error 
 	return cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 }
 
-// ClearNominatedNodeName internally submit a patch request to API server
+// ClearNominatedNodeName internally submits a patch request to API server
 // to set each pods[*].Status.NominatedNodeName> to "".
 func ClearNominatedNodeName(ctx context.Context, cs kubernetes.Interface, pods ...*v1.Pod) utilerrors.Aggregate {
 	var errs []error
@@ -148,6 +150,9 @@ func ClearNominatedNodeName(ctx context.Context, cs kubernetes.Interface, pods .
 		}
 		podStatusCopy := p.Status.DeepCopy()
 		podStatusCopy.NominatedNodeName = ""
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking) {
+			podStatusCopy.ObservedGeneration = p.Generation
+		}
 		if err := PatchPodStatus(ctx, cs, p, podStatusCopy); err != nil {
 			errs = append(errs, err)
 		}
