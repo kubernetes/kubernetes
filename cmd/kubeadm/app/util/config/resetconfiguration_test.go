@@ -18,10 +18,13 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/lithammer/dedent"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,6 +89,62 @@ func TestBytesToResetConfiguration(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestLoadResetConfigurationFromFile(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpdir); err != nil {
+			t.Fatalf("Couldn't remove tmpdir: %v", err)
+		}
+	}()
+	filename := "kubeadmConfig"
+	filePath := filepath.Join(tmpdir, filename)
+	options := LoadOrDefaultConfigurationOptions{}
+
+	tests := []struct {
+		name         string
+		cfgPath      string
+		fileContents string
+		wantErr      bool
+	}{
+		{
+			name:    "Config file does not exists",
+			cfgPath: "tmp",
+			wantErr: true,
+		},
+		{
+			name:    "Valid kubeadm config",
+			cfgPath: filePath,
+			fileContents: dedent.Dedent(`
+				apiVersion: kubeadm.k8s.io/v1beta4
+				kind: ResetConfiguration`),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.cfgPath == filePath {
+				err = os.WriteFile(tt.cfgPath, []byte(tt.fileContents), 0644)
+				if err != nil {
+					t.Fatalf("Couldn't write content to file: %v", err)
+				}
+				defer func() {
+					if err := os.RemoveAll(filePath); err != nil {
+						t.Fatalf("Couldn't remove filePath: %v", err)
+					}
+				}()
+			}
+
+			_, err = LoadResetConfigurationFromFile(tt.cfgPath, options)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadResetConfigurationFromFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 

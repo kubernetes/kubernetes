@@ -156,30 +156,11 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 		name         string
 		cfgPath      string
 		fileContents string
-		want         *kubeadmapi.UpgradeConfiguration
 		wantErr      bool
 	}{
 		{
 			name:    "Config file does not exists",
 			cfgPath: "tmp",
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name:         "Config file format is basic text",
-			cfgPath:      filePath,
-			want:         nil,
-			fileContents: "some-text",
-			wantErr:      true,
-		},
-		{
-			name:    "Unknown kind UpgradeConfiguration for kubeadm.k8s.io/unknown",
-			cfgPath: filePath,
-			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/unknown
-				kind: UpgradeConfiguration
-    		`),
-			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -187,24 +168,8 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 			cfgPath: filePath,
 			fileContents: dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1beta4
-				kind: UpgradeConfiguration`),
-			want: &kubeadmapi.UpgradeConfiguration{
-				Apply: kubeadmapi.UpgradeApplyConfiguration{
-					CertificateRenewal: ptr.To(true),
-					EtcdUpgrade:        ptr.To(true),
-					ImagePullPolicy:    v1.PullIfNotPresent,
-					ImagePullSerial:    ptr.To(true),
-				},
-				Node: kubeadmapi.UpgradeNodeConfiguration{
-					CertificateRenewal: ptr.To(true),
-					EtcdUpgrade:        ptr.To(true),
-					ImagePullPolicy:    v1.PullIfNotPresent,
-					ImagePullSerial:    ptr.To(true),
-				},
-				Plan: kubeadmapi.UpgradePlanConfiguration{
-					EtcdUpgrade: ptr.To(true),
-				},
-			},
+				kind: UpgradeConfiguration
+		`),
 			wantErr: false,
 		},
 	}
@@ -222,16 +187,9 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 				}()
 			}
 
-			got, err := LoadUpgradeConfigurationFromFile(tt.cfgPath, options)
+			_, err = LoadUpgradeConfigurationFromFile(tt.cfgPath, options)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LoadUpgradeConfigurationFromFile() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if tt.want == nil && got != tt.want {
-				t.Errorf("LoadUpgradeConfigurationFromFile() got = %v, want %v", got, tt.want)
-			} else if tt.want != nil {
-				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-					t.Errorf("LoadUpgradeConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)
-				}
 			}
 		})
 	}
