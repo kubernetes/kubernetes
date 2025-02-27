@@ -54,7 +54,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), fu
 		nfsServerPod                *v1.Pod
 		nfsPVconfig                 e2epv.PersistentVolumeConfig
 		pvcConfig                   e2epv.PersistentVolumeClaimConfig
-		nfsServerHost, clientNodeIP string
+		nfsServerHost               string
 		clientNode                  *v1.Node
 		volLabel                    labels.Set
 		selector                    *metav1.LabelSelector
@@ -88,20 +88,18 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), fu
 			Selector:         selector,
 			StorageClassName: &emptyStorageClass,
 		}
-		// Get the first ready node IP that is not hosting the NFS pod.
-		if clientNodeIP == "" {
+		if clientNode != nil {
 			framework.Logf("Designating test node")
 			nodes, err := e2enode.GetReadySchedulableNodes(ctx, c)
 			framework.ExpectNoError(err)
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
 					clientNode = &node
-					clientNodeIP, err = e2enode.GetSSHExternalIP(clientNode)
 					framework.ExpectNoError(err)
 					break
 				}
 			}
-			gomega.Expect(clientNodeIP).NotTo(gomega.BeEmpty())
+			gomega.Expect(clientNode).NotTo(gomega.BeEmpty())
 		}
 	})
 
