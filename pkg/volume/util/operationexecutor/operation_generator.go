@@ -584,6 +584,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FsGroup:             fsGroup,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
 			FSGroupChangePolicy: fsGroupChangePolicy,
+			Recorder:            og.recorder,
 			SELinuxLabel:        volumeToMount.SELinuxLabel,
 		})
 		// Update actual state of world
