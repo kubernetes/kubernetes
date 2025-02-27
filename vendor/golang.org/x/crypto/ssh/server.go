@@ -59,6 +59,27 @@ type GSSAPIWithMICConfig struct {
 	Server GSSAPIServer
 }
 
+// SendAuthBanner implements [ServerPreAuthConn].
+func (s *connection) SendAuthBanner(msg string) error {
+	return s.transport.writePacket(Marshal(&userAuthBannerMsg{
+		Message: msg,
+	}))
+}
+
+func (*connection) unexportedMethodForFutureProofing() {}
+
+// ServerPreAuthConn is the interface available on an incoming server
+// connection before authentication has completed.
+type ServerPreAuthConn interface {
+	unexportedMethodForFutureProofing() // permits growing ServerPreAuthConn safely later, ala testing.TB
+
+	ConnMetadata
+
+	// SendAuthBanner sends a banner message to the client.
+	// It returns an error once the authentication phase has ended.
+	SendAuthBanner(string) error
+}
+
 // ServerConfig holds server specific configuration data.
 type ServerConfig struct {
 	// Config contains configuration shared between client and server.
@@ -117,6 +138,12 @@ type ServerConfig struct {
 	// AuthLogCallback, if non-nil, is called to log all authentication
 	// attempts.
 	AuthLogCallback func(conn ConnMetadata, method string, err error)
+
+	// PreAuthConnCallback, if non-nil, is called upon receiving a new connection
+	// before any authentication has started. The provided ServerPreAuthConn
+	// can be used at any time before authentication is complete, including
+	// after this callback has returned.
+	PreAuthConnCallback func(ServerPreAuthConn)
 
 	// ServerVersion is the version identification string to announce in
 	// the public handshake.
@@ -488,6 +515,10 @@ func (b *BannerError) Error() string {
 }
 
 func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, error) {
+	if config.PreAuthConnCallback != nil {
+		config.PreAuthConnCallback(s)
+	}
+
 	sessionID := s.transport.getSessionID()
 	var cache pubKeyCache
 	var perms *Permissions
@@ -495,7 +526,7 @@ func (s *connection) serverAuthenticate(config *ServerConfig) (*Permissions, err
 	authFailures := 0
 	noneAuthCount := 0
 	var authErrs []error
-	var displayedBanner bool
+	var calledBannerCallback bool
 	partialSuccessReturned := false
 	// Set the initial authentication callbacks from the config. They can be
 	// changed if a PartialSuccessError is returned.
@@ -542,14 +573,10 @@ userAuthLoop:
 
 		s.user = userAuthReq.User
 
-		if !displayedBanner && config.BannerCallback != nil {
-			displayedBanner = true
-			msg := config.BannerCallback(s)
-			if msg != "" {
-				bannerMsg := &userAuthBannerMsg{
-					Message: msg,
-				}
-				if err := s.transport.writePacket(Marshal(bannerMsg)); err != nil {
+		if !calledBannerCallback && config.BannerCallback != nil {
+			calledBannerCallback = true
+			if msg := config.BannerCallback(s); msg != "" {
+				if err := s.SendAuthBanner(msg); err != nil {
 					return nil, err
 				}
 			}
@@ -762,10 +789,7 @@ userAuthLoop:
 		var bannerErr *BannerError
 		if errors.As(authErr, &bannerErr) {
 			if bannerErr.Message != "" {
-				bannerMsg := &userAuthBannerMsg{
-					Message: bannerErr.Message,
-				}
-				if err := s.transport.writePacket(Marshal(bannerMsg)); err != nil {
+				if err := s.SendAuthBanner(bannerErr.Message); err != nil {
 					return nil, err
 				}
 			}
