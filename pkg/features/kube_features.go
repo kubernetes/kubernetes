@@ -667,6 +667,12 @@ const (
 	// Enables support for the StorageVersionMigrator controller.
 	StorageVersionMigrator featuregate.Feature = "StorageVersionMigrator"
 
+	// owner: @chaunceyctx
+	// Deprecated: v1.33
+	//
+	// remove termination log file automatically when container has been removed.
+	TerminationLogFileCleanup featuregate.Feature = "TerminationLogFileCleanup"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	//
