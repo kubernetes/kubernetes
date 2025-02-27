@@ -17,14 +17,20 @@ limitations under the License.
 package resourceclaim
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -33,7 +39,7 @@ import (
 var obj = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
@@ -51,7 +57,7 @@ var obj = &resource.ResourceClaim{
 var objWithStatus = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
@@ -83,6 +89,25 @@ var objWithStatus = &resource.ResourceClaim{
 var objWithAdminAccess = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name:            "req-0",
+					DeviceClassName: "class",
+					AllocationMode:  resource.DeviceAllocationModeAll,
+					AdminAccess:     ptr.To(true),
+				},
+			},
+		},
+	},
+}
+
+var objWithAdminAccessInNonAdminNamespace = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
 		Namespace: "default",
 	},
 	Spec: resource.ResourceClaimSpec{
@@ -102,7 +127,7 @@ var objWithAdminAccess = &resource.ResourceClaim{
 var objWithAdminAccessStatus = &resource.ResourceClaim{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "valid-claim",
-		Namespace: "default",
+		Namespace: "kube-system",
 	},
 	Spec: resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
@@ -133,6 +158,28 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 	},
 }
 
+// Function that uses v1.NamespaceInterface to create namespaces.
+func CreateNamespace(nsClient v1.NamespaceInterface) error {
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "default",
+			Labels: map[string]string{"key": "value"},
+		},
+	}
+	_, err := nsClient.Create(context.TODO(), ns, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	ns = &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "kube-system",
+			Labels: map[string]string{DRAAdminNamespaceLabel: "true"},
+		},
+	}
+	_, err = nsClient.Create(context.TODO(), ns, metav1.CreateOptions{})
+	return err
+}
+
 const (
 	testRequest = "test-request"
 	testDriver  = "test-driver"
@@ -141,22 +188,34 @@ const (
 )
 
 func TestStrategy(t *testing.T) {
-	if !Strategy.NamespaceScoped() {
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
+	if !strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaim must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate() {
 		t.Errorf("ResourceClaim should not allow create on update")
+	}
+	if strategy.nsClient == nil {
+		t.Errorf("ResourceClaim nsClient should not be nil")
 	}
 }
 
 func TestStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	err := CreateNamespace(mockNSClient)
+	if err != nil {
+		t.Fatalf("failed to create test namespaces: %v", err)
+	}
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaim
 		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
+		nsClient              v1.NamespaceInterface
 	}{
 		"simple": {
 			obj:       obj,
@@ -179,16 +238,31 @@ func TestStrategyCreate(t *testing.T) {
 			obj:         objWithAdminAccess,
 			adminAccess: true,
 			expectObj:   objWithAdminAccess,
+			nsClient:    mockNSClient,
+		},
+		"admin-access-nil-namespace": {
+			obj:                   objWithAdminAccess,
+			adminAccess:           true,
+			expectObj:             objWithAdminAccess,
+			expectValidationError: true,
+		},
+		"admin-access-non-admin-namespace": {
+			obj:                   objWithAdminAccessInNonAdminNamespace,
+			adminAccess:           true,
+			expectObj:             objWithAdminAccessInNonAdminNamespace,
+			expectValidationError: true,
+			nsClient:              mockNSClient,
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+			strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, tc.nsClient)
 
 			obj := tc.obj.DeepCopy()
-			Strategy.PrepareForCreate(ctx, obj)
-			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
+			strategy.PrepareForCreate(ctx, obj)
+			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
 				if !tc.expectValidationError {
 					t.Fatalf("unexpected validation errors: %q", errs)
 				}
@@ -196,10 +270,10 @@ func TestStrategyCreate(t *testing.T) {
 			} else if tc.expectValidationError {
 				t.Fatal("expected validation error(s), got none")
 			}
-			if warnings := Strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
+			if warnings := strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
 				t.Fatalf("unexpected warnings: %q", warnings)
 			}
-			Strategy.Canonicalize(obj)
+			strategy.Canonicalize(obj)
 			assert.Equal(t, tc.expectObj, obj)
 		})
 	}
@@ -207,6 +281,12 @@ func TestStrategyCreate(t *testing.T) {
 
 func TestStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	err := CreateNamespace(mockNSClient)
+	if err != nil {
+		t.Fatalf("failed to create test namespaces: %v", err)
+	}
 
 	testcases := map[string]struct {
 		oldObj                *resource.ResourceClaim
@@ -214,6 +294,7 @@ func TestStrategyUpdate(t *testing.T) {
 		adminAccess           bool
 		expectValidationError bool
 		expectObj             *resource.ResourceClaim
+		nsClient              v1.NamespaceInterface
 	}{
 		"no-changes-okay": {
 			oldObj:    obj,
@@ -246,19 +327,21 @@ func TestStrategyUpdate(t *testing.T) {
 			newObj:      objWithAdminAccess,
 			adminAccess: true,
 			expectObj:   objWithAdminAccess,
+			nsClient:    mockNSClient,
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
+			strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, tc.nsClient)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
 
-			Strategy.PrepareForUpdate(ctx, newObj, oldObj)
-			if errs := Strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+			strategy.PrepareForUpdate(ctx, newObj, oldObj)
+			if errs := strategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
 				if !tc.expectValidationError {
 					t.Fatalf("unexpected validation errors: %q", errs)
 				}
@@ -266,10 +349,10 @@ func TestStrategyUpdate(t *testing.T) {
 			} else if tc.expectValidationError {
 				t.Fatal("expected validation error(s), got none")
 			}
-			if warnings := Strategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
+			if warnings := strategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
 				t.Fatalf("unexpected warnings: %q", warnings)
 			}
-			Strategy.Canonicalize(newObj)
+			strategy.Canonicalize(newObj)
 
 			expectObj := tc.expectObj.DeepCopy()
 			expectObj.ResourceVersion = "4"
@@ -280,6 +363,9 @@ func TestStrategyUpdate(t *testing.T) {
 
 func TestStatusStrategyUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
+	fakeClient := fake.NewSimpleClientset()
+	mockNSClient := fakeClient.CoreV1().Namespaces()
+	strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 
 	testcases := map[string]struct {
 		oldObj                  *resource.ResourceClaim
@@ -472,13 +558,14 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatusFeatureGate)
+			statusStrategy := NewStatusStrategy(strategy)
 
 			oldObj := tc.oldObj.DeepCopy()
 			newObj := tc.newObj.DeepCopy()
 			newObj.ResourceVersion = "4"
 
-			StatusStrategy.PrepareForUpdate(ctx, newObj, oldObj)
-			if errs := StatusStrategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
+			statusStrategy.PrepareForUpdate(ctx, newObj, oldObj)
+			if errs := statusStrategy.ValidateUpdate(ctx, newObj, oldObj); len(errs) != 0 {
 				if !tc.expectValidationError {
 					t.Fatalf("unexpected validation errors: %q", errs)
 				}
@@ -486,10 +573,10 @@ func TestStatusStrategyUpdate(t *testing.T) {
 			} else if tc.expectValidationError {
 				t.Fatal("expected validation error(s), got none")
 			}
-			if warnings := StatusStrategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
+			if warnings := statusStrategy.WarningsOnUpdate(ctx, newObj, oldObj); len(warnings) != 0 {
 				t.Fatalf("unexpected warnings: %q", warnings)
 			}
-			StatusStrategy.Canonicalize(newObj)
+			statusStrategy.Canonicalize(newObj)
 
 			expectObj := tc.expectObj.DeepCopy()
 			expectObj.ResourceVersion = "4"
