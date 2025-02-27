@@ -1237,7 +1237,7 @@ func BenchmarkAuthorization(b *testing.B) {
 		},
 	}
 
-	podToAdd, _ := generatePod("testwrite", "ns0", "node0", "default", opts)
+	podToAdd, _ := generatePod("testwrite", "ns0", "node0", "default", opts, rand.Perm)
 
 	b.ResetTimer()
 	for _, testWriteContention := range []bool{false, true} {
@@ -1338,11 +1338,11 @@ func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*cor
 	}
 }
 
-func randomSubset(a, b int) []int {
+func randomSubset(a, b int, randPerm func(int) []int) []int {
 	if b < a {
 		b = a
 	}
-	return rand.Perm(b)[:a]
+	return randPerm(b)[:a]
 }
 
 // generate creates sample pods and persistent volumes based on the provided options.
@@ -1356,7 +1356,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
 
-	rand.Seed(12345)
+	r := rand.New(rand.NewSource(12345))
 
 	for n := 0; n < opts.nodes; n++ {
 		nodeName := fmt.Sprintf("node%d", n)
@@ -1365,7 +1365,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			namespace := fmt.Sprintf("ns%d", p%opts.namespaces)
 			svcAccountName := fmt.Sprintf("svcacct%d-%s", p, nodeName)
 
-			pod, podPVs := generatePod(name, namespace, nodeName, svcAccountName, opts)
+			pod, podPVs := generatePod(name, namespace, nodeName, svcAccountName, opts, r.Perm)
 			pods = append(pods, pod)
 			pvs = append(pvs, podPVs...)
 		}
@@ -1395,7 +1395,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 	return nodes, pods, pvs, attachments, slices
 }
 
-func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts) (*corev1.Pod, []*corev1.PersistentVolume) {
+func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume) {
 	pvs := make([]*corev1.PersistentVolume, 0, opts.uniquePVCsPerPod+opts.sharedPVCsPerPod)
 
 	pod := &corev1.Pod{}
@@ -1410,7 +1410,7 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		}})
 	}
 	// Choose shared secrets randomly from shared secrets in a namespace.
-	subset := randomSubset(opts.sharedSecretsPerPod, opts.sharedSecretsPerNamespace)
+	subset := randomSubset(opts.sharedSecretsPerPod, opts.sharedSecretsPerNamespace, randPerm)
 	for _, i := range subset {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{SecretName: fmt.Sprintf("secret%d-shared", i)},
@@ -1423,7 +1423,7 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		}})
 	}
 	// Choose shared configmaps randomly from shared configmaps in a namespace.
-	subset = randomSubset(opts.sharedConfigMapsPerPod, opts.sharedConfigMapsPerNamespace)
+	subset = randomSubset(opts.sharedConfigMapsPerPod, opts.sharedConfigMapsPerNamespace, randPerm)
 	for _, i := range subset {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: fmt.Sprintf("configmap%d-shared", i)}},
@@ -1470,7 +1470,7 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		})
 	}
 	// Choose shared pvcs randomly from shared pvcs in a namespace.
-	subset = randomSubset(opts.sharedPVCsPerPod, opts.sharedPVCsPerNamespace)
+	subset = randomSubset(opts.sharedPVCsPerPod, opts.sharedPVCsPerNamespace, randPerm)
 	for _, i := range subset {
 		pv := &corev1.PersistentVolume{}
 		pv.Name = fmt.Sprintf("pv%d-shared-%s", i, pod.Namespace)

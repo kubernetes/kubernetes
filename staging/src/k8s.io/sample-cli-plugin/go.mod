@@ -2,9 +2,9 @@
 
 module k8s.io/sample-cli-plugin
 
-go 1.23.0
+go 1.24.0
 
-godebug default=go1.23
+godebug default=go1.24
 
 require (
 	github.com/spf13/cobra v1.8.1
