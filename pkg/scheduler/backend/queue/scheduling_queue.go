@@ -702,8 +702,6 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 // and this will be removed after SchedulingQueueHint goes to stable and the feature gate is removed.
 func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	pod := pInfo.Pod
-	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
 
 	// When the queueing hint is enabled, they are used differently.
 	// But, we use all of them as UnschedulablePlugins when the queueing hint isn't enabled so that we don't break the old behaviour.
@@ -756,13 +754,14 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 		return fmt.Errorf("Pod %v is already present in the backoff queue", klog.KObj(pod))
 	}
 
+	// Refresh the timestamp since the pod is re-added.
+	pInfo.Timestamp = p.clock.Now()
+	pInfo.BackoffExpiration = p.backoffQ.calculateBackoffTime(pInfo)
+
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
 		return p.addUnschedulableWithoutQueueingHint(logger, pInfo, podSchedulingCycle)
 	}
-
-	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
 
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulablePods.

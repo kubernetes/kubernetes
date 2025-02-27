@@ -32,8 +32,9 @@ type backoffQueuer interface {
 	// isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 	// If this returns true, the pod should not be re-tried.
 	isPodBackingoff(podInfo *framework.QueuedPodInfo) bool
-	// getBackoffTime returns the time that podInfo completes backoff
-	getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time
+	// calculateBackoffTime returns the time that podInfo completes backoff.
+	// The podInfo.BackoffExpiration field should be used instead if it's not empty.
+	calculateBackoffTime(podInfo *framework.QueuedPodInfo) time.Time
 	// popEachBackoffCompleted run fn for all pods from podBackoffQ and podErrorBackoffQ that completed backoff while popping them.
 	popEachBackoffCompleted(logger klog.Logger, fn func(pInfo *framework.QueuedPodInfo))
 
@@ -100,20 +101,18 @@ func (bq *backoffQueue) podMaxBackoffDuration() time.Duration {
 
 // lessBackoffCompleted is a less function of podBackoffQ and podErrorBackoffQ.
 func (bq *backoffQueue) lessBackoffCompleted(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
-	bo1 := bq.getBackoffTime(pInfo1)
-	bo2 := bq.getBackoffTime(pInfo2)
-	return bo1.Before(bo2)
+	return pInfo1.BackoffExpiration.Before(pInfo2.BackoffExpiration)
 }
 
 // isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 // If this returns true, the pod should not be re-tried.
 func (bq *backoffQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
-	boTime := bq.getBackoffTime(podInfo)
-	return boTime.After(bq.clock.Now())
+	return podInfo.BackoffExpiration.After(bq.clock.Now())
 }
 
-// getBackoffTime returns the time that podInfo completes backoff
-func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time {
+// calculateBackoffTime returns the time that podInfo completes backoff.
+// The podInfo.BackoffExpiration field should be used instead if it's not empty.
+func (bq *backoffQueue) calculateBackoffTime(podInfo *framework.QueuedPodInfo) time.Time {
 	duration := bq.calculateBackoffDuration(podInfo)
 	backoffTime := podInfo.Timestamp.Add(duration)
 	return backoffTime
