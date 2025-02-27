@@ -21,6 +21,8 @@ package conntrack
 
 import (
 	"errors"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/vishvananda/netlink"
@@ -79,13 +81,18 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 			}
 		}
 
-		serviceIPEndpointIPs[svc.ClusterIP().String()] = endpointIPs
+		// we need to filter entries that are directed to a ServiceIP:Port
+		// that does not have a backend as part of the endpoints IPs
+		portStr := strconv.Itoa(svc.Port())
+		serviceIPEndpointIPs[net.JoinHostPort(svc.ClusterIP().String(), portStr)] = endpointIPs
 		for _, loadBalancerIP := range svc.LoadBalancerVIPs() {
-			serviceIPEndpointIPs[loadBalancerIP.String()] = endpointIPs
+			serviceIPEndpointIPs[net.JoinHostPort(loadBalancerIP.String(), portStr)] = endpointIPs
 		}
 		for _, externalIP := range svc.ExternalIPs() {
-			serviceIPEndpointIPs[externalIP.String()] = endpointIPs
+			serviceIPEndpointIPs[net.JoinHostPort(externalIP.String(), portStr)] = endpointIPs
 		}
+		// we need to filter entries that are directed to a *:NodePort
+		// that does not have a backend as part of the endpoints IPs
 		if svc.NodePort() != 0 {
 			serviceNodePortEndpointIPs[svc.NodePort()] = endpointIPs
 		}
@@ -100,14 +107,15 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 
 		origDst := entry.Forward.DstIP.String()
 		origPortDst := int(entry.Forward.DstPort)
+		origPortDstStr := strconv.Itoa(origPortDst)
 		replySrc := entry.Reverse.SrcIP.String()
 
 		// if the original destination (--orig-dst) of the entry is service IP (ClusterIP,
-		// LoadBalancerIPs or ExternalIPs) and the reply source (--reply-src) is not IP of
-		// any serving endpoint, we clear the entry.
-		if _, ok := serviceIPEndpointIPs[origDst]; ok {
-			if !serviceIPEndpointIPs[origDst].Has(replySrc) {
-				filters = append(filters, filterForNAT(origDst, replySrc, v1.ProtocolUDP))
+		// LoadBalancerIPs or ExternalIPs) and (--orig-port-dst) of the flow is service Port
+		// and the reply source (--reply-src) is not IP of any serving endpoint, we clear the entry.
+		if _, ok := serviceIPEndpointIPs[net.JoinHostPort(origDst, origPortDstStr)]; ok {
+			if !serviceIPEndpointIPs[net.JoinHostPort(origDst, origPortDstStr)].Has(replySrc) {
+				filters = append(filters, filterForIPPortNAT(origDst, replySrc, entry.Forward.DstPort, v1.ProtocolUDP))
 			}
 		}
 
@@ -145,14 +153,16 @@ var protocolMap = map[v1.Protocol]uint8{
 	v1.ProtocolSCTP: unix.IPPROTO_SCTP,
 }
 
-// filterForNAT returns *conntrackFilter to delete the conntrack entries for connections
-// specified by the destination IP (original direction) and source IP (reply direction).
-func filterForNAT(origin, dest string, protocol v1.Protocol) *conntrackFilter {
-	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "reply-src", dest, "protocol", protocol)
+// filterForIPPortNAT returns *conntrackFilter to delete the conntrack entries for connections
+// specified by the destination IP (original direction) and destination port (original direction)
+// and source IP (reply direction).
+func filterForIPPortNAT(origin, dest string, dstPort uint16, protocol v1.Protocol) *conntrackFilter {
+	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "org-port-dst", dstPort, "reply-src", dest, "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{
-			dstIP: netutils.ParseIPSloppy(origin),
+			dstIP:   netutils.ParseIPSloppy(origin),
+			dstPort: dstPort,
 		},
 		reply: &connectionTuple{
 			srcIP: netutils.ParseIPSloppy(dest),
