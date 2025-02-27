@@ -25,6 +25,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../../../../.. && pwd -P)"
+source "${KUBE_ROOT}/hack/lib/init.sh"
+
 readonly cluster_name="kms"
 readonly registry_name="kind-registry"
 readonly kind_network="kind"
@@ -35,6 +38,7 @@ build_and_push_mock_plugin() {
         --no-cache \
         --platform linux/amd64 \
         --output=type=docker \
+        --build-arg=GOTOOLCHAIN="${GOTOOLCHAIN}" \
         -t localhost:5000/mock-kms-provider:e2e \
         -f staging/src/k8s.io/kms/internal/plugins/_mock/Dockerfile staging/src/k8s.io/ \
         --progress=plain;
@@ -136,18 +140,23 @@ main(){
     export ARTIFACTS="${ARTIFACTS:-${PWD}/_artifacts}"
     mkdir -p "${ARTIFACTS}"
 
-    export GO111MODULE=on;
-    go install sigs.k8s.io/kind@latest;
-    go install sigs.k8s.io/kubetest2@latest;
-    go install sigs.k8s.io/kubetest2/kubetest2-kind@latest;
-    go install sigs.k8s.io/kubetest2/kubetest2-tester-ginkgo@latest;
+    kube::golang::setup_env
+    (
+        # just while installing external tools
+        export GO111MODULE=on GOTOOLCHAIN=auto
+        # TODO: consider using specific versions to avoid surprise breaking changes
+        go install sigs.k8s.io/kind@latest
+        go install sigs.k8s.io/kubetest2@latest
+        go install sigs.k8s.io/kubetest2/kubetest2-kind@latest
+        go install sigs.k8s.io/kubetest2/kubetest2-tester-ginkgo@latest
+    )
 
     # The build e2e.test, ginkgo and kubectl binaries + copy to dockerized dir is
     # because of https://github.com/kubernetes-sigs/kubetest2/issues/184
-    make all WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/v2/ginkgo cmd/kubectl";
+    make all WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/v2/ginkgo cmd/kubectl"
     mkdir -p _output/dockerized/bin/linux/amd64;
     for binary in kubectl e2e.test ginkgo; do
-        cp -f _output/local/go/bin/${binary} _output/dockerized/bin/linux/amd64/${binary};
+        cp -f _output/local/go/bin/${binary} _output/dockerized/bin/linux/amd64/${binary}
     done;
 
     create_registry
