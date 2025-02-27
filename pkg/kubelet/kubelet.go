@@ -989,7 +989,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		renewInterval,
 		string(klet.nodeName),
 		v1.NamespaceNodeLease,
-		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
+		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName), logger))
 
 	// setup node shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{

@@ -20,6 +20,8 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"k8s.io/klog/v2"
 )
 
 func TestConfigurationChannels(t *testing.T) {
@@ -43,7 +45,7 @@ type MergeMock struct {
 	t      *testing.T
 }
 
-func (m MergeMock) Merge(source string, update interface{}) error {
+func (m MergeMock) Merge(source string, update interface{}, logger klog.Logger) error {
 	if m.source != source {
 		m.t.Errorf("Expected %s, Got %s", m.source, source)
 	}
@@ -63,10 +65,10 @@ func TestMergeInvoked(t *testing.T) {
 }
 
 // mergeFunc implements the Merger interface
-type mergeFunc func(source string, update interface{}) error
+type mergeFunc func(source string, update interface{}, logger klog.Logger) error
 
-func (f mergeFunc) Merge(source string, update interface{}) error {
-	return f(source, update)
+func (f mergeFunc) Merge(source string, update interface{}, logger klog.Logger) error {
+	return f(source, update, logger)
 }
 
 func TestSimultaneousMerge(t *testing.T) {
@@ -74,7 +76,7 @@ func TestSimultaneousMerge(t *testing.T) {
 	defer cancel()
 
 	ch := make(chan bool, 2)
-	mux := newMux(mergeFunc(func(source string, update interface{}) error {
+	mux := newMux(mergeFunc(func(source string, update interface{}, logger klog.Logger) error {
 		switch source {
 		case "one":
 			if update.(string) != "test" {

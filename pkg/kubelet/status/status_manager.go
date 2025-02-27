@@ -113,7 +113,7 @@ type PodDeletionSafetyProvider interface {
 }
 
 type PodStartupLatencyStateHelper interface {
-	RecordStatusUpdated(pod *v1.Pod)
+	RecordStatusUpdated(pod *v1.Pod, logger klog.Logger)
 	DeletePodStartupState(podUID types.UID)
 }
 
@@ -905,7 +905,10 @@ func (m *manager) syncBatch(all bool) int {
 // syncPod syncs the given status with the API server. The caller must not hold the status lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(context.TODO(), status.podName, metav1.GetOptions{})
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(ctx, status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		klog.V(3).InfoS("Pod does not exist on the server",
 			"podUID", uid,
@@ -948,7 +951,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
 		pod = newPod
 		// We pass a new object (result of API call which contains updated ResourceVersion)
-		m.podStartupLatencyHelper.RecordStatusUpdated(pod)
+		m.podStartupLatencyHelper.RecordStatusUpdated(pod, logger)
 	}
 
 	// measure how long the status update took to propagate from generation to update on the server
