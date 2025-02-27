@@ -214,21 +214,23 @@ func TestGetListCacheBypass(t *testing.T) {
 		Limit                int64
 		Continue             string
 	}
+	continueOnRev1, err := storage.EncodeContinue("pods/a", "pods", 1)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	testCases := map[opts]bool{}
 	testCases[opts{}] = false
 	testCases[opts{Limit: 100}] = false
-	testCases[opts{Continue: "continue"}] = true
-	testCases[opts{Limit: 100, Continue: "continue"}] = true
+	testCases[opts{Continue: continueOnRev1}] = true
+	testCases[opts{Limit: 100, Continue: continueOnRev1}] = true
 	testCases[opts{ResourceVersion: "0"}] = false
 	testCases[opts{ResourceVersion: "0", Limit: 100}] = false
-	testCases[opts{ResourceVersion: "0", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: "continue"}] = true
+	testCases[opts{ResourceVersion: "0", Continue: continueOnRev1}] = true
+	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueOnRev1}] = true
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
 	testCases[opts{ResourceVersion: "1"}] = false
 	testCases[opts{ResourceVersion: "1", Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", Limit: 100, Continue: "continue"}] = true
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
@@ -236,7 +238,7 @@ func TestGetListCacheBypass(t *testing.T) {
 
 	for _, rv := range []string{"", "0", "1"} {
 		for _, match := range []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
-			for _, c := range []string{"", "continue"} {
+			for _, c := range []string{"", continueOnRev1} {
 				for _, limit := range []int64{0, 100} {
 					errs := validation.ValidateListOptions(&internalversion.ListOptions{
 						ResourceVersion:      rv,
@@ -288,11 +290,11 @@ func TestGetListCacheBypass(t *testing.T) {
 					Continue: opt.Continue,
 					Limit:    opt.Limit,
 				},
-			}, expectBypass)
+			}, false, expectBypass)
 		}
-
 	})
 	t.Run("ConsistentListFromCache", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 
 		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
@@ -313,12 +315,47 @@ func TestGetListCacheBypass(t *testing.T) {
 					Continue: opt.Continue,
 					Limit:    opt.Limit,
 				},
-			}, expectBypass)
+			}, false, expectBypass)
+		}
+	})
+
+	t.Run("ListFromCacheSnapshot", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
+		testCases[opts{}] = true
+		testCases[opts{Limit: 100}] = true
+		for opt, expectBypass := range testCases {
+			testGetListCacheBypass(t, storage.ListOptions{
+				ResourceVersion:      opt.ResourceVersion,
+				ResourceVersionMatch: opt.ResourceVersionMatch,
+				Predicate: storage.SelectionPredicate{
+					Continue: opt.Continue,
+					Limit:    opt.Limit,
+				},
+			}, false, expectBypass)
+		}
+		overrides := map[opts]bool{}
+		overrides[opts{Continue: continueOnRev1}] = false
+		overrides[opts{Limit: 100, Continue: continueOnRev1}] = false
+		overrides[opts{ResourceVersion: "0", Continue: continueOnRev1}] = false
+		overrides[opts{ResourceVersion: "0", Limit: 100, Continue: continueOnRev1}] = false
+		overrides[opts{ResourceVersion: "1", Limit: 100}] = false
+		overrides[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+		overrides[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+		for opt, expectBypass := range overrides {
+			testGetListCacheBypass(t, storage.ListOptions{
+				ResourceVersion:      opt.ResourceVersion,
+				ResourceVersionMatch: opt.ResourceVersionMatch,
+				Predicate: storage.SelectionPredicate{
+					Continue: opt.Continue,
+					Limit:    opt.Limit,
+				},
+			}, true, expectBypass)
 		}
 	})
 }
 
-func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
+func testGetListCacheBypass(t *testing.T, options storage.ListOptions, snapshottedRev1, expectBypass bool) {
 	backingStorage := &dummyStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -326,6 +363,10 @@ func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectByp
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	if snapshottedRev1 && cacher.watchCache.snapshots != nil {
+		cacher.watchCache.snapshots.Add(1, fakeOrderedLister{})
+	}
+
 	result := &example.PodList{}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if err := cacher.ready.wait(context.Background()); err != nil {
@@ -3172,7 +3213,7 @@ func TestListIndexer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pred := storagetesting.CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
-			_, usedIndex, err := cacher.cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, pred, tt.recursive)
+			_, usedIndex, err := cacher.cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
