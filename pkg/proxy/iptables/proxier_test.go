@@ -116,9 +116,9 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 	p := &Proxier{
 		ipFamily:                 ipfamily,
 		svcPortMap:               make(proxy.ServicePortMap),
-		serviceChanges:           proxy.NewServiceChangeTracker(ipfamily, newServiceInfo, nil),
+		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipfamily, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointsChangeTracker(ipfamily, testHostname, newEndpointInfo, nil),
+		endpointsChanges:         proxy.NewEndpointsChangeTracker(testHostname, newEndpointInfo, ipfamily, nil, nil),
 		needFullSync:             true,
 		iptables:                 ipt,
 		masqueradeMark:           "0x4000",

@@ -140,9 +140,9 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 	}
 	p := &Proxier{
 		svcPortMap:            make(proxy.ServicePortMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
+		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, nil, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointsChangeTracker(ipFamily, testHostname, nil, nil),
+		endpointsChanges:      proxy.NewEndpointsChangeTracker(testHostname, nil, ipFamily, nil, nil),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,

@@ -375,9 +375,9 @@ func NewProxier(
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
 		svcPortMap:            make(proxy.ServicePortMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
+		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointsChangeTracker(ipFamily, hostname, nil, nil),
+		endpointsChanges:      proxy.NewEndpointsChangeTracker(hostname, nil, ipFamily, recorder, nil),
 		initialSync:           true,
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
