@@ -201,6 +201,20 @@ const (
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
 
+	// owner: @nojnhuh
+	// kep: http://kep.k8s.io/5027
+	//
+	// Enables support for modifying attributes and capacities of
+	// devices in ResourceSlices via ResourceSlicePatch objects.
+	DRAAdminControlledDeviceAttributes featuregate.Feature = "DRAAdminControlledDeviceAttributes"
+
+	// owner: @pohly
+	// kep: http://kep.k8s.io/5055
+	//
+	// Marking devices as tainted can prevent using them for new pods and/or
+	// cause pods using them to stop. Users can decide to tolerate taints.
+	DRADeviceTaints featuregate.Feature = "DRADeviceTaints"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//

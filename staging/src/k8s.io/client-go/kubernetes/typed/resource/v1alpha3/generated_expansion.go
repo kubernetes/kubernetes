@@ -25,3 +25,5 @@ type ResourceClaimExpansion interface{}
 type ResourceClaimTemplateExpansion interface{}
 
 type ResourceSliceExpansion interface{}
+
+type ResourceSlicePatchExpansion interface{}
