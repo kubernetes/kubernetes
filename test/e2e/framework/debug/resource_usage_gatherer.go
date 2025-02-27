@@ -23,8 +23,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -547,11 +549,7 @@ func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 	}
 
 	// Workers has been stopped. We need to gather data stored in them.
-	sortedKeys := []string{}
-	for name := range data[percentiles[0]] {
-		sortedKeys = append(sortedKeys, name)
-	}
-	sort.Strings(sortedKeys)
+	sortedKeys := slices.Sorted(maps.Keys(data[percentiles[0]]))
 	violatedConstraints := make([]string, 0)
 	summary := make(ResourceUsageSummary)
 	for _, perc := range percentiles {
