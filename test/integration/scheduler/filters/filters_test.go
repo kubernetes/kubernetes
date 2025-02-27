@@ -49,9 +49,11 @@ var (
 	createPausePod               = testutils.CreatePausePod
 	deletePod                    = testutils.DeletePod
 	getPod                       = testutils.GetPod
+	runPausePod                  = testutils.RunPausePod
 	initPausePod                 = testutils.InitPausePod
 	initTest                     = testutils.InitTestSchedulerWithNS
 	podScheduledIn               = testutils.PodScheduledIn
+	podScheduled                 = testutils.PodScheduled
 	podUnschedulable             = testutils.PodUnschedulable
 	waitForPodUnschedulable      = testutils.WaitForPodUnschedulable
 )
@@ -2314,4 +2316,111 @@ func TestPodAffinityMatchLabelKeyEnablement(t *testing.T) {
 		t.Fatalf("Pod %v has wrong label selector: diff = \n%v", p2.Name, d)
 	}
 
+}
+
+func TestNodeResourcesFilter(t *testing.T) {
+	pause := imageutils.GetPauseImageName()
+	tests := []struct {
+		name         string
+		nodes        []*v1.Node
+		existingPods []*v1.Pod
+		incomingPod  *v1.Pod
+		fit          bool
+	}{
+		{
+			name: "pod does not fit due to insufficient node resources",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("insufficient-node-1").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:    "2",
+						v1.ResourceMemory: "2G",
+					}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("insufficient-existing-pod-1").
+					Res(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "1",
+						v1.ResourceMemory: "1G",
+					}).Container(pause).
+					Obj(),
+			},
+			incomingPod: st.MakePod().Name("insufficient-incoming-pod-1").
+				Res(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "3",
+					v1.ResourceMemory: "3G",
+				}).Container(pause).
+				Obj(),
+			fit: false,
+		},
+		{
+			name: "pod fits with sufficient node resources",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("sufficient-node-1").Capacity(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:    "3",
+						v1.ResourceMemory: "3G",
+					}).Obj(),
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("sufficient-existing-pod-1").
+					Res(map[v1.ResourceName]string{
+						v1.ResourceCPU:    "1",
+						v1.ResourceMemory: "1G",
+					}).Container(pause).
+					Obj(),
+			},
+			incomingPod: st.MakePod().Name("sufficient-incoming-pod-1").
+				Res(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1",
+					v1.ResourceMemory: "1G",
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "node-resources-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			for i := range tt.nodes {
+				if _, err := createNode(cs, tt.nodes[i]); err != nil {
+					t.Fatalf("Cannot create node: %v", err)
+				}
+			}
+
+			// set namespace to pods
+			tt.incomingPod.SetNamespace(ns)
+			for i := range tt.existingPods {
+				tt.existingPods[i].SetNamespace(ns)
+			}
+			allPods := append([]*v1.Pod{tt.incomingPod}, tt.existingPods...)
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
+
+			for _, pod := range tt.existingPods {
+				if _, err := runPausePod(testCtx.ClientSet, pod); err != nil {
+					t.Fatalf("failed to create existing pod: %v", err)
+				}
+			}
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(testCtx.Ctx, tt.incomingPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error while creating pod during test: %v", err)
+			}
+
+			if tt.fit {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podScheduled(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be scheduled but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			} else {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be unschedulable but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			}
+		})
+	}
 }
