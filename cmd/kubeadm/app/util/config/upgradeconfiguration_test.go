@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,15 +29,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/yaml"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-func TestDocMapToUpgradeConfiguration(t *testing.T) {
+func TestBytesToUpgradeConfiguration(t *testing.T) {
 	tests := []struct {
 		name          string
 		cfg           interface{}
@@ -117,25 +116,25 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			b, err := yaml.Marshal(tc.cfg)
-			if err != nil {
-				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
-			}
-			docmap, err := kubeadmutil.SplitYAMLDocuments(b)
-			if err != nil {
-				t.Fatalf("Unexpected error of SplitYAMLDocuments: %v", err)
-			}
-			cfg, err := DocMapToUpgradeConfiguration(docmap)
-			if (err != nil) != tc.expectedError {
-				t.Fatalf("failed DocMapToUpgradeConfiguration:\n\texpected error: %t\n\t  actual error: %v", tc.expectedError, err)
-			}
-			if err == nil {
-				if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-					t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tc.name, format.name), func(t *testing.T) {
+				b, err := format.marshal(tc.cfg)
+				if err != nil {
+					t.Fatalf("unexpected error while marshalling to %s: %v", format.name, err)
 				}
-			}
-		})
+
+				cfg, err := BytesToUpgradeConfiguration(b)
+				if (err != nil) != tc.expectedError {
+					t.Fatalf("failed BytesToUpgradeConfiguration:\n\texpected error: %t\n\t  actual error: %v", tc.expectedError, err)
+				}
+
+				if err == nil {
+					if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
+						t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+					}
+				}
+			})
+		}
 	}
 }
 
@@ -415,21 +414,24 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			bytes, err := yaml.Marshal(tt.cfg)
-			if err != nil {
-				t.Fatalf("Could not marshal test config: %v", err)
-			}
-			err = os.WriteFile(filePath, bytes, 0644)
-			if err != nil {
-				t.Fatalf("Couldn't write content to file: %v", err)
-			}
 
-			got, _ := LoadOrDefaultUpgradeConfiguration(tt.cfgPath, tt.cfg, options)
-			if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-				t.Errorf("LoadOrDefaultUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
-			}
-		})
+	for _, tt := range tests {
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tt.name, format.name), func(t *testing.T) {
+				bytes, err := format.marshal(tt.cfg)
+				if err != nil {
+					t.Fatalf("Could not marshal test config: %v", err)
+				}
+				err = os.WriteFile(filePath, bytes, 0644)
+				if err != nil {
+					t.Fatalf("Couldn't write content to file: %v", err)
+				}
+
+				got, _ := LoadOrDefaultUpgradeConfiguration(tt.cfgPath, tt.cfg, options)
+				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
+					t.Errorf("LoadOrDefaultUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+				}
+			})
+		}
 	}
 }
