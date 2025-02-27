@@ -39,6 +39,7 @@ import (
 	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha2 "k8s.io/api/coordination/v1alpha2"
+	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	eventsv1 "k8s.io/api/events/v1"
@@ -457,6 +458,7 @@ var (
 	betaAPIGroupVersionsDisabledByDefault = []schema.GroupVersion{
 		admissionregistrationv1beta1.SchemeGroupVersion,
 		authenticationv1beta1.SchemeGroupVersion,
+		coordinationv1beta1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
 		flowcontrolv1beta2.SchemeGroupVersion,

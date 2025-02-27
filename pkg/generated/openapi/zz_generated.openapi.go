@@ -389,6 +389,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/coordination/v1alpha2.LeaseCandidateList":                                                   schema_k8sio_api_coordination_v1alpha2_LeaseCandidateList(ref),
 		"k8s.io/api/coordination/v1alpha2.LeaseCandidateSpec":                                                   schema_k8sio_api_coordination_v1alpha2_LeaseCandidateSpec(ref),
 		"k8s.io/api/coordination/v1beta1.Lease":                                                                 schema_k8sio_api_coordination_v1beta1_Lease(ref),
+		"k8s.io/api/coordination/v1beta1.LeaseCandidate":                                                        schema_k8sio_api_coordination_v1beta1_LeaseCandidate(ref),
+		"k8s.io/api/coordination/v1beta1.LeaseCandidateList":                                                    schema_k8sio_api_coordination_v1beta1_LeaseCandidateList(ref),
+		"k8s.io/api/coordination/v1beta1.LeaseCandidateSpec":                                                    schema_k8sio_api_coordination_v1beta1_LeaseCandidateSpec(ref),
 		"k8s.io/api/coordination/v1beta1.LeaseList":                                                             schema_k8sio_api_coordination_v1beta1_LeaseList(ref),
 		"k8s.io/api/coordination/v1beta1.LeaseSpec":                                                             schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref),
 		"k8s.io/api/core/v1.AWSElasticBlockStoreVolumeSource":                                                   schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref),
@@ -19585,6 +19588,158 @@ func schema_k8sio_api_coordination_v1beta1_Lease(ref common.ReferenceCallback) c
 		},
 		Dependencies: []string{
 			"k8s.io/api/coordination/v1beta1.LeaseSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_coordination_v1beta1_LeaseCandidate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LeaseCandidate defines a candidate for a Lease object. Candidates are created such that coordinated leader election will pick the best leader from the list of candidates.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/coordination/v1beta1.LeaseCandidateSpec"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/coordination/v1beta1.LeaseCandidateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_coordination_v1beta1_LeaseCandidateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LeaseCandidateList is a list of Lease objects.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "items is a list of schema objects.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/coordination/v1beta1.LeaseCandidate"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/coordination/v1beta1.LeaseCandidate", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_coordination_v1beta1_LeaseCandidateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "LeaseCandidateSpec is a specification of a Lease.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"leaseName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LeaseName is the name of the lease for which this candidate is contending. The limits on this field are the same as on Lease.name. Multiple lease candidates may reference the same Lease.name. This field is immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"pingTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PingTime is the last time that the server has requested the LeaseCandidate to renew. It is only done during leader election to check if any LeaseCandidates have become ineligible. When PingTime is updated, the LeaseCandidate will respond by updating RenewTime.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime"),
+						},
+					},
+					"renewTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RenewTime is the time that the LeaseCandidate was last updated. Any time a Lease needs to do leader election, the PingTime field is updated to signal to the LeaseCandidate that they should update the RenewTime. Old LeaseCandidate objects are also garbage collected if it has been hours since the last renew. The PingTime field is updated regularly to prevent garbage collection for still active LeaseCandidates.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime"),
+						},
+					},
+					"binaryVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BinaryVersion is the binary version. It must be in a semver format without leading `v`. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"emulationVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "EmulationVersion is the emulation version. It must be in a semver format without leading `v`. EmulationVersion must be less than or equal to BinaryVersion. This field is required when strategy is \"OldestEmulationVersion\"",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"strategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Strategy is the strategy that coordinated leader election will use for picking the leader. If multiple candidates for the same Lease return different strategies, the strategy provided by the candidate with the latest BinaryVersion will be used. If there is still conflict, this is a user error and coordinated leader election will not operate the Lease until resolved.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"leaseName", "binaryVersion", "strategy"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime"},
 	}
 }
 
