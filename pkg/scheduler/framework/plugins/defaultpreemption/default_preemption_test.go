@@ -436,7 +436,7 @@ func TestPostFilter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			p, err := NewDefaultPreemption(getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+			p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1186,7 +1186,7 @@ func TestDryRunPreemption(t *testing.T) {
 			if tt.args == nil {
 				tt.args = getDefaultDefaultPreemptionArgs()
 			}
-			pl, err := NewDefaultPreemption(tt.args, fwk, feature.Features{})
+			pl, err := New(ctx, tt.args, fwk, feature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1430,7 +1430,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
-			pl, err := NewDefaultPreemption(getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1693,7 +1693,7 @@ func TestCustomSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			pl, err := NewDefaultPreemption(getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1809,7 +1809,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			pl, err := NewDefaultPreemption(getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2115,7 +2115,7 @@ func TestPreempt(t *testing.T) {
 				features := feature.Features{
 					EnableAsyncPreemption: asyncPreemptionEnabled,
 				}
-				pl, err := NewDefaultPreemption(getDefaultDefaultPreemptionArgs(), fwk, features)
+				pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, features)
 				if err != nil {
 					t.Fatal(err)
 				}

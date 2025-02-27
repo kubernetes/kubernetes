@@ -82,13 +82,8 @@ func (pl *DefaultPreemption) Name() string {
 	return Name
 }
 
-// New initializes a new plugin and returns it.
-func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
-	return NewDefaultPreemption(dpArgs, fh, fts)
-}
-
-// NewDefaultPreemption initializes a new plugin and returns it. The plugin type is retained to allow modification.
-func NewDefaultPreemption(dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (*DefaultPreemption, error) {
+// New initializes a new plugin and returns it. The plugin type is retained to allow modification.
+func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (*DefaultPreemption, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
