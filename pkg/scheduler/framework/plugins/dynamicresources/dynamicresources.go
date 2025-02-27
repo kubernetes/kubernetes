@@ -826,13 +826,17 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	// We need to decide how long we should wait for the device to be attached to the node.
-	timeout := 10 * time.Minute
+	timeoutDefault := 10 * time.Minute
+	timeout := 0 * time.Minute
 	for _, claim := range state.claims {
 		for _, device := range claim.Status.Devices {
 			if device.BindingTimeout != nil && timeout < device.BindingTimeout.Duration {
 				timeout = device.BindingTimeout.Duration
 			}
 		}
+	}
+	if timeout == 0*time.Minute {
+		timeout = timeoutDefault
 	}
 
 	// We need to wait for the device to be attached to the node.
