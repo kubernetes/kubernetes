@@ -77,11 +77,6 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 	return internalcfg, nil
 }
 
-// DocMapToUpgradeConfiguration converts documentMap to an internal, defaulted and validated UpgradeConfiguration object.
-func DocMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap) (*kubeadmapi.UpgradeConfiguration, error) {
-	return documentMapToUpgradeConfiguration(gvkmap, false)
-}
-
 // LoadUpgradeConfigurationFromFile loads UpgradeConfiguration from a file.
 func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurationOptions) (*kubeadmapi.UpgradeConfiguration, error) {
 	var err error
