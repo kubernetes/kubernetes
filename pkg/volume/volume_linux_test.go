@@ -126,8 +126,12 @@ func TestSkipPermissionChange(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating temp dir: %v", err)
 			}
-
-			defer os.RemoveAll(tmpDir)
+			defer func() {
+				err := os.RemoveAll(tmpDir)
+				if err != nil {
+					t.Fatalf("error removing tmpDir %s: %v", tmpDir, err)
+				}
+			}()
 
 			info, err := os.Lstat(tmpDir)
 			if err != nil {
@@ -141,12 +145,12 @@ func TestSkipPermissionChange(t *testing.T) {
 
 			gid := stat.Gid
 
-			var expectedGid int64
+			var expectedGID int64
 
 			if test.gidOwnerMatch {
-				expectedGid = int64(gid)
+				expectedGID = int64(gid)
 			} else {
-				expectedGid = int64(gid + 3000)
+				expectedGID = int64(gid + 3000)
 			}
 
 			mask := rwMask
@@ -169,7 +173,7 @@ func TestSkipPermissionChange(t *testing.T) {
 			}
 
 			mounter := &localFakeMounter{path: tmpDir}
-			ok = skipPermissionChange(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy)
+			ok = skipPermissionChange(mounter, tmpDir, &expectedGID, test.fsGroupChangePolicy)
 			if ok != test.skipPermssion {
 				t.Errorf("for %s expected skipPermission to be %v got %v", test.description, test.skipPermssion, ok)
 			}
@@ -288,7 +292,12 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 				t.Fatalf("error creating temp dir: %v", err)
 			}
 
-			defer os.RemoveAll(tmpDir)
+			defer func() {
+				err := os.RemoveAll(tmpDir)
+				if err != nil {
+					t.Fatalf("error removing tmpDir %s: %v", tmpDir, err)
+				}
+			}()
 
 			info, err := os.Lstat(tmpDir)
 			if err != nil {
@@ -300,14 +309,14 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 				t.Fatalf("error reading permission stats for tmpdir: %s", tmpDir)
 			}
 
-			var expectedGid = int64(stat.Gid)
+			var expectedGID = int64(stat.Gid)
 			err = test.setupFunc(tmpDir)
 			if err != nil {
 				t.Errorf("for %s error running setup with: %v", test.description, err)
 			}
 
 			mounter := &localFakeMounter{path: "FAKE_DIR_DOESNT_EXIST"} // SetVolumeOwnership() must rely on tmpDir
-			ownershipChanger := NewVolumeOwnership(mounter, tmpDir, &expectedGid, test.fsGroupChangePolicy, nil)
+			ownershipChanger := NewVolumeOwnership(mounter, tmpDir, &expectedGID, test.fsGroupChangePolicy, nil)
 			err = ownershipChanger.ChangePermissions()
 			if err != nil {
 				t.Errorf("for %s error changing ownership with: %v", test.description, err)
@@ -475,7 +484,7 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 	if currentUid != 0 {
 		t.Skip("running as non-root")
 	}
-	currentGid := os.Getgid()
+	currentGID := os.Getgid()
 
 	tests := []struct {
 		description string
@@ -497,7 +506,7 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 			},
 			assertFunc: func(path string) error {
 				filename := filepath.Join(path, "file.txt")
-				if !verifyFileOwner(filename, currentUid, currentGid) {
+				if !verifyFileOwner(filename, currentUid, currentGID) {
 					return fmt.Errorf("invalid owner on %s", filename)
 				}
 				return nil
@@ -559,7 +568,12 @@ func TestSetVolumeOwnershipOwner(t *testing.T) {
 				t.Fatalf("error creating temp dir: %v", err)
 			}
 
-			defer os.RemoveAll(tmpDir)
+			defer func() {
+				err := os.RemoveAll(tmpDir)
+				if err != nil {
+					t.Fatalf("error removing tmpDir %s: %v", tmpDir, err)
+				}
+			}()
 
 			err = test.setupFunc(tmpDir)
 			if err != nil {
