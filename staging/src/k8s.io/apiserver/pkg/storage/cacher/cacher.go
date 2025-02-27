@@ -729,7 +729,7 @@ type listResp struct {
 }
 
 // GetList implements storage.Interface
-func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, listRV uint64) error {
+func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	recursive := opts.Recursive
 	pred := opts.Predicate
 	// For recursive lists, we need to make sure the key ended with "/" so that we only
@@ -739,6 +739,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	preparedKey := key
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		preparedKey += "/"
+	}
+	listRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return err
 	}
 
 	ctx, span := tracing.Start(ctx, "cacher.GetList",
