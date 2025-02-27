@@ -155,6 +155,55 @@ var (
 	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
 				Allocation(allocationResult).
 				Obj()
+	allocationResultWithBindingConditions = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:                   driver,
+				Pool:                     nodeName,
+				Device:                   "instance-1",
+				Request:                  "req-1",
+				UsageRestrictedToNode:    ptr.To(true),
+				BindingConditions:        []string{"condition"},
+				BindingFailureConditions: []string{"failed"},
+				BindingTimeout:           &metav1.Duration{Duration: 10 * time.Second},
+			}},
+		},
+		NodeSelector: st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj(),
+	}
+	boundClaim = st.FromResourceClaim(allocatedClaim).
+			Allocation(allocationResultWithBindingConditions).
+			AllocatedDeviceStatuses([]resourceapi.AllocatedDeviceStatus{
+			{
+				Driver: driver,
+				Pool:   nodeName,
+				Device: "instance-1",
+				Conditions: []metav1.Condition{
+					{Type: "condition", Status: metav1.ConditionTrue},
+					{Type: "failed", Status: metav1.ConditionFalse},
+				},
+				UsageRestrictedToNode:    ptr.To(true),
+				BindingConditions:        []string{"condition"},
+				BindingFailureConditions: []string{"failed"},
+			},
+		}).
+		Obj()
+	failedBindingClaim = st.FromResourceClaim(allocatedClaim).
+				Allocation(allocationResultWithBindingConditions).
+				AllocatedDeviceStatuses([]resourceapi.AllocatedDeviceStatus{
+			{
+				Driver: driver,
+				Pool:   nodeName,
+				Device: "instance-1",
+				Conditions: []metav1.Condition{
+					{Type: "condition", Status: metav1.ConditionFalse},
+					{Type: "failed", Status: metav1.ConditionTrue},
+				},
+				BindingConditions:        []string{"condition"},
+				BindingFailureConditions: []string{"failed"},
+				UsageRestrictedToNode:    ptr.To(true),
+			},
+		}).
+		Obj()
 )
 
 func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
@@ -292,6 +341,8 @@ func TestPlugin(t *testing.T) {
 
 		// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
 		enableDRAAdminAccess bool
+		// enableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is enabled.
+		enableDRADeviceBindingConditions bool
 		// Feature gates. False is chosen so that the uncommon case
 		// doesn't need to be set.
 		disableDRA bool
@@ -795,6 +846,46 @@ func TestPlugin(t *testing.T) {
 			},
 			disableDRA: true,
 		},
+		"bound-claim": {
+			pod:                              podWithClaimName,
+			claims:                           []*resourceapi.ResourceClaim{boundClaim},
+			enableDRADeviceBindingConditions: true,
+			want: want{
+				prebind: result{
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							return st.FromResourceClaim(in).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								Obj()
+						},
+					},
+				},
+			},
+		},
+		"failed-binding-claim": {
+			pod:                              podWithClaimName,
+			claims:                           []*resourceapi.ResourceClaim{failedBindingClaim},
+			objs:                             []apiruntime.Object{workerNodeSlice},
+			enableDRADeviceBindingConditions: true,
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
+					},
+				},
+				postfilter: result{
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							return st.FromResourceClaim(in).
+								Allocation(nil).
+								AllocatedDeviceStatuses(nil).
+								Obj()
+						},
+					},
+					status: framework.NewStatus(framework.Unschedulable, `deallocation of ResourceClaim completed`),
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -807,8 +898,9 @@ func TestPlugin(t *testing.T) {
 				nodes = []*v1.Node{workerNode}
 			}
 			features := feature.Features{
-				EnableDRAAdminAccess:            tc.enableDRAAdminAccess,
-				EnableDynamicResourceAllocation: !tc.disableDRA,
+				EnableDRAAdminAccess:             tc.enableDRAAdminAccess,
+				EnableDRADeviceBindingConditions: tc.enableDRADeviceBindingConditions,
+				EnableDynamicResourceAllocation:  !tc.disableDRA,
 			}
 			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
