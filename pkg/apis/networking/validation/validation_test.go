@@ -249,10 +249,12 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Success cases are expected to pass validation.
 
-	for k, v := range successCases {
-		if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
-			t.Errorf("Expected success for the success validation test number %d, got %v", k, errs)
-		}
+	for _, v := range successCases {
+		t.Run("", func(t *testing.T) {
+			if errs := ValidateNetworkPolicy(v, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) != 0 {
+				t.Errorf("Expected success, got %v", errs)
+			}
+		})
 	}
 
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
@@ -367,9 +369,11 @@ func TestValidateNetworkPolicy(t *testing.T) {
 
 	// Error cases are not expected to pass validation.
 	for testName, networkPolicy := range errorCases {
-		if errs := ValidateNetworkPolicy(networkPolicy, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %s", testName)
-		}
+		t.Run(testName, func(t *testing.T) {
+			if errs := ValidateNetworkPolicy(networkPolicy, NetworkPolicyValidationOptions{AllowInvalidLabelValueInSelector: true}); len(errs) == 0 {
+				t.Errorf("Expected failure")
+			}
+		})
 	}
 }
 
@@ -420,11 +424,13 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	}
 
 	for testName, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{false}); len(errs) != 0 {
-			t.Errorf("expected success (%s): %v", testName, errs)
-		}
+		t.Run(testName, func(t *testing.T) {
+			successCase.old.ObjectMeta.ResourceVersion = "1"
+			successCase.update.ObjectMeta.ResourceVersion = "1"
+			if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old, NetworkPolicyValidationOptions{false}); len(errs) != 0 {
+				t.Errorf("expected success, but got %v", errs)
+			}
+		})
 	}
 
 	errorCases := map[string]npUpdateTest{
@@ -447,11 +453,13 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	}
 
 	for testName, errorCase := range errorCases {
-		errorCase.old.ObjectMeta.ResourceVersion = "1"
-		errorCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{false}); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
-		}
+		t.Run(testName, func(t *testing.T) {
+			errorCase.old.ObjectMeta.ResourceVersion = "1"
+			errorCase.update.ObjectMeta.ResourceVersion = "1"
+			if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old, NetworkPolicyValidationOptions{false}); len(errs) == 0 {
+				t.Errorf("expected failure")
+			}
+		})
 	}
 }
 
@@ -1824,16 +1832,18 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 		"status.loadBalancer.ingress[0].hostname: Invalid value": invalidHostname,
 	}
 	for k, v := range errorCases {
-		errs := ValidateIngressStatusUpdate(&v, &oldValue)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %q, expected: %q", err, k)
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateIngressStatusUpdate(&v, &oldValue)
+			if len(errs) == 0 {
+				t.Errorf("expected failure")
+			} else {
+				s := strings.Split(k, ":")
+				err := errs[0]
+				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+					t.Errorf("unexpected error: %q, expected: %q", err, k)
+				}
 			}
-		}
+		})
 	}
 }
 
