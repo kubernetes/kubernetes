@@ -295,17 +295,6 @@ var (
 		},
 		[]string{"ip_family"},
 	)
-
-	// ReconcileConntrackFlowsDeletedEntriesTotal is the number of entries deleted by conntrack reconciler.
-	ReconcileConntrackFlowsDeletedEntriesTotal = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      kubeProxySubsystem,
-			Name:           "conntrack_reconciler_deleted_entries_total",
-			Help:           "Cumulative conntrack flows deleted by conntrack reconciler",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"ip_family"},
-	)
 )
 
 var registerMetricsOnce sync.Once
@@ -345,12 +334,10 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(IPTablesRulesTotal)
 			legacyregistry.MustRegister(IPTablesRulesLastSync)
 			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
-			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeIPVS:
 			legacyregistry.MustRegister(IPTablesRestoreFailuresTotal)
 			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
-			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeNFTables:
 			legacyregistry.MustRegister(SyncFullProxyRulesLatency)
@@ -358,7 +345,6 @@ func RegisterMetrics(mode kubeproxyconfig.ProxyMode) {
 			legacyregistry.MustRegister(NFTablesSyncFailuresTotal)
 			legacyregistry.MustRegister(NFTablesCleanupFailuresTotal)
 			legacyregistry.MustRegister(ReconcileConntrackFlowsLatency)
-			legacyregistry.MustRegister(ReconcileConntrackFlowsDeletedEntriesTotal)
 
 		case kubeproxyconfig.ProxyModeKernelspace:
 			// currently no winkernel-specific metrics
