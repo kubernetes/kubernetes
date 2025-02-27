@@ -56,9 +56,9 @@ func (ipAddressStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an IPAddress before creation.
-func (ipAddressStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (ipAddressStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	_ = obj.(*networking.IPAddress)
-
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

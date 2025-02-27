@@ -45,11 +45,12 @@ func (csiDriverStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the fields for which the corresponding feature is disabled.
-func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	csiDriver := obj.(*storage.CSIDriver)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		csiDriver.Spec.SELinuxMount = nil
 	}
+	return nil, nil
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

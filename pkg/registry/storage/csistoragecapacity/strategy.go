@@ -44,7 +44,8 @@ func (csiStorageCapacityStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate is currently a NOP.
-func (csiStorageCapacityStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (csiStorageCapacityStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
+	return nil, nil
 }
 
 func (csiStorageCapacityStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

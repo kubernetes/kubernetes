@@ -65,6 +65,7 @@ var knownReasons = map[metav1.StatusReason]struct{}{
 	metav1.StatusReasonInternalError:         {},
 	metav1.StatusReasonExpired:               {},
 	metav1.StatusReasonServiceUnavailable:    {},
+	metav1.StatusReasonUnsupported:           {},
 }
 
 // Error implements the Error interface.

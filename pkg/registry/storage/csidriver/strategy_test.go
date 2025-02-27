@@ -60,7 +60,7 @@ func TestCSIDriverStrategy(t *testing.T) {
 
 	csiDriver := getValidCSIDriver("valid-csidriver")
 
-	Strategy.PrepareForCreate(ctx, csiDriver)
+	Strategy.PrepareForCreate(ctx, csiDriver, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, csiDriver)
 	if len(errs) != 0 {

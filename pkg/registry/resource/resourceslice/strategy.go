@@ -46,9 +46,10 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	slice := obj.(*resource.ResourceSlice)
 	slice.Generation = 1
+	return nil, nil
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

@@ -34,7 +34,7 @@ func TestValidatingWebhookConfigurationStrategy(t *testing.T) {
 	}
 
 	configuration := validValidatingWebhookConfiguration()
-	Strategy.PrepareForCreate(ctx, configuration)
+	Strategy.PrepareForCreate(ctx, configuration, fieldValidation string) ([]string, error)
 	errs := Strategy.Validate(ctx, configuration)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)

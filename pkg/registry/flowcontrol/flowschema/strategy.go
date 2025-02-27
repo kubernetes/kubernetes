@@ -65,10 +65,11 @@ func (flowSchemaStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 }
 
 // PrepareForCreate clears the status of a flow-schema before creation.
-func (flowSchemaStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (flowSchemaStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	fl := obj.(*flowcontrol.FlowSchema)
 	fl.Status = flowcontrol.FlowSchemaStatus{}
 	fl.Generation = 1
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

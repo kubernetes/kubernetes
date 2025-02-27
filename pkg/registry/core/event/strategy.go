@@ -52,7 +52,8 @@ func (eventStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (eventStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (eventStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
+	return nil, nil
 }
 
 func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

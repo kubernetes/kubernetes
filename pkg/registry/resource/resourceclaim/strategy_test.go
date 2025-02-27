@@ -187,7 +187,7 @@ func TestStrategyCreate(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
 
 			obj := tc.obj.DeepCopy()
-			Strategy.PrepareForCreate(ctx, obj)
+			Strategy.PrepareForCreate(ctx, obj, fieldValidation string) ([]string, error)
 			if errs := Strategy.Validate(ctx, obj); len(errs) != 0 {
 				if !tc.expectValidationError {
 					t.Fatalf("unexpected validation errors: %q", errs)

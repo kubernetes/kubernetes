@@ -43,8 +43,9 @@ func (strategy) NamespaceScoped() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	cleanSecretReferences(obj.(*api.ServiceAccount))
+	return nil, nil
 }
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

@@ -67,10 +67,11 @@ func (priorityLevelConfigurationStrategy) GetResetFields() map[fieldpath.APIVers
 }
 
 // PrepareForCreate clears the status of a priority-level-configuration before creation.
-func (priorityLevelConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (priorityLevelConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	pl := obj.(*flowcontrol.PriorityLevelConfiguration)
 	pl.Status = flowcontrol.PriorityLevelConfigurationStatus{}
 	pl.Generation = 1
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

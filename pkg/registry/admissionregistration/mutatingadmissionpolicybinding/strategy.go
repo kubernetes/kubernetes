@@ -62,9 +62,10 @@ func (v *mutatingAdmissionPolicyBindingStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an MutatingAdmissionPolicyBinding before creation.
-func (v *mutatingAdmissionPolicyBindingStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (v *mutatingAdmissionPolicyBindingStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	ic := obj.(*admissionregistration.MutatingAdmissionPolicyBinding)
 	ic.Generation = 1
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
