@@ -17,9 +17,11 @@ limitations under the License.
 package compatibility
 
 import (
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestValidate(t *testing.T) {
@@ -142,6 +144,118 @@ func TestSetEmulationVersion(t *testing.T) {
 			expectMinCompatibilityVersion := version.MustParseGeneric(test.expectMinCompatibilityVersion)
 			if !effective.MinCompatibilityVersion().EqualTo(expectMinCompatibilityVersion) {
 				t.Errorf("expected minCompatibilityVersion %s, got %s", expectMinCompatibilityVersion.String(), effective.MinCompatibilityVersion().String())
+			}
+		})
+	}
+}
+
+func TestInfo(t *testing.T) {
+	tests := []struct {
+		name                    string
+		binaryVersion           string
+		emulationVersion        string
+		minCompatibilityVersion string
+		expectedInfo            *apimachineryversion.Info
+	}{
+		{
+			name:                    "normal case",
+			binaryVersion:           "v1.34.0",
+			emulationVersion:        "v1.32.0",
+			minCompatibilityVersion: "v1.31.0",
+			expectedInfo: &apimachineryversion.Info{
+				Major:                 "1",
+				Minor:                 "34",
+				EmulationMajor:        "1",
+				EmulationMinor:        "32",
+				MinCompatibilityMajor: "1",
+				MinCompatibilityMinor: "31",
+				GitVersion:            "1.34.0",
+			},
+		},
+		{
+			name:             "default min compatibility version is emulation version - 1",
+			binaryVersion:    "v1.34.0",
+			emulationVersion: "v1.32.0",
+			// minCompatibilityVersion not set, should default to v1.31.0
+			expectedInfo: &apimachineryversion.Info{
+				Major:                 "1",
+				Minor:                 "34",
+				EmulationMajor:        "1",
+				EmulationMinor:        "32",
+				MinCompatibilityMajor: "1",
+				MinCompatibilityMinor: "31",
+				GitVersion:            "1.34.0",
+			},
+		},
+		{
+			name:             "emulation version same as binary version",
+			binaryVersion:    "v1.34.0",
+			emulationVersion: "v1.34.0",
+			// minCompatibilityVersion not set, should default to v1.33.0
+			expectedInfo: &apimachineryversion.Info{
+				Major:                 "1",
+				Minor:                 "34",
+				EmulationMajor:        "1",
+				EmulationMinor:        "34",
+				MinCompatibilityMajor: "1",
+				MinCompatibilityMinor: "33",
+				GitVersion:            "1.34.0",
+			},
+		},
+		{
+			name:          "empty binary version",
+			binaryVersion: "",
+			expectedInfo:  nil,
+		},
+		{
+			name:             "with pre-release and build metadata",
+			binaryVersion:    "v1.34.0-alpha.1+abc123",
+			emulationVersion: "v1.32.0",
+			// minCompatibilityVersion not set, should default to v1.31.0
+			expectedInfo: &apimachineryversion.Info{
+				Major:                 "1",
+				Minor:                 "34",
+				EmulationMajor:        "1",
+				EmulationMinor:        "32",
+				MinCompatibilityMajor: "1",
+				MinCompatibilityMinor: "31",
+				GitVersion:            "1.34.0-alpha.1+abc123",
+			},
+		},
+		{
+			name:                    "override default min compatibility version",
+			binaryVersion:           "v1.34.0",
+			emulationVersion:        "v1.32.0",
+			minCompatibilityVersion: "v1.32.0", // explicitly set to same as emulation version
+			expectedInfo: &apimachineryversion.Info{
+				Major:                 "1",
+				Minor:                 "34",
+				EmulationMajor:        "1",
+				EmulationMinor:        "32",
+				MinCompatibilityMajor: "1",
+				MinCompatibilityMinor: "32",
+				GitVersion:            "1.34.0",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var effective MutableEffectiveVersion
+			if test.binaryVersion == "" {
+				effective = &effectiveVersion{}
+			} else {
+				effective = NewEffectiveVersionFromString(test.binaryVersion, "", "")
+				if test.emulationVersion != "" {
+					effective.SetEmulationVersion(version.MustParse(test.emulationVersion))
+				}
+				if test.minCompatibilityVersion != "" {
+					effective.SetMinCompatibilityVersion(version.MustParse(test.minCompatibilityVersion))
+				}
+			}
+			info := effective.Info()
+			if !reflect.DeepEqual(test.expectedInfo, info) {
+				t.Errorf("Expected %#v, Got %#v", test.expectedInfo, *info)
 			}
 		})
 	}

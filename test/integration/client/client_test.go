@@ -85,8 +85,14 @@ func TestClient(t *testing.T) {
 	}
 	expectedInfo := utilversion.Get()
 	kubeVersion := compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion()
+	emulationVersion := compatibility.DefaultKubeEffectiveVersionForTest().EmulationVersion()
+	minCompatibilityVersion := compatibility.DefaultKubeEffectiveVersionForTest().MinCompatibilityVersion()
 	expectedInfo.Major = fmt.Sprintf("%d", kubeVersion.Major())
 	expectedInfo.Minor = fmt.Sprintf("%d", kubeVersion.Minor())
+	expectedInfo.EmulationMajor = fmt.Sprintf("%d", emulationVersion.Major())
+	expectedInfo.EmulationMinor = fmt.Sprintf("%d", emulationVersion.Minor())
+	expectedInfo.MinCompatibilityMajor = fmt.Sprintf("%d", minCompatibilityVersion.Major())
+	expectedInfo.MinCompatibilityMinor = fmt.Sprintf("%d", minCompatibilityVersion.Minor())
 
 	if e, a := expectedInfo, *info; !reflect.DeepEqual(e, a) {
 		t.Errorf("expected %#v, got %#v", e, a)
