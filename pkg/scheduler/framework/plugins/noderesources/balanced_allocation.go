@@ -127,10 +127,12 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h framework
 	return &BalancedAllocation{
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
-			Name:         BalancedAllocationName,
-			scorer:       balancedResourceScorer,
-			useRequested: true,
-			resources:    args.Resources,
+			Name:                            BalancedAllocationName,
+			enableInPlacePodVerticalScaling: fts.EnableInPlacePodVerticalScaling,
+			enablePodLevelResources:         fts.EnablePodLevelResources,
+			scorer:                          balancedResourceScorer,
+			useRequested:                    true,
+			resources:                       args.Resources,
 		},
 	}, nil
 }

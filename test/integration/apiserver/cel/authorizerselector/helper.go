@@ -49,7 +49,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 	// Start the server with the desired feature enablement
 	server, err := apiservertesting.StartTestServer(t, nil, []string{
 		fmt.Sprintf("--feature-gates=AuthorizeNodeWithSelectors=%v,AuthorizeWithSelectors=%v", featureEnabled, featureEnabled),
-		"--runtime-config=resource.k8s.io/v1alpha3=true",
+		fmt.Sprintf("--runtime-config=%s=true", resourceapi.SchemeGroupVersion),
 	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)

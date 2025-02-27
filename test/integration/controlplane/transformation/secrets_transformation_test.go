@@ -106,7 +106,7 @@ func TestSecretsShouldBeTransformed(t *testing.T) {
 		// TODO: add secretbox
 	}
 	for _, tt := range testCases {
-		test, err := newTransformTest(t, tt.transformerConfigContent, false, "", nil)
+		test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: tt.transformerConfigContent})
 		if err != nil {
 			t.Fatalf("failed to setup test for envelop %s, error was %v", tt.transformerPrefix, err)
 			continue
@@ -195,7 +195,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 		t.Run(fmt.Sprintf("%s/%t", string(genericfeatures.AllowUnsafeMalformedObjectDeletion), tc.featureEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AllowUnsafeMalformedObjectDeletion, tc.featureEnabled)
 
-			test, err := newTransformTest(t, aesGCMConfigYAML, true, "", nil)
+			test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: aesGCMConfigYAML, reload: true})
 			if err != nil {
 				t.Fatalf("failed to setup test for envelop %s, error was %v", aesGCMPrefix, err)
 			}
@@ -498,7 +498,7 @@ func TestListCorruptObjects(t *testing.T) {
 		t.Run(fmt.Sprintf("%s/%t", string(genericfeatures.AllowUnsafeMalformedObjectDeletion), tc.featureEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AllowUnsafeMalformedObjectDeletion, tc.featureEnabled)
 
-			test, err := newTransformTest(t, aesGCMConfigYAML, true, "", nil)
+			test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: aesGCMConfigYAML, reload: true})
 			if err != nil {
 				t.Fatalf("failed to setup test for envelop %s, error was %v", aesGCMPrefix, err)
 			}
@@ -651,7 +651,7 @@ func BenchmarkAESCBCEnvelopeWrite(b *testing.B) {
 
 func runBenchmark(b *testing.B, transformerConfig string) {
 	b.StopTimer()
-	test, err := newTransformTest(b, transformerConfig, false, "", nil)
+	test, err := newTransformTest(b, transformTestConfig{transformerConfigYAML: transformerConfig})
 	if err != nil {
 		b.Fatalf("failed to setup benchmark for config %s, error was %v", transformerConfig, err)
 	}

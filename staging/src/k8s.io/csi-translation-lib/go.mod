@@ -2,9 +2,9 @@
 
 module k8s.io/csi-translation-lib
 
-go 1.23.0
+go 1.24.0
 
-godebug default=go1.23
+godebug default=go1.24
 
 require (
 	github.com/stretchr/testify v1.9.0

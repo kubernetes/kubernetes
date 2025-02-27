@@ -217,7 +217,9 @@ func TestReadinessAggregatedAPIServiceDiscovery(t *testing.T) {
 		}
 	}))
 	go func() {
-		require.NoError(t, service.Run(ctx))
+		if err := service.Run(ctx); err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}()
 	require.NoError(t, service.WaitForReady(ctx))
 
@@ -306,7 +308,9 @@ func TestAggregatedAPIServiceDiscovery(t *testing.T) {
 		}
 	}))
 	go func() {
-		require.NoError(t, service.Run(ctx))
+		if err := service.Run(ctx); err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}()
 	require.NoError(t, service.WaitForReady(ctx))
 

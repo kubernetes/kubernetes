@@ -262,6 +262,10 @@ type Interface interface {
 	// TODO: Remove when storage.Interface will be separate from etc3.store.
 	// Deprecated: Added temporarily to simplify exposing RequestProgress for watch cache.
 	RequestWatchProgress(ctx context.Context) error
+
+	// GetCurrentResourceVersion gets the current resource version from etcd.
+	// This method issues an empty list request and reads only the ResourceVersion from the object metadata
+	GetCurrentResourceVersion(ctx context.Context) (uint64, error)
 }
 
 // GetOptions provides the options that may be provided for storage get operations.

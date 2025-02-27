@@ -172,7 +172,9 @@ func TestRotateLogs(t *testing.T) {
 		err = wait.PollUntilContextCancel(pollTimeoutCtx, 5*time.Millisecond, false, func(ctx context.Context) (done bool, err error) {
 			return c.queue.Len() == 0, nil
 		})
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		c.queue.ShutDown()
 	}()
 	// This is a blocking call. But the above routine takes care of ensuring that this is terminated once the queue is shutdown

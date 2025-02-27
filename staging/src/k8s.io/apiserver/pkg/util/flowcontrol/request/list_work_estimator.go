@@ -162,7 +162,7 @@ func key(requestInfo *apirequest.RequestInfo) string {
 
 // NOTICE: Keep in sync with shouldDelegateList function in
 //
-//	staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+//	staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	switch opts.ResourceVersionMatch {

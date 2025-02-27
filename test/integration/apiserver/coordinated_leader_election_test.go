@@ -44,7 +44,8 @@ import (
 func TestSingleLeaseCandidate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +63,8 @@ func TestSingleLeaseCandidate(t *testing.T) {
 func TestMultipleLeaseCandidate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +86,8 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +108,8 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 func TestUpgradeSkew(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +138,8 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 		apiserver.LeaseCandidateGCPeriod = 30 * time.Minute
 	}()
 
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}

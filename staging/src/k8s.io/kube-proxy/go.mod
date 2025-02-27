@@ -2,9 +2,9 @@
 
 module k8s.io/kube-proxy
 
-go 1.23.0
+go 1.24.0
 
-godebug default=go1.23
+godebug default=go1.24
 
 require (
 	k8s.io/apimachinery v0.0.0
