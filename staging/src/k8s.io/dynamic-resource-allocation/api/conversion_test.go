@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	corev1 "k8s.io/api/core/v1"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	draapi "k8s.io/dynamic-resource-allocation/api"
@@ -14,9 +15,10 @@ import (
 
 func TestConversion(t *testing.T) {
 	testcases := map[string]struct {
-		in        resourcev1beta1.ResourceSlice
-		expectOut draapi.ResourceSlice
-		expectErr string
+		in                          resourcev1beta1.ResourceSlice
+		partitionableDevicesEnabled bool
+		expectOut                   draapi.ResourceSlice
+		expectErr                   string
 	}{
 		"simple-resourceslice-with-basic-devices": {
 			in: resourcev1beta1.ResourceSlice{
@@ -421,7 +423,14 @@ func TestConversion(t *testing.T) {
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			var out draapi.ResourceSlice
-			err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(&tc.in, &out, nil)
+			scope := draapi.SliceScope{
+				SliceContext: draapi.SliceContext{
+					Slice:                       &tc.in,
+					Node:                        &corev1.Node{},
+					PartitionableDevicesEnabled: tc.partitionableDevicesEnabled,
+				},
+			}
+			err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(&tc.in, &out, scope)
 			if err != nil {
 				if len(tc.expectErr) == 0 {
 					t.Fatalf("unexpected error %v", err)

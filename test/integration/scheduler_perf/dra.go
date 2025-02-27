@@ -321,7 +321,11 @@ claims:
 			}
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+		features := structured.Features{
+			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+		}
+		allocator, err := structured.NewAllocator(tCtx, features,
 			[]*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
