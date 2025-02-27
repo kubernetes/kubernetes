@@ -129,6 +129,7 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &Options{
+		ParsedFlags: s.ParsedFlags,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:             netutils.ParseIPSloppy("192.168.10.10"),
 			CorsAllowedOriginList:        []string{"10.10.10.100", "10.10.10.200"},

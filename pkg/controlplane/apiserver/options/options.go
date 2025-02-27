@@ -48,6 +48,7 @@ import (
 // Options define the flags and validation for a generic controlplane. If the
 // structs are nil, the options are not added to the command line and not validated.
 type Options struct {
+	ParsedFlags             *cliflag.NamedFlagSets
 	Flagz                   flagz.Reader
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
@@ -201,6 +202,8 @@ func (s *Options) AddFlags(fss *cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningEndpoint, "service-account-signing-endpoint", s.ServiceAccountSigningEndpoint, ""+
 		"Path to socket where a external JWT signer is listening. This flag is mutually exclusive with --service-account-signing-key-file and --service-account-key-file. Requires enabling feature gate (ExternalServiceAccountTokenSigner)")
+
+	s.ParsedFlags = fss
 }
 
 func (o *Options) Complete(ctx context.Context, alternateDNS []string, alternateIPs []net.IP) (CompletedOptions, error) {
