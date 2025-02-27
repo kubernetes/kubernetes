@@ -29,9 +29,6 @@ import (
 
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
-
-	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // MaxLength represents the maximum length allowed for the name in a nfacct counter.
@@ -149,15 +146,9 @@ func (r *runner) Get(name string) (*Counter, error) {
 
 // List is part of the interface.
 func (r *runner) List() ([]*Counter, error) {
-	var err error
-	var msgs [][]byte
-	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
-		req := r.handler.newRequest(cmdGet, unix.NLM_F_REQUEST|unix.NLM_F_DUMP)
-		msgs, err = req.Execute(unix.NETLINK_NETFILTER, 0)
-		return err
-	})
-
-	if err != nil && !errors.Is(err, unix.EINTR) {
+	req := r.handler.newRequest(cmdGet, unix.NLM_F_REQUEST|unix.NLM_F_DUMP)
+	msgs, err := req.Execute(unix.NETLINK_NETFILTER, 0)
+	if err != nil {
 		return nil, handleError(err)
 	}
 
@@ -169,7 +160,7 @@ func (r *runner) List() ([]*Counter, error) {
 		}
 		counters = append(counters, counter)
 	}
-	return counters, err
+	return counters, nil
 }
 
 var ErrObjectNotFound = errors.New("object not found")

@@ -24,9 +24,7 @@ import (
 
 	"github.com/vishvananda/netlink"
 
-	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // Interface for dealing with conntrack
@@ -59,12 +57,8 @@ func newConntracker(handler netlinkHandler) Interface {
 }
 
 // ListEntries list all conntrack entries for connections of the given IP family.
-func (ct *conntracker) ListEntries(ipFamily uint8) (entries []*netlink.ConntrackFlow, err error) {
-	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
-		entries, err = ct.handler.ConntrackTableList(netlink.ConntrackTable, netlink.InetFamily(ipFamily))
-		return err
-	})
-	return entries, err
+func (ct *conntracker) ListEntries(ipFamily uint8) ([]*netlink.ConntrackFlow, error) {
+	return ct.handler.ConntrackTableList(netlink.ConntrackTable, netlink.InetFamily(ipFamily))
 }
 
 // ClearEntries deletes conntrack entries for connections of the given IP family,
@@ -75,15 +69,7 @@ func (ct *conntracker) ClearEntries(ipFamily uint8, filters ...netlink.CustomCon
 		return 0, nil
 	}
 
-	var n uint
-	var err error
-	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
-		var count uint
-		count, err = ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, netlink.InetFamily(ipFamily), filters...)
-		n += count
-		return err
-	})
-
+	n, err := ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, netlink.InetFamily(ipFamily), filters...)
 	if err != nil {
 		return int(n), fmt.Errorf("error deleting conntrack entries, error: %w", err)
 	}

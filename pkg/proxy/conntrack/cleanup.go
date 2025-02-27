@@ -20,7 +20,6 @@ limitations under the License.
 package conntrack
 
 import (
-	"errors"
 	"time"
 
 	"github.com/vishvananda/netlink"
@@ -44,12 +43,8 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 
 	entries, err := ct.ListEntries(ipFamilyMap[ipFamily])
 	if err != nil {
-		if errors.Is(err, unix.EINTR) {
-			klog.V(2).ErrorS(err, "received a partial result, continuing to clean with partial result")
-		} else {
-			klog.ErrorS(err, "Failed to list conntrack entries")
-			return
-		}
+		klog.ErrorS(err, "Failed to list conntrack entries")
+		return
 	}
 
 	// serviceIPEndpointIPs maps service IPs (ClusterIP, LoadBalancerIPs and ExternalIPs)
