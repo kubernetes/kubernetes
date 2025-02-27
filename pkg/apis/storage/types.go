@@ -412,6 +412,15 @@ type CSIDriverSpec struct {
 	// +featureGate=SELinuxMountReadWriteOncePod
 	// +optional
 	SELinuxMount *bool
+
+	// NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
+	// the CSINode allocatable capacity for this driver. If not set, periodic updates
+	// are disabled, and updates occur only upon detecting capacity-related failures.
+	// The minimum allowed value for this field is 10 seconds.
+	//
+	// +featureGate=MutableCSINodeAllocatableCount
+	// +optional
+	NodeAllocatableUpdatePeriodSeconds *int64
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying

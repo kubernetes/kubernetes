@@ -304,18 +304,37 @@ func ValidateCSINode(csiNode *storage.CSINode, validationOpts CSINodeValidationO
 func ValidateCSINodeUpdate(new, old *storage.CSINode, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := ValidateCSINode(new, validationOpts)
 
-	// Validate modifying fields inside an existing CSINodeDriver entry is not allowed
-	for _, oldDriver := range old.Spec.Drivers {
-		for _, newDriver := range new.Spec.Drivers {
-			if oldDriver.Name == newDriver.Name {
-				if !apiequality.Semantic.DeepEqual(oldDriver, newDriver) {
-					allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
+	g := utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount)
+
+	if !g {
+		// Validate modifying fields inside an existing CSINodeDriver entry is not allowed
+		for _, oldDriver := range old.Spec.Drivers {
+			for _, newDriver := range new.Spec.Drivers {
+				if oldDriver.Name == newDriver.Name {
+					if !apiequality.Semantic.DeepEqual(oldDriver, newDriver) {
+						allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
+					}
 				}
 			}
 		}
-	}
+		return allErrs
+	} else {
+		for _, oldDriver := range old.Spec.Drivers {
+			for _, newDriver := range new.Spec.Drivers {
+				if oldDriver.Name == newDriver.Name {
+					oldCompare := oldDriver.DeepCopy()
+					newCompare := newDriver.DeepCopy()
+					oldCompare.Allocatable = nil // +k8s:verify-mutation:reason=clone
+					newCompare.Allocatable = nil // +k8s:verify-mutation:reason=clone
 
-	return allErrs
+					if !apiequality.Semantic.DeepEqual(oldCompare, newCompare) {
+						allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
+					}
+				}
+			}
+		}
+		return allErrs
+	}
 }
 
 // ValidateCSINodeSpec tests that the specified CSINodeSpec has valid data.
@@ -435,6 +454,16 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateTokenRequests(spec.TokenRequests, fldPath.Child("tokenRequests"))...)
 	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
 	allErrs = append(allErrs, validateSELinuxMount(spec.SELinuxMount, fldPath.Child("seLinuxMount"))...)
+	allErrs = append(allErrs, validateNodeAllocatableUpdatePeriodSeconds(spec.NodeAllocatableUpdatePeriodSeconds, fldPath.Child("nodeAllocatableUpdatePeriodSeconds"))...)
+	return allErrs
+}
+
+// validateNodeAllocatableUpdatePeriodSeconds tests if NodeAllocatableUpdatePeriodSeconds is valid for CSIDriver.
+func validateNodeAllocatableUpdatePeriodSeconds(period *int64, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if period != nil && *period < 10 {
+		allErrs = append(allErrs, field.Invalid(fldPath, *period, "must be greater than or equal to 10 seconds"))
+	}
 	return allErrs
 }
 

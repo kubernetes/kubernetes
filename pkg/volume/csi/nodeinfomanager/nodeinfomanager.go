@@ -37,9 +37,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -88,6 +90,9 @@ type Interface interface {
 	// Concurrent calls to UninstallCSIDriver() is allowed, but they should not be intertwined with calls
 	// to other methods in this interface.
 	UninstallCSIDriver(driverName string) error
+
+	// UpdateCSINodeAllocatable updates the Allocatable field for the given driver
+	UpdateCSINodeAllocatable(driverName string, allocatableCount int32) error
 }
 
 // NewNodeInfoManager initializes nodeInfoManager
@@ -128,6 +133,53 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 	}
 
 	return nil
+}
+
+func (nim *nodeInfoManager) UpdateCSINodeAllocatable(driverName string, newCount int32) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		return nil
+	}
+
+	csiKubeClient := nim.volumeHost.GetKubeClient()
+	if csiKubeClient == nil {
+		return fmt.Errorf("error getting CSI client")
+	}
+
+	newAllocatableCount := &storagev1.VolumeNodeResources{
+		Count: &newCount,
+	}
+
+	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
+		if err := nim.tryUpdateCSINodeAllocatable(csiKubeClient, driverName, newAllocatableCount); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error updating CSINode allocatable: %w", err)
+	}
+	return nil
+}
+
+func (nim *nodeInfoManager) tryUpdateCSINodeAllocatable(
+	csiKubeClient clientset.Interface,
+	driverName string,
+	allocatable *storagev1.VolumeNodeResources) error {
+
+	nodeInfo, err := csiKubeClient.StorageV1().CSINodes().Get(context.TODO(), string(nim.nodeName), metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	for i, driver := range nodeInfo.Spec.Drivers {
+		if driver.Name == driverName {
+			nodeInfo.Spec.Drivers[i].Allocatable = allocatable
+			_, err := csiKubeClient.StorageV1().CSINodes().Update(context.TODO(), nodeInfo, metav1.UpdateOptions{})
+			return err
+		}
+	}
+
+	return fmt.Errorf("driver %s not found in CSINode %s", driverName, nim.nodeName)
 }
 
 // UninstallCSIDriver removes the node ID annotation from the Node object and CSIDrivers field from the
