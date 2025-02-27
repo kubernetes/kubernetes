@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-new"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	testeventclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/eventclock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"

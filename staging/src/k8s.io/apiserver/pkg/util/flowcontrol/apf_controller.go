@@ -37,7 +37,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	fcbootnew "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-new"
+	fcbootold "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-old"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/apihelpers"
@@ -124,6 +125,7 @@ type configController struct {
 	queueSetFactory   fq.QueueSetFactory
 	reqsGaugeVec      metrics.RatioedGaugeVec
 	execSeatsGaugeVec metrics.RatioedGaugeVec
+	newConfig         bool
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -276,6 +278,7 @@ func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
 // NewTestableController is extra flexible to facilitate testing
 func newTestableController(config TestableConfig) *configController {
 	cfgCtlr := &configController{
+		newConfig:              config.NewConfig,
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
@@ -690,10 +693,10 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 
 	// Supply missing mandatory PriorityLevelConfiguration objects
 	if !meal.haveExemptPL {
-		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationExempt)
+		meal.imaginePL(ite(cfgCtlr.newConfig, fcbootnew.MandatoryPriorityLevelConfigurationExempt, fcbootold.MandatoryPriorityLevelConfigurationExempt))
 	}
 	if !meal.haveCatchAllPL {
-		meal.imaginePL(fcboot.MandatoryPriorityLevelConfigurationCatchAll)
+		meal.imaginePL(ite(cfgCtlr.newConfig, fcbootnew.MandatoryPriorityLevelConfigurationCatchAll, fcbootold.MandatoryPriorityLevelConfigurationCatchAll))
 	}
 
 	meal.finishQueueSetReconfigsLocked()
@@ -708,6 +711,16 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 	metrics.GetExecutingMutatingConcurrency().SetDenominator(float64(meal.maxExecutingRequests))
 
 	return meal.fsStatusUpdates
+}
+
+// ite is if-then-else.
+// Being a func, all argument expressions at a call site are evaluated.
+func ite[T any](cond bool, ifTrue, ifFalse T) T {
+	if cond {
+		return ifTrue
+	} else {
+		return ifFalse
+	}
 }
 
 // Digest the new set of PriorityLevelConfiguration objects.
@@ -785,10 +798,10 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*flowcontrol.FlowSchema) {
 
 	// Supply missing mandatory FlowSchemas, in correct position
 	if !haveExemptFS {
-		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.MandatoryFlowSchemaExempt}, fsSeq...)
+		fsSeq = append(apihelpers.FlowSchemaSequence{ite(meal.cfgCtlr.newConfig, fcbootnew.MandatoryFlowSchemaExempt, fcbootold.MandatoryFlowSchemaExempt)}, fsSeq...)
 	}
 	if !haveCatchAllFS {
-		fsSeq = append(fsSeq, fcboot.MandatoryFlowSchemaCatchAll)
+		fsSeq = append(fsSeq, ite(meal.cfgCtlr.newConfig, fcbootnew.MandatoryFlowSchemaCatchAll, fcbootold.MandatoryFlowSchemaCatchAll))
 	}
 
 	meal.cfgCtlr.flowSchemas = fsSeq

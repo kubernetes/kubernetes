@@ -263,7 +263,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 			Spec: badExempt,
 		},
-		expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badExempt, "spec of 'exempt' must equal the fixed value")},
+		expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badExempt, "spec of 'exempt' must equal the old or new fixed value")},
 	}, {
 		name: "bad catch-all flow-schema should fail",
 		flowSchema: &flowcontrol.FlowSchema{
@@ -272,7 +272,7 @@ func TestFlowSchemaValidation(t *testing.T) {
 			},
 			Spec: badCatchAll,
 		},
-		expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badCatchAll, "spec of 'catch-all' must equal the fixed value")},
+		expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badCatchAll, "spec of 'catch-all' must equal the old or new fixed value")},
 	}, {
 		name: "catch-all flow-schema should work",
 		flowSchema: &flowcontrol.FlowSchema{
@@ -769,7 +769,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 	}
 
 	validChangesInExemptFieldOfExemptPLFn := func() flowcontrol.PriorityLevelConfigurationSpec {
-		have, _ := internalbootstrap.MandatoryPriorityLevelConfigurations[flowcontrol.PriorityLevelConfigurationNameExempt]
+		have := internalbootstrap.MandatoryPriorityLevelConfigurations[true][flowcontrol.PriorityLevelConfigurationNameExempt]
 		return flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementExempt,
 			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
@@ -949,7 +949,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 			},
 			Spec: badSpec,
 		},
-		expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'catch-all' must equal the fixed value")},
+		expectedErrors: field.ErrorList{field.Invalid(field.NewPath("spec"), badSpec, "spec of 'catch-all' must equal the old or new fixed value")},
 	}, {
 		name: "backstop should work",
 		priorityLevelConfiguration: &flowcontrol.PriorityLevelConfiguration{
