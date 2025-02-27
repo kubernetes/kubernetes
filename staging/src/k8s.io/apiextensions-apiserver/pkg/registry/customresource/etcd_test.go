@@ -92,7 +92,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 	}
 	table, _ := tableconvertor.New(headers)
 
-	storage := customresource.NewStorage(
+	storage, err := customresource.NewStorage(
 		groupResource,
 		groupResource,
 		kind,
@@ -113,6 +113,9 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 		table,
 		managedfields.ResourcePathMappings{},
 	)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 
 	return storage, server
 }
