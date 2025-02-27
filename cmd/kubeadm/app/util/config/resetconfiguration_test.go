@@ -18,10 +18,13 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/lithammer/dedent"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,6 +89,93 @@ func TestBytesToResetConfiguration(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestLoadResetConfigurationFromFile(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpdir); err != nil {
+			t.Fatalf("Couldn't remove tmpdir: %v", err)
+		}
+	}()
+	filename := "kubeadmConfig"
+	filePath := filepath.Join(tmpdir, filename)
+	options := LoadOrDefaultConfigurationOptions{}
+
+	tests := []struct {
+		name         string
+		cfgPath      string
+		fileContents string
+		want         *kubeadmapi.ResetConfiguration
+		wantErr      bool
+	}{
+		{
+			name:    "Config file does not exists",
+			cfgPath: "tmp",
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:         "Config file format is basic text",
+			cfgPath:      filePath,
+			want:         nil,
+			fileContents: "some-text",
+			wantErr:      true,
+		},
+		{
+			name:    "Unknown kind ResetConfiguration for kubeadm.k8s.io/unknown",
+			cfgPath: filePath,
+			fileContents: dedent.Dedent(`
+				apiVersion: kubeadm.k8s.io/unknown
+				kind: ResetConfiguration`),
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "Valid kubeadm config",
+			cfgPath: filePath,
+			fileContents: dedent.Dedent(`
+				apiVersion: kubeadm.k8s.io/v1beta4
+				kind: ResetConfiguration`),
+			want: &kubeadmapi.ResetConfiguration{
+				CertificatesDir: "/etc/kubernetes/pki",
+				CleanupTmpDir:   false,
+				SkipPhases:      nil,
+				CRISocket:       "unix:///var/run/containerd/containerd.sock",
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.cfgPath == filePath {
+				err = os.WriteFile(tt.cfgPath, []byte(tt.fileContents), 0644)
+				if err != nil {
+					t.Fatalf("Couldn't write content to file: %v", err)
+				}
+				defer func() {
+					if err := os.RemoveAll(filePath); err != nil {
+						t.Fatalf("Couldn't remove filePath: %v", err)
+					}
+				}()
+			}
+
+			got, err := LoadResetConfigurationFromFile(tt.cfgPath, options)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadResetConfigurationFromFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.want == nil && got != tt.want {
+				t.Errorf("LoadResetConfigurationFromFile() got = %v, want %v", got, tt.want)
+			} else if tt.want != nil {
+				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.ResetConfiguration{}, "Timeouts")); diff != "" {
+					t.Errorf("LoadResetConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
 

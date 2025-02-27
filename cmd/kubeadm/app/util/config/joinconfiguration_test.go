@@ -18,10 +18,13 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/lithammer/dedent"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -130,5 +133,111 @@ func TestBytesToJoinConfiguration(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestLoadJoinConfigurationFromFile(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpdir); err != nil {
+			t.Fatalf("Couldn't remove tmpdir: %v", err)
+		}
+	}()
+	filename := "kubeadmConfig"
+	filePath := filepath.Join(tmpdir, filename)
+	options := LoadOrDefaultConfigurationOptions{}
+
+	tests := []struct {
+		name         string
+		cfgPath      string
+		fileContents string
+		want         *kubeadmapi.JoinConfiguration
+		wantErr      bool
+	}{
+		{
+			name:    "Config file does not exists",
+			cfgPath: "tmp",
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:         "Config file format is basic text",
+			cfgPath:      filePath,
+			want:         nil,
+			fileContents: "some-text",
+			wantErr:      true,
+		},
+		{
+			name:    "Unknown kind JoinConfiguration for kubeadm.k8s.io/unknown",
+			cfgPath: filePath,
+			fileContents: dedent.Dedent(`
+				apiVersion: kubeadm.k8s.io/unknown
+				kind: JoinConfiguration`),
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "Valid kubeadm config",
+			cfgPath: filePath,
+			fileContents: dedent.Dedent(`
+apiVersion: kubeadm.k8s.io/v1beta4
+discovery:
+  bootstrapToken:
+    apiServerEndpoint: 1.2.3.4:6443
+    caCertHashes:
+    - aaaa
+    token: abcdef.1234567890123456
+  tlsBootstrapToken: abcdef.1234567890123456
+kind: JoinConfiguration`),
+			want: &kubeadmapi.JoinConfiguration{
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+					CRISocket:       "unix:///var/run/containerd/containerd.sock",
+					ImagePullPolicy: "IfNotPresent",
+					ImagePullSerial: ptr.To(true),
+				},
+				CACertPath: "/etc/kubernetes/pki/ca.crt",
+				Discovery: kubeadmapi.Discovery{
+					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
+						Token:             "abcdef.1234567890123456",
+						APIServerEndpoint: "1.2.3.4:6443",
+						CACertHashes:      []string{"aaaa"},
+					},
+					TLSBootstrapToken: "abcdef.1234567890123456",
+				},
+				ControlPlane: nil,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.cfgPath == filePath {
+				err = os.WriteFile(tt.cfgPath, []byte(tt.fileContents), 0644)
+				if err != nil {
+					t.Fatalf("Couldn't write content to file: %v", err)
+				}
+				defer func() {
+					if err := os.RemoveAll(filePath); err != nil {
+						t.Fatalf("Couldn't remove filePath: %v", err)
+					}
+				}()
+			}
+
+			got, err := LoadJoinConfigurationFromFile(tt.cfgPath, options)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadJoinConfigurationFromFile() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.want == nil && got != tt.want {
+				t.Errorf("LoadJoinConfigurationFromFile() got = %v, want %v", got, tt.want)
+			} else if tt.want != nil {
+				if diff := cmp.Diff(got, tt.want, cmpopts.IgnoreFields(kubeadmapi.JoinConfiguration{}, "Timeouts"),
+					cmpopts.IgnoreFields(kubeadmapi.Discovery{}, "Timeout"), cmpopts.IgnoreFields(kubeadmapi.NodeRegistrationOptions{}, "Name")); diff != "" {
+					t.Errorf("LoadJoinConfigurationFromFile returned unexpected diff (-want,+got):\n%s", diff)
+				}
+			}
+		})
 	}
 }
