@@ -271,6 +271,10 @@ func TestIsValidCIDR(t *testing.T) {
 			in:   "1.1.1.1/32",
 		},
 		{
+			name: "ipv4 ifaddr",
+			in:   "1.2.3.4/24",
+		},
+		{
 			name: "ipv6",
 			in:   "2001:4860:4860::/48",
 		},
@@ -282,6 +286,10 @@ func TestIsValidCIDR(t *testing.T) {
 			name: "ipv6, single IP",
 			in:   "::1/128",
 		},
+		{
+			name: "ipv6 ifaddr",
+			in:   "2001:db8::1/64",
+		},
 
 		// GOOD, THOUGH NON-CANONICAL, VALUES
 		{
@@ -291,6 +299,10 @@ func TestIsValidCIDR(t *testing.T) {
 		{
 			name: "ipv6, capital letters (non-canonical)",
 			in:   "2001:DB8::/64",
+		},
+		{
+			name: "non-canonical ifaddr",
+			in:   "2a00:79e0:2:0::1/64",
 		},
 
 		// BAD VALUES WE CURRENTLY CONSIDER GOOD
@@ -305,14 +317,6 @@ func TestIsValidCIDR(t *testing.T) {
 		{
 			name: "ipv4-in-ipv6 with ipv6-sized prefix",
 			in:   "::ffff:1.1.1.0/120",
-		},
-		{
-			name: "ipv4 with bits past prefix",
-			in:   "1.2.3.4/24",
-		},
-		{
-			name: "ipv6 with bits past prefix",
-			in:   "2001:db8::1/64",
 		},
 		{
 			name: "prefix length with leading 0s",
