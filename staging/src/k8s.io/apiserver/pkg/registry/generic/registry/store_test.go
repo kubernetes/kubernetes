@@ -2459,8 +2459,10 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			}
 		}
 		d := destroyFunc
-		s = cacherstorage.NewCacheDelegator(cacher, s)
+		delegator := cacherstorage.NewCacheDelegator(cacher, s)
+		s = delegator
 		destroyFunc = func() {
+			delegator.Stop()
 			cacher.Stop()
 			d()
 		}
