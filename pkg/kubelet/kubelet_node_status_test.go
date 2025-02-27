@@ -2758,9 +2758,6 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 
 	addNotImplatedReaction(kubeClient)
 
-	// Make node to be unschedulable.
-	kubelet.registerSchedulable = false
-
 	// Reset kubelet status for each test.
 	kubelet.registrationCompleted = false
 
