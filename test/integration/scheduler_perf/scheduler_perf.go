@@ -1628,7 +1628,7 @@ func (e *WorkloadExecutor) runBarrierOp(opIndex int, op *barrierOp) error {
 
 func (e *WorkloadExecutor) runSleepOp(op *sleepOp) {
 	select {
-	case <-(e.tCtx).Done():
+	case <-e.tCtx.Done():
 	case <-time.After(op.Duration.Duration):
 	}
 }
@@ -1825,7 +1825,7 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 						churnFns[i]("")
 					}
 					count++
-				case <-(e.tCtx).Done():
+				case <-e.tCtx.Done():
 					return
 				}
 			}
@@ -1849,7 +1849,7 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 						retVals[i][count%op.Number] = churnFns[i](retVals[i][count%op.Number])
 					}
 					count++
-				case <-(e.tCtx).Done():
+				case <-e.tCtx.Done():
 					return
 				}
 			}
