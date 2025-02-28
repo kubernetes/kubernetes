@@ -39,6 +39,8 @@ import (
 
 func TestEndpointHandlers(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
+
 	server, configStr, _, err := startTestAPIServer(t)
 	if err != nil {
 		t.Fatalf("Failed to start kube-apiserver server: %v", err)
@@ -125,6 +127,16 @@ func TestEndpointHandlers(t *testing.T) {
 			wantResponseCode: http.StatusOK,
 			wantResponseBodyRegx: `^\n` +
 				`kube-scheduler flags\n` +
+				`Warning: This endpoint is not meant to be machine parseable, ` +
+				`has no formatting compatibility guarantees and is for debugging purposes only.`,
+		},
+		{
+			name:             "/statusz",
+			path:             "/statusz",
+			requestHeader:    map[string]string{"Accept": "text/plain"},
+			wantResponseCode: http.StatusOK,
+			wantResponseBodyRegx: `^\n` +
+				`kube-scheduler statusz\n` +
 				`Warning: This endpoint is not meant to be machine parseable, ` +
 				`has no formatting compatibility guarantees and is for debugging purposes only.`,
 		},
