@@ -678,7 +678,13 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 	// The name of the debugging pod is based on the target node, and it's not configurable to
 	// limit the number of command line flags. There may be a collision on the name, but this
 	// should be rare enough that it's not worth the API round trip to check.
-	pn := fmt.Sprintf("node-debugger-%s-%s", node.Name, nameSuffixFunc(5))
+	// The node name is truncated to 43 characters to avoid exceeding the 63 character limit for pod names.
+	const maxNodeNameLength = 43
+	nodeName := node.Name
+	if len(nodeName) > maxNodeNameLength {
+		nodeName = nodeName[:maxNodeNameLength]
+	}
+	pn := fmt.Sprintf("node-debugger-%s-%s", nodeName, nameSuffixFunc(5))
 	if !o.Quiet {
 		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node.Name)
 	}
