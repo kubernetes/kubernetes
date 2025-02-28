@@ -31,14 +31,12 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/controller/storageversiongc"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 
@@ -48,7 +46,6 @@ import (
 )
 
 func TestPeerProxiedRequest(t *testing.T) {
-
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
@@ -60,7 +57,6 @@ func TestPeerProxiedRequest(t *testing.T) {
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)
 
 	// create sharedetcd
@@ -111,7 +107,6 @@ func TestPeerProxiedRequest(t *testing.T) {
 }
 
 func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
-
 	ktesting.SetDefaultVerbosity(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer func() {
@@ -123,7 +118,6 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.UnknownVersionInteroperabilityProxy, true)
 
 	// create sharedetcd
@@ -133,8 +127,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	proxyCA, err := createProxyCertContent()
 	require.NoError(t, err)
 
-	// set lease duration to 1s for serverA to ensure that storageversions for serverA are updated
-	// once it is shutdown
+	// modify lease parameters so that they are garbage collected timely.
 	controlplaneapiserver.IdentityLeaseDurationSeconds = 10
 	controlplaneapiserver.IdentityLeaseGCPeriod = 2 * time.Second
 	controlplaneapiserver.IdentityLeaseRenewIntervalPeriod = time.Second
@@ -146,10 +139,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	serverA := kastesting.StartTestServerOrDie(t, &kastesting.TestServerInstanceOptions{EnableCertAuth: true, ProxyCA: &proxyCA}, []string{"--runtime-config=api/all=true"}, etcd)
 	kubeClientSetA, err := kubernetes.NewForConfig(serverA.ClientConfig)
 	require.NoError(t, err)
-	// ensure storageversion garbage collector ctlr is set up
-	informersA := informers.NewSharedInformerFactory(kubeClientSetA, time.Second)
-	informersACtx, informersACancel := context.WithCancel(ctx)
-	setupStorageVersionGC(informersACtx, kubeClientSetA, informersA)
+
 	// reset lease duration to default value for serverB and serverC since we will not be
 	// shutting these down
 	controlplaneapiserver.IdentityLeaseDurationSeconds = 3600
@@ -163,9 +153,6 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	t.Cleanup(serverB.TearDownFn)
 	kubeClientSetB, err := kubernetes.NewForConfig(serverB.ClientConfig)
 	require.NoError(t, err)
-	// ensure storageversion garbage collector ctlr is set up
-	informersB := informers.NewSharedInformerFactory(kubeClientSetB, time.Second)
-	setupStorageVersionGC(ctx, kubeClientSetB, informersB)
 
 	// start serverC with all APIs enabled
 	// override hostname to ensure unique ips
@@ -181,7 +168,6 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	klog.Infof("\nServerA has created jobs\n")
 
 	// shutdown serverA
-	informersACancel()
 	serverA.TearDownFn()
 
 	var jobsB *v1.JobList
@@ -210,16 +196,6 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, jobsB)
 	assert.Equal(t, job.Name, jobsB.Items[0].Name)
-}
-
-func setupStorageVersionGC(ctx context.Context, kubeClientSet *kubernetes.Clientset, informers informers.SharedInformerFactory) {
-	leaseInformer := informers.Coordination().V1().Leases()
-	storageVersionInformer := informers.Internal().V1alpha1().StorageVersions()
-	go leaseInformer.Informer().Run(ctx.Done())
-	go storageVersionInformer.Informer().Run(ctx.Done())
-
-	controller := storageversiongc.NewStorageVersionGC(ctx, kubeClientSet, leaseInformer, storageVersionInformer)
-	go controller.Run(ctx)
 }
 
 func createProxyCertContent() (kastesting.ProxyCA, error) {

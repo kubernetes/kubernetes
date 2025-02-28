@@ -68,7 +68,7 @@ func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, l
 		serializer,
 		loopbackClientConfig,
 		proxyClientConfig,
-	), nil
+	)
 }
 
 // CreatePeerEndpointLeaseReconciler creates a apiserver endpoint lease reconciliation loop
