@@ -271,6 +271,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
 
+	// Owner: sig-api-machinery
+	// Marks tests that enforce ordered namespace deletion.
+	MutatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("MutatingAdmissionPolicy"))
+
 	// Owner: sig-network
 	// Marks tests that require working external DNS.
 	NetworkingDNS = framework.WithFeature(framework.ValidFeatures.Add("Networking-DNS"))
