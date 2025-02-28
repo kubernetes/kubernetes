@@ -230,7 +230,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.drainer.PodSelector, "pod-selector", "", o.drainer.PodSelector, "Label selector to filter pods on the node")
 	cmd.Flags().BoolVar(&o.drainer.DisableEviction, "disable-eviction", o.drainer.DisableEviction, "Force drain to use delete, even if eviction is supported. This will bypass checking PodDisruptionBudgets, use with caution.")
 	cmd.Flags().IntVar(&o.drainer.SkipWaitForDeleteTimeoutSeconds, "skip-wait-for-delete-timeout", o.drainer.SkipWaitForDeleteTimeoutSeconds, "If pod DeletionTimestamp older than N seconds, skip waiting for the pod.  Seconds must be greater than 0 to skip.")
-
+	cmd.Flags().BoolVar(&o.drainer.PriorityDescending, "priority-descending", o.drainer.PriorityDescending, "If true, sort and evict pods by priority in descending order (highest priority first). If false, sort in ascending order (lowest priority first).")
 	cmdutil.AddChunkSizeFlag(cmd, &o.drainer.ChunkSize)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.drainer.Selector)
