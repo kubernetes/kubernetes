@@ -18,7 +18,6 @@ package node
 
 import (
 	"context"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -85,6 +84,14 @@ var _ = SIGDescribe("PodRejectionStatus", func() {
 				},
 			}
 			err = f.ClientSet.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			pod2, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			pod2.Annotations = make(map[string]string)
+			pod2.Annotations["test"] = "test"
+			pod2.Status = v1.PodStatus{}
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Update(ctx, pod2, metav1.UpdateOptions{})
 			framework.ExpectNoError(err)
 
 			// kubelet has rejected the pod
