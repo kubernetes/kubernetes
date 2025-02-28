@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -219,6 +220,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
+	flagValue := true
 	for i := 0; i < capacity; i++ {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
@@ -233,6 +235,10 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 						"memory": {Value: resource.MustParse("1Gi")},
 					},
+					UsageRestrictedToNode:    &flagValue,
+					BindingConditions:        []string{"DeviceAttached"},
+					BindingFailureConditions: []string{"AttachmentFailed"},
+					BindingTimeout:           &metav1.Duration{Duration: 1 * time.Minute},
 				},
 			},
 		)
@@ -321,7 +327,7 @@ claims:
 			}
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions), []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {
@@ -341,4 +347,67 @@ claims:
 		}
 		tCtx.Fatalf("Could not allocate claim %d out of %d", i, len(claims))
 	}
+}
+
+type updateDeviceConditionsOp struct {
+	Opcode     operationCode
+	Namespace  string
+	Conditions []metav1.Condition
+}
+
+func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
+	if op.Namespace == "" || len(op.Conditions) == 0 {
+		return fmt.Errorf("namespace and conditions must be set")
+	}
+	return nil
+}
+
+func (op *updateDeviceConditionsOp) patchParams(w *workload) (realOp, error) {
+	return op, op.isValid(false)
+}
+
+func (op *updateDeviceConditionsOp) collectsMetrics() bool {
+	return false
+}
+
+func (op *updateDeviceConditionsOp) requiredNamespaces() []string {
+	return []string{op.Namespace}
+}
+
+func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
+	// Wait for the pod to be created.
+	claimName := ""
+	retry := 0
+	for {
+		claimList, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
+		if retry > 40 {
+			tCtx.Fatalf("no claims found in namespace %s", op.Namespace)
+			break
+		}
+		if err != nil || len(claimList.Items) == 0 {
+			retry++
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		claimName = claimList.Items[0].GetName()
+		break
+	}
+
+	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	if err != nil {
+		tCtx.Fatalf("get claim %s/%s: %v", op.Namespace, claimName, err)
+	}
+
+	claim = claim.DeepCopy()
+	for i := range claim.Status.Devices {
+		claim.Status.Devices[i].Conditions = op.Conditions
+		for condIdx, cond := range claim.Status.Devices[i].Conditions {
+			cond.LastTransitionTime = metav1.Now()
+			cond.Reason = "Test"
+			cond.Message = "Test"
+			claim.Status.Devices[i].Conditions[condIdx] = cond
+		}
+	}
+	_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "update device conditions")
 }
