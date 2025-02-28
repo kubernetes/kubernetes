@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
@@ -45,6 +46,7 @@ type ServiceChangeTracker struct {
 	processServiceMapChange processServiceMapChangeFunc
 
 	ipFamily v1.IPFamily
+	recorder events.EventRecorder
 }
 
 type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServicePortInfo) ServicePort
@@ -59,10 +61,11 @@ type serviceChange struct {
 }
 
 // NewServiceChangeTracker initializes a ServiceChangeTracker
-func NewServiceChangeTracker(ipFamily v1.IPFamily, makeServiceInfo makeServicePortFunc, processServiceMapChange processServiceMapChangeFunc) *ServiceChangeTracker {
+func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IPFamily, recorder events.EventRecorder, processServiceMapChange processServiceMapChangeFunc) *ServiceChangeTracker {
 	return &ServiceChangeTracker{
 		items:                   make(map[types.NamespacedName]*serviceChange),
 		makeServiceInfo:         makeServiceInfo,
+		recorder:                recorder,
 		ipFamily:                ipFamily,
 		processServiceMapChange: processServiceMapChange,
 	}
@@ -114,6 +117,11 @@ type UpdateServiceMapResult struct {
 	// UpdatedServices lists the names of all services added/updated/deleted since the
 	// last Update.
 	UpdatedServices sets.Set[types.NamespacedName]
+
+	// DeletedUDPClusterIPs holds stale (no longer assigned to a Service) Service IPs
+	// that had UDP ports. Callers can use this to abort timeout-waits or clear
+	// connection-tracking information.
+	DeletedUDPClusterIPs sets.Set[string]
 }
 
 // HealthCheckNodePorts returns a map of Service names to HealthCheckNodePort values
@@ -170,7 +178,8 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 	defer sct.lock.Unlock()
 
 	result := UpdateServiceMapResult{
-		UpdatedServices: sets.New[types.NamespacedName](),
+		UpdatedServices:      sets.New[types.NamespacedName](),
+		DeletedUDPClusterIPs: sets.New[string](),
 	}
 
 	for nn, change := range sct.items {
@@ -183,7 +192,7 @@ func (sm ServicePortMap) Update(sct *ServiceChangeTracker) UpdateServiceMapResul
 		// filter out the Update event of current changes from previous changes
 		// before calling unmerge() so that can skip deleting the Update events.
 		change.previous.filter(change.current)
-		sm.unmerge(change.previous)
+		sm.unmerge(change.previous, result.DeletedUDPClusterIPs)
 	}
 	// clear changes after applying them to ServicePortMap.
 	sct.items = make(map[types.NamespacedName]*serviceChange)
@@ -217,12 +226,16 @@ func (sm *ServicePortMap) filter(other ServicePortMap) {
 	}
 }
 
-// unmerge deletes all other ServicePortMap's elements from current ServicePortMap.
-func (sm *ServicePortMap) unmerge(other ServicePortMap) {
+// unmerge deletes all other ServicePortMap's elements from current ServicePortMap and
+// updates deletedUDPClusterIPs with all of the newly-deleted UDP cluster IPs.
+func (sm *ServicePortMap) unmerge(other ServicePortMap, deletedUDPClusterIPs sets.Set[string]) {
 	for svcPortName := range other {
-		_, exists := (*sm)[svcPortName]
+		info, exists := (*sm)[svcPortName]
 		if exists {
 			klog.V(4).InfoS("Removing service port", "portName", svcPortName)
+			if info.Protocol() == v1.ProtocolUDP {
+				deletedUDPClusterIPs.Insert(info.ClusterIP().String())
+			}
 			delete(*sm, svcPortName)
 		} else {
 			klog.ErrorS(nil, "Service port does not exists", "portName", svcPortName)

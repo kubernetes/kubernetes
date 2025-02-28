@@ -577,7 +577,7 @@ func TestServiceToServiceMap(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
-			svcTracker := NewServiceChangeTracker(tc.ipFamily, nil, nil)
+			svcTracker := NewServiceChangeTracker(nil, tc.ipFamily, nil, nil)
 			// outputs
 			newServices := svcTracker.serviceToServiceMap(tc.service)
 
@@ -621,16 +621,20 @@ type FakeProxier struct {
 	serviceChanges   *ServiceChangeTracker
 	svcPortMap       ServicePortMap
 	endpointsMap     EndpointsMap
+	hostname         string
 }
 
 func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
-	ect := NewEndpointsChangeTracker(ipFamily, testHostname, nil, nil)
-	ect.trackerStartTime = t
 	return &FakeProxier{
-		svcPortMap:       make(ServicePortMap),
-		serviceChanges:   NewServiceChangeTracker(ipFamily, nil, nil),
-		endpointsMap:     make(EndpointsMap),
-		endpointsChanges: ect,
+		svcPortMap:     make(ServicePortMap),
+		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
+		endpointsMap:   make(EndpointsMap),
+		endpointsChanges: &EndpointsChangeTracker{
+			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
+			trackerStartTime:          t,
+			processEndpointsMapChange: nil,
+			endpointSliceCache:        NewEndpointSliceCache(testHostname, ipFamily, nil, nil),
+		},
 	}
 }
 
@@ -676,6 +680,9 @@ func TestServiceMapUpdateHeadless(t *testing.T) {
 	if len(result.UpdatedServices) != 0 {
 		t.Errorf("expected 0 updated services, got %d", len(result.UpdatedServices))
 	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
+	}
 
 	// No proxied services, so no healthchecks
 	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
@@ -702,6 +709,9 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 	}
 	if len(result.UpdatedServices) != 0 {
 		t.Errorf("expected 0 updated services, got %v", result.UpdatedServices)
+	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs)
 	}
 
 	// No proxied services, so no healthchecks
@@ -772,6 +782,10 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	if len(result.UpdatedServices) != len(services) {
 		t.Errorf("expected %d updated services, got %d", len(services), len(result.UpdatedServices))
 	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		// Services only added, so nothing stale yet
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
+	}
 
 	// The only-local-loadbalancer ones get added
 	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
@@ -809,6 +823,19 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	if len(healthCheckNodePorts) != 0 {
 		t.Errorf("expected 0 healthcheck ports, got %v", healthCheckNodePorts)
 	}
+
+	// All services but one were deleted. While you'd expect only the ClusterIPs
+	// from the three deleted services here, we still have the ClusterIP for
+	// the not-deleted service, because one of it's ServicePorts was deleted.
+	expectedDeletedUDPClusterIPs := []string{"172.16.55.10", "172.16.55.4", "172.16.55.11", "172.16.55.12"}
+	if len(result.DeletedUDPClusterIPs) != len(expectedDeletedUDPClusterIPs) {
+		t.Errorf("expected stale UDP services length %d, got %v", len(expectedDeletedUDPClusterIPs), result.DeletedUDPClusterIPs.UnsortedList())
+	}
+	for _, ip := range expectedDeletedUDPClusterIPs {
+		if !result.DeletedUDPClusterIPs.Has(ip) {
+			t.Errorf("expected stale UDP service service %s", ip)
+		}
+	}
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
@@ -844,6 +871,10 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.UpdatedServices) != 1 {
 		t.Errorf("expected 1 updated service, got %d", len(result.UpdatedServices))
 	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		// Services only added, so nothing stale yet
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
+	}
 
 	healthCheckNodePorts := fp.svcPortMap.HealthCheckNodePorts()
 	if len(healthCheckNodePorts) != 0 {
@@ -858,6 +889,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 	if len(result.UpdatedServices) != 1 {
 		t.Errorf("expected 1 updated service, got %d", len(result.UpdatedServices))
+	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
 	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
@@ -875,6 +909,9 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	if len(result.UpdatedServices) != 0 {
 		t.Errorf("expected 0 updated services, got %d", len(result.UpdatedServices))
 	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		t.Errorf("expected stale UDP services length 0, got %v", result.DeletedUDPClusterIPs.UnsortedList())
+	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()
 	if len(healthCheckNodePorts) != 1 {
@@ -889,6 +926,10 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	}
 	if len(result.UpdatedServices) != 1 {
 		t.Errorf("expected 1 updated service, got %d", len(result.UpdatedServices))
+	}
+	if len(result.DeletedUDPClusterIPs) != 0 {
+		// Services only added, so nothing stale yet
+		t.Errorf("expected stale UDP services length 0, got %d", len(result.DeletedUDPClusterIPs))
 	}
 
 	healthCheckNodePorts = fp.svcPortMap.HealthCheckNodePorts()

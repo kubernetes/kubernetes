@@ -121,9 +121,9 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, hostn
 		terminatedEndpoints:   make(map[string]bool),
 	}
 
-	serviceChanges := proxy.NewServiceChangeTracker(v1.IPv4Protocol, proxier.newServiceInfo, proxier.serviceMapChange)
-	endpointChangeTracker := proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, hostname, proxier.newEndpointInfo, proxier.endpointsMapChange)
-	proxier.endpointsChanges = endpointChangeTracker
+	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
+	endpointsChangeTracker := proxy.NewEndpointsChangeTracker(hostname, proxier.newEndpointInfo, v1.IPv4Protocol, nil, proxier.endpointsMapChange)
+	proxier.endpointsChanges = endpointsChangeTracker
 	proxier.serviceChanges = serviceChanges
 
 	return proxier
@@ -1201,7 +1201,6 @@ func TestEndpointSlice(t *testing.T) {
 
 func TestNoopEndpointSlice(t *testing.T) {
 	p := Proxier{}
-	p.endpointsChanges = proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "", nil, nil)
 	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
 	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
 	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
