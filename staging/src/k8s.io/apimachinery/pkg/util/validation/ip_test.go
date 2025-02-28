@@ -26,70 +26,58 @@ import (
 
 func TestIsValidIP(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		in     string
-		family int
-		err    string
+		name string
+		in   string
+		err  string
 	}{
 		// GOOD VALUES
 		{
-			name:   "ipv4",
-			in:     "1.2.3.4",
-			family: 4,
+			name: "ipv4",
+			in:   "1.2.3.4",
 		},
 		{
-			name:   "ipv4, all zeros",
-			in:     "0.0.0.0",
-			family: 4,
+			name: "ipv4, all zeros",
+			in:   "0.0.0.0",
 		},
 		{
-			name:   "ipv4, max",
-			in:     "255.255.255.255",
-			family: 4,
+			name: "ipv4, max",
+			in:   "255.255.255.255",
 		},
 		{
-			name:   "ipv6",
-			in:     "1234::abcd",
-			family: 6,
+			name: "ipv6",
+			in:   "1234::abcd",
 		},
 		{
-			name:   "ipv6, all zeros, collapsed",
-			in:     "::",
-			family: 6,
+			name: "ipv6, all zeros, collapsed",
+			in:   "::",
 		},
 		{
-			name:   "ipv6, max",
-			in:     "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
-			family: 6,
+			name: "ipv6, max",
+			in:   "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
 		},
 
 		// GOOD, THOUGH NON-CANONICAL, VALUES
 		{
-			name:   "ipv6, all zeros, expanded (non-canonical)",
-			in:     "0:0:0:0:0:0:0:0",
-			family: 6,
+			name: "ipv6, all zeros, expanded (non-canonical)",
+			in:   "0:0:0:0:0:0:0:0",
 		},
 		{
-			name:   "ipv6, leading 0s (non-canonical)",
-			in:     "0001:002:03:4::",
-			family: 6,
+			name: "ipv6, leading 0s (non-canonical)",
+			in:   "0001:002:03:4::",
 		},
 		{
-			name:   "ipv6, capital letters (non-canonical)",
-			in:     "1234::ABCD",
-			family: 6,
+			name: "ipv6, capital letters (non-canonical)",
+			in:   "1234::ABCD",
 		},
 
 		// BAD VALUES WE CURRENTLY CONSIDER GOOD
 		{
-			name:   "ipv4 with leading 0s",
-			in:     "1.1.1.01",
-			family: 4,
+			name: "ipv4 with leading 0s",
+			in:   "1.1.1.01",
 		},
 		{
-			name:   "ipv4-in-ipv6 value",
-			in:     "::ffff:1.1.1.1",
-			family: 4,
+			name: "ipv4-in-ipv6 value",
+			in:   "::ffff:1.1.1.1",
 		},
 
 		// BAD VALUES
@@ -170,28 +158,6 @@ func TestIsValidIP(t *testing.T) {
 					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
 				} else if !strings.Contains(errs[0].Detail, tc.err) {
 					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
-				}
-			}
-
-			errs = IsValidIPv4Address(field.NewPath(""), tc.in)
-			if tc.family == 4 {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to pass IsValidIPv4Address but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) == 0 {
-					t.Errorf("expected %q to fail IsValidIPv4Address", tc.in)
-				}
-			}
-
-			errs = IsValidIPv6Address(field.NewPath(""), tc.in)
-			if tc.family == 6 {
-				if len(errs) != 0 {
-					t.Errorf("expected %q to pass IsValidIPv6Address but got: %v", tc.in, errs)
-				}
-			} else {
-				if len(errs) == 0 {
-					t.Errorf("expected %q to fail IsValidIPv6Address", tc.in)
 				}
 			}
 		})
