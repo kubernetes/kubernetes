@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -179,10 +180,14 @@ type KubeProxyConfiguration struct {
 	// kube-proxy is running on. If unset, the node name is assumed to be the same as
 	// the node's hostname.
 	HostnameOverride string
-	// bindAddress can be used to override kube-proxy's idea of what its node's
-	// primary IP is. Note that the name is a historical artifact, and kube-proxy does
-	// not actually bind any sockets to this IP.
-	BindAddress string
+	// nodeIPOverride lets you override the node IP(s) if kube-proxy is auto-detecting
+	// the wrong IP(s).
+	NodeIPOverride []string
+	// ipFamilyPolicy controls whether kube-proxy runs in single-stack or dual-stack mode.
+	// The default is 'PreferDualStack' if nodeIPOverride is not specified, 'SingleStack'
+	// if nodeIPOverride contains a single IP, or 'RequireDualStack' if nodeIPOverride
+	// contains dual-stack IPs.
+	IPFamilyPolicy v1.IPFamilyPolicy
 	// healthzBindAddress is the IP address and port for the health check server to
 	// serve on, defaulting to "0.0.0.0:10256" (if bindAddress is unset or IPv4), or
 	// "[::]:10256" (if bindAddress is IPv6).
