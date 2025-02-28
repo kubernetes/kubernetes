@@ -1877,11 +1877,11 @@ func TestNodeReclaimFuncs(t *testing.T) {
 			fakeClock.Step(1 * time.Minute)
 
 			setDiskStatsBasedOnFs := func(whichFs string, diskPressure string, diskStat diskStats) diskStats {
-				if tc.inducePressureOnWhichFs == "nodefs" {
+				if whichFs == "nodefs" {
 					diskStat.rootFsAvailableBytes = diskPressure
-				} else if tc.inducePressureOnWhichFs == "imagefs" {
+				} else if whichFs == "imagefs" {
 					diskStat.imageFsAvailableBytes = diskPressure
-				} else if tc.inducePressureOnWhichFs == "containerfs" {
+				} else if whichFs == "containerfs" {
 					diskStat.containerFsAvailableBytes = diskPressure
 				}
 				return diskStat
