@@ -44,13 +44,13 @@ func (leaseStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate prepares Lease for creation.
-func (leaseStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (leaseStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	lease := obj.(*coordination.Lease)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CoordinatedLeaderElection) {
 		lease.Spec.Strategy = nil
 		lease.Spec.PreferredHolder = nil
 	}
-
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

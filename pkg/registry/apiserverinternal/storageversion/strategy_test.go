@@ -34,7 +34,7 @@ func TestStorageVersionStrategy(t *testing.T) {
 	}
 
 	storageVersion := validStorageVersion()
-	Strategy.PrepareForCreate(ctx, storageVersion)
+	Strategy.PrepareForCreate(ctx, storageVersion, fieldValidation string) ([]string, error)
 	errs := Strategy.Validate(ctx, storageVersion)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)

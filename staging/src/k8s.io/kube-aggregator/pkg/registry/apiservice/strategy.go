@@ -65,7 +65,7 @@ func (apiServerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Se
 	return fields
 }
 
-func (apiServerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (apiServerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	apiservice := obj.(*apiregistration.APIService)
 	apiservice.Status = apiregistration.APIServiceStatus{}
 
@@ -73,6 +73,7 @@ func (apiServerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if apiservice.Spec.Service == nil {
 		apiregistration.SetAPIServiceCondition(apiservice, apiregistration.NewLocalAvailableAPIServiceCondition())
 	}
+	return nil, nil
 }
 
 func (apiServerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

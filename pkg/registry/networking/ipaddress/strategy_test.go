@@ -51,7 +51,7 @@ func TestIPAddressStrategy(t *testing.T) {
 	}
 
 	ipAddress := newIPAddress()
-	Strategy.PrepareForCreate(ctx, &ipAddress)
+	Strategy.PrepareForCreate(ctx, &ipAddress, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, &ipAddress)
 	if len(errs) != 0 {

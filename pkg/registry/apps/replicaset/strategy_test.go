@@ -69,7 +69,7 @@ func TestReplicaSetStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, rs)
+	Strategy.PrepareForCreate(ctx, rs, fieldValidation string) ([]string, error)
 	if rs.Status.Replicas != 0 {
 		t.Error("ReplicaSet should not allow setting status.replicas on create")
 	}
