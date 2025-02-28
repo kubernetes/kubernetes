@@ -20,8 +20,10 @@ import (
 	"reflect"
 	"testing"
 
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
+
+	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
@@ -818,9 +820,11 @@ func Test_Discover(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Discover(&tt.machineInfo)
+			ctx := ktesting.Init(t)
+			got, err := Discover(ctx, &tt.machineInfo)
 			if err != nil {
 				if tt.wantErr {
 					t.Logf("Discover() expected error = %v", err)

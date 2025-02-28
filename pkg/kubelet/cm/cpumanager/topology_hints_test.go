@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
 
@@ -72,6 +73,7 @@ type containerOptions struct {
 }
 
 func TestPodGuaranteedCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	options := [][]*containerOptions{
 		{
 			{request: "0", limit: "0"},
@@ -199,7 +201,7 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			requestedCPU := p.podGuaranteedCPUs(tc.pod)
+			requestedCPU := p.podGuaranteedCPUs(logger, tc.pod)
 
 			if requestedCPU != tc.expectedCPU {
 				t.Errorf("Expected in result to be %v , got %v", tc.expectedCPU, requestedCPU)
@@ -209,11 +211,12 @@ func TestPodGuaranteedCPUs(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
+	ctx := ktesting.Init(t)
 	machineInfo := returnMachineInfo()
 	tcases := returnTestCases()
 
 	for _, tc := range tcases {
-		topology, _ := topology.Discover(&machineInfo)
+		topology, _ := topology.Discover(ctx, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
@@ -258,10 +261,11 @@ func TestGetTopologyHints(t *testing.T) {
 }
 
 func TestGetPodTopologyHints(t *testing.T) {
+	ctx := ktesting.Init(t)
 	machineInfo := returnMachineInfo()
 
 	for _, tc := range returnTestCases() {
-		topology, _ := topology.Discover(&machineInfo)
+		topology, _ := topology.Discover(ctx, &machineInfo)
 
 		var activePods []*v1.Pod
 		for p := range tc.assignments {
