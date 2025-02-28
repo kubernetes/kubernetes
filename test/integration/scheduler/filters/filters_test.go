@@ -38,7 +38,7 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -1472,7 +1472,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 					"node",
 					hardSpread,
 					st.MakeLabelSelector().Exists("foo").Obj(),
-					pointer.Int32(4), // larger than the number of domains (= 3)
+					ptr.To[int32](4), // larger than the number of domains (= 3)
 					nil,
 					nil,
 					nil,
@@ -1498,7 +1498,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 					"node",
 					hardSpread,
 					st.MakeLabelSelector().Exists("foo").Obj(),
-					pointer.Int32(2), // smaller than the number of domains (= 3)
+					ptr.To[int32](2), // smaller than the number of domains (= 3)
 					nil,
 					nil,
 					nil,
@@ -1523,7 +1523,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 					"zone",
 					v1.DoNotSchedule,
 					st.MakeLabelSelector().Exists("foo").Obj(),
-					pointer.Int32(3), // larger than the number of domains(2)
+					ptr.To[int32](3), // larger than the number of domains(2)
 					nil,
 					nil,
 					nil,
@@ -1545,7 +1545,7 @@ func TestPodTopologySpreadFilter(t *testing.T) {
 					"zone",
 					v1.DoNotSchedule,
 					st.MakeLabelSelector().Exists("foo").Obj(),
-					pointer.Int32(1), // smaller than the number of domains(2)
+					ptr.To[int32](1), // smaller than the number of domains(2)
 					nil,
 					nil,
 					nil,

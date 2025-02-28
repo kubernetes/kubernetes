@@ -51,7 +51,7 @@ import (
 	testfwk "k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestSchedulingGates(t *testing.T) {
@@ -264,7 +264,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -378,7 +378,7 @@ func TestRequeueByBindFailure(t *testing.T) {
 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -471,7 +471,7 @@ func TestRequeueByPermitRejection(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Enabled: []configv1.Plugin{

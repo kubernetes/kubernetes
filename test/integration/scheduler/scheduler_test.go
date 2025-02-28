@@ -40,7 +40,7 @@ import (
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type nodeMutationFunc func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface)
@@ -248,13 +248,13 @@ func TestMultipleSchedulers(t *testing.T) {
 	// 5. create and start a scheduler with name "foo-scheduler"
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(fooScheduler),
+			SchedulerName: ptr.To(fooScheduler),
 			PluginConfig: []configv1.PluginConfig{
 				{
 					Name: "VolumeBinding",
 					Args: runtime.RawExtension{
 						Object: &configv1.VolumeBindingArgs{
-							BindTimeoutSeconds: pointer.Int64(30),
+							BindTimeoutSeconds: ptr.To[int64](30),
 						},
 					},
 				},
@@ -278,8 +278,8 @@ func TestMultipleSchedulers(t *testing.T) {
 func TestMultipleSchedulingProfiles(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
-			{SchedulerName: pointer.String("default-scheduler")},
-			{SchedulerName: pointer.String("custom-scheduler")},
+			{SchedulerName: ptr.To("default-scheduler")},
+			{SchedulerName: ptr.To("custom-scheduler")},
 		},
 	})
 
