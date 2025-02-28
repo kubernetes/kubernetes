@@ -408,7 +408,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ip": {
-			expectedErrors: 2,
+			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -423,7 +423,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv4": {
-			expectedErrors: 3,
+			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -438,7 +438,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv6": {
-			expectedErrors: 4,
+			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,

@@ -28,6 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -99,11 +100,25 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			// and do not get validated.
 			switch addrType {
 			case discovery.AddressTypeIPv4:
-				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				ipErrs := validation.IsValidIP(addressPath.Index(i), address)
+				if len(ipErrs) > 0 {
+					allErrs = append(allErrs, ipErrs...)
+				} else {
+					if !netutils.IsIPv4String(address) {
+						allErrs = append(allErrs, field.Invalid(addressPath, address, "must be an IPv4 address"))
+					}
+					allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				}
 			case discovery.AddressTypeIPv6:
-				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				ipErrs := validation.IsValidIP(addressPath.Index(i), address)
+				if len(ipErrs) > 0 {
+					allErrs = append(allErrs, ipErrs...)
+				} else {
+					if !netutils.IsIPv6String(address) {
+						allErrs = append(allErrs, field.Invalid(addressPath, address, "must be an IPv6 address"))
+					}
+					allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				}
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
 			}
