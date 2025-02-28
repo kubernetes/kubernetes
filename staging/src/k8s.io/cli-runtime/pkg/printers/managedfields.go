@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,8 +45,9 @@ func omitManagedFields(o runtime.Object) runtime.Object {
 // PrintObj copies the object and omits the managed fields from the copied object before printing it.
 func (p *OmitManagedFieldsPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	if obj == nil {
-		return p.Delegate.PrintObj(obj, w)
+		return fmt.Errorf("error: unable to find the specified revision")
 	}
+
 	if meta.IsListType(obj) {
 		obj = obj.DeepCopyObject()
 		_ = meta.EachListItem(obj, func(item runtime.Object) error {
