@@ -39,8 +39,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	rand2 "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/features"
@@ -803,4 +806,81 @@ func gzipContent(data []byte, level int) []byte {
 		panic(err)
 	}
 	return buf.Bytes()
+}
+
+func TestStreamingGzipIntegration(t *testing.T) {
+	largeChunk := bytes.Repeat([]byte("b"), defaultGzipThresholdBytes+1)
+	tcs := []struct {
+		name            string
+		serializer      runtime.Encoder
+		object          runtime.Object
+		expectGzip      bool
+		expectStreaming bool
+	}{
+		{
+			name:            "JSON, small object, default -> no gzip",
+			serializer:      jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{}),
+			object:          &testapigroupv1.CarpList{},
+			expectGzip:      false,
+			expectStreaming: false,
+		},
+		{
+			name:            "JSON, small object, streaming -> no gzip",
+			serializer:      jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{StreamingCollectionsEncoding: true}),
+			object:          &testapigroupv1.CarpList{},
+			expectGzip:      false,
+			expectStreaming: true,
+		},
+		{
+			name:            "JSON, large object, default -> gzip",
+			serializer:      jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{}),
+			object:          &testapigroupv1.CarpList{TypeMeta: metav1.TypeMeta{Kind: string(largeChunk)}},
+			expectGzip:      true,
+			expectStreaming: false,
+		},
+		{
+			name:            "JSON, large object, streaming -> gzip",
+			serializer:      jsonserializer.NewSerializerWithOptions(jsonserializer.DefaultMetaFactory, nil, nil, jsonserializer.SerializerOptions{StreamingCollectionsEncoding: true}),
+			object:          &testapigroupv1.CarpList{TypeMeta: metav1.TypeMeta{Kind: string(largeChunk)}},
+			expectGzip:      true,
+			expectStreaming: true,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			mockResponseWriter := httptest.NewRecorder()
+			drw := &deferredResponseWriter{
+				mediaType:       "text/plain",
+				statusCode:      200,
+				contentEncoding: "gzip",
+				hw:              mockResponseWriter,
+				ctx:             context.Background(),
+			}
+			counter := &writeCounter{Writer: drw}
+			err := tc.serializer.Encode(tc.object, counter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoding := mockResponseWriter.Header().Get("Content-Encoding")
+			if (encoding == "gzip") != tc.expectGzip {
+				t.Errorf("Expect gzip: %v, got: %q", tc.expectGzip, encoding)
+			}
+			if counter.writeCount < 1 {
+				t.Fatalf("Expect at least 1 write")
+			}
+			if (counter.writeCount > 1) != tc.expectStreaming {
+				t.Errorf("Expect streaming: %v, got write count: %d", tc.expectStreaming, counter.writeCount)
+			}
+		})
+	}
+}
+
+type writeCounter struct {
+	writeCount int
+	io.Writer
+}
+
+func (b *writeCounter) Write(data []byte) (int, error) {
+	b.writeCount++
+	return b.Writer.Write(data)
 }
