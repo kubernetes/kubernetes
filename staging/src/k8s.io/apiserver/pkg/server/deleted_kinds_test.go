@@ -742,6 +742,34 @@ func Test_removeUnIntroducedKinds(t *testing.T) {
 					resource2: storageIntroducedIn(1, 23),
 				},
 			},
+			expectErr: true,
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible:              true,
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
 			expectedStorage: map[string]map[string]rest.Storage{
 				"v1": {
 					resource1: storageIntroducedIn(1, 20),
@@ -767,7 +795,7 @@ func Test_removeUnIntroducedKinds(t *testing.T) {
 			resourceConfig.EnableVersions(convertor.PrioritizedVersionsForGroup(groupName)...)
 			resourceConfig, err := resourceconfig.MergeAPIResourceConfigs(resourceConfig, tt.runtimeConfig, convertor)
 			require.NoError(t, err)
-			err = tt.resourceExpirationEvaluator.removeUnIntroducedKinds(groupName, convertor, tt.versionedResourcesStorageMap, resourceConfig)
+			err = tt.resourceExpirationEvaluator.removeUnintroducedKinds(groupName, convertor, tt.versionedResourcesStorageMap, resourceConfig)
 			if tt.expectErr {
 				require.Error(t, err)
 				return
@@ -1139,6 +1167,34 @@ func Test_RemoveUnavailableKinds(t *testing.T) {
 					resource2: storageIntroducedIn(1, 23),
 				},
 			},
+			expectErr: true,
+		},
+		{
+			name: "both-runtime-config-and-emulation-forward-compatible-runtime-config-beta2-api",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:                          apimachineryversion.MajorMinor(1, 20),
+				emulationForwardCompatible:              true,
+				runtimeConfigEmulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
 			expectedStorage: map[string]map[string]rest.Storage{
 				"v1": {
 					resource1: storageIntroducedIn(1, 20),
@@ -1150,6 +1206,46 @@ func Test_RemoveUnavailableKinds(t *testing.T) {
 				"v2": {
 					resource1: storageIntroducedIn(1, 23),
 					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+		},
+		{
+			name: "emulation-forward-compatible-runtime-config-beta2-api-resource1-ok",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:             apimachineryversion.MajorMinor(1, 21),
+				emulationForwardCompatible: true,
+			},
+			runtimeConfig: map[string]string{
+				groupName + "/v2beta2": "true",
+			},
+			versionedResourcesStorageMap: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+					resource2: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
+					resource2: storageIntroducedIn(1, 23),
+				},
+			},
+			expectedStorage: map[string]map[string]rest.Storage{
+				"v1": {
+					resource1: storageIntroducedIn(1, 20),
+				},
+				"v2beta1": {
+					resource1: storageIntroducedAndRemovedIn(1, 21, 1, 22),
+				},
+				"v2beta2": {
+					resource1: storageIntroducedAndRemovedIn(1, 22, 1, 23),
+				},
+				"v2": {
+					resource1: storageIntroducedIn(1, 23),
 				},
 			},
 		},

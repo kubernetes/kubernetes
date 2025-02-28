@@ -204,12 +204,12 @@ func (e *resourceExpirationEvaluator) removeDeletedKinds(groupName string, versi
 
 func (e *resourceExpirationEvaluator) RemoveUnavailableKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage, apiResourceConfigSource serverstorage.APIResourceConfigSource) error {
 	e.removeDeletedKinds(groupName, versioner, versionedResourcesStorageMap)
-	return e.removeUnIntroducedKinds(groupName, versioner, versionedResourcesStorageMap, apiResourceConfigSource)
+	return e.removeUnintroducedKinds(groupName, versioner, versionedResourcesStorageMap, apiResourceConfigSource)
 }
 
-// removeUnIntroducedKinds inspects the storage map and modifies it in place by removing storage for kinds that are introduced after the current version.
+// removeUnintroducedKinds inspects the storage map and modifies it in place by removing storage for kinds that are introduced after the current version.
 // versionedResourcesStorageMap mirrors the field on APIGroupInfo, it's a map from version to resource to the storage.
-func (e *resourceExpirationEvaluator) removeUnIntroducedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage, apiResourceConfigSource serverstorage.APIResourceConfigSource) error {
+func (e *resourceExpirationEvaluator) removeUnintroducedKinds(groupName string, versioner runtime.ObjectVersioner, versionedResourcesStorageMap map[string]map[string]rest.Storage, apiResourceConfigSource serverstorage.APIResourceConfigSource) error {
 	versionsToRemove := sets.NewString()
 	prioritizedVersions := versioner.PrioritizedVersionsForGroup(groupName)
 	enabledResources := sets.NewString()
@@ -302,9 +302,8 @@ func (e *resourceExpirationEvaluator) shouldServeBasedOnVersionIntroduced(gvr sc
 	if apiResourceConfigSource == nil {
 		return false, nil
 	}
-	forwardCompatible := e.runtimeConfigEmulationForwardCompatible || e.emulationForwardCompatible
-	// could explicitly enable future resources in forward compatible mode.
-	if forwardCompatible && (apiResourceConfigSource.ResourceExplicitlyEnabled(gvr) || apiResourceConfigSource.VersionExplicitlyEnabled(gvr.GroupVersion())) {
+	// could explicitly enable future resources in runtime-config forward compatible mode.
+	if e.runtimeConfigEmulationForwardCompatible && (apiResourceConfigSource.ResourceExplicitlyEnabled(gvr) || apiResourceConfigSource.VersionExplicitlyEnabled(gvr.GroupVersion())) {
 		return true, nil
 	}
 	if apiResourceConfigSource.ResourceExplicitlyEnabled(gvr) {

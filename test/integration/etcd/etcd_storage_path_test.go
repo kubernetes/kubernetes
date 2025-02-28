@@ -99,10 +99,8 @@ func testEtcdStoragePathWithVersion(t *testing.T, v string) {
 	apiServer := StartRealAPIServerOrDie(t, func(opts *options.ServerRunOptions) {
 		// Disable alphas when emulating previous versions.
 		if v != componentbaseversion.DefaultKubeBinaryVersion {
-			opts.Options.GenericServerRunOptions.RuntimeConfigEmulationForwardCompatible = true
+			opts.Options.GenericServerRunOptions.EmulationForwardCompatible = true
 			opts.Options.APIEnablement.RuntimeConfig["api/alpha"] = "false"
-			// these APIs are required to enable Beta features in the api server.
-			opts.Options.APIEnablement.RuntimeConfig["networking.k8s.io/v1"] = "true"
 		}
 	})
 
