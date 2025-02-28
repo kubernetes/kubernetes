@@ -164,11 +164,8 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
-						"requestheader-client-ca-file":       string(anotherRandomCA),
-						"requestheader-allowed-names":        `["first","second"]`,
+						"requestheader-client-ca-file": string(anotherRandomCA),
+						"requestheader-allowed-names":  `["first","second"]`,
 					},
 				},
 			},
@@ -198,11 +195,7 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
-						"requestheader-group-headers":        `[]`,
-						"requestheader-extra-headers-prefix": `[]`,
-						"requestheader-client-ca-file":       string(anotherRandomCA),
-						"requestheader-allowed-names":        `[]`,
+						"requestheader-client-ca-file": string(anotherRandomCA),
 					},
 				},
 			},
@@ -307,9 +300,9 @@ func TestWriteClientCAs(t *testing.T) {
 			expectCreate:       false,
 		},
 		{
-			name: "drop uid without feature gate",
+			name: "keep uid without feature gate",
 			clusterAuthInfo: ClusterAuthenticationInfo{
-				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
+				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{"dolphin"},
 				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{"panda"},
 				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{},
 				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
@@ -333,7 +326,8 @@ func TestWriteClientCAs(t *testing.T) {
 				"extension-apiserver-authentication": {
 					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
 					Data: map[string]string{
-						"requestheader-username-headers":     `[]`,
+						"requestheader-username-headers":     `["dolphin"]`,
+						"requestheader-uid-headers":          `["snorlax"]`,
 						"requestheader-group-headers":        `[]`,
 						"requestheader-extra-headers-prefix": `[]`,
 						"requestheader-client-ca-file":       string(anotherRandomCA),
@@ -419,6 +413,40 @@ func TestWriteClientCAs(t *testing.T) {
 			},
 			expectCreate: false,
 			uidGate:      true,
+		},
+		{
+			name: "keep unhandled data keys",
+			clusterAuthInfo: ClusterAuthenticationInfo{
+				RequestHeaderUsernameHeaders:     headerrequest.StaticStringSlice{},
+				RequestHeaderUIDHeaders:          headerrequest.StaticStringSlice{},
+				RequestHeaderGroupHeaders:        headerrequest.StaticStringSlice{"new-group-headers"},
+				RequestHeaderExtraHeaderPrefixes: headerrequest.StaticStringSlice{},
+				RequestHeaderCA:                  anotherRandomCAProvider,
+				RequestHeaderAllowedNames:        headerrequest.StaticStringSlice{},
+			},
+			preexistingObjs: []runtime.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-client-ca-file": string(anotherRandomCA),
+						"requestheader-group-headers":  `[]`,
+						"unknown-key":                  `["important","future","values"]`,
+						"unknown-key-empty":            "",
+					},
+				},
+			},
+			expectedConfigMaps: map[string]*corev1.ConfigMap{
+				"extension-apiserver-authentication": {
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-group-headers":  `["new-group-headers"]`,
+						"requestheader-client-ca-file": string(anotherRandomCA),
+						"unknown-key":                  `["important","future","values"]`,
+						"unknown-key-empty":            "",
+					},
+				},
+			},
+			expectCreate: false,
 		},
 	}
 
