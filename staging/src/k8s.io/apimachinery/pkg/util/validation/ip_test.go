@@ -450,3 +450,106 @@ func TestGetWarningsForCIDR(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidInterfaceAddress(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   string
+		err  string
+	}{
+		// GOOD VALUES
+		{
+			name: "ipv4",
+			in:   "1.2.3.4/24",
+		},
+		{
+			name: "ipv4, single IP",
+			in:   "1.1.1.1/32",
+		},
+		{
+			name: "ipv6",
+			in:   "2001:4860:4860::1/48",
+		},
+		{
+			name: "ipv6, single IP",
+			in:   "::1/128",
+		},
+
+		// BAD VALUES
+		{
+			name: "empty string",
+			in:   "",
+			err:  "must be a valid address in CIDR form",
+		},
+		{
+			name: "junk",
+			in:   "aaaaaaa",
+			err:  "must be a valid address in CIDR form",
+		},
+		{
+			name: "IP address",
+			in:   "1.2.3.4",
+			err:  "must be a valid address in CIDR form",
+		},
+		{
+			name: "partial URL",
+			in:   "192.168.0.1/healthz",
+			err:  "must be a valid address in CIDR form",
+		},
+		{
+			name: "partial URL 2",
+			in:   "192.168.0.1/0/99",
+			err:  "must be a valid address in CIDR form",
+		},
+		{
+			name: "negative prefix length",
+			in:   "192.168.0.0/-16",
+			err:  "must be a valid address in CIDR form",
+		},
+		{
+			name: "prefix length with sign",
+			in:   "192.168.0.0/+16",
+			err:  "must be a valid address in CIDR form",
+		},
+		{
+			name: "ipv6 non-canonical",
+			in:   "2001:0:0:0::0BCD/64",
+			err:  `must be in canonical form ("2001::bcd/64")`,
+		},
+		{
+			name: "ipv4 with leading 0s",
+			in:   "1.1.01.002/24",
+			err:  `must be in canonical form ("1.1.1.2/24")`,
+		},
+		{
+			name: "ipv4-in-ipv6 with ipv4-sized prefix",
+			in:   "::ffff:1.1.1.1/24",
+			err:  `must be in canonical form ("1.1.1.1/24")`,
+		},
+		{
+			name: "ipv4-in-ipv6 with ipv6-sized prefix",
+			in:   "::ffff:1.1.1.1/120",
+			err:  `must be in canonical form ("1.1.1.1/24")`,
+		},
+		{
+			name: "prefix length with leading 0s",
+			in:   "192.168.0.5/016",
+			err:  `must be in canonical form ("192.168.0.5/16")`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := IsValidInterfaceAddress(field.NewPath(""), tc.in)
+			if tc.err == "" {
+				if len(errs) != 0 {
+					t.Errorf("expected %q to be valid but got: %v", tc.in, errs)
+				}
+			} else {
+				if len(errs) != 1 {
+					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
+				} else if !strings.Contains(errs[0].Detail, tc.err) {
+					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
+				}
+			}
+		})
+	}
+}

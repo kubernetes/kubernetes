@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"net"
 	"net/netip"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -136,4 +137,31 @@ func GetWarningsForCIDR(fldPath *field.Path, value string) []string {
 	}
 
 	return warnings
+}
+
+// IsValidInterfaceAddress tests that the argument is a valid "ifaddr"-style CIDR value in
+// canonical form (e.g., "192.168.1.5/24", with a complete IP address and associated
+// subnet length). Use IsValidCIDR for "subnet"/"mask"-style CIDR values (e.g.,
+// "192.168.1.0/24").
+func IsValidInterfaceAddress(fldPath *field.Path, value string) field.ErrorList {
+	var allErrors field.ErrorList
+	ip, ipnet, err := netutils.ParseCIDRSloppy(value)
+	if err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid address in CIDR form, (e.g. 10.9.8.7/24 or 2001:db8::1/64)"))
+		return allErrors
+	}
+
+	// The canonical form of `value` is not `ipnet.String()`, because `ipnet` doesn't
+	// include the bits after the prefix. We need to construct the canonical form
+	// ourselves from `ip` and `ipnet.Mask`.
+	maskSize, _ := ipnet.Mask.Size()
+	if netutils.IsIPv4(ip) && maskSize > net.IPv4len*8 {
+		// "::ffff:192.168.0.1/120" -> "192.168.0.1/24"
+		maskSize -= (net.IPv6len - net.IPv4len) * 8
+	}
+	canonical := fmt.Sprintf("%s/%d", ip.String(), maskSize)
+	if value != canonical {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", canonical)))
+	}
+	return allErrors
 }
