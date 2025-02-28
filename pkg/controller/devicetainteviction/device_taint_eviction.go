@@ -69,7 +69,6 @@ type Controller struct {
 	logger klog.Logger
 
 	client             clientset.Interface
-	broadcaster        record.EventBroadcaster
 	recorder           record.EventRecorder
 	podInformer        coreinformers.PodInformer
 	podLister          corelisters.PodLister
@@ -232,19 +231,20 @@ type deviceGeneration struct {
 // replaced the old pod under the same name.
 func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), controllerName string) func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *tainteviction.WorkArgs) error {
-		ns := args.NamespacedName.Namespace
-		name := args.NamespacedName.Name
 		klog.FromContext(ctx).Info("Deleting pod", "pod", args.NamespacedName)
-		if emitEventFunc != nil {
-			emitEventFunc(args.NamespacedName)
-		}
 		var err error
 		for i := 0; i < retries; i++ {
-			err = addConditionAndDeletePod(ctx, c, name, ns)
+			err = addConditionAndDeletePod(ctx, c, args.NamespacedName, &emitEventFunc)
+			if apierrors.IsNotFound(err) {
+				// Not a problem, the work is done.
+				// But we didn't do it, so don't
+				// bump the metric.
+				return nil
+			}
 			if err == nil {
 				metrics.PodDeletionsTotal.Inc()
 				metrics.PodDeletionsLatency.Observe(float64(time.Since(fireAt) * time.Second))
-				break
+				return nil
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -252,11 +252,20 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 	}
 }
 
-func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, ns string) (err error) {
-	pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, podRef types.NamespacedName, emitEventFunc *func(types.NamespacedName)) (err error) {
+	pod, err := c.CoreV1().Pods(podRef.Namespace).Get(ctx, podRef.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
+
+	// TODO: ignore pod with wrong UID
+
+	// Emit the event only once, and only if we are actually doing something.
+	if *emitEventFunc != nil {
+		(*emitEventFunc)(podRef)
+		*emitEventFunc = nil
+	}
+
 	newStatus := pod.Status.DeepCopy()
 	updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
 		Type:    v1.DisruptionTarget,
@@ -269,7 +278,7 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, 
 			return err
 		}
 	}
-	return c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
+	return c.CoreV1().Pods(podRef.Namespace).Delete(ctx, podRef.Name, metav1.DeleteOptions{})
 }
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
@@ -319,25 +328,34 @@ func (tc *Controller) Run(ctx context.Context) {
 	defer eventBroadcaster.Shutdown()
 
 	taintEvictionQueue := tainteviction.CreateWorkerQueue(deletePodHandler(tc.client, tc.emitPodDeletionEvent, tc.name))
-	tc.evictPod = func(pod object, fireAt time.Time) {
-		taintEvictionQueue.AddWork(ctx, tainteviction.NewWorkArgs(pod.Name, pod.Namespace), time.Now(), fireAt)
+	evictPod := tc.evictPod
+	tc.evictPod = func(podRef object, fireAt time.Time) {
+		// Only relevant for testing.
+		if evictPod != nil {
+			evictPod(podRef, fireAt)
+		}
+		taintEvictionQueue.AddWork(ctx, tainteviction.NewWorkArgs(podRef.Name, podRef.Namespace), time.Now(), fireAt)
 	}
-	tc.cancelEvict = func(pod object) bool {
+	cancelEvict := tc.cancelEvict
+	tc.cancelEvict = func(podRef object) bool {
+		if cancelEvict != nil {
+			cancelEvict(podRef)
+		}
 		// TODO: clean up key handling: here we use types.NamespacedName.String, elsewhere WorkArgs.KeyFromWorkArgs.
 		// Both happen to be the same, but it's still a bit dirty.
-		return taintEvictionQueue.CancelWork(logger, pod.NamespacedName.String())
+		return taintEvictionQueue.CancelWork(logger, podRef.NamespacedName.String())
 	}
 
 	// Start events processing pipeline.
-	tc.broadcaster.StartStructuredLogging(3)
+	eventBroadcaster.StartStructuredLogging(3)
 	if tc.client != nil {
 		logger.Info("Sending events to api server")
-		tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
 	} else {
 		logger.Error(nil, "kubeClient is nil", "controller", tc.name)
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
-	defer tc.broadcaster.Shutdown()
+	defer eventBroadcaster.Shutdown()
 
 	// mutex serializes event processing.
 	var mutex sync.Mutex
@@ -382,6 +400,7 @@ func (tc *Controller) Run(ctx context.Context) {
 		},
 	})
 	defer tc.claimInformer.Informer().RemoveEventHandler(claimHandler)
+	tc.haveSynced = append(tc.haveSynced, claimHandler.HasSynced)
 
 	podHandler, err := tc.podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -423,11 +442,13 @@ func (tc *Controller) Run(ctx context.Context) {
 		},
 	})
 	defer tc.podInformer.Informer().RemoveEventHandler(podHandler)
+	tc.haveSynced = append(tc.haveSynced, podHandler.HasSynced)
 
-	// Wait for the caches to be synced.
+	// Wait for the caches and event handlers to be synced.
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.haveSynced...) {
 		return
 	}
+	logger.Info("Pods and claims have synced")
 
 	// At this point, all claims and pods are assumed to be unaffected by
 	// taints. This will be reconsidered in response to observing tainted
@@ -444,9 +465,10 @@ func (tc *Controller) Run(ctx context.Context) {
 		return
 	}
 
-	// TODO: wait for tracker to sync before we react to events. Otherwise
-	// some unnecessary work might be done as events get emitted for
-	// intermediate state.
+	// TODO: wait for tracker to sync before we react to events.
+	// This doesn't have to be perfect, it merely avoids unnecessary
+	// work which might be done as events get emitted for intermediate
+	// state.
 
 	sliceTracker.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -728,8 +750,20 @@ func usesDevice(allocation *resourceapi.AllocationResult, pool poolID, modifiedD
 
 func (tc *Controller) handlePodChange(oldPod, newPod *v1.Pod) {
 	if newPod == nil {
-		// Nothing left to do for it.
+		// Nothing left to do for it. No need to emit an event here, it's gone.
 		tc.cancelEvict(newObject(oldPod))
+		return
+	}
+
+	// Pods get updated quite frequently. There's no need
+	// to check them again unless something changed regarding
+	// their claims.
+	//
+	// In particular this prevents adding the pod again
+	// directly after the eviction condition got added
+	// to it.
+	if oldPod != nil &&
+		apiequality.Semantic.DeepEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
 		return
 	}
 
@@ -758,9 +792,13 @@ func (tc *Controller) handlePods(claim *resourceapi.ResourceClaim) {
 }
 
 func (tc *Controller) handlePod(pod *v1.Pod) {
+	// Not scheduled yet? No need to evict.
+	if pod.Spec.NodeName == "" {
+		return
+	}
+
 	// If any claim in use by the pod is tainted such that the taint is not tolerated,
 	// the pod needs to be evicted.
-
 	var evictionTime *metav1.Time
 	for i := range pod.Spec.ResourceClaims {
 		claimName, mustCheckOwner, err := resourceclaim.Name(pod, &pod.Spec.ResourceClaims[i])
@@ -796,9 +834,9 @@ func (tc *Controller) handlePod(pod *v1.Pod) {
 	}
 }
 
-func (tc *Controller) cancelWorkWithEvent(pod object) {
-	if tc.cancelEvict(pod) {
-		tc.emitCancelPodDeletionEvent(pod.NamespacedName)
+func (tc *Controller) cancelWorkWithEvent(podRef object) {
+	if tc.cancelEvict(podRef) {
+		tc.emitCancelPodDeletionEvent(podRef.NamespacedName)
 	}
 }
 
@@ -826,31 +864,6 @@ func (tc *Controller) emitCancelPodDeletionEvent(nsName types.NamespacedName) {
 		Namespace:  nsName.Namespace,
 	}
 	tc.recorder.Eventf(ref, v1.EventTypeNormal, "DeviceTaintManagerEviction", "Cancelling deletion")
-}
-
-// getMinTolerationTime returns minimal toleration time from the given slice, or -1 if it's infinite.
-// It returns 0 if there are no tolerations.
-func getMinTolerationTime(tolerations []resourceapi.DeviceToleration) time.Duration {
-	minTolerationTime := int64(math.MaxInt64)
-	if len(tolerations) == 0 {
-		return 0
-	}
-
-	for i := range tolerations {
-		if tolerations[i].TolerationSeconds != nil {
-			tolerationSeconds := *(tolerations[i].TolerationSeconds)
-			if tolerationSeconds <= 0 {
-				return 0
-			} else if tolerationSeconds < minTolerationTime {
-				minTolerationTime = tolerationSeconds
-			}
-		}
-	}
-
-	if minTolerationTime == int64(math.MaxInt64) {
-		return -1
-	}
-	return time.Duration(minTolerationTime) * time.Second
 }
 
 func newNamespacedName(obj metav1.Object) types.NamespacedName {
