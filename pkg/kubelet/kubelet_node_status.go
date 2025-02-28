@@ -644,7 +644,6 @@ func (kl *Kubelet) patchNodeStatus(originalNode, node *v1.Node) (*v1.Node, error
 		return nil, err
 	}
 	kl.lastStatusReportTime = kl.clock.Now()
-	kl.setLastObservedNodeAddresses(updatedNode.Status.Addresses)
 
 	readyIdx, readyCondition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeReady)
 	if readyIdx >= 0 && readyCondition.Status == v1.ConditionTrue {
@@ -719,17 +718,6 @@ func (kl *Kubelet) setNodeStatus(ctx context.Context, node *v1.Node) {
 			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
 		}
 	}
-}
-
-func (kl *Kubelet) setLastObservedNodeAddresses(addresses []v1.NodeAddress) {
-	kl.lastObservedNodeAddressesMux.Lock()
-	defer kl.lastObservedNodeAddressesMux.Unlock()
-	kl.lastObservedNodeAddresses = addresses
-}
-func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
-	kl.lastObservedNodeAddressesMux.RLock()
-	defer kl.lastObservedNodeAddressesMux.RUnlock()
-	return kl.lastObservedNodeAddresses
 }
 
 // defaultNodeStatusFuncs is a factory that generates the default set of
