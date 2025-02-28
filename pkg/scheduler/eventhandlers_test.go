@@ -27,11 +27,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2/ktesting"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -280,12 +282,13 @@ func TestAddAllEventHandlers(t *testing.T) {
 			},
 			enableDRA: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                    true,
-				reflect.TypeOf(&v1.Node{}):                   true,
-				reflect.TypeOf(&v1.Namespace{}):              true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
+				reflect.TypeOf(&v1.Pod{}):                              true,
+				reflect.TypeOf(&v1.Node{}):                             true,
+				reflect.TypeOf(&v1.Namespace{}):                        true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}):           true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}):           true,
+				reflect.TypeOf(&resourcealphaapi.ResourceSlicePatch{}): true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):             true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -364,12 +367,18 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
+			var resourceSliceTracker *resourceslicetracker.Tracker
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+				var err error
+				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, informerFactory, resourceslicetracker.Options{})
+				if err != nil {
+					t.Fatalf("couldn't start resource slice tracker: %v", err)
+				}
 			}
 
-			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, tt.gvkMap); err != nil {
+			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, tt.gvkMap); err != nil {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 
