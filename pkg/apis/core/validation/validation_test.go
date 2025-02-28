@@ -9183,7 +9183,7 @@ func TestValidateContainers(t *testing.T) {
 				t.Fatal("expected error but received none")
 			}
 
-			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin")); diff != "" {
 				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
 				t.Errorf("INFO: all errors:\n%s", prettyErrorList(errs))
 			}
@@ -16791,144 +16791,179 @@ func TestValidateReplicationController(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]core.ReplicationController{
+	errorCases := map[string]struct {
+		rc             core.ReplicationController
+		expectedOrigin []string
+	}{
 		"zero-length ID": {
-			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
+				Spec: core.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
 			},
 		},
 		"missing-namespace": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
+				Spec: core.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
 			},
 		},
 		"empty selector": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Template: &validPodTemplate.Template,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: core.ReplicationControllerSpec{
+					Template: &validPodTemplate.Template,
+				},
 			},
 		},
 		"selector_doesnt_match": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: map[string]string{"foo": "bar"},
-				Template: &validPodTemplate.Template,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: core.ReplicationControllerSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Template: &validPodTemplate.Template,
+				},
 			},
 		},
 		"invalid manifest": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: core.ReplicationControllerSpec{
+					Selector: validSelector,
+				},
 			},
 		},
 		"read-write persistent disk with > 1 pod": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc"},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 2,
-				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Template,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc"},
+				Spec: core.ReplicationControllerSpec{
+					Replicas: 2,
+					Selector: validSelector,
+					Template: &readWriteVolumePodTemplate.Template,
+				},
 			},
 		},
 		"negative_replicas": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: -1,
-				Selector: validSelector,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: core.ReplicationControllerSpec{
+					Replicas: -1,
+					Selector: validSelector,
+				},
+			},
+			expectedOrigin: []string{
+				"minimum",
 			},
 		},
 		"invalid_label": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-				Labels: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc-123",
+					Namespace: metav1.NamespaceDefault,
+					Labels: map[string]string{
+						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+					},
 				},
-			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
+				Spec: core.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
 			},
 		},
 		"invalid_label 2": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-				Labels: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc-123",
+					Namespace: metav1.NamespaceDefault,
+					Labels: map[string]string{
+						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+					},
 				},
-			},
-			Spec: core.ReplicationControllerSpec{
-				Template: &invalidPodTemplate.Template,
+				Spec: core.ReplicationControllerSpec{
+					Template: &invalidPodTemplate.Template,
+				},
 			},
 		},
 		"invalid_annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-				Annotations: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc-123",
+					Namespace: metav1.NamespaceDefault,
+					Annotations: map[string]string{
+						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+					},
 				},
-			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
+				Spec: core.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &validPodTemplate.Template,
+				},
 			},
 		},
 		"invalid restart policy 1": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &core.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyOnFailure)),
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validSelector,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc-123",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: core.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &core.PodTemplateSpec{
+						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyOnFailure)),
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validSelector,
+						},
 					},
 				},
 			},
 		},
 		"invalid restart policy 2": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: metav1.NamespaceDefault,
-			},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &core.PodTemplateSpec{
-					Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyNever)),
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validSelector,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc-123",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Spec: core.ReplicationControllerSpec{
+					Selector: validSelector,
+					Template: &core.PodTemplateSpec{
+						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyNever)),
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validSelector,
+						},
 					},
 				},
 			},
 		},
 		"template may not contain ephemeral containers": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 1,
-				Selector: validSelector,
-				Template: &core.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels: validSelector,
+			rc: core.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+				Spec: core.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: validSelector,
+					Template: &core.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: validSelector,
+						},
+						Spec: podtest.MakePodSpec(
+							podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}),
+						),
 					},
-					Spec: podtest.MakePodSpec(
-						podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}),
-					),
 				},
 			},
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateReplicationController(&v, PodValidationOptions{})
+		errs := ValidateReplicationController(&v.rc, PodValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
+
+		expectedOrigins := sets.NewString(v.expectedOrigin...)
+
 		for i := range errs {
 			field := errs[i].Field
 			if !strings.HasPrefix(field, "spec.template.") &&
@@ -16944,6 +16979,16 @@ func TestValidateReplicationController(t *testing.T) {
 				field != "status.replicas" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
+
+			if len(v.expectedOrigin) > 0 && errs[i].Origin != "" {
+				if !expectedOrigins.Has(errs[i].Origin) {
+					t.Errorf("%s: unexpected origin for: %v, expected one of %v", k, errs[i].Origin, v.expectedOrigin)
+				}
+				expectedOrigins.Delete(errs[i].Origin)
+			}
+		}
+		if len(expectedOrigins) > 0 {
+			t.Errorf("%s: missing errors with origin: %v", k, expectedOrigins.List())
 		}
 	}
 }
@@ -20674,7 +20719,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	errorCases := map[string]struct {
 		endpoints   core.Endpoints
 		errorType   field.ErrorType
-		errorDetail string
+		errorOrigin string
 	}{
 		"missing namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
@@ -20685,14 +20730,12 @@ func TestValidateEndpointsCreate(t *testing.T) {
 			errorType: "FieldValueRequired",
 		},
 		"invalid namespace": {
-			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
-			errorType:   "FieldValueInvalid",
-			errorDetail: dnsLabelErrMsg,
+			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
+			errorType: "FieldValueInvalid",
 		},
 		"invalid name": {
-			endpoints:   core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
-			errorType:   "FieldValueInvalid",
-			errorDetail: dnsSubdomainLabelErrMsg,
+			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
+			errorType: "FieldValueInvalid",
 		},
 		"empty addresses": {
 			endpoints: core.Endpoints{
@@ -20712,7 +20755,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IP address",
+			errorOrigin: "format=ip-sloppy",
 		},
 		"Multiple ports, one without name": {
 			endpoints: core.Endpoints{
@@ -20733,7 +20776,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "between",
+			errorOrigin: "portNum",
 		},
 		"Invalid protocol": {
 			endpoints: core.Endpoints{
@@ -20754,7 +20797,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "must be a valid IP address",
+			errorOrigin: "format=ip-sloppy",
 		},
 		"Port missing number": {
 			endpoints: core.Endpoints{
@@ -20765,7 +20808,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "between",
+			errorOrigin: "portNum",
 		},
 		"Port missing protocol": {
 			endpoints: core.Endpoints{
@@ -20786,7 +20829,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "loopback",
+			errorOrigin: "format=non-special-ip",
 		},
 		"Address is link-local": {
 			endpoints: core.Endpoints{
@@ -20797,7 +20840,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "link-local",
+			errorOrigin: "format=non-special-ip",
 		},
 		"Address is link-local multicast": {
 			endpoints: core.Endpoints{
@@ -20808,7 +20851,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "link-local multicast",
+			errorOrigin: "format=non-special-ip",
 		},
 		"Invalid AppProtocol": {
 			endpoints: core.Endpoints{
@@ -20819,14 +20862,14 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			errorType:   "FieldValueInvalid",
-			errorDetail: "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character",
+			errorOrigin: "format=qualified-name",
 		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
-				t.Errorf("Expected error type %s with detail %q, got %v", v.errorType, v.errorDetail, errs)
+			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || errs[0].Origin != v.errorOrigin {
+				t.Errorf("Expected error type %s with origin %q, got %#v", v.errorType, v.errorOrigin, errs[0])
 			}
 		})
 	}
@@ -21190,7 +21233,7 @@ func TestValidateSchedulingGates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			errs := validateSchedulingGates(tt.schedulingGates, fieldPath)
-			if diff := cmp.Diff(tt.wantFieldErrors, errs); diff != "" {
+			if diff := cmp.Diff(tt.wantFieldErrors, errs, cmpopts.IgnoreFields(field.Error{}, "Detail", "Origin")); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
 		})

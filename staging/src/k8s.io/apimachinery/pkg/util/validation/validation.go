@@ -373,7 +373,7 @@ func IsValidPortName(port string) []string {
 func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
 	var allErrors field.ErrorList
 	if netutils.ParseIPSloppy(value) == nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"))
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)").WithOrigin("format=ip-sloppy"))
 	}
 	return allErrors
 }
