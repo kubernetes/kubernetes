@@ -166,7 +166,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 
 	if utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.CoordinatedLeaderElection) {
 		leaseInformer := s.VersionedInformers.Coordination().V1().Leases()
-		lcInformer := s.VersionedInformers.Coordination().V1alpha2().LeaseCandidates()
+		lcInformer := s.VersionedInformers.Coordination().V1beta1().LeaseCandidates()
 		// Ensure that informers are registered before starting. Coordinated Leader Election leader-elected
 		// and may register informer handlers after they are started.
 		_ = leaseInformer.Informer()
@@ -177,7 +177,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 					leaseInformer,
 					lcInformer,
 					client.CoordinationV1(),
-					client.CoordinationV1alpha2(),
+					client.CoordinationV1beta1(),
 				)
 				gccontroller := leaderelection.NewLeaseCandidateGC(
 					client,
