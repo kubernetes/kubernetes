@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
-	v1alpha2 "k8s.io/api/coordination/v1alpha2"
+	v1beta1 "k8s.io/api/coordination/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,7 +44,7 @@ import (
 func TestSingleLeaseCandidate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestSingleLeaseCandidate(t *testing.T) {
 func TestMultipleLeaseCandidate(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 func TestUpgradeSkew(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +138,7 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 		apiserver.LeaseCandidateGCPeriod = 30 * time.Minute
 	}()
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -149,12 +149,12 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expiredLC := &v1alpha2.LeaseCandidate{
+	expiredLC := &v1beta1.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "expired",
 			Namespace: "default",
 		},
-		Spec: v1alpha2.LeaseCandidateSpec{
+		Spec: v1beta1.LeaseCandidateSpec{
 			LeaseName:        "foobaz",
 			BinaryVersion:    "0.1.0",
 			EmulationVersion: "0.1.0",
@@ -164,13 +164,13 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 		},
 	}
 	ctx := context.Background()
-	_, err = clientset.CoordinationV1alpha2().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
+	_, err = clientset.CoordinationV1beta1().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = wait.PollUntilContextTimeout(ctx, 1000*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		_, err = clientset.CoordinationV1alpha2().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
+		_, err = clientset.CoordinationV1beta1().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
