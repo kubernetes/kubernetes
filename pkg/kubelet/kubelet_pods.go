@@ -1904,8 +1904,10 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
 	// ensure the probe managers have up to date status for containers
-	kl.probeManager.UpdatePodStatus(pod, s)
+	kl.probeManager.UpdatePodStatus(context.TODO(), pod, s)
 
 	// update the allocated resources status
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) {
