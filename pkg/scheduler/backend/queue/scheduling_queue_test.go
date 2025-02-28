@@ -1097,7 +1097,8 @@ func TestPriorityQueue_Update(t *testing.T) {
 			name:  "When updating a pod that is in backoff queue and is still backing off, it will be updated in backoff queue",
 			wantQ: backoffQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				podInfo := q.newQueuedPodInfo(medPriorityPodInfo.Pod)
+				podInfo := attemptQueuedPodInfo(q.newQueuedPodInfo(medPriorityPodInfo.Pod))
+				podInfo.BackoffExpiration = q.backoffQ.calculateBackoffTime(podInfo)
 				q.backoffQ.add(logger, podInfo)
 				return podInfo.Pod, podInfo.Pod
 			},
@@ -1107,7 +1108,9 @@ func TestPriorityQueue_Update(t *testing.T) {
 			name:  "when updating a pod which is in unschedulable queue and is backing off, it will be moved to backoff queue",
 			wantQ: backoffQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				q.unschedulablePods.addOrUpdate(attemptQueuedPodInfo(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin)))
+				podInfo := attemptQueuedPodInfo(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin))
+				podInfo.BackoffExpiration = q.backoffQ.calculateBackoffTime(podInfo)
+				q.unschedulablePods.addOrUpdate(podInfo)
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test"
 				return medPriorityPodInfo.Pod, updatedPod
@@ -1118,7 +1121,9 @@ func TestPriorityQueue_Update(t *testing.T) {
 			name:  "when updating a pod which is in unschedulable queue and is not backing off, it will be moved to active queue",
 			wantQ: activeQ,
 			prepareFunc: func(t *testing.T, logger klog.Logger, q *PriorityQueue) (oldPod, newPod *v1.Pod) {
-				q.unschedulablePods.addOrUpdate(attemptQueuedPodInfo(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin)))
+				podInfo := attemptQueuedPodInfo(q.newQueuedPodInfo(medPriorityPodInfo.Pod, queuePlugin))
+				podInfo.BackoffExpiration = q.backoffQ.calculateBackoffTime(podInfo)
+				q.unschedulablePods.addOrUpdate(podInfo)
 				updatedPod := medPriorityPodInfo.Pod.DeepCopy()
 				updatedPod.Annotations["foo"] = "test1"
 				// Move clock by podInitialBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
@@ -2977,6 +2982,7 @@ var (
 				Message: "fake scheduling failure",
 			})
 			pInfo = attemptQueuedPodInfo(pInfo)
+			pInfo.BackoffExpiration = queue.backoffQ.calculateBackoffTime(pInfo)
 		}
 		queue.unschedulablePods.addOrUpdate(pInfo)
 	}
@@ -3640,7 +3646,7 @@ func TestBackOffFlow(t *testing.T) {
 			}
 
 			// Check backoff duration.
-			deadline := q.backoffQ.getBackoffTime(podInfo)
+			deadline := q.backoffQ.calculateBackoffTime(podInfo)
 			backoff := deadline.Sub(timestamp)
 			if backoff != step.wantBackoff {
 				t.Errorf("got backoff %s, want %s", backoff, step.wantBackoff)
@@ -3743,6 +3749,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 				// in a certain order.
 				// See: https://github.com/golang/go/issues/8687
 				podInfo.Timestamp = podInfo.Timestamp.Add(time.Duration((i - len(tt.podInfos))) * time.Millisecond)
+				podInfo.BackoffExpiration = q.backoffQ.calculateBackoffTime(podInfo)
 			}
 			q.MoveAllToActiveOrBackoffQueue(logger, tt.event, nil, nil, tt.preEnqueueCheck)
 			var got []string
