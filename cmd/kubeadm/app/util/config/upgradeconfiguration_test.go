@@ -38,9 +38,10 @@ import (
 
 func TestDocMapToUpgradeConfiguration(t *testing.T) {
 	tests := []struct {
-		name        string
-		cfg         kubeadmapiv1.UpgradeConfiguration
-		expectedCfg kubeadmapi.UpgradeConfiguration
+		name          string
+		cfg           interface{}
+		expectedCfg   kubeadmapi.UpgradeConfiguration
+		expectedError bool
 	}{
 		{
 			name: "default config is set correctly",
@@ -63,6 +64,9 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 		},
 		{
@@ -72,6 +76,9 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					CertificateRenewal: ptr.To(false),
 				},
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
 					EtcdUpgrade: ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
@@ -92,7 +99,20 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 			},
+		},
+		{
+			name: "no UpgradeConfiguration found",
+			cfg: kubeadmapiv1.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.InitConfigurationKind,
+				},
+			},
+			expectedError: true,
 		},
 	}
 
@@ -107,11 +127,13 @@ func TestDocMapToUpgradeConfiguration(t *testing.T) {
 				t.Fatalf("Unexpected error of SplitYAMLDocuments: %v", err)
 			}
 			cfg, err := DocMapToUpgradeConfiguration(docmap)
-			if err != nil {
-				t.Fatalf("unexpected error of DocMapToUpgradeConfiguration: %v\nconfig: %s", err, string(b))
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("failed DocMapToUpgradeConfiguration:\n\texpected error: %t\n\t  actual error: %v", tc.expectedError, err)
 			}
-			if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
-				t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+			if err == nil {
+				if diff := cmp.Diff(*cfg, tc.expectedCfg, cmpopts.IgnoreFields(kubeadmapi.UpgradeConfiguration{}, "Timeouts")); diff != "" {
+					t.Fatalf("DocMapToUpgradeConfiguration returned unexpected diff (-want,+got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -180,6 +202,9 @@ func TestLoadUpgradeConfigurationFromFile(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 			wantErr: false,
 		},
@@ -236,6 +261,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
 				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(true),
+				},
 			},
 		},
 		{
@@ -250,6 +278,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:     ptr.To(false),
 					ImagePullPolicy: v1.PullAlways,
 					ImagePullSerial: ptr.To(false),
+				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -268,6 +299,9 @@ func TestDefaultedUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullAlways,
 					ImagePullSerial:    ptr.To(false),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},
@@ -312,6 +346,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 				Node: kubeadmapiv1.UpgradeNodeConfiguration{
 					EtcdUpgrade: ptr.To(false),
 				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.UpgradeConfigurationKind,
@@ -329,6 +366,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullIfNotPresent,
 					ImagePullSerial:    ptr.To(true),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},
@@ -348,6 +388,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					ImagePullPolicy:    v1.PullNever,
 					ImagePullSerial:    ptr.To(false),
 				},
+				Plan: kubeadmapiv1.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
+				},
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.UpgradeConfigurationKind,
@@ -365,6 +408,9 @@ func TestLoadOrDefaultUpgradeConfiguration(t *testing.T) {
 					EtcdUpgrade:        ptr.To(false),
 					ImagePullPolicy:    v1.PullNever,
 					ImagePullSerial:    ptr.To(false),
+				},
+				Plan: kubeadmapi.UpgradePlanConfiguration{
+					EtcdUpgrade: ptr.To(false),
 				},
 			},
 		},

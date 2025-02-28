@@ -860,6 +860,128 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	}
 }
 
+// TestAdmitBelowTerminatingQuotaLimitWhenPodScopeUpdated ensures that terminating pods are charged to the right quota.
+// It creates a terminating and non-terminating quota, and changes an existing pod to be terminating.
+// It ensures that the terminating quota is incremented, and the non-terminating quota is not.
+//
+// The Quota admission is intended to fail "high" in this case, and depends on a controller reconciling actual persisted
+// use to lower / free the reserved quota. We need always overcount in the admission plugin if something later causes
+// the request to be rejected, so you can not reduce quota with requests that aren't completed.
+func TestAdmitBelowTerminatingQuotaLimitWhenPodScopeUpdated(t *testing.T) {
+	resourceQuotaNonTerminating := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-non-terminating", Namespace: "test", ResourceVersion: "124"},
+		Spec: corev1.ResourceQuotaSpec{
+			Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeNotTerminating},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("50Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
+			},
+		},
+	}
+	resourceQuotaTerminating := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-terminating", Namespace: "test", ResourceVersion: "124"},
+		Spec: corev1.ResourceQuotaSpec{
+			Scopes: []corev1.ResourceQuotaScope{corev1.ResourceQuotaScopeTerminating},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("50Gi"),
+				corev1.ResourcePods:   resource.MustParse("3"),
+			},
+		},
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuotaTerminating, resourceQuotaNonTerminating)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
+	}
+
+	err = informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaNonTerminating)
+	if err != nil {
+		t.Errorf("Error occurred while adding resource quota to the indexer: %v", err)
+	}
+	err = informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaTerminating)
+	if err != nil {
+		t.Errorf("Error occurred while adding resource quota to the indexer: %v", err)
+	}
+
+	// old pod belonged to the non-terminating scope, but updated version belongs to the terminating scope
+	existingPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
+	existingPod.ResourceVersion = "1"
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", "")))
+	activeDeadlineSeconds := int64(30)
+	newPod.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPod, existingPod, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, corev1.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.CreateOptions{}, false, nil), nil)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
+	}
+
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	decimatedActions := removeListWatch(kubeClient.Actions())
+	lastActionIndex := len(decimatedActions) - 1
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+
+	// ensure only the quota-terminating was updated
+	if usage.Name != resourceQuotaTerminating.Name {
+		t.Errorf("Incremented the wrong quota, expected %v, actual %v", resourceQuotaTerminating.Name, usage.Name)
+	}
+
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Gi"),
+				corev1.ResourcePods:   resource.MustParse("5"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1100m"),
+				corev1.ResourceMemory: resource.MustParse("52Gi"),
+				corev1.ResourcePods:   resource.MustParse("4"),
+			},
+		},
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+}
+
 // TestAdmitBelowBestEffortQuotaLimit creates a best effort and non-best effort quota.
 // It verifies that best effort pods are properly scoped to the best effort quota document.
 func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {

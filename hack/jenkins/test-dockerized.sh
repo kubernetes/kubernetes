@@ -19,7 +19,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Runs the unit and integration tests, producing JUnit-style XML test
+# Runs test-cmd and test-integration,
+# producing JUnit-style XML test
 # reports in ${WORKSPACE}/artifacts. This script is intended to be run from
 # kubekins-test container with a kubernetes repo mapped in. See
 # k8s.io/test-infra/scenarios/kubernetes_verify.py
@@ -27,7 +28,11 @@ set -o xtrace
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 # Install tools we need
-go -C "./hack/tools" install gotest.tools/gotestsum
+hack_tools_gotoolchain="${GOTOOLCHAIN:-}"
+if [ -n "${KUBE_HACK_TOOLS_GOTOOLCHAIN:-}" ]; then
+  hack_tools_gotoolchain="${KUBE_HACK_TOOLS_GOTOOLCHAIN}";
+fi
+GOTOOLCHAIN="${hack_tools_gotoolchain}" go -C "./hack/tools" install gotest.tools/gotestsum
 
 # Disable coverage report
 export KUBE_COVER="n"

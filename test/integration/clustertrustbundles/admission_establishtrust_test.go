@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestCTBAttestPlugin(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			ctx := context.Background()
 
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--authorization-mode=RBAC", "--feature-gates=ClusterTrustBundle=true"}, framework.SharedEtcd())
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--authorization-mode=RBAC", "--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certsv1alpha1.SchemeGroupVersion)}, framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client := kubernetes.NewForConfigOrDie(server.ClientConfig)

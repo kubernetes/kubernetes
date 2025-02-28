@@ -942,6 +942,7 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 			name: "add ephemeral container to regular pod and expect success",
 			oldPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
+				podtest.SetGeneration(1),
 			),
 			newPod: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("1"),
@@ -953,6 +954,7 @@ func TestEphemeralContainerStrategyValidateUpdate(t *testing.T) {
 						TerminationMessagePolicy: "File",
 					},
 				}),
+				podtest.SetGeneration(2),
 			),
 		},
 	}
@@ -1338,7 +1340,7 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
 
-			pod := podtest.MakePod("foo")
+			pod := podtest.MakePod("foo", podtest.SetGeneration(1))
 			wantPod := pod.DeepCopy()
 			pod.Spec.TopologySpreadConstraints = append(pod.Spec.TopologySpreadConstraints, tc.topologySpreadConstraints...)
 
@@ -2451,6 +2453,7 @@ func (w *warningRecorder) AddWarning(_, text string) {
 }
 
 func TestPodResizePrepareForUpdate(t *testing.T) {
+	containerRestartPolicyAlways := api.ContainerRestartPolicyAlways
 	tests := []struct {
 		name     string
 		oldPod   *api.Pod
@@ -2469,6 +2472,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2488,6 +2492,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2507,6 +2512,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2529,6 +2535,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2551,6 +2558,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						api.ContainerResizePolicy{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 					),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2573,6 +2581,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						api.ContainerResizePolicy{ResourceName: "memory", RestartPolicy: "RestartContainer"},
 					),
 				)),
+				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2594,6 +2603,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2622,6 +2632,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2640,6 +2651,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2661,6 +2673,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2689,6 +2702,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2707,6 +2721,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						},
 					}),
 				)),
+				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
@@ -2739,6 +2754,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("container1",
@@ -2774,6 +2790,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("container1",
@@ -2809,6 +2826,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(
@@ -2841,6 +2859,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("container1",
@@ -2864,6 +2883,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("container1",
@@ -2887,9 +2907,157 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 						}),
 					),
 				),
+				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+		},
+		{
+			name: "Update resources for sidecar container",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetInitContainers(
+					podtest.MakeContainer("init-container1",
+						podtest.SetContainerRestartPolicy(containerRestartPolicyAlways),
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetGeneration(1),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("init-container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetInitContainers(
+					podtest.MakeContainer("init-container1",
+						podtest.SetContainerRestartPolicy(containerRestartPolicyAlways),
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
+				),
+				podtest.SetGeneration(1),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("init-container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetInitContainers(
+					podtest.MakeContainer("init-container1",
+						podtest.SetContainerRestartPolicy(containerRestartPolicyAlways),
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
+				),
+				podtest.SetGeneration(2),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("init-container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+		},
+		{
+			name: "Update resources should fail for non-restartable init container",
+			oldPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("1"),
+				podtest.SetInitContainers(
+					podtest.MakeContainer("init-container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("init-container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			newPod: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetInitContainers(
+					podtest.MakeContainer("init-container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
+				),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("init-container1",
+							api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							}),
+					),
+				)),
+			),
+			expected: podtest.MakePod("test-pod",
+				podtest.SetResourceVersion("2"),
+				podtest.SetInitContainers(
+					podtest.MakeContainer("init-container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
+				),
+				podtest.SetGeneration(1),
+				podtest.SetStatus(podtest.MakePodStatus(
+					podtest.SetResizeStatus(""), // Resize status not set
+					podtest.SetContainerStatuses(
+						podtest.MakeContainerStatus("init-container1",
 							api.ResourceList{
 								api.ResourceCPU:    resource.MustParse("100m"),
 								api.ResourceMemory: resource.MustParse("1Gi"),
@@ -2904,10 +3072,237 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingAllocatedStatus, true)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 			ctx := context.Background()
 			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
 			if !cmp.Equal(tc.expected, tc.newPod) {
 				t.Errorf("ResizeStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
+			}
+		})
+	}
+}
+
+func TestPodGenerationPrepareForCreate(t *testing.T) {
+	testCases := []struct {
+		pod                *api.Pod
+		expectedGeneration int64
+	}{
+		{
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gen-not-set",
+				},
+			},
+			expectedGeneration: 1,
+		},
+		{
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "gen-custom-set",
+					Generation: 5,
+				},
+			},
+			expectedGeneration: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.pod.Name, func(t *testing.T) {
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), tc.pod)
+			actual := tc.pod.Generation
+			if actual != tc.expectedGeneration {
+				t.Errorf("invalid generation for pod %s, expected: %d, actual: %d", tc.pod.Name, tc.expectedGeneration, actual)
+			}
+		})
+	}
+}
+
+func TestPodGenerationPrepareForUpdate(t *testing.T) {
+	testCases := []struct {
+		description        string
+		oldPod             *api.Pod
+		newPod             *api.Pod
+		expectedGeneration int64
+	}{
+		{
+			description: "pod not updated",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-not-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{newContainer("container", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-not-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{newContainer("container", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))},
+				},
+			},
+			expectedGeneration: 1,
+		},
+		{
+			description: "only metadata change",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "only-metadata-change",
+					Generation:  1,
+					Annotations: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{newContainer("container", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "only-metadata-change",
+					Generation:  1,
+					Annotations: map[string]string{"foo": "baz"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{newContainer("container", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))},
+				},
+			},
+			expectedGeneration: 1,
+		},
+		{
+			description: "spec semantically equal",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "spec-semantically-equal",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "spec-semantically-equal",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{},
+				},
+			},
+			expectedGeneration: 1,
+		},
+		{
+			description: "tolerations updated",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "tolerations-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "tolerations-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{{
+						Key:   "toleration-key",
+						Value: "toleration-value",
+					}},
+				},
+			},
+			expectedGeneration: 2,
+		},
+		{
+			description: "generation not set",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gen-not-set",
+				},
+				Spec: api.PodSpec{},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gen-not-set",
+				},
+				Spec: api.PodSpec{},
+			},
+			expectedGeneration: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			Strategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
+			actual := tc.newPod.Generation
+			if actual != tc.expectedGeneration {
+				t.Errorf("invalid generation for pod %s, expected: %d, actual: %d", tc.oldPod.Name, tc.expectedGeneration, actual)
+			}
+		})
+	}
+}
+
+func TestEphemeralContainersPrepareForUpdate(t *testing.T) {
+	testCases := []struct {
+		description        string
+		oldPod             *api.Pod
+		newPod             *api.Pod
+		expectedGeneration int64
+	}{
+		{
+			description: "pod not updated",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-not-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{newContainer("container", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "pod-not-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{newContainer("container", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi"))},
+				},
+			},
+			expectedGeneration: 1,
+		},
+		{
+			description: "ephemeral containers updated",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "ephemeral-containers-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "ephemeral-containers-updated",
+					Generation: 1,
+				},
+				Spec: api.PodSpec{
+					EphemeralContainers: []api.EphemeralContainer{{
+						EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "ephemeral-container"},
+					}},
+				},
+			},
+			expectedGeneration: 2,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			EphemeralContainersStrategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
+			actual := tc.newPod.Generation
+			if actual != tc.expectedGeneration {
+				t.Errorf("invalid generation for pod %s, expected: %d, actual: %d", tc.oldPod.Name, tc.expectedGeneration, actual)
 			}
 		})
 	}

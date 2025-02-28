@@ -18,12 +18,17 @@ package transport
 
 import (
 	"bytes"
+	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/go-logr/logr/funcr"
 
 	"k8s.io/klog/v2"
 )
@@ -460,101 +465,224 @@ func TestHeaderEscapeRoundTrip(t *testing.T) {
 	}
 }
 
+//nolint:logcheck // Intentionally tests with global logging.
 func TestDebuggingRoundTripper(t *testing.T) {
-	t.Parallel()
-
 	rawURL := "https://127.0.0.1:12345/api/v1/pods?limit=500"
-	req := &http.Request{
-		Method: http.MethodGet,
-		Header: map[string][]string{
-			"Authorization":  {"bearer secretauthtoken"},
-			"X-Test-Request": {"test"},
-		},
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatalf("url.Parse(%q) returned error: %v", rawURL, err)
 	}
+	method := http.MethodGet
+	header := map[string][]string{
+		"Authorization":  {"bearer secretauthtoken"},
+		"X-Test-Request": {"test"},
+	}
+	reqHeaderText := `headers=<
+	Authorization: bearer <masked>
+	X-Test-Request: test
+ >`
+	// Both can be written by funcr.
+	reqHeaderJSON := `"headers":{"Authorization":["bearer <masked>"],"X-Test-Request":["test"]}`
+	reqHeaderJSONReversed := `"headers":{"X-Test-Request":["test"],"Authorization":["bearer <masked>"]}`
+
 	res := &http.Response{
 		Status:     "OK",
 		StatusCode: http.StatusOK,
 		Header: map[string][]string{
-			"X-Test-Response": {"test"},
+			"X-Test-Response": {"a", "b"},
 		},
 	}
+
+	resHeaderText := `headers=<
+	X-Test-Response: a
+	X-Test-Response: b
+ >`
+	resHeaderJSON := `"headers":{"X-Test-Response":["a","b"]}`
+
 	tcs := []struct {
-		levels              []DebugLevel
-		expectedOutputLines []string
+		levels            []DebugLevel
+		v                 int
+		expectedTextLines []string
+		expectedJSONLines []string
 	}{
 		{
-			levels:              []DebugLevel{DebugJustURL},
-			expectedOutputLines: []string{fmt.Sprintf("%s %s", req.Method, rawURL)},
+			levels:            []DebugLevel{DebugJustURL},
+			expectedTextLines: []string{fmt.Sprintf(`"Request" verb=%q url=%q`, method, rawURL)},
+			expectedJSONLines: []string{fmt.Sprintf(`"msg":"Request","verb":%q,"url":%q`, method, rawURL)},
 		},
 		{
-			levels: []DebugLevel{DebugRequestHeaders},
-			expectedOutputLines: func() []string {
-				lines := []string{fmt.Sprintf("Request Headers:\n")}
-				for key, values := range req.Header {
-					for _, value := range values {
-						if key == "Authorization" {
-							value = "bearer <masked>"
-						}
-						lines = append(lines, fmt.Sprintf("    %s: %s\n", key, value))
-					}
-				}
-				return lines
-			}(),
+			levels:            []DebugLevel{DebugRequestHeaders},
+			expectedTextLines: []string{`"Request" ` + reqHeaderText},
+			expectedJSONLines: []string{`"msg":"Request",` + reqHeaderJSON},
 		},
 		{
-			levels: []DebugLevel{DebugResponseHeaders},
-			expectedOutputLines: func() []string {
-				lines := []string{fmt.Sprintf("Response Headers:\n")}
-				for key, values := range res.Header {
-					for _, value := range values {
-						lines = append(lines, fmt.Sprintf("    %s: %s\n", key, value))
-					}
-				}
-				return lines
-			}(),
+			levels:            []DebugLevel{DebugResponseHeaders},
+			expectedTextLines: []string{`"Response" ` + resHeaderText},
+			expectedJSONLines: []string{`"msg":"Response",` + resHeaderJSON},
 		},
 		{
-			levels:              []DebugLevel{DebugURLTiming},
-			expectedOutputLines: []string{fmt.Sprintf("%s %s %s", req.Method, rawURL, res.Status)},
+			levels:            []DebugLevel{DebugURLTiming},
+			expectedTextLines: []string{fmt.Sprintf(`"Response" verb=%q url=%q status=%q`, method, rawURL, res.Status)},
+			expectedJSONLines: []string{fmt.Sprintf(`"msg":"Response","verb":%q,"url":%q,"status":%q`, method, rawURL, res.Status)},
 		},
 		{
-			levels:              []DebugLevel{DebugResponseStatus},
-			expectedOutputLines: []string{fmt.Sprintf("Response Status: %s", res.Status)},
+			levels:            []DebugLevel{DebugResponseStatus},
+			expectedTextLines: []string{fmt.Sprintf(`"Response" status=%q`, res.Status)},
+			expectedJSONLines: []string{fmt.Sprintf(`"msg":"Response","status":%q`, res.Status)},
 		},
 		{
-			levels:              []DebugLevel{DebugCurlCommand},
-			expectedOutputLines: []string{fmt.Sprintf("curl -v -X")},
+			levels: []DebugLevel{DebugCurlCommand},
+			expectedTextLines: []string{`curlCommand=<
+	curl -v -X`},
+			expectedJSONLines: []string{`"curlCommand":"curl -v -X`},
+		},
+		{
+			levels:            []DebugLevel{DebugURLTiming, DebugResponseStatus},
+			expectedTextLines: []string{fmt.Sprintf(`"Response" verb=%q url=%q status=%q milliseconds=`, method, rawURL, res.Status)},
+			expectedJSONLines: []string{fmt.Sprintf(`"msg":"Response","verb":%q,"url":%q,"status":%q,"milliseconds":`, method, rawURL, res.Status)},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      5,
+		},
+		{
+			levels: []DebugLevel{DebugByContext, DebugURLTiming},
+			v:      5,
+			expectedTextLines: []string{
+				fmt.Sprintf(`"Response" verb=%q url=%q status=%q milliseconds=`, method, rawURL, res.Status),
+			},
+			expectedJSONLines: []string{
+				fmt.Sprintf(`"msg":"Response","verb":%q,"url":%q,"status":%q,"milliseconds":`, method, rawURL, res.Status),
+			},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      6,
+			expectedTextLines: []string{
+				fmt.Sprintf(`"Response" verb=%q url=%q status=%q milliseconds=`, method, rawURL, res.Status),
+			},
+			expectedJSONLines: []string{
+				fmt.Sprintf(`"msg":"Response","verb":%q,"url":%q,"status":%q,"milliseconds":`, method, rawURL, res.Status),
+			},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      7,
+			expectedTextLines: []string{
+				fmt.Sprintf(`"Request" verb=%q url=%q %s
+`, method, rawURL, reqHeaderText),
+				fmt.Sprintf(`"Response" status=%q milliseconds=`, res.Status),
+			},
+			expectedJSONLines: []string{
+				fmt.Sprintf(`"msg":"Request","verb":%q,"url":%q,%s`, method, rawURL, reqHeaderJSON),
+				fmt.Sprintf(`"msg":"Response","status":%q,"milliseconds":`, res.Status),
+			},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      8,
+			expectedTextLines: []string{
+				fmt.Sprintf(`"Request" verb=%q url=%q %s
+`, method, rawURL, reqHeaderText),
+				fmt.Sprintf(`"Response" status=%q %s milliseconds=`, res.Status, resHeaderText),
+			},
+			expectedJSONLines: []string{
+				fmt.Sprintf(`"msg":"Request","verb":%q,"url":%q,%s`, method, rawURL, reqHeaderJSON),
+				fmt.Sprintf(`"msg":"Response","status":%q,%s,"milliseconds":`, res.Status, resHeaderJSON),
+			},
+		},
+		{
+			levels: []DebugLevel{DebugByContext},
+			v:      9,
+			expectedTextLines: []string{
+				fmt.Sprintf(`"Request" curlCommand=<
+	curl -v -X%s`, method),
+				fmt.Sprintf(`"Response" verb=%q url=%q status=%q %s milliseconds=`, method, rawURL, res.Status, resHeaderText),
+			},
+			expectedJSONLines: []string{
+				fmt.Sprintf(`"msg":"Request","curlCommand":"curl -v -X%s`, method),
+				fmt.Sprintf(`"msg":"Response","verb":%q,"url":%q,"status":%q,%s,"milliseconds":`, method, rawURL, res.Status, resHeaderJSON),
+			},
 		},
 	}
 
-	for _, tc := range tcs {
-		// hijack the klog output
-		tmpWriteBuffer := bytes.NewBuffer(nil)
-		klog.SetOutput(tmpWriteBuffer)
-		klog.LogToStderr(false)
+	for i, tc := range tcs {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			for _, format := range []string{"text", "JSON"} {
+				t.Run(format, func(t *testing.T) {
+					// hijack the klog output
+					state := klog.CaptureState()
+					tmpWriteBuffer := bytes.NewBuffer(nil)
+					klog.SetOutput(tmpWriteBuffer)
+					klog.LogToStderr(false)
+					var fs flag.FlagSet
+					klog.InitFlags(&fs)
+					if err := fs.Set("one_output", "true"); err != nil {
+						t.Errorf("unexpected error setting -one_output: %v", err)
+					}
+					if err := fs.Set("v", fmt.Sprintf("%d", tc.v)); err != nil {
+						t.Errorf("unexpected error setting -v: %v", err)
+					}
 
-		// parse rawURL
-		parsedURL, err := url.Parse(rawURL)
-		if err != nil {
-			t.Fatalf("url.Parse(%q) returned error: %v", rawURL, err)
-		}
-		req.URL = parsedURL
+					expectOutput := tc.expectedTextLines
+					var req *http.Request
+					if format == "JSON" {
+						// Logger will be picked up through the context.
+						logger := funcr.NewJSON(func(obj string) {
+							_, _ = tmpWriteBuffer.Write([]byte(obj))
+							_, _ = tmpWriteBuffer.Write([]byte("\n"))
+						}, funcr.Options{Verbosity: tc.v})
+						ctx := klog.NewContext(context.Background(), logger)
+						expectOutput = tc.expectedJSONLines
+						r, err := http.NewRequestWithContext(ctx, method, rawURL, nil)
+						if err != nil {
+							t.Fatalf("unexpected error constructing the HTTP request: %v", err)
+						}
+						req = r
+					} else {
+						// Intentionally no context, as before.
+						req = &http.Request{
+							Method: method,
+							URL:    parsedURL,
+						}
+					}
+					req.Header = header
 
-		// execute the round tripper
-		rt := &testRoundTripper{
-			Response: res,
-		}
-		NewDebuggingRoundTripper(rt, tc.levels...).RoundTrip(req)
+					// execute the round tripper
+					rt := &testRoundTripper{
+						Response: res,
+					}
+					if len(tc.levels) == 1 && tc.levels[0] == DebugByContext {
+						DebugWrappers(rt).RoundTrip(req)
+					} else {
+						NewDebuggingRoundTripper(rt, tc.levels...).RoundTrip(req)
+					}
 
-		// call Flush to ensure the text isn't still buffered
-		klog.Flush()
+					// call Flush to ensure the text isn't still buffered
+					klog.Flush()
 
-		// check if klog's output contains the expected lines
-		actual := tmpWriteBuffer.String()
-		for _, expected := range tc.expectedOutputLines {
-			if !strings.Contains(actual, expected) {
-				t.Errorf("%q does not contain expected output %q", actual, expected)
+					// check if klog's output contains the expected lines
+					actual := tmpWriteBuffer.String()
+
+					// funcr writes a map in non-deterministic order.
+					// Fix that up before comparison.
+					actual = strings.ReplaceAll(actual, reqHeaderJSONReversed, reqHeaderJSON)
+
+					for _, expected := range expectOutput {
+						if !strings.Contains(actual, expected) {
+							t.Errorf("verbosity %d: expected this substring:\n%s\n\ngot:\n%s", tc.v, expected, actual)
+						}
+					}
+					// These test cases describe all expected lines. Split the log output
+					// into log entries and compare their number.
+					entries := regexp.MustCompile(`(?m)^[I{]`).FindAllStringIndex(actual, -1)
+					if tc.v > 0 && len(entries) != len(expectOutput) {
+						t.Errorf("expected %d output lines, got %d:\n%s", len(expectOutput), len(entries), actual)
+					}
+
+					state.Restore()
+				})
 			}
-		}
+		})
 	}
 }

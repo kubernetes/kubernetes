@@ -52,6 +52,26 @@
       ]
     },
     {
+      "kind": "IPAddress",
+      "name": "ipaddresses",
+      "namespaced": false,
+      "shortNames": [
+        "ip"
+      ],
+      "singularName": "ipaddress",
+      "storageVersionHash": "O4H8VxQhW5Y=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
       "kind": "NetworkPolicy",
       "name": "networkpolicies",
       "namespaced": true,
@@ -69,6 +89,34 @@
         "patch",
         "update",
         "watch"
+      ]
+    },
+    {
+      "kind": "ServiceCIDR",
+      "name": "servicecidrs",
+      "namespaced": false,
+      "singularName": "servicecidr",
+      "storageVersionHash": "8ufAXOnr3Yg=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ServiceCIDR",
+      "name": "servicecidrs/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
       ]
     }
   ]

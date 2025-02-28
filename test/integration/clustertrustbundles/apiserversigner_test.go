@@ -73,6 +73,7 @@ func TestClusterTrustBundlesPublisherController(t *testing.T) {
 		"--disable-admission-plugins", "ServiceAccount",
 		"--authorization-mode=RBAC",
 		"--feature-gates", "ClusterTrustBundle=true",
+		fmt.Sprintf("--runtime-config=%s=true", v1alpha1.SchemeGroupVersion),
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)

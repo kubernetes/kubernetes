@@ -290,6 +290,8 @@ func TestPlugin(t *testing.T) {
 		prepare prepare
 		want    want
 
+		// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
+		enableDRAAdminAccess bool
 		// Feature gates. False is chosen so that the uncommon case
 		// doesn't need to be set.
 		disableDRA bool
@@ -301,7 +303,7 @@ func TestPlugin(t *testing.T) {
 					status: framework.NewStatus(framework.Skip),
 				},
 				postfilter: result{
-					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+					status: framework.NewStatus(framework.Unschedulable),
 				},
 			},
 		},
@@ -554,9 +556,10 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 
-		"request-admin-access": {
-			// Because the pending claim asks for admin access, allocation succeeds despite resources
-			// being exhausted.
+		"request-admin-access-with-DRAAdminAccess-featuregate": {
+			// When the DRAAdminAccess feature gate is enabled,
+			// Because the pending claim asks for admin access,
+			// allocation succeeds despite resources being exhausted.
 			pod:     podWithClaimName,
 			claims:  []*resourceapi.ResourceClaim{adminAccess(pendingClaim), otherAllocatedClaim},
 			classes: []*resourceapi.DeviceClass{deviceClass},
@@ -582,6 +585,24 @@ func TestPlugin(t *testing.T) {
 					assumedClaim: reserve(adminAccess(allocatedClaim), podWithClaimName),
 				},
 			},
+			enableDRAAdminAccess: true,
+		},
+		"request-admin-access-without-DRAAdminAccess-featuregate": {
+			// When the DRAAdminAccess feature gate is disabled,
+			// even though the pending claim requests admin access,
+			// the scheduler returns an unschedulable status.
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{adminAccess(pendingClaim), otherAllocatedClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: admin access is requested, but the feature is disabled`),
+					},
+				},
+			},
+			enableDRAAdminAccess: false,
 		},
 
 		"structured-ignore-allocated-admin-access": {
@@ -768,6 +789,9 @@ func TestPlugin(t *testing.T) {
 				prefilter: result{
 					status: framework.NewStatus(framework.Skip),
 				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `plugin disabled`),
+				},
 			},
 			disableDRA: true,
 		},
@@ -783,6 +807,7 @@ func TestPlugin(t *testing.T) {
 				nodes = []*v1.Node{workerNode}
 			}
 			features := feature.Features{
+				EnableDRAAdminAccess:            tc.enableDRAAdminAccess,
 				EnableDynamicResourceAllocation: !tc.disableDRA,
 			}
 			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.objs, features)
@@ -801,9 +826,6 @@ func TestPlugin(t *testing.T) {
 				assert.Equal(t, tc.want.preFilterResult, result)
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
-			if status.IsSkip() {
-				return
-			}
 			unschedulable := status.Code() != framework.Success
 
 			var potentialNodes []*framework.NodeInfo
@@ -912,9 +934,9 @@ type testContext struct {
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
-	if expectedErr := status.AsError(); expectedErr != nil {
+	if actualErr := status.AsError(); actualErr != nil {
 		// Compare only the error strings.
-		assert.ErrorContains(t, status.AsError(), expectedErr.Error())
+		assert.ErrorContains(t, actualErr, expected.status.AsError().Error())
 	} else {
 		assert.Equal(t, expected.status, status)
 	}

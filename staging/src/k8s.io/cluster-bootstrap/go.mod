@@ -2,15 +2,13 @@
 
 module k8s.io/cluster-bootstrap
 
-go 1.23.0
+go 1.24.0
 
-godebug default=go1.23
-
-godebug winsymlink=0
+godebug default=go1.24
 
 require (
 	github.com/stretchr/testify v1.9.0
-	gopkg.in/square/go-jose.v2 v2.6.0
+	gopkg.in/go-jose/go-jose.v2 v2.6.3
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.130.1

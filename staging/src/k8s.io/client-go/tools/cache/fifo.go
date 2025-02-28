@@ -27,30 +27,16 @@ import (
 // It is supposed to process the accumulator popped from the queue.
 type PopProcessFunc func(obj interface{}, isInInitialList bool) error
 
-// ErrRequeue may be returned by a PopProcessFunc to safely requeue
-// the current item. The value of Err will be returned from Pop.
-type ErrRequeue struct {
-	// Err is returned by the Pop function
-	Err error
-}
-
 // ErrFIFOClosed used when FIFO is closed
 var ErrFIFOClosed = errors.New("DeltaFIFO: manipulating with closed queue")
 
-func (e ErrRequeue) Error() string {
-	if e.Err == nil {
-		return "the popped item should be requeued without returning an error"
-	}
-	return e.Err.Error()
-}
-
-// Queue extends Store with a collection of Store keys to "process".
+// Queue extends ReflectorStore with a collection of Store keys to "process".
 // Every Add, Update, or Delete may put the object's key in that collection.
 // A Queue has a way to derive the corresponding key given an accumulator.
 // A Queue can be accessed concurrently from multiple goroutines.
 // A Queue can be "closed", after which Pop operations return an error.
 type Queue interface {
-	Store
+	ReflectorStore
 
 	// Pop blocks until there is at least one key to process or the
 	// Queue is closed.  In the latter case Pop returns with an error.
@@ -63,11 +49,6 @@ type Queue interface {
 	// of the atomic processing and (b) return the inner error from
 	// Pop.
 	Pop(PopProcessFunc) (interface{}, error)
-
-	// AddIfNotPresent puts the given accumulator into the Queue (in
-	// association with the accumulator's key) if and only if that key
-	// is not already associated with a non-empty accumulator.
-	AddIfNotPresent(interface{}) error
 
 	// HasSynced returns true if the first batch of keys have all been
 	// popped.  The first batch of keys are those of the first Replace
@@ -177,36 +158,6 @@ func (f *FIFO) Add(obj interface{}) error {
 	return nil
 }
 
-// AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
-// present in the set, it is neither enqueued nor added to the set.
-//
-// This is useful in a single producer/consumer scenario so that the consumer can
-// safely retry items without contending with the producer and potentially enqueueing
-// stale items.
-func (f *FIFO) AddIfNotPresent(obj interface{}) error {
-	id, err := f.keyFunc(obj)
-	if err != nil {
-		return KeyError{obj, err}
-	}
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.addIfNotPresent(id, obj)
-	return nil
-}
-
-// addIfNotPresent assumes the fifo lock is already held and adds the provided
-// item to the queue under id if it does not already exist.
-func (f *FIFO) addIfNotPresent(id string, obj interface{}) {
-	f.populated = true
-	if _, exists := f.items[id]; exists {
-		return
-	}
-
-	f.queue = append(f.queue, id)
-	f.items[id] = obj
-	f.cond.Broadcast()
-}
-
 // Update is the same as Add in this implementation.
 func (f *FIFO) Update(obj interface{}) error {
 	return f.Add(obj)
@@ -225,46 +176,6 @@ func (f *FIFO) Delete(obj interface{}) error {
 	f.populated = true
 	delete(f.items, id)
 	return err
-}
-
-// List returns a list of all the items.
-func (f *FIFO) List() []interface{} {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	list := make([]interface{}, 0, len(f.items))
-	for _, item := range f.items {
-		list = append(list, item)
-	}
-	return list
-}
-
-// ListKeys returns a list of all the keys of the objects currently
-// in the FIFO.
-func (f *FIFO) ListKeys() []string {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	list := make([]string, 0, len(f.items))
-	for key := range f.items {
-		list = append(list, key)
-	}
-	return list
-}
-
-// Get returns the requested item, or sets exists=false.
-func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	key, err := f.keyFunc(obj)
-	if err != nil {
-		return nil, false, KeyError{obj, err}
-	}
-	return f.GetByKey(key)
-}
-
-// GetByKey returns the requested item, or sets exists=false.
-func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	item, exists = f.items[key]
-	return item, exists, nil
 }
 
 // IsClosed checks if the queue is closed
@@ -307,10 +218,6 @@ func (f *FIFO) Pop(process PopProcessFunc) (interface{}, error) {
 		}
 		delete(f.items, id)
 		err := process(item, isInInitialList)
-		if e, ok := err.(ErrRequeue); ok {
-			f.addIfNotPresent(id, item)
-			err = e.Err
-		}
 		return item, err
 	}
 }

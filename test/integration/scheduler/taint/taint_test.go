@@ -545,7 +545,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 				pods = append(pods, createdPod)
 
 				if p.fits {
-					if err := testutils.WaitForPodToSchedule(cs, createdPod); err != nil {
+					if err := testutils.WaitForPodToSchedule(testCtx.Ctx, cs, createdPod); err != nil {
 						t.Errorf("Failed to schedule pod %s/%s on the node, err: %v",
 							pod.Namespace, pod.Name, err)
 					}

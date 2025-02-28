@@ -329,9 +329,9 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	podLabelSet := labels.Set(pod.Labels)
 	for i, c := range s.Constraints {
 		tpKey := c.TopologyKey
-		tpVal, ok := node.Labels[c.TopologyKey]
+		tpVal, ok := node.Labels[tpKey]
 		if !ok {
-			logger.V(5).Info("Node doesn't have required label", "node", klog.KObj(node), "label", tpKey)
+			logger.V(5).Info("Node doesn't have required topology label for spread constraint", "node", klog.KObj(node), "topologyKey", tpKey)
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 

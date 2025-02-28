@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -74,7 +73,7 @@ type testRun struct {
 
 // GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
 // http://kubernetes.io/docs/admin/garbage-collection/
-var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), nodefeature.GarbageCollect, feature.GarbageCollect, func() {
+var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), feature.GarbageCollect, func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	containerNamePrefix := "gc-test-container-"

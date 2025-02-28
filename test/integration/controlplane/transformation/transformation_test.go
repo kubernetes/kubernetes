@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -88,27 +87,35 @@ type transformTest struct {
 	secret            *corev1.Secret
 }
 
-func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, configDir string, storageConfig *storagebackend.Config) (*transformTest, error) {
+type transformTestConfig struct {
+	transformerConfigYAML string
+	reload                bool
+	configDir             string
+	storageConfig         *storagebackend.Config
+	runtimeConfig         []string
+}
+
+func newTransformTest(tb testing.TB, config transformTestConfig) (*transformTest, error) {
 	tCtx := ktesting.Init(tb)
-	if storageConfig == nil {
-		storageConfig = framework.SharedEtcd()
+	if config.storageConfig == nil {
+		config.storageConfig = framework.SharedEtcd()
 	}
 	e := transformTest{
 		TContext:          tCtx,
-		transformerConfig: transformerConfigYAML,
-		storageConfig:     storageConfig,
+		transformerConfig: config.transformerConfigYAML,
+		storageConfig:     config.storageConfig,
 	}
 
 	var err error
 	// create config dir with provided config yaml
-	if transformerConfigYAML != "" && configDir == "" {
+	if config.transformerConfigYAML != "" && config.configDir == "" {
 		if e.configDir, err = e.createEncryptionConfig(); err != nil {
 			e.cleanUp()
 			return nil, fmt.Errorf("error while creating KubeAPIServer encryption config: %w", err)
 		}
 	} else {
 		// configDir already exists. api-server must be restarting with existing encryption config
-		e.configDir = configDir
+		e.configDir = config.configDir
 	}
 	configFile := filepath.Join(e.configDir, encryptionConfigFileName)
 	_, err = os.ReadFile(configFile)
@@ -117,9 +124,13 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if e.kubeAPIServer, err = startTestServerLocked(
+	flags := e.getEncryptionOptions(config.reload)
+	if len(config.runtimeConfig) > 0 {
+		flags = append(flags, "--runtime-config="+strings.Join(config.runtimeConfig, ","))
+	}
+	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
 		tb, nil,
-		e.getEncryptionOptions(reload), e.storageConfig); err != nil {
+		flags, e.storageConfig); err != nil {
 		e.cleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
 	}
@@ -135,7 +146,7 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 		return nil, err
 	}
 
-	if transformerConfigYAML != "" && reload {
+	if config.transformerConfigYAML != "" && config.reload {
 		// when reloading is enabled, this healthz endpoint is always present
 		mustBeHealthy(tCtx, "/kms-providers", "ok", e.kubeAPIServer.ClientConfig)
 		mustNotHaveLivez(tCtx, "/kms-providers", "404 page not found", e.kubeAPIServer.ClientConfig)
@@ -146,15 +157,6 @@ func newTransformTest(tb testing.TB, transformerConfigYAML string, reload bool, 
 	}
 
 	return &e, nil
-}
-
-var startTestServerLock sync.Mutex
-
-// startTestServerLocked prevents parallel calls to kubeapiservertesting.StartTestServer because it messes with global state.
-func startTestServerLocked(t ktesting.TB, instanceOptions *kubeapiservertesting.TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result kubeapiservertesting.TestServer, err error) {
-	startTestServerLock.Lock()
-	defer startTestServerLock.Unlock()
-	return kubeapiservertesting.StartTestServer(t, instanceOptions, customFlags, storageConfig)
 }
 
 func (e *transformTest) cleanUp() {

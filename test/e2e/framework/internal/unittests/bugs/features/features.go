@@ -29,7 +29,7 @@ const (
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(testFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(testFeatureGates)) //nolint:forbidigo // Part of a unit test.
 }
 
 var testFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{

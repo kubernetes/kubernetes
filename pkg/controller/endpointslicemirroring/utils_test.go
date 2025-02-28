@@ -217,8 +217,9 @@ func TestAddressToEndpoint(t *testing.T) {
 		NodeName: pointer.String("node-abc"),
 	}
 
-	ep := addressToEndpoint(epAddress, ready)
+	ep, addrType := addressToEndpoint(epAddress, ready)
 	assert.EqualValues(t, expectedEndpoint, *ep)
+	assert.EqualValues(t, discovery.AddressTypeIPv4, *addrType)
 }
 
 // Test helpers

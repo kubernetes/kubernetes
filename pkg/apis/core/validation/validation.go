@@ -30,7 +30,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
@@ -133,7 +133,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123Label(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=dns-label"))
 	}
 	return allErrs
 }
@@ -142,7 +142,7 @@ func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 func ValidateQualifiedName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=qualified-name"))
 	}
 	return allErrs
 }
@@ -5413,16 +5413,16 @@ func ValidateInitContainerStateTransition(newStatuses, oldStatuses []core.Contai
 		}
 
 		// Skip any restartable init container that is allowed to restart
-		isRestartableInitContainer := false
+		isRestartableInitCtr := false
 		for _, c := range podSpec.InitContainers {
 			if oldStatus.Name == c.Name {
-				if c.RestartPolicy != nil && *c.RestartPolicy == core.ContainerRestartPolicyAlways {
-					isRestartableInitContainer = true
+				if isRestartableInitContainer(&c) {
+					isRestartableInitCtr = true
 				}
 				break
 			}
 		}
-		if isRestartableInitContainer {
+		if isRestartableInitCtr {
 			continue
 		}
 
@@ -5581,7 +5581,7 @@ func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodVali
 func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	// Part 1: Validate newPod's spec and updates to metadata
 	fldPath := field.NewPath("metadata")
-	allErrs := ValidateImmutableField(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
+	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
 
 	// pods with pod-level resources cannot be resized
@@ -5605,7 +5605,8 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Part 2: Validate that the changes between oldPod.Spec.Containers[].Resources and
-	// newPod.Spec.Containers[].Resources are allowed.
+	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
+	// newPod.Spec.InitContainers[].Resources are allowed.
 	specPath := field.NewPath("spec")
 	if qos.GetPodQOS(oldPod) != qos.ComputePodQOS(newPod) {
 		allErrs = append(allErrs, field.Invalid(specPath, newPod.Status.QOSClass, "Pod QOS Class may not change as a result of resizing"))
@@ -5618,64 +5619,97 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Do not allow removing resource requests/limits on resize.
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for ix, ctr := range oldPod.Spec.InitContainers {
-			if ctr.RestartPolicy != nil && *ctr.RestartPolicy != core.ContainerRestartPolicyAlways {
+			if !isRestartableInitContainer(&ctr) {
 				continue
 			}
-			if resourcesRemoved(newPod.Spec.InitContainers[ix].Resources.Requests, ctr.Resources.Requests) {
-				allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(ix).Child("resources").Child("requests"), "resource requests cannot be removed"))
-			}
-			if resourcesRemoved(newPod.Spec.InitContainers[ix].Resources.Limits, ctr.Resources.Limits) {
-				allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(ix).Child("resources").Child("limits"), "resource limits cannot be removed"))
-			}
+			allErrs = append(allErrs, validateContainerResize(
+				&newPod.Spec.InitContainers[ix].Resources,
+				&oldPod.Spec.InitContainers[ix].Resources,
+				newPod.Spec.InitContainers[ix].ResizePolicy,
+				specPath.Child("initContainers").Index(ix).Child("resources"))...)
 		}
 	}
-	for ix, ctr := range oldPod.Spec.Containers {
-		if resourcesRemoved(newPod.Spec.Containers[ix].Resources.Requests, ctr.Resources.Requests) {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("containers").Index(ix).Child("resources").Child("requests"), "resource requests cannot be removed"))
-		}
-		if resourcesRemoved(newPod.Spec.Containers[ix].Resources.Limits, ctr.Resources.Limits) {
-			allErrs = append(allErrs, field.Forbidden(specPath.Child("containers").Index(ix).Child("resources").Child("limits"), "resource limits cannot be removed"))
-		}
+	for ix := range oldPod.Spec.Containers {
+		allErrs = append(allErrs, validateContainerResize(
+			&newPod.Spec.Containers[ix].Resources,
+			&oldPod.Spec.Containers[ix].Resources,
+			newPod.Spec.Containers[ix].ResizePolicy,
+			specPath.Child("containers").Index(ix).Child("resources"))...)
 	}
 
-	// Ensure that only CPU and memory resources are mutable.
+	// Ensure that only CPU and memory resources are mutable for regular containers.
 	originalCPUMemPodSpec := *newPod.Spec.DeepCopy()
 	var newContainers []core.Container
 	for ix, container := range originalCPUMemPodSpec.Containers {
-		dropCPUMemoryUpdates := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
-			if oldResourceList == nil {
-				return nil
-			}
-			var mungedResourceList core.ResourceList
-			if resourceList == nil {
-				mungedResourceList = make(core.ResourceList)
-			} else {
-				mungedResourceList = resourceList.DeepCopy()
-			}
-			delete(mungedResourceList, core.ResourceCPU)
-			delete(mungedResourceList, core.ResourceMemory)
-			if cpu, found := oldResourceList[core.ResourceCPU]; found {
-				mungedResourceList[core.ResourceCPU] = cpu
-			}
-			if mem, found := oldResourceList[core.ResourceMemory]; found {
-				mungedResourceList[core.ResourceMemory] = mem
-			}
-			return mungedResourceList
+		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
+		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.Containers[ix]) {
+			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
+			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
+			allErrs = append(allErrs, errs)
 		}
-		lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPod.Spec.Containers[ix].Resources.Limits)
-		req := dropCPUMemoryUpdates(container.Resources.Requests, oldPod.Spec.Containers[ix].Resources.Requests)
-		container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
-		container.ResizePolicy = oldPod.Spec.Containers[ix].ResizePolicy // +k8s:verify-mutation:reason=clone
 		newContainers = append(newContainers, container)
 	}
 	originalCPUMemPodSpec.Containers = newContainers
+
+	// Ensure that only CPU and memory resources are mutable for restartable init containers.
+	// Also ensure that resources are immutable for non-restartable init containers.
+	var newInitContainers []core.Container
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for ix, container := range originalCPUMemPodSpec.InitContainers {
+			if isRestartableInitContainer(&container) { // restartable init container
+				dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
+				if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
+					// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
+					errs := field.Forbidden(specPath, "only cpu and memory resources for sidecar containers are mutable")
+					allErrs = append(allErrs, errs)
+				}
+			} else if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) { // non-restartable init container
+				// This likely means that the user has modified resources of non-sidecar init container.
+				errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
+				allErrs = append(allErrs, errs)
+			}
+			newInitContainers = append(newInitContainers, container)
+		}
+		originalCPUMemPodSpec.InitContainers = newInitContainers
+	}
+
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+
 	if !apiequality.Semantic.DeepEqual(originalCPUMemPodSpec, oldPod.Spec) {
 		// This likely means that the user has made changes to resources other than CPU and Memory.
-		specDiff := cmp.Diff(oldPod.Spec, originalCPUMemPodSpec)
-		errs := field.Forbidden(specPath, fmt.Sprintf("only cpu and memory resources are mutable\n%v", specDiff))
+		errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
 		allErrs = append(allErrs, errs)
 	}
 	return allErrs
+}
+
+// dropCPUMemoryResourcesFromContainer deletes the cpu and memory resources from the container, and copies them from the old pod container resources if present.
+func dropCPUMemoryResourcesFromContainer(container *core.Container, oldPodSpecContainer *core.Container) {
+	dropCPUMemoryUpdates := func(resourceList, oldResourceList core.ResourceList) core.ResourceList {
+		if oldResourceList == nil {
+			return nil
+		}
+		var mungedResourceList core.ResourceList
+		if resourceList == nil {
+			mungedResourceList = make(core.ResourceList)
+		} else {
+			mungedResourceList = resourceList.DeepCopy()
+		}
+		delete(mungedResourceList, core.ResourceCPU)
+		delete(mungedResourceList, core.ResourceMemory)
+		if cpu, found := oldResourceList[core.ResourceCPU]; found {
+			mungedResourceList[core.ResourceCPU] = cpu
+		}
+		if mem, found := oldResourceList[core.ResourceMemory]; found {
+			mungedResourceList[core.ResourceMemory] = mem
+		}
+		return mungedResourceList
+	}
+	lim := dropCPUMemoryUpdates(container.Resources.Limits, oldPodSpecContainer.Resources.Limits)
+	req := dropCPUMemoryUpdates(container.Resources.Requests, oldPodSpecContainer.Resources.Requests)
+	container.Resources = core.ResourceRequirements{Limits: lim, Requests: req}
 }
 
 // isPodResizeRequestSupported checks whether the pod is running on a node with InPlacePodVerticalScaling enabled.
@@ -5693,6 +5727,49 @@ func isPodResizeRequestSupported(pod core.Pod) bool {
 	}
 	// No running containers. We cannot tell whether the node supports resize at this point, so we assume it does.
 	return true
+}
+
+// validateContainerResize validates the changes to the container's resource requirements for a pod resize request.
+// newRequriements and oldRequirements must be non-nil.
+func validateContainerResize(newRequirements, oldRequirements *core.ResourceRequirements, resizePolicies []core.ContainerResizePolicy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Removing resource requirements is not supported.
+	if resourcesRemoved(newRequirements.Requests, oldRequirements.Requests) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("requests"), "resource requests cannot be removed"))
+	}
+	if resourcesRemoved(newRequirements.Limits, oldRequirements.Limits) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("limits"), "resource limits cannot be removed"))
+	}
+
+	// Special case: memory limits may not be decreased if resize policy is NotRequired.
+	var memRestartPolicy core.ResourceResizeRestartPolicy
+	for _, policy := range resizePolicies {
+		if policy.ResourceName == core.ResourceMemory {
+			memRestartPolicy = policy.RestartPolicy
+			break
+		}
+	}
+	if memRestartPolicy == core.NotRequired || memRestartPolicy == "" {
+		newLimit, hasNewLimit := newRequirements.Limits[core.ResourceMemory]
+		oldLimit, hasOldLimit := oldRequirements.Limits[core.ResourceMemory]
+		if hasNewLimit && hasOldLimit {
+			if newLimit.Cmp(oldLimit) < 0 {
+				allErrs = append(allErrs, field.Forbidden(
+					fldPath.Child("limits").Key(core.ResourceMemory.String()),
+					fmt.Sprintf("memory limits cannot be decreased unless resizePolicy is %s", core.RestartContainer)))
+			}
+		} else if hasNewLimit && !hasOldLimit {
+			// Adding a memory limit is implicitly decreasing the memory limit (from 'max')
+			allErrs = append(allErrs, field.Forbidden(
+				fldPath.Child("limits").Key(core.ResourceMemory.String()),
+				fmt.Sprintf("memory limits cannot be added unless resizePolicy is %s", core.RestartContainer)))
+		}
+	}
+
+	// TODO(tallclair): Move resizable resource checks here.
+
+	return allErrs
 }
 
 func resourcesRemoved(resourceList, oldResourceList core.ResourceList) bool {
@@ -6189,7 +6266,7 @@ func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationController
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 	allErrs = append(allErrs, ValidateNonEmptySelector(spec.Selector, fldPath.Child("selector"))...)
-	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
+	allErrs = append(allErrs, ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas")).WithOrigin("minimum")...)
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, spec.Replicas, fldPath.Child("template"), opts)...)
 	return allErrs
 }
@@ -7389,7 +7466,7 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path)
 	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
 	if address.NodeName != nil {
 		for _, msg := range ValidateNodeName(*address.NodeName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg).WithOrigin("format=dns-label"))
 		}
 	}
 	allErrs = append(allErrs, ValidateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
@@ -7408,20 +7485,20 @@ func ValidateNonSpecialIP(ipAddress string, fldPath *field.Path) field.ErrorList
 	allErrs := field.ErrorList{}
 	ip := netutils.ParseIPSloppy(ipAddress)
 	if ip == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "must be a valid IP address"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "must be a valid IP address").WithOrigin("format=ip-sloppy"))
 		return allErrs
 	}
 	if ip.IsUnspecified() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, fmt.Sprintf("may not be unspecified (%v)", ipAddress)))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, fmt.Sprintf("may not be unspecified (%v)", ipAddress)).WithOrigin("format=non-special-ip"))
 	}
 	if ip.IsLoopback() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the loopback range (127.0.0.0/8, ::1/128)"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the loopback range (127.0.0.0/8, ::1/128)").WithOrigin("format=non-special-ip"))
 	}
 	if ip.IsLinkLocalUnicast() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local range (169.254.0.0/16, fe80::/10)"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local range (169.254.0.0/16, fe80::/10)").WithOrigin("format=non-special-ip"))
 	}
 	if ip.IsLinkLocalMulticast() {
-		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24, ff02::/10)"))
+		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24, ff02::/10)").WithOrigin("format=non-special-ip"))
 	}
 	return allErrs
 }
@@ -7434,7 +7511,7 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 		allErrs = append(allErrs, ValidateDNS1123Label(port.Name, fldPath.Child("name"))...)
 	}
 	for _, msg := range validation.IsValidPortNum(int(port.Port)) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), port.Port, msg).WithOrigin("portNum"))
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
@@ -8603,4 +8680,12 @@ func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *fie
 	}
 	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)
 	return allErrs
+}
+
+// isRestartableInitContainer returns true if the container has ContainerRestartPolicyAlways.
+func isRestartableInitContainer(initContainer *core.Container) bool {
+	if initContainer == nil || initContainer.RestartPolicy == nil {
+		return false
+	}
+	return *initContainer.RestartPolicy == core.ContainerRestartPolicyAlways
 }

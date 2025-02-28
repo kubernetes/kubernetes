@@ -40,6 +40,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -85,6 +86,7 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
+	pod.Generation = 1
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
@@ -103,6 +105,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
 }
 
 // Validate validates a new pod.
@@ -259,6 +262,7 @@ func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 	*newPod = *dropNonEphemeralContainerUpdates(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
 }
 
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -289,18 +293,21 @@ var ResizeStrategy = podResizeStrategy{
 	),
 }
 
-// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources,ResizePolicy and certain metadata
+// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources, pod.Spec.InitContainers[*].Resources, ResizePolicy and certain metadata
 func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	pod := dropPodUpdates(newPod, oldPod)
 
 	// Containers are not allowed to be re-ordered, but in case they were,
 	// we don't want to corrupt them here. It will get caught in validation.
 	oldCtrToIndex := make(map[string]int)
+	oldInitCtrToIndex := make(map[string]int)
 	for idx, ctr := range pod.Spec.Containers {
 		oldCtrToIndex[ctr.Name] = idx
 	}
-	// TODO: Once we add in-place pod resize support for sidecars, we need to allow
-	// modifying sidecar resources via resize subresource too.
+	for idx, ctr := range pod.Spec.InitContainers {
+		oldInitCtrToIndex[ctr.Name] = idx
+	}
+
 	for _, ctr := range newPod.Spec.Containers {
 		idx, ok := oldCtrToIndex[ctr.Name]
 		if !ok {
@@ -308,6 +315,17 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 		}
 		pod.Spec.Containers[idx].Resources = ctr.Resources
 		pod.Spec.Containers[idx].ResizePolicy = ctr.ResizePolicy
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		for _, ctr := range newPod.Spec.InitContainers {
+			idx, ok := oldInitCtrToIndex[ctr.Name]
+			if !ok {
+				continue
+			}
+			pod.Spec.InitContainers[idx].Resources = ctr.Resources
+			pod.Spec.InitContainers[idx].ResizePolicy = ctr.ResizePolicy
+		}
 	}
 	return pod
 }
@@ -319,6 +337,7 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
 	podutil.MarkPodProposedForResize(oldPod, newPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
 }
 
 func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -365,7 +384,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	var indexFields = []string{"spec.nodeName"}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
 		indexFields = append(indexFields, "metadata.namespace")
 	}
 	return storage.SelectionPredicate{
@@ -404,7 +423,7 @@ func Indexers() *cache.Indexers {
 	var indexers = cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
 		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
 	}
 	return &indexers
@@ -959,4 +978,12 @@ func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+// updatePodGeneration bumps metadata.generation if needed for any updates
+// to the podspec.
+func updatePodGeneration(newPod, oldPod *api.Pod) {
+	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
+		newPod.Generation++
+	}
 }

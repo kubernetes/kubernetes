@@ -782,7 +782,7 @@ func TestSyncService(t *testing.T) {
 						Serving:     ptr.To(true),
 						Terminating: ptr.To(false),
 					},
-					Addresses: []string{"fd08::5678:0000:0000:9abc:def0"},
+					Addresses: []string{"fd08::5678:0:0:9abc:def0"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
 					NodeName:  ptr.To("node-1"),
 				},

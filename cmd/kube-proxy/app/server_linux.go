@@ -36,13 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	toolswatch "k8s.io/client-go/tools/watch"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -527,11 +525,9 @@ func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanup
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.NFTablesProxyMode) {
-		// Clean up nftables rules when switching to iptables or ipvs, or if cleanupAndExit
-		if isIPTablesBased(mode) || cleanupAndExit {
-			encounteredError = nftables.CleanupLeftovers(ctx) || encounteredError
-		}
+	// Clean up nftables rules when switching to iptables or ipvs, or if cleanupAndExit
+	if isIPTablesBased(mode) || cleanupAndExit {
+		encounteredError = nftables.CleanupLeftovers(ctx) || encounteredError
 	}
 
 	if encounteredError {

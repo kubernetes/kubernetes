@@ -160,6 +160,13 @@ func GetInitSystem() (InitSystem, error) {
 	}
 	_, err = exec.LookPath("openrc")
 	if err == nil {
+		binaries := []string{"rc-service", "rc-update"}
+		for _, binary := range binaries {
+			_, err = exec.LookPath(binary)
+			if err != nil {
+				return nil, errors.Wrapf(err, "openrc detected, but missing required binary: %s", binary)
+			}
+		}
 		return &OpenRCInitSystem{}, nil
 	}
 

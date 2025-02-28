@@ -275,6 +275,7 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 		"--audit-log-mode", "blocking",
 		"--audit-log-path", logFile.Name(),
 		"--authorization-mode=RBAC",
+		fmt.Sprintf("--runtime-config=%s=true", svmv1alpha1.SchemeGroupVersion),
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)

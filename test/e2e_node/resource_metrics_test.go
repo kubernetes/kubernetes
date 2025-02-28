@@ -30,7 +30,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/prometheus/common/model"
@@ -47,7 +46,7 @@ const (
 	maxStatsAge = time.Minute
 )
 
-var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, feature.ResourceMetrics, func() {
+var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 	f := framework.NewDefaultFramework("resource-metrics")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {
@@ -88,6 +87,8 @@ var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, feature.R
 				keys = append(keys, "container_cpu_usage_seconds_total", "container_memory_working_set_bytes", "container_start_time_seconds")
 			}
 
+			zeroSampe := boundedSample(0, 0)
+
 			matchResourceMetrics := gomega.And(gstruct.MatchKeys(gstruct.IgnoreMissing, gstruct.Keys{
 				"resource_scrape_error": gstruct.Ignore(),
 				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeID, gstruct.Elements{
@@ -95,6 +96,10 @@ var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, feature.R
 				}),
 				"node_memory_working_set_bytes": gstruct.MatchAllElements(nodeID, gstruct.Elements{
 					"": boundedSample(10*e2evolume.Mb, memoryLimit),
+				}),
+
+				"node_swap_usage_bytes": gstruct.MatchElements(nodeID, gstruct.IgnoreExtras, gstruct.Elements{
+					"": zeroSampe,
 				}),
 
 				"container_cpu_usage_seconds_total": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
@@ -110,6 +115,11 @@ var _ = SIGDescribe("ResourceMetricsAPI", nodefeature.ResourceMetrics, feature.R
 				"container_start_time_seconds": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
+				}),
+
+				"container_swap_usage_bytes": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): zeroSampe,
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): zeroSampe,
 				}),
 
 				"pod_cpu_usage_seconds_total": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{

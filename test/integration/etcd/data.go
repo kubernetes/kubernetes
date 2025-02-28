@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilversion "k8s.io/component-base/version"
 
 	"k8s.io/kubernetes/test/utils/image"
@@ -34,9 +35,9 @@ import (
 // Tests aiming for full coverage of versions should test fixtures of all supported versions.
 func GetSupportedEmulatedVersions() []string {
 	return []string{
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(2).String(),
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(1).String(),
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().String(),
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(2).String(),
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(1).String(),
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().String(),
 	}
 }
 
@@ -271,6 +272,18 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			Stub:              `{"metadata": {"name": "np2"}, "spec": {"podSelector": {"matchLabels": {"e": "f"}}}}`,
 			ExpectedEtcdPath:  "/registry/networkpolicies/" + namespace + "/np2",
 			IntroducedVersion: "1.7",
+		},
+		gvr("networking.k8s.io", "v1", "ipaddresses"): {
+			Stub:              `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath:  "/registry/ipaddresses/192.168.2.3",
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
+			IntroducedVersion: "1.33",
+		},
+		gvr("networking.k8s.io", "v1", "servicecidrs"): {
+			Stub:              `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
+			ExpectedEtcdPath:  "/registry/servicecidrs/range-b2",
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
+			IntroducedVersion: "1.33",
 		},
 		// --
 

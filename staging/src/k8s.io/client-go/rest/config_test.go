@@ -41,6 +41,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsConfigTransportTLS(t *testing.T) {
@@ -266,6 +267,19 @@ type fakeWarningHandler struct{}
 
 func (f fakeWarningHandler) HandleWarningHeader(code int, agent string, message string) {}
 
+type fakeWarningHandlerWithLogging struct {
+	messages []string
+}
+
+func (f *fakeWarningHandlerWithLogging) HandleWarningHeader(code int, agent string, message string) {
+	f.messages = append(f.messages, message)
+}
+
+type fakeWarningHandlerWithContext struct{}
+
+func (f fakeWarningHandlerWithContext) HandleWarningHeaderWithContext(ctx context.Context, code int, agent string, message string) {
+}
+
 type fakeNegotiatedSerializer struct{}
 
 func (n *fakeNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -329,6 +343,9 @@ func TestAnonymousAuthConfig(t *testing.T) {
 		},
 		func(h *WarningHandler, f fuzz.Continue) {
 			*h = &fakeWarningHandler{}
+		},
+		func(h *WarningHandlerWithContext, f fuzz.Continue) {
+			*h = &fakeWarningHandlerWithContext{}
 		},
 		// Authentication does not require fuzzer
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {},
@@ -427,6 +444,9 @@ func TestCopyConfig(t *testing.T) {
 		},
 		func(h *WarningHandler, f fuzz.Continue) {
 			*h = &fakeWarningHandler{}
+		},
+		func(h *WarningHandlerWithContext, f fuzz.Continue) {
+			*h = &fakeWarningHandlerWithContext{}
 		},
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {
 			*r = fakeAuthProviderConfigPersister{}
@@ -619,25 +639,69 @@ func TestConfigSprint(t *testing.T) {
 			KeyData:    []byte("fake key"),
 			NextProtos: []string{"h2", "http/1.1"},
 		},
-		UserAgent:      "gobot",
-		Transport:      &fakeRoundTripper{},
-		WrapTransport:  fakeWrapperFunc,
-		QPS:            1,
-		Burst:          2,
-		RateLimiter:    &fakeLimiter{},
-		WarningHandler: fakeWarningHandler{},
-		Timeout:        3 * time.Second,
-		Dial:           fakeDialFunc,
-		Proxy:          fakeProxyFunc,
+		UserAgent:                 "gobot",
+		Transport:                 &fakeRoundTripper{},
+		WrapTransport:             fakeWrapperFunc,
+		QPS:                       1,
+		Burst:                     2,
+		RateLimiter:               &fakeLimiter{},
+		WarningHandler:            fakeWarningHandler{},
+		WarningHandlerWithContext: fakeWarningHandlerWithContext{},
+		Timeout:                   3 * time.Second,
+		Dial:                      fakeDialFunc,
+		Proxy:                     fakeProxyFunc,
 	}
 	want := fmt.Sprintf(
-		`&rest.Config{Host:"localhost:8080", APIPath:"v1", ContentConfig:rest.ContentConfig{AcceptContentTypes:"application/json", ContentType:"application/json", GroupVersion:(*schema.GroupVersion)(nil), NegotiatedSerializer:runtime.NegotiatedSerializer(nil)}, Username:"gopher", Password:"--- REDACTED ---", BearerToken:"--- REDACTED ---", BearerTokenFile:"", Impersonate:rest.ImpersonationConfig{UserName:"gopher2", UID:"uid123", Groups:[]string(nil), Extra:map[string][]string(nil)}, AuthProvider:api.AuthProviderConfig{Name: "gopher", Config: map[string]string{--- REDACTED ---}}, AuthConfigPersister:rest.AuthProviderConfigPersister(--- REDACTED ---), ExecProvider:api.ExecConfig{Command: "sudo", Args: []string{"--- REDACTED ---"}, Env: []ExecEnvVar{--- REDACTED ---}, APIVersion: "", ProvideClusterInfo: true, Config: runtime.Object(--- REDACTED ---), StdinUnavailable: false}, TLSClientConfig:rest.sanitizedTLSClientConfig{Insecure:false, ServerName:"", CertFile:"a.crt", KeyFile:"a.key", CAFile:"", CertData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x54, 0x52, 0x55, 0x4e, 0x43, 0x41, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, KeyData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x52, 0x45, 0x44, 0x41, 0x43, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, CAData:[]uint8(nil), NextProtos:[]string{"h2", "http/1.1"}}, UserAgent:"gobot", DisableCompression:false, Transport:(*rest.fakeRoundTripper)(%p), WrapTransport:(transport.WrapperFunc)(%p), QPS:1, Burst:2, RateLimiter:(*rest.fakeLimiter)(%p), WarningHandler:rest.fakeWarningHandler{}, Timeout:3000000000, Dial:(func(context.Context, string, string) (net.Conn, error))(%p), Proxy:(func(*http.Request) (*url.URL, error))(%p)}`,
+		`&rest.Config{Host:"localhost:8080", APIPath:"v1", ContentConfig:rest.ContentConfig{AcceptContentTypes:"application/json", ContentType:"application/json", GroupVersion:(*schema.GroupVersion)(nil), NegotiatedSerializer:runtime.NegotiatedSerializer(nil)}, Username:"gopher", Password:"--- REDACTED ---", BearerToken:"--- REDACTED ---", BearerTokenFile:"", Impersonate:rest.ImpersonationConfig{UserName:"gopher2", UID:"uid123", Groups:[]string(nil), Extra:map[string][]string(nil)}, AuthProvider:api.AuthProviderConfig{Name: "gopher", Config: map[string]string{--- REDACTED ---}}, AuthConfigPersister:rest.AuthProviderConfigPersister(--- REDACTED ---), ExecProvider:api.ExecConfig{Command: "sudo", Args: []string{"--- REDACTED ---"}, Env: []ExecEnvVar{--- REDACTED ---}, APIVersion: "", ProvideClusterInfo: true, Config: runtime.Object(--- REDACTED ---), StdinUnavailable: false}, TLSClientConfig:rest.sanitizedTLSClientConfig{Insecure:false, ServerName:"", CertFile:"a.crt", KeyFile:"a.key", CAFile:"", CertData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x54, 0x52, 0x55, 0x4e, 0x43, 0x41, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, KeyData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x52, 0x45, 0x44, 0x41, 0x43, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, CAData:[]uint8(nil), NextProtos:[]string{"h2", "http/1.1"}}, UserAgent:"gobot", DisableCompression:false, Transport:(*rest.fakeRoundTripper)(%p), WrapTransport:(transport.WrapperFunc)(%p), QPS:1, Burst:2, RateLimiter:(*rest.fakeLimiter)(%p), WarningHandler:rest.fakeWarningHandler{}, WarningHandlerWithContext:rest.fakeWarningHandlerWithContext{}, Timeout:3000000000, Dial:(func(context.Context, string, string) (net.Conn, error))(%p), Proxy:(func(*http.Request) (*url.URL, error))(%p)}`,
 		c.Transport, fakeWrapperFunc, c.RateLimiter, fakeDialFunc, fakeProxyFunc,
 	)
 
 	for _, f := range []string{"%s", "%v", "%+v", "%#v"} {
 		if got := fmt.Sprintf(f, c); want != got {
-			t.Errorf("fmt.Sprintf(%q, c)\ngot:  %q\nwant: %q", f, got, want)
+			t.Errorf("fmt.Sprintf(%q, c)\ngot:  %q\nwant: %q\ndiff: %s", f, got, want, cmp.Diff(want, got))
 		}
 	}
+}
+
+func TestConfigWarningHandler(t *testing.T) {
+	config := &Config{}
+	config.GroupVersion = &schema.GroupVersion{}
+	config.NegotiatedSerializer = &fakeNegotiatedSerializer{}
+	handlerNoContext := &fakeWarningHandler{}
+	handlerWithContext := &fakeWarningHandlerWithContext{}
+
+	t.Run("none", func(t *testing.T) {
+		client, err := RESTClientForConfigAndClient(config, nil)
+		require.NoError(t, err)
+		assert.Nil(t, client.warningHandler)
+	})
+
+	t.Run("no-context", func(t *testing.T) {
+		config := CopyConfig(config)
+		handler := &fakeWarningHandlerWithLogging{}
+		config.WarningHandler = handler
+		client, err := RESTClientForConfigAndClient(config, nil)
+		require.NoError(t, err)
+		client.warningHandler.HandleWarningHeaderWithContext(context.Background(), 0, "", "message")
+		assert.Equal(t, []string{"message"}, handler.messages)
+
+	})
+
+	t.Run("with-context", func(t *testing.T) {
+		config := CopyConfig(config)
+		config.WarningHandlerWithContext = handlerWithContext
+		client, err := RESTClientForConfigAndClient(config, nil)
+		require.NoError(t, err)
+		assert.Equal(t, handlerWithContext, client.warningHandler)
+	})
+
+	t.Run("both", func(t *testing.T) {
+		config := CopyConfig(config)
+		config.WarningHandler = handlerNoContext
+		config.WarningHandlerWithContext = handlerWithContext
+		client, err := RESTClientForConfigAndClient(config, nil)
+		require.NoError(t, err)
+		assert.NotNil(t, client.warningHandler)
+		assert.Equal(t, handlerWithContext, client.warningHandler)
+	})
 }

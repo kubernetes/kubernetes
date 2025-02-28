@@ -32,9 +32,11 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // NamespacedResourcesDeleterInterface is the interface to delete a namespace with all resources in it.
@@ -526,6 +528,38 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 		gvrToNumRemaining:        map[schema.GroupVersionResource]int{},
 		finalizersToNumRemaining: map[string]int{},
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) {
+		// TODO: remove this log when the feature gate is enabled by default
+		logger.V(5).Info("Namespace controller - OrderedNamespaceDeletion feature gate is enabled", "namespace", namespace)
+		// Ensure all pods in the namespace are deleted first
+		podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, podsGVR, namespace, namespaceDeletedAt)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to delete pods for namespace: %s, err: %w", namespace, err))
+			conditionUpdater.ProcessDeleteContentErr(err)
+		}
+		if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
+			estimate = gvrDeletionMetadata.finalizerEstimateSeconds
+		}
+		if gvrDeletionMetadata.numRemaining > 0 {
+			numRemainingTotals.gvrToNumRemaining[podsGVR] = gvrDeletionMetadata.numRemaining
+			for finalizer, numRemaining := range gvrDeletionMetadata.finalizersToNumRemaining {
+				if numRemaining == 0 {
+					continue
+				}
+				numRemainingTotals.finalizersToNumRemaining[finalizer] += numRemaining
+			}
+		}
+
+		// Check if any pods remain before proceeding to delete other resources
+		if numRemainingTotals.gvrToNumRemaining[podsGVR] > 0 {
+			logger.V(5).Info("Namespace controller - pods still remain, delaying deletion of other resources", "namespace", namespace)
+			return estimate, utilerrors.NewAggregate(errs)
+		}
+	}
+
+	// Proceed with deleting other resources in the namespace
 	for gvr := range groupVersionResources {
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, gvr, namespace, namespaceDeletedAt)
 		if err != nil {

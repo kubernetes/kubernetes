@@ -856,6 +856,118 @@ func TestNodeAuthorizerSharedResources(t *testing.T) {
 	}
 }
 
+func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
+	g := NewGraph()
+	g.destinationEdgeThreshold = 1
+	identifier := nodeidentifier.NewDefaultNodeIdentifier()
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+
+	node1 := &user.DefaultInfo{Name: "system:node:node1", Groups: []string{"system:nodes"}}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod1-node1", Namespace: "ns1"},
+		Spec: corev1.PodSpec{
+			NodeName: "node1",
+			Volumes: []corev1.Volume{
+				{VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{SecretName: "node1-only"}}},
+			},
+		},
+	}
+
+	ecNewSecret := corev1.EphemeralContainer{
+		TargetContainerName: "targetContainerName",
+		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+			Image:   "imageURL",
+			Name:    "eph",
+			Command: []string{"command"},
+			EnvFrom: []corev1.EnvFromSource{
+				{
+					SecretRef: &corev1.SecretEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "new-secret",
+						},
+						Optional: nil,
+					},
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: &[]bool{true}[0],
+			},
+		},
+	}
+
+	ecNewConfigMap := corev1.EphemeralContainer{
+		TargetContainerName: "targetContainerName",
+		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+			Image:   "imageURL",
+			Name:    "eph",
+			Command: []string{"command"},
+			EnvFrom: []corev1.EnvFromSource{
+				{
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "new-config-map",
+						},
+						Optional: nil,
+					},
+				},
+			},
+			SecurityContext: &corev1.SecurityContext{
+				Privileged: &[]bool{true}[0],
+			},
+		},
+	}
+	p := &graphPopulator{}
+	p.graph = g
+	p.addPod(pod)
+
+	testcases := []struct {
+		User      user.Info
+		Secret    string
+		ConfigMap string
+		Decision  authorizer.Decision
+		EphCont   *corev1.EphemeralContainer
+	}{
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "node1-only"},
+		{User: node1, Decision: authorizer.DecisionNoOpinion, Secret: "new-secret"},
+		{User: node1, Decision: authorizer.DecisionAllow, Secret: "new-secret", EphCont: &ecNewSecret},
+		{User: node1, Decision: authorizer.DecisionNoOpinion, ConfigMap: "new-config-map"},
+		{User: node1, Decision: authorizer.DecisionAllow, ConfigMap: "new-config-map", EphCont: &ecNewConfigMap},
+	}
+
+	for i, tc := range testcases {
+		var (
+			decision authorizer.Decision
+			err      error
+		)
+		if tc.EphCont != nil {
+			newPod := &corev1.Pod{}
+			pod.DeepCopyInto(newPod)
+			newPod.Spec.EphemeralContainers = append(newPod.Spec.EphemeralContainers, *tc.EphCont)
+			p.updatePod(pod, newPod)
+		}
+
+		if len(tc.Secret) > 0 {
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+		} else if len(tc.ConfigMap) > 0 {
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			if err != nil {
+				t.Errorf("%d: unexpected error: %v", i, err)
+				continue
+			}
+		} else {
+			t.Fatalf("test case must include a request for a Secret")
+		}
+
+		if decision != tc.Decision {
+			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
+		}
+	}
+}
+
 type sampleDataOpts struct {
 	nodes       int
 	namespaces  int
@@ -1125,7 +1237,7 @@ func BenchmarkAuthorization(b *testing.B) {
 		},
 	}
 
-	podToAdd, _ := generatePod("testwrite", "ns0", "node0", "default", opts)
+	podToAdd, _ := generatePod("testwrite", "ns0", "node0", "default", opts, rand.Perm)
 
 	b.ResetTimer()
 	for _, testWriteContention := range []bool{false, true} {
@@ -1226,11 +1338,11 @@ func populate(graph *Graph, nodes []*corev1.Node, pods []*corev1.Pod, pvs []*cor
 	}
 }
 
-func randomSubset(a, b int) []int {
+func randomSubset(a, b int, randPerm func(int) []int) []int {
 	if b < a {
 		b = a
 	}
-	return rand.Perm(b)[:a]
+	return randPerm(b)[:a]
 }
 
 // generate creates sample pods and persistent volumes based on the provided options.
@@ -1244,7 +1356,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 	attachments := make([]*storagev1.VolumeAttachment, 0, opts.nodes*opts.attachmentsPerNode)
 	slices := make([]*resourceapi.ResourceSlice, 0, opts.nodes*opts.nodeResourceSlicesPerNode)
 
-	rand.Seed(12345)
+	r := rand.New(rand.NewSource(12345))
 
 	for n := 0; n < opts.nodes; n++ {
 		nodeName := fmt.Sprintf("node%d", n)
@@ -1253,7 +1365,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 			namespace := fmt.Sprintf("ns%d", p%opts.namespaces)
 			svcAccountName := fmt.Sprintf("svcacct%d-%s", p, nodeName)
 
-			pod, podPVs := generatePod(name, namespace, nodeName, svcAccountName, opts)
+			pod, podPVs := generatePod(name, namespace, nodeName, svcAccountName, opts, r.Perm)
 			pods = append(pods, pod)
 			pvs = append(pvs, podPVs...)
 		}
@@ -1283,7 +1395,7 @@ func generate(opts *sampleDataOpts) ([]*corev1.Node, []*corev1.Pod, []*corev1.Pe
 	return nodes, pods, pvs, attachments, slices
 }
 
-func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts) (*corev1.Pod, []*corev1.PersistentVolume) {
+func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleDataOpts, randPerm func(int) []int) (*corev1.Pod, []*corev1.PersistentVolume) {
 	pvs := make([]*corev1.PersistentVolume, 0, opts.uniquePVCsPerPod+opts.sharedPVCsPerPod)
 
 	pod := &corev1.Pod{}
@@ -1298,7 +1410,7 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		}})
 	}
 	// Choose shared secrets randomly from shared secrets in a namespace.
-	subset := randomSubset(opts.sharedSecretsPerPod, opts.sharedSecretsPerNamespace)
+	subset := randomSubset(opts.sharedSecretsPerPod, opts.sharedSecretsPerNamespace, randPerm)
 	for _, i := range subset {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{SecretName: fmt.Sprintf("secret%d-shared", i)},
@@ -1311,7 +1423,7 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		}})
 	}
 	// Choose shared configmaps randomly from shared configmaps in a namespace.
-	subset = randomSubset(opts.sharedConfigMapsPerPod, opts.sharedConfigMapsPerNamespace)
+	subset = randomSubset(opts.sharedConfigMapsPerPod, opts.sharedConfigMapsPerNamespace, randPerm)
 	for _, i := range subset {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{LocalObjectReference: corev1.LocalObjectReference{Name: fmt.Sprintf("configmap%d-shared", i)}},
@@ -1358,7 +1470,7 @@ func generatePod(name, namespace, nodeName, svcAccountName string, opts *sampleD
 		})
 	}
 	// Choose shared pvcs randomly from shared pvcs in a namespace.
-	subset = randomSubset(opts.sharedPVCsPerPod, opts.sharedPVCsPerNamespace)
+	subset = randomSubset(opts.sharedPVCsPerPod, opts.sharedPVCsPerNamespace, randPerm)
 	for _, i := range subset {
 		pv := &corev1.PersistentVolume{}
 		pv.Name = fmt.Sprintf("pv%d-shared-%s", i, pod.Namespace)

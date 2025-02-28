@@ -184,6 +184,7 @@ func NewCommand() *cobra.Command {
 	fs = kubeletPluginFlagSets.FlagSet("CDI")
 	cdiDir := fs.String("cdi-dir", "/var/run/cdi", "directory for dynamically created CDI JSON files")
 	nodeName := fs.String("node-name", "", "name of the node that the kubelet plugin is responsible for")
+	numDevices := fs.Int("num-devices", 4, "number of devices to simulate per node")
 	fs = kubeletPlugin.Flags()
 	for _, f := range kubeletPluginFlagSets.FlagSets {
 		fs.AddFlagSet(f)
@@ -203,7 +204,7 @@ func NewCommand() *cobra.Command {
 			return errors.New("--node-name not set")
 		}
 
-		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{},
+		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{NumDevices: *numDevices},
 			kubeletplugin.PluginSocketPath(*endpoint),
 			kubeletplugin.RegistrarSocketPath(path.Join(*pluginRegistrationPath, *driverName+"-reg.sock")),
 			kubeletplugin.KubeletPluginSocketPath(*draAddress),

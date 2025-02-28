@@ -36,7 +36,6 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -44,7 +43,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("KubeletSeparateDiskGC", nodefeature.KubeletSeparateDiskGC, feature.KubeletSeparateDiskGC, func() {
+var _ = SIGDescribe("KubeletSeparateDiskGC", feature.KubeletSeparateDiskGC, func() {
 	f := framework.NewDefaultFramework("split-disk-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute

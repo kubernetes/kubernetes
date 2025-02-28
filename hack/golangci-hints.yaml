@@ -2,8 +2,6 @@
 # enable an increasing amount of checks:
 # - golangci.yaml is the most permissive configuration. All existing code
 #   passed.
-# - golangci-strict.yaml adds checks that all new code in pull requests
-#   must pass.
 # - golangci-hints.yaml adds checks for code patterns where developer
 #   and reviewer may decide whether findings should get addressed before
 #   merging. Beware that the golangci-lint output includes also the
@@ -15,8 +13,6 @@
 
 run:
   timeout: 30m
-  skip-files:
-    - "^zz_generated.*"
 
 output:
   sort-results: true
@@ -33,6 +29,9 @@ issues:
     # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
     - ineffective break statement. Did you mean to break out of the outer loop
 
+  exclude-files:
+    - "^zz_generated.*"
+
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
     # exclude ineffassign linter for generated files for conversion
@@ -44,6 +43,12 @@ issues:
     - linters:
         - forbidigo
       text: should not be used because managedFields was removed
+      path: _test.go$
+
+    # Adding unversioned feature gates is allowed in tests
+    - linters:
+        - forbidigo
+      text: should not use MutableFeatureGate.Add, use AddVersioned instead
       path: _test.go$
 
     # The Kubernetes naming convention for conversion functions uses underscores
@@ -91,6 +96,7 @@ issues:
 linters:
   disable-all: false
   enable: # please keep this alphabetized
+    - depguard
     - forbidigo
     - ginkgolinter
     - gocritic
@@ -143,6 +149,7 @@ linters-settings: # please keep this alphabetized
           contextual k8s.io/api/.*
           contextual k8s.io/apimachinery/pkg/util/runtime/.*
           contextual k8s.io/client-go/metadata/.*
+          contextual k8s.io/client-go/rest/.*
           contextual k8s.io/client-go/tools/cache/.*
           contextual k8s.io/client-go/tools/events/.*
           contextual k8s.io/client-go/tools/record/.*
@@ -169,12 +176,24 @@ linters-settings: # please keep this alphabetized
           contextual k8s.io/kubernetes/pkg/kubelet/clustertrustbundle/.*
           contextual k8s.io/kubernetes/pkg/kubelet/token/.*
           contextual k8s.io/kubernetes/pkg/kubelet/cadvisor/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/oom/.*
+          contextual k8s.io/kubernetes/pkg/kubelet/sysctl/.*
           
           # As long as contextual logging is alpha or beta, all WithName, WithValues,
           # NewContext calls have to go through klog. Once it is GA, we can lift
           # this restriction. Whether we then do a global search/replace remains
           # to be decided.
           with-helpers .*
+  depguard:
+    rules:
+      main:
+        files:
+          - $all
+          - "!$test"
+          - "!**/test/**"
+        deny:
+          - pkg: "github.com/google/go-cmp/cmp"
+            desc: "cmp is allowed only in test files"
   forbidigo:
     analyze-types: true
     forbid:
@@ -184,6 +203,10 @@ linters-settings: # please keep this alphabetized
     - p: \.Extract
       pkg: ^k8s\.io/client-go/applyconfigurations/
       msg: should not be used because managedFields was removed
+    - p: \.Add$
+      pkg: ^k8s\.io/component-base/featuregate$
+      type: ^MutableFeatureGate$
+      msg: should not use MutableFeatureGate.Add, use AddVersioned instead
     - p: ^gomega\.BeTrue$
       pkg: ^github.com/onsi/gomega$
       msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"

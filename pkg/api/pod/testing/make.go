@@ -202,6 +202,12 @@ func SetLabels(annos map[string]string) Tweak {
 	}
 }
 
+func SetGeneration(gen int64) Tweak {
+	return func(pod *api.Pod) {
+		pod.Generation = gen
+	}
+}
+
 func SetSchedulingGates(gates ...api.PodSchedulingGate) Tweak {
 	return func(pod *api.Pod) {
 		pod.Spec.SchedulingGates = gates
@@ -333,5 +339,22 @@ func MakeContainerStatus(name string, allocatedResources api.ResourceList) api.C
 func SetResizeStatus(resizeStatus api.PodResizeStatus) TweakPodStatus {
 	return func(podstatus *api.PodStatus) {
 		podstatus.Resize = resizeStatus
+	}
+}
+
+// TweakContainers applies the container tweaks to all containers (regular & init) in the pod.
+// Note: this should typically be added to pod tweaks after all containers have been added.
+func TweakContainers(tweaks ...TweakContainer) Tweak {
+	return func(pod *api.Pod) {
+		for i := range pod.Spec.InitContainers {
+			for _, tweak := range tweaks {
+				tweak(&pod.Spec.InitContainers[i])
+			}
+		}
+		for i := range pod.Spec.Containers {
+			for _, tweak := range tweaks {
+				tweak(&pod.Spec.Containers[i])
+			}
+		}
 	}
 }

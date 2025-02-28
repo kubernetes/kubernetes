@@ -184,6 +184,7 @@ func TestCondition(t *testing.T) {
 
 	v130 := version.MajorMinor(1, 30)
 	v131 := version.MajorMinor(1, 31)
+	v127 := version.MajorMinor(1, 27)
 
 	var nilUnstructured *unstructured.Unstructured
 	cases := []struct {
@@ -200,6 +201,7 @@ func TestCondition(t *testing.T) {
 		enableSelectors  bool
 
 		compatibilityVersion *version.Version
+		envType              environment.Type
 	}{
 		{
 			name: "valid syntax for object",
@@ -867,6 +869,52 @@ func TestCondition(t *testing.T) {
 			hasParamKind:    false,
 			namespaceObject: nsObject,
 		},
+		{
+			name: "cel lib not recognized in version earlier than introduced version",
+			validations: []ExpressionAccessor{
+				&testCondition{
+					Expression: "isQuantity(\"20M\")",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					Error: fmt.Errorf("isQuantity"),
+				},
+			},
+			compatibilityVersion: v127,
+		},
+		{
+			name: "cel lib recognized in version later than introduced version",
+			validations: []ExpressionAccessor{
+				&testCondition{
+					Expression: "isQuantity(\"20M\")",
+				},
+			},
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			attributes:           newValidAttribute(&podObject, false),
+			compatibilityVersion: v130,
+		},
+		{
+			name: "cel lib always recognized in stored expression",
+			validations: []ExpressionAccessor{
+				&testCondition{
+					Expression: "isQuantity(\"20M\")",
+				},
+			},
+			attributes: newValidAttribute(&podObject, false),
+			results: []EvaluationResult{
+				{
+					EvalResult: celtypes.True,
+				},
+			},
+			envType:              environment.StoredExpressions,
+			compatibilityVersion: version.MajorMinor(1, 2),
+		},
 	}
 
 	for _, tc := range cases {
@@ -891,7 +939,11 @@ func TestCondition(t *testing.T) {
 				t.Fatal(err)
 			}
 			c := NewConditionCompiler(env)
-			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil, StrictCost: tc.strictCost}, environment.NewExpressions)
+			envType := tc.envType
+			if envType == "" {
+				envType = environment.NewExpressions
+			}
+			f := c.CompileCondition(tc.validations, OptionalVariableDeclarations{HasParams: tc.hasParamKind, HasAuthorizer: tc.authorizer != nil, StrictCost: tc.strictCost}, envType)
 			if f == nil {
 				t.Fatalf("unexpected nil validator")
 			}

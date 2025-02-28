@@ -98,7 +98,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 		}},
 	})
 
-	testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0,
+	testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0, true,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 	)
@@ -131,7 +131,7 @@ func TestUpdateNodeEvent(t *testing.T) {
 		t.Fatalf("Error updating the node: %v", err)
 	}
 
-	if err := testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
+	if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, pod); err != nil {
 		t.Errorf("Pod %v was not scheduled: %v", pod.Name, err)
 	}
 }

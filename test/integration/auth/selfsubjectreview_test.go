@@ -28,8 +28,11 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -37,10 +40,6 @@ import (
 )
 
 func TestGetsSelfAttributes(t *testing.T) {
-	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
-	// TODO: Remove this line when oldest emulation version is 1.34, along with removal of v1beta1 SelfSubjectReview (unservable by default but still servable via this envvar in 1.33)
-	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
-
 	tests := []struct {
 		name           string
 		userInfo       *user.DefaultInfo
@@ -95,29 +94,29 @@ func TestGetsSelfAttributes(t *testing.T) {
 		Name: "stub",
 	}
 
-	kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1=true")
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			// Unset BearerToken to disable BearerToken authenticator.
-			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
-			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-				respMu.RLock()
-				defer respMu.RUnlock()
-				return &authenticator.Response{User: response}, true, nil
-			})
-		},
-	})
-	defer tearDownFn()
-
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+"_v1beta1", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParseMajorMinor("1.32"))
 			respMu.Lock()
 			response = tc.userInfo
 			respMu.Unlock()
+
+			kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
+					opts.Authorization.Modes = []string{"AlwaysAllow"}
+				},
+				ModifyServerConfig: func(config *controlplane.Config) {
+					// Unset BearerToken to disable BearerToken authenticator.
+					config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+					config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+						respMu.RLock()
+						defer respMu.RUnlock()
+						return &authenticator.Response{User: response}, true, nil
+					})
+				},
+			})
+			defer tearDownFn()
 
 			resBeta, err := kubeClient.AuthenticationV1beta1().
 				SelfSubjectReviews().
@@ -145,6 +144,30 @@ func TestGetsSelfAttributes(t *testing.T) {
 			if !reflect.DeepEqual(resBeta.Status.UserInfo.Extra, tc.expectedExtra) {
 				t.Fatalf("unexpected extra: wanted %v, got %v", tc.expectedExtra, resBeta.Status.UserInfo.Extra)
 			}
+		})
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name+"_v1", func(t *testing.T) {
+			respMu.Lock()
+			response = tc.userInfo
+			respMu.Unlock()
+
+			kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Authorization.Modes = []string{"AlwaysAllow"}
+				},
+				ModifyServerConfig: func(config *controlplane.Config) {
+					// Unset BearerToken to disable BearerToken authenticator.
+					config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+					config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+						respMu.RLock()
+						defer respMu.RUnlock()
+						return &authenticator.Response{User: response}, true, nil
+					})
+				},
+			})
+			defer tearDownFn()
 
 			resV1, err := kubeClient.AuthenticationV1().
 				SelfSubjectReviews().
@@ -179,35 +202,34 @@ func TestGetsSelfAttributes(t *testing.T) {
 func TestGetsSelfAttributesError(t *testing.T) {
 	toggle := &atomic.Value{}
 	toggle.Store(true)
-
-	tCtx := ktesting.Init(t)
-	kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
-			opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1=true")
-			opts.Authorization.Modes = []string{"AlwaysAllow"}
-		},
-		ModifyServerConfig: func(config *controlplane.Config) {
-			// Unset BearerToken to disable BearerToken authenticator.
-			config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
-			config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-				if toggle.Load().(bool) {
-					return &authenticator.Response{
-						User: &user.DefaultInfo{
-							Name: "alice",
-						},
-					}, true, nil
-				}
-
-				return nil, false, fmt.Errorf("test error")
-			})
-		},
-	})
-	defer tearDownFn()
-
 	expected := fmt.Errorf("Unauthorized")
 
-	{ // v1beta1
+	t.Run("v1beta1", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParseMajorMinor("1.32"))
+		tCtx := ktesting.Init(t)
+		kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+			ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+				opts.APIEnablement.RuntimeConfig.Set("authentication.k8s.io/v1beta1=true")
+				opts.Authorization.Modes = []string{"AlwaysAllow"}
+			},
+			ModifyServerConfig: func(config *controlplane.Config) {
+				// Unset BearerToken to disable BearerToken authenticator.
+				config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+				config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+					if toggle.Load().(bool) {
+						return &authenticator.Response{
+							User: &user.DefaultInfo{
+								Name: "alice",
+							},
+						}, true, nil
+					}
+
+					return nil, false, fmt.Errorf("test error")
+				})
+			},
+		})
+		defer tearDownFn()
+
 		toggle.Store(!toggle.Load().(bool))
 
 		_, err := kubeClient.AuthenticationV1beta1().
@@ -221,9 +243,32 @@ func TestGetsSelfAttributesError(t *testing.T) {
 		if expected.Error() != err.Error() {
 			t.Fatalf("expected error: %v, got %v", expected, err)
 		}
-	}
+	})
 
-	{ // v1
+	t.Run("v1", func(t *testing.T) {
+		tCtx := ktesting.Init(t)
+		kubeClient, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+			ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+				opts.Authorization.Modes = []string{"AlwaysAllow"}
+			},
+			ModifyServerConfig: func(config *controlplane.Config) {
+				// Unset BearerToken to disable BearerToken authenticator.
+				config.ControlPlane.Generic.LoopbackClientConfig.BearerToken = ""
+				config.ControlPlane.Generic.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+					if toggle.Load().(bool) {
+						return &authenticator.Response{
+							User: &user.DefaultInfo{
+								Name: "alice",
+							},
+						}, true, nil
+					}
+
+					return nil, false, fmt.Errorf("test error")
+				})
+			},
+		})
+		defer tearDownFn()
+
 		toggle.Store(!toggle.Load().(bool))
 
 		_, err := kubeClient.AuthenticationV1().
@@ -237,5 +282,5 @@ func TestGetsSelfAttributesError(t *testing.T) {
 		if expected.Error() != err.Error() {
 			t.Fatalf("expected error: %v, got %v", expected, err)
 		}
-	}
+	})
 }

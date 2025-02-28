@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -46,7 +45,7 @@ var _ = SIGDescribe("DefaultProcMount [LinuxOnly]", framework.WithNodeConformanc
 	})
 })
 
-var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, feature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
+var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("proc-mount-baseline-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
@@ -77,7 +76,7 @@ var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, feature.
 	})
 })
 
-var _ = SIGDescribe("ProcMount [LinuxOnly]", nodefeature.ProcMountType, feature.ProcMountType, nodefeature.UserNamespacesSupport, feature.UserNamespacesSupport, func() {
+var _ = SIGDescribe("ProcMount [LinuxOnly]", feature.ProcMountType, feature.UserNamespacesSupport, func() {
 	f := framework.NewDefaultFramework("proc-mount-privileged-test")
 
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

@@ -103,7 +103,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 					klog.Warningf("[discovery] Could not access the %s ConfigMap for refreshing the cluster-info information, but the TLS cert is valid so proceeding...\n", bootstrapapi.ConfigMapClusterInfo)
 					return true, nil
 				}
-				klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, err)
+				klog.V(1).Infof("[discovery] Error reading the %s ConfigMap, will try again: %v\n", bootstrapapi.ConfigMapClusterInfo, lastError)
 				return false, nil
 			}
 			return true, nil

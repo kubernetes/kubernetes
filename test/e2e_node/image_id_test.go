@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -33,7 +32,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("ImageID", nodefeature.ImageID, feature.ImageID, func() {
+var _ = SIGDescribe("ImageID", feature.ImageID, func() {
 
 	busyBoxImage := "registry.k8s.io/e2e-test-images/busybox@sha256:a9155b13325b2abef48e71de77bb8ac015412a566829f621d06bfae5c699b1b9"
 

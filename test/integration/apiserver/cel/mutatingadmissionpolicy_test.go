@@ -20,13 +20,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -493,7 +493,8 @@ func TestMutatingAdmissionPolicy(t *testing.T) {
 
 	// Run all tests in a shared apiserver
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha1.SchemeGroupVersion)}
+	server, err := apiservertesting.StartTestServer(t, nil, flags, framework.SharedEtcd())
 	require.NoError(t, err)
 	defer server.TearDownFn()
 
@@ -1006,7 +1007,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-			server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
+			flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha1.SchemeGroupVersion)}
+			server, err := apiservertesting.StartTestServer(t, nil, flags, framework.SharedEtcd())
 			require.NoError(t, err)
 			defer server.TearDownFn()
 
@@ -1091,7 +1093,8 @@ func TestMutatingAdmissionPolicy_Slow(t *testing.T) {
 // tested.
 func Test_MutatingAdmissionPolicy_CustomResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.MutatingAdmissionPolicy, true)
-	server, err := apiservertesting.StartTestServer(t, nil, nil, framework.SharedEtcd())
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha1.SchemeGroupVersion)}
+	server, err := apiservertesting.StartTestServer(t, nil, flags, framework.SharedEtcd())
 	etcd.CreateTestCRDs(t, apiextensions.NewForConfigOrDie(server.ClientConfig), false, versionedCustomResourceDefinition())
 	if err != nil {
 		t.Fatal(err)

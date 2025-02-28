@@ -758,7 +758,7 @@ func (cache *cacheImpl) updateMetrics() {
 	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
 	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
 
-	// we intentionally keep them with the deprecation and will remove at v1.33.
+	// we intentionally keep them with the deprecation and will remove at v1.34.
 	//nolint:staticcheck
 	metrics.SchedulerCacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
 	//nolint:staticcheck

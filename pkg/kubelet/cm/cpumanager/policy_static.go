@@ -388,6 +388,7 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	p.updateCPUsToReuse(pod, container, cpuset)
 	p.updateMetricsOnAllocate(cpuset)
 
+	klog.V(4).InfoS("Allocated exclusive CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpuset", cpuset)
 	return nil
 }
 
@@ -455,7 +456,9 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 }
 
 func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
-	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
+	qos := v1qos.GetPodQOS(pod)
+	if qos != v1.PodQOSGuaranteed {
+		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod QoS is not guaranteed", "pod", klog.KObj(pod), "containerName", container.Name, "qos", qos)
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
@@ -464,11 +467,19 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	// We should return this value because this is what kubelet agreed to allocate for the container
 	// and the value configured with runtime.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		if cs, ok := podutil.GetContainerStatus(pod.Status.ContainerStatuses, container.Name); ok {
+		containerStatuses := pod.Status.ContainerStatuses
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && podutil.IsRestartableInitContainer(container) {
+			if len(pod.Status.InitContainerStatuses) != 0 {
+				containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
+			}
+		}
+		if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
 		}
 	}
-	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
+	cpuValue := cpuQuantity.Value()
+	if cpuValue*1000 != cpuQuantity.MilliValue() {
+		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod requested non-integral CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpu", cpuValue)
 		return 0
 	}
 	// Safe downcast to do for all systems with < 2.1 billion CPUs.

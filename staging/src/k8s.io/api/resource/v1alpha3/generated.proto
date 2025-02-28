@@ -62,6 +62,8 @@ message AllocatedDeviceStatus {
   // If the device has been configured according to the class and claim
   // config references, the `Ready` condition should be True.
   //
+  // Must not contain more than 8 entries.
+  //
   // +optional
   // +listType=map
   // +listMapKey=type
@@ -439,10 +441,11 @@ message DeviceRequest {
   //   count field.
   //
   // - All: This request is for all of the matching devices in a pool.
+  //   At least one device must exist on the node for the allocation to succeed.
   //   Allocation will fail if some devices are already allocated,
   //   unless adminAccess is requested.
   //
-  // If AlloctionMode is not specified, the default mode is ExactCount. If
+  // If AllocationMode is not specified, the default mode is ExactCount. If
   // the mode is ExactCount and count is not specified, the default count is
   // one. Any other requests must specify this field.
   //
@@ -548,6 +551,8 @@ message NetworkDeviceData {
   // The IPs are in the CIDR notation, which includes both the address and the
   // associated subnet mask.
   // e.g.: "192.0.2.5/24" for IPv4 and "2001:db8::5/64" for IPv6.
+  //
+  // Must not contain more than 16 entries.
   //
   // +optional
   // +listType=atomic

@@ -51,12 +51,18 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 			Subprotocols: []string{constants.WebsocketsSPDYTunnelingPortForwardV1},
 		}
 		conn, err := upgrader.Upgrade(w, req, nil)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		defer conn.Close() //nolint:errcheck
-		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
+		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
+			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
+		}
 		tunnelingConn := NewTunnelingConnection("server", conn)
 		spdyConn, err := spdy.NewServerConnection(tunnelingConn, justQueueStream(streamChan))
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		defer spdyConn.Close() //nolint:errcheck
 		<-stopServerChan
 	}))
@@ -77,9 +83,13 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 	var actual []byte
 	go func() {
 		clientStream, err := spdyClient.CreateStream(http.Header{})
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		_, err = io.Copy(clientStream, strings.NewReader(expected))
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		clientStream.Close() //nolint:errcheck
 	}()
 	select {
@@ -102,9 +112,13 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 			Subprotocols: []string{constants.WebsocketsSPDYTunnelingPortForwardV1},
 		}
 		conn, err := upgrader.Upgrade(w, req, nil)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		defer conn.Close() //nolint:errcheck
-		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
+		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
+			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
+		}
 		<-stopServerChan
 	}))
 	defer tunnelingServer.Close()
@@ -134,9 +148,13 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 			Subprotocols: []string{constants.WebsocketsSPDYTunnelingPortForwardV1},
 		}
 		conn, err := upgrader.Upgrade(w, req, nil)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		defer conn.Close() //nolint:errcheck
-		require.Equal(t, constants.WebsocketsSPDYTunnelingPortForwardV1, conn.Subprotocol())
+		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
+			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
+		}
 		<-stopServerChan
 	}))
 	defer tunnelingServer.Close()

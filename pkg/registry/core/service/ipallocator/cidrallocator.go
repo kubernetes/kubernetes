@@ -24,16 +24,16 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	networkingv1beta1informers "k8s.io/client-go/informers/networking/v1beta1"
-	networkingv1beta1client "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
-	networkingv1beta1listers "k8s.io/client-go/listers/networking/v1beta1"
+	networkingv1informers "k8s.io/client-go/informers/networking/v1"
+	networkingv1client "k8s.io/client-go/kubernetes/typed/networking/v1"
+	networkingv1listers "k8s.io/client-go/listers/networking/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -52,12 +52,12 @@ import (
 // MetaAllocator implements current allocator interface using
 // ServiceCIDR and IPAddress API objects.
 type MetaAllocator struct {
-	client            networkingv1beta1client.NetworkingV1beta1Interface
-	serviceCIDRLister networkingv1beta1listers.ServiceCIDRLister
+	client            networkingv1client.NetworkingV1Interface
+	serviceCIDRLister networkingv1listers.ServiceCIDRLister
 	serviceCIDRSynced cache.InformerSynced
-	ipAddressLister   networkingv1beta1listers.IPAddressLister
+	ipAddressLister   networkingv1listers.IPAddressLister
 	ipAddressSynced   cache.InformerSynced
-	ipAddressInformer networkingv1beta1informers.IPAddressInformer
+	ipAddressInformer networkingv1informers.IPAddressInformer
 	queue             workqueue.TypedRateLimitingInterface[string]
 
 	internalStopCh chan struct{}
@@ -87,9 +87,9 @@ var _ Interface = &MetaAllocator{}
 // and ServiceCIDR objects to track the assigned IP addresses,
 // using an informer cache as storage.
 func NewMetaAllocator(
-	client networkingv1beta1client.NetworkingV1beta1Interface,
-	serviceCIDRInformer networkingv1beta1informers.ServiceCIDRInformer,
-	ipAddressInformer networkingv1beta1informers.IPAddressInformer,
+	client networkingv1client.NetworkingV1Interface,
+	serviceCIDRInformer networkingv1informers.ServiceCIDRInformer,
+	ipAddressInformer networkingv1informers.IPAddressInformer,
 	isIPv6 bool,
 	bitmapAllocator Interface,
 ) (*MetaAllocator, error) {
@@ -100,9 +100,9 @@ func NewMetaAllocator(
 }
 
 // newMetaAllocator is used to build the allocator for testing
-func newMetaAllocator(client networkingv1beta1client.NetworkingV1beta1Interface,
-	serviceCIDRInformer networkingv1beta1informers.ServiceCIDRInformer,
-	ipAddressInformer networkingv1beta1informers.IPAddressInformer,
+func newMetaAllocator(client networkingv1client.NetworkingV1Interface,
+	serviceCIDRInformer networkingv1informers.ServiceCIDRInformer,
+	ipAddressInformer networkingv1informers.IPAddressInformer,
 	isIPv6 bool,
 	bitmapAllocator Interface,
 ) *MetaAllocator {
@@ -152,13 +152,13 @@ func (c *MetaAllocator) enqueueServiceCIDR(obj interface{}) {
 }
 
 func (c *MetaAllocator) deleteServiceCIDR(obj interface{}) {
-	serviceCIDR, ok := obj.(*networkingv1beta1.ServiceCIDR)
+	serviceCIDR, ok := obj.(*networkingv1.ServiceCIDR)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			return
 		}
-		serviceCIDR, ok = tombstone.Obj.(*networkingv1beta1.ServiceCIDR)
+		serviceCIDR, ok = tombstone.Obj.(*networkingv1.ServiceCIDR)
 		if !ok {
 			return
 		}
@@ -361,6 +361,20 @@ func (c *MetaAllocator) Allocate(ip net.IP) error {
 }
 
 func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error) {
+	// If the cluster is still using the old allocators use them first to try to
+	// get an IP address to keep backwards compatibility.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
+		ip, err := c.bitmapAllocator.AllocateNext()
+		if err == nil {
+			allocator, err := c.getAllocator(ip, true)
+			if err != nil {
+				return nil, err
+			}
+			return ip, allocator.AllocateService(service, ip)
+		} else {
+			klog.Infof("no IP address available on the old ClusterIP allocator, trying to get a new address using the new allocators")
+		}
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// TODO(aojea) add strategy to return a random allocator but
@@ -376,15 +390,6 @@ func (c *MetaAllocator) AllocateNextService(service *api.Service) (net.IP, error
 		}
 		ip, err := item.allocator.AllocateNextService(service)
 		if err == nil {
-			if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAllocatorDualWrite) {
-				cidr := c.bitmapAllocator.CIDR()
-				if cidr.Contains(ip) {
-					err := c.bitmapAllocator.Allocate(ip)
-					if err != nil {
-						continue
-					}
-				}
-			}
 			return ip, nil
 		}
 	}
@@ -414,8 +419,8 @@ func (c *MetaAllocator) Release(ip net.IP) error {
 }
 func (c *MetaAllocator) ForEach(f func(ip net.IP)) {
 	ipLabelSelector := labels.Set(map[string]string{
-		networkingv1beta1.LabelIPAddressFamily: string(c.IPFamily()),
-		networkingv1beta1.LabelManagedBy:       ControllerName,
+		networkingv1.LabelIPAddressFamily: string(c.IPFamily()),
+		networkingv1.LabelManagedBy:       ControllerName,
 	}).AsSelectorPreValidated()
 	ips, err := c.ipAddressLister.List(ipLabelSelector)
 	if err != nil {
@@ -454,8 +459,8 @@ func (c *MetaAllocator) Destroy() {
 // for testing
 func (c *MetaAllocator) Used() int {
 	ipLabelSelector := labels.Set(map[string]string{
-		networkingv1beta1.LabelIPAddressFamily: string(c.IPFamily()),
-		networkingv1beta1.LabelManagedBy:       ControllerName,
+		networkingv1.LabelIPAddressFamily: string(c.IPFamily()),
+		networkingv1.LabelManagedBy:       ControllerName,
 	}).AsSelectorPreValidated()
 	ips, err := c.ipAddressLister.List(ipLabelSelector)
 	if err != nil {
@@ -512,13 +517,13 @@ func (c *MetaAllocator) DryRun() Interface {
 	return &Allocator{}
 }
 
-func isReady(serviceCIDR *networkingv1beta1.ServiceCIDR) bool {
+func isReady(serviceCIDR *networkingv1.ServiceCIDR) bool {
 	if serviceCIDR == nil {
 		return false
 	}
 
 	for _, condition := range serviceCIDR.Status.Conditions {
-		if condition.Type == networkingv1beta1.ServiceCIDRConditionReady {
+		if condition.Type == networkingv1.ServiceCIDRConditionReady {
 			return condition.Status == metav1.ConditionStatus(metav1.ConditionTrue)
 		}
 	}

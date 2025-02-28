@@ -130,10 +130,6 @@ func (pl *InterPodAffinity) PreScore(
 	pod *v1.Pod,
 	nodes []*framework.NodeInfo,
 ) *framework.Status {
-	if len(nodes) == 0 {
-		// No nodes to score.
-		return framework.NewStatus(framework.Skip)
-	}
 
 	if pl.sharedLister == nil {
 		return framework.NewStatus(framework.Error, "empty shared lister in InterPodAffinity PreScore")

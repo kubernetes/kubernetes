@@ -56,16 +56,16 @@ func (r *TokenREST) Destroy() {
 }
 
 type TokenREST struct {
-	svcaccts              rest.Getter
-	pods                  rest.Getter
-	secrets               rest.Getter
-	nodes                 rest.Getter
-	issuer                token.TokenGenerator
-	auds                  authenticator.Audiences
-	audsSet               sets.String
-	maxExpirationSeconds  int64
-	extendExpiration      bool
-	isTokenSignerExternal bool
+	svcaccts                     rest.Getter
+	pods                         rest.Getter
+	secrets                      rest.Getter
+	nodes                        rest.Getter
+	issuer                       token.TokenGenerator
+	auds                         authenticator.Audiences
+	audsSet                      sets.String
+	maxExpirationSeconds         int64
+	extendExpiration             bool
+	maxExtendedExpirationSeconds int64
 }
 
 var _ = rest.NamedCreater(&TokenREST{})
@@ -218,13 +218,7 @@ func (r *TokenREST) Create(ctx context.Context, name string, obj runtime.Object,
 	exp := req.Spec.ExpirationSeconds
 	if r.extendExpiration && pod != nil && req.Spec.ExpirationSeconds == token.WarnOnlyBoundTokenExpirationSeconds && r.isKubeAudiences(req.Spec.Audiences) {
 		warnAfter = exp
-		// If token issuer is external-jwt-signer, then choose the smaller of
-		// ExpirationExtensionSeconds and max token lifetime supported by external signer.
-		if r.isTokenSignerExternal {
-			exp = min(r.maxExpirationSeconds, token.ExpirationExtensionSeconds)
-		} else {
-			exp = token.ExpirationExtensionSeconds
-		}
+		exp = r.maxExtendedExpirationSeconds
 	}
 
 	sc, pc, err := token.Claims(*svcacct, pod, secret, node, exp, warnAfter, req.Spec.Audiences)

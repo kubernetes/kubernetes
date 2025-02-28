@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -120,6 +121,10 @@ type Options struct {
 
 	// CostLimit allows overriding the default runtime cost limit [resourceapi.CELSelectorExpressionMaxCost].
 	CostLimit *uint64
+
+	// DisableCostEstimation can be set to skip estimating the worst-case CEL cost.
+	// If disabled or after an error, [CompilationResult.MaxCost] will be set to [math.Uint64].
+	DisableCostEstimation bool
 }
 
 // CompileCELExpression returns a compiled CEL expression. It evaluates to bool.
@@ -133,6 +138,7 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 				Detail: errorString,
 			},
 			Expression: expression,
+			MaxCost:    math.MaxUint64,
 		}
 	}
 
@@ -140,10 +146,6 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 	if err != nil {
 		return resultError(fmt.Sprintf("unexpected error loading CEL environment: %v", err), apiservercel.ErrorTypeInternal)
 	}
-
-	// We don't have a SizeEstimator. The potential size of the input (= a
-	// device) is already declared in the definition of the environment.
-	estimator := c.newCostEstimator()
 
 	ast, issues := env.Compile(expression)
 	if issues != nil {
@@ -176,15 +178,21 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		OutputType:  ast.OutputType(),
 		Environment: env,
 		emptyMapVal: env.CELTypeAdapter().NativeToValue(map[string]any{}),
+		MaxCost:     math.MaxUint64,
 	}
 
-	costEst, err := env.EstimateCost(ast, estimator)
-	if err != nil {
-		compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
-		return compilationResult
+	if !options.DisableCostEstimation {
+		// We don't have a SizeEstimator. The potential size of the input (= a
+		// device) is already declared in the definition of the environment.
+		estimator := c.newCostEstimator()
+		costEst, err := env.EstimateCost(ast, estimator)
+		if err != nil {
+			compilationResult.Error = &apiservercel.Error{Type: apiservercel.ErrorTypeInternal, Detail: "cost estimation failed: " + err.Error()}
+			return compilationResult
+		}
+		compilationResult.MaxCost = costEst.Max
 	}
 
-	compilationResult.MaxCost = costEst.Max
 	return compilationResult
 }
 

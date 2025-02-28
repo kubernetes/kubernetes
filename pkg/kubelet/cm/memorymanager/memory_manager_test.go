@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -1896,6 +1897,13 @@ func TestRemoveContainer(t *testing.T) {
 	}
 }
 
+func getPolicyNameForOs() policyType {
+	if goruntime.GOOS == "windows" {
+		return policyTypeBestEffort
+	}
+	return policyTypeStatic
+}
+
 func TestNewManager(t *testing.T) {
 	machineInfo := returnMachineInfo()
 	expectedReserved := systemReservedMemory{
@@ -1909,7 +1917,7 @@ func TestNewManager(t *testing.T) {
 	testCases := []testMemoryManager{
 		{
 			description:                "Successful creation of Memory Manager instance",
-			policyName:                 policyTypeStatic,
+			policyName:                 getPolicyNameForOs(),
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
 			systemReservedMemory: []kubeletconfig.MemoryReservation{
@@ -1928,7 +1936,7 @@ func TestNewManager(t *testing.T) {
 		},
 		{
 			description:                "Should return an error when systemReservedMemory (configured with kubelet flag) does not comply with Node Allocatable feature values",
-			policyName:                 policyTypeStatic,
+			policyName:                 getPolicyNameForOs(),
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{v1.ResourceMemory: *resource.NewQuantity(2*gb, resource.BinarySI)},
 			systemReservedMemory: []kubeletconfig.MemoryReservation{
@@ -1951,7 +1959,7 @@ func TestNewManager(t *testing.T) {
 		},
 		{
 			description:                "Should return an error when memory reserved for system is empty (systemReservedMemory)",
-			policyName:                 policyTypeStatic,
+			policyName:                 getPolicyNameForOs(),
 			machineInfo:                machineInfo,
 			nodeAllocatableReservation: v1.ResourceList{},
 			systemReservedMemory:       []kubeletconfig.MemoryReservation{},

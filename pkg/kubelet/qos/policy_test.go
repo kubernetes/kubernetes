@@ -653,7 +653,6 @@ type oomTest struct {
 	pod                             *v1.Pod
 	memoryCapacity                  int64
 	lowHighOOMScoreAdj              map[string]lowHighOOMScoreAdjTest // [container-name] : min and max oom_score_adj score the container should be assigned.
-	sidecarContainersFeatureEnabled bool
 	podLevelResourcesFeatureEnabled bool
 }
 
@@ -728,7 +727,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			lowHighOOMScoreAdj: map[string]lowHighOOMScoreAdjTest{
 				"burstable-unique-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
 			},
-			sidecarContainersFeatureEnabled: true,
 		},
 		"burstable-mixed-unique-main-container-pod": {
 			pod:            &burstableMixedUniqueMainContainerPod,
@@ -737,7 +735,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 				"init-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
 				"main-1":         {lowOOMScoreAdj: 875, highOOMScoreAdj: 880},
 			},
-			sidecarContainersFeatureEnabled: true,
 		},
 		"burstable-mixed-multi-container-small-sidecar-pod": {
 			pod:            &burstableMixedMultiContainerSmallSidecarPod,
@@ -747,7 +744,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 				"sidecar-small-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
 				"main-1":                  {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
 			},
-			sidecarContainersFeatureEnabled: true,
 		},
 		"burstable-mixed-multi-container-sample-request-pod": {
 			pod:            &burstableMixedMultiContainerSameRequestPod,
@@ -757,7 +753,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 				"sidecar-container": {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
 				"main-1":            {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
 			},
-			sidecarContainersFeatureEnabled: true,
 		},
 		"burstable-mixed-multi-container-big-sidecar-container-pod": {
 			pod:            &burstableMixedMultiContainerBigSidecarContainerPod,
@@ -767,7 +762,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 				"sidecar-big-container": {lowOOMScoreAdj: 500, highOOMScoreAdj: 500},
 				"main-1":                {lowOOMScoreAdj: 875, highOOMScoreAdj: 875},
 			},
-			sidecarContainersFeatureEnabled: true,
 		},
 		"guaranteed-pod-resources-no-container-resources": {
 			pod: &guaranteedPodResourcesNoContainerResources,
@@ -831,7 +825,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			},
 			memoryCapacity:                  4000000000,
 			podLevelResourcesFeatureEnabled: true,
-			sidecarContainersFeatureEnabled: true,
 		},
 		"burstable-pod-resources-equal-container-requests-with-sidecar": {
 			pod: &burstablePodResourcesEqualContainerRequestsWithSidecar,
@@ -841,7 +834,6 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			},
 			memoryCapacity:                  4000000000,
 			podLevelResourcesFeatureEnabled: true,
-			sidecarContainersFeatureEnabled: true,
 		},
 		"burstable-pod-resources-unequal-container-requests-with-sidecar": {
 			pod: &burstablePodResourcesUnequalContainerRequestsWithSidecar,
@@ -852,12 +844,10 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			},
 			memoryCapacity:                  4000000000,
 			podLevelResourcesFeatureEnabled: true,
-			sidecarContainersFeatureEnabled: true,
 		},
 	}
 	for name, test := range oomTests {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, test.sidecarContainersFeatureEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, test.podLevelResourcesFeatureEnabled)
 			listContainers := test.pod.Spec.InitContainers
 			listContainers = append(listContainers, test.pod.Spec.Containers...)

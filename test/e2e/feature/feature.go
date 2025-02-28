@@ -192,20 +192,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	HPA = framework.WithFeature(framework.ValidFeatures.Add("HPA"))
 
-	// owning-sig: sig-storage
-	// kep: https://kep.k8s.io/2680
-	// test-infra jobs:
-	// - pull-kubernetes-e2e-storage-kind-alpha-features (need manual trigger)
-	// - ci-kubernetes-e2e-storage-kind-alpha-features
-	//
-	// When this label is added to a test, it means that the cluster must be created
-	// with the feature-gate "HonorPVReclaimPolicy=true".
-	//
-	// Once the feature are stable, this label should be removed and these tests will
-	// be run by default on any cluster. The test-infra job also should be updated to
-	// not focus on this feature anymore.
-	HonorPVReclaimPolicy = framework.WithFeature(framework.ValidFeatures.Add("HonorPVReclaimPolicy"))
-
 	// owner: sig-node
 	HostAccess = framework.WithFeature(framework.ValidFeatures.Add("HostAccess"))
 
@@ -244,6 +230,8 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
+
+	KubeletFineGrainedAuthz = framework.WithFeature(framework.ValidFeatures.Add("KubeletFineGrainedAuthz"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletSecurity = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
@@ -309,9 +297,6 @@ var (
 	// Testing node allocatable validations
 	NodeAllocatable = framework.WithFeature(framework.ValidFeatures.Add("NodeAllocatable"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	NodeAuthenticator = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthenticator"))
-
 	// Owner: sig-node
 	// Node Problem Detect e2e tests in tree.
 	NodeProblemDetector = framework.WithFeature(framework.ValidFeatures.Add("NodeProblemDetector"))
@@ -334,6 +319,10 @@ var (
 	// Owner: sig-node
 	// Tests aiming to verify oom_score functionality
 	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
+
+	// Owner: sig-api-machinery
+	// Marks tests that enforce ordered namespace deletion.
+	OrderedNamespaceDeletion = framework.WithFeature(framework.ValidFeatures.Add("OrderedNamespaceDeletion"))
 
 	// Owner: sig-node
 	// Verify ProcMount feature.
@@ -454,7 +443,9 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StackdriverMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverMonitoring"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Tests marked with this feature require the kubelet to be running in standalone mode (--standalone-mode=true) like this:
+	// make test-e2e-node PARALLELISM=1 FOCUS="StandaloneMode" TEST_ARGS='--kubelet-flags="--fail-swap-on=false" --standalone-mode=true'
+	// Tests validating the behavior of kubelet when running without the API server.
 	StandaloneMode = framework.WithFeature(framework.ValidFeatures.Add("StandaloneMode"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)

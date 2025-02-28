@@ -31,7 +31,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	"k8s.io/kubernetes/test/e2e/nodefeature"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
@@ -541,7 +540,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		f.It("should run the container as privileged when true [LinuxOnly]", nodefeature.HostAccess, feature.HostAccess, func(ctx context.Context) {
+		f.It("should run the container as privileged when true [LinuxOnly]", feature.HostAccess, func(ctx context.Context) {
 			podName := createAndWaitUserPod(ctx, true)
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {

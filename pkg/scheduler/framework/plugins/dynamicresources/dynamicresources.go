@@ -23,7 +23,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp" //nolint:depguard
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -575,6 +575,11 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 func (pl *DynamicResources) PostFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Unschedulable, "plugin disabled")
+	}
+	// If a Pod doesn't have any resource claims attached to it, there is no need for further processing.
+	// Thus we provide a fast path for this case to avoid unnecessary computations.
+	if len(pod.Spec.ResourceClaims) == 0 {
+		return nil, framework.NewStatus(framework.Unschedulable)
 	}
 	logger := klog.FromContext(ctx)
 	state, err := getStateData(cs)
