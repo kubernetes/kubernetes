@@ -28,25 +28,19 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 )
 
-// documentMapToUpgradeConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
+// documentMapToUpgradeConfiguration takes a map between GVKs and YAML/JSON documents (as returned by SplitYAMLDocuments),
 // finds a UpgradeConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
 func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.UpgradeConfiguration, error) {
 	upgradeBytes := []byte{}
 
 	for gvk, bytes := range gvkmap {
-		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvk) || componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
-			klog.Warningf("[config] WARNING: YAML document with GroupVersionKind %v is deprecated for upgrade, please use config file with kind of UpgradeConfiguration instead \n", gvk)
-			continue
-		}
-
 		if gvk.Kind != constants.UpgradeConfigurationKind {
-			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+			klog.Warningf("[config] WARNING: Ignored configuration document with GroupVersionKind %v\n", gvk)
 			continue
 		}
 
@@ -55,7 +49,7 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 			return nil, err
 		}
 
-		// verify the validity of the YAML
+		// verify the validity of the YAML/JSON
 		if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme}, gvk, bytes); err != nil {
 			klog.Warning(err.Error())
 		}
@@ -83,11 +77,6 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 	return internalcfg, nil
 }
 
-// DocMapToUpgradeConfiguration converts documentMap to an internal, defaulted and validated UpgradeConfiguration object.
-func DocMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap) (*kubeadmapi.UpgradeConfiguration, error) {
-	return documentMapToUpgradeConfiguration(gvkmap, false)
-}
-
 // LoadUpgradeConfigurationFromFile loads UpgradeConfiguration from a file.
 func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurationOptions) (*kubeadmapi.UpgradeConfiguration, error) {
 	var err error
@@ -99,20 +88,27 @@ func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurati
 		return nil, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
 	}
 
-	// Split the YAML documents in the file into a DocumentMap
-	docmap, err := kubeadmutil.SplitYAMLDocuments(configBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	// Convert documentMap to internal UpgradeConfiguration, InitConfiguration and ClusterConfiguration from config file will be ignored.
 	// Upgrade should respect the cluster configuration from the existing cluster, re-configure the cluster with a InitConfiguration and
 	// ClusterConfiguration from the config file is not allowed for upgrade.
-	if upgradeCfg, err = DocMapToUpgradeConfiguration(docmap); err != nil {
+	if upgradeCfg, err = BytesToUpgradeConfiguration(configBytes); err != nil {
 		return nil, err
 	}
 
 	return upgradeCfg, nil
+}
+
+// BytesToUpgradeConfiguration converts a byte slice to an internal, defaulted and validated UpgradeConfiguration object.
+// The map may contain many different YAML/JSON documents. These documents are parsed one-by-one.
+// The resulting UpgradeConfiguration is then dynamically defaulted and validated prior to return.
+func BytesToUpgradeConfiguration(b []byte) (*kubeadmapi.UpgradeConfiguration, error) {
+	// Split the YAML/JSON documents in the file into a DocumentMap
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
+	if err != nil {
+		return nil, err
+	}
+
+	return documentMapToUpgradeConfiguration(gvkmap, false)
 }
 
 // LoadOrDefaultUpgradeConfiguration takes a path to a config file and a versioned configuration that can serve as the default config

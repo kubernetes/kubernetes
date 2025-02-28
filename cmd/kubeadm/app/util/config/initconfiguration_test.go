@@ -23,11 +23,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
+	"k8s.io/utils/ptr"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -52,7 +55,7 @@ kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), certDir, const
 		name         string
 		fileContents []byte
 		expectErr    bool
-		validate     func(*testing.T, *kubeadm.InitConfiguration)
+		validate     func(*testing.T, *kubeadmapi.InitConfiguration)
 	}{
 		{
 			name:         "v1beta3.partial1",
@@ -64,7 +67,7 @@ kubernetesVersion: %s`, kubeadmapiv1.SchemeGroupVersion.String(), certDir, const
 				cfgFiles["InitConfiguration_v1beta3"],
 				clusterCfg,
 			}, []byte(constants.YAMLDocumentSeparator)),
-			validate: func(t *testing.T, cfg *kubeadm.InitConfiguration) {
+			validate: func(t *testing.T, cfg *kubeadmapi.InitConfiguration) {
 				if cfg.ClusterConfiguration.CertificatesDir != certDir {
 					t.Errorf("CertificatesDir from ClusterConfiguration holds the wrong value, Expected: %v. Actual: %v", certDir, cfg.ClusterConfiguration.CertificatesDir)
 				}
@@ -184,20 +187,167 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.desc, func(t *testing.T) {
-			b, err := yaml.Marshal(tc.cfg)
-			if err != nil {
-				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
-			}
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tc.desc, format.name), func(t *testing.T) {
+				b, err := format.marshal(tc.cfg)
+				if err != nil {
+					t.Fatalf("unexpected error while marshalling to %s: %v", format.name, err)
+				}
 
-			cfg, err := BytesToInitConfiguration(b, true)
-			if err != nil {
-				t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
-			}
+				cfg, err := BytesToInitConfiguration(b, true)
+				if err != nil {
+					t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
+				}
 
-			if tc.expectedTaintCnt != len(cfg.NodeRegistration.Taints) {
-				t.Fatalf("unexpected taints count\nexpected: %d\ngot: %d\ntaints: %v", tc.expectedTaintCnt, len(cfg.NodeRegistration.Taints), cfg.NodeRegistration.Taints)
-			}
-		})
+				if tc.expectedTaintCnt != len(cfg.NodeRegistration.Taints) {
+					t.Fatalf("unexpected taints count\nexpected: %d\ngot: %d\ntaints: %v", tc.expectedTaintCnt, len(cfg.NodeRegistration.Taints), cfg.NodeRegistration.Taints)
+				}
+			})
+		}
+	}
+}
+
+func TestBytesToInitConfiguration(t *testing.T) {
+	tests := []struct {
+		name          string
+		cfg           interface{}
+		expectedCfg   kubeadmapi.InitConfiguration
+		expectedError bool
+		skipCRIDetect bool
+	}{
+		{
+			name: "default config is set correctly",
+			cfg: kubeadmapiv1.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.InitConfigurationKind,
+				},
+			},
+			expectedCfg: kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "",
+					BindPort:         0,
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
+					Name:      "",
+					Taints: []v1.Taint{
+						{
+							Key:    "node-role.kubernetes.io/control-plane",
+							Effect: "NoSchedule",
+						},
+					},
+					ImagePullPolicy: "IfNotPresent",
+					ImagePullSerial: ptr.To(true),
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
+							DataDir: "/var/lib/etcd",
+						},
+					},
+					KubernetesVersion:   "stable-1",
+					ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+					ClusterName:         kubeadmapiv1.DefaultClusterName,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmType(kubeadmapiv1.DefaultEncryptionAlgorithm),
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.96.0.0/12",
+						DNSDomain:     "cluster.local",
+					},
+					CertificatesDir: "/etc/kubernetes/pki",
+				},
+			},
+			skipCRIDetect: true,
+		},
+		{
+			name: "partial config with custom values",
+			cfg: kubeadmapiv1.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+					Name:      "test-node",
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
+				},
+			},
+			expectedCfg: kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "",
+					BindPort:         0,
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+					CRISocket: "unix:///var/run/containerd/containerd.sock",
+					Name:      "test-node",
+					Taints: []v1.Taint{
+						{
+							Key:    "node-role.kubernetes.io/control-plane",
+							Effect: "NoSchedule",
+						},
+					},
+					ImagePullPolicy: "IfNotPresent",
+					ImagePullSerial: ptr.To(true),
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
+							DataDir: "/var/lib/etcd",
+						},
+					},
+					KubernetesVersion:   "stable-1",
+					ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+					ClusterName:         kubeadmapiv1.DefaultClusterName,
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmType(kubeadmapiv1.DefaultEncryptionAlgorithm),
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.96.0.0/12",
+						DNSDomain:     "cluster.local",
+					},
+					CertificatesDir: "/etc/kubernetes/pki",
+				},
+			},
+			skipCRIDetect: true,
+		},
+		{
+			name: "invalid configuration type",
+			cfg: kubeadmapiv1.UpgradeConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
+					Kind:       constants.UpgradeConfigurationKind,
+				},
+			},
+			expectedError: true,
+			skipCRIDetect: true,
+		},
+	}
+
+	for _, tc := range tests {
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("%s_%s", tc.name, format.name), func(t *testing.T) {
+				b, err := format.marshal(tc.cfg)
+				if err != nil {
+					t.Fatalf("unexpected error marshaling %s: %v", format.name, err)
+				}
+
+				cfg, err := BytesToInitConfiguration(b, tc.skipCRIDetect)
+				if (err != nil) != tc.expectedError {
+					t.Fatalf("expected error: %v, got error: %v\nError: %v", tc.expectedError, err != nil, err)
+				}
+
+				if !tc.expectedError {
+					// Ignore dynamic fields that may be set during defaulting
+					diffOpts := []cmp.Option{
+						cmpopts.IgnoreFields(kubeadmapi.NodeRegistrationOptions{}, "Name"),
+						cmpopts.IgnoreFields(kubeadmapi.InitConfiguration{}, "Timeouts", "BootstrapTokens", "LocalAPIEndpoint"),
+						cmpopts.IgnoreFields(kubeadmapi.APIServer{}, "TimeoutForControlPlane"),
+						cmpopts.IgnoreFields(kubeadmapi.ClusterConfiguration{}, "ComponentConfigs", "KubernetesVersion",
+							"CertificateValidityPeriod", "CACertificateValidityPeriod"),
+					}
+
+					if diff := cmp.Diff(*cfg, tc.expectedCfg, diffOpts...); diff != "" {
+						t.Fatalf("unexpected configuration difference (-want +got):\n%s", diff)
+					}
+				}
+			})
+		}
 	}
 }
