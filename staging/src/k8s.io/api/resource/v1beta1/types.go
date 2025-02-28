@@ -326,6 +326,8 @@ const DeviceTaintsMaxLength = 8
 // The device this DeviceTaint is attached to has the "effect" on
 // any claim and, through the claim, to pods that do not tolerate
 // the Taint.
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type DeviceTaint struct {
 	// The taint key to be applied to a device.
 	// Must be a label name.
@@ -988,6 +990,19 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
+
+	// A copy of all tolerations specified in the request at the time
+	// when the device got allocated.
+	//
+	// The maximum number of tolerations is 16.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,6,opt,name=tolerations"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
