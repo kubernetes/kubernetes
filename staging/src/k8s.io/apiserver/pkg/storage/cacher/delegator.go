@@ -18,12 +18,19 @@ package cacher
 
 import (
 	"context"
+	"fmt"
+	"hash"
+	"hash/fnv"
+	"math/rand"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
@@ -33,18 +40,36 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegator {
-	return &CacheDelegator{
-		cacher:  cacher,
-		storage: storage,
+	return newCacheDelegator(cacher, storage, clock.RealClock{})
+}
+
+func newCacheDelegator(cacher *Cacher, storage storage.Interface, clock clock.Clock) *CacheDelegator {
+	d := &CacheDelegator{
+		cacher:      cacher,
+		storage:     storage,
+		consistency: newConsistencyChecker(cacher.resourcePrefix, cacher.newListFunc, cacher, storage, clock),
+		stopCh:      make(chan struct{}),
 	}
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		d.consistency.startChecking(d.stopCh)
+	}()
+	return d
 }
 
 type CacheDelegator struct {
-	cacher  *Cacher
-	storage storage.Interface
+	cacher      *Cacher
+	storage     storage.Interface
+	consistency *consistencyChecker
+
+	wg       sync.WaitGroup
+	stopOnce sync.Once
+	stopCh   chan struct{}
 }
 
 var _ storage.Interface = (*CacheDelegator)(nil)
@@ -169,7 +194,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 			return err
 		}
 	}
-	err = c.cacher.GetList(ctx, key, opts, listObj, listRV)
+	err = c.cacher.GetList(ctx, key, opts, listObj)
 	success := "true"
 	fallback := "false"
 	if err != nil {
@@ -257,4 +282,160 @@ func (c *CacheDelegator) ReadinessCheck() error {
 
 func (c *CacheDelegator) RequestWatchProgress(ctx context.Context) error {
 	return c.storage.RequestWatchProgress(ctx)
+}
+
+func (c *CacheDelegator) Stop() {
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+	})
+	c.wg.Wait()
+}
+
+func newConsistencyChecker(resourcePrefix string, newListFunc func() runtime.Object, cacher storeCache, etcd store, clock clock.Clock) *consistencyChecker {
+	return &consistencyChecker{
+		resourcePrefix: resourcePrefix,
+		newListFunc:    newListFunc,
+		cacher:         cacher,
+		etcd:           etcd,
+		clock:          clock,
+	}
+}
+
+type consistencyChecker struct {
+	resourcePrefix string
+	newListFunc    func() runtime.Object
+
+	cacher storeCache
+	etcd   store
+	clock  clock.Clock
+}
+
+type storeCache interface {
+	store
+	Ready() bool
+}
+
+type store interface {
+	GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error
+}
+
+func (c consistencyChecker) startChecking(stopCh <-chan struct{}) {
+	period := 5 * time.Minute
+	minDelay := time.Minute
+	delay := minDelay + time.Duration(rand.Int63n(int64(period-minDelay)))
+	select {
+	case <-stopCh:
+		return
+	case <-c.clock.After(delay):
+	}
+	ctx := wait.ContextForChannel(stopCh)
+	for {
+		c.check(ctx)
+		select {
+		case <-stopCh:
+			return
+		case <-c.clock.After(period):
+		}
+	}
+}
+
+func (c *consistencyChecker) check(ctx context.Context) {
+	digests, err := c.calculateDigests(ctx)
+	if err != nil {
+		klog.ErrorS(err, "Cache consistentency check error")
+	}
+	if digests.CacheDigest == digests.EtcdDigest {
+		klog.InfoS("Cache consistentency check passed", "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
+	} else {
+		klog.InfoS("Cache consistentency check failed", "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
+	}
+	metrics.RecordStorageDigest(c.resourcePrefix, *digests)
+}
+
+func (c *consistencyChecker) calculateDigests(ctx context.Context) (*metrics.StorageDigest, error) {
+	if !c.cacher.Ready() {
+		return nil, fmt.Errorf("cache is not ready")
+	}
+	cacheDigest, resourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, storage.ListOptions{
+		ResourceVersion:      "0",
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
+	}
+	etcdDigest, _, err := c.calculateStoreDigest(ctx, c.etcd, storage.ListOptions{
+		ResourceVersion:      resourceVersion,
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating etcd digest: %w", err)
+	}
+	return &metrics.StorageDigest{
+		ResourceVersion: resourceVersion,
+		CacheDigest:     cacheDigest,
+		EtcdDigest:      etcdDigest,
+	}, nil
+}
+
+func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store store, opts storage.ListOptions) (digest, rv string, err error) {
+	// TODO: Implement pagination
+	resp := c.newListFunc()
+	err = store.GetList(ctx, c.resourcePrefix, opts, resp)
+	if err != nil {
+		return "", "", err
+	}
+	digest, err = listDigest(resp)
+	if err != nil {
+		return "", "", err
+	}
+	list, err := meta.ListAccessor(resp)
+	if err != nil {
+		return "", "", err
+	}
+	return digest, list.GetResourceVersion(), nil
+}
+
+func listDigest(list runtime.Object) (string, error) {
+	h := fnv.New64()
+	err := meta.EachListItem(list, func(obj runtime.Object) error {
+		objectMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+		err = addObjectToDigest(h, objectMeta)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum64()), nil
+}
+
+func addObjectToDigest(h hash.Hash64, objectMeta metav1.Object) error {
+	_, err := h.Write([]byte(objectMeta.GetNamespace()))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte("/"))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte(objectMeta.GetName()))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte("/"))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte(objectMeta.GetResourceVersion()))
+	if err != nil {
+		return err
+	}
+	return nil
 }

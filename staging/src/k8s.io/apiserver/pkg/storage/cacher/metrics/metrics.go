@@ -21,6 +21,7 @@ import (
 
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -176,6 +177,16 @@ var (
 			Help:           "Counter for consistent reads from cache.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		}, []string{"resource", "success", "fallback"})
+
+	storageDigestDescription = compbasemetrics.NewDesc(
+		"apiserver_storage_digest",
+		"Gage exposing digest of storages to validate consistency between. Algorithm to calculate digest might change, so it should not be compared accross apiservers.",
+		[]string{"resource", "storage", "resource_version", "digest"},
+		nil,
+		compbasemetrics.ALPHA,
+		"",
+	)
+	storageDigest = &storageDigestMonitor{digests: make(map[string]StorageDigest)}
 )
 
 var registerMetrics sync.Once
@@ -198,6 +209,7 @@ func Register() {
 		legacyregistry.MustRegister(WatchCacheInitializations)
 		legacyregistry.MustRegister(WatchCacheReadWait)
 		legacyregistry.MustRegister(ConsistentReadTotal)
+		legacyregistry.CustomMustRegister(storageDigest)
 	})
 }
 
@@ -221,4 +233,47 @@ func RecordsWatchCacheCapacityChange(objType string, old, new int) {
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()
+}
+
+// RecordResourceVersion sets the current resource version for a given resource type.
+func RecordStorageDigest(resource string, digest StorageDigest) {
+	storageDigest.mux.Lock()
+	defer storageDigest.mux.Unlock()
+	storageDigest.digests[resource] = digest
+}
+
+type StorageDigest struct {
+	ResourceVersion string
+	CacheDigest     string
+	EtcdDigest      string
+}
+
+type storageDigestMonitor struct {
+	compbasemetrics.BaseStableCollector
+
+	mux     sync.Mutex
+	digests map[string]StorageDigest
+}
+
+// DescribeWithStability implements metrics.StableCollector.
+func (s *storageDigestMonitor) DescribeWithStability(ch chan<- *compbasemetrics.Desc) {
+	ch <- storageDigestDescription
+}
+
+// CollectWithStability implements metrics.StableCollector.
+func (s *storageDigestMonitor) CollectWithStability(ch chan<- compbasemetrics.Metric) {
+	storageDigest.mux.Lock()
+	defer storageDigest.mux.Unlock()
+	for resource, digest := range s.digests {
+		metric, err := compbasemetrics.NewConstMetric(storageDigestDescription, compbasemetrics.GaugeValue, 1, resource, "cache", digest.ResourceVersion, digest.CacheDigest)
+		if err != nil {
+			klog.ErrorS(err, "Failed to create metric", "metric", "apiserver_storage_digest", "resource", resource)
+		}
+		ch <- metric
+		metric, err = compbasemetrics.NewConstMetric(storageDigestDescription, compbasemetrics.GaugeValue, 1, resource, "etcd", digest.ResourceVersion, digest.EtcdDigest)
+		if err != nil {
+			klog.ErrorS(err, "Failed to create metric", "metric", "apiserver_storage_digest", "resource", resource)
+		}
+		ch <- metric
+	}
 }
