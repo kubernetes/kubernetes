@@ -240,13 +240,17 @@ func splitYAMLDocument(data []byte, atEOF bool) (advance int, token []byte, err 
 // YAMLOrJSONDecoder attempts to decode a stream of JSON or YAML documents.
 // While JSON is YAML, the way Go's JSON decode defines a multi-document stream
 // is a series of JSON objects (e.g. {}{}), but YAML defines a multi-document
-// stream as a series of documents separated by "---". This decoder will
-// attempt to decode the stream as JSON first, and if that fails, it will
-// switch to YAML.
+// stream as a series of documents separated by "---".
+//
+// This decoder will attempt to decode the stream as JSON first, and if that
+// fails, it will switch to YAML. Once it determines the stream is JSON (by
+// finding a non-YAML-delimited series of objects), it will not switch to YAML.
+// Once it switches to YAML it will not switch back to JSON.
 type YAMLOrJSONDecoder struct {
 	json   *json.Decoder
 	yaml   *YAMLToJSONDecoder
 	stream *StreamReader
+	count  int // how many objects have been decoded
 }
 
 type JSONSyntaxError struct {
@@ -286,11 +290,17 @@ func NewYAMLOrJSONDecoder(r io.Reader, bufferSize int) *YAMLOrJSONDecoder {
 // Decode unmarshals the next object from the underlying stream into the
 // provide object, or returns an error.
 func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
+	// Because we don't know if this is a JSON or YAML stream, a failure from
+	// both decoders is ambiguous. When in doubt, it will return the error from
+	// the JSON decoder.  Unfortunately, this means that if the first document
+	// is invalid YAML, the error won't be awesome.
+	// TODO: the errors from YAML are not great, we could improve them a lot.
 	var firstErr error
 	if d.json != nil {
 		err := d.json.Decode(into)
 		if err == nil {
 			d.stream.Consume(int(d.json.InputOffset()) - d.stream.Consumed())
+			d.count++
 			return nil
 		}
 		if err == io.EOF { //nolint:errorlint
@@ -304,6 +314,12 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 			}
 		} else {
 			firstErr = err
+		}
+		if d.count > 1 {
+			// If we found 0 or 1 JSON object(s), this stream is still
+			// ambiguous.  But if we found more than 1 JSON object, then this
+			// is an unambiguous JSON stream, and we should not switch to YAML.
+			return err
 		}
 		// If JSON decoding hits the end of one object and then fails on the
 		// next, it leaves any leading whitespace in the buffer, which can
@@ -319,6 +335,7 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 		err := d.yaml.Decode(into)
 		if err == nil {
 			d.stream.Consume(d.yaml.InputOffset() - d.stream.Consumed())
+			d.count++
 			return nil
 		}
 		if err == io.EOF { //nolint:errorlint

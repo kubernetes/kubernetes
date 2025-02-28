@@ -368,6 +368,8 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 			{"foo": "bar"},
 			{"baz": "biz"},
 		}},
+		// First 2 documents are JSON, third is YAML (stream is JSON)
+		{"{\"foo\": \"bar\"}\n{\"baz\": \"biz\"}\n---\n{qux: zrb}", 100, true, true, nil},
 	}
 	for i, testCase := range testCases {
 		decoder := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(testCase.input)), testCase.buffer)
