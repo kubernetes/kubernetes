@@ -77,6 +77,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
@@ -662,7 +663,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker, klet.getRootDir())
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+	klet.allocationManager = allocation.NewManager(klet.getRootDir())
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
@@ -1146,6 +1148,9 @@ type Kubelet struct {
 	// and components that need to check whether a pod is still running should instead directly
 	// consult the pod worker.
 	statusManager status.Manager
+
+	// allocationManager manages allocated resources for pods.
+	allocationManager allocation.Manager
 
 	// resyncInterval is the interval between periodic full reconciliations of
 	// pods on this node.
@@ -2638,7 +2643,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
-				allocatedPod, _ := kl.statusManager.UpdatePodFromAllocation(pod)
+				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
 
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(allocatedPods, allocatedPod); !ok {
@@ -2651,7 +2656,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					continue
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
-				if err := kl.statusManager.SetPodAllocation(allocatedPod); err != nil {
+				if err := kl.allocationManager.SetPodAllocation(allocatedPod); err != nil {
 					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
@@ -2707,6 +2712,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.RemovePod(pod)
+		kl.allocationManager.DeletePodAllocation(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2870,7 +2876,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
 func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error) {
-	allocatedPod, updated := kl.statusManager.UpdatePodFromAllocation(pod)
+	allocatedPod, updated := kl.allocationManager.UpdatePodFromAllocation(pod)
 	if !updated {
 		// Desired resources == allocated resources. Check whether a resize is in progress.
 		resizeInProgress := !allocatedResourcesMatchStatus(allocatedPod, podStatus)
@@ -2891,7 +2897,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 	fit, resizeStatus, resizeMsg := kl.canResizePod(pod)
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := kl.statusManager.SetPodAllocation(pod); err != nil {
+		if err := kl.allocationManager.SetPodAllocation(pod); err != nil {
 			return nil, err
 		}
 		for i, container := range pod.Spec.Containers {
