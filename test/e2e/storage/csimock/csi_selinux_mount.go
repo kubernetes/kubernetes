@@ -72,6 +72,10 @@ import (
 //
 // All other feature gate combinations should be invalid.
 
+const (
+	controllerSELinuxMetricName = "selinux_warning_controller_selinux_volume_conflict"
+)
+
 var (
 	defaultSELinuxLabels = map[string]struct{ defaultProcessLabel, defaultFileLabel string }{
 		"debian": {"svirt_lxc_net_t", "svirt_lxc_file_t"},
@@ -713,13 +717,13 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 					// We don't need to compare the initial and final KCM metrics,
 					// KCM metrics report exact pod namespaces+names as labels and the metric value is always "1".
 					err = waitForControllerMetric(ctx, grabber, f.Namespace.Name, pod.Name, pod2.Name, t.expectControllerConflictProperty, framework.PodStartShortTimeout)
-					framework.ExpectNoError(err, "failed to get metrics from KCM")
+					framework.ExpectNoError(err, "while waiting for metrics from KCM")
 					// Check the controler generated a conflict event on the first pod
 					err = waitForConflictEvent(ctx, m.cs, pod, pod2, t.expectControllerConflictProperty, f.Timeouts.PodStart)
-					framework.ExpectNoError(err, "failed to receive event on the first pod")
+					framework.ExpectNoError(err, "while waiting for an event on the first pod")
 					// Check the controler generated event on the second pod
 					err = waitForConflictEvent(ctx, m.cs, pod2, pod, t.expectControllerConflictProperty, f.Timeouts.PodStart)
-					framework.ExpectNoError(err, "failed to receive event on the second pod")
+					framework.ExpectNoError(err, "while waiting for an event on the second pod")
 				}
 			}
 			// t.testTags is array and it's not possible to use It("name", func(){xxx}, t.testTags...)
@@ -778,7 +782,7 @@ func grabKCMSELinuxMetrics(ctx context.Context, grabber *e2emetrics.Grabber, nam
 		for i := range samples {
 			// E.g. "selinux_warning_controller_selinux_volume_conflict"
 			metricName := samples[i].Metric[testutil.MetricNameLabel]
-			if metricName != "selinux_warning_controller_selinux_volume_conflict" {
+			if metricName != controllerSELinuxMetricName {
 				continue
 			}
 
@@ -836,7 +840,6 @@ func waitForNodeMetricIncrease(ctx context.Context, grabber *e2emetrics.Grabber,
 }
 
 func waitForControllerMetric(ctx context.Context, grabber *e2emetrics.Grabber, namespace, pod1Name, pod2Name, propertyName string, timeout time.Duration) error {
-	var noIncreaseMetrics sets.Set[string]
 	var metrics map[string]float64
 
 	expectLabels := []string{
@@ -846,6 +849,8 @@ func waitForControllerMetric(ctx context.Context, grabber *e2emetrics.Grabber, n
 		fmt.Sprintf("pod2_namespace=%q", namespace),
 		fmt.Sprintf("property=%q", propertyName),
 	}
+	framework.Logf("Waiting for KCM metric %s{%+v}", controllerSELinuxMetricName, expectLabels)
+
 	err := wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		var err error
 		metrics, err = grabKCMSELinuxMetrics(ctx, grabber, namespace)
@@ -876,8 +881,8 @@ func waitForControllerMetric(ctx context.Context, grabber *e2emetrics.Grabber, n
 	ginkgo.By("Dumping final KCM metrics")
 	dumpMetrics(metrics)
 
-	if err == context.DeadlineExceeded {
-		return fmt.Errorf("timed out waiting for KCM metrics %v", noIncreaseMetrics.UnsortedList())
+	if err != nil {
+		return fmt.Errorf("error waiting for KCM metrics %s{%+v}: %w", controllerSELinuxMetricName, expectLabels, err)
 	}
 	return err
 }
