@@ -195,6 +195,12 @@ func tweakPVCScalePolicy(t apps.PersistentVolumeClaimRetentionPolicyType) pvcPol
 	}
 }
 
+func tweakServiceName(name string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.ServiceName = name
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -519,6 +525,14 @@ func TestValidateStatefulSet(t *testing.T) {
 		),
 		errs: field.ErrorList{
 			field.Invalid(field.NewPath("spec", "ordinals.start"), nil, ""),
+		},
+	}, {
+		name: "invalid service name",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakServiceName("Invalid.Name"),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "serviceName"), "Invalid.Name", ""),
 		},
 	},
 	}
