@@ -1426,6 +1426,9 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 		if err != nil {
 			return nil, nil, fmt.Errorf("op %d: Failed to initialize data collector: %v", opIndex, err)
 		}
+		tCtx.TB().Cleanup(func() {
+			collectorCtx.Cancel("cleaning up")
+		})
 		collectorWG.Add(1)
 		go func() {
 			defer collectorWG.Done()
@@ -1663,11 +1666,6 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 		if err != nil {
 			return err
 		}
-		e.tCtx.TB().Cleanup(func() {
-			if e.collectorCtx != nil {
-				e.collectorCtx.Cancel("cleaning up")
-			}
-		})
 	}
 	if err := createPodsRapidly(e.tCtx, namespace, op); err != nil {
 		return fmt.Errorf("op %d: %v", opIndex, err)
@@ -1879,11 +1877,6 @@ func (e *WorkloadExecutor) runStartCollectingMetricsOp(opIndex int, op *startCol
 	if err != nil {
 		return err
 	}
-	e.tCtx.TB().Cleanup(func() {
-		if e.collectorCtx != nil {
-			e.collectorCtx.Cancel("cleaning up")
-		}
-	})
 	return nil
 }
 
