@@ -20,6 +20,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -34,9 +35,11 @@ import (
 // It uses /proc/stat first, which is more accurate, and falls back to the less accurate
 // unix.Sysinfo if /proc/stat failed.
 func GetBootTime() (time.Time, error) {
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	bootTime, err := getBootTimeWithProcStat()
 	if err != nil {
-		klog.InfoS("Failed to get boot time from /proc/uptime. Will retry with unix.Sysinfo.", "error", err)
+		logger.Info("Failed to get boot time from /proc/uptime. Will retry with unix.Sysinfo.", "error", err)
 		return getBootTimeWithSysinfo()
 	}
 	return bootTime, nil
