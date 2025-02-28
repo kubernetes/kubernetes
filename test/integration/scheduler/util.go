@@ -35,7 +35,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // The returned shutdown func will delete created resources and scheduler, resources should be those
@@ -140,7 +140,7 @@ func InitRegistryAndConfig(t *testing.T, factory func(plugin framework.Plugin) f
 
 	versionedCfg := configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins:       pls,
 		}},
 	}
