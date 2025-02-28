@@ -52,7 +52,13 @@ const Name = names.DefaultPreemption
 type IsEligiblePodFunc func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool
 
 // MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
-// The implementations should return true if the first pod is more important than the second pod and the second one should be considered for preemption before the first one.
+// Implementations should return true if the first pod is more important than the second pod
+// and the second one should be considered for preemption before the first one.
+// For performance reasons, the search for nodes eligible for preemption is done by omitting all
+// eligible victims from a node then checking whether the preemptor fits on the node without them.
+// The victims are then readded after the preemptor in order of highest to lowest importance.
+// The default behavior is to ignore the possibility of affinity between the preemptor and any of
+// the victims, as affinity between pods that are eligible to preempt each other isn't recommended.
 type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
@@ -71,6 +77,8 @@ type DefaultPreemption struct {
 
 	// MoreImportantPod is used to sort eligible victims in-place in descending order of highest to
 	// lowest importance. Pods with higher importance are less likely to be preempted.
+	// The default behavior is to order pods by descending priority, then descending runtime duration
+	// for pods with equal priority.
 	MoreImportantPod MoreImportantPodFunc
 }
 
@@ -231,7 +239,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// condition that we could check is if the "pod" is failing to schedule due to
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
-	// priority pods is not a recommended configuration anyway.
+	// importance (priority) pods is not a recommended configuration anyway.
 	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
