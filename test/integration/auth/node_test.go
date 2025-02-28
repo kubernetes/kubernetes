@@ -1066,6 +1066,140 @@ func TestNodeRestrictionServiceAccountAudience(t *testing.T) {
 		expectedForbiddenMessage(t, createTokenRequest(node1Client, pod.UID, "audience1", "audience2"), "node may only request 0 or 1 audiences")
 		deletePod(t, superuserClient, "pod1")
 	})
+
+	t.Run("clusterrole and clusterrolebinding allowing node1 to request audience1 should work", func(t *testing.T) {
+		cr := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1"},
+			Rules: []rbacv1.PolicyRule{{
+				APIGroups:     []string{"node-access.audience.serviceaccount.kubernetes.io"},
+				Resources:     []string{"default/audiences"},
+				Verbs:         []string{"use"},
+				ResourceNames: []string{"audience1"},
+			}},
+		}
+		crb := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1"},
+			Subjects:   []rbacv1.Subject{{Kind: "User", Name: "system:node:node1"}},
+			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "audience-access-for-node1"},
+		}
+		createRBACClusterRole(t, cr, superuserClient)
+		createRBACClusterRoleBinding(t, crb, superuserClient)
+		pod := createPod(t, superuserClient, nil)
+
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "audience1"))
+		expectForbidden(t, createTokenRequest(node1Client, pod.UID, "audience2"))
+
+		deletePod(t, superuserClient, "pod1")
+		deleteRBACClusterRole(t, cr, superuserClient)
+		deleteRBACClusterRoleBinding(t, crb, superuserClient)
+	})
+
+	t.Run("clusterrole and rolebinding in a namespace allowing node1 to request audience1 should work", func(t *testing.T) {
+		cr := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1"},
+			Rules: []rbacv1.PolicyRule{{
+				APIGroups:     []string{"node-access.audience.serviceaccount.kubernetes.io"},
+				Resources:     []string{"default/audiences"},
+				Verbs:         []string{"use"},
+				ResourceNames: []string{"audience1"},
+			}},
+		}
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1", Namespace: "ns"},
+			Subjects:   []rbacv1.Subject{{Kind: "User", Name: "system:node:node1"}},
+			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: "audience-access-for-node1"},
+		}
+		createRBACClusterRole(t, cr, superuserClient)
+		createRBACRoleBinding(t, rb, superuserClient)
+		pod := createPod(t, superuserClient, nil)
+
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "audience1"))
+		expectForbidden(t, createTokenRequest(node1Client, pod.UID, "audience2"))
+
+		deletePod(t, superuserClient, "pod1")
+		deleteRBACClusterRole(t, cr, superuserClient)
+		deleteRBACRoleBinding(t, rb, superuserClient)
+	})
+
+	t.Run("role and rolebinding in a namespace allowing node1 to request audience1 should work", func(t *testing.T) {
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1", Namespace: "ns"},
+			Rules: []rbacv1.PolicyRule{{
+				APIGroups:     []string{"node-access.audience.serviceaccount.kubernetes.io"},
+				Resources:     []string{"default/audiences"},
+				Verbs:         []string{"use"},
+				ResourceNames: []string{"audience1"},
+			}},
+		}
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1", Namespace: "ns"},
+			Subjects:   []rbacv1.Subject{{Kind: "User", Name: "system:node:node1"}},
+			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "audience-access-for-node1"},
+		}
+		createRBACRole(t, role, superuserClient)
+		createRBACRoleBinding(t, rb, superuserClient)
+		pod := createPod(t, superuserClient, nil)
+
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "audience1"))
+		expectForbidden(t, createTokenRequest(node1Client, pod.UID, "audience2"))
+
+		deletePod(t, superuserClient, "pod1")
+		deleteRBACRole(t, role, superuserClient)
+		deleteRBACRoleBinding(t, rb, superuserClient)
+	})
+
+	t.Run("clusterrole and rolebinding in a namespace allowing node1 to request audience1, wildcard for service account names", func(t *testing.T) {
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1", Namespace: "ns"},
+			Rules: []rbacv1.PolicyRule{{
+				APIGroups:     []string{"node-access.audience.serviceaccount.kubernetes.io"},
+				Resources:     []string{"*/audiences"},
+				Verbs:         []string{"use"},
+				ResourceNames: []string{"audience1"},
+			}},
+		}
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1", Namespace: "ns"},
+			Subjects:   []rbacv1.Subject{{Kind: "User", Name: "system:node:node1"}},
+			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "audience-access-for-node1"},
+		}
+		createRBACRole(t, role, superuserClient)
+		createRBACRoleBinding(t, rb, superuserClient)
+		pod := createPod(t, superuserClient, nil)
+
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "audience1"))
+		expectForbidden(t, createTokenRequest(node1Client, pod.UID, "audience2"))
+
+		deletePod(t, superuserClient, "pod1")
+		deleteRBACRole(t, role, superuserClient)
+		deleteRBACRoleBinding(t, rb, superuserClient)
+	})
+
+	t.Run("clusterrole and rolebinding in a namespace allowing nodes to request any audience, wildcard for audiences (no resourcename)", func(t *testing.T) {
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-nodes", Namespace: "ns"},
+			Rules: []rbacv1.PolicyRule{{
+				APIGroups: []string{"node-access.audience.serviceaccount.kubernetes.io"},
+				Resources: []string{"default/audiences"},
+				Verbs:     []string{"use"},
+			}},
+		}
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{Name: "audience-access-for-node1", Namespace: "ns"},
+			Subjects:   []rbacv1.Subject{{Kind: "Group", Name: "system:nodes"}},
+			RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: "audience-access-for-nodes"},
+		}
+		createRBACRole(t, role, superuserClient)
+		createRBACRoleBinding(t, rb, superuserClient)
+		pod := createPod(t, superuserClient, nil)
+
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "audience1"))
+		expectAllowed(t, createTokenRequest(node1Client, pod.UID, "audience2"))
+
+		deletePod(t, superuserClient, "pod1")
+		deleteRBACRole(t, role, superuserClient)
+		deleteRBACRoleBinding(t, rb, superuserClient)
+	})
 }
 
 func createKubeConfigFileForRestConfig(t *testing.T, restConfig *rest.Config) string {
@@ -1181,4 +1315,56 @@ func configureRBACForServiceAccountToken(t *testing.T, client clientset.Interfac
 		},
 	}, metav1.UpdateOptions{})
 	checkNilError(t, err)
+}
+
+func createRBACClusterRole(t *testing.T, clusterrole *rbacv1.ClusterRole, client clientset.Interface) {
+	t.Helper()
+
+	_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), clusterrole, metav1.CreateOptions{})
+	checkNilError(t, err)
+}
+
+func createRBACClusterRoleBinding(t *testing.T, clusterrolebinding *rbacv1.ClusterRoleBinding, client clientset.Interface) {
+	t.Helper()
+
+	_, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterrolebinding, metav1.CreateOptions{})
+	checkNilError(t, err)
+}
+
+func createRBACRole(t *testing.T, role *rbacv1.Role, client clientset.Interface) {
+	t.Helper()
+
+	_, err := client.RbacV1().Roles(role.Namespace).Create(context.TODO(), role, metav1.CreateOptions{})
+	checkNilError(t, err)
+}
+
+func createRBACRoleBinding(t *testing.T, rolebinding *rbacv1.RoleBinding, client clientset.Interface) {
+	t.Helper()
+
+	_, err := client.RbacV1().RoleBindings(rolebinding.Namespace).Create(context.TODO(), rolebinding, metav1.CreateOptions{})
+	checkNilError(t, err)
+}
+
+func deleteRBACClusterRole(t *testing.T, clusterrole *rbacv1.ClusterRole, client clientset.Interface) {
+	t.Helper()
+
+	checkNilError(t, client.RbacV1().ClusterRoles().Delete(context.TODO(), clusterrole.Name, metav1.DeleteOptions{}))
+}
+
+func deleteRBACClusterRoleBinding(t *testing.T, clusterrolebinding *rbacv1.ClusterRoleBinding, client clientset.Interface) {
+	t.Helper()
+
+	checkNilError(t, client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), clusterrolebinding.Name, metav1.DeleteOptions{}))
+}
+
+func deleteRBACRole(t *testing.T, role *rbacv1.Role, client clientset.Interface) {
+	t.Helper()
+
+	checkNilError(t, client.RbacV1().Roles(role.Namespace).Delete(context.TODO(), role.Name, metav1.DeleteOptions{}))
+}
+
+func deleteRBACRoleBinding(t *testing.T, rolebinding *rbacv1.RoleBinding, client clientset.Interface) {
+	t.Helper()
+
+	checkNilError(t, client.RbacV1().RoleBindings(rolebinding.Namespace).Delete(context.TODO(), rolebinding.Name, metav1.DeleteOptions{}))
 }

@@ -34,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -84,6 +86,8 @@ type Plugin struct {
 	pvGetter        corev1lister.PersistentVolumeLister
 	csiTranslator   csitrans.CSITranslator
 
+	authz authorizer.Authorizer
+
 	expansionRecoveryEnabled                       bool
 	dynamicResourceAllocationEnabled               bool
 	allowInsecureKubeletCertificateSigningRequests bool
@@ -94,6 +98,7 @@ var (
 	_ admission.Interface                                 = &Plugin{}
 	_ apiserveradmission.WantsExternalKubeInformerFactory = &Plugin{}
 	_ apiserveradmission.WantsFeatures                    = &Plugin{}
+	_ apiserveradmission.WantsAuthorizer                  = &Plugin{}
 )
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
@@ -139,6 +144,11 @@ func (p *Plugin) ValidateInitialization() error {
 		}
 	}
 	return nil
+}
+
+// SetAuthorizer sets the authorizer.
+func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
+	p.authz = authz
 }
 
 var (
@@ -624,7 +634,7 @@ func (p *Plugin) admitServiceAccount(ctx context.Context, nodeName string, a adm
 	}
 
 	if p.serviceAccountNodeAudienceRestriction {
-		if err := p.validateNodeServiceAccountAudience(ctx, tr, pod); err != nil {
+		if err := p.validateNodeServiceAccountAudience(ctx, tr, pod, a.GetName(), a.GetUserInfo()); err != nil {
 			return admission.NewForbidden(a, err)
 		}
 	}
@@ -638,7 +648,7 @@ func (p *Plugin) admitServiceAccount(ctx context.Context, nodeName string, a adm
 	return nil
 }
 
-func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *authenticationapi.TokenRequest, pod *v1.Pod) error {
+func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *authenticationapi.TokenRequest, pod *v1.Pod, serviceAccountName string, userInfo user.Info) error {
 	// ensure all items in tr.Spec.Audiences are present in a volume mount in the pod
 	requestedAudience := ""
 	switch len(tr.Spec.Audiences) {
@@ -654,9 +664,31 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 	if err != nil {
 		return fmt.Errorf("error validating audience %q: %w", requestedAudience, err)
 	}
-	if !foundAudiencesInPodSpec {
+	if foundAudiencesInPodSpec {
+		return nil
+	}
+
+	attrs := authorizer.AttributesRecord{
+		User:            userInfo, // this is the user info of the node
+		Verb:            "use",
+		Namespace:       tr.Namespace,
+		APIGroup:        "node-access.audience.serviceaccount.kubernetes.io",
+		APIVersion:      "*",
+		Resource:        serviceAccountName, // this gives us the service account name for which we're requesting a token for
+		Subresource:     "audiences",
+		Name:            requestedAudience, // this gives us the audience for which we're requesting a token for; empty string in clusterrole/role will match all audiences
+		ResourceRequest: true,
+	}
+
+	authorized, _, err := p.authz.Authorize(ctx, attrs)
+	if err != nil {
+		return fmt.Errorf("error validating audience %q: %w", requestedAudience, err)
+	}
+
+	if authorized != authorizer.DecisionAllow {
 		return fmt.Errorf("audience %q not found in pod spec volume", requestedAudience)
 	}
+
 	return nil
 }
 
