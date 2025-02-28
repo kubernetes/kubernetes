@@ -52,8 +52,8 @@ type Error struct {
 var _ error = &Error{}
 
 // Error implements the error interface.
-func (v *Error) Error() string {
-	return fmt.Sprintf("%s: %s", v.Field, v.ErrorBody())
+func (e *Error) Error() string {
+	return fmt.Sprintf("%s: %s", e.Field, e.ErrorBody())
 }
 
 type OmitValueType struct{}
@@ -62,21 +62,21 @@ var omitValue = OmitValueType{}
 
 // ErrorBody returns the error message without the field name.  This is useful
 // for building nice-looking higher-level error reporting.
-func (v *Error) ErrorBody() string {
+func (e *Error) ErrorBody() string {
 	var s string
 	switch {
-	case v.Type == ErrorTypeRequired:
-		s = v.Type.String()
-	case v.Type == ErrorTypeForbidden:
-		s = v.Type.String()
-	case v.Type == ErrorTypeTooLong:
-		s = v.Type.String()
-	case v.Type == ErrorTypeInternal:
-		s = v.Type.String()
-	case v.BadValue == omitValue:
-		s = v.Type.String()
+	case e.Type == ErrorTypeRequired:
+		s = e.Type.String()
+	case e.Type == ErrorTypeForbidden:
+		s = e.Type.String()
+	case e.Type == ErrorTypeTooLong:
+		s = e.Type.String()
+	case e.Type == ErrorTypeInternal:
+		s = e.Type.String()
+	case e.BadValue == omitValue:
+		s = e.Type.String()
 	default:
-		value := v.BadValue
+		value := e.BadValue
 		valueType := reflect.TypeOf(value)
 		if value == nil || valueType == nil {
 			value = "null"
@@ -90,30 +90,30 @@ func (v *Error) ErrorBody() string {
 		switch t := value.(type) {
 		case int64, int32, float64, float32, bool:
 			// use simple printer for simple types
-			s = fmt.Sprintf("%s: %v", v.Type, value)
+			s = fmt.Sprintf("%s: %v", e.Type, value)
 		case string:
-			s = fmt.Sprintf("%s: %q", v.Type, t)
+			s = fmt.Sprintf("%s: %q", e.Type, t)
 		case fmt.Stringer:
 			// anything that defines String() is better than raw struct
-			s = fmt.Sprintf("%s: %s", v.Type, t.String())
+			s = fmt.Sprintf("%s: %s", e.Type, t.String())
 		default:
 			// fallback to raw struct
 			// TODO: internal types have panic guards against json.Marshalling to prevent
 			// accidental use of internal types in external serialized form.  For now, use
 			// %#v, although it would be better to show a more expressive output in the future
-			s = fmt.Sprintf("%s: %#v", v.Type, value)
+			s = fmt.Sprintf("%s: %#v", e.Type, value)
 		}
 	}
-	if len(v.Detail) != 0 {
-		s += fmt.Sprintf(": %s", v.Detail)
+	if len(e.Detail) != 0 {
+		s += fmt.Sprintf(": %s", e.Detail)
 	}
 	return s
 }
 
 // WithOrigin adds origin information to the FieldError
-func (v *Error) WithOrigin(o string) *Error {
-	v.Origin = o
-	return v
+func (e *Error) WithOrigin(o string) *Error {
+	e.Origin = o
+	return e
 }
 
 // ErrorType is a machine readable value providing more detail about why
