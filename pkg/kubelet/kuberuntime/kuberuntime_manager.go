@@ -908,6 +908,7 @@ func nonNilQuantity(q *resource.Quantity) *resource.Quantity {
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
+	logger := klog.FromContext(ctx)
 	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
 
 	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
@@ -1057,7 +1058,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		// If container does not exist, or is not running, check whether we
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
+			if kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) {
 				klog.V(3).InfoS("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
