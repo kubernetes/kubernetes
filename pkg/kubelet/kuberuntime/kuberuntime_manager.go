@@ -698,32 +698,46 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 		result.Fail(fmt.Errorf("unable to get resource configuration processing resize for pod %s", pod.Name))
 		return
 	}
+
+	currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
+	if err != nil {
+		klog.V(3).ErrorS(nil, "Unable to get pod cgroup memory config", "pod", pod.Name)
+	}
+	currentPodCPUConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceCPU)
+	if err != nil {
+		klog.V(3).ErrorS(nil, "Unable to get pod cgroup cpu config", "pod", pod.Name)
+	}
+	currentPodResources := podResources
+	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
+	currentPodResources = mergeResourceConfig(currentPodResources, currentPodCPUConfig)
+
 	setPodCgroupConfig := func(rName v1.ResourceName, setLimitValue bool) error {
 		var err error
+		resizedResources := &cm.ResourceConfig{}
 		switch rName {
 		case v1.ResourceCPU:
-			podCPUResources := &cm.ResourceConfig{}
 			if setLimitValue {
-				podCPUResources.CPUPeriod = podResources.CPUPeriod
-				podCPUResources.CPUQuota = podResources.CPUQuota
+				resizedResources.CPUPeriod = podResources.CPUPeriod
+				resizedResources.CPUQuota = podResources.CPUQuota
 			} else {
-				podCPUResources.CPUShares = podResources.CPUShares
+				resizedResources.CPUShares = podResources.CPUShares
 			}
-			err = pcm.SetPodCgroupConfig(pod, podCPUResources)
+			err = pcm.SetPodCgroupConfig(pod, resizedResources)
 		case v1.ResourceMemory:
 			if !setLimitValue {
 				// Memory requests aren't written to cgroups.
 				return nil
 			}
-			podMemoryResources := &cm.ResourceConfig{
-				Memory: podResources.Memory,
-			}
-			err = pcm.SetPodCgroupConfig(pod, podMemoryResources)
+			resizedResources.Memory = podResources.Memory
+			err = pcm.SetPodCgroupConfig(pod, resizedResources)
 		}
 		if err != nil {
 			klog.ErrorS(err, "Failed to set cgroup config", "resource", rName, "pod", pod.Name)
+			return err
 		}
-		return err
+		currentPodResources = mergeResourceConfig(currentPodResources, resizedResources)
+		_ = m.updatePodSandboxResources(podContainerChanges.SandboxID, pod, currentPodResources)
+		return nil
 	}
 	// Memory and CPU are updated separately because memory resizes may be ordered differently than CPU resizes.
 	// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
@@ -762,7 +776,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 		return err
 	}
 
-	anyResizeDone := false
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
 		currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 		if err != nil {
@@ -791,7 +804,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 			result.Fail(errResize)
 			return
 		}
-		anyResizeDone = true
 	}
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceCPU]) > 0 || podContainerChanges.UpdatePodResources {
 		if podResources.CPUShares == nil {
@@ -817,13 +829,6 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 			int64(*currentPodCpuConfig.CPUShares), int64(*podResources.CPUShares)); errResize != nil {
 			result.Fail(errResize)
 			return
-		}
-		anyResizeDone = true
-	}
-
-	if anyResizeDone {
-		if errUpdate := m.updatePodSandboxResources(podContainerChanges.SandboxID, pod); errUpdate != nil {
-			klog.ErrorS(errUpdate, "updatePodSandboxResources failed", "pod", pod.Name)
 		}
 	}
 }

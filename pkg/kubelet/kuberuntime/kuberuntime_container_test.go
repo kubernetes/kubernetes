@@ -40,6 +40,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -999,7 +1000,9 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 	_, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace)
 	require.NoError(t, err)
 
-	err = m.updatePodSandboxResources(fakeSandbox.Id, pod)
+	resourceConfig := &cm.ResourceConfig{}
+
+	err = m.updatePodSandboxResources(fakeSandbox.Id, pod, resourceConfig)
 	require.NoError(t, err)
 
 	// Verify sandbox is updated
