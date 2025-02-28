@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
@@ -336,4 +337,54 @@ func getAppArmorProfile(pod *v1.Pod, container *v1.Container) (*runtimeapi.Secur
 	}
 
 	return securityProfile, deprecatedProfile, nil
+}
+
+func mergeResourceConfig(source, update *cm.ResourceConfig) *cm.ResourceConfig {
+	if source == nil {
+		return update
+	}
+	if update == nil {
+		return source
+	}
+
+	merged := *source
+
+	if update.Memory != nil {
+		merged.Memory = update.Memory
+	}
+	if update.CPUSet.Size() > 0 {
+		merged.CPUSet = update.CPUSet
+	}
+	if update.CPUShares != nil {
+		merged.CPUShares = update.CPUShares
+	}
+	if update.CPUQuota != nil {
+		merged.CPUQuota = update.CPUQuota
+	}
+	if update.CPUPeriod != nil {
+		merged.CPUPeriod = update.CPUPeriod
+	}
+	if update.PidsLimit != nil {
+		merged.PidsLimit = update.PidsLimit
+	}
+
+	if update.HugePageLimit != nil {
+		if merged.HugePageLimit == nil {
+			merged.HugePageLimit = make(map[int64]int64)
+		}
+		for k, v := range update.HugePageLimit {
+			merged.HugePageLimit[k] = v
+		}
+	}
+
+	if update.Unified != nil {
+		if merged.Unified == nil {
+			merged.Unified = make(map[string]string)
+		}
+		for k, v := range update.Unified {
+			merged.Unified[k] = v
+		}
+	}
+
+	return &merged
 }
