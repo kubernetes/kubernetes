@@ -2965,6 +2965,9 @@ type PodCondition struct {
 	Reason string
 	// +optional
 	Message string
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64
 }
 
 // PodResizeStatus shows status of desired resize of a pod's containers.
@@ -4174,6 +4177,10 @@ type PodStatus struct {
 	// A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'
 	// +optional
 	Reason string
+	// The generation of the pod observed at the point this pod status is being reported.
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64
 	// nominatedNodeName is set when this pod preempts other pods on the node, but it cannot be
 	// scheduled right away as preemption victims receive their graceful termination periods.
 	// This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide

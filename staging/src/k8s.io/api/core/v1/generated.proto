@@ -3732,6 +3732,11 @@ message PodCondition {
   // Human-readable message indicating details about last transition.
   // +optional
   optional string message = 6;
+
+  // The generation of the pod observed at the point this condition is being reported.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 7;
 }
 
 // PodDNSConfig defines the DNS parameters of a pod in addition to
@@ -4535,6 +4540,11 @@ message PodStatus {
   // e.g. 'Evicted'
   // +optional
   optional string reason = 4;
+
+  // The generation of the pod observed at the point this pod status is being reported.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 17;
 
   // nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be
   // scheduled right away as preemption victims receive their graceful termination periods.

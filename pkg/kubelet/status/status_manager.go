@@ -352,10 +352,20 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	// Make sure we're caching a deep copy.
 	status = *status.DeepCopy()
 
+	// Set the observedGeneration for this pod status. Static pods are excluded.
+	if podObservedGenerationTrackingEnabled(pod) && !metav1.HasAnnotation(pod.ObjectMeta, v1.MirrorPodAnnotationKey) {
+		status.ObservedGeneration = pod.GetGeneration()
+	}
+
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
 	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil, false)
+}
+
+// We will emit status.observedGeneration if the feature is enabled OR if status.observedGeneration is already set.
+func podObservedGenerationTrackingEnabled(pod *v1.Pod) bool {
+	return pod.Status.ObservedGeneration != 0 || utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking)
 }
 
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
