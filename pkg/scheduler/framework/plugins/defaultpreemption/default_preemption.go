@@ -55,10 +55,10 @@ type IsEligiblePodFunc func(nodeInfo *framework.NodeInfo, victim *framework.PodI
 // Implementations should return true if the first pod is more important than the second pod
 // and the second one should be considered for preemption before the first one.
 // For performance reasons, the search for nodes eligible for preemption is done by omitting all
-// eligible victims from a node then checking whether the preemptor fits on the node without them.
-// The victims are then readded after the preemptor in order of highest to lowest importance.
-// The default behavior is to ignore the possibility of affinity between the preemptor and any of
-// the victims, as affinity between pods that are eligible to preempt each other isn't recommended.
+// eligible victims from a node then checking whether the preemptor fits on the node without them,
+// before adding back victims that still fit with the preemptor.
+// The default behavior is to not consider pod affinity between the preemptor and the victims,
+// as affinity between pods that are eligible to preempt each other isn't recommended.
 type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
