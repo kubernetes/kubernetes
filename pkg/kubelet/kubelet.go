@@ -1259,7 +1259,6 @@ type Kubelet struct {
 	//    N means number of retries allowed for kubelet to post node status. It is pointless
 	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
 	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
-	//    The constant must be less than podEvictionTimeout.
 	// 2. nodeStatusUpdateFrequency needs to be large enough for kubelet to generate node
 	//    status. Kubelet may fail to update node status reliably if the value is too small,
 	//    as it takes time to gather all necessary node information.
