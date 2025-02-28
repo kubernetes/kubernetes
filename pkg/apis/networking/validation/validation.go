@@ -18,7 +18,6 @@ package validation
 
 import (
 	"fmt"
-	"net/netip"
 	"strings"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -220,7 +219,7 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
 		return allErrs
 	}
-	allErrs = append(allErrs, validation.IsValidCIDR(fldPath.Child("cidr"), ipb.CIDR)...)
+	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR)...)
 	_, cidrIPNet, err := netutils.ParseCIDRSloppy(ipb.CIDR)
 	if err != nil {
 		// Implies validation would have failed so we already added errors for it.
@@ -229,7 +228,7 @@ func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path) field.ErrorLi
 
 	for i, exceptCIDRStr := range ipb.Except {
 		exceptPath := fldPath.Child("except").Index(i)
-		allErrs = append(allErrs, validation.IsValidCIDR(exceptPath, exceptCIDRStr)...)
+		allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(exceptPath, exceptCIDRStr)...)
 		_, exceptCIDR, err := netutils.ParseCIDRSloppy(exceptCIDRStr)
 		if err != nil {
 			// Implies validation would have failed so we already added errors for it.
@@ -357,7 +356,7 @@ func ValidateIngressLoadBalancerStatus(status *networking.IngressLoadBalancerSta
 	for i, ingress := range status.Ingress {
 		idxPath := fldPath.Child("ingress").Index(i)
 		if len(ingress.IP) > 0 {
-			allErrs = append(allErrs, validation.IsValidIP(idxPath.Child("ip"), ingress.IP)...)
+			allErrs = append(allErrs, apivalidation.IsValidIPForLegacyField(idxPath.Child("ip"), ingress.IP)...)
 		}
 		if len(ingress.Hostname) > 0 {
 			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
@@ -653,12 +652,12 @@ func allowInvalidWildcardHostRule(oldIngress *networking.Ingress) bool {
 // IPAddress does not support generating names, prefix is not considered.
 func ValidateIPAddressName(name string, prefix bool) []string {
 	var errs []string
-	ip, err := netip.ParseAddr(name)
-	if err != nil {
-		errs = append(errs, err.Error())
-	} else if ip.String() != name {
-		errs = append(errs, "must be a canonical format IP address")
 
+	allErrs := validation.IsValidIP(&field.Path{}, name)
+	// Need to unconvert the field.Error from IsValidIP back to a string so our caller
+	// can convert it back to a field.Error!
+	for _, err := range allErrs {
+		errs = append(errs, err.Detail)
 	}
 	return errs
 }
@@ -748,25 +747,9 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 	}
 
 	for i, cidr := range cidrConfig.Spec.CIDRs {
-		allErrs = append(allErrs, validateCIDR(cidr, fieldPath.Index(i))...)
+		allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(i), cidr)...)
 	}
 
-	return allErrs
-}
-
-func validateCIDR(cidr string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	prefix, err := netip.ParsePrefix(cidr)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, cidr, err.Error()))
-	} else {
-		if prefix.Addr() != prefix.Masked().Addr() {
-			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "wrong CIDR format, IP doesn't match network IP address"))
-		}
-		if prefix.String() != cidr {
-			allErrs = append(allErrs, field.Invalid(fldPath, cidr, "CIDR not in RFC 5952 canonical format"))
-		}
-	}
 	return allErrs
 }
 

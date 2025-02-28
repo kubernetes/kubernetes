@@ -100,7 +100,7 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			// and do not get validated.
 			switch addrType {
 			case discovery.AddressTypeIPv4:
-				ipErrs := validation.IsValidIP(addressPath.Index(i), address)
+				ipErrs := apivalidation.IsValidIPForLegacyField(addressPath.Index(i), address)
 				if len(ipErrs) > 0 {
 					allErrs = append(allErrs, ipErrs...)
 				} else {

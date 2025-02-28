@@ -28,7 +28,10 @@ func TestIsValidIP(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		in   string
-		err  string
+
+		err             string
+		legacyErr       string
+		legacyStrictErr string
 	}{
 		// GOOD VALUES
 		{
@@ -56,95 +59,148 @@ func TestIsValidIP(t *testing.T) {
 			in:   "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff",
 		},
 
-		// GOOD, THOUGH NON-CANONICAL, VALUES
+		// NON-CANONICAL VALUES
 		{
 			name: "ipv6, all zeros, expanded (non-canonical)",
 			in:   "0:0:0:0:0:0:0:0",
+
+			err: `must be in canonical form ("::")`,
 		},
 		{
 			name: "ipv6, leading 0s (non-canonical)",
 			in:   "0001:002:03:4::",
+
+			err: `must be in canonical form ("1:2:3:4::")`,
 		},
 		{
 			name: "ipv6, capital letters (non-canonical)",
 			in:   "1234::ABCD",
+
+			err: `must be in canonical form ("1234::abcd")`,
 		},
 
-		// BAD VALUES WE CURRENTLY CONSIDER GOOD
+		// GOOD WITH LEGACY VALIDATION, BAD WITH STRICT VALIDATION
 		{
 			name: "ipv4 with leading 0s",
 			in:   "1.1.1.01",
+
+			err:             "must not have leading 0s",
+			legacyErr:       "",
+			legacyStrictErr: "must not have leading 0s",
 		},
 		{
 			name: "ipv4-in-ipv6 value",
 			in:   "::ffff:1.1.1.1",
+
+			err:             "must not be an IPv4-mapped IPv6 address",
+			legacyErr:       "",
+			legacyStrictErr: "must not be an IPv4-mapped IPv6 address",
 		},
 
 		// BAD VALUES
 		{
 			name: "empty string",
 			in:   "",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "junk",
 			in:   "aaaaaaa",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "domain name",
 			in:   "myhost.mydomain",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "cidr",
 			in:   "1.2.3.0/24",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "ipv4 with out-of-range octets",
 			in:   "1.2.3.400",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "ipv4 with negative octets",
 			in:   "-1.0.0.0",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "ipv6 with out-of-range segment",
 			in:   "2001:db8::10005",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "ipv4:port",
 			in:   "1.2.3.4:80",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "ipv6 with brackets",
 			in:   "[2001:db8::1]",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "[ipv6]:port",
 			in:   "[2001:db8::1]:80",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "host:port",
 			in:   "example.com:80",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "ipv6 with zone",
 			in:   "1234::abcd%eth0",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 		{
 			name: "ipv4 with zone",
 			in:   "169.254.0.0%eth0",
-			err:  "must be a valid IP address",
+
+			err:             "must be a valid IP address",
+			legacyErr:       "must be a valid IP address",
+			legacyStrictErr: "must be a valid IP address",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -158,6 +214,32 @@ func TestIsValidIP(t *testing.T) {
 					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
 				} else if !strings.Contains(errs[0].Detail, tc.err) {
 					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
+				}
+			}
+
+			errs = IsValidIPForLegacyField(field.NewPath(""), tc.in, false)
+			if tc.legacyErr == "" {
+				if len(errs) != 0 {
+					t.Errorf("expected %q to be valid according to IsValidIPForLegacyField but got: %v", tc.in, errs)
+				}
+			} else {
+				if len(errs) != 1 {
+					t.Errorf("expected %q to have 1 error from IsValidIPForLegacyField but got: %v", tc.in, errs)
+				} else if !strings.Contains(errs[0].Detail, tc.legacyErr) {
+					t.Errorf("expected error from IsValidIPForLegacyField for %q to contain %q but got: %q", tc.in, tc.legacyErr, errs[0].Detail)
+				}
+			}
+
+			errs = IsValidIPForLegacyField(field.NewPath(""), tc.in, true)
+			if tc.legacyStrictErr == "" {
+				if len(errs) != 0 {
+					t.Errorf("expected %q to be valid according to IsValidIPForLegacyField with strict validation, but got: %v", tc.in, errs)
+				}
+			} else {
+				if len(errs) != 1 {
+					t.Errorf("expected %q to have 1 error from IsValidIPForLegacyField with strict validation, but got: %v", tc.in, errs)
+				} else if !strings.Contains(errs[0].Detail, tc.legacyStrictErr) {
+					t.Errorf("expected error from IsValidIPForLegacyField with strict validation for %q to contain %q but got: %q", tc.in, tc.legacyStrictErr, errs[0].Detail)
 				}
 			}
 		})
@@ -221,7 +303,10 @@ func TestIsValidCIDR(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		in   string
-		err  string
+
+		err             string
+		legacyErr       string
+		legacyStrictErr string
 	}{
 		// GOOD VALUES
 		{
@@ -249,77 +334,126 @@ func TestIsValidCIDR(t *testing.T) {
 			in:   "::1/128",
 		},
 
-		// GOOD, THOUGH NON-CANONICAL, VALUES
+		// NON-CANONICAL VALUES
 		{
 			name: "ipv6, extra 0s (non-canonical)",
 			in:   "2a00:79e0:2:0::/64",
+
+			err: `must be in canonical form ("2a00:79e0:2::/64")`,
 		},
 		{
 			name: "ipv6, capital letters (non-canonical)",
 			in:   "2001:DB8::/64",
+
+			err: `must be in canonical form ("2001:db8::/64")`,
 		},
 
-		// BAD VALUES WE CURRENTLY CONSIDER GOOD
+		// GOOD WITH LEGACY VALIDATION, BAD WITH STRICT VALIDATION
 		{
 			name: "ipv4 with leading 0s",
 			in:   "1.1.01.0/24",
+
+			err:             "must not have leading 0s in IP",
+			legacyErr:       "",
+			legacyStrictErr: "must not have leading 0s in IP",
 		},
 		{
 			name: "ipv4-in-ipv6 with ipv4-sized prefix",
 			in:   "::ffff:1.1.1.0/24",
+
+			err:             "must not have an IPv4-mapped IPv6 address",
+			legacyErr:       "",
+			legacyStrictErr: "must not have an IPv4-mapped IPv6 address",
 		},
 		{
 			name: "ipv4-in-ipv6 with ipv6-sized prefix",
 			in:   "::ffff:1.1.1.0/120",
+
+			err:             "must not have an IPv4-mapped IPv6 address",
+			legacyErr:       "",
+			legacyStrictErr: "must not have an IPv4-mapped IPv6 address",
 		},
 		{
-			name: "ipv4 with bits past prefix",
+			name: "ipv4 ifaddr",
 			in:   "1.2.3.4/24",
+
+			err:             "must not have bits set beyond the prefix length",
+			legacyErr:       "",
+			legacyStrictErr: "must not have bits set beyond the prefix length",
 		},
 		{
-			name: "ipv6 with bits past prefix",
+			name: "ipv6 ifaddr",
 			in:   "2001:db8::1/64",
+
+			err:             "must not have bits set beyond the prefix length",
+			legacyErr:       "",
+			legacyStrictErr: "must not have bits set beyond the prefix length",
 		},
 		{
 			name: "prefix length with leading 0s",
 			in:   "192.168.0.0/016",
+
+			err:             "must not have leading 0s",
+			legacyErr:       "",
+			legacyStrictErr: "must not have leading 0s",
 		},
 
 		// BAD VALUES
 		{
 			name: "empty string",
 			in:   "",
-			err:  "must be a valid CIDR value",
+
+			err:             "must be a valid CIDR value",
+			legacyErr:       "must be a valid CIDR value",
+			legacyStrictErr: "must be a valid CIDR value",
 		},
 		{
 			name: "junk",
 			in:   "aaaaaaa",
-			err:  "must be a valid CIDR value",
+
+			err:             "must be a valid CIDR value",
+			legacyErr:       "must be a valid CIDR value",
+			legacyStrictErr: "must be a valid CIDR value",
 		},
 		{
 			name: "IP address",
 			in:   "1.2.3.4",
-			err:  "must be a valid CIDR value",
+
+			err:             "must be a valid CIDR value",
+			legacyErr:       "must be a valid CIDR value",
+			legacyStrictErr: "must be a valid CIDR value",
 		},
 		{
 			name: "partial URL",
 			in:   "192.168.0.1/healthz",
-			err:  "must be a valid CIDR value",
+
+			err:             "must be a valid CIDR value",
+			legacyErr:       "must be a valid CIDR value",
+			legacyStrictErr: "must be a valid CIDR value",
 		},
 		{
 			name: "partial URL 2",
 			in:   "192.168.0.1/0/99",
-			err:  "must be a valid CIDR value",
+
+			err:             "must be a valid CIDR value",
+			legacyErr:       "must be a valid CIDR value",
+			legacyStrictErr: "must be a valid CIDR value",
 		},
 		{
 			name: "negative prefix length",
 			in:   "192.168.0.0/-16",
-			err:  "must be a valid CIDR value",
+
+			err:             "must be a valid CIDR value",
+			legacyErr:       "must be a valid CIDR value",
+			legacyStrictErr: "must be a valid CIDR value",
 		},
 		{
 			name: "prefix length with sign",
 			in:   "192.168.0.0/+16",
-			err:  "must be a valid CIDR value",
+
+			err:             "must be a valid CIDR value",
+			legacyErr:       "must be a valid CIDR value",
+			legacyStrictErr: "must be a valid CIDR value",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -333,6 +467,32 @@ func TestIsValidCIDR(t *testing.T) {
 					t.Errorf("expected %q to have 1 error but got: %v", tc.in, errs)
 				} else if !strings.Contains(errs[0].Detail, tc.err) {
 					t.Errorf("expected error for %q to contain %q but got: %q", tc.in, tc.err, errs[0].Detail)
+				}
+			}
+
+			errs = IsValidCIDRForLegacyField(field.NewPath(""), tc.in, false)
+			if tc.legacyErr == "" {
+				if len(errs) != 0 {
+					t.Errorf("expected %q to be valid according to IsValidCIDRForLegacyField but got: %v", tc.in, errs)
+				}
+			} else {
+				if len(errs) != 1 {
+					t.Errorf("expected %q to have 1 error from IsValidCIDRForLegacyField but got: %v", tc.in, errs)
+				} else if !strings.Contains(errs[0].Detail, tc.legacyErr) {
+					t.Errorf("expected error for %q from IsValidCIDRForLegacyField to contain %q but got: %q", tc.in, tc.legacyErr, errs[0].Detail)
+				}
+			}
+
+			errs = IsValidCIDRForLegacyField(field.NewPath(""), tc.in, true)
+			if tc.legacyStrictErr == "" {
+				if len(errs) != 0 {
+					t.Errorf("expected %q to be valid according to IsValidCIDRForLegacyField with strict validation but got: %v", tc.in, errs)
+				}
+			} else {
+				if len(errs) != 1 {
+					t.Errorf("expected %q to have 1 error from IsValidCIDRForLegacyField with strict validation but got: %v", tc.in, errs)
+				} else if !strings.Contains(errs[0].Detail, tc.legacyStrictErr) {
+					t.Errorf("expected error for %q from IsValidCIDRForLegacyField with strict validation to contain %q but got: %q", tc.in, tc.legacyStrictErr, errs[0].Detail)
 				}
 			}
 		})
