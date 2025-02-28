@@ -242,7 +242,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	sort.Slice(potentialVictims, func(i, j int) bool { return pl.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
-	// from the highest priority victims.
+	// from the highest importance victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
 	reprievePod := func(pi *framework.PodInfo) (bool, error) {
 		if err := addPod(pi); err != nil {
@@ -273,7 +273,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		}
 	}
 
-	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of priority from high to low.
+	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of importance from high to low.
 	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
 		sort.Slice(victims, func(i, j int) bool { return pl.MoreImportantPod(victims[i].Pod, victims[j].Pod) })
 	}
