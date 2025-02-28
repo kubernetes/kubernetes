@@ -53,6 +53,7 @@ import (
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -412,8 +413,8 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, contai
 	return err
 }
 
-func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, pod *v1.Pod) error {
-	podResourcesRequest := m.generateUpdatePodSandboxResourcesRequest(sandboxID, pod)
+func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {
+	podResourcesRequest := m.generateUpdatePodSandboxResourcesRequest(sandboxID, pod, podResources)
 	if podResourcesRequest == nil {
 		return fmt.Errorf("sandboxID %q updatePodSandboxResources failed: cannot generate resources config", sandboxID)
 	}
@@ -423,10 +424,10 @@ func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, 
 	if err != nil {
 		stat, _ := grpcstatus.FromError(err)
 		if stat.Code() == codes.Unimplemented {
-			klog.InfoS("updatePodSandboxResources failed: method unimplemented on runtime service", "sandboxID", sandboxID)
+			klog.V(3).InfoS("updatePodSandboxResources failed: unimplemented; this call is best-effort: proceeding with resize", "sandboxID", sandboxID)
 			return nil
 		}
-		klog.ErrorS(err, "updatePodSandboxResources failed", "sandboxID", sandboxID)
+		return fmt.Errorf("updatePodSandboxResources failed for sanboxID %q: %w", sandboxID, err)
 	}
 	return nil
 }

@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/utils/ptr"
 )
@@ -38,6 +39,14 @@ type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecon
 
 func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	return f(uid, name, namespace)
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+func uint64Ptr(i uint64) *uint64 {
+	return &i
 }
 
 func TestIsInitContainerFailed(t *testing.T) {
@@ -440,4 +449,84 @@ func TestGetAppArmorProfile(t *testing.T) {
 			assert.Equal(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
 		})
 	}
+}
+
+func TestMergeResourceConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   *cm.ResourceConfig
+		update   *cm.ResourceConfig
+		expected *cm.ResourceConfig
+	}{
+		{
+			name:   "merge all fields",
+			source: &cm.ResourceConfig{Memory: int64Ptr(1024), CPUShares: uint64Ptr(2)},
+			update: &cm.ResourceConfig{Memory: int64Ptr(2048), CPUQuota: int64Ptr(5000)},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(2048),
+				CPUShares: uint64Ptr(2),
+				CPUQuota:  int64Ptr(5000),
+			},
+		},
+		{
+			name:   "merge HugePageLimit and Unified",
+			source: &cm.ResourceConfig{HugePageLimit: map[int64]int64{2048: 1024}, Unified: map[string]string{"key1": "value1"}},
+			update: &cm.ResourceConfig{HugePageLimit: map[int64]int64{4096: 2048}, Unified: map[string]string{"key1": "newValue1", "key2": "value2"}},
+			expected: &cm.ResourceConfig{
+				HugePageLimit: map[int64]int64{2048: 1024, 4096: 2048},
+				Unified:       map[string]string{"key1": "newValue1", "key2": "value2"},
+			},
+		},
+		{
+			name:   "update nil source",
+			source: nil,
+			update: &cm.ResourceConfig{Memory: int64Ptr(4096)},
+			expected: &cm.ResourceConfig{
+				Memory: int64Ptr(4096),
+			},
+		},
+		{
+			name:   "update nil update",
+			source: &cm.ResourceConfig{Memory: int64Ptr(1024)},
+			update: nil,
+			expected: &cm.ResourceConfig{
+				Memory: int64Ptr(1024),
+			},
+		},
+		{
+			name:   "update empty source",
+			source: &cm.ResourceConfig{},
+			update: &cm.ResourceConfig{Memory: int64Ptr(8192)},
+			expected: &cm.ResourceConfig{
+				Memory: int64Ptr(8192),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			merged := mergeResourceConfig(tt.source, tt.update)
+
+			assert.Equal(t, tt.expected, merged)
+		})
+	}
+}
+
+func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
+	resCfg := &cm.ResourceConfig{
+		Memory:        int64Ptr(2048),
+		CPUShares:     uint64Ptr(2),
+		CPUPeriod:     uint64Ptr(10000),
+		CPUQuota:      int64Ptr(5000),
+		HugePageLimit: map[int64]int64{4096: 2048},
+		Unified:       map[string]string{"key1": "value1"},
+	}
+
+	lcr := convertResourceConfigToLinuxContainerResources(resCfg)
+
+	assert.Equal(t, int64(*resCfg.CPUPeriod), lcr.CpuPeriod)
+	assert.Equal(t, *resCfg.CPUQuota, lcr.CpuQuota)
+	assert.Equal(t, int64(*resCfg.CPUShares), lcr.CpuShares)
+	assert.Equal(t, *resCfg.Memory, lcr.MemoryLimitInBytes)
+	assert.Equal(t, resCfg.Unified, lcr.Unified)
 }

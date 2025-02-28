@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -490,6 +491,233 @@ func TestQuotaToMilliCPU(t *testing.T) {
 			milliCPU := quotaToMilliCPU(tc.quota, tc.period)
 			if milliCPU != tc.expected {
 				t.Errorf("Test %s: Input quota %v and period %v, expected milliCPU %v, but got %v", tc.name, tc.quota, tc.period, tc.expected, milliCPU)
+			}
+		})
+	}
+}
+
+func TestSubtractOverheadFromResourceConfig(t *testing.T) {
+	podCPUMilli := resource.MustParse("200m")
+	podMemory := resource.MustParse("256Mi")
+	podOverheadCPUMilli := resource.MustParse("100m")
+	podOverheadMemory := resource.MustParse("64Mi")
+
+	resCfg := &cm.ResourceConfig{
+		Memory:    int64Ptr(335544320),
+		CPUShares: uint64Ptr(306),
+		CPUPeriod: uint64Ptr(100000),
+		CPUQuota:  int64Ptr(30000),
+	}
+
+	for _, tc := range []struct {
+		name     string
+		cfgInput *cm.ResourceConfig
+		pod      *v1.Pod
+		expected *cm.ResourceConfig
+	}{
+		{
+			name:     "withoutOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(306),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(30000),
+			},
+		},
+		{
+			name:     "withoutCPUOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceMemory: podOverheadMemory,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(268435456),
+				CPUShares: uint64Ptr(306),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(30000),
+			},
+		},
+		{
+			name:     "withoutMemoryOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: podOverheadCPUMilli,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(203),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(20000),
+			},
+		},
+		{
+			name: "withoutCPUPeriod",
+			cfgInput: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(306),
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: podOverheadCPUMilli,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(203),
+			},
+		},
+		{
+			name: "withoutCPUShares",
+			cfgInput: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(30000),
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: podOverheadCPUMilli,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(20000),
+			},
+		},
+		{
+			name:     "withOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    podOverheadCPUMilli,
+						v1.ResourceMemory: podOverheadMemory,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(268435456),
+				CPUShares: uint64Ptr(203),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(20000),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gotCfg := subtractOverheadFromResourceConfig(tc.cfgInput, tc.pod)
+
+			if tc.expected.CPUPeriod != nil && *gotCfg.CPUPeriod != *tc.expected.CPUPeriod {
+				t.Errorf("Test %s: expected CPUPeriod %v, but got %v", tc.name, *tc.expected.CPUPeriod, *gotCfg.CPUPeriod)
+			}
+			if tc.expected.CPUQuota != nil && *gotCfg.CPUQuota != *tc.expected.CPUQuota {
+				t.Errorf("Test %s: expected CPUQuota %v, but got %v", tc.name, *tc.expected.CPUQuota, *gotCfg.CPUQuota)
+			}
+			if tc.expected.CPUShares != nil && *gotCfg.CPUShares != *tc.expected.CPUShares {
+				t.Errorf("Test %s: expected CPUShares %v, but got %v", tc.name, *tc.expected.CPUShares, *gotCfg.CPUShares)
+			}
+			if tc.expected.Memory != nil && *gotCfg.Memory != *tc.expected.Memory {
+				t.Errorf("Test %s: expected Memory %v, but got %v", tc.name, *tc.expected.Memory, *gotCfg.Memory)
 			}
 		})
 	}
