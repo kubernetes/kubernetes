@@ -31,13 +31,16 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controlplaneadmission "k8s.io/kubernetes/pkg/controlplane/apiserver/admission"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -979,6 +982,414 @@ func TestAdmitBelowTerminatingQuotaLimitWhenPodScopeUpdated(t *testing.T) {
 		if expectedValue != actualValue {
 			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
 		}
+	}
+}
+
+// TestAdmitBelowVolumeAttributesClassQuotaLimit ensures that pvcs with a given vac are charged to the right quota.
+// It creates a glod and silver quota, and creates a pvc with the glod class.
+// It ensures that the glod quota is incremented, and the silver quota is not.
+func TestAdmitBelowVolumeAttributesClassQuotaLimit(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
+
+	classGold := "gold"
+	classSilver := "silver"
+
+	resourceQuotaGold := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-gold", Namespace: "test", ResourceVersion: "124"},
+		Spec: corev1.ResourceQuotaSpec{
+			ScopeSelector: &corev1.ScopeSelector{
+				MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass,
+						Operator:  corev1.ScopeSelectorOpIn,
+						Values:    []string{classGold},
+					},
+				},
+			},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+	resourceQuotaSilver := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-silver", Namespace: "test", ResourceVersion: "124"},
+		Spec: corev1.ResourceQuotaSpec{
+			ScopeSelector: &corev1.ScopeSelector{
+				MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass,
+						Operator:  corev1.ScopeSelectorOpIn,
+						Values:    []string{classSilver},
+					},
+				},
+			},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuotaGold, resourceQuotaSilver)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+	handler, err := createHandler(kubeClient, informerFactory, stopCh)
+	if err != nil {
+		t.Errorf("Error occurred while creating admission plugin: %v", err)
+	}
+
+	err = informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaGold)
+	if err != nil {
+		t.Errorf("Error occurred while adding resource quota to the indexer: %v", err)
+	}
+	err = informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaSilver)
+	if err != nil {
+		t.Errorf("Error occurred while adding resource quota to the indexer: %v", err)
+	}
+
+	// create a pvc that references the gold class
+	newPvc := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+	newPvc.Spec.VolumeAttributesClassName = &classGold
+	err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
+	}
+
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	decimatedActions := removeListWatch(kubeClient.Actions())
+	lastActionIndex := len(decimatedActions) - 1
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+
+	// ensure only the quota-gold was updated
+	if usage.Name != resourceQuotaGold.Name {
+		t.Errorf("Incremented the wrong quota, expected %v, actual %v", resourceQuotaGold.Name, usage.Name)
+	}
+
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("2"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("11Gi"),
+			},
+		},
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+}
+
+// TestAdmitBelowVolumeAttributesClassQuotaLimitWhenPVCScopeUpdated ensures that pvcs with a given vac are charged to the right quota.
+// It creates three quotas, gold, silver, and copper, and changes the pvc to reference the different classes.
+// It ensures that the expected quota is incremented, and others are not.
+//
+// The Quota admission is intended to fail "high" in this case, and depends on a controller reconciling actual persisted
+// use to lower / free the reserved quota. We need always overcount in the admission plugin if something later causes
+// the request to be rejected, so you can not reduce quota with requests that aren't completed.
+func TestAdmitBelowVolumeAttributesClassQuotaLimitWhenPVCScopeUpdated(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
+
+	classGold := "gold"
+	classSilver := "silver"
+	classCopper := "copper"
+
+	resourceQuotaGold := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-gold", Namespace: "test", ResourceVersion: "124"},
+		Spec: corev1.ResourceQuotaSpec{
+			ScopeSelector: &corev1.ScopeSelector{
+				MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass,
+						Operator:  corev1.ScopeSelectorOpIn,
+						Values:    []string{classGold},
+					},
+				},
+			},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+	resourceQuotaSilver := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-silver", Namespace: "test", ResourceVersion: "124"},
+		Spec: corev1.ResourceQuotaSpec{
+			ScopeSelector: &corev1.ScopeSelector{
+				MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass,
+						Operator:  corev1.ScopeSelectorOpIn,
+						Values:    []string{classSilver},
+					},
+				},
+			},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+	resourceQuotaCopper := &corev1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota-copper", Namespace: "test", ResourceVersion: "124"},
+		Spec: corev1.ResourceQuotaSpec{
+			ScopeSelector: &corev1.ScopeSelector{
+				MatchExpressions: []corev1.ScopedResourceSelectorRequirement{
+					{
+						ScopeName: corev1.ResourceQuotaScopeVolumeAttributesClass,
+						Operator:  corev1.ScopeSelectorOpIn,
+						Values:    []string{classCopper},
+					},
+				},
+			},
+		},
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	expectedUsage := corev1.ResourceQuota{
+		Status: corev1.ResourceQuotaStatus{
+			Hard: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: corev1.ResourceList{
+				corev1.ResourcePersistentVolumeClaims: resource.MustParse("2"),
+				corev1.ResourceRequestsStorage:        resource.MustParse("11Gi"),
+			},
+		},
+	}
+
+	testCases := []struct {
+		claims            func() (*api.PersistentVolumeClaim, *api.PersistentVolumeClaim)
+		expectedActionSet sets.Set[string]
+		expectedQuotaName string
+		expectedUsage     corev1.ResourceQuota
+	}{
+		{
+			claims: func() (*api.PersistentVolumeClaim, *api.PersistentVolumeClaim) {
+				// old pvc didn't reference any class
+				existingPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				existingPVC.ResourceVersion = "1"
+				existingPVC.Status.Phase = api.ClaimBound
+
+				// updated version references a single class: gold.
+				newPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				newPVC.Spec.VolumeAttributesClassName = &classGold
+				newPVC.Status.Phase = api.ClaimBound
+				return existingPVC, newPVC
+			},
+			expectedActionSet: sets.New(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			expectedQuotaName: resourceQuotaGold.Name,
+			expectedUsage:     expectedUsage,
+		},
+		{
+			claims: func() (*api.PersistentVolumeClaim, *api.PersistentVolumeClaim) {
+				// old pvc referenced the gold class
+				existingPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				existingPVC.ResourceVersion = "1"
+				existingPVC.Spec.VolumeAttributesClassName = &classGold
+				existingPVC.Status.Phase = api.ClaimBound
+				existingPVC.Status.CurrentVolumeAttributesClassName = &classGold
+
+				// updated version references two different classes: copper and gold.
+				newPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				newPVC.Spec.VolumeAttributesClassName = &classCopper
+				newPVC.Status.Phase = api.ClaimBound
+				newPVC.Status.CurrentVolumeAttributesClassName = &classGold
+				return existingPVC, newPVC
+			},
+			expectedActionSet: sets.New(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			expectedQuotaName: resourceQuotaCopper.Name,
+			expectedUsage:     expectedUsage,
+		},
+		{
+			claims: func() (*api.PersistentVolumeClaim, *api.PersistentVolumeClaim) {
+				// old pvc referenced two different classes: copper and gold.
+				existingPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				existingPVC.ResourceVersion = "1"
+				existingPVC.Spec.VolumeAttributesClassName = &classCopper
+				existingPVC.Status.Phase = api.ClaimBound
+				existingPVC.Status.CurrentVolumeAttributesClassName = &classGold
+
+				// updated version referenced three different classes: silver, copper and gold.
+				newPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				newPVC.Spec.VolumeAttributesClassName = &classSilver
+				newPVC.Status.Phase = api.ClaimBound
+				newPVC.Status.ModifyVolumeStatus = &api.ModifyVolumeStatus{TargetVolumeAttributesClassName: classCopper}
+				newPVC.Status.CurrentVolumeAttributesClassName = &classGold
+				return existingPVC, newPVC
+			},
+			expectedActionSet: sets.New(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			expectedQuotaName: resourceQuotaSilver.Name,
+			expectedUsage:     expectedUsage,
+		},
+		{
+			claims: func() (*api.PersistentVolumeClaim, *api.PersistentVolumeClaim) {
+				// old pvc referenced three different classes: silver, copper and gold.
+				existingPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				existingPVC.ResourceVersion = "1"
+				existingPVC.Spec.VolumeAttributesClassName = &classSilver
+				existingPVC.Status.Phase = api.ClaimBound
+				existingPVC.Status.ModifyVolumeStatus = &api.ModifyVolumeStatus{TargetVolumeAttributesClassName: classCopper}
+				existingPVC.Status.CurrentVolumeAttributesClassName = &classGold
+
+				// updated version references a single class: silver. It should not trigger any quota update.
+				newPVC := validPersistentVolumeClaim("allowed-pvc", getVolumeResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+				existingPVC.Spec.VolumeAttributesClassName = &classSilver
+				existingPVC.Status.Phase = api.ClaimBound
+				existingPVC.Status.CurrentVolumeAttributesClassName = &classSilver
+				return existingPVC, newPVC
+			},
+			expectedActionSet: sets.New[string](),
+			expectedQuotaName: "",
+		},
+	}
+
+	for i, testCase := range testCases {
+		t.Run(fmt.Sprintf("testCase %d", i), func(t *testing.T) {
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+
+			kubeClient := fake.NewSimpleClientset(resourceQuotaGold, resourceQuotaSilver, resourceQuotaCopper)
+			informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+
+			handler, err := createHandler(kubeClient, informerFactory, stopCh)
+			if err != nil {
+				t.Errorf("Error occurred while creating admission plugin: %v", err)
+			}
+
+			err = informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaGold)
+			if err != nil {
+				t.Errorf("Error occurred while adding resource quota to the indexer: %v", err)
+			}
+			err = informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaSilver)
+			if err != nil {
+				t.Errorf("Error occurred while adding resource quota to the indexer: %v", err)
+			}
+			err = informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuotaCopper)
+			if err != nil {
+				t.Errorf("Error occurred while adding resource quota to the indexer: %v", err)
+			}
+
+			existingPVC, newPVC := testCase.claims()
+			err = handler.Validate(context.TODO(), admission.NewAttributesRecord(newPVC, existingPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, corev1.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, &metav1.CreateOptions{}, false, nil), nil)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if len(testCase.expectedActionSet) == 0 || testCase.expectedQuotaName == "" {
+				decimatedActions := removeListWatch(kubeClient.Actions())
+				if len(decimatedActions) != 0 {
+					t.Errorf("Expected no actions, but got %v", decimatedActions)
+				}
+				return
+			}
+
+			if len(kubeClient.Actions()) == 0 {
+				t.Errorf("Expected a client action")
+			}
+
+			actionSet := sets.New[string]()
+			for _, action := range kubeClient.Actions() {
+				actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+			}
+
+			if !actionSet.HasAll(sets.List(testCase.expectedActionSet)...) {
+				t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", testCase.expectedActionSet, actionSet, testCase.expectedActionSet.Difference(actionSet))
+			}
+
+			decimatedActions := removeListWatch(kubeClient.Actions())
+			lastActionIndex := len(decimatedActions) - 1
+			usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*corev1.ResourceQuota)
+
+			// ensure only the exoected quota was updated
+			if usage.Name != testCase.expectedQuotaName {
+				t.Errorf("Incremented the wrong quota, expected %v, actual %v", testCase.expectedQuotaName, usage.Name)
+			}
+
+			expectedUsage := corev1.ResourceQuota{
+				Status: corev1.ResourceQuotaStatus{
+					Hard: corev1.ResourceList{
+						corev1.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+						corev1.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+					},
+					Used: corev1.ResourceList{
+						corev1.ResourcePersistentVolumeClaims: resource.MustParse("2"),
+						corev1.ResourceRequestsStorage:        resource.MustParse("11Gi"),
+					},
+				},
+			}
+			for k, v := range expectedUsage.Status.Used {
+				actual := usage.Status.Used[k]
+				actualValue := actual.String()
+				expectedValue := v.String()
+				if expectedValue != actualValue {
+					t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+				}
+			}
+		})
 	}
 }
 
