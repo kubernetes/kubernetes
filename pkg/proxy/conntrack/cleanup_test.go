@@ -300,6 +300,7 @@ func TestFilterForNAT(t *testing.T) {
 		name           string
 		orig           string
 		dest           string
+		dstPort        uint16
 		protocol       v1.Protocol
 		expectedFilter *conntrackFilter
 	}{
@@ -329,7 +330,7 @@ func TestFilterForNAT(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForNAT(tc.orig, tc.dest, tc.protocol))
+			require.Equal(t, tc.expectedFilter, filterForIPPortNAT(tc.orig, tc.dest, tc.dstPort, tc.protocol))
 		})
 	}
 }
