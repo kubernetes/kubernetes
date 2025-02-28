@@ -95,6 +95,14 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 	}
 
 	mergedResourceConfig, err := resourceconfig.MergeAPIResourceConfigs(defaultResourceConfig, s.RuntimeConfig, registry)
+	if err != nil {
+		return err
+	}
+	// apply emulation forward compatibility to the api enablement if applicable.
+	if c.EmulationForwardCompatible {
+		mergedResourceConfig, err = resourceconfig.EmulationForwardCompatibleResourceConfig(mergedResourceConfig, s.RuntimeConfig, registry)
+	}
+
 	c.MergedResourceConfig = mergedResourceConfig
 
 	return err
