@@ -1380,6 +1380,16 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+- name: TerminationLogFileCleanup
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.0"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.33"
 - name: TopologyAwareHints
   versionedSpecs:
   - default: false
