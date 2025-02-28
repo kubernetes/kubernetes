@@ -667,6 +667,12 @@ const (
 	// Enables support for the StorageVersionMigrator controller.
 	StorageVersionMigrator featuregate.Feature = "StorageVersionMigrator"
 
+	// owner: @danwinship
+	// kep: https://kep.k8s.io/4858
+	//
+	// Requires stricter validation of IP addresses and CIDR values in API objects.
+	StrictIPCIDRValidation featuregate.Feature = "StrictIPCIDRValidation"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	//
