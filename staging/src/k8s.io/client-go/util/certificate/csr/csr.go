@@ -67,6 +67,7 @@ func RequestCertificate(client clientset.Interface, csrData []byte, name, signer
 		csr.Spec.ExpirationSeconds = DurationToExpirationSeconds(*requestedDuration)
 	}
 
+	klog.Infof("creating csr")
 	reqName, reqUID, err = create(client, csr)
 	switch {
 	case err == nil:
