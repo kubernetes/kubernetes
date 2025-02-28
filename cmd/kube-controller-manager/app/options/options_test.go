@@ -34,6 +34,8 @@ import (
 
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
 
 	componentbaseconfig "k8s.io/component-base/config"
@@ -1490,10 +1492,21 @@ func TestWatchListClientFlagChange(t *testing.T) {
 		fs.AddFlagSet(f)
 	}
 
+	// DeepCopy the default feature gate, which has been added the client-go feature gate.
+	featureGates := utilfeature.DefaultFeatureGate.DeepCopy()
+	// set up new instance of ComponentGlobalsRegistry instead of using the DefaultComponentGlobalsRegistry to avoid contention in parallel tests.
+	effectiveVersion := utilcompatibility.DefaultKubeEffectiveVersionForTest()
+	effectiveVersion.SetEmulationVersion(featureGates.EmulationVersion())
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
+	if err := componentGlobalsRegistry.Register(basecompatibility.DefaultKubeComponent, effectiveVersion, featureGates); err != nil {
+		t.Fatal(fmt.Errorf("componentGlobalsRegistry.Register failed with %w", err))
+	}
+	s.ComponentGlobalsRegistry = componentGlobalsRegistry
+
 	assertWatchListClientFeatureDefaultValue(t)
 	assertWatchListCommandLineDefaultValue(t, fs)
 
-	args := []string{fmt.Sprintf("--feature-gates=%v=true", clientgofeaturegate.WatchListClient)}
+	args := []string{fmt.Sprintf("--feature-gates=%v=false", clientgofeaturegate.WatchListClient)}
 	if err := fs.Parse(args); err != nil {
 		t.Fatal(fmt.Errorf("FlatSet.Parse failed with %w", err))
 	}
