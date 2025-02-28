@@ -34,6 +34,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -389,6 +390,129 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			ginkgo.By("Ensuring the metrics match the expectations about alignment metrics a few more times")
 			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchAlignmentMetrics)
 		})
+		ginkgo.It("should report zero counters for allocation per NUMA after a fresh restart", func(ctx context.Context) {
+
+			cpuPolicyOptions := map[string]string{
+				cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+				cpumanager.FullPCPUsOnlyOption:            "true",
+			}
+			newCfg := configureCPUManagerInKubelet(oldCfg,
+				&cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      cpuset.New(0),
+					enableCPUManagerOptions: true,
+					options:                 cpuPolicyOptions,
+				},
+			)
+
+			updateKubeletConfig(ctx, f, newCfg, true)
+
+			ginkgo.By("Checking the cpumanager allocation per NUMA metric right after the kubelet restart, with no pods running")
+			numaNodes, _, _ := hostCheck()
+
+			framework.Logf("numaNodes on the system %d", numaNodes)
+
+			keys := make(map[interface{}]types.GomegaMatcher)
+			idFn := makeCustomLabelID(metrics.AlignedNUMANode)
+
+			for i := 0; i < numaNodes; i++ {
+				keys["kubelet_cpu_manager_allocation_per_numa"] = gstruct.MatchAllElements(idFn, gstruct.Elements{
+					fmt.Sprintf("%d", i): timelessSample(0),
+				})
+
+			}
+
+			matchSpreadMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, keys)
+
+			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchSpreadMetrics)
+			ginkgo.By("Ensuring the metrics match the expectations a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchSpreadMetrics)
+
+		})
+
+		ginkgo.It("should report allocation per NUMA metric when handling guaranteed pods", func(ctx context.Context) {
+			var cpusNumPerNUMA, coresNumPerNUMA, numaNodes, threadsPerCore int
+			cpuPolicyOptions := map[string]string{
+				cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+				cpumanager.FullPCPUsOnlyOption:            "true",
+			}
+			newCfg := configureCPUManagerInKubelet(oldCfg,
+				&cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      cpuset.New(0),
+					enableCPUManagerOptions: true,
+					options:                 cpuPolicyOptions,
+				},
+			)
+
+			updateKubeletConfig(ctx, f, newCfg, true)
+
+			numaNodes, coresNumPerNUMA, threadsPerCore = hostCheck()
+			cpusNumPerNUMA = coresNumPerNUMA * threadsPerCore
+
+			framework.Logf("numaNodes on the system %d", numaNodes)
+			framework.Logf("Cores per NUMA on the system %d", coresNumPerNUMA)
+			framework.Logf("Threads per Core on the system %d", threadsPerCore)
+			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
+
+			smtLevel = getSMTLevel()
+			framework.Logf("SMT Level on the system %d", smtLevel)
+
+			ginkgo.By("Querying the podresources endpoint to get the baseline")
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err, "LocalEndpoint() failed err: %v", err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err, "GetV1Client() failed err: %v", err)
+			defer func() {
+				framework.ExpectNoError(conn.Close())
+			}()
+
+			ginkgo.By("Checking the pool allocatable resources from the kubelet")
+			resp, err := cli.GetAllocatableResources(ctx, &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.ExpectNoError(err, "failed to get the kubelet allocatable resources")
+			allocatableCPUs, _ := demuxCPUsAndDevicesFromGetAllocatableResources(resp)
+
+			// 'distribute-cpus-across-numa' policy option ensures that CPU allocations are evenly distributed
+			//  across NUMA nodes in cases where more than one NUMA node is required to satisfy the allocation.
+			// So, we want to ensure that the CPU Request exceeds the number of CPUs that can fit within a single
+			// NUMA node. We have to pick cpuRequest such that:
+			// 1. CPURequest > cpusNumPerNUMA
+			// 2. Not occupy all the CPUs on the node ande leave room for reserved CPU
+			// 3. CPURequest is a multiple if number of NUMA nodes to allow equal CPU distribution across NUMA nodes
+			//
+			// In summary: cpusNumPerNUMA < CPURequest < ((cpusNumPerNuma * numaNodes) - reservedCPUscount)
+			// Considering all these constraints we select: CPURequest= (cpusNumPerNUMA-smtLevel)*numaNodes
+			cpuRequest := (cpusNumPerNUMA - smtLevel) * numaNodes
+			if cpuRequest > allocatableCPUs.Size() {
+				e2eskipper.Skipf("Pod requesting %d CPUs which is more than allocatable CPUs:%d", cpuRequest, allocatableCPUs.Size())
+			}
+
+			ginkgo.By("Creating the test pod")
+			testPod = e2epod.NewPodClient(f).Create(ctx, makeGuaranteedCPUExclusiveSleeperPod("test-pod-allocation-per-numa", cpuRequest))
+
+			ginkgo.By("Checking the cpumanager metrics after pod creation")
+
+			keys := make(map[interface{}]types.GomegaMatcher)
+			idFn := makeCustomLabelID(metrics.AlignedNUMANode)
+
+			// On a clean environment with no other pods running if distribute-across-numa policy option is enabled
+			for i := 0; i < numaNodes; i++ {
+				keys["kubelet_cpu_manager_allocation_per_numa"] = gstruct.MatchAllElements(idFn, gstruct.Elements{
+					fmt.Sprintf("%d", i): timelessSample(2),
+				})
+
+			}
+
+			matchSpreadMetrics := gstruct.MatchKeys(gstruct.IgnoreExtras, keys)
+
+			ginkgo.By("Giving the Kubelet time to start up and produce metrics")
+			gomega.Eventually(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchSpreadMetrics)
+			ginkgo.By("Ensuring the metrics match the expectations a few more times")
+			gomega.Consistently(ctx, getKubeletMetrics, 1*time.Minute, 15*time.Second).Should(matchSpreadMetrics)
+		})
+
 	})
 })
 

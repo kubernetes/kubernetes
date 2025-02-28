@@ -187,6 +187,13 @@ func makeCustomPairID(pri, sec string) func(interface{}) string {
 	}
 }
 
+func makeCustomLabelID(label string) func(interface{}) string {
+	return func(element interface{}) string {
+		el := element.(*model.Sample)
+		return string(el.Metric[model.LabelName(label)])
+	}
+}
+
 func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 	return gstruct.PointTo(gstruct.MatchAllFields(gstruct.Fields{
 		// We already check Metric when matching the Id
