@@ -44,6 +44,7 @@ import (
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -335,11 +336,11 @@ func TestCRIListPodStats(t *testing.T) {
 }
 
 func TestListPodStatsStrictlyFromCRI(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	if runtime.GOOS == "windows" {
 		// TODO: remove skip once the failing test has been fixed.
 		t.Skip("Skip failing test on Windows.")
 	}
-	ctx := context.Background()
 	var (
 		imageFsMountpoint = "/test/mount/point"
 		unknownMountpoint = "/unknown/mount/point"
@@ -467,11 +468,11 @@ func TestListPodStatsStrictlyFromCRI(t *testing.T) {
 		true,
 	)
 
-	cadvisorInfos, err := getCadvisorContainerInfo(mockCadvisor)
+	cadvisorInfos, err := getCadvisorContainerInfo(tCtx, mockCadvisor)
 	if err != nil {
 		t.Errorf("failed to get container info from cadvisor: %v", err)
 	}
-	stats, err := provider.ListPodStats(ctx)
+	stats, err := provider.ListPodStats(tCtx)
 	assert := assert.New(t)
 	assert.NoError(err)
 	assert.Len(stats, 2)
@@ -1106,6 +1107,7 @@ func makeFakeLogStats(seed int) *volume.Metrics {
 }
 
 func TestGetContainerUsageNanoCores(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	var value0 uint64
 	var value1 uint64 = 10000000000
 
@@ -1268,7 +1270,7 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 		assert.Nil(t, cached)
 
 		// Update the cache and get the latest value.
-		real := provider.getAndUpdateContainerUsageNanoCores(test.stats)
+		real := provider.getAndUpdateContainerUsageNanoCores(tCtx,test.stats)
 		assert.Equal(t, test.expected, real, test.desc)
 
 		// After the update, the cached value should be up-to-date
