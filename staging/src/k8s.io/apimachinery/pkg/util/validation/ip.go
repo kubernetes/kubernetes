@@ -26,21 +26,78 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// IsValidIP tests that the argument is a valid IP address.
-func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
+func parseIP(fldPath *field.Path, value string, strictValidation bool) (net.IP, field.ErrorList) {
 	var allErrors field.ErrorList
-	if netutils.ParseIPSloppy(value) == nil {
-		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)").WithOrigin("format=ip-sloppy"))
+
+	ip := netutils.ParseIPSloppy(value)
+	if ip == nil {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"))
+		return nil, allErrors
 	}
-	return allErrors
+
+	if strictValidation {
+		addr, err := netip.ParseAddr(value)
+		if err != nil {
+			// If netutils.ParseIPSloppy parsed it, but netip.ParseAddr
+			// doesn't, then it must have illegal leading 0s.
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have leading 0s"))
+		}
+		if addr.Is4In6() {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not be an IPv4-mapped IPv6 address"))
+		}
+	}
+
+	return ip, allErrors
+}
+
+// IsValidIPForLegacyField tests that the argument is a valid IP address for a "legacy"
+// API field that predates strict IP validation. In particular, this allows IPs that are
+// not in canonical form (e.g., "FE80:0:0:0:0:0:0:0abc" instead of "fe80::abc").
+//
+// If strictValidation is false, this also allows IPs in certain invalid or ambiguous
+// formats:
+//
+//  1. IPv4 IPs are allowed to have leading "0"s in octets (e.g. "010.002.003.004").
+//     Historically, net.ParseIP (and later netutils.ParseIPSloppy) simply ignored leading
+//     "0"s in IPv4 addresses, but most libc-based software treats 0-prefixed IPv4 octets
+//     as octal, meaning different software might interpret the same string as two
+//     different IPs, potentially leading to security issues. (Current net.ParseIP and
+//     netip.ParseAddr simply reject inputs with leading "0"s.)
+//
+//  2. IPv4-mapped IPv6 IPs (e.g. "::ffff:1.2.3.4") are allowed. These can also lead to
+//     different software interpreting the value in different ways, because they may be
+//     treated as IPv4 by some software and IPv6 by other software. (net.ParseIP and
+//     netip.ParseAddr both allow these, but there are no use cases for representing IPv4
+//     addresses as IPv4-mapped IPv6 addresses in Kubernetes.)
+//
+// This function should only be used to validate the existing fields that were
+// historically validated in this way, and strictValidation should be true unless the
+// StrictIPCIDRValidation feature gate is disabled. Use IsValidIP for parsing new fields.
+func IsValidIPForLegacyField(fldPath *field.Path, value string, strictValidation bool) field.ErrorList {
+	_, allErrors := parseIP(fldPath, value, strictValidation)
+	return allErrors.WithOrigin("format=ip-sloppy")
+}
+
+// IsValidIP tests that the argument is a valid IP address, according to current
+// Kubernetes standards for IP address validation.
+func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
+	ip, allErrors := parseIP(fldPath, value, true)
+	if len(allErrors) != 0 {
+		return allErrors.WithOrigin("format=ip-strict")
+	}
+
+	if value != ip.String() {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", ip.String())))
+	}
+	return allErrors.WithOrigin("format=ip-strict")
 }
 
 // GetWarningsForIP returns warnings for IP address values in non-standard forms. This
-// should only be used with fields that are validated with IsValidIP().
+// should only be used with fields that are validated with IsValidIPForLegacyField().
 func GetWarningsForIP(fldPath *field.Path, value string) []string {
 	ip := netutils.ParseIPSloppy(value)
 	if ip == nil {
-		klog.ErrorS(nil, "GetWarningsForIP called on value that was not validated with IsValidIP", "field", fldPath, "value", value)
+		klog.ErrorS(nil, "GetWarningsForIP called on value that was not validated with IsValidIPForLegacyField", "field", fldPath, "value", value)
 		return nil
 	}
 
@@ -65,22 +122,80 @@ func GetWarningsForIP(fldPath *field.Path, value string) []string {
 	return nil
 }
 
-// IsValidCIDR tests that the argument is a valid CIDR value.
-func IsValidCIDR(fldPath *field.Path, value string) field.ErrorList {
+func parseCIDR(fldPath *field.Path, value string, strictValidation bool) (*net.IPNet, field.ErrorList) {
 	var allErrors field.ErrorList
-	_, _, err := netutils.ParseCIDRSloppy(value)
+
+	_, ipnet, err := netutils.ParseCIDRSloppy(value)
 	if err != nil {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, "must be a valid CIDR value, (e.g. 10.9.8.0/24 or 2001:db8::/64)"))
+		return nil, allErrors
+	}
+
+	if strictValidation {
+		prefix, err := netip.ParsePrefix(value)
+		if err != nil {
+			// If netutils.ParseCIDRSloppy parsed it, but netip.ParsePrefix
+			// doesn't, then it must have illegal leading 0s (either in the
+			// IP part or the prefix).
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have leading 0s in IP or prefix length"))
+		} else if prefix.Addr().Is4In6() {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have an IPv4-mapped IPv6 address"))
+		} else if prefix.Addr() != prefix.Masked().Addr() {
+			allErrors = append(allErrors, field.Invalid(fldPath, value, "must not have bits set beyond the prefix length"))
+		}
+	}
+
+	return ipnet, allErrors
+}
+
+// IsValidCIDRForLegacyField tests that the argument is a valid CIDR value for a "legacy"
+// API field that predates strict IP validation. In particular, this allows IPs that are
+// not in canonical form (e.g., "FE80:0abc:0:0:0:0:0:0/64" instead of "fe80:abc::/64").
+//
+// If strictValidation is false, this also allows CIDR values in certain invalid or
+// ambiguous formats:
+//
+//  1. The IP part of the CIDR value is parsed as with IsValidIPForLegacyField with
+//     strictValidation=false.
+//
+//  2. The CIDR value is allowed to be either a "subnet"/"mask" (with the lower bits after
+//     the prefix length all being 0), or an "interface address" as with `ip addr` (with a
+//     complete IP address and associated subnet length). With strict validation, the
+//     value is required to be in "subnet"/"mask" form.
+//
+//  3. The prefix length is allowed to have leading 0s.
+//
+// This function should only be used to validate the existing fields that were
+// historically validated in this way, and strictValidation should be true unless the
+// StrictIPCIDRValidation feature gate is disabled. Use IsValidCIDR or
+// IsValidInterfaceAddress for parsing new fields.
+func IsValidCIDRForLegacyField(fldPath *field.Path, value string, strictValidation bool) field.ErrorList {
+	_, allErrors := parseCIDR(fldPath, value, strictValidation)
+	return allErrors
+}
+
+// IsValidCIDR tests that the argument is a valid CIDR value, according to current
+// Kubernetes standards for CIDR validation. This function is only for
+// "subnet"/"mask"-style CIDR values (e.g., "192.168.1.0/24", with no bits set beyond the
+// prefix length). Use IsValidInterfaceAddress for "ifaddr"-style CIDR values.
+func IsValidCIDR(fldPath *field.Path, value string) field.ErrorList {
+	ipnet, allErrors := parseCIDR(fldPath, value, true)
+	if len(allErrors) != 0 {
+		return allErrors
+	}
+
+	if value != ipnet.String() {
+		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", ipnet.String())))
 	}
 	return allErrors
 }
 
 // GetWarningsForCIDR returns warnings for CIDR values in non-standard forms. This should
-// only be used with fields that are validated with IsValidCIDR().
+// only be used with fields that are validated with IsValidCIDRForLegacyField().
 func GetWarningsForCIDR(fldPath *field.Path, value string) []string {
 	ip, ipnet, err := netutils.ParseCIDRSloppy(value)
 	if err != nil {
-		klog.ErrorS(err, "GetWarningsForCIDR called on value that was not validated with IsValidCIDR", "field", fldPath, "value", value)
+		klog.ErrorS(err, "GetWarningsForCIDR called on value that was not validated with IsValidCIDRForLegacyField", "field", fldPath, "value", value)
 		return nil
 	}
 

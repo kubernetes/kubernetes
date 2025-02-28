@@ -715,6 +715,12 @@ const (
 	// Allow API server Protobuf encoder to encode collections item by item, instead of all at once.
 	StreamingCollectionEncodingToProtobuf featuregate.Feature = "StreamingCollectionEncodingToProtobuf"
 
+	// owner: @danwinship
+	// kep: https://kep.k8s.io/4858
+	//
+	// Requires stricter validation of IP addresses and CIDR values in API objects.
+	StrictIPCIDRValidation featuregate.Feature = "StrictIPCIDRValidation"
+
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433
 	//
