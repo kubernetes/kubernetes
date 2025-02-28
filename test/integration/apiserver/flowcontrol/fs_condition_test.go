@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	machinerytypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-new"
 	flowcontrolapply "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"

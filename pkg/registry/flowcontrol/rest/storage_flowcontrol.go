@@ -24,7 +24,9 @@ import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	flowcontrolbootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	flowcontrolbootstrapnew "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-new"
+	flowcontrolbootstrapold "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-old"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -33,9 +35,11 @@ import (
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol/internalbootstrap"
 	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 	flowcontrolapisv1beta3 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta3"
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/ensurer"
@@ -48,6 +52,7 @@ var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 // RESTStorageProvider is a provider of REST storage
 type RESTStorageProvider struct {
 	InformerFactory informers.SharedInformerFactory
+	FeatureGate     featuregate.FeatureGate
 }
 
 // PostStartHookName is the name of the post-start-hook provided by flow-control storage
@@ -106,6 +111,7 @@ func (p RESTStorageProvider) GroupName() string {
 // PostStartHook returns the hook func that launches the config provider
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	bce := &bootstrapConfigurationEnsurer{
+		newConfig: p.FeatureGate.Enabled(features.APFNewConfig),
 		informersSynced: []cache.InformerSynced{
 			p.InformerFactory.Flowcontrol().V1().PriorityLevelConfigurations().Informer().HasSynced,
 			p.InformerFactory.Flowcontrol().V1().FlowSchemas().Informer().HasSynced,
@@ -117,6 +123,7 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 }
 
 type bootstrapConfigurationEnsurer struct {
+	newConfig       bool
 	informersSynced []cache.InformerSynced
 	fsLister        flowcontrollisters.FlowSchemaLister
 	plcLister       flowcontrollisters.PriorityLevelConfigurationLister
@@ -142,7 +149,7 @@ func (bce *bootstrapConfigurationEnsurer) ensureAPFBootstrapConfiguration(hookCo
 			ctx,
 			time.Second,
 			func(context.Context) (bool, error) {
-				if err := ensure(ctx, clientset, bce.fsLister, bce.plcLister); err != nil {
+				if err := ensure(ctx, bce.newConfig, clientset, bce.fsLister, bce.plcLister); err != nil {
 					klog.ErrorS(err, "APF bootstrap ensurer ran into error, will retry later")
 					return false, nil
 				}
@@ -163,7 +170,7 @@ func (bce *bootstrapConfigurationEnsurer) ensureAPFBootstrapConfiguration(hookCo
 		wait.PollImmediateUntil(
 			time.Minute,
 			func() (bool, error) {
-				if err := ensure(hookContext, clientset, bce.fsLister, bce.plcLister); err != nil {
+				if err := ensure(hookContext, bce.newConfig, clientset, bce.fsLister, bce.plcLister); err != nil {
 					klog.ErrorS(err, "APF bootstrap ensurer ran into error, will retry later")
 				}
 				// always auto update both suggested and mandatory configuration
@@ -175,64 +182,80 @@ func (bce *bootstrapConfigurationEnsurer) ensureAPFBootstrapConfiguration(hookCo
 	return nil
 }
 
-func ensure(ctx context.Context, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
+func ensure(ctx context.Context, newConfig bool, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
 
-	if err := ensureSuggestedConfiguration(ctx, clientset, fsLister, plcLister); err != nil {
+	if err := ensureSuggestedConfiguration(ctx, newConfig, clientset, fsLister, plcLister); err != nil {
 		// We should not attempt creation of mandatory objects if ensuring the suggested
 		// configuration resulted in an error.
 		// This only happens when the stop channel is closed.
 		return fmt.Errorf("failed ensuring suggested settings - %w", err)
 	}
 
-	if err := ensureMandatoryConfiguration(ctx, clientset, fsLister, plcLister); err != nil {
+	if err := ensureMandatoryConfiguration(ctx, newConfig, clientset, fsLister, plcLister); err != nil {
 		return fmt.Errorf("failed ensuring mandatory settings - %w", err)
 	}
 
-	if err := removeDanglingBootstrapConfiguration(ctx, clientset, fsLister, plcLister); err != nil {
+	if err := removeDanglingBootstrapConfiguration(ctx, newConfig, clientset, fsLister, plcLister); err != nil {
 		return fmt.Errorf("failed to delete removed settings - %w", err)
 	}
 
 	return nil
 }
 
-func ensureSuggestedConfiguration(ctx context.Context, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
+func pickConfig(mandatory, newConfig bool) ([]*flowcontrolv1.PriorityLevelConfiguration, []*flowcontrolv1.FlowSchema) {
+	if mandatory {
+		if newConfig {
+			return flowcontrolbootstrapnew.MandatoryPriorityLevelConfigurations, flowcontrolbootstrapnew.MandatoryFlowSchemas
+		} else {
+			return flowcontrolbootstrapold.MandatoryPriorityLevelConfigurations, flowcontrolbootstrapold.MandatoryFlowSchemas
+		}
+	} else {
+		if newConfig {
+			return flowcontrolbootstrapnew.SuggestedPriorityLevelConfigurations, flowcontrolbootstrapnew.SuggestedFlowSchemas
+		} else {
+			return flowcontrolbootstrapold.SuggestedPriorityLevelConfigurations, flowcontrolbootstrapold.SuggestedFlowSchemas
+		}
+	}
+}
+
+func ensureSuggestedConfiguration(ctx context.Context, newConfig bool, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
 	plcOps := ensurer.NewPriorityLevelConfigurationOps(clientset.PriorityLevelConfigurations(), plcLister)
-	if err := ensurer.EnsureConfigurations(ctx, plcOps, flowcontrolbootstrap.SuggestedPriorityLevelConfigurations, ensurer.NewSuggestedEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration]()); err != nil {
+	plcs, fses := pickConfig(false, newConfig)
+	if err := ensurer.EnsureConfigurations(ctx, plcOps, plcs, ensurer.NewSuggestedEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration]()); err != nil {
 		return err
 	}
 
 	fsOps := ensurer.NewFlowSchemaOps(clientset.FlowSchemas(), fsLister)
-	return ensurer.EnsureConfigurations(ctx, fsOps, flowcontrolbootstrap.SuggestedFlowSchemas, ensurer.NewSuggestedEnsureStrategy[*flowcontrolv1.FlowSchema]())
+	return ensurer.EnsureConfigurations(ctx, fsOps, fses, ensurer.NewSuggestedEnsureStrategy[*flowcontrolv1.FlowSchema]())
 }
 
-func ensureMandatoryConfiguration(ctx context.Context, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
+func ensureMandatoryConfiguration(ctx context.Context, newConfig bool, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
 	plcOps := ensurer.NewPriorityLevelConfigurationOps(clientset.PriorityLevelConfigurations(), plcLister)
-	if err := ensurer.EnsureConfigurations(ctx, plcOps, flowcontrolbootstrap.MandatoryPriorityLevelConfigurations, ensurer.NewMandatoryEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration]()); err != nil {
+	plcs, fses := pickConfig(true, newConfig)
+	if err := ensurer.EnsureConfigurations(ctx, plcOps, plcs, ensurer.NewMandatoryEnsureStrategy[*flowcontrolv1.PriorityLevelConfiguration]()); err != nil {
 		return err
 	}
 
 	fsOps := ensurer.NewFlowSchemaOps(clientset.FlowSchemas(), fsLister)
-	return ensurer.EnsureConfigurations(ctx, fsOps, flowcontrolbootstrap.MandatoryFlowSchemas, ensurer.NewMandatoryEnsureStrategy[*flowcontrolv1.FlowSchema]())
+	return ensurer.EnsureConfigurations(ctx, fsOps, fses, ensurer.NewMandatoryEnsureStrategy[*flowcontrolv1.FlowSchema]())
 }
 
-func removeDanglingBootstrapConfiguration(ctx context.Context, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
-	if err := removeDanglingBootstrapFlowSchema(ctx, clientset, fsLister); err != nil {
+func removeDanglingBootstrapConfiguration(ctx context.Context, newConfig bool, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
+	if err := removeDanglingBootstrapFlowSchema(ctx, newConfig, clientset, fsLister); err != nil {
 		return err
 	}
 
-	return removeDanglingBootstrapPriorityLevel(ctx, clientset, plcLister)
+	return removeDanglingBootstrapPriorityLevel(ctx, newConfig, clientset, plcLister)
 }
 
-func removeDanglingBootstrapFlowSchema(ctx context.Context, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister) error {
-	bootstrap := append(flowcontrolbootstrap.MandatoryFlowSchemas, flowcontrolbootstrap.SuggestedFlowSchemas...)
+func removeDanglingBootstrapFlowSchema(ctx context.Context, newConfig bool, clientset flowcontrolclient.FlowcontrolV1Interface, fsLister flowcontrollisters.FlowSchemaLister) error {
 	fsOps := ensurer.NewFlowSchemaOps(clientset.FlowSchemas(), fsLister)
-	return ensurer.RemoveUnwantedObjects(ctx, fsOps, bootstrap)
+	return ensurer.RemoveUnwantedObjects(ctx, fsOps, internalbootstrap.FlowSchemas[newConfig])
 }
 
-func removeDanglingBootstrapPriorityLevel(ctx context.Context, clientset flowcontrolclient.FlowcontrolV1Interface, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
-	bootstrap := append(flowcontrolbootstrap.MandatoryPriorityLevelConfigurations, flowcontrolbootstrap.SuggestedPriorityLevelConfigurations...)
+func removeDanglingBootstrapPriorityLevel(ctx context.Context, newConfig bool, clientset flowcontrolclient.FlowcontrolV1Interface, plcLister flowcontrollisters.PriorityLevelConfigurationLister) error {
 	plcOps := ensurer.NewPriorityLevelConfigurationOps(clientset.PriorityLevelConfigurations(), plcLister)
-	return ensurer.RemoveUnwantedObjects(ctx, plcOps, bootstrap)
+	return ensurer.RemoveUnwantedObjects(ctx, plcOps, internalbootstrap.PrioritylevelConfigurations[newConfig])
 }
 
 // contextFromChannelAndMaxWaitDuration returns a Context that is bound to the
