@@ -7136,6 +7136,8 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "123", MountPath: "/rro-enabled", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)},
 		{Name: "123", MountPath: "/rro-enabled-2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationNone)},
 		{Name: "image-volume", MountPath: "/image-volume"},
+		{Name: "image-volume", MountPath: "/image-volume-1", SubPath: "foo"},
+		{Name: "image-volume", MountPath: "/image-volume-2", SubPathExpr: "$(POD_NAME)"},
 	}
 	goodVolumeDevices := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/foofoo"},
@@ -7146,23 +7148,22 @@ func TestValidateVolumeMounts(t *testing.T) {
 	}
 
 	errorCases := map[string][]core.VolumeMount{
-		"empty name":                                       {{Name: "", MountPath: "/foo"}},
-		"name not found":                                   {{Name: "", MountPath: "/foo"}},
-		"empty mountpath":                                  {{Name: "abc", MountPath: ""}},
-		"mountpath collision":                              {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
-		"absolute subpath":                                 {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"subpath in ..":                                    {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
-		"subpath contains ..":                              {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
-		"subpath ends in ..":                               {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
-		"disabled MountPropagation feature gate":           {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
-		"name exists in volumeDevice":                      {{Name: "xyz", MountPath: "/bar"}},
-		"mountpath exists in volumeDevice":                 {{Name: "uvw", MountPath: "/mnt/exists"}},
-		"both exist in volumeDevice":                       {{Name: "xyz", MountPath: "/mnt/exists"}},
-		"rro but not ro":                                   {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
-		"rro with incompatible propagation":                {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
-		"rro-if-possible but not ro":                       {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
-		"subPath not allowed for image volume sources":     {{Name: "image-volume", MountPath: "/image-volume-err-1", SubPath: "/foo"}},
-		"subPathExpr not allowed for image volume sources": {{Name: "image-volume", MountPath: "/image-volume-err-2", SubPathExpr: "$(POD_NAME)"}},
+		"empty name":                                          {{Name: "", MountPath: "/foo"}},
+		"name not found":                                      {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":                                     {{Name: "abc", MountPath: ""}},
+		"mountpath collision":                                 {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"absolute subpath":                                    {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"subpath in ..":                                       {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
+		"subpath contains ..":                                 {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
+		"subpath ends in ..":                                  {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"disabled MountPropagation feature gate":              {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
+		"name exists in volumeDevice":                         {{Name: "xyz", MountPath: "/bar"}},
+		"mountpath exists in volumeDevice":                    {{Name: "uvw", MountPath: "/mnt/exists"}},
+		"both exist in volumeDevice":                          {{Name: "xyz", MountPath: "/mnt/exists"}},
+		"rro but not ro":                                      {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled)}},
+		"rro with incompatible propagation":                   {{Name: "123", MountPath: "/rro-bad2", ReadOnly: true, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyEnabled), MountPropagation: ptr.To(core.MountPropagationHostToContainer)}},
+		"rro-if-possible but not ro":                          {{Name: "123", MountPath: "/rro-bad1", ReadOnly: false, RecursiveReadOnly: ptr.To(core.RecursiveReadOnlyIfPossible)}},
+		"subPath for image volume sources should be relative": {{Name: "image-volume", MountPath: "/image-volume-err-1", SubPath: "/foo"}},
 	}
 	badVolumeDevice := []core.VolumeDevice{
 		{Name: "xyz", DevicePath: "/mnt/exists"},
