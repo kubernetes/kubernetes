@@ -1222,7 +1222,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Remove orphaned pod user namespace allocations (if any).
 	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
-	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(allPods, runningRuntimePods); err != nil {
+	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(ctx, allPods, runningRuntimePods); err != nil {
 		klog.ErrorS(err, "Failed cleaning up orphaned pod user namespaces allocations")
 	}
 
