@@ -573,6 +573,19 @@ message DeviceRequestAllocationResult {
   // +optional
   // +featureGate=DRAAdminAccess
   optional bool adminAccess = 5;
+
+  // A copy of all tolerations specified in the request at the time
+  // when the device got allocated.
+  //
+  // The maximum number of tolerations is 16.
+  //
+  // This is an alpha field and requires enabling the DRADeviceTaints
+  // feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceTaints
+  repeated DeviceToleration tolerations = 6;
 }
 
 // DeviceSelector must have exactly one field set.
@@ -587,6 +600,8 @@ message DeviceSelector {
 // The device this DeviceTaint is attached to has the "effect" on
 // any claim and, through the claim, to pods that do not tolerate
 // the Taint.
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 message DeviceTaint {
   // The taint key to be applied to a device.
   // Must be a label name.

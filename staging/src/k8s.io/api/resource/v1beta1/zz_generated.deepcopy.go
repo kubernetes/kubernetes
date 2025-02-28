@@ -517,6 +517,13 @@ func (in *DeviceRequestAllocationResult) DeepCopyInto(out *DeviceRequestAllocati
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]DeviceToleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

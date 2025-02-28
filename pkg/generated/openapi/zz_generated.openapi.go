@@ -49518,10 +49518,31 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							Format:      "",
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceToleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.DeviceToleration"},
 	}
 }
 

@@ -846,6 +846,7 @@ func autoConvert_v1beta1_DeviceRequestAllocationResult_To_resource_DeviceRequest
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.Tolerations = *(*[]resource.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
@@ -860,6 +861,7 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1beta1_DeviceRequest
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.Tolerations = *(*[]resourcev1beta1.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 

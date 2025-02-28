@@ -13304,6 +13304,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceToleration
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.DeviceSelector
   map:
     fields:
