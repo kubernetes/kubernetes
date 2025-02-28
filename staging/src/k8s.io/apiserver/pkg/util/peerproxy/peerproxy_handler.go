@@ -27,10 +27,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/reconcilers"
@@ -43,7 +43,6 @@ import (
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	v1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -65,14 +64,15 @@ type peerProxyHandler struct {
 	// identity for this server
 	serverId string
 	// reconciler that is used to fetch host port of peer apiserver when proxying request to a peer
-	reconciler                  reconcilers.PeerEndpointLeaseReconciler
-	serializer                  runtime.NegotiatedSerializer
-	discoverySerializer         serializer.CodecFactory
-	loopbackClientConfig        *restclient.Config
-	proxyClientConfig           *transport.Config
-	finishedSync                atomic.Bool
-	localDiscoveryResponseCache map[schema.GroupVersion][]metav1.APIResource
-	discoveryResponseCacheLock  sync.RWMutex
+	reconciler                    reconcilers.PeerEndpointLeaseReconciler
+	serializer                    runtime.NegotiatedSerializer
+	discoverySerializer           serializer.CodecFactory
+	loopbackClientConfig          *restclient.Config
+	proxyClientConfig             *transport.Config
+	finishedSync                  atomic.Bool
+	localDiscoveryResponseCache   map[schema.GroupVersion][]string
+	peerAggDiscoveryResponseCache map[string]map[schema.GroupVersion][]string
+	discoveryResponseCacheLock    sync.RWMutex
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
@@ -131,22 +131,14 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		}
 
 		gvr := schema.GroupVersionResource{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion, Resource: requestInfo.Resource}
-		apiserversi, err := h.apiserverIdentityLeases()
-		if err != nil {
-			// No other option since no peers were discovered than to handle the
-			// request locally.
-			klog.InfoS("no apiserver identity leases found")
-			handler.ServeHTTP(w, r)
-			return
-		}
 
-		if h.shouldServeLocally(apiserversi, gvr) {
+		if h.shouldServeLocally(gvr) {
 			handler.ServeHTTP(w, r)
 			return
 		}
 
 		// find servers that are capable of serving this request
-		peerEndpoint, err := h.findServiceableByServers(r.Context(), gvr, apiserversi)
+		peerEndpoint, err := h.findServiceableByPeerFromAggDiscoveryCache(gvr)
 		if err != nil {
 			klog.ErrorS(err, "error fetching remote server details while proxying")
 			responsewriters.ErrorNegotiated(apierrors.NewServiceUnavailable("Error getting ip and port info of the remote server while proxying"), h.serializer, gvr.GroupVersion(), w, r)
@@ -173,27 +165,16 @@ func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
 	h.discoveryResponseCacheLock.Lock()
 	defer h.discoveryResponseCacheLock.Unlock()
 	for gv, resources := range resourcesByGV {
-		h.localDiscoveryResponseCache[gv] = resources.APIResources
+		h.localDiscoveryResponseCache[gv] = []string{}
+		for _, resource := range resources.APIResources {
+			h.localDiscoveryResponseCache[gv] = append(h.localDiscoveryResponseCache[gv], resource.Name)
+		}
 	}
 
 	return nil
 }
 
-func (h *peerProxyHandler) apiserverIdentityLeases() ([]*v1.Lease, error) {
-	var apiserversi []*v1.Lease
-	apiserversi, err := h.apiserverIdentityLister.Leases(metav1.NamespaceSystem).List(labels.SelectorFromSet(labels.Set{"apiserver.kubernetes.io/identity": "kube-apiserver"}))
-	if err != nil {
-		return apiserversi, err
-	}
-
-	return apiserversi, nil
-}
-
-func (h *peerProxyHandler) shouldServeLocally(apiserversi []*v1.Lease, gvr schema.GroupVersionResource) bool {
-	if len(apiserversi) <= 1 {
-		return true
-	}
-
+func (h *peerProxyHandler) shouldServeLocally(gvr schema.GroupVersionResource) bool {
 	return h.localDiscoverySuccessful(gvr)
 }
 
@@ -204,8 +185,8 @@ func (h *peerProxyHandler) localDiscoverySuccessful(gvr schema.GroupVersionResou
 		return false
 	}
 
-	for _, resource := range resources {
-		if gvr.GroupResource().Resource == resource.Name {
+	for _, resourceName := range resources {
+		if gvr.GroupResource().Resource == resourceName {
 			return true
 		}
 	}
@@ -213,30 +194,46 @@ func (h *peerProxyHandler) localDiscoverySuccessful(gvr schema.GroupVersionResou
 	return false
 }
 
-func (h *peerProxyHandler) findServiceableByServers(ctx context.Context, gvr schema.GroupVersionResource, apiserversi []*v1.Lease) (string, error) {
-	var foundPeer bool
-	var peerEndpoint string
-	for _, identity := range apiserversi {
-		apiserverKey := identity.Name
-		if apiserverKey == h.serverId {
+func (h *peerProxyHandler) findServiceableByPeerFromAggDiscoveryCache(gvr schema.GroupVersionResource) (string, error) {
+	var peerServerID, peerEndpoint string
+	var foundResource bool
+	var err error
+
+	for serverID, resourceMap := range h.peerAggDiscoveryResponseCache {
+		if serverID == h.serverId {
 			continue
 		}
 
-		hostPort, err := getHostPortInfoFromLease(apiserverKey, h.reconciler)
-		if err != nil {
-			klog.Errorf("failed to get host port info from identity lease for server %s: %v", apiserverKey, err)
-			continue
+		peerServerID = ""
+		foundResource = false
+
+		for gv, resources := range resourceMap {
+			if gv.Group == gvr.Group && gv.Version == gvr.Version {
+				for _, resource := range resources {
+					if resource == gvr.Resource {
+						peerServerID = serverID
+						foundResource = true
+						break
+					}
+				}
+			}
+
+			if foundResource {
+				break
+			}
 		}
 
-		if h.proxyDiscoverySuccessful(ctx, hostPort, gvr) {
-			peerEndpoint = hostPort
-			foundPeer = true
-			break
+		if foundResource {
+			peerEndpoint, err = getHostPortInfoFromLease(peerServerID, h.reconciler)
+			if err != nil {
+				klog.Errorf("failed to get host port info from identity lease for server %s: %v", peerServerID, err)
+				continue
+			}
 		}
-	}
 
-	if foundPeer {
-		return peerEndpoint, nil
+		if peerEndpoint != "" {
+			return peerEndpoint, nil
+		}
 	}
 
 	return "", fmt.Errorf("failed to fetch any apiserver capable of handling the request")
@@ -254,46 +251,6 @@ func getHostPortInfoFromLease(apiserverKey string, reconciler reconcilers.PeerEn
 	}
 
 	return hostPort, nil
-}
-
-func (h *peerProxyHandler) proxyDiscoverySuccessful(ctx context.Context, hostport string, gvr schema.GroupVersionResource) bool {
-	discoveryPaths := []string{"/api", "/apis"}
-	for _, path := range discoveryPaths {
-		discoveryResponse, err := h.aggregateDiscovery(ctx, path, hostport)
-		if err != nil {
-			klog.Errorf("error while querying discovery endpoint: %v", err)
-			return false
-		}
-
-		if foundGVRInAggDiscoveryDoc(discoveryResponse, gvr) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, hostport string) (*apidiscoveryv2.APIGroupDiscoveryList, error) {
-	req, err := http.NewRequest(http.MethodGet, path, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req = req.WithContext(ctx)
-	req.Header.Add("Accept", discovery.AcceptV2)
-
-	writer := responsewriterutil.NewInMemoryResponseWriter()
-	h.proxyRequestToDestinationAPIServer(req, writer, hostport)
-	if writer.RespCode() != http.StatusOK {
-		return nil, fmt.Errorf("discovery request failed with status: %d", writer.RespCode())
-	}
-
-	parsed := &apidiscoveryv2.APIGroupDiscoveryList{}
-	if err := runtime.DecodeInto(h.discoverySerializer.UniversalDecoder(), writer.Data(), parsed); err != nil {
-		return nil, fmt.Errorf("error decoding discovery response: %w", err)
-	}
-
-	return parsed, nil
 }
 
 func (h *peerProxyHandler) proxyRequestToDestinationAPIServer(req *http.Request, rw http.ResponseWriter, host string) {
@@ -335,25 +292,170 @@ func (h *peerProxyHandler) buildProxyRoundtripper(req *http.Request) (http.Round
 	return transport.NewAuthProxyRoundTripper(user.GetName(), user.GetUID(), user.GetGroups(), user.GetExtra(), proxyTransport), nil
 }
 
-func foundGVRInAggDiscoveryDoc(discoveryDoc *apidiscoveryv2.APIGroupDiscoveryList, gvr schema.GroupVersionResource) bool {
-	for _, groupDiscovery := range discoveryDoc.Items {
-		if groupDiscovery.Name == gvr.Group {
-			for _, version := range groupDiscovery.Versions {
-				if version.Version == gvr.Version {
-					for _, resource := range version.Resources {
-						if resource.Resource == gvr.Resource {
-							return true
-						}
-					}
-				}
+func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
+	klog.ErrorS(err, "Error while proxying request to destination apiserver")
+	http.Error(w, err.Error(), http.StatusServiceUnavailable)
+}
+
+func (h *peerProxyHandler) addPeerDiscoveryInfo(obj interface{}) {
+	serverIdentityLease, ok := obj.(*v1.Lease)
+	if !ok {
+		klog.Error("Invalid lease object provided to addPeerServedResources()")
+		return
+	}
+
+	// We only want to record peers' discovery info.
+	if serverIdentityLease.Name == h.serverId {
+		return
+	}
+
+	h.updatePeerServedResourcesCache(nil, serverIdentityLease)
+}
+
+func (h *peerProxyHandler) updatePeerDiscoveryInfo(oldObj interface{}, newObj interface{}) {
+	oldServerIdentityLease, ok := oldObj.(*v1.Lease)
+	if !ok {
+		klog.Error("Invalid lease object provided to updatePeerServedResources()")
+		return
+	}
+
+	newServerIdentityLease, ok := newObj.(*v1.Lease)
+	if !ok {
+		klog.Error("Invalid lease object provided to updatePeerServedResources()")
+		return
+	}
+
+	h.updatePeerServedResourcesCache(oldServerIdentityLease, newServerIdentityLease)
+}
+
+func (h *peerProxyHandler) deletePeerDiscoveryInfo(obj interface{}) {
+	serverIdentityLease, ok := obj.(*v1.Lease)
+	if !ok {
+		klog.Error("Invalid lease object provided to addPeerServedResources()")
+		return
+	}
+
+	if h.serverId == serverIdentityLease.Name {
+		return
+	}
+
+	h.deletePeerDiscoveryInfoFromCache(serverIdentityLease.Name)
+}
+
+func (h *peerProxyHandler) updatePeerServedResourcesCache(oldLease *v1.Lease, newLease *v1.Lease) {
+	if oldLease != nil && newLease != nil {
+		// update peer discovery info only if the holderIdentity changed, meaning
+		// the sever was restarted
+		if oldLease.Name == newLease.Name {
+			// We only want to record peers' discovery info.
+			if newLease.Name == h.serverId {
+				return
+			}
+
+			if *oldLease.Spec.HolderIdentity != *newLease.Spec.HolderIdentity {
+				h.deletePeerDiscoveryInfoFromCache(oldLease.Name)
+				h.addPeerDiscoveryInfoToCache(newLease.Name)
+				return
 			}
 		}
 	}
 
-	return false
+	if newLease != nil {
+		// add new peer's served-resources info
+		err := h.addPeerDiscoveryInfoToCache(newLease.Name)
+		if err != nil {
+			klog.ErrorS(err, "error while updating peer discovery cache for server ID:", newLease.Name)
+		}
+		return
+	}
+
+	if oldLease != nil {
+		// delete old peer's served-resources info
+		h.deletePeerDiscoveryInfoFromCache(oldLease.Name)
+	}
 }
 
-func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	klog.ErrorS(err, "Error while proxying request to destination apiserver")
-	http.Error(w, err.Error(), http.StatusServiceUnavailable)
+func (h *peerProxyHandler) addPeerDiscoveryInfoToCache(serverID string) error {
+	hostport, err := getHostPortInfoFromLease(serverID, h.reconciler)
+	if err != nil {
+		return fmt.Errorf("failed to get host port info from identity lease for server %s: %v", serverID, err)
+	}
+
+	if h.peerAggDiscoveryResponseCache == nil {
+		h.peerAggDiscoveryResponseCache = make(map[string]map[schema.GroupVersion][]string)
+	}
+
+	gvrMap, ok := h.peerAggDiscoveryResponseCache[serverID]
+	if !ok {
+		gvrMap = make(map[schema.GroupVersion][]string)
+		h.peerAggDiscoveryResponseCache[serverID] = gvrMap
+	}
+
+	discoveryPaths := []string{"/api", "/apis"}
+	for _, path := range discoveryPaths {
+		discoveryResponse, err := h.aggregateDiscovery(path, hostport) // Pass context
+		if err != nil {
+			klog.Errorf("error while querying discovery endpoint: %v", err)
+			continue
+		}
+
+		if discoveryResponse == nil {
+			continue
+		}
+
+		for _, groupDiscovery := range discoveryResponse.Items {
+			groupName := groupDiscovery.Name
+			if groupName == "" || groupName == "core" {
+				groupName = "core"
+			}
+			for _, version := range groupDiscovery.Versions {
+				gv := schema.GroupVersion{Group: groupName, Version: version.Version}
+				resources := make([]string, 0, len(version.Resources))
+				for _, resource := range version.Resources {
+					resources = append(resources, resource.Resource)
+				}
+				gvrMap[gv] = resources
+			}
+		}
+	}
+	return nil
+}
+
+func (h *peerProxyHandler) deletePeerDiscoveryInfoFromCache(serverID string) {
+	if h.peerAggDiscoveryResponseCache == nil {
+		return
+	}
+
+	delete(h.peerAggDiscoveryResponseCache, serverID)
+}
+
+func (h *peerProxyHandler) aggregateDiscovery(path string, hostport string) (*apidiscoveryv2.APIGroupDiscoveryList, error) {
+	req, err := http.NewRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	apiServerUser := &user.DefaultInfo{
+		Name:   user.APIServerUser,
+		UID:    user.APIServerUser,
+		Groups: []string{user.SystemPrivilegedGroup},
+	}
+
+	ctx := apirequest.WithUser(req.Context(), apiServerUser)
+	req = req.WithContext(ctx)
+
+	req.Header.Add("Accept", discovery.AcceptV2)
+
+	writer := responsewriterutil.NewInMemoryResponseWriter()
+	h.proxyRequestToDestinationAPIServer(req, writer, hostport)
+	if writer.RespCode() != http.StatusOK {
+		return nil, fmt.Errorf("discovery request failed with status: %d", writer.RespCode())
+	}
+
+	parsed := &apidiscoveryv2.APIGroupDiscoveryList{}
+	if err := runtime.DecodeInto(h.discoverySerializer.UniversalDecoder(), writer.Data(), parsed); err != nil {
+		return nil, fmt.Errorf("error decoding discovery response: %w", err)
+	}
+
+	return parsed, nil
 }

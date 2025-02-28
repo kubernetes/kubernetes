@@ -342,8 +342,8 @@ func newFakePeerProxyHandler(apiserverIdentityLister *fakeApiserverIdentityListe
 		for _, serverID := range gvrdata.serverIDs {
 			if serverID == localServerID {
 				ppI.discoveryResponseCacheLock.Lock()
-				ppI.localDiscoveryResponseCache[gvrdata.gvr.GroupVersion()] = []metav1.APIResource{
-					{Name: gvrdata.gvr.Resource, Kind: "SomeKind"},
+				ppI.localDiscoveryResponseCache[gvrdata.gvr.GroupVersion()] = []string{
+					gvrdata.gvr.Resource,
 				}
 				ppI.discoveryResponseCacheLock.Unlock()
 			}
