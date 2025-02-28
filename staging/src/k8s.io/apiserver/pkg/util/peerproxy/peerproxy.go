@@ -17,14 +17,15 @@ limitations under the License.
 package peerproxy
 
 import (
+	"fmt"
 	"net/http"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
@@ -47,15 +48,16 @@ func NewPeerProxyHandler(informerFactory kubeinformers.SharedInformerFactory,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
 	ser runtime.NegotiatedSerializer,
 	loopbackClientConfig *rest.Config,
-	proxyClientConfig *transport.Config) *peerProxyHandler {
+	proxyClientConfig *transport.Config) (*peerProxyHandler, error) {
 	h := &peerProxyHandler{
-		name:                        "PeerProxyHandler",
-		serverId:                    serverId,
-		reconciler:                  reconciler,
-		serializer:                  ser,
-		loopbackClientConfig:        loopbackClientConfig,
-		proxyClientConfig:           proxyClientConfig,
-		localDiscoveryResponseCache: make(map[schema.GroupVersion][]metav1.APIResource),
+		name:                          "PeerProxyHandler",
+		serverId:                      serverId,
+		reconciler:                    reconciler,
+		serializer:                    ser,
+		loopbackClientConfig:          loopbackClientConfig,
+		proxyClientConfig:             proxyClientConfig,
+		localDiscoveryResponseCache:   make(map[schema.GroupVersion][]string),
+		peerAggDiscoveryResponseCache: make(map[string]*peerAggDiscoveryInfo),
 	}
 
 	h.apiserverIdentityInformer = informerFactory.Coordination().V1().Leases().Informer()
@@ -64,5 +66,20 @@ func NewPeerProxyHandler(informerFactory kubeinformers.SharedInformerFactory,
 	utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
 	h.discoverySerializer = serializer.NewCodecFactory(discoveryScheme)
 
-	return h
+	_, err := h.apiserverIdentityInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			h.addPeerDiscoveryInfo(obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			h.updatePeerDiscoveryInfo(oldObj, newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			h.deletePeerDiscoveryInfo(obj)
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to add apiserver identity lease event handler: %w", err)
+	}
+	return h, nil
 }
