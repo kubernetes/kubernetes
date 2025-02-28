@@ -5616,6 +5616,37 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without support for resize"))
 	}
 
+	// Do not allow adding, removing, re-ordering, or renaming containers on resize.
+	var containerOrderModified bool
+	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("containers"), "containers may not be added or removed on resize"))
+		containerOrderModified = true
+	} else {
+		for i, ctr := range oldPod.Spec.Containers {
+			if newPod.Spec.Containers[i].Name != ctr.Name {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("containers").Index(i).Child("name"), "containers may not be renamed or reordered on resize"))
+				containerOrderModified = true
+			}
+		}
+	}
+	if len(newPod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers"), "initContainers may not be added or removed on resize"))
+		containerOrderModified = true
+	} else {
+		for i, ctr := range oldPod.Spec.InitContainers {
+			if newPod.Spec.InitContainers[i].Name != ctr.Name {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(i).Child("name"), "initContainers may not be renamed or reordered on resize"))
+				containerOrderModified = true
+			}
+		}
+	}
+
+	// The rest of the validation assumes that the containers are in the same order,
+	// so we proceed only if that assumption is true.
+	if containerOrderModified {
+		return allErrs
+	}
+
 	// Do not allow removing resource requests/limits on resize.
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for ix, ctr := range oldPod.Spec.InitContainers {
