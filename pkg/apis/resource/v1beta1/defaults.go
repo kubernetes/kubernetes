@@ -26,7 +26,10 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
-	if len(obj.FirstAvailable) > 0 {
+	// If the deviceClassName is not set, then the request will have
+	// subrequests and the allocationMode and count fields should not
+	// be set.
+	if obj.DeviceClassName == "" {
 		return
 	}
 	if obj.AllocationMode == "" {

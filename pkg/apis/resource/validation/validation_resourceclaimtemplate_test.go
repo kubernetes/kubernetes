@@ -190,7 +190,7 @@ func TestValidateClaimTemplate(t *testing.T) {
 			template:     testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable),
 		},
 		"proritized-list-class-name-on-parent": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("deviceClassName"), goodName, "must not be specified when firstAvailable is set")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0), nil, "exactly one of `deviceClassName` or `firstAvailable` must be specified")},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
 				template.Spec.Spec.Devices.Requests[0].DeviceClassName = goodName

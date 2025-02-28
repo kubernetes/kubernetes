@@ -403,7 +403,9 @@ type DeviceRequest struct {
 	// request.
 	//
 	// A class is required if no subrequests are specified in the
-	// firstAvailable list. Which classes are available depends on the cluster.
+	// firstAvailable list and no class can be set if subrequests
+	// are specified in the firstAvailable list.
+	// Which classes are available depends on the cluster.
 	//
 	// Administrators may use this to restrict which devices may get
 	// requested by only installing classes with selectors for permitted
@@ -419,6 +421,9 @@ type DeviceRequest struct {
 	// device in order for that device to be considered for this
 	// request. All selectors must be satisfied for a device to be
 	// considered.
+	//
+	// This field can only be set when deviceClassName is set and no subrequests
+	// are specified in the firstAvailable list.
 	//
 	// +optional
 	// +listType=atomic
@@ -440,6 +445,9 @@ type DeviceRequest struct {
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other requests must specify this field.
 	//
+	// This field can only be set when deviceClassName is set and no subrequests
+	// are specified in the firstAvailable list.
+	//
 	// More modes may get added in the future. Clients must refuse to handle
 	// requests with unknown modes.
 	//
@@ -448,6 +456,9 @@ type DeviceRequest struct {
 
 	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
 	// If AllocationMode is ExactCount and this field is not specified, the default is one.
+	//
+	// This field can only be set when deviceClassName is set and no subrequests
+	// are specified in the firstAvailable list.
 	//
 	// +optional
 	// +oneOf=AllocationMode
@@ -459,6 +470,9 @@ type DeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
+	// This field can only be set when deviceClassName is set and no subrequests
+	// are specified in the firstAvailable list.
+	//
 	// This is an alpha field and requires enabling the DRAAdminAccess
 	// feature gate. Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
@@ -467,9 +481,21 @@ type DeviceRequest struct {
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool
 
-	// FirstAvailable contains subrequests, exactly one of which must be satisfied
-	// in order to satisfy this request. This field may only be set in the
-	// entries of DeviceClaim.Requests.
+	// FirstAvailable contains subrequests, of which exactly one will be
+	// satisfied by the scheduler to satisfy this request. It tries to
+	// satisfy them in the order in which they are listed here. So if
+	// there are two entries in the list, the scheduler will only check
+	// the second one if it determines that the first one cannot be used.
+	//
+	// This field may only be set in the entries of DeviceClaim.Requests.
+	//
+	// DRA does not yet implement scoring, so the scheduler will
+	// select the first set of devices that satisfies all the
+	// requests in the claim. And if the requirements can
+	// be satisfied on more than one node, other scheduling features
+	// will determine which node is chosen. This means that the set of
+	// devices allocated to a claim might not be the optimal set
+	// available to the cluster. Scoring will be implemented later.
 	//
 	// +optional
 	// +oneOf=deviceRequestType

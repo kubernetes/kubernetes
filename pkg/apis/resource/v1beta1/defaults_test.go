@@ -34,7 +34,11 @@ func TestSetDefaultAllocationMode(t *testing.T) {
 	claim := &v1beta1.ResourceClaim{
 		Spec: v1beta1.ResourceClaimSpec{
 			Devices: v1beta1.DeviceClaim{
-				Requests: []v1beta1.DeviceRequest{{}},
+				Requests: []v1beta1.DeviceRequest{
+					{
+						DeviceClassName: "device-class",
+					},
+				},
 			},
 		},
 	}

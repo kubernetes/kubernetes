@@ -169,10 +169,16 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 
 func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
-	if len(request.FirstAvailable) > 0 {
-		if request.DeviceClassName != "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("deviceClassName"), request.DeviceClassName, "must not be specified when firstAvailable is set"))
-		}
+
+	if request.DeviceClassName == "" && len(request.FirstAvailable) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `deviceClassName` or `firstAvailable` must be specified"))
+	} else if request.DeviceClassName != "" && len(request.FirstAvailable) > 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `deviceClassName` or `firstAvailable` must be specified"))
+	} else if request.DeviceClassName != "" {
+		allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
+		allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
+		allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	} else if len(request.FirstAvailable) > 0 {
 		if request.Selectors != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectors"), request.Selectors, "must not be specified when firstAvailable is set"))
 		}
@@ -193,11 +199,7 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 				return subRequest.Name, "name"
 			},
 			fldPath.Child("firstAvailable"))...)
-		return allErrs
 	}
-	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
-	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
-	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	return allErrs
 }
 

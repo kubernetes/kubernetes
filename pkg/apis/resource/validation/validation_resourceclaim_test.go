@@ -245,8 +245,8 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
-		"missing-classname": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "devices", "requests").Index(0).Child("deviceClassName"), "")},
+		"missing-classname-and-firstavailable": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "devices", "requests").Index(0), "exactly one of `deviceClassName` or `firstAvailable` must be specified")},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
 				claim.Spec.Devices.Requests[0].DeviceClassName = ""
@@ -578,11 +578,7 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"prioritized-list-field-on-parent": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("deviceClassName"), goodName, "must not be specified when firstAvailable is set"),
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("selectors"), validSelector, "must not be specified when firstAvailable is set"),
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("allocationMode"), resource.DeviceAllocationModeAll, "must not be specified when firstAvailable is set"),
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("count"), int64(2), "must not be specified when firstAvailable is set"),
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("adminAccess"), ptr.To(true), "must not be specified when firstAvailable is set"),
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0), nil, "exactly one of `deviceClassName` or `firstAvailable` must be specified"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
