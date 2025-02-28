@@ -593,13 +593,14 @@ done`}
 	})
 
 	/*
-		Testcase: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex despite some failing
+		Release: v1.33
+		Testname: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex despite some failing
 		Description: Create an indexed job and ensure that all indexes are either failed or succeeded, depending
 		on the end state of the corresponding pods. Pods with odd indexes fail, while the pods with even indexes
 		succeeded. Also, verify that the number of failed pods doubles the number of failing indexes, as the
 		backoffLimitPerIndex=1, allowing for one pod recreation before marking that indexed failed.
 	*/
-	ginkgo.It("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
+	framework.ConformanceIt("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(4)
 		backoffLimit := int32(6) // default value
@@ -627,12 +628,13 @@ done`}
 	})
 
 	/*
-		Testcase: Terminate job execution when the maxFailedIndexes is exceeded
+		Release: v1.33
+		Testname: Terminate job execution when the maxFailedIndexes is exceeded
 		Description: Create an indexed job with backoffLimitPerIndex and maxFailedIndexes.
 		Verify the job execution is terminated as soon as the number of failed
 		indexes exceeds maxFailedIndexes.
 	*/
-	ginkgo.It("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
+	framework.ConformanceIt("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
 		// we use parallelism=1 to make sure in the asserts only one pod was created
 		parallelism := int32(1)
 		completions := int32(4)
@@ -712,13 +714,14 @@ done`}
 	})
 
 	/*
-		Testcase: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
+		Release: v1.33
+		Testname: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
 		Description: Create an indexed job with backoffLimitPerIndex, and podFailurePolicy
 		with the FailIndex action. Verify the failed pods matching the pod failure policy
 		result in marking the corresponding indexes as failed without restarts, despite
 		backoffLimitPerIndex > 0.
 	*/
-	ginkgo.It("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
+	framework.ConformanceIt("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(2)
 		backoffLimit := int32(6) // default value

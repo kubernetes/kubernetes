@@ -560,6 +560,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.33"
 - name: JobManagedBy
   versionedSpecs:
   - default: false
@@ -1324,6 +1328,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.30"
+- name: StreamingCollectionEncodingToJSON
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: StrictCostEnforcementForVAP
   versionedSpecs:
   - default: false
