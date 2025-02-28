@@ -50,8 +50,11 @@ const (
 	testNonServingEndpointIP = "10.240.1.5"
 	testDeletedEndpointIP    = "10.240.2.6"
 
-	testPort     = 8000
-	testNodePort = 32000
+	testServicePort     = 8000
+	testServiceNodePort = 32000
+	// testNonServicePort is used to mock conntrack flow entries which are not owned by
+	// kube-proxy and reconciler should not consider these for cleanup
+	testNonServicePort = 3000
 )
 
 func TestCleanStaleEntries(t *testing.T) {
@@ -74,19 +77,19 @@ func TestCleanStaleEntries(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Name:     "test-tcp",
-					Port:     testPort,
+					Port:     testServicePort,
 					Protocol: v1.ProtocolTCP,
 				},
 				{
 					Name:     "test-udp",
-					Port:     testPort,
-					NodePort: testNodePort,
+					Port:     testServicePort,
+					NodePort: testServiceNodePort,
 					Protocol: v1.ProtocolUDP,
 				},
 				{
 					Name:     "test-sctp",
-					Port:     testPort,
-					NodePort: testNodePort,
+					Port:     testServicePort,
+					NodePort: testServiceNodePort,
 					Protocol: v1.ProtocolSCTP,
 				},
 			},
@@ -126,17 +129,17 @@ func TestCleanStaleEntries(t *testing.T) {
 		Ports: []discovery.EndpointPort{
 			{
 				Name:     ptr.To("test-tcp"),
-				Port:     ptr.To(int32(testPort)),
+				Port:     ptr.To(int32(testServicePort)),
 				Protocol: ptr.To(v1.ProtocolTCP),
 			},
 			{
 				Name:     ptr.To("test-udp"),
-				Port:     ptr.To(int32(testPort)),
+				Port:     ptr.To(int32(testServicePort)),
 				Protocol: ptr.To(v1.ProtocolUDP),
 			},
 			{
 				Name:     ptr.To("test-sctp"),
-				Port:     ptr.To(int32(testPort)),
+				Port:     ptr.To(int32(testServicePort)),
 				Protocol: ptr.To(v1.ProtocolSCTP),
 			},
 		},
@@ -212,35 +215,44 @@ func TestCleanStaleEntries(t *testing.T) {
 		}
 	}
 
-	// mock existing entries before cleanup
-	// we create 36 fake flow entries ( 3 Endpoints * 3 Protocols * ( 3 (ServiceIPs) + 1 (NodePort))
-	var mockEntries []*netlink.ConntrackFlow
-	// expectedEntries are the entries on which we will assert the cleanup logic
-	var expectedEntries []*netlink.ConntrackFlow
+	// The following mock conntrack flow entries `entriesBeforeCleanup` and `entriesAfterCleanup`
+	// represent conntrack flow entries before and after reconciler cleanup loop. Before cleanup,
+	// reconciler lists the conntrack flows, receiving `entriesBeforeCleanup` and after cleanup,
+	// we list the conntrack flows and assert them to match with `entriesAfterCleanup`.
+	// {entriesBeforeCleanup} - {entriesAfterCleanup} = entries cleared by conntrack reconciler
+	var entriesBeforeCleanup []*netlink.ConntrackFlow
+	// entriesBeforeCleanup - entriesAfterCleanup = entries cleared by conntrack reconciler
+	var entriesAfterCleanup []*netlink.ConntrackFlow
+
+	// we create 63 fake flow entries ( 3 Endpoints * 3 Protocols * ( 3 (ServiceIP:ServicePort) + 3 (ServiceIP:NonServicePort) + 1 (NodePort))
 	for _, dnatDest := range []string{testServingEndpointIP, testNonServingEndpointIP, testDeletedEndpointIP} {
 		for _, proto := range []uint8{unix.IPPROTO_TCP, unix.IPPROTO_UDP, unix.IPPROTO_SCTP} {
 			for _, origDest := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
-				entry := &netlink.ConntrackFlow{
-					FamilyType: unix.AF_INET,
-					Forward: netlink.IPTuple{
-						DstIP:    netutils.ParseIPSloppy(origDest),
-						Protocol: proto,
-					},
-					Reverse: netlink.IPTuple{
-						Protocol: proto,
-						SrcIP:    netutils.ParseIPSloppy(dnatDest),
-					},
-				}
-				mockEntries = append(mockEntries, entry)
-				// we do not expect deleted or non-serving UDP endpoints flows to be present after cleanup
-				if !(proto == unix.IPPROTO_UDP && (dnatDest == testNonServingEndpointIP || dnatDest == testDeletedEndpointIP)) {
-					expectedEntries = append(expectedEntries, entry)
+				for _, port := range []uint16{testServicePort, testNonServicePort} {
+					entry := &netlink.ConntrackFlow{
+						FamilyType: unix.AF_INET,
+						Forward: netlink.IPTuple{
+							DstIP:    netutils.ParseIPSloppy(origDest),
+							DstPort:  port,
+							Protocol: proto,
+						},
+						Reverse: netlink.IPTuple{
+							Protocol: proto,
+							SrcIP:    netutils.ParseIPSloppy(dnatDest),
+						},
+					}
+					entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
+					// we do not expect UDP entries with destination port `testServicePort` and DNATed destination
+					// address not an address of serving endpoint to be present after cleanup.
+					if !(proto == unix.IPPROTO_UDP && port == testServicePort && dnatDest != testServingEndpointIP) {
+						entriesAfterCleanup = append(entriesAfterCleanup, entry)
+					}
 				}
 			}
 			entry := &netlink.ConntrackFlow{
 				FamilyType: unix.AF_INET,
 				Forward: netlink.IPTuple{
-					DstPort:  testNodePort,
+					DstPort:  testServiceNodePort,
 					Protocol: proto,
 				},
 				Reverse: netlink.IPTuple{
@@ -248,10 +260,11 @@ func TestCleanStaleEntries(t *testing.T) {
 					SrcIP:    netutils.ParseIPSloppy(dnatDest),
 				},
 			}
-			mockEntries = append(mockEntries, entry)
-			// we do not expect deleted or non-serving UDP endpoints entries to be present after cleanup
-			if !(proto == unix.IPPROTO_UDP && (dnatDest == testNonServingEndpointIP || dnatDest == testDeletedEndpointIP)) {
-				expectedEntries = append(expectedEntries, entry)
+			entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
+			// we do not expect UDP entries with DNATed destination address not
+			// an address of serving endpoint to be present after cleanup.
+			if !(proto == unix.IPPROTO_UDP && dnatDest != testServingEndpointIP) {
+				entriesAfterCleanup = append(entriesAfterCleanup, entry)
 			}
 		}
 	}
@@ -260,38 +273,46 @@ func TestCleanStaleEntries(t *testing.T) {
 	// These will exist if the proxy don't have DROP/REJECT rule for service with
 	// no endpoints, --orig-dst and --reply-src will be same for these entries.
 	for _, ip := range []string{testClusterIP, testLoadBalancerIP, testExternalIP} {
-		entry := &netlink.ConntrackFlow{
-			FamilyType: unix.AF_INET,
-			Forward: netlink.IPTuple{
-				DstIP:    netutils.ParseIPSloppy(ip),
-				Protocol: unix.IPPROTO_UDP,
-			},
-			Reverse: netlink.IPTuple{
-				Protocol: unix.IPPROTO_UDP,
-				SrcIP:    netutils.ParseIPSloppy(ip),
-			},
+		for _, port := range []uint16{testServicePort, testNonServicePort} {
+			entry := &netlink.ConntrackFlow{
+				FamilyType: unix.AF_INET,
+				Forward: netlink.IPTuple{
+					DstIP:    netutils.ParseIPSloppy(ip),
+					DstPort:  port,
+					Protocol: unix.IPPROTO_UDP,
+				},
+				Reverse: netlink.IPTuple{
+					Protocol: unix.IPPROTO_UDP,
+					SrcIP:    netutils.ParseIPSloppy(ip),
+				},
+			}
+			entriesBeforeCleanup = append(entriesBeforeCleanup, entry)
+			// we do not expect entries with destination port `testServicePort` to be
+			// present after cleanup.
+			if !(port == testServicePort) {
+				entriesAfterCleanup = append(entriesAfterCleanup, entry)
+			}
 		}
-		mockEntries = append(mockEntries, entry)
 	}
 
 	fake := NewFake()
-	fake.entries = mockEntries
+	fake.entries = entriesBeforeCleanup
 	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
 
 	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
-	require.Equal(t, len(expectedEntries), len(actualEntries))
+	require.Equal(t, len(entriesAfterCleanup), len(actualEntries))
 
 	// sort the actual flows before comparison
 	sort.Slice(actualEntries, func(i, j int) bool {
 		return actualEntries[i].String() < actualEntries[j].String()
 	})
 	// sort the expected flows before comparison
-	sort.Slice(expectedEntries, func(i, j int) bool {
-		return expectedEntries[i].String() < expectedEntries[j].String()
+	sort.Slice(entriesAfterCleanup, func(i, j int) bool {
+		return entriesAfterCleanup[i].String() < entriesAfterCleanup[j].String()
 	})
 
-	for i := 0; i < len(expectedEntries); i++ {
-		require.Equal(t, expectedEntries[i], actualEntries[i])
+	for i := 0; i < len(entriesAfterCleanup); i++ {
+		require.Equal(t, entriesAfterCleanup[i], actualEntries[i])
 	}
 }
 
@@ -300,6 +321,7 @@ func TestFilterForNAT(t *testing.T) {
 		name           string
 		orig           string
 		dest           string
+		dstPort        uint16
 		protocol       v1.Protocol
 		expectedFilter *conntrackFilter
 	}{
@@ -329,7 +351,7 @@ func TestFilterForNAT(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expectedFilter, filterForNAT(tc.orig, tc.dest, tc.protocol))
+			require.Equal(t, tc.expectedFilter, filterForIPPortNAT(tc.orig, tc.dest, tc.dstPort, tc.protocol))
 		})
 	}
 }
