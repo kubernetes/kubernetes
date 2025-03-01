@@ -1526,7 +1526,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		}
 		select {
 		case <-tCtx.Done():
-			return nil, fmt.Errorf("op %d: %v", opIndex, context.Cause(tCtx))
+			return nil, fmt.Errorf("op %d: %w", opIndex, context.Cause(tCtx))
 		default:
 		}
 		err = executor.runOp(realOp, opIndex)
