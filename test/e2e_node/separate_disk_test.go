@@ -57,8 +57,17 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
 			return *(summary.Node.Runtime.ImageFs.InodesFree)
 		},
-		func() *v1.Pod {
-			return inodeConsumingPod("container-inode-hog", lotsOfFiles, nil)
+		[]podEvictSpec{
+			{
+				evictionPriority: 1,
+				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
+				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
+				pod: inodeConsumingPod("container-inode-hog", lotsOfFiles, nil),
+			},
+			{
+				evictionPriority: 0,
+				pod:              innocentPod(),
+			},
 		})
 })
 
@@ -72,28 +81,32 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
 			return *summary.Node.Runtime.ImageFs.AvailableBytes
 		},
-		func() *v1.Pod {
-			return diskConsumingPod("best-effort-disk", lotsOfDisk, nil, v1.ResourceRequirements{})
+		[]podEvictSpec{
+			{
+				evictionPriority: 1,
+				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
+				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
+				pod: diskConsumingPod("best-effort-disk", lotsOfDisk, nil, v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod:              innocentPod(),
+			},
 		})
 })
 
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 // removed localstoragecapacityisolation feature gate here as its not a feature gate anymore
 var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
-	f := framework.NewDefaultFramework("localstorage-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	evictionTestTimeout := 10 * time.Minute
-	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
-		})
 		sizeLimit := resource.MustParse("40Mi")
 		useOverLimit := 41  /* Mb */
 		useUnderLimit := 39 /* Mb */
 		containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
 
-		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, []podEvictSpec{
+	runLocalStorageCapacityIsolationEvictionTest(
+		"localstorage-eviction-test",
+		string(evictionapi.SignalMemoryAvailable),
+		[]podEvictSpec{
 			{
 				evictionPriority: 1, // This pod should be evicted because emptyDir (default storage type) usage violation
 				pod: diskConsumingPod("emptydir-disk-sizelimit", useOverLimit, &v1.VolumeSource{
@@ -110,6 +123,12 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 					v1.ResourceRequirements{Limits: containerLimit}),
 			},
 			{
+				evictionPriority: 0, // This pod should not be evicted because MemoryBackedVolumes cannot use more space than is allocated to them since SizeMemoryBackedVolumes was enabled
+				pod: diskConsumingPod("emptydir-memory-sizelimit", useOverLimit, &v1.VolumeSource{
+					EmptyDir: &v1.EmptyDirVolumeSource{Medium: "Memory", SizeLimit: &sizeLimit},
+				}, v1.ResourceRequirements{}),
+			},
+			{
 				evictionPriority: 0, // This pod should not be evicted because it uses less than its limit
 				pod: diskConsumingPod("emptydir-disk-below-sizelimit", useUnderLimit, &v1.VolumeSource{
 					EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
@@ -120,7 +139,6 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 				pod:              diskConsumingPod("container-disk-below-sizelimit", useUnderLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
 			},
 		})
-	})
 })
 
 // LocalStorageEviction tests that the node responds to IMAGE FS pressure by evicting pods.
