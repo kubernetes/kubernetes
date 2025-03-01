@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	fldtest "k8s.io/apimachinery/pkg/util/validation/field/testing"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -20717,25 +20718,32 @@ func TestValidateEndpointsCreate(t *testing.T) {
 	}
 
 	errorCases := map[string]struct {
-		endpoints   core.Endpoints
-		errorType   field.ErrorType
-		errorOrigin string
+		endpoints    core.Endpoints
+		expectedErrs field.ErrorList
 	}{
 		"missing namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc"}},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.namespace"), ""),
+			},
 		},
 		"missing name": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Namespace: "namespace"}},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.name"), ""),
+			},
 		},
 		"invalid namespace": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
-			errorType: "FieldValueInvalid",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.namespace"), nil, ""),
+			},
 		},
 		"invalid name": {
 			endpoints: core.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
-			errorType: "FieldValueInvalid",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.name"), nil, ""),
+			},
 		},
 		"empty addresses": {
 			endpoints: core.Endpoints{
@@ -20744,7 +20752,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports: []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("subsets[0]"), ""),
+			},
 		},
 		"invalid IP": {
 			endpoints: core.Endpoints{
@@ -20754,8 +20764,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "format=ip-sloppy",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+			},
 		},
 		"Multiple ports, one without name": {
 			endpoints: core.Endpoints{
@@ -20765,7 +20776,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
 				}},
 			},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("subsets[0].ports[0].name"), ""),
+			},
 		},
 		"Invalid port number": {
 			endpoints: core.Endpoints{
@@ -20775,8 +20788,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 66000, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "portNum",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].ports[0].port"), nil, "").WithOrigin("portNum"),
+			},
 		},
 		"Invalid protocol": {
 			endpoints: core.Endpoints{
@@ -20786,7 +20800,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "Protocol"}},
 				}},
 			},
-			errorType: "FieldValueNotSupported",
+			expectedErrs: field.ErrorList{
+				field.NotSupported[string](field.NewPath("subsets[0].ports[0].protocol"), nil, nil),
+			},
 		},
 		"Address missing IP": {
 			endpoints: core.Endpoints{
@@ -20796,8 +20812,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "format=ip-sloppy",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+			},
 		},
 		"Port missing number": {
 			endpoints: core.Endpoints{
@@ -20807,8 +20824,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "portNum",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].ports[0].port"), nil, "").WithOrigin("portNum"),
+			},
 		},
 		"Port missing protocol": {
 			endpoints: core.Endpoints{
@@ -20818,7 +20836,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93}},
 				}},
 			},
-			errorType: "FieldValueRequired",
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("subsets[0].ports[0].protocol"), ""),
+			},
 		},
 		"Address is loopback": {
 			endpoints: core.Endpoints{
@@ -20828,8 +20848,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "format=non-special-ip",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+			},
 		},
 		"Address is link-local": {
 			endpoints: core.Endpoints{
@@ -20839,8 +20860,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "format=non-special-ip",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+			},
 		},
 		"Address is link-local multicast": {
 			endpoints: core.Endpoints{
@@ -20850,8 +20872,9 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP"}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "format=non-special-ip",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+			},
 		},
 		"Invalid AppProtocol": {
 			endpoints: core.Endpoints{
@@ -20861,16 +20884,18 @@ func TestValidateEndpointsCreate(t *testing.T) {
 					Ports:     []core.EndpointPort{{Name: "p", Port: 93, Protocol: "TCP", AppProtocol: utilpointer.String("lots-of[invalid]-{chars}")}},
 				}},
 			},
-			errorType:   "FieldValueInvalid",
-			errorOrigin: "format=qualified-name",
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].ports[0].appProtocol"), nil, "").WithOrigin("format=qualified-name"),
+			},
 		},
 	}
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			if errs := ValidateEndpointsCreate(&v.endpoints); len(errs) == 0 || errs[0].Type != v.errorType || errs[0].Origin != v.errorOrigin {
-				t.Errorf("Expected error type %s with origin %q, got %#v", v.errorType, v.errorOrigin, errs[0])
-			}
+			errs := ValidateEndpointsCreate(&v.endpoints)
+			// TODO: set .RequireOriginWhenInvalid() once metadata is done
+			matcher := fldtest.Match().ByType().ByField().ByOrigin()
+			fldtest.MatchErrors(t, v.expectedErrs, errs, matcher)
 		})
 	}
 }
@@ -22630,8 +22655,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	testCases := []struct {
 		name            string
 		constraints     []core.TopologySpreadConstraint
-		wantFieldErrors field.ErrorList
 		opts            PodValidationOptions
+		wantFieldErrors field.ErrorList
 	}{{
 		name: "all required fields ok",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22640,19 +22665,23 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.DoNotSchedule,
 			MinDomains:        utilpointer.Int32(3),
 		}},
-		wantFieldErrors: field.ErrorList{},
+		wantFieldErrors: nil,
 	}, {
 		name: "missing MaxSkew",
 		constraints: []core.TopologySpreadConstraint{
 			{TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(0), isNotPositiveErrorMsg)},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMaxSkew, nil, "").WithOrigin("minimum"),
+		},
 	}, {
 		name: "negative MaxSkew",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: -1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(-1), isNotPositiveErrorMsg)},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMaxSkew, nil, "").WithOrigin("minimum"),
+		},
 	}, {
 		name: "can use MinDomains with ScheduleAnyway, when MinDomains = nil",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22661,7 +22690,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.ScheduleAnyway,
 			MinDomains:        nil,
 		}},
-		wantFieldErrors: field.ErrorList{},
+		wantFieldErrors: nil,
 	}, {
 		name: "negative minDomains is invalid",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22670,7 +22699,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.DoNotSchedule,
 			MinDomains:        utilpointer.Int32(-1),
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg)},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("minimum"),
+		},
 	}, {
 		name: "cannot use non-nil MinDomains with ScheduleAnyway",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22679,7 +22710,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.ScheduleAnyway,
 			MinDomains:        utilpointer.Int32(10),
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, utilpointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("dependsOn"),
+		},
 	}, {
 		name: "use negative MinDomains with ScheduleAnyway(invalid)",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22688,50 +22721,58 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.ScheduleAnyway,
 			MinDomains:        utilpointer.Int32(-1),
 		}},
-		wantFieldErrors: []*field.Error{
-			field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), isNotPositiveErrorMsg),
-			field.Invalid(fieldPathMinDomains, utilpointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("minimum"),
+			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("dependsOn"),
 		},
 	}, {
 		name: "missing TopologyKey",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
+		wantFieldErrors: field.ErrorList{
+			field.Required(fieldPathTopologyKey, ""),
+		},
 	}, {
 		name: "missing scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone"},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), sets.List(supportedScheduleActions))},
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.UnsatisfiableConstraintAction](fieldPathWhenUnsatisfiable, nil, nil),
+		},
 	}, {
 		name: "unsupported scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.UnsatisfiableConstraintAction("N/A")},
 		},
-		wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), sets.List(supportedScheduleActions))},
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.UnsatisfiableConstraintAction](fieldPathWhenUnsatisfiable, nil, nil),
+		},
 	}, {
 		name: "multiple constraints ok with all required fields",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			{MaxSkew: 2, TopologyKey: "k8s.io/node", WhenUnsatisfiable: core.ScheduleAnyway},
 		},
-		wantFieldErrors: field.ErrorList{},
+		wantFieldErrors: nil,
 	}, {
 		name: "multiple constraints missing TopologyKey on partial ones",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, WhenUnsatisfiable: core.ScheduleAnyway},
 			{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
+		wantFieldErrors: field.ErrorList{
+			field.Required(fieldPathTopologyKey, ""),
+		},
 	}, {
 		name: "duplicate constraints",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 		},
-		wantFieldErrors: []*field.Error{
-			field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, fmt.Sprintf("{%v, %v}", "k8s.io/zone", core.DoNotSchedule)),
+		wantFieldErrors: field.ErrorList{
+			field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, nil),
 		},
 	}, {
 		name: "supported policy name set on NodeAffinityPolicy and NodeTaintsPolicy",
@@ -22742,7 +22783,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeAffinityPolicy: &honor,
 			NodeTaintsPolicy:   &ignore,
 		}},
-		wantFieldErrors: []*field.Error{},
+		wantFieldErrors: nil,
 	}, {
 		name: "unsupported policy name set on NodeAffinityPolicy",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22752,8 +22793,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeAffinityPolicy: &unknown,
 			NodeTaintsPolicy:   &ignore,
 		}},
-		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeAffinityField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.NodeInclusionPolicy](nodeAffinityField, nil, nil),
 		},
 	}, {
 		name: "unsupported policy name set on NodeTaintsPolicy",
@@ -22764,8 +22805,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeAffinityPolicy: &honor,
 			NodeTaintsPolicy:   &unknown,
 		}},
-		wantFieldErrors: []*field.Error{
-			field.NotSupported(nodeTaintsField, &unknown, sets.List(supportedPodTopologySpreadNodePolicies)),
+		wantFieldErrors: field.ErrorList{
+			field.NotSupported[core.NodeInclusionPolicy](nodeTaintsField, nil, nil),
 		},
 	}, {
 		name: "key in MatchLabelKeys isn't correctly defined",
@@ -22776,7 +22817,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.DoNotSchedule,
 			MatchLabelKeys:    []string{"/simple"},
 		}},
-		wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), "/simple", "prefix part must be non-empty")},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
+		},
 	}, {
 		name: "key exists in both matchLabelKeys and labelSelector",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22794,7 +22837,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				},
 			},
 		}},
-		wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), "foo", "exists in both matchLabelKeys and labelSelector")},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("overlappingKeys"),
+		},
 	}, {
 		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22803,7 +22848,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.DoNotSchedule,
 			MatchLabelKeys:    []string{"foo"},
 		}},
-		wantFieldErrors: field.ErrorList{field.Forbidden(fieldPathMatchLabelKeys, "must not be specified when labelSelector is not set")},
+		wantFieldErrors: field.ErrorList{
+			field.Forbidden(fieldPathMatchLabelKeys, ""),
+		},
 	}, {
 		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22813,8 +22860,10 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
 		}},
-		wantFieldErrors: []*field.Error{field.Invalid(labelSelectorField.Child("matchLabels"), "NoUppercaseOrSpecialCharsLike=Equals", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(labelSelectorField.Child("matchLabels"), nil, "").WithOrigin("labelKey"),
+		},
+		opts: PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
 	}, {
 		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22824,7 +22873,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
 		}},
-		wantFieldErrors: []*field.Error{},
+		wantFieldErrors: nil,
 		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: true},
 	}, {
 		name: "valid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
@@ -22835,17 +22884,15 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "foo"}},
 		}},
-		wantFieldErrors: []*field.Error{},
+		wantFieldErrors: nil,
 		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
-	},
-	}
+	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath, tc.opts)
-			if diff := cmp.Diff(tc.wantFieldErrors, errs); diff != "" {
-				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
-			}
+			matcher := fldtest.Match().ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
+			fldtest.MatchErrors(t, tc.wantFieldErrors, errs, matcher)
 		})
 	}
 }
