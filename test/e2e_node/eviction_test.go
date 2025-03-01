@@ -68,6 +68,9 @@ const (
 	noStarvedResource = v1.ResourceName("none")
 )
 
+// runInodeTest tests node eviction under inode pressure, validating that
+// only inode-hogging pods are evicted. Takes custom signal, metric extractor,
+// and pod factory to allow testing both nodefs and imagefs pressure scenarios.
 func runInodeTest(signal string, getInodesSummary func(summary *kubeletstatsv1alpha1.Summary) uint64, createConsumingPod func() *v1.Pod) {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -237,22 +240,23 @@ var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.With
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
-var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	f := framework.NewDefaultFramework("localstorage-eviction-test")
+func runStorageSoftEviction(frameworkName string, signal string, getAvailableBytes func(summary *kubeletstatsv1alpha1.Summary) uint64, createConsumingPod func() *v1.Pod) {
+	f := framework.NewDefaultFramework(frameworkName)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	pressureTimeout := 10 * time.Minute
 	expectedNodeCondition := v1.NodeDiskPressure
 	expectedStarvedResource := v1.ResourceEphemeralStorage
+
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("4Gi")
 			summary := eventuallyGetSummary(ctx)
-			availableBytes := *(summary.Node.Fs.AvailableBytes)
+			availableBytes := getAvailableBytes(summary)
 			if availableBytes <= uint64(diskConsumed.Value()) {
 				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
 			}
-			initialConfig.EvictionSoft = map[string]string{string(evictionapi.SignalNodeFsAvailable): fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
-			initialConfig.EvictionSoftGracePeriod = map[string]string{string(evictionapi.SignalNodeFsAvailable): "1m"}
+			initialConfig.EvictionSoft = map[string]string{signal: fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
+			initialConfig.EvictionSoftGracePeriod = map[string]string{signal: "1m"}
 			// Defer to the pod default grace period
 			initialConfig.EvictionMaxPodGracePeriod = 30
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
@@ -265,7 +269,7 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 				evictionPriority: 1,
 				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
 				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+				pod: createConsumingPod(),
 			},
 			{
 				evictionPriority: 0,
@@ -273,6 +277,21 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 			},
 		})
 	})
+}
+
+// LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
+// Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
+// Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
+var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
+	runStorageSoftEviction(
+		"localstorage-eviction-test",
+		string(evictionapi.SignalNodeFsAvailable),
+		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Fs.AvailableBytes
+		},
+		func() *v1.Pod {
+			return diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{})
+		})
 })
 
 var _ = SIGDescribe("LocalStorageSoftEvictionNotOverwriteTerminationGracePeriodSeconds", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
