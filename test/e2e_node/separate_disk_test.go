@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -53,28 +54,14 @@ var _ = SIGDescribe("Summary", feature.SeparateDiskTest, func() {
 
 // Node disk pressure is induced by consuming all inodes on the Writeable Layer (imageFS).
 var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
-	f := framework.NewDefaultFramework("inode-eviction-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := resourceInodes
-	pressureTimeout := 15 * time.Minute
-	inodesConsumed := uint64(200000)
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
-			summary := eventuallyGetSummary(ctx)
-			inodesFreeImagefs := *(summary.Node.Runtime.ImageFs.InodesFree)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalImageFsInodesFree): fmt.Sprintf("%d", inodesFreeImagefs-inodesConsumed)}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			ginkgo.By(fmt.Sprintf("EvictionHardSettings %s", initialConfig.EvictionHard))
+	runInodeTest(
+		string(evictionapi.SignalImageFsInodesFree),
+		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *(summary.Node.Runtime.ImageFs.InodesFree)
+		},
+		func() *v1.Pod {
+			return inodeConsumingPod("container-inode-hog", lotsOfFiles, nil)
 		})
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logInodeMetrics, []podEvictSpec{
-			{
-				evictionPriority: 1,
-				pod:              inodeConsumingPod("container-inode-hog", lotsOfFiles, nil),
-			},
-		})
-	})
 })
 
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods

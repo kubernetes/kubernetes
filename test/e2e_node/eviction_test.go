@@ -68,9 +68,7 @@ const (
 	noStarvedResource = v1.ResourceName("none")
 )
 
-// InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
-// Node disk pressure is induced by consuming all inodes on the node.
-var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
+func runInodeTest(signal string, getInodesSummary func(summary *kubeletstatsv1alpha1.Summary) uint64, createConsumingPod func() *v1.Pod) {
 	f := framework.NewDefaultFramework("inode-eviction-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	expectedNodeCondition := v1.NodeDiskPressure
@@ -81,11 +79,11 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
 			summary := eventuallyGetSummary(ctx)
-			inodesFree := *summary.Node.Fs.InodesFree
+			inodesFree := getInodesSummary(summary)
 			if inodesFree <= inodesConsumed {
 				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
 			}
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsInodesFree): fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+			initialConfig.EvictionHard = map[string]string{signal: fmt.Sprintf("%d", inodesFree-inodesConsumed)}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logInodeMetrics, []podEvictSpec{
@@ -93,7 +91,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 				evictionPriority: 1,
 				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
 				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: inodeConsumingPod("volume-inode-hog", lotsOfFiles, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}),
+				pod: createConsumingPod(),
 			},
 			{
 				evictionPriority: 0,
@@ -101,6 +99,19 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 			},
 		})
 	})
+}
+
+// InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
+// Node disk pressure is induced by consuming all inodes on the node.
+var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
+	runInodeTest(
+		string(evictionapi.SignalNodeFsInodesFree),
+		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+			return *summary.Node.Fs.InodesFree
+		},
+		func() *v1.Pod {
+			return inodeConsumingPod("volume-inode-hog", lotsOfFiles, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}})
+		})
 })
 
 // ImageGCNoEviction tests that the eviction manager is able to prevent eviction
