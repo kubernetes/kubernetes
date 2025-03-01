@@ -1196,7 +1196,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 
 					results, err := runWorkload(tCtx, tc, w, informerFactory)
 					if err != nil {
-						tCtx.Fatalf("%w: %s", w.Name, err)
+						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
 					dataItems.DataItems = append(dataItems.DataItems, results...)
 
@@ -1295,7 +1295,10 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string) {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
 					}
 
-					runWorkload(tCtx, tc, w, informerFactory)
+					_, err = runWorkload(tCtx, tc, w, informerFactory)
+					if err != nil {
+						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
+					}
 
 					if featureGates[features.SchedulerQueueingHints] {
 						// In any case, we should make sure InFlightEvents is empty after running the scenario.
@@ -1424,7 +1427,7 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 		collector := collector
 		err := collector.init()
 		if err != nil {
-			return nil, nil, fmt.Errorf("op %d: Failed to initialize data collector: %v", opIndex, err)
+			return nil, nil, fmt.Errorf("op %d: Failed to initialize data collector: %w", opIndex, err)
 		}
 		tCtx.TB().Cleanup(func() {
 			collectorCtx.Cancel("cleaning up")
@@ -1519,7 +1522,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	for opIndex, op := range unrollWorkloadTemplate(tCtx, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
 		if err != nil {
-			return nil, fmt.Errorf("op %d: %v", opIndex, err)
+			return nil, fmt.Errorf("op %d: %w", opIndex, err)
 		}
 		select {
 		case <-tCtx.Done():
@@ -1528,14 +1531,14 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		}
 		err = executor.runOp(realOp, opIndex)
 		if err != nil {
-			return nil, fmt.Errorf("op %d: %v", opIndex, err)
+			return nil, fmt.Errorf("op %d: %w", opIndex, err)
 		}
 	}
 
 	// check unused params and inform users
 	unusedParams := w.unusedParams()
 	if len(unusedParams) != 0 {
-		return nil, fmt.Errorf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
+		return nil, fmt.Errorf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos", unusedParams, w.Name)
 	}
 
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
@@ -1571,10 +1574,10 @@ func (e *WorkloadExecutor) runOp(op realOp, opIndex int) error {
 func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) error {
 	nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), op, e.tCtx.Client())
 	if err != nil {
-		return fmt.Errorf("op %d: %v", opIndex, err)
+		return fmt.Errorf("op %d: %w", opIndex, err)
 	}
 	if err := nodePreparer.PrepareNodes(e.tCtx, e.nextNodeIndex); err != nil {
-		return fmt.Errorf("op %d: %v", opIndex, err)
+		return fmt.Errorf("op %d: %w", opIndex, err)
 	}
 	e.nextNodeIndex += op.Count
 	return nil
@@ -1583,14 +1586,14 @@ func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) erro
 func (e *WorkloadExecutor) runCreateNamespaceOp(opIndex int, op *createNamespacesOp) error {
 	nsPreparer, err := newNamespacePreparer(e.tCtx, op)
 	if err != nil {
-		return fmt.Errorf("op %d: %v", opIndex, err)
+		return fmt.Errorf("op %d: %w", opIndex, err)
 	}
 	if err := nsPreparer.prepare(e.tCtx); err != nil {
 		err2 := nsPreparer.cleanup(e.tCtx)
 		if err2 != nil {
 			err = fmt.Errorf("prepare: %w; cleanup: %w", err, err2)
 		}
-		return fmt.Errorf("op %d: %v", opIndex, err)
+		return fmt.Errorf("op %d: %w", opIndex, err)
 	}
 	for _, n := range nsPreparer.namespaces() {
 		if _, ok := e.numPodsScheduledPerNamespace[n]; ok {
@@ -1611,14 +1614,14 @@ func (e *WorkloadExecutor) runBarrierOp(opIndex int, op *barrierOp) error {
 	switch op.StageRequirement {
 	case Attempted:
 		if err := waitUntilPodsAttempted(e.tCtx, e.podInformer, op.LabelSelector, op.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
-			return fmt.Errorf("op %d: %v", opIndex, err)
+			return fmt.Errorf("op %d: %w", opIndex, err)
 		}
 	case Scheduled:
 		// Default should be treated like "Scheduled", so handling both in the same way.
 		fallthrough
 	default:
 		if err := waitUntilPodsScheduled(e.tCtx, e.podInformer, op.LabelSelector, op.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
-			return fmt.Errorf("op %d: %v", opIndex, err)
+			return fmt.Errorf("op %d: %w", opIndex, err)
 		}
 		// At the end of the barrier, we can be sure that there are no pods
 		// pending scheduling in the namespaces that we just blocked on.
@@ -1657,7 +1660,10 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 	if op.Namespace != nil {
 		namespace = *op.Namespace
 	}
-	createNamespaceIfNotPresent(e.tCtx, namespace, &e.numPodsScheduledPerNamespace)
+	err := createNamespaceIfNotPresent(e.tCtx, namespace, &e.numPodsScheduledPerNamespace)
+	if err != nil {
+		return err
+	}
 	if op.PodTemplatePath == nil {
 		op.PodTemplatePath = e.testCase.DefaultPodTemplatePath
 	}
@@ -1673,7 +1679,7 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 		}
 	}
 	if err := createPodsRapidly(e.tCtx, namespace, op); err != nil {
-		return fmt.Errorf("op %d: %v", opIndex, err)
+		return fmt.Errorf("op %d: %w", opIndex, err)
 	}
 	switch {
 	case op.SkipWaitToCompletion:
@@ -1682,11 +1688,11 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 		e.numPodsScheduledPerNamespace[namespace] += op.Count
 	case op.SteadyState:
 		if err := createPodsSteadily(e.tCtx, namespace, e.podInformer, op); err != nil {
-			return fmt.Errorf("op %d: %v", opIndex, err)
+			return fmt.Errorf("op %d: %w", opIndex, err)
 		}
 	default:
 		if err := waitUntilPodsScheduledInNamespace(e.tCtx, e.podInformer, nil, namespace, op.Count); err != nil {
-			return fmt.Errorf("op %d: error in waiting for pods to get scheduled: %v", opIndex, err)
+			return fmt.Errorf("op %d: error in waiting for pods to get scheduled: %w", opIndex, err)
 		}
 	}
 	if op.CollectMetrics {
@@ -1708,7 +1714,7 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) error 
 
 	podsToDelete, err := e.podInformer.Lister().Pods(op.Namespace).List(labelSelector)
 	if err != nil {
-		return fmt.Errorf("op %d: error in listing pods in the namespace %s: %v", opIndex, op.Namespace, err)
+		return fmt.Errorf("op %d: error in listing pods in the namespace %s: %w", opIndex, op.Namespace, err)
 	}
 
 	deletePods := func(opIndex int) {
@@ -1765,7 +1771,7 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 	// Ensure the namespace exists.
 	nsObj := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 	if _, err := e.tCtx.Client().CoreV1().Namespaces().Create(e.tCtx, nsObj, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("op %d: unable to create namespace %v: %v", opIndex, namespace, err)
+		return fmt.Errorf("op %d: unable to create namespace %v: %w", opIndex, namespace, err)
 	}
 
 	var churnFns []func(name string) string
@@ -1773,12 +1779,12 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 	for i, path := range op.TemplatePaths {
 		unstructuredObj, gvk, err := getUnstructuredFromFile(path)
 		if err != nil {
-			return fmt.Errorf("op %d: unable to parse the %v-th template path: %v", opIndex, i, err)
+			return fmt.Errorf("op %d: unable to parse the %v-th template path: %w", opIndex, i, err)
 		}
 		// Obtain GVR.
 		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
-			return fmt.Errorf("op %d: unable to find GVR for %v: %v", opIndex, gvk, err)
+			return fmt.Errorf("op %d: unable to find GVR for %v: %w", opIndex, gvk, err)
 		}
 		gvr := mapping.Resource
 		// Distinguish cluster-scoped with namespaced API objects.
@@ -1867,7 +1873,10 @@ func (e *WorkloadExecutor) runDefaultOp(opIndex int, op realOp) error {
 		return fmt.Errorf("op %d: invalid op %v", opIndex, op)
 	}
 	for _, namespace := range runable.requiredNamespaces() {
-		createNamespaceIfNotPresent(e.tCtx, namespace, &e.numPodsScheduledPerNamespace)
+		err := createNamespaceIfNotPresent(e.tCtx, namespace, &e.numPodsScheduledPerNamespace)
+		if err != nil {
+			return err
+		}
 	}
 	runable.run(e.tCtx)
 	return nil
