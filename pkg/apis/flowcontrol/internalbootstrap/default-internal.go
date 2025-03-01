@@ -19,23 +19,54 @@ package internalbootstrap
 import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	bootstrapnew "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-new"
+	bootstrapold "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-old"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/install"
 )
 
+// Concat concatenates the given slices, without reusing any given backing array.
+func Concat[T any](slices ...[]T) []T {
+	var ans []T
+	for _, slice := range slices {
+		ans = append(ans, slice...)
+	}
+	return ans
+}
+
+// PrioritylevelConfigurations maps `newConfig bool` to a slice of all the default objects
+// Deeply immutable.
+var PrioritylevelConfigurations = map[bool][]*flowcontrolv1.PriorityLevelConfiguration{
+	false: Concat(bootstrapold.MandatoryPriorityLevelConfigurations, bootstrapold.SuggestedPriorityLevelConfigurations),
+	true:  Concat(bootstrapnew.MandatoryPriorityLevelConfigurations, bootstrapnew.SuggestedPriorityLevelConfigurations),
+}
+
+// FlowSchemas maps `newConfig bool` to a slice of all the default objects
+// Deeply immutable.
+var FlowSchemas = map[bool][]*flowcontrolv1.FlowSchema{
+	false: Concat(bootstrapold.MandatoryFlowSchemas, bootstrapold.SuggestedFlowSchemas),
+	true:  Concat(bootstrapnew.MandatoryFlowSchemas, bootstrapnew.SuggestedFlowSchemas),
+}
+
 // MandatoryFlowSchemas holds the untyped renditions of the mandatory
-// flow schemas.  In this map the key is the schema's name and the
+// flow schemas.  In the outer map the key is `newConfig bool` and
+// in the inner map the key is the schema's name and the
 // value is the `*FlowSchema`.  Nobody should mutate anything
 // reachable from this map.
-var MandatoryFlowSchemas = internalizeFSes(bootstrap.MandatoryFlowSchemas)
+var MandatoryFlowSchemas = map[bool]map[string]*flowcontrol.FlowSchema{
+	false: internalizeFSes(bootstrapold.MandatoryFlowSchemas),
+	true:  internalizeFSes(bootstrapnew.MandatoryFlowSchemas),
+}
 
 // MandatoryPriorityLevelConfigurations holds the untyped renditions of the
-// mandatory priority level configuration objects.  In this map the
-// key is the object's name and the value is the
+// mandatory priority level configuration objects.  In the outer map the key is `newConfig bool` and
+// in the inner map the key is the object's name and the value is the
 // `*PriorityLevelConfiguration`.  Nobody should mutate anything
 // reachable from this map.
-var MandatoryPriorityLevelConfigurations = internalizePLs(bootstrap.MandatoryPriorityLevelConfigurations)
+var MandatoryPriorityLevelConfigurations = map[bool]map[string]*flowcontrol.PriorityLevelConfiguration{
+	false: internalizePLs(bootstrapold.MandatoryPriorityLevelConfigurations),
+	true:  internalizePLs(bootstrapnew.MandatoryPriorityLevelConfigurations),
+}
 
 // NewAPFScheme constructs and returns a Scheme configured to handle
 // the API object types that are used to configure API Priority and
