@@ -177,7 +177,10 @@ func (o *RolloutHistoryOptions) Run() error {
 			}
 
 			if o.Revision > 0 {
-				return printer.PrintObj(historyInfo[o.Revision], o.Out)
+				err := printer.PrintObj(historyInfo[o.Revision], o.Out)
+				if err != nil {
+					return err
+				}
 			} else {
 				sortedKeys := make([]int64, 0, len(historyInfo))
 				for k := range historyInfo {
@@ -185,7 +188,10 @@ func (o *RolloutHistoryOptions) Run() error {
 				}
 				sort.Slice(sortedKeys, func(i, j int) bool { return sortedKeys[i] < sortedKeys[j] })
 				for _, k := range sortedKeys {
-					return printer.PrintObj(historyInfo[k], o.Out)
+					err := printer.PrintObj(historyInfo[k], o.Out)
+					if err != nil {
+						return err
+					}
 				}
 			}
 
