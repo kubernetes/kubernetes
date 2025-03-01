@@ -528,12 +528,10 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 		gvrToNumRemaining:        map[schema.GroupVersionResource]int{},
 		finalizersToNumRemaining: map[string]int{},
 	}
+	podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) {
-		// TODO: remove this log when the feature gate is enabled by default
-		logger.V(5).Info("Namespace controller - OrderedNamespaceDeletion feature gate is enabled", "namespace", namespace)
+	if _, hasPods := groupVersionResources[podsGVR]; hasPods && utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) {
 		// Ensure all pods in the namespace are deleted first
-		podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, podsGVR, namespace, namespaceDeletedAt)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to delete pods for namespace: %s, err: %w", namespace, err))
@@ -561,6 +559,10 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 
 	// Proceed with deleting other resources in the namespace
 	for gvr := range groupVersionResources {
+		if utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) && gvr.Group == podsGVR.Group &&
+			gvr.Version == podsGVR.Version && gvr.Resource == podsGVR.Resource {
+			continue
+		}
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, gvr, namespace, namespaceDeletedAt)
 		if err != nil {
 			// If there is an error, hold on to it but proceed with all the remaining
