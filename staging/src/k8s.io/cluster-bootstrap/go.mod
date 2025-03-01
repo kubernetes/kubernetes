@@ -7,7 +7,7 @@ go 1.24.0
 godebug default=go1.24
 
 require (
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	gopkg.in/go-jose/go-jose.v2 v2.6.3
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
