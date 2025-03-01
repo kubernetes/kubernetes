@@ -1526,30 +1526,9 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 			return nil, fmt.Errorf("op %d: %v", opIndex, context.Cause(tCtx))
 		default:
 		}
-		switch concreteOp := realOp.(type) {
-		case *createNodesOp:
-			err = executor.runCreateNodesOp(opIndex, concreteOp)
-		case *createNamespacesOp:
-			err = executor.runCreateNamespaceOp(opIndex, concreteOp)
-		case *createPodsOp:
-			err = executor.runCreatePodsOp(opIndex, concreteOp)
-		case *deletePodsOp:
-			err = executor.runDeletePodsOp(opIndex, concreteOp)
-		case *churnOp:
-			err = executor.runChurnOp(opIndex, concreteOp)
-		case *barrierOp:
-			err = executor.runBarrierOp(opIndex, concreteOp)
-		case *sleepOp:
-			executor.runSleepOp(concreteOp)
-		case *startCollectingMetricsOp:
-			err = executor.runStartCollectingMetricsOp(opIndex, concreteOp)
-		case *stopCollectingMetricsOp:
-			err = executor.runStopCollectingMetrics(opIndex)
-		default:
-			err = executor.runDefaultOp(opIndex, concreteOp)
-		}
+		err = executor.runOp(realOp, opIndex)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("op %d: %v", opIndex, err)
 		}
 	}
 
@@ -1562,6 +1541,31 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return executor.dataItems, nil
+}
+
+func (e *WorkloadExecutor) runOp(op realOp, opIndex int) error {
+	switch concreteOp := op.(type) {
+	case *createNodesOp:
+		return e.runCreateNodesOp(opIndex, concreteOp)
+	case *createNamespacesOp:
+		return e.runCreateNamespaceOp(opIndex, concreteOp)
+	case *createPodsOp:
+		return e.runCreatePodsOp(opIndex, concreteOp)
+	case *deletePodsOp:
+		return e.runDeletePodsOp(opIndex, concreteOp)
+	case *churnOp:
+		return e.runChurnOp(opIndex, concreteOp)
+	case *barrierOp:
+		return e.runBarrierOp(opIndex, concreteOp)
+	case *sleepOp:
+		return e.runSleepOp(concreteOp)
+	case *startCollectingMetricsOp:
+		return e.runStartCollectingMetricsOp(opIndex, concreteOp)
+	case *stopCollectingMetricsOp:
+		return e.runStopCollectingMetrics(opIndex)
+	default:
+		return e.runDefaultOp(opIndex, concreteOp)
+	}
 }
 
 func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) error {
@@ -1629,11 +1633,12 @@ func (e *WorkloadExecutor) runBarrierOp(opIndex int, op *barrierOp) error {
 	return nil
 }
 
-func (e *WorkloadExecutor) runSleepOp(op *sleepOp) {
+func (e *WorkloadExecutor) runSleepOp(op *sleepOp) error {
 	select {
 	case <-e.tCtx.Done():
 	case <-time.After(op.Duration.Duration):
 	}
+	return nil
 }
 
 func (e *WorkloadExecutor) runStopCollectingMetrics(opIndex int) error {
