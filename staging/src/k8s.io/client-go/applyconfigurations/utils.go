@@ -640,10 +640,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=coordination.k8s.io, Version=v1beta1
 	case coordinationv1beta1.SchemeGroupVersion.WithKind("Lease"):
 		return &applyconfigurationscoordinationv1beta1.LeaseApplyConfiguration{}
-	case coordinationv1beta1.SchemeGroupVersion.WithKind("LeaseCandidate"):
-		return &applyconfigurationscoordinationv1beta1.LeaseCandidateApplyConfiguration{}
-	case coordinationv1beta1.SchemeGroupVersion.WithKind("LeaseCandidateSpec"):
-		return &applyconfigurationscoordinationv1beta1.LeaseCandidateSpecApplyConfiguration{}
 	case coordinationv1beta1.SchemeGroupVersion.WithKind("LeaseSpec"):
 		return &applyconfigurationscoordinationv1beta1.LeaseSpecApplyConfiguration{}
 
