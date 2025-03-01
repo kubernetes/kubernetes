@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
@@ -124,6 +125,24 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 			externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
 			externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 
+			// Add an index to the pod informer to allow looking up pods by node name
+			nodeNameByIndex := "spec.nodeName"
+			err := externalInformers.Core().V1().Pods().Informer().AddIndexers(cache.Indexers{
+				nodeNameByIndex: func(obj interface{}) ([]string, error) {
+					pod, ok := obj.(*v1.Pod)
+					if !ok {
+						return []string{}, nil
+					}
+					if len(pod.Spec.NodeName) == 0 {
+						return []string{}, nil
+					}
+					return []string{pod.Spec.NodeName}, nil
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to add pod informer indexer: %v", err)
+			}
+
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(
 				testCtx.Ctx,
@@ -139,6 +158,7 @@ func TestEvictionForNoExecuteTaintAddedByUser(t *testing.T) {
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
+				nodeNameByIndex,
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)
@@ -334,6 +354,24 @@ func TestTaintBasedEvictions(t *testing.T) {
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
+			// Add an index to the pod informer to allow looking up pods by node name
+			nodeNameByIndex := "spec.nodeName"
+			err := externalInformers.Core().V1().Pods().Informer().AddIndexers(cache.Indexers{
+				nodeNameByIndex: func(obj interface{}) ([]string, error) {
+					pod, ok := obj.(*v1.Pod)
+					if !ok {
+						return []string{}, nil
+					}
+					if len(pod.Spec.NodeName) == 0 {
+						return []string{}, nil
+					}
+					return []string{pod.Spec.NodeName}, nil
+				},
+			})
+			if err != nil {
+				t.Fatalf("Failed to add pod informer indexer: %v", err)
+			}
+
 			cs := testCtx.ClientSet
 
 			// Start NodeLifecycleController for taint.
@@ -351,6 +389,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 				100,              // Secondary eviction limiter QPS
 				50,               // Large cluster threshold
 				0.55,             // Unhealthy zone threshold
+				nodeNameByIndex,
 			)
 			if err != nil {
 				t.Fatalf("Failed to create node controller: %v", err)

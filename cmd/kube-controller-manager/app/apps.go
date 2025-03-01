@@ -47,6 +47,7 @@ func startDaemonSetController(ctx context.Context, controllerContext ControllerC
 		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
+		controllerContext.NodeNameByIndex,
 		controllerContext.ClientBuilder.ClientOrDie("daemon-set-controller"),
 		flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
 	)

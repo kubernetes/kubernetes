@@ -81,12 +81,32 @@ func setupWithServerSetup(t *testing.T, serverSetup framework.TestServerSetup) (
 
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-informers")), resyncPeriod)
+
+	// Add an index to the pod informer to allow looking up pods by node name
+	nodeNameByIndex := "spec.nodeName"
+	err := informers.Core().V1().Pods().Informer().AddIndexers(cache.Indexers{
+		nodeNameByIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return []string{}, nil
+			}
+			if len(pod.Spec.NodeName) == 0 {
+				return []string{}, nil
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to add pod informer indexer: %v", err)
+	}
+
 	dc, err := daemon.NewDaemonSetsController(
 		tCtx,
 		informers.Apps().V1().DaemonSets(),
 		informers.Apps().V1().ControllerRevisions(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
+		nodeNameByIndex,
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-controller")),
 		flowcontrol.NewBackOff(5*time.Second, 15*time.Minute),
 	)
