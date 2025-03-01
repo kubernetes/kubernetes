@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	coordinationv1beta1informers "k8s.io/client-go/informers/coordination/v1beta1"
+	coordinationv1alpha2informers "k8s.io/client-go/informers/coordination/v1alpha2"
 	"k8s.io/client-go/kubernetes"
-	listers "k8s.io/client-go/listers/coordination/v1beta1"
+	listers "k8s.io/client-go/listers/coordination/v1alpha2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/clock"
 
@@ -39,7 +39,7 @@ type LeaseCandidateGCController struct {
 	kubeclientset kubernetes.Interface
 
 	leaseCandidateLister   listers.LeaseCandidateLister
-	leaseCandidateInformer coordinationv1beta1informers.LeaseCandidateInformer
+	leaseCandidateInformer coordinationv1alpha2informers.LeaseCandidateInformer
 	leaseCandidatesSynced  cache.InformerSynced
 
 	gcCheckPeriod time.Duration
@@ -48,7 +48,7 @@ type LeaseCandidateGCController struct {
 }
 
 // NewLeaseCandidateGC creates a new LeaseCandidateGCController.
-func NewLeaseCandidateGC(clientset kubernetes.Interface, gcCheckPeriod time.Duration, leaseCandidateInformer coordinationv1beta1informers.LeaseCandidateInformer) *LeaseCandidateGCController {
+func NewLeaseCandidateGC(clientset kubernetes.Interface, gcCheckPeriod time.Duration, leaseCandidateInformer coordinationv1alpha2informers.LeaseCandidateInformer) *LeaseCandidateGCController {
 	return &LeaseCandidateGCController{
 		kubeclientset:          clientset,
 		leaseCandidateLister:   leaseCandidateInformer.Lister(),
@@ -87,7 +87,7 @@ func (c *LeaseCandidateGCController) gc(ctx context.Context) {
 		if !isLeaseCandidateExpired(c.clock, leaseCandidate) {
 			continue
 		}
-		lc, err := c.kubeclientset.CoordinationV1beta1().LeaseCandidates(leaseCandidate.Namespace).Get(ctx, leaseCandidate.Name, metav1.GetOptions{})
+		lc, err := c.kubeclientset.CoordinationV1alpha2().LeaseCandidates(leaseCandidate.Namespace).Get(ctx, leaseCandidate.Name, metav1.GetOptions{})
 		if err != nil {
 			klog.ErrorS(err, "Error getting lc")
 			continue
@@ -96,7 +96,7 @@ func (c *LeaseCandidateGCController) gc(ctx context.Context) {
 		if !isLeaseCandidateExpired(c.clock, lc) {
 			continue
 		}
-		if err := c.kubeclientset.CoordinationV1beta1().LeaseCandidates(lc.Namespace).Delete(
+		if err := c.kubeclientset.CoordinationV1alpha2().LeaseCandidates(lc.Namespace).Delete(
 			ctx, lc.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 			klog.ErrorS(err, "Error deleting lease")
 		}

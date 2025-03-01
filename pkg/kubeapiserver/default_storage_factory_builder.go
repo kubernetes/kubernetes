@@ -79,7 +79,7 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		//
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
 		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
-		coordination.Resource("leasecandidates").WithVersion("v1beta1"),
+		coordination.Resource("leasecandidates").WithVersion("v1alpha2"),
 		// TODO(aojea) ipaddresses and servicecidrs are v1 in 1.33
 		// remove them in 1.34 when all apiserver understand the v1 version.
 		networking.Resource("ipaddresses").WithVersion("v1beta1"),

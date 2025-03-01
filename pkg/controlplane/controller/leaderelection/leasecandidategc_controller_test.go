@@ -22,7 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
-	v1beta1 "k8s.io/api/coordination/v1beta1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -33,19 +33,19 @@ import (
 func TestLeaseCandidateGCController(t *testing.T) {
 	tests := []struct {
 		name                 string
-		leaseCandidates      []*v1beta1.LeaseCandidate
+		leaseCandidates      []*v1alpha2.LeaseCandidate
 		expectedDeletedCount int
 	}{
 		{
 			name: "delete expired lease candidates",
-			leaseCandidates: []*v1beta1.LeaseCandidate{
+			leaseCandidates: []*v1alpha2.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "candidate1",
 						Namespace:         "default",
 						CreationTimestamp: metav1.Time{Time: time.Now().Add(-1 * leaseCandidateValidDuration)},
 					},
-					Spec: v1beta1.LeaseCandidateSpec{
+					Spec: v1alpha2.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -59,7 +59,7 @@ func TestLeaseCandidateGCController(t *testing.T) {
 						Namespace:         "default",
 						CreationTimestamp: metav1.Time{Time: time.Now().Add(-1 * leaseCandidateValidDuration)},
 					},
-					Spec: v1beta1.LeaseCandidateSpec{
+					Spec: v1alpha2.LeaseCandidateSpec{
 						LeaseName:        "component-B",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -73,7 +73,7 @@ func TestLeaseCandidateGCController(t *testing.T) {
 						Namespace:         "default",
 						CreationTimestamp: metav1.Time{Time: time.Now()},
 					},
-					Spec: v1beta1.LeaseCandidateSpec{
+					Spec: v1alpha2.LeaseCandidateSpec{
 						LeaseName:        "component-C",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -86,14 +86,14 @@ func TestLeaseCandidateGCController(t *testing.T) {
 		},
 		{
 			name: "no expired lease candidates",
-			leaseCandidates: []*v1beta1.LeaseCandidate{
+			leaseCandidates: []*v1alpha2.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:              "candidate1",
 						Namespace:         "default",
 						CreationTimestamp: metav1.Time{Time: time.Now()},
 					},
-					Spec: v1beta1.LeaseCandidateSpec{
+					Spec: v1alpha2.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -111,12 +111,12 @@ func TestLeaseCandidateGCController(t *testing.T) {
 			ctx := context.Background()
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
-			leaseCandidateInformer := informerFactory.Coordination().V1beta1().LeaseCandidates()
+			leaseCandidateInformer := informerFactory.Coordination().V1alpha2().LeaseCandidates()
 			controller := NewLeaseCandidateGC(client, 10*time.Millisecond, leaseCandidateInformer)
 
 			// Create lease candidates
 			for _, lc := range tc.leaseCandidates {
-				_, err := client.CoordinationV1beta1().LeaseCandidates(lc.Namespace).Create(ctx, lc, metav1.CreateOptions{})
+				_, err := client.CoordinationV1alpha2().LeaseCandidates(lc.Namespace).Create(ctx, lc, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -127,7 +127,7 @@ func TestLeaseCandidateGCController(t *testing.T) {
 
 			go controller.Run(ctx)
 			err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 600*time.Second, true, func(ctx context.Context) (done bool, err error) {
-				lcs, err := client.CoordinationV1beta1().LeaseCandidates("default").List(ctx, metav1.ListOptions{})
+				lcs, err := client.CoordinationV1alpha2().LeaseCandidates("default").List(ctx, metav1.ListOptions{})
 				if err != nil {
 					return true, err
 				}

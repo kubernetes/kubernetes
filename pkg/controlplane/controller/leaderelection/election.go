@@ -22,12 +22,12 @@ import (
 
 	"github.com/blang/semver/v4"
 	v1 "k8s.io/api/coordination/v1"
-	v1beta1 "k8s.io/api/coordination/v1beta1"
+	v1alpha2 "k8s.io/api/coordination/v1alpha2"
 	"k8s.io/utils/clock"
 )
 
-func pickBestLeaderOldestEmulationVersion(candidates []*v1beta1.LeaseCandidate) *v1beta1.LeaseCandidate {
-	var electee *v1beta1.LeaseCandidate
+func pickBestLeaderOldestEmulationVersion(candidates []*v1alpha2.LeaseCandidate) *v1alpha2.LeaseCandidate {
+	var electee *v1alpha2.LeaseCandidate
 	for _, c := range candidates {
 		if !validLeaseCandidateForOldestEmulationVersion(c) {
 			continue
@@ -39,7 +39,7 @@ func pickBestLeaderOldestEmulationVersion(candidates []*v1beta1.LeaseCandidate) 
 	return electee
 }
 
-func pickBestStrategy(candidates []*v1beta1.LeaseCandidate) (v1.CoordinatedLeaseStrategy, error) {
+func pickBestStrategy(candidates []*v1alpha2.LeaseCandidate) (v1.CoordinatedLeaseStrategy, error) {
 	nilStrategy := v1.CoordinatedLeaseStrategy("")
 	if len(candidates) == 0 {
 		return nilStrategy, fmt.Errorf("no candidates")
@@ -62,7 +62,7 @@ func pickBestStrategy(candidates []*v1beta1.LeaseCandidate) (v1.CoordinatedLease
 	return strategy, nil
 }
 
-func validLeaseCandidateForOldestEmulationVersion(l *v1beta1.LeaseCandidate) bool {
+func validLeaseCandidateForOldestEmulationVersion(l *v1alpha2.LeaseCandidate) bool {
 	_, err := semver.ParseTolerant(l.Spec.EmulationVersion)
 	if err != nil {
 		return false
@@ -71,7 +71,7 @@ func validLeaseCandidateForOldestEmulationVersion(l *v1beta1.LeaseCandidate) boo
 	return err == nil
 }
 
-func getEmulationVersionOrZero(l *v1beta1.LeaseCandidate) semver.Version {
+func getEmulationVersionOrZero(l *v1alpha2.LeaseCandidate) semver.Version {
 	value := l.Spec.EmulationVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -80,7 +80,7 @@ func getEmulationVersionOrZero(l *v1beta1.LeaseCandidate) semver.Version {
 	return v
 }
 
-func getBinaryVersionOrZero(l *v1beta1.LeaseCandidate) semver.Version {
+func getBinaryVersionOrZero(l *v1alpha2.LeaseCandidate) semver.Version {
 	value := l.Spec.BinaryVersion
 	v, err := semver.ParseTolerant(value)
 	if err != nil {
@@ -90,7 +90,7 @@ func getBinaryVersionOrZero(l *v1beta1.LeaseCandidate) semver.Version {
 }
 
 // -1: lhs better, 1: rhs better
-func compare(lhs, rhs *v1beta1.LeaseCandidate) int {
+func compare(lhs, rhs *v1alpha2.LeaseCandidate) int {
 	l := getEmulationVersionOrZero(lhs)
 	r := getEmulationVersionOrZero(rhs)
 	result := l.Compare(r)
@@ -115,7 +115,7 @@ func isLeaseExpired(clock clock.Clock, lease *v1.Lease) bool {
 		lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds)*time.Second).Before(currentTime)
 }
 
-func isLeaseCandidateExpired(clock clock.Clock, lease *v1beta1.LeaseCandidate) bool {
+func isLeaseCandidateExpired(clock clock.Clock, lease *v1alpha2.LeaseCandidate) bool {
 	currentTime := clock.Now()
 	return lease.Spec.RenewTime == nil ||
 		lease.Spec.RenewTime.Add(leaseCandidateValidDuration).Before(currentTime)

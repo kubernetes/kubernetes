@@ -19,5 +19,3 @@ limitations under the License.
 package v1beta1
 
 type LeaseExpansion interface{}
-
-type LeaseCandidateExpansion interface{}

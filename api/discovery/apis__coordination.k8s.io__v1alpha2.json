@@ -8,7 +8,7 @@
       "name": "leasecandidates",
       "namespaced": true,
       "singularName": "leasecandidate",
-      "storageVersionHash": "lvME0iHWE20=",
+      "storageVersionHash": "RuOD9aJW3DI=",
       "verbs": [
         "create",
         "delete",
