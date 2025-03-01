@@ -80,6 +80,17 @@ const (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 
+// NodeUpdateItem represents a node update event that may affect DaemonSets.
+// It contains the node name and previous node state (labels and taints) to determine
+// if DaemonSet pods need to be added or removed from the node after the update.
+// Note: When adding new fields to NodeUpdateItem, ensure to update both the struct definition
+// and the enqueueNodeUpdate function to handle the new fields properly.
+type NodeUpdateItem struct {
+	nodeName  string
+	oldLabels map[string]string
+	oldTaints []v1.Taint
+}
+
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
@@ -125,6 +136,10 @@ type DaemonSetsController struct {
 	// DaemonSet keys that need to be synced.
 	queue workqueue.TypedRateLimitingInterface[string]
 
+	// nodeUpdateQueue is a workqueue that processes node updates to ensure DaemonSets
+	// are properly reconciled when node properties change
+	nodeUpdateQueue workqueue.TypedRateLimitingInterface[*NodeUpdateItem]
+
 	failedPodsBackoff *flowcontrol.Backoff
 }
 
@@ -157,6 +172,12 @@ func NewDaemonSetsController(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{
 				Name: "daemonset",
+			},
+		),
+		nodeUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[*NodeUpdateItem](),
+			workqueue.TypedRateLimitingQueueConfig[*NodeUpdateItem]{
+				Name: "daemonset-node-updates",
 			},
 		),
 	}
@@ -289,6 +310,7 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	defer dsc.eventBroadcaster.Shutdown()
 
 	defer dsc.queue.ShutDown()
+	defer dsc.nodeUpdateQueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting daemon sets controller")
@@ -300,6 +322,10 @@ func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, dsc.runWorker, time.Second)
+	}
+
+	for i := 0; i < workers; i++ {
+		go wait.UntilWithContext(ctx, dsc.runNodeUpdateWorker, time.Second)
 	}
 
 	go wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, ctx.Done())
@@ -643,18 +669,20 @@ func (dsc *DaemonSetsController) deletePod(logger klog.Logger, obj interface{}) 
 }
 
 func (dsc *DaemonSetsController) addNode(logger klog.Logger, obj interface{}) {
-	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
-	dsList, err := dsc.dsLister.List(labels.Everything())
-	if err != nil {
-		logger.V(4).Info("Error enqueueing daemon sets", "err", err)
+	node, ok := obj.(*v1.Node)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("couldn't get node from object %#v", obj))
 		return
 	}
-	node := obj.(*v1.Node)
-	for _, ds := range dsList {
-		if shouldRun, _ := NodeShouldRunDaemonPod(node, ds); shouldRun {
-			dsc.enqueueDaemonSet(ds)
-		}
+
+	nodeUpdateItem := &NodeUpdateItem{
+		nodeName:  node.Name,
+		oldLabels: make(map[string]string),
+		oldTaints: []v1.Taint{},
 	}
+
+	logger.V(4).Info("Queuing node addition", "node", klog.KObj(node))
+	dsc.nodeUpdateQueue.Add(nodeUpdateItem)
 }
 
 // shouldIgnoreNodeUpdate returns true if Node labels and taints have not changed, otherwise returns false.
@@ -671,20 +699,15 @@ func (dsc *DaemonSetsController) updateNode(logger klog.Logger, old, cur interfa
 		return
 	}
 
-	dsList, err := dsc.dsLister.List(labels.Everything())
-	if err != nil {
-		logger.V(4).Info("Error listing daemon sets", "err", err)
-		return
+	//
+	nodeUpdateItem := &NodeUpdateItem{
+		nodeName:  curNode.Name,
+		oldLabels: oldNode.Labels,
+		oldTaints: oldNode.Spec.Taints,
 	}
-	// TODO: it'd be nice to pass a hint with these enqueues, so that each ds would only examine the added node (unless it has other work to do, too).
-	for _, ds := range dsList {
-		// If NodeShouldRunDaemonPod needs to uses other than Labels and Taints (mutable) properties of node, it needs to update shouldIgnoreNodeUpdate.
-		oldShouldRun, oldShouldContinueRunning := NodeShouldRunDaemonPod(oldNode, ds)
-		currentShouldRun, currentShouldContinueRunning := NodeShouldRunDaemonPod(curNode, ds)
-		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) {
-			dsc.enqueueDaemonSet(ds)
-		}
-	}
+
+	logger.V(4).Info("Queuing node update", "node", klog.KObj(curNode))
+	dsc.nodeUpdateQueue.Add(nodeUpdateItem)
 }
 
 // getDaemonPods returns daemon pods owned by the given ds.
@@ -1375,4 +1398,86 @@ func getUnscheduledPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods
 	}
 
 	return results
+}
+
+// runNodeUpdateWorker is a worker that processes node updates from the nodeUpdateQueue.
+func (dsc *DaemonSetsController) runNodeUpdateWorker(ctx context.Context) {
+	for dsc.processNextNodeUpdate(ctx) {
+	}
+}
+
+func (dsc *DaemonSetsController) processNextNodeUpdate(ctx context.Context) bool {
+	key, quit := dsc.nodeUpdateQueue.Get()
+	if quit {
+		return false
+	}
+	defer dsc.nodeUpdateQueue.Done(key)
+
+	err := dsc.syncNodeUpdate(ctx, key)
+	if err == nil {
+		dsc.nodeUpdateQueue.Forget(key)
+		return true
+	}
+
+	logger := klog.FromContext(ctx)
+	utilruntime.HandleError(fmt.Errorf("%v failed with : %v", key, err))
+	logger.Error(err, "Error syncing node update, requeuing", "node", key.nodeName)
+	dsc.nodeUpdateQueue.AddRateLimited(key)
+
+	return true
+}
+
+func (dsc *DaemonSetsController) syncNodeUpdate(ctx context.Context, item *NodeUpdateItem) error {
+	logger := klog.FromContext(ctx)
+
+	node, err := dsc.nodeLister.Get(item.nodeName)
+	if apierrors.IsNotFound(err) {
+		logger.V(3).Info("Node not found, skipping update", "node", item.nodeName)
+		return nil
+	}
+	if err != nil {
+		logger.V(4).Info("Error getting node", "node", item.nodeName, "err", err)
+		return err
+	}
+
+	dsList, err := dsc.dsLister.List(labels.Everything())
+	if err != nil {
+		logger.V(4).Info("Error listing daemon sets", "err", err)
+		return err
+	}
+
+	oldLabels := item.oldLabels
+	oldTaints := item.oldTaints
+
+	// For new nodes, oldLabels and oldTaints are empty
+	if len(oldLabels) == 0 && len(oldTaints) == 0 {
+		for _, ds := range dsList {
+			if shouldRun, _ := NodeShouldRunDaemonPod(node, ds); shouldRun {
+				dsc.enqueueDaemonSet(ds)
+			}
+		}
+		return nil
+	}
+
+	// For node updates, compare old and new state
+	oldNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   item.nodeName,
+			Labels: oldLabels,
+		},
+		Spec: v1.NodeSpec{
+			Taints: oldTaints,
+		},
+	}
+
+	for _, ds := range dsList {
+		// If NodeShouldRunDaemonPod needs to uses other than Labels and Taints (mutable) properties of node, it needs to update shouldIgnoreNodeUpdate.
+		oldShouldRun, oldShouldContinueRunning := NodeShouldRunDaemonPod(oldNode, ds)
+		currentShouldRun, currentShouldContinueRunning := NodeShouldRunDaemonPod(node, ds)
+		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) {
+			dsc.enqueueDaemonSet(ds)
+		}
+	}
+
+	return nil
 }
