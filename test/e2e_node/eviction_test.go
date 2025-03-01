@@ -626,7 +626,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 					return nil
 				}
 				return fmt.Errorf("NodeCondition: %s encountered", expectedNodeCondition)
-			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
+			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.Succeed())
 			gomega.Expect(PrePullAllImages(ctx)).Should(gomega.Succeed())
 			ginkgo.By("setting up pods to be used by tests")
 			pods := []*v1.Pod{}
