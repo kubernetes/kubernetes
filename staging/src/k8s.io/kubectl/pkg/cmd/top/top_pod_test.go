@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -283,6 +283,306 @@ func TestTopPod(t *testing.T) {
 				if !reflect.DeepEqual(testCase.expectedContainers, resultContainers) {
 					t.Errorf("containers not matching:\n\texpectedContainers: %v\n\tresultContainers: %v\n", testCase.expectedContainers, resultContainers)
 				}
+			}
+		})
+	}
+}
+
+func TestTopPodPrintFlags(t *testing.T) {
+	testNS := "test"
+	pods := []v1.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: testNS}, Spec: v1.PodSpec{NodeName: "node1"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: testNS}, Spec: v1.PodSpec{NodeName: "node2"}},
+		{ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: testNS}, Spec: v1.PodSpec{NodeName: "node3"}},
+	}
+	metrics := testV1beta1PodMetricsData()
+	testCases := []struct {
+		name string
+
+		sortBy          string
+		printContainers bool
+		allNamespaces   bool
+		noHeaders       bool
+		sum             bool
+
+		outputFormat string
+		resourceName string
+
+		expectedOutput string
+		expectedErr    string
+	}{
+		{
+			name: "output",
+			expectedOutput: `NAME   CPU(cores)   MEMORY(bytes)   
+pod1   5m           7Mi             
+pod2   30m          33Mi            
+pod3   7m           8Mi             
+`,
+		},
+		{
+			name:         "output with spec pod name",
+			resourceName: "pod2",
+			expectedOutput: `NAME   CPU(cores)   MEMORY(bytes)   
+pod2   30m          33Mi            
+`,
+		},
+		{
+			name:      "output with no headers",
+			noHeaders: true,
+			expectedOutput: `pod1   5m    7Mi    
+pod2   30m   33Mi   
+pod3   7m    8Mi    
+`,
+		},
+		{
+			name: "output with sum",
+			sum:  true,
+			expectedOutput: `NAME   CPU(cores)   MEMORY(bytes)   
+pod1   5m           7Mi             
+pod2   30m          33Mi            
+pod3   7m           8Mi             
+       ________     ________        
+       42m          48Mi            
+`,
+		},
+		{
+			name:   "sort by cpu",
+			sortBy: "cpu",
+			expectedOutput: `NAME   CPU(cores)   MEMORY(bytes)   
+pod2   30m          33Mi            
+pod3   7m           8Mi             
+pod1   5m           7Mi             
+`,
+		},
+		{
+			name:          "output with namespace",
+			allNamespaces: true,
+			expectedOutput: `NAMESPACE   NAME   CPU(cores)   MEMORY(bytes)   
+test        pod1   5m           7Mi             
+test        pod2   30m          33Mi            
+test        pod3   7m           8Mi             
+`,
+		},
+		{
+			name:            "output with containers",
+			printContainers: true,
+			expectedOutput: `POD    NAME           CPU(cores)   MEMORY(bytes)   
+pod1   container1-1   1m           2Mi             
+pod1   container1-2   4m           5Mi             
+pod2   container2-1   7m           8Mi             
+pod2   container2-2   10m          11Mi            
+pod2   container2-3   13m          14Mi            
+pod3   container3-1   7m           8Mi             
+`,
+		},
+		{
+			name:         "sort by cpu and wide",
+			sortBy:       "cpu",
+			outputFormat: "wide",
+			expectedOutput: `NAME   NODE    CPU(cores)   MEMORY(bytes)   
+pod2   node2   30m          33Mi            
+pod3   node3   7m           8Mi             
+pod1   node1   5m           7Mi             
+`,
+		},
+		{
+			name:            "output with containers and wide and sort by cpu",
+			printContainers: true,
+			outputFormat:    "wide",
+			sortBy:          "cpu",
+			expectedOutput: `POD    NAME           NODE    CPU(cores)   MEMORY(bytes)   
+pod2   container2-3   node2   13m          14Mi            
+pod2   container2-2   node2   10m          11Mi            
+pod2   container2-1   node2   7m           8Mi             
+pod3   container3-1   node3   7m           8Mi             
+pod1   container1-2   node1   4m           5Mi             
+pod1   container1-1   node1   1m           2Mi             
+`,
+		},
+		{
+			name:            "output with namespace and containers and wide and sort by cpu",
+			allNamespaces:   true,
+			printContainers: true,
+			outputFormat:    "wide",
+			sortBy:          "cpu",
+			expectedOutput: `NAMESPACE   POD    NAME           NODE    CPU(cores)   MEMORY(bytes)   
+test        pod2   container2-3   node2   13m          14Mi            
+test        pod2   container2-2   node2   10m          11Mi            
+test        pod2   container2-1   node2   7m           8Mi             
+test        pod3   container3-1   node3   7m           8Mi             
+test        pod1   container1-2   node1   4m           5Mi             
+test        pod1   container1-1   node1   1m           2Mi             
+`,
+		},
+		{
+			name:            "output with namespace and containers and wide and sort by cpu and sum",
+			allNamespaces:   true,
+			printContainers: true,
+			outputFormat:    "wide",
+			sortBy:          "cpu",
+			sum:             true,
+			expectedOutput: `NAMESPACE   POD    NAME           NODE    CPU(cores)   MEMORY(bytes)   
+test        pod2   container2-3   node2   13m          14Mi            
+test        pod2   container2-2   node2   10m          11Mi            
+test        pod2   container2-1   node2   7m           8Mi             
+test        pod3   container3-1   node3   7m           8Mi             
+test        pod1   container1-2   node1   4m           5Mi             
+test        pod1   container1-1   node1   1m           2Mi             
+                                          ________     ________        
+                                          42m          48Mi            
+`,
+		},
+		{
+			name:            "output with namespace and containers and wide and sort by cpu and sum and no-headers",
+			allNamespaces:   true,
+			printContainers: true,
+			outputFormat:    "wide",
+			sortBy:          "cpu",
+			noHeaders:       true,
+			sum:             true,
+			expectedOutput: `test   pod2   container2-3   node2   13m        14Mi       
+test   pod2   container2-2   node2   10m        11Mi       
+test   pod2   container2-1   node2   7m         8Mi        
+test   pod3   container3-1   node3   7m         8Mi        
+test   pod1   container1-2   node1   4m         5Mi        
+test   pod1   container1-1   node1   1m         2Mi        
+                                     ________   ________   
+                                     42m        48Mi       
+`,
+		},
+		{
+			name:            "output with spec pod name and namespace and containers and wide and sort by cpu and sum",
+			resourceName:    "pod2",
+			allNamespaces:   true,
+			printContainers: true,
+			outputFormat:    "wide",
+			sortBy:          "cpu",
+			sum:             true,
+			expectedOutput: `NAMESPACE   POD    NAME           NODE    CPU(cores)   MEMORY(bytes)   
+test        pod2   container2-3   node2   13m          14Mi            
+test        pod2   container2-2   node2   10m          11Mi            
+test        pod2   container2-1   node2   7m           8Mi             
+                                          ________     ________        
+                                          30m          33Mi            
+`,
+		},
+		{
+			name:            "output with spec pod name and namespace and containers and wide and sort by cpu and sum and no-headers",
+			resourceName:    "pod2",
+			allNamespaces:   true,
+			printContainers: true,
+			noHeaders:       true,
+			outputFormat:    "wide",
+			sortBy:          "cpu",
+			sum:             true,
+			expectedOutput: `test   pod2   container2-3   node2   13m        14Mi       
+test   pod2   container2-2   node2   10m        11Mi       
+test   pod2   container2-1   node2   7m         8Mi        
+                                     ________   ________   
+                                     30m        33Mi       
+`,
+		},
+	}
+	cmdtesting.InitTestErrorHandler(t)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fakemetricsClientset := &metricsfake.Clientset{}
+			fakemetricsClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				res := &metricsv1beta1api.PodMetricsList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "2",
+					},
+					Items: metrics,
+				}
+				return true, res, nil
+			})
+
+			resourceName := "test"
+			pod := v1.Pod{}
+			if len(testCase.resourceName) > 0 {
+				resourceName = testCase.resourceName
+				for _, m := range metrics {
+					if m.Name == resourceName {
+						fakemetricsClientset.AddReactor("get", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+							return true, &m, nil
+						})
+						break
+					}
+				}
+				for _, p := range pods {
+					if p.Name == resourceName {
+						pod = p
+						break
+					}
+				}
+			}
+
+			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+			defer tf.Cleanup()
+
+			ns := scheme.Codecs.WithoutConversion()
+			tf.Client = &fake.RESTClient{
+				NegotiatedSerializer: ns,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p := req.URL.Path; {
+					case p == "/api":
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+					case p == "/apis":
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+					case p == "/api/v1/pods":
+						fallthrough
+					case p == "/api/v1/namespaces/"+testNS+"/pods":
+						body, _ := marshallBody(v1.PodList{
+							ListMeta: metav1.ListMeta{
+								ResourceVersion: "2",
+							},
+							Items: pods,
+						})
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+					case p == "/api/v1/namespaces/"+testNS+"/pods/"+resourceName:
+						body, _ := marshallBody(pod)
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+					default:
+						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
+							testCase.name, req, req.URL)
+						return nil, nil
+					}
+				}),
+			}
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+			streams, _, buf, errbuf := genericiooptions.NewTestIOStreams()
+
+			cmd := NewCmdTopPod(tf, nil, streams)
+			cmdOptions := &TopPodOptions{IOStreams: streams}
+			if err := cmdOptions.Complete(tf, cmd, nil); err != nil {
+				t.Fatal(err)
+			}
+			cmdOptions.MetricsClient = fakemetricsClientset
+			if err := cmdOptions.Validate(); err != nil {
+				t.Fatal(err)
+			}
+
+			cmdOptions.PrintFlags.OutputFormat = &testCase.outputFormat
+			if len(testCase.resourceName) > 0 {
+				cmdOptions.ResourceName = pod.Name
+				cmdOptions.Namespace = pod.Namespace
+			}
+
+			cmdOptions.SortBy = testCase.sortBy
+			cmdOptions.PrintContainers = testCase.printContainers
+			cmdOptions.AllNamespaces = testCase.allNamespaces
+			cmdOptions.NoHeaders = testCase.noHeaders
+			cmdOptions.Sum = testCase.sum
+
+			if err := cmdOptions.RunTopPod(); err != nil {
+				t.Fatal(err)
+			}
+
+			if e, a := testCase.expectedOutput, buf.String(); e != a {
+				t.Errorf("Unexpected output:\nExpected:\n%v\nActual:\n%v", e, a)
+			}
+			if e, a := testCase.expectedErr, errbuf.String(); e != a {
+				t.Errorf("Unexpected error:\nExpected:\n%v\nActual:\n%v", e, a)
 			}
 		})
 	}
