@@ -68,38 +68,72 @@ const (
 	noStarvedResource = v1.ResourceName("none")
 )
 
-// runInodeTest tests node eviction under inode pressure, validating that
-// only inode-hogging pods are evicted. Takes custom signal, metric extractor,
-// and pod factory to allow testing both nodefs and imagefs pressure scenarios.
-func runInodeTest(signal string, getInodesSummary func(summary *kubeletstatsv1alpha1.Summary) uint64, specs []podEvictSpec) {
-	f := framework.NewDefaultFramework("inode-eviction-test")
+type EvictionTestConfig struct {
+	Signal                  string
+	PressureTimeout         time.Duration
+	ExpectedNodeCondition   v1.NodeConditionType
+	ExpectedStarvedResource v1.ResourceName
+	IsHardEviction          bool                                               // true for hard eviction, false for soft eviction
+	ResourceGetter          func(summary *kubeletstatsv1alpha1.Summary) uint64 // Gets available resources (bytes, inodes, etc.)
+	ResourceThreshold       uint64                                             // Consumed resources that trigger eviction
+	EvictionGracePeriod     string                                             // Used for soft eviction
+	MetricsLogger           func(ctx context.Context)
+}
+
+func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEvictSpec) {
+
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := resourceInodes
-	pressureTimeout := 15 * time.Minute
-	inodesConsumed := uint64(200000)
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, config.ExpectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
 			summary := eventuallyGetSummary(ctx)
-			inodesFree := getInodesSummary(summary)
-			if inodesFree <= inodesConsumed {
-				e2eskipper.Skipf("Too few inodes free on the host for the InodeEviction test to run")
+			available := config.ResourceGetter(summary)
+
+			if available <= config.ResourceThreshold {
+				// TODO: add resource threshold name here and test name to make it easier to debug while running
+				e2eskipper.Skipf("Too few resources free on the host for the eviction test to run")
 			}
-			initialConfig.EvictionHard = map[string]string{signal: fmt.Sprintf("%d", inodesFree-inodesConsumed)}
+
+			thresholdValue := fmt.Sprintf("%d", available-config.ResourceThreshold)
+
+			if config.IsHardEviction {
+				initialConfig.EvictionHard = map[string]string{config.Signal: thresholdValue}
+			} else {
+				initialConfig.EvictionSoft = map[string]string{config.Signal: thresholdValue}
+				initialConfig.EvictionSoftGracePeriod = map[string]string{config.Signal: config.EvictionGracePeriod}
+				initialConfig.EvictionMaxPodGracePeriod = 30
+			}
+
+			// Add any special overrides for specific tests
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
+
+			// For soft eviction, ensure hard thresholds don't interfere
+			if !config.IsHardEviction {
+				initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
+			}
 		})
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logInodeMetrics, specs)
+
+		runEvictionTest(f, config.PressureTimeout, config.ExpectedNodeCondition,
+			config.ExpectedStarvedResource, config.MetricsLogger, specs)
 	})
 }
 
 // InodeEviction tests that the node responds to node disk pressure by evicting only responsible pods.
 // Node disk pressure is induced by consuming all inodes on the node.
 var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	runInodeTest(
-		string(evictionapi.SignalNodeFsInodesFree),
-		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
-			return *summary.Node.Fs.InodesFree
+	testRunner(
+		framework.NewDefaultFramework("inode-eviction-test"),
+		EvictionTestConfig{
+			Signal:                  string(evictionapi.SignalNodeFsInodesFree),
+			PressureTimeout:         15 * time.Minute,
+			ExpectedNodeCondition:   v1.NodeDiskPressure,
+			ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+			IsHardEviction:          true,
+			ResourceThreshold:       uint64(200000), // Inodes consumed
+			MetricsLogger:           logDiskMetrics,
+			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+				return *summary.Node.Fs.InodesFree
+			},
 		},
 		[]podEvictSpec{
 			{
