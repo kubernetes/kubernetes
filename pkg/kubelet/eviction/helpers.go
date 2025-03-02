@@ -1258,8 +1258,8 @@ func evictionMessage(resourceToReclaim v1.ResourceName, pod *v1.Pod, stats stats
 				var usage *resource.Quantity
 				switch resourceToReclaim {
 				case v1.ResourceEphemeralStorage:
-					if containerStats.Rootfs != nil && containerStats.Rootfs.UsedBytes != nil && containerStats.Logs != nil && containerStats.Logs.UsedBytes != nil {
-						usage = resource.NewQuantity(int64(*containerStats.Rootfs.UsedBytes+*containerStats.Logs.UsedBytes), resource.BinarySI)
+					if containerStats.Rootfs != nil && containerStats.Rootfs.UsedBytes != nil && containerStats.Logs != nil && containerStats.Logs.UsedBytes != nil && podStats.EphemeralStorage.UsedBytes != nil {
+						usage = resource.NewQuantity(int64(*containerStats.Rootfs.UsedBytes + *containerStats.Logs.UsedBytes + *podStats.EphemeralStorage.UsedBytes), resource.BinarySI)
 					}
 				case v1.ResourceMemory:
 					if containerStats.Memory != nil && containerStats.Memory.WorkingSetBytes != nil {
