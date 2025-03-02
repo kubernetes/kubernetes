@@ -77,7 +77,7 @@ spec:
         # test for directories or create them. It needs additional privileges
         # for that.
         - name: busybox
-          image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+          image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
           securityContext:
             privileged: true
           command:
