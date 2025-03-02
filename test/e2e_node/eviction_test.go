@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -136,7 +137,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 			ExpectedStarvedResource: resourceInodes,
 			IsHardEviction:          true,
 			ResourceThreshold:       uint64(200000), // Inodes consumed
-			MetricsLogger:           logDiskMetrics,
+			MetricsLogger:           logInodeMetrics,
 			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
 				return *summary.Node.Fs.InodesFree
 			},
@@ -629,7 +630,11 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				}
 				return fmt.Errorf("NodeCondition: %s encountered", expectedNodeCondition)
 			}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.Succeed())
-			gomega.Expect(PrePullAllImages(ctx)).Should(gomega.Succeed())
+
+			// prepull images only if its image-gc-eviction-test
+			if regexp.MustCompile(`(?i)image-gc.*`).MatchString(f.BaseName) {
+				gomega.Expect(PrePullAllImages(ctx)).Should(gomega.Succeed())
+			}
 			ginkgo.By("setting up pods to be used by tests")
 			pods := []*v1.Pod{}
 			for _, spec := range testSpecs {

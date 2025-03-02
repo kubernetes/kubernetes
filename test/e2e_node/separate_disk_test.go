@@ -61,7 +61,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 			ExpectedStarvedResource: resourceInodes,
 			ResourceThreshold:       uint64(200000), // Inodes consumed
 			IsHardEviction:          true,
-			MetricsLogger:           logDiskMetrics,
+			MetricsLogger:           logInodeMetrics,
 			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
 				return *(summary.Node.Runtime.ImageFs.InodesFree)
 			},
