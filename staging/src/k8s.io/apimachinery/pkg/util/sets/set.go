@@ -19,6 +19,7 @@ package sets
 import (
 	"cmp"
 	"sort"
+	"encoding/json"
 )
 
 // Set is a set of the same type elements, implemented via map[comparable]struct{} for minimal memory consumption.
@@ -26,6 +27,12 @@ type Set[T comparable] map[T]Empty
 
 // cast transforms specified set to generic Set[T].
 func cast[T comparable](s map[T]Empty) Set[T] { return s }
+
+// MarshalJSON implements the json.Marshaler interface for Set.
+func (s Set[T]) MarshalJSON() ([]byte, error) {
+	items := s.UnsortedList()
+	return json.Marshal(items)
+}
 
 // New creates a Set from a list of values.
 // NOTE: type param must be explicitly instantiated if given items are empty.
