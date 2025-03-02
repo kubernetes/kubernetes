@@ -52,10 +52,19 @@ var _ = SIGDescribe("Summary", feature.SeparateDiskTest, func() {
 
 // Node disk pressure is induced by consuming all inodes on the Writeable Layer (imageFS).
 var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
-	runInodeTest(
-		string(evictionapi.SignalImageFsInodesFree),
-		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
-			return *(summary.Node.Runtime.ImageFs.InodesFree)
+	testRunner(
+		framework.NewDefaultFramework("inode-eviction-test"),
+		EvictionTestConfig{
+			Signal:                  string(evictionapi.SignalImageFsInodesFree),
+			PressureTimeout:         15 * time.Minute,
+			ExpectedNodeCondition:   v1.NodeDiskPressure,
+			ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+			IsHardEviction:          true,
+			ResourceThreshold:       uint64(200000), // Inodes consumed
+			MetricsLogger:           logDiskMetrics,
+			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+				return *(summary.Node.Runtime.ImageFs.InodesFree)
+			},
 		},
 		[]podEvictSpec{
 			{
@@ -98,10 +107,10 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 // removed localstoragecapacityisolation feature gate here as its not a feature gate anymore
 var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
-		sizeLimit := resource.MustParse("40Mi")
-		useOverLimit := 41  /* Mb */
-		useUnderLimit := 39 /* Mb */
-		containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
+	sizeLimit := resource.MustParse("40Mi")
+	useOverLimit := 41  /* Mb */
+	useUnderLimit := 39 /* Mb */
+	containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
 
 	runLocalStorageCapacityIsolationEvictionTest(
 		"localstorage-eviction-test",
