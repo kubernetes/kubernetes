@@ -76,6 +76,7 @@ type EvictionTestConfig struct {
 	IsHardEviction          bool                                               // true for hard eviction, false for soft eviction
 	ResourceGetter          func(summary *kubeletstatsv1alpha1.Summary) uint64 // Gets available resources (bytes, inodes, etc.)
 	ResourceThreshold       uint64                                             // Consumed resources that trigger eviction
+	ThresholdPercentage     string                                             // either uint64 or percentage
 	EvictionGracePeriod     string                                             // Used for soft eviction
 	MetricsLogger           func(ctx context.Context)
 }
@@ -89,12 +90,16 @@ func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEv
 			summary := eventuallyGetSummary(ctx)
 			available := config.ResourceGetter(summary)
 
-			if available <= config.ResourceThreshold {
-				// TODO: add resource threshold name here and test name to make it easier to debug while running
+			if config.ThresholdPercentage == "" && available <= config.ResourceThreshold {
 				e2eskipper.Skipf("Too few resources free on the host for the eviction test to run")
 			}
 
-			thresholdValue := fmt.Sprintf("%d", available-config.ResourceThreshold)
+			var thresholdValue string
+			if config.ThresholdPercentage != "" {
+				thresholdValue = config.ThresholdPercentage
+			} else {
+				thresholdValue = fmt.Sprintf("%d", available-config.ResourceThreshold)
+			}
 
 			if config.IsHardEviction {
 				initialConfig.EvictionHard = map[string]string{config.Signal: thresholdValue}
@@ -107,7 +112,8 @@ func testRunner(f *framework.Framework, config EvictionTestConfig, specs []podEv
 			// Add any special overrides for specific tests
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 
-			// For soft eviction, ensure hard thresholds don't interfere
+			// Ensure that pods are not evicted because of the eviction-hard threshold
+			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			if !config.IsHardEviction {
 				initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
 			}
@@ -127,7 +133,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 			Signal:                  string(evictionapi.SignalNodeFsInodesFree),
 			PressureTimeout:         15 * time.Minute,
 			ExpectedNodeCondition:   v1.NodeDiskPressure,
-			ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+			ExpectedStarvedResource: resourceInodes,
 			IsHardEviction:          true,
 			ResourceThreshold:       uint64(200000), // Inodes consumed
 			MetricsLogger:           logDiskMetrics,
@@ -257,49 +263,27 @@ var _ = SIGDescribe("LocalStorageEviction", framework.WithSlow(), framework.With
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
-func runStorageSoftEviction(frameworkName string, signal string, getAvailableBytes func(summary *kubeletstatsv1alpha1.Summary) uint64, specs []podEvictSpec) {
-	f := framework.NewDefaultFramework(frameworkName)
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	pressureTimeout := 10 * time.Minute
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := v1.ResourceEphemeralStorage
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			diskConsumed := resource.MustParse("4Gi")
-			summary := eventuallyGetSummary(ctx)
-			availableBytes := getAvailableBytes(summary)
-			if availableBytes <= uint64(diskConsumed.Value()) {
-				e2eskipper.Skipf("Too little disk free on the host for the LocalStorageSoftEviction test to run")
-			}
-			initialConfig.EvictionSoft = map[string]string{signal: fmt.Sprintf("%d", availableBytes-uint64(diskConsumed.Value()))}
-			initialConfig.EvictionSoftGracePeriod = map[string]string{signal: "1m"}
-			// Defer to the pod default grace period
-			initialConfig.EvictionMaxPodGracePeriod = 30
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			// Ensure that pods are not evicted because of the eviction-hard threshold
-			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): "0%"}
-		})
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, specs)
-	})
-}
-
-// LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
-// Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
-// Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
 var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
-	runStorageSoftEviction(
-		"localstorage-eviction-test",
-		string(evictionapi.SignalNodeFsAvailable),
-		func(summary *kubeletstatsv1alpha1.Summary) uint64 {
-			return *summary.Node.Fs.AvailableBytes
+	diskConsumed := resource.MustParse("4Gi")
+	testRunner(
+		framework.NewDefaultFramework("localstorage-eviction-test"),
+		EvictionTestConfig{
+			Signal:                  string(evictionapi.SignalNodeFsAvailable),
+			PressureTimeout:         10 * time.Minute,
+			ExpectedNodeCondition:   v1.NodeDiskPressure,
+			ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+			ResourceThreshold:       uint64(diskConsumed.Value()), // local storage
+			IsHardEviction:          false,
+			EvictionGracePeriod:     "1m",
+			MetricsLogger:           logDiskMetrics,
+			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+				return *summary.Node.Fs.AvailableBytes
+			},
 		},
 		[]podEvictSpec{
 			{
 				evictionPriority: 1,
-				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
-				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
+				pod:              diskConsumingPod("container-disk-hog", lotsOfDisk, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.ResourceRequirements{}),
 			},
 			{
 				evictionPriority: 0,
@@ -346,29 +330,29 @@ var _ = SIGDescribe("LocalStorageSoftEvictionNotOverwriteTerminationGracePeriodS
 	})
 })
 
-func runLocalStorageCapacityIsolationEvictionTest(frameworkName string, signal string, podspecs []podEvictSpec) {
-	f := framework.NewDefaultFramework(frameworkName)
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	evictionTestTimeout := 10 * time.Minute
-	ginkgo.Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
-			initialConfig.EvictionHard = map[string]string{signal: "0%"}
-		})
-		runEvictionTest(f, evictionTestTimeout, noPressure, noStarvedResource, logDiskMetrics, podspecs)
-	})
-}
-
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.LocalStorageCapacityIsolationQuota, feature.Eviction, func() {
-	sizeLimit := resource.MustParse("100Mi")
-	useOverLimit := 101 /* Mb */
-	useUnderLimit := 99 /* Mb */
+	sizeLimit := resource.MustParse("40Mi")
+	useOverLimit := 41  /* Mb */
+	useUnderLimit := 39 /* Mb */
 	containerLimit := v1.ResourceList{v1.ResourceEphemeralStorage: sizeLimit}
 
-	runLocalStorageCapacityIsolationEvictionTest(
-		"localstorage-eviction-test",
-		string(evictionapi.SignalMemoryAvailable),
+	testRunner(
+		framework.NewDefaultFramework("localstorage-eviction-test"),
+		EvictionTestConfig{
+			Signal:                  string(evictionapi.SignalMemoryAvailable),
+			PressureTimeout:         10 * time.Minute,
+			ExpectedNodeCondition:   noPressure,
+			ExpectedStarvedResource: noStarvedResource,
+			IsHardEviction:          true,
+			ThresholdPercentage:     "0%", // Disabling this threshold to focus on pod-level limits
+			MetricsLogger:           logDiskMetrics,
+			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+				// We're not using node-level resource checks for this test
+				// Just need a non-zero value to pass the resource check
+				return 1024 * 1024 * 1024 // 1 GB (arbitrary non-zero value)
+			},
+		},
 		[]podEvictSpec{
 			{
 				evictionPriority: 1, // This pod should be evicted because emptyDir (default storage type) usage violation
