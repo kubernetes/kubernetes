@@ -16,7 +16,12 @@ limitations under the License.
 
 package swap
 
-import "testing"
+import (
+	"testing"
+
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
+)
 
 func TestIsSwapEnabled(t *testing.T) {
 	testCases := []struct {
@@ -54,10 +59,12 @@ Filename				Type		Size		Used		Priority
 			expectedEnabled: false,
 		},
 	}
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			isEnabled := isSwapOnAccordingToProcSwaps([]byte(tc.procSwapsContent))
+			isEnabled := isSwapOnAccordingToProcSwaps(logger, []byte(tc.procSwapsContent))
 			if isEnabled != tc.expectedEnabled {
 				t.Errorf("expected %v, got %v", tc.expectedEnabled, isEnabled)
 			}
