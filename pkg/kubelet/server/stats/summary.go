@@ -51,12 +51,12 @@ var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a SummaryProvider using the stats provided by the
 // specified statsProvider.
-func NewSummaryProvider(statsProvider Provider) SummaryProvider {
+func NewSummaryProvider(logger klog.Logger, statsProvider Provider) SummaryProvider {
 	kubeletCreationTime := metav1.Now()
-	bootTime, err := util.GetBootTime()
+	bootTime, err := util.GetBootTime(logger)
 	if err != nil {
 		// bootTime will be zero if we encounter an error getting the boot time.
-		klog.InfoS("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
+		logger.Info("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
 	}
 
 	return &summaryProviderImpl{

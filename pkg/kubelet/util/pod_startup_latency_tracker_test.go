@@ -25,9 +25,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -60,6 +62,7 @@ func TestNoEvents(t *testing.T) {
 }
 
 func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	t.Run("pod was running for 10m before kubelet started", func(t *testing.T) {
 
 		// expects no metrics in the output
@@ -80,7 +83,7 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 				StartTime: &metav1.Time{Time: frozenTime.Add(-10 * time.Minute)},
 			},
 		}
-		tracker.ObservedPodOnWatch(podStarted, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime)
 
 		assert.Empty(t, tracker.pods)
 		metrics.PodStartSLIDuration.Reset()
@@ -88,6 +91,8 @@ func TestPodsRunningBeforeKubeletStarted(t *testing.T) {
 }
 
 func TestSinglePodOneImageDownloadRecorded(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
 
 	t.Run("single pod; started in 3s, image pulling 100ms", func(t *testing.T) {
 
@@ -134,7 +139,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		podInit := buildInitializingPod()
-		tracker.ObservedPodOnWatch(podInit, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podInit, frozenTime)
 
 		// image pulling took 100ms
 		tracker.RecordImageStartedPulling(podInit.UID)
@@ -151,10 +156,10 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		podStarted := buildRunningPod()
-		tracker.RecordStatusUpdated(podStarted)
+		tracker.RecordStatusUpdated(logger, podStarted)
 
 		// 3s later, observe the same pod on watch
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*3))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*3))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
@@ -169,6 +174,8 @@ kubelet_pod_start_sli_duration_seconds_count 1
 }
 
 func TestSinglePodMultipleDownloadsAndRestartsRecorded(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
 
 	t.Run("single pod; started in 30s, image pulling between 10th and 20th seconds", func(t *testing.T) {
 
@@ -215,7 +222,7 @@ kubelet_pod_start_sli_duration_seconds_count 1
 		}
 
 		podInitializing := buildInitializingPod()
-		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podInitializing, frozenTime)
 
 		// image pulling started at 10s and the last one finished at 30s
 		// first image starts pulling at 10s
@@ -249,19 +256,19 @@ kubelet_pod_start_sli_duration_seconds_count 1
 
 		// pod started
 		podStarted := buildRunningPod()
-		tracker.RecordStatusUpdated(podStarted)
+		tracker.RecordStatusUpdated(logger, podStarted)
 
 		// at 30s observe the same pod on watch
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*30))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
 		}
 
 		// any new pod observations should not impact the metrics, as the pod should be recorder only once
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*150))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*150))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*200))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*250))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), metricsName); err != nil {
 			t.Fatal(err)
@@ -276,6 +283,8 @@ kubelet_pod_start_sli_duration_seconds_count 1
 }
 
 func TestFirstNetworkPodMetrics(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	logger := klog.FromContext(tCtx)
 
 	t.Run("first network pod; started in 30s, image pulling between 10th and 20th seconds", func(t *testing.T) {
 
@@ -298,32 +307,32 @@ kubelet_first_network_pod_start_sli_duration_seconds 30
 		hostNetworkPodInitializing := buildInitializingPod()
 		hostNetworkPodInitializing.UID = "11111-22222"
 		hostNetworkPodInitializing.Spec.HostNetwork = true
-		tracker.ObservedPodOnWatch(hostNetworkPodInitializing, frozenTime)
+		tracker.ObservedPodOnWatch(logger, hostNetworkPodInitializing, frozenTime)
 
 		hostNetworkPodStarted := buildRunningPod()
 		hostNetworkPodStarted.UID = "11111-22222"
 		hostNetworkPodStarted.Spec.HostNetwork = true
-		tracker.RecordStatusUpdated(hostNetworkPodStarted)
+		tracker.RecordStatusUpdated(logger, hostNetworkPodStarted)
 
 		// track only the first pod with network
 		podInitializing := buildInitializingPod()
-		tracker.ObservedPodOnWatch(podInitializing, frozenTime)
+		tracker.ObservedPodOnWatch(logger, podInitializing, frozenTime)
 
 		// pod started
 		podStarted := buildRunningPod()
-		tracker.RecordStatusUpdated(podStarted)
+		tracker.RecordStatusUpdated(logger, podStarted)
 
 		// at 30s observe the same pod on watch
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*30))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*30))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
 			t.Fatal(err)
 		}
 
 		// any new pod observations should not impact the metrics, as the pod should be recorder only once
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*150))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*200))
-		tracker.ObservedPodOnWatch(podStarted, frozenTime.Add(time.Second*250))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*150))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*200))
+		tracker.ObservedPodOnWatch(logger, podStarted, frozenTime.Add(time.Second*250))
 
 		if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(wants), "kubelet_first_network_pod_start_sli_duration_seconds", "kubelet_first_network_pod_start_total_duration_seconds"); err != nil {
 			t.Fatal(err)

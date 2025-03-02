@@ -28,7 +28,7 @@ type merger interface {
 	// Invoked when a change from a source is received.  May also function as an incremental
 	// merger if you wish to consume changes incrementally.  Must be reentrant when more than
 	// one source is defined.
-	Merge(source string, update interface{}) error
+	Merge(logger klog.Logger, source string, update interface{}) error
 }
 
 // mux is a class for merging configuration from multiple sources.  Changes are
@@ -70,14 +70,16 @@ func (m *mux) ChannelWithContext(ctx context.Context, source string) chan interf
 	newChannel := make(chan interface{})
 	m.sources[source] = newChannel
 
-	go wait.Until(func() { m.listen(source, newChannel) }, 0, ctx.Done())
+	logger := klog.FromContext(ctx)
+
+	go wait.Until(func() { m.listen(logger, source, newChannel) }, 0, ctx.Done())
 	return newChannel
 }
 
-func (m *mux) listen(source string, listenChannel <-chan interface{}) {
+func (m *mux) listen(logger klog.Logger, source string, listenChannel <-chan interface{}) {
 	for update := range listenChannel {
-		if err := m.merger.Merge(source, update); err != nil {
-			klog.InfoS("failed merging update", "err", err)
+		if err := m.merger.Merge(logger, source, update); err != nil {
+			logger.Info("failed merging update", "err", err)
 		}
 	}
 }

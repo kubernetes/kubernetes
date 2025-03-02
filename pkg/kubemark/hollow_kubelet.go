@@ -93,6 +93,9 @@ func NewHollowKubelet(
 	imageService internalapi.ImageManagerService,
 	runtimeService internalapi.RuntimeService,
 	containerManager cm.ContainerManager) *HollowKubelet {
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	d := &kubelet.Dependencies{
 		KubeClient:                client,
 		HeartbeatClient:           heartbeatClient,
@@ -110,7 +113,7 @@ func NewHollowKubelet(
 		Subpather:                 &subpath.FakeSubpath{},
 		HostUtil:                  hostutil.NewFakeHostUtil(nil),
 		PodStartupLatencyTracker:  kubeletutil.NewPodStartupLatencyTracker(),
-		NodeStartupLatencyTracker: kubeletutil.NewNodeStartupLatencyTracker(),
+		NodeStartupLatencyTracker: kubeletutil.NewNodeStartupLatencyTracker(logger),
 		TracerProvider:            noopoteltrace.NewTracerProvider(),
 		Recorder:                  &record.FakeRecorder{}, // With real recorder we attempt to read /dev/kmsg.
 	}

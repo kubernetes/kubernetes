@@ -105,7 +105,7 @@ type PodDeletionSafetyProvider interface {
 }
 
 type PodStartupLatencyStateHelper interface {
-	RecordStatusUpdated(pod *v1.Pod)
+	RecordStatusUpdated(logger klog.Logger, pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
 
@@ -786,9 +786,13 @@ func (m *manager) syncBatch(all bool) int {
 // syncPod syncs the given status with the API server. The caller must not hold the status lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(context.TODO(), status.podName, metav1.GetOptions{})
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+
+	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(ctx, status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		klog.V(3).InfoS("Pod does not exist on the server",
+		logger.V(3).Info("Pod does not exist on the server",
 			"podUID", uid,
 			"pod", klog.KRef(status.podNamespace, status.podName))
 		// If the Pod is deleted the status will be cleared in
@@ -796,7 +800,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		return
 	}
 	if err != nil {
-		klog.InfoS("Failed to get status for pod",
+		logger.Info("Failed to get status for pod",
 			"podUID", uid,
 			"pod", klog.KRef(status.podNamespace, status.podName),
 			"err", err)
@@ -806,7 +810,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	translatedUID := m.podManager.TranslatePodUID(pod.UID)
 	// Type convert original uid just for the purpose of comparison.
 	if len(translatedUID) > 0 && translatedUID != kubetypes.ResolvedPodUID(uid) {
-		klog.V(2).InfoS("Pod was deleted and then recreated, skipping status update",
+		logger.V(2).Info("Pod was deleted and then recreated, skipping status update",
 			"pod", klog.KObj(pod),
 			"oldPodUID", uid,
 			"podUID", translatedUID)
@@ -816,25 +820,25 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 
 	mergedStatus := mergePodStatus(pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
 
-	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(context.TODO(), m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
-	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
+	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(ctx, m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
+	logger.V(3).Info("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
 
 	if err != nil {
-		klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
+		logger.Info("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
 		return
 	}
 	if unchanged {
-		klog.V(3).InfoS("Status for pod is up-to-date", "pod", klog.KObj(pod), "statusVersion", status.version)
+		logger.V(3).Info("Status for pod is up-to-date", "pod", klog.KObj(pod), "statusVersion", status.version)
 	} else {
-		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
+		logger.V(3).Info("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
 		pod = newPod
 		// We pass a new object (result of API call which contains updated ResourceVersion)
-		m.podStartupLatencyHelper.RecordStatusUpdated(pod)
+		m.podStartupLatencyHelper.RecordStatusUpdated(logger, pod)
 	}
 
 	// measure how long the status update took to propagate from generation to update on the server
 	if status.at.IsZero() {
-		klog.V(3).InfoS("Pod had no status time set", "pod", klog.KObj(pod), "podUID", uid, "version", status.version)
+		logger.V(3).Info("Pod had no status time set", "pod", klog.KObj(pod), "podUID", uid, "version", status.version)
 	} else {
 		duration := time.Since(status.at).Truncate(time.Millisecond)
 		metrics.PodStatusSyncDuration.Observe(duration.Seconds())
@@ -850,12 +854,12 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			// newly created pod with the same name and namespace.
 			Preconditions: metav1.NewUIDPreconditions(string(pod.UID)),
 		}
-		err = m.kubeClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
+		err = m.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, deleteOptions)
 		if err != nil {
-			klog.InfoS("Failed to delete status for pod", "pod", klog.KObj(pod), "err", err)
+			logger.Info("Failed to delete status for pod", "pod", klog.KObj(pod), "err", err)
 			return
 		}
-		klog.V(3).InfoS("Pod fully terminated and removed from etcd", "pod", klog.KObj(pod))
+		logger.V(3).Info("Pod fully terminated and removed from etcd", "pod", klog.KObj(pod))
 		m.deletePodStatus(uid)
 	}
 }

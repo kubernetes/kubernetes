@@ -37,6 +37,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
@@ -53,6 +54,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	// Do some initialization to decode the query parameters correctly.
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -325,22 +327,21 @@ type serverTestFramework struct {
 	testHTTPServer  *httptest.Server
 }
 
-func newServerTest() *serverTestFramework {
-	return newServerTestWithDebug(true, nil)
+func newServerTest(logger klog.Logger) *serverTestFramework {
+	return newServerTestWithDebug(logger, true, nil)
 }
 
-func newServerTestWithDebug(enableDebugging bool, streamingServer streaming.Server) *serverTestFramework {
+func newServerTestWithDebug(logger klog.Logger, enableDebugging bool, streamingServer streaming.Server) *serverTestFramework {
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
 		EnableDebuggingHandlers: enableDebugging,
 		EnableSystemLogHandler:  enableDebugging,
 		EnableProfilingHandler:  enableDebugging,
 		EnableDebugFlagsHandler: enableDebugging,
 	}
-	return newServerTestWithDebuggingHandlers(kubeCfg, streamingServer)
+	return newServerTestWithDebuggingHandlers(logger, kubeCfg, streamingServer)
 }
 
-func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletConfiguration, streamingServer streaming.Server) *serverTestFramework {
-
+func newServerTestWithDebuggingHandlers(logger klog.Logger, kubeCfg *kubeletconfiginternal.KubeletConfiguration, streamingServer streaming.Server) *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -371,7 +372,7 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 	}
 	server := NewServer(
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
+		stats.NewResourceAnalyzer(logger, fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		[]healthz.HealthChecker{},
 		fw.fakeAuth,
 		kubeCfg,
@@ -390,7 +391,8 @@ func getPodName(name, namespace string) string {
 }
 
 func TestServeLogs(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
@@ -419,7 +421,8 @@ func TestServeLogs(t *testing.T) {
 }
 
 func TestServeRunInContainer(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
@@ -460,7 +463,8 @@ func TestServeRunInContainer(t *testing.T) {
 }
 
 func TestServeRunInContainerWithUID(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
@@ -503,7 +507,8 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 }
 
 func TestHealthCheck(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
@@ -532,7 +537,8 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 
 // Ensure all registered handlers & services have an associated testcase.
 func TestAuthzCoverage(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	for _, fineGrained := range []bool{false, true} {
@@ -577,7 +583,8 @@ func TestAuthzCoverage(t *testing.T) {
 }
 
 func TestInstallAuthNotRequiredHandlers(t *testing.T) {
-	fw := newServerTestWithDebug(false, nil)
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTestWithDebug(logger, false, nil)
 	defer fw.testHTTPServer.Close()
 
 	// No new handlers should be added to this list.
@@ -647,7 +654,8 @@ func TestAuthFilters(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
@@ -706,7 +714,8 @@ func TestAuthenticationError(t *testing.T) {
 		calledAttributes   = false
 	)
 
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
 		calledAuthenticate = true
@@ -744,7 +753,8 @@ func TestAuthenticationFailure(t *testing.T) {
 		calledAttributes   = false
 	)
 
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
 		calledAuthenticate = true
@@ -782,7 +792,8 @@ func TestAuthorizationSuccess(t *testing.T) {
 		calledAttributes   = false
 	)
 
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
 		calledAuthenticate = true
@@ -811,7 +822,8 @@ func TestAuthorizationSuccess(t *testing.T) {
 }
 
 func TestSyncLoopCheck(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
@@ -884,7 +896,8 @@ func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodN
 }
 
 func TestContainerLogs(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	tests := map[string]struct {
@@ -938,7 +951,8 @@ func TestContainerLogs(t *testing.T) {
 }
 
 func TestContainerLogsWithInvalidTail(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 	output := "foo bar"
 	podNamespace := "other"
@@ -965,7 +979,8 @@ func TestContainerLogsWithSeparateStream(t *testing.T) {
 		msg    string
 	}
 
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	var (
@@ -1180,7 +1195,8 @@ func TestCheckpointContainer(t *testing.T) {
 		// Enable features.ContainerCheckpoint during test
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, featureGate)
 
-		fw := newServerTest()
+		logger, _ := ktesting.NewTestContext(t)
+		fw := newServerTest(logger)
 		// GetPodByName() should always fail
 		fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
 			return nil, false
@@ -1273,10 +1289,11 @@ func makeReq(t *testing.T, method, url, clientProtocol string) *http.Request {
 }
 
 func TestServeExecInContainerIdleTimeout(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, ss)
+	fw := newServerTestWithDebug(logger, true, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1313,6 +1330,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 }
 
 func testExecAttach(t *testing.T, verb string) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := map[string]struct {
 		stdin              bool
 		stdout             bool
@@ -1336,7 +1354,7 @@ func testExecAttach(t *testing.T, verb string) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, ss)
+			fw := newServerTestWithDebug(logger, true, ss)
 			defer fw.testHTTPServer.Close()
 			fmt.Println(desc)
 
@@ -1532,10 +1550,11 @@ func TestServeAttachContainer(t *testing.T) {
 }
 
 func TestServePortForwardIdleTimeout(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, ss)
+	fw := newServerTestWithDebug(logger, true, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1569,6 +1588,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 }
 
 func TestServePortForward(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	tests := map[string]struct {
 		port          string
 		uid           bool
@@ -1597,7 +1617,7 @@ func TestServePortForward(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, ss)
+			fw := newServerTestWithDebug(logger, true, ss)
 			defer fw.testHTTPServer.Close()
 
 			portForwardFuncDone := make(chan struct{})
@@ -1732,7 +1752,8 @@ func TestMetricBuckets(t *testing.T) {
 		"invalid path":                    {url: "/junk", bucket: "other"},
 		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
 	}
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	for _, test := range tests {
@@ -1752,7 +1773,8 @@ func TestMetricMethodBuckets(t *testing.T) {
 		"invalid method": {method: "WEIRD", bucket: "other"},
 	}
 
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	for _, test := range tests {
@@ -1763,6 +1785,7 @@ func TestMetricMethodBuckets(t *testing.T) {
 }
 
 func TestDebuggingDisabledHandlers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	// for backward compatibility even if enablesystemLogHandler or enableProfilingHandler is set but not
 	// enableDebuggingHandler then /logs, /pprof and /flags shouldn't be served.
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
@@ -1771,7 +1794,7 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 		EnableDebugFlagsHandler: true,
 		EnableProfilingHandler:  true,
 	}
-	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
+	fw := newServerTestWithDebuggingHandlers(logger, kubeCfg, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1786,10 +1809,11 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 }
 
 func TestDisablingLogAndProfilingHandler(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
 		EnableDebuggingHandlers: true,
 	}
-	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
+	fw := newServerTestWithDebuggingHandlers(logger, kubeCfg, nil)
 	defer fw.testHTTPServer.Close()
 
 	// verify debug endpoints are disabled
@@ -1799,7 +1823,8 @@ func TestDisablingLogAndProfilingHandler(t *testing.T) {
 }
 
 func TestFailedParseParamsSummaryHandler(t *testing.T) {
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/summary", "invalid/content/type", nil)
@@ -1852,7 +1877,8 @@ func TestFineGrainedAuthz(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletFineGrainedAuthz, true)
 
-	fw := newServerTest()
+	logger, _ := ktesting.NewTestContext(t)
+	fw := newServerTest(logger)
 	defer fw.testHTTPServer.Close()
 
 	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
@@ -1953,12 +1979,13 @@ func TestFineGrainedAuthz(t *testing.T) {
 }
 
 func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	host := &fakeKubelet{
 		hostnameFunc: func() string {
 			return "127.0.0.1"
 		},
 	}
-	resourceAnalyzer := stats.NewResourceAnalyzer(nil, time.Minute, &record.FakeRecorder{})
+	resourceAnalyzer := stats.NewResourceAnalyzer(logger, nil, time.Minute, &record.FakeRecorder{})
 
 	server1 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)
 	server2 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)

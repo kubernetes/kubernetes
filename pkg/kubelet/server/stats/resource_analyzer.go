@@ -17,8 +17,10 @@ limitations under the License.
 package stats
 
 import (
-	"k8s.io/client-go/tools/record"
 	"time"
+
+	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 )
 
 // ResourceAnalyzer provides statistics on node resource consumption
@@ -38,9 +40,9 @@ type resourceAnalyzer struct {
 var _ ResourceAnalyzer = &resourceAnalyzer{}
 
 // NewResourceAnalyzer returns a new ResourceAnalyzer
-func NewResourceAnalyzer(statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder) ResourceAnalyzer {
+func NewResourceAnalyzer(logger klog.Logger, statsProvider Provider, calVolumeFrequency time.Duration, eventRecorder record.EventRecorder) ResourceAnalyzer {
 	fsAnalyzer := newFsResourceAnalyzer(statsProvider, calVolumeFrequency, eventRecorder)
-	summaryProvider := NewSummaryProvider(statsProvider)
+	summaryProvider := NewSummaryProvider(logger, statsProvider)
 	return &resourceAnalyzer{fsAnalyzer, summaryProvider}
 }
 

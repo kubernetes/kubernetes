@@ -275,7 +275,7 @@ func newTestKubeletWithImageList(
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
 	kubelet.allocationManager = allocation.NewInMemoryManager()
-	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
+	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker(logger)
 
 	kubelet.containerRuntime = fakeRuntime
 	kubelet.runtimeCache = containertest.NewFakeRuntimeCache(kubelet.containerRuntime)
@@ -302,7 +302,7 @@ func newTestKubeletWithImageList(
 	}
 
 	volumeStatsAggPeriod := time.Second * 10
-	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
+	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(logger, kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
 	fakeHostStatsProvider := stats.NewFakeHostStatsProvider()
 
