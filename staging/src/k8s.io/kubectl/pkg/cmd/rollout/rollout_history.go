@@ -177,10 +177,12 @@ func (o *RolloutHistoryOptions) Run() error {
 			}
 
 			if o.Revision > 0 {
-				err := printer.PrintObj(historyInfo[o.Revision], o.Out)
-				if err != nil {
-					return err
+				// Ensure the specified revision exists before printing
+				if historyInfo[o.Revision] == nil {
+					return fmt.Errorf("error: unable to find the specified revision")
 				}
+
+				printer.PrintObj(historyInfo[o.Revision], o.Out)
 			} else {
 				sortedKeys := make([]int64, 0, len(historyInfo))
 				for k := range historyInfo {
@@ -188,10 +190,7 @@ func (o *RolloutHistoryOptions) Run() error {
 				}
 				sort.Slice(sortedKeys, func(i, j int) bool { return sortedKeys[i] < sortedKeys[j] })
 				for _, k := range sortedKeys {
-					err := printer.PrintObj(historyInfo[k], o.Out)
-					if err != nil {
-						return err
-					}
+					printer.PrintObj(historyInfo[k], o.Out)
 				}
 			}
 
