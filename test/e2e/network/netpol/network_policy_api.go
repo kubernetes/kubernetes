@@ -291,7 +291,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 				return false, err
 			}
 			if len(nps.Items) > 0 {
-				framework.Logf("still %d network policies present, retrying ...", len(nps.Items) )
+				framework.Logf("still %d network policies present, retrying ...", len(nps.Items))
 				return false, nil
 			}
 			return true, nil
