@@ -18,19 +18,15 @@ package e2enode
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -193,32 +189,29 @@ var _ = SIGDescribe("ImageStorageEviction", framework.WithSlow(), framework.With
 		})
 })
 
-// NOTE: why is this here??
-
 // ImageStorageVolumeEviction tests that the node responds to node disk pressure by evicting pods.
 // Volumes write to the node filesystem so we are testing eviction on nodefs even if it
 // exceeds imagefs limits.
 var _ = SIGDescribe("ImageStorageVolumeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
-	f := framework.NewDefaultFramework("exceed-nodefs-test")
-	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
-	expectedNodeCondition := v1.NodeDiskPressure
-	expectedStarvedResource := v1.ResourceEphemeralStorage
-	pressureTimeout := 15 * time.Minute
-
-	diskTestInMb := 16000
-
-	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalNodeFsAvailable): "50%"}
-			initialConfig.EvictionMinimumReclaim = map[string]string{}
-			ginkgo.By(fmt.Sprintf("EvictionHard %s", initialConfig.EvictionHard))
-		})
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
+	testRunner(
+		framework.NewDefaultFramework("exceed-nodefs-test"),
+		EvictionTestConfig{
+			Signal:                  string(evictionapi.SignalNodeFsAvailable),
+			PressureTimeout:         15 * time.Minute,
+			ExpectedNodeCondition:   v1.NodeDiskPressure,
+			ExpectedStarvedResource: v1.ResourceEphemeralStorage,
+			IsHardEviction:          true,
+			ThresholdPercentage:     "50%", // Use percentage instead of absolute threshold
+			MetricsLogger:           logDiskMetrics,
+			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
+				return *summary.Node.Fs.AvailableBytes
+			},
+		},
+		[]podEvictSpec{
 			{
-				evictionPriority: 1, // This pod should exceed disk capacity on nodefs since writing to a volume
-				pod: diskConsumingPod("container-emptydir-disk-limit", diskTestInMb, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+				evictionPriority: 1,
+				pod: diskConsumingPod("container-emptydir-disk-limit", 16000, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
 					v1.ResourceRequirements{}),
 			},
 		})
-	})
 })
