@@ -61,6 +61,7 @@
   - k8s.io/code-generator
   - k8s.io/kube-openapi
   - k8s.io/klog
+  - k8s.io/utils/ptr
 
 - baseImportPath: "./staging/src/k8s.io/component-base"
   allowedImports:
