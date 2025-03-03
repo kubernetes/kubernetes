@@ -34,13 +34,6 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
-	// owner: @jefftree @alexzielenski
-	// stable: v1.30
-	//
-	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
-	// caching with ETags containing all APIResources known to the apiserver.
-	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
-
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
@@ -253,12 +246,6 @@ func init() {
 // Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	AggregatedDiscoveryEndpoint: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	AllowParsingUserUIDFromCertAuth: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
