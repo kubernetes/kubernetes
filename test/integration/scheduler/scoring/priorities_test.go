@@ -44,7 +44,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // imported from testutils
@@ -80,7 +80,7 @@ const (
 func initTestSchedulerForScoringTests(t *testing.T, preScorePluginName, scorePluginName string) *testutils.TestContext {
 	cc := configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				PreScore: configv1.PluginSet{
 					Disabled: []configv1.Plugin{
@@ -89,7 +89,7 @@ func initTestSchedulerForScoringTests(t *testing.T, preScorePluginName, scorePlu
 				},
 				Score: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
-						{Name: scorePluginName, Weight: pointer.Int32(1)},
+						{Name: scorePluginName, Weight: ptr.To[int32](1)},
 					},
 					Disabled: []configv1.Plugin{
 						{Name: "*"},
@@ -117,7 +117,7 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T, strategy configv1.Scori
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
-				SchedulerName: pointer.String(v1.DefaultSchedulerName),
+				SchedulerName: ptr.To(v1.DefaultSchedulerName),
 				PluginConfig: []configv1.PluginConfig{
 					{
 						Name: noderesources.Name,
