@@ -434,7 +434,7 @@ var (
 
 	// SeparateDiskTest (SIG-node, used for testing separate container runtime filesystem)
 	// The tests need separate disk settings on nodes and separate filesystems in storage.conf
-	SeparateDiskTest = framework.WithFeature(framework.ValidFeatures.Add("SeparateDiskTest"))
+	SeparateDisk = framework.WithFeature(framework.ValidFeatures.Add("SeparateDisk"))
 
 	// Owner: sig-network
 	// Marks tests of KEP-1880 that require the `MultiCIDRServiceAllocator` feature gate
