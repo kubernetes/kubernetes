@@ -116,7 +116,7 @@ func (p *pvcEvaluator) MatchingScopes(item runtime.Object, scopeSelectors []core
 		for _, selector := range scopeSelectors {
 			match, err := pvcMatchesScopeFunc(selector, item)
 			if err != nil {
-				return []corev1.ScopedResourceSelectorRequirement{}, fmt.Errorf("error on matching scope %v: %v", selector, err)
+				return []corev1.ScopedResourceSelectorRequirement{}, fmt.Errorf("error on matching scope %v: %w", selector, err)
 			}
 			if match {
 				matchedScopes = append(matchedScopes, selector)
@@ -284,8 +284,7 @@ func pvcMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 		return false, err
 	}
 
-	switch selector.ScopeName {
-	case corev1.ResourceQuotaScopeVolumeAttributesClass:
+	if selector.ScopeName == corev1.ResourceQuotaScopeVolumeAttributesClass {
 		if selector.Operator == corev1.ScopeSelectorOpExists {
 			// This is just checking for existence of a volumeAttributesClass on the pvc,
 			// no need to take the overhead of selector parsing/evaluation.
@@ -309,7 +308,7 @@ func pvcMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 func pvcMatchesSelector(pvc *corev1.PersistentVolumeClaim, selector corev1.ScopedResourceSelectorRequirement) (bool, error) {
 	labelSelector, err := helper.ScopedResourceSelectorRequirementsAsSelector(selector)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse and convert selector: %v", err)
+		return false, fmt.Errorf("failed to parse and convert selector: %w", err)
 	}
 
 	vacNames := getReferencedVolumeAttributesClassNames(pvc)
