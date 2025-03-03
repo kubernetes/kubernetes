@@ -119,21 +119,21 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			podNamespace: "ns2",
 			podName:      "pod2-recursive",
 			volumeName:   "vol2",
-			label:        "system_u:system_r:label2",
+			label:        "", // labels on volumes with Recursive policy are cleared, we don't want the controller to report label conflicts on them
 			changePolicy: v1.SELinuxChangePolicyRecursive,
 		},
 		{
 			podNamespace: "ns3",
 			podName:      "pod3-1",
 			volumeName:   "vol3", // vol3 is used by 2 pods with the same label + recursive policy
-			label:        "system_u:system_r:label3",
+			label:        "",     // labels on volumes with Recursive policy are cleared, we don't want the controller to report label conflicts on them
 			changePolicy: v1.SELinuxChangePolicyRecursive,
 		},
 		{
 			podNamespace: "ns3",
 			podName:      "pod3-2",
 			volumeName:   "vol3", // vol3 is used by 2 pods with the same label + recursive policy
-			label:        "system_u:system_r:label3",
+			label:        "",     // labels on volumes with Recursive policy are cleared, we don't want the controller to report label conflicts on them
 			changePolicy: v1.SELinuxChangePolicyRecursive,
 		},
 		{
@@ -244,13 +244,13 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			},
 		},
 		{
-			name:        "existing volume in a new pod with new conflicting policy and existing label",
+			name:        "existing volume in a new pod with new conflicting policy",
 			initialPods: existingPods,
 			podToAdd: podWithVolume{
 				podNamespace: "testns",
 				podName:      "testpod",
 				volumeName:   "vol1",
-				label:        "system_u:system_r:label1",
+				label:        "",
 				changePolicy: v1.SELinuxChangePolicyRecursive,
 			},
 			expectedConflicts: []Conflict{
@@ -261,35 +261,6 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 					PropertyValue:      "Recursive",
 					OtherPod:           cache.ObjectName{Namespace: "ns1", Name: "pod1-mountOption"},
 					OtherPropertyValue: "MountOption",
-				},
-			},
-		},
-		{
-			name:        "existing volume in a new pod with new conflicting policy and new conflicting label",
-			initialPods: existingPods,
-			podToAdd: podWithVolume{
-				podNamespace: "testns",
-				podName:      "testpod",
-				volumeName:   "vol1",
-				label:        "system_u:system_r:label-new",
-				changePolicy: v1.SELinuxChangePolicyRecursive,
-			},
-			expectedConflicts: []Conflict{
-				{
-					PropertyName:       "SELinuxChangePolicy",
-					EventReason:        "SELinuxChangePolicyConflict",
-					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
-					PropertyValue:      "Recursive",
-					OtherPod:           cache.ObjectName{Namespace: "ns1", Name: "pod1-mountOption"},
-					OtherPropertyValue: "MountOption",
-				},
-				{
-					PropertyName:       "SELinuxLabel",
-					EventReason:        "SELinuxLabelConflict",
-					Pod:                cache.ObjectName{Namespace: "testns", Name: "testpod"},
-					PropertyValue:      "system_u:system_r:label-new",
-					OtherPod:           cache.ObjectName{Namespace: "ns1", Name: "pod1-mountOption"},
-					OtherPropertyValue: "system_u:system_r:label1",
 				},
 			},
 		},
@@ -307,7 +278,7 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 			expectedConflicts: nil,
 		},
 		{
-			name:        "existing pod is replaced with conflicting policy and label",
+			name:        "existing pod is replaced with conflicting policy",
 			initialPods: existingPods,
 			podToAdd: podWithVolume{
 
@@ -325,14 +296,6 @@ func TestVolumeCache_AddVolumeSendConflicts(t *testing.T) {
 					PropertyValue:      "MountOption",
 					OtherPod:           cache.ObjectName{Namespace: "ns3", Name: "pod3-2"},
 					OtherPropertyValue: "Recursive",
-				},
-				{
-					PropertyName:       "SELinuxLabel",
-					EventReason:        "SELinuxLabelConflict",
-					Pod:                cache.ObjectName{Namespace: "ns3", Name: "pod3-1"},
-					PropertyValue:      "system_u:system_r:label-new",
-					OtherPod:           cache.ObjectName{Namespace: "ns3", Name: "pod3-2"},
-					OtherPropertyValue: "system_u:system_r:label3",
 				},
 			},
 		},
