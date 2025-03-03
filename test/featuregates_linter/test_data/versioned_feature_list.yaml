@@ -1,17 +1,3 @@
-- name: AdmissionWebhookMatchConditions
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.27"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.28"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.30"
 - name: AllowDNSOnlyNodeCSR
   versionedSpecs:
   - default: true
