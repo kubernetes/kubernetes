@@ -142,13 +142,6 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
-	// owner: @caesarxuchao
-	// stable: 1.29
-	//
-	// Allow apiservers to show a count of remaining items in the response
-	// to a chunking list request.
-	RemainingItemCount featuregate.Feature = "RemainingItemCount"
-
 	// owner: @stlaz
 	//
 	// Enable kube-apiserver to accept UIDs via request header authentication.
@@ -355,12 +348,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	OpenAPIEnums: {
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	RemainingItemCount: {
-		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	RemoteRequestHeaderUID: {

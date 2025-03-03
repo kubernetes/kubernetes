@@ -1034,20 +1034,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
-- name: RemainingItemCount
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.15"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.16"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.29"
 - name: RemoteRequestHeaderUID
   versionedSpecs:
   - default: false
