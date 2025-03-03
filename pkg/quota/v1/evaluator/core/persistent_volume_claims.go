@@ -267,6 +267,13 @@ func RequiresQuotaReplenish(pvc, oldPVC *corev1.PersistentVolumeClaim) bool {
 			return true
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.VolumeAttributesClass) {
+		oldNames := getReferencedVolumeAttributesClassNames(oldPVC)
+		newNames := getReferencedVolumeAttributesClassNames(pvc)
+		if !oldNames.Equal(newNames) {
+			return true
+		}
+	}
 	return false
 }
 
@@ -305,6 +312,17 @@ func pvcMatchesSelector(pvc *corev1.PersistentVolumeClaim, selector corev1.Scope
 		return false, fmt.Errorf("failed to parse and convert selector: %v", err)
 	}
 
+	vacNames := getReferencedVolumeAttributesClassNames(pvc)
+	for vacName := range vacNames {
+		m := labels.Set{string(corev1.ResourceQuotaScopeVolumeAttributesClass): vacName}
+		if labelSelector.Matches(m) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func getReferencedVolumeAttributesClassNames(pvc *corev1.PersistentVolumeClaim) sets.Set[string] {
 	vacNames := sets.New[string]()
 	if ptr.Deref(pvc.Spec.VolumeAttributesClassName, "") != "" {
 		vacNames.Insert(*pvc.Spec.VolumeAttributesClassName)
@@ -316,12 +334,5 @@ func pvcMatchesSelector(pvc *corev1.PersistentVolumeClaim, selector corev1.Scope
 	if modifyStatus != nil && modifyStatus.TargetVolumeAttributesClassName != "" {
 		vacNames.Insert(modifyStatus.TargetVolumeAttributesClassName)
 	}
-
-	for vacName := range vacNames {
-		m := labels.Set{string(corev1.ResourceQuotaScopeVolumeAttributesClass): vacName}
-		if labelSelector.Matches(m) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return vacNames
 }
