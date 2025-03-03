@@ -348,6 +348,7 @@ func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Cont
 	if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
 		newStatus := pod.Status.DeepCopy()
 		newStatus.Phase = v1.PodFailed
+		newStatus.ObservedGeneration = apipod.GetPodObservedGenerationIfEnabled(pod)
 		if condition != nil {
 			apipod.UpdatePodCondition(newStatus, condition)
 		}
