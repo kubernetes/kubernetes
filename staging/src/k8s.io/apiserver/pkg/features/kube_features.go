@@ -34,13 +34,6 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
-	// owner: @ivelichkovich, @tallclair
-	// stable: v1.30
-	// kep: https://kep.k8s.io/3716
-	//
-	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
-	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
-
 	// owner: @jefftree @alexzielenski
 	// stable: v1.30
 	//
@@ -260,12 +253,6 @@ func init() {
 // Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	AdmissionWebhookMatchConditions: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	AggregatedDiscoveryEndpoint: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
