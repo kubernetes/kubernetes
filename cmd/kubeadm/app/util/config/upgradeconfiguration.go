@@ -22,28 +22,34 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
-	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 )
 
-var componentCfgGV = sets.New(kubeproxyconfig.GroupName, kubeletconfig.GroupName)
-
 // documentMapToUpgradeConfiguration takes a map between GVKs and YAML documents (as returned by SplitYAMLDocuments),
 // finds a UpgradeConfiguration, decodes it, dynamically defaults it and then validates it prior to return.
 func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecated bool) (*kubeadmapi.UpgradeConfiguration, error) {
-	var internalcfg *kubeadmapi.UpgradeConfiguration
+	upgradeBytes := []byte{}
 
 	for gvk, bytes := range gvkmap {
+		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvk) || componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
+			klog.Warningf("[config] WARNING: YAML document with GroupVersionKind %v is deprecated for upgrade, please use config file with kind of UpgradeConfiguration instead \n", gvk)
+			continue
+		}
+
+		if gvk.Kind != constants.UpgradeConfigurationKind {
+			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
+			continue
+		}
+
 		// check if this version is supported and possibly not deprecated
 		if err := validateSupportedVersion(gvk, allowDeprecated, true); err != nil {
 			return nil, err
@@ -54,37 +60,19 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 			klog.Warning(err.Error())
 		}
 
-		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) || kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvk) {
-			klog.Warningf("[config] WARNING: YAML document with GroupVersionKind %v is deprecated for upgrade, please use config file with kind of UpgradeConfiguration instead \n", gvk)
-			continue
-		}
-
-		if kubeadmutil.GroupVersionKindsHasUpgradeConfiguration(gvk) {
-			// Set internalcfg to an empty struct value the deserializer will populate
-			internalcfg = &kubeadmapi.UpgradeConfiguration{}
-			// Decode the bytes into the internal struct. Under the hood, the bytes will be unmarshalled into the
-			// right external version, defaulted, and converted into the internal version.
-			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), bytes, internalcfg); err != nil {
-				return nil, err
-			}
-			continue
-		}
-
-		// If the group is neither a kubeadm core type or of a supported component config group, we dump a warning about it being ignored
-		if !componentconfigs.Scheme.IsGroupRegistered(gvk.Group) {
-			klog.Warningf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
-		}
+		upgradeBytes = bytes
 	}
 
-	// If UpgradeConfiguration wasn't given, default it by creating an external struct instance, default it and convert into the internal type
-	if internalcfg == nil {
-		extinitcfg := &kubeadmapiv1.UpgradeConfiguration{}
-		kubeadmscheme.Scheme.Default(extinitcfg)
-		// Set upgradeCfg to an empty struct value the deserializer will populate
-		internalcfg = &kubeadmapi.UpgradeConfiguration{}
-		if err := kubeadmscheme.Scheme.Convert(extinitcfg, internalcfg, nil); err != nil {
-			return nil, err
-		}
+	if len(upgradeBytes) == 0 {
+		return nil, errors.Errorf("no %s found in the supplied config", constants.UpgradeConfigurationKind)
+	}
+
+	// Set internalcfg to an empty struct value the deserializer will populate
+	internalcfg := &kubeadmapi.UpgradeConfiguration{}
+	// Decode the bytes into the internal struct. Under the hood, the bytes will be unmarshalled into the
+	// right external version, defaulted, and converted into the internal version.
+	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), upgradeBytes, internalcfg); err != nil {
+		return nil, err
 	}
 
 	// Validates cfg
@@ -96,9 +84,6 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 }
 
 // DocMapToUpgradeConfiguration converts documentMap to an internal, defaulted and validated UpgradeConfiguration object.
-// The map may contain many different YAML documents. These YAML documents are parsed one-by-one
-// and well-known ComponentConfig GroupVersionKinds are stored inside of the internal UpgradeConfiguration struct.
-// The resulting UpgradeConfiguration is then dynamically defaulted and validated prior to return.
 func DocMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap) (*kubeadmapi.UpgradeConfiguration, error) {
 	return documentMapToUpgradeConfiguration(gvkmap, false)
 }
@@ -123,18 +108,8 @@ func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurati
 	// Convert documentMap to internal UpgradeConfiguration, InitConfiguration and ClusterConfiguration from config file will be ignored.
 	// Upgrade should respect the cluster configuration from the existing cluster, re-configure the cluster with a InitConfiguration and
 	// ClusterConfiguration from the config file is not allowed for upgrade.
-	if isKubeadmConfigPresent(docmap) {
-		if upgradeCfg, err = DocMapToUpgradeConfiguration(docmap); err != nil {
-			return nil, err
-		}
-	}
-
-	// Check is there any component configs defined in the config file.
-	for gvk := range docmap {
-		if componentCfgGV.Has(gvk.Group) {
-			klog.Warningf("[config] WARNING: YAML document with Component Configs %v is deprecated for upgrade and will be ignored \n", gvk.Group)
-			continue
-		}
+	if upgradeCfg, err = DocMapToUpgradeConfiguration(docmap); err != nil {
+		return nil, err
 	}
 
 	return upgradeCfg, nil
