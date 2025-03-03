@@ -270,6 +270,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeOutOfServiceVolumeDetach = framework.WithFeature(framework.ValidFeatures.Add("NodeOutOfServiceVolumeDetach"))
 
+	// Owner: sig-api-machinery
+	// Marks tests that enforce ordered namespace deletion.
+	OrderedNamespaceDeletion = framework.WithFeature(framework.ValidFeatures.Add("OrderedNamespaceDeletion"))
+
 	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
