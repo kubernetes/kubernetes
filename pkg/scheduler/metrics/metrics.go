@@ -160,7 +160,7 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "event_handling_duration_seconds",
 			Help:      "Event handling latency in seconds.",
-			// Start with 0.001ms with the last bucket being [~120ms, Inf)
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~120ms, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.000001, 1.5, 30),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"event"})
@@ -234,6 +234,8 @@ func InitMetrics() {
 		[]string{"attempts"})
 
 	PodSchedulingAttempts = metrics.NewHistogram(
+		// Note that the unit is ms, so values displayed in logs need to be divided by 1000
+		// - because metric.Observe(1[attempt]) will actually record 1000[ms] in this case.
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pod_scheduling_attempts",
@@ -247,8 +249,8 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "framework_extension_point_duration_seconds",
 			Help:      "Latency for running all plugins of a specific extension point.",
-			// Start with 0.1ms with the last bucket being [~200ms, Inf)
-			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
+			// Start with 0.0001ms (0.1 microsecond) with the last bucket being [~1,6s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0000001, 2, 25),
 			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"extension_point", "status", "profile"})
