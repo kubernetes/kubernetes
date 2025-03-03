@@ -160,8 +160,8 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "event_handling_duration_seconds",
 			Help:      "Event handling latency in seconds.",
-			// Start with 0.1ms with the last bucket being [~200ms, Inf)
-			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
+			// Start with 0.001ms with the last bucket being [~120ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.000001, 1.5, 30),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"event"})
 
