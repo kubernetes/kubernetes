@@ -17,7 +17,6 @@ limitations under the License.
 package resourceclaimtemplate
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -98,27 +96,21 @@ var objWithAdminAccessInNonAdminNamespace = &resource.ResourceClaimTemplate{
 	},
 }
 
-// Function that uses v1.NamespaceInterface to create namespaces.
-func CreateNamespace(nsClient v1.NamespaceInterface) error {
-	ns := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "default",
-			Labels: map[string]string{"key": "value"},
-		},
-	}
-	_, err := nsClient.Create(context.TODO(), ns, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-	ns = &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "kube-system",
-			Labels: map[string]string{DRAAdminNamespaceLabel: "true"},
-		},
-	}
-	_, err = nsClient.Create(context.TODO(), ns, metav1.CreateOptions{})
-	return err
+var ns1 = &corev1.Namespace{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:   "default",
+		Labels: map[string]string{"key": "value"},
+	},
 }
+var ns2 = &corev1.Namespace{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:   "kube-system",
+		Labels: map[string]string{resource.DRAAdminNamespaceLabel: "true"},
+	},
+}
+var adminAccessError = "Forbidden: admin access to devices is not allowed in namespace without Resource Admin Access label"
+var fieldImmutableError = "field is immutable"
+var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 
 func TestClaimTemplateStrategy(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
@@ -131,26 +123,18 @@ func TestClaimTemplateStrategy(t *testing.T) {
 	if strategy.AllowCreateOnUpdate() {
 		t.Errorf("ResourceClaimTemplate should not allow create on update")
 	}
-	if strategy.nsClient == nil {
-		t.Errorf("ResourceClaimTemplate nsClient should not be nil")
-	}
 }
 
 func TestClaimTemplateStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
-	fakeClient := fake.NewSimpleClientset()
+	fakeClient := fake.NewSimpleClientset(ns1, ns2)
 	mockNSClient := fakeClient.CoreV1().Namespaces()
-	err := CreateNamespace(mockNSClient)
-	if err != nil {
-		t.Fatalf("failed to create test namespaces: %v", err)
-	}
 
 	testcases := map[string]struct {
 		obj                   *resource.ResourceClaimTemplate
 		adminAccess           bool
-		expectValidationError bool
+		expectValidationError string
 		expectObj             *resource.ResourceClaimTemplate
-		nsClient              v1.NamespaceInterface
 	}{
 		"simple": {
 			obj:       obj,
@@ -162,7 +146,7 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 				obj.Name = "%#@$%$"
 				return obj
 			}(),
-			expectValidationError: true,
+			expectValidationError: metadataError,
 		},
 		"drop-fields-admin-access": {
 			obj:         objWithAdminAccess,
@@ -173,36 +157,32 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 			obj:         objWithAdminAccess,
 			adminAccess: true,
 			expectObj:   objWithAdminAccess,
-			nsClient:    mockNSClient,
 		},
-		"admin-access-nil-namespace": {
-			obj:                   objWithAdminAccess,
-			adminAccess:           true,
-			expectObj:             objWithAdminAccess,
-			expectValidationError: true,
+		"admin-access-admin-namespace": {
+			obj:         objWithAdminAccess,
+			adminAccess: true,
+			expectObj:   objWithAdminAccess,
 		},
 		"admin-access-non-admin-namespace": {
 			obj:                   objWithAdminAccessInNonAdminNamespace,
 			adminAccess:           true,
 			expectObj:             objWithAdminAccessInNonAdminNamespace,
-			expectValidationError: true,
-			nsClient:              mockNSClient,
+			expectValidationError: adminAccessError,
 		},
 	}
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
-			strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, tc.nsClient)
+			strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 
 			obj := tc.obj.DeepCopy()
 			strategy.PrepareForCreate(ctx, obj)
 			if errs := strategy.Validate(ctx, obj); len(errs) != 0 {
-				if !tc.expectValidationError {
-					t.Fatalf("unexpected validation errors: %q", errs)
-				}
+				assert.ErrorContains(t, errs[0], tc.expectValidationError, "the error message should have contained the expected error message")
 				return
-			} else if tc.expectValidationError {
+			}
+			if tc.expectValidationError != "" {
 				t.Fatal("expected validation error(s), got none")
 			}
 			if warnings := strategy.WarningsOnCreate(ctx, obj); len(warnings) != 0 {
@@ -217,12 +197,8 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 func TestClaimTemplateStrategyUpdate(t *testing.T) {
 	t.Run("no-changes-okay", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
-		fakeClient := fake.NewSimpleClientset()
+		fakeClient := fake.NewSimpleClientset(ns1, ns2)
 		mockNSClient := fakeClient.CoreV1().Namespaces()
-		err := CreateNamespace(mockNSClient)
-		if err != nil {
-			t.Fatalf("failed to create test namespaces: %v", err)
-		}
 		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 		resourceClaimTemplate := obj.DeepCopy()
 		newClaimTemplate := resourceClaimTemplate.DeepCopy()
@@ -237,12 +213,8 @@ func TestClaimTemplateStrategyUpdate(t *testing.T) {
 
 	t.Run("name-change-not-allowed", func(t *testing.T) {
 		ctx := genericapirequest.NewDefaultContext()
-		fakeClient := fake.NewSimpleClientset()
+		fakeClient := fake.NewSimpleClientset(ns1, ns2)
 		mockNSClient := fakeClient.CoreV1().Namespaces()
-		err := CreateNamespace(mockNSClient)
-		if err != nil {
-			t.Fatalf("failed to create test namespaces: %v", err)
-		}
 		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
 		resourceClaimTemplate := obj.DeepCopy()
 		newClaimTemplate := resourceClaimTemplate.DeepCopy()
@@ -253,6 +225,26 @@ func TestClaimTemplateStrategyUpdate(t *testing.T) {
 		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
 		if len(errs) == 0 {
 			t.Errorf("expected a validation error")
+		}
+	})
+
+	t.Run("adminaccess-update-not-allowed", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, true)
+		ctx := genericapirequest.NewDefaultContext()
+		fakeClient := fake.NewSimpleClientset(ns1, ns2)
+		mockNSClient := fakeClient.CoreV1().Namespaces()
+		strategy := NewStrategy(legacyscheme.Scheme, names.SimpleNameGenerator, mockNSClient)
+		resourceClaimTemplate := obj.DeepCopy()
+		newClaimTemplate := resourceClaimTemplate.DeepCopy()
+		newClaimTemplate.ResourceVersion = "4"
+		newClaimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+
+		strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
+		if len(errs) == 0 {
+			t.Errorf("expected a validation error")
+		} else {
+			assert.ErrorContains(t, errs[0], fieldImmutableError, "the error message should have contained the expected error message")
 		}
 	})
 }
