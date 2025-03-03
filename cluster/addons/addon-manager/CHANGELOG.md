@@ -1,3 +1,6 @@
+### Version 9.1.8 (Mon Mar 3 2025 Jeffrey Ying <jeffrey.ying86@live.com>)
+- Update kubectl to v1.32.2.
+
 ### Version 9.1.7 (Thu May 15 2023 Paco Xu <paco.xu@daocloud.io>)
 - Update kubectl to v1.27.1.
 - Use `--prune-allowlist` instead of deprecated `--prune-whitelist`.
