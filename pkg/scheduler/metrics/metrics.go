@@ -167,9 +167,10 @@ func InitMetrics() {
 
 	schedulingLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_attempt_duration_seconds",
-			Help:           "Scheduling attempt latency in seconds (scheduling algorithm + binding)",
+			Subsystem: SchedulerSubsystem,
+			Name:      "scheduling_attempt_duration_seconds",
+			Help:      "Scheduling attempt latency in seconds (scheduling algorithm + binding)",
+			// Start with 1ms with the last bucket being [~16s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.STABLE,
 		}, []string{"result", "profile"})
@@ -178,7 +179,7 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "scheduling_algorithm_duration_seconds",
 			Help:      "Scheduling algorithm latency in seconds",
-			// Start with 0.1ms with the last bucket being [~3s, Inf)
+			// Start with 0.1ms with the last bucket being [~1.6s, Inf)
 			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -226,7 +227,7 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "pod_scheduling_sli_duration_seconds",
 			Help:      "E2e latency for a pod being scheduled, from the time the pod enters the scheduling queue and might involve multiple scheduling attempts.",
-			// Start with 10ms with the last bucket being [~88m, Inf).
+			// Start with 10ms with the last bucket being [~8 minutes, Inf).
 			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
 			StabilityLevel: metrics.BETA,
 		},
