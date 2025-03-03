@@ -35,7 +35,7 @@ import (
 // Stats is best effort and we evict based on stats being successful
 
 // Container runtime filesystem should display different stats for imagefs and nodefs
-var _ = SIGDescribe("Summary", feature.SeparateDiskTest, func() {
+var _ = SIGDescribe("Summary", feature.SeparateDisk, func() {
 	f := framework.NewDefaultFramework("summary-test")
 	f.It("should display different stats for imagefs and nodefs", func(ctx context.Context) {
 		summary := eventuallyGetSummary(ctx)
@@ -47,7 +47,7 @@ var _ = SIGDescribe("Summary", feature.SeparateDiskTest, func() {
 })
 
 // Node disk pressure is induced by consuming all inodes on the Writeable Layer (imageFS).
-var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
+var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDisk, func() {
 	testRunner(
 		framework.NewDefaultFramework("inode-eviction-test"),
 		EvictionTestConfig{
@@ -77,7 +77,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 // LocalStorageEviction tests that the node responds to node disk pressure by evicting only responsible pods
 // Disk pressure is induced by running pods which consume disk space, which exceed the soft eviction threshold.
 // Note: This test's purpose is to test Soft Evictions.  Local storage was chosen since it is the least costly to run.
-var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
+var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDisk, func() {
 	diskConsumed := resource.MustParse("4Gi")
 	testRunner(
 		framework.NewDefaultFramework("local-storage-imagefs-soft-test"),
@@ -108,7 +108,7 @@ var _ = SIGDescribe("LocalStorageSoftEviction", framework.WithSlow(), framework.
 
 // LocalStorageCapacityIsolationEviction tests that container and volume local storage limits are enforced through evictions
 // removed localstoragecapacityisolation feature gate here as its not a feature gate anymore
-var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
+var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDisk, func() {
 	sizeLimit := resource.MustParse("40Mi")
 	useOverLimit := 41  /* Mb */
 	useUnderLimit := 39 /* Mb */
@@ -166,7 +166,7 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 })
 
 // LocalStorageEviction tests that the node responds to IMAGE FS pressure by evicting pods.
-var _ = SIGDescribe("ImageStorageEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
+var _ = SIGDescribe("ImageStorageEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDisk, func() {
 	testRunner(
 		framework.NewDefaultFramework("local-storage-imagefs-test"),
 		EvictionTestConfig{
@@ -192,7 +192,7 @@ var _ = SIGDescribe("ImageStorageEviction", framework.WithSlow(), framework.With
 // ImageStorageVolumeEviction tests that the node responds to node disk pressure by evicting pods.
 // Volumes write to the node filesystem so we are testing eviction on nodefs even if it
 // exceeds imagefs limits.
-var _ = SIGDescribe("ImageStorageVolumeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDiskTest, func() {
+var _ = SIGDescribe("ImageStorageVolumeEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDisk, func() {
 	testRunner(
 		framework.NewDefaultFramework("exceed-nodefs-test"),
 		EvictionTestConfig{
