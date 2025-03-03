@@ -41,13 +41,6 @@ const (
 	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
 	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
 
-	// owner: @jefftree @alexzielenski
-	// stable: v1.30
-	//
-	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
-	// caching with ETags containing all APIResources known to the apiserver.
-	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
-
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
@@ -263,12 +256,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	AdmissionWebhookMatchConditions: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	AggregatedDiscoveryEndpoint: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
