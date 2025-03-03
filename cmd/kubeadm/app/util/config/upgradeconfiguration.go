@@ -93,20 +93,27 @@ func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurati
 		return nil, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
 	}
 
-	// Split the YAML/JSON documents in the file into a DocumentMap
-	docmap, err := kubeadmutil.SplitConfigDocuments(configBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	// Convert documentMap to internal UpgradeConfiguration, InitConfiguration and ClusterConfiguration from config file will be ignored.
 	// Upgrade should respect the cluster configuration from the existing cluster, re-configure the cluster with a InitConfiguration and
 	// ClusterConfiguration from the config file is not allowed for upgrade.
-	if upgradeCfg, err = DocMapToUpgradeConfiguration(docmap); err != nil {
+	if upgradeCfg, err = BytesToUpgradeConfiguration(configBytes); err != nil {
 		return nil, err
 	}
 
 	return upgradeCfg, nil
+}
+
+// BytesToUpgradeConfiguration converts a byte slice to an internal, defaulted and validated UpgradeConfiguration object.
+// The map may contain many different YAML/JSON documents. These documents are parsed one-by-one.
+// The resulting UpgradeConfiguration is then dynamically defaulted and validated prior to return.
+func BytesToUpgradeConfiguration(b []byte) (*kubeadmapi.UpgradeConfiguration, error) {
+	// Split the YAML/JSON documents in the file into a DocumentMap
+	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
+	if err != nil {
+		return nil, err
+	}
+
+	return documentMapToUpgradeConfiguration(gvkmap, false)
 }
 
 // LoadOrDefaultUpgradeConfiguration takes a path to a config file and a versioned configuration that can serve as the default config

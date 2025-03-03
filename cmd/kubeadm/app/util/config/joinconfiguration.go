@@ -87,6 +87,14 @@ func LoadJoinConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurati
 		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
 	}
 
+	return BytesToJoinConfiguration(b, opts)
+}
+
+// BytesToJoinConfiguration converts a byte slice to an internal, defaulted and validated JoinConfiguration object.
+// The map may contain many different YAML/JSON documents. These documents are parsed one-by-one.
+// The resulting JoinConfiguration is then dynamically defaulted and validated prior to return.
+func BytesToJoinConfiguration(b []byte, opts LoadOrDefaultConfigurationOptions) (*kubeadmapi.JoinConfiguration, error) {
+	// Split the YAML/JSON documents in the file into a DocumentMap
 	gvkmap, err := kubeadmutil.SplitConfigDocuments(b)
 	if err != nil {
 		return nil, err
