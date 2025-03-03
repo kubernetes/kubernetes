@@ -824,11 +824,11 @@ func TestSuccessPolicy(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
-			if !tc.enableBackoffLimitPerIndex {
+			if !tc.enableBackoffLimitPerIndex || !tc.enableJobSuccessPolicy {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 			}
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableBackoffLimitPerIndex)
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -875,6 +875,7 @@ func TestSuccessPolicy(t *testing.T) {
 // TestSuccessPolicy_ReEnabling tests handling of pod successful when
 // re-enabling the JobSuccessPolicy feature.
 func TestSuccessPolicy_ReEnabling(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, true)
 	closeFn, resetConfig, clientSet, ns := setup(t, "success-policy-re-enabling")
 	t.Cleanup(closeFn)
@@ -1582,6 +1583,10 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
+			if !test.enableJobSuccessPolicy {
+				// TODO: this will be removed in 1.36.
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ElasticIndexedJob, true)
