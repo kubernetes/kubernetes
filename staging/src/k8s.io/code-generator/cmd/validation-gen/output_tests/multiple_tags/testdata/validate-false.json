@@ -1,0 +1,25 @@
+{
+    "*multipletags.T1": {
+      "": [
+        "type T1 #1",
+        "type T1 #2",
+        "type T1 #3"
+      ],
+      "s": [
+        "field T1.S false #1",
+        "field T1.S false #2",
+        "field T1.S false #3"
+      ],
+      "t2": [
+        "field T1.T2 false #1",
+        "field T1.T2 false #2",
+        "field T1.T2 false #3",
+        "type T2 false #1",
+        "type T2 false #2"
+      ],
+      "t2.s": [
+        "field T2.S false #1",
+        "field T2.S false #2"
+      ]
+    }
+  }

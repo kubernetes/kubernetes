@@ -1,0 +1,45 @@
+{
+    "*typedeftoslice.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "listField": [
+        "field Struct.ListField",
+        "type ListType"
+      ],
+      "listField[0]": [
+        "field Struct.ListField[*]",
+        "type ListType[*]"
+      ],
+      "listField[1]": [
+        "field Struct.ListField[*]",
+        "type ListType[*]"
+      ],
+      "listPtrField": [
+        "field Struct.ListPtrField",
+        "type ListPtrType"
+      ],
+      "listPtrField[0]": [
+        "field Struct.ListPtrField[*]",
+        "type ListPtrType[*]"
+      ],
+      "listPtrField[1]": [
+        "field Struct.ListPtrField[*]",
+        "type ListPtrType[*]"
+      ],
+      "listTypedefField": [
+        "field Struct.ListTypedefField",
+        "type ListTypedefType"
+      ],
+      "listTypedefField[0]": [
+        "field Struct.ListTypedefField[*]",
+        "type ListTypedefType[*]",
+        "type StringType"
+      ],
+      "listTypedefField[1]": [
+        "field Struct.ListTypedefField[*]",
+        "type ListTypedefType[*]",
+        "type StringType"
+      ]
+    }
+  }

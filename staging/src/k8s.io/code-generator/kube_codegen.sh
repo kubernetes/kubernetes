@@ -48,7 +48,7 @@ function kube::codegen::internal::grep() {
         --exclude-dir vendor
 }
 
-# Generate tagged helper code: conversions, deepcopy, and defaults
+# Generate tagged helper code: conversions, deepcopy, defaults and validations
 #
 # USAGE: kube::codegen::gen_helpers [FLAGS] <input-dir>
 #
@@ -111,6 +111,7 @@ function kube::codegen::gen_helpers() {
             conversion-gen"${CODEGEN_VERSION_SPEC}"
             deepcopy-gen"${CODEGEN_VERSION_SPEC}"
             defaulter-gen"${CODEGEN_VERSION_SPEC}"
+            validation-gen"${CODEGEN_VERSION_SPEC}"
         )
         # shellcheck disable=2046 # printf word-splitting is intentional
         GO111MODULE=on go install $(printf "k8s.io/code-generator/cmd/%s " "${BINS[@]}")
@@ -146,6 +147,38 @@ function kube::codegen::gen_helpers() {
         "${gobin}/deepcopy-gen" \
             -v "${v}" \
             --output-file zz_generated.deepcopy.go \
+            --go-header-file "${boilerplate}" \
+            "${input_pkgs[@]}"
+    fi
+
+    # Validations
+    #
+    local input_pkgs=()
+    while read -r dir; do
+        pkg="$(cd "${dir}" && GO111MODULE=on go list -find .)"
+        input_pkgs+=("${pkg}")
+    done < <(
+        ( kube::codegen::internal::grep -l --null \
+            -e '^\s*//\s*+k8s:validation-gen=' \
+            -r "${in_dir}" \
+            --include '*.go' \
+            || true \
+        ) | while read -r -d $'\0' F; do dirname "${F}"; done \
+          | LC_ALL=C sort -u
+    )
+
+    if [ "${#input_pkgs[@]}" != 0 ]; then
+        echo "Generating validation code for ${#input_pkgs[@]} targets"
+
+        kube::codegen::internal::findz \
+            "${in_dir}" \
+            -type f \
+            -name zz_generated.validations.go \
+            | xargs -0 rm -f
+
+        "${gobin}/validation-gen" \
+            -v "${v}" \
+            --output-file zz_generated.validations.go \
             --go-header-file "${boilerplate}" \
             "${input_pkgs[@]}"
     fi
