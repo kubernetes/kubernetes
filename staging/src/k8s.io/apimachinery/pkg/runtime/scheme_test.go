@@ -1089,7 +1089,8 @@ func TestRegisterValidate(t *testing.T) {
 			} else {
 				results = s.ValidateUpdate(ctx, tc.options, tc.object, tc.oldObject, tc.subresource...)
 			}
-			fieldtesting.MatchErrors(t, tc.expected, results, fieldtesting.Match().ByType().ByField().ByOrigin())
+			matcher := fieldtesting.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher.Test(t, tc.expected, results)
 		})
 	}
 }

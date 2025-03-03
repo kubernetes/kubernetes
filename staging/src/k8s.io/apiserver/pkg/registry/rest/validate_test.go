@@ -154,7 +154,8 @@ func TestValidateDeclaratively(t *testing.T) {
 			} else {
 				results = ValidateUpdateDeclaratively(ctx, tc.options, scheme, tc.object, tc.oldObject)
 			}
-			fieldtesting.MatchErrors(t, tc.expected, results, fieldtesting.Match().ByType().ByField().ByOrigin())
+			matcher := fieldtesting.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher.Test(t, tc.expected, results)
 		})
 	}
 }
