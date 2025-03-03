@@ -239,7 +239,7 @@ func (p *pvcEvaluator) getStorageUsage(pvc *corev1.PersistentVolumeClaim) *resou
 
 // UsageStats calculates aggregate usage for the object.
 func (p *pvcEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
+	return generic.CalculateUsageStats(options, p.listFuncByNamespace, pvcMatchesScopeFunc, p.Usage)
 }
 
 // ensure we implement required interface
