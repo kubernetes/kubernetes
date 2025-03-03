@@ -18,8 +18,10 @@ import (
 	v "github.com/openshift-eng/openshift-tests-extension/pkg/version"
 
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/client-go/tools/clientcmd"
 	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/openshift-hack/e2e/annotate/generated"
 	"k8s.io/kubernetes/test/utils/image"
 
@@ -49,10 +51,18 @@ func main() {
 	kubeTestsExtension := e.NewExtension("openshift", "payload", "hyperkube")
 	extensionRegistry.Register(kubeTestsExtension)
 
+	providerJSON := os.Getenv("TEST_PROVIDER")
+	if providerJSON == "" {
+		klog.Fatal("TEST_PROVIDER must be set (example: export TEST_PROVIDER='{\"type\":\"local\"}')")
+	}
+
 	// Initialization for kube ginkgo test framework needs to run before all tests are discovered.
 	// Some tests use the testContext to generate e2e tests.
-	if err := initializeTestFramework(os.Getenv("TEST_PROVIDER")); err != nil {
-		panic(err)
+	if err := initializeTestFramework(providerJSON); err != nil {
+		if clientcmd.IsEmptyConfig(err) {
+			klog.Fatalf("Failed to initialize Kubernetes client. Is KUBECONFIG set? Full error: %v", err)
+		}
+		klog.Fatalf("Failed to initialize test framework: %v", err)
 	}
 
 	// Carve up the kube tests into our openshift suites...
@@ -85,7 +95,7 @@ func main() {
 	// Build our specs from ginkgo
 	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
 	if err != nil {
-		panic(err)
+		klog.Fatalf("Failed to build test specs: %v", err)
 	}
 
 	// Annotations get appended to test names, these are additions to upstream
