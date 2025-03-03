@@ -49,6 +49,12 @@ func main() {
 	kubeTestsExtension := e.NewExtension("openshift", "payload", "hyperkube")
 	extensionRegistry.Register(kubeTestsExtension)
 
+	// Initialization for kube ginkgo test framework needs to run before all tests are discovered.
+	// Some tests use the testContext to generate e2e tests.
+	if err := initializeTestFramework(os.Getenv("TEST_PROVIDER")); err != nil {
+		panic(err)
+	}
+
 	// Carve up the kube tests into our openshift suites...
 	kubeTestsExtension.AddSuite(e.Suite{
 		Name: "kubernetes/conformance/parallel",
@@ -81,13 +87,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// Initialization for kube ginkgo test framework needs to run before all tests execute
-	specs.AddBeforeAll(func() {
-		if err := initializeTestFramework(os.Getenv("TEST_PROVIDER")); err != nil {
-			panic(err)
-		}
-	})
 
 	// Annotations get appended to test names, these are additions to upstream
 	// tests for controlling skips, suite membership, etc.
