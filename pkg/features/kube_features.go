@@ -964,6 +964,16 @@ const (
 	// restore the old behavior. Please file issues if you hit issues and have to use this Feature Gate.
 	// The Feature Gate will be locked to true and then removed in +2 releases (1.35) if there are no bug reported
 	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
+
+	// owner: @munnerz
+	// kep: https://kep.k8s.io/4742
+	// alpha: v1.33
+	//
+	// Enables the PodTopologyLabelsAdmission admission plugin to automatically set node topology labels
+	// (i.e. those with the 'topology.k8s.io/' prefix on Node objects) onto Pod objects when they are
+	// bound/scheduled to a node.
+	// This allows workloads running in pods to understand the topology information of their assigned node.
+	PodTopologyLabelsAdmission featuregate.Feature = "PodTopologyLabelsAdmission"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.

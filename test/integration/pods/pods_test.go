@@ -22,11 +22,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -39,6 +43,124 @@ import (
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+func TestPodTopologyLabels(t *testing.T) {
+	tests := []podTopologyTestCase{
+		{
+			name: "zone and region topology labels copied from assigned Node",
+			targetNodeLabels: map[string]string{
+				"topology.k8s.io/zone":   "zone",
+				"topology.k8s.io/region": "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.k8s.io/zone":   "zone",
+				"topology.k8s.io/region": "region",
+			},
+		},
+	}
+	// Enable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
+	// on start up and not on each invocation at runtime.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, true)
+	testPodTopologyLabels(t, tests)
+}
+
+func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
+	tests := []podTopologyTestCase{
+		{
+			name: "does nothing when the feature is not enabled",
+			targetNodeLabels: map[string]string{
+				"topology.k8s.io/zone":   "zone",
+				"topology.k8s.io/region": "region",
+			},
+			expectedPodLabels: map[string]string{},
+		},
+	}
+	// Disable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
+	// on start up and not on each invocation at runtime.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, false)
+	testPodTopologyLabels(t, tests)
+}
+
+// podTopologyTestCase is defined outside of TestPodTopologyLabels to allow us to re-use the test implementation logic
+// between the feature enabled and feature disabled tests.
+// This will no longer be required once the feature gate graduates to GA/locked to being enabled.
+type podTopologyTestCase struct {
+	name              string
+	targetNodeLabels  map[string]string
+	expectedPodLabels map[string]string
+}
+
+func testPodTopologyLabels(t *testing.T, tests []podTopologyTestCase) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-topology-labels", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	prototypePod := func() *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "pod-topology-test-",
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:  "fake-name",
+						Image: "fakeimage",
+					},
+				},
+			},
+		}
+	}
+	prototypeNode := func() *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "podtopology-test-node-",
+			},
+		}
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create the Node we are going to bind to.
+			node := prototypeNode()
+			// Set the labels on the Node we are going to create.
+			node.Labels = test.targetNodeLabels
+			ctx := context.Background()
+
+			var err error
+			if node, err = client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create node: %v", err)
+			}
+
+			pod := prototypePod()
+			if pod, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to create pod: %v", err)
+			}
+
+			binding := &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: node.Name,
+				},
+			}
+			if err := client.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{}); err != nil {
+				t.Errorf("Failed to bind pod to node: %v", err)
+			}
+
+			if pod, err = client.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{}); err != nil {
+				t.Errorf("Failed to fetch bound Pod: %v", err)
+			}
+
+			if !apiequality.Semantic.DeepEqual(pod.Labels, test.expectedPodLabels) {
+				t.Errorf("Unexpected label values: %v", cmp.Diff(pod.Labels, test.expectedPodLabels))
+			}
+		})
+	}
+}
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
