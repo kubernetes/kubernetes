@@ -99,7 +99,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes", framework.WithDisruptive(), fu
 					break
 				}
 			}
-			gomega.Expect(clientNode).NotTo(gomega.BeEmpty())
+			gomega.Expect(clientNode).NotTo(gomega.BeNil())
 		}
 	})
 
