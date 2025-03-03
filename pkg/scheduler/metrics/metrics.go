@@ -175,10 +175,11 @@ func InitMetrics() {
 		}, []string{"result", "profile"})
 	SchedulingAlgorithmLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_duration_seconds",
-			Help:           "Scheduling algorithm latency in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Subsystem: SchedulerSubsystem,
+			Name:      "scheduling_algorithm_duration_seconds",
+			Help:      "Scheduling algorithm latency in seconds",
+			// Start with 0.1ms with the last bucket being [~3s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
