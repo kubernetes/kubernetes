@@ -355,7 +355,7 @@ func (sp *ScorePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -367,7 +367,7 @@ func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p
 	score := int64(1)
 	if sp.numScoreCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
-		sp.highScoreNode = nodeName
+		sp.highScoreNode = nodeInfo.Node().Name
 		score = framework.MaxNodeScore
 	}
 	return score, nil
@@ -383,7 +383,7 @@ func (sp *ScoreWithNormalizePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 

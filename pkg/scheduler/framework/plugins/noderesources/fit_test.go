@@ -1106,7 +1106,11 @@ func TestFitScore(t *testing.T) {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 					}
 				}
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
+				nodeInfo, err := snapshot.Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
@@ -1221,12 +1225,16 @@ func BenchmarkTestFitScore(b *testing.B) {
 			var nodeResourcesFunc = runtime.FactoryAdapter(plfeature.Features{}, NewFit)
 			pl := plugintesting.SetupPlugin(ctx, b, nodeResourcesFunc, &test.nodeResourcesFitArgs, cache.NewSnapshot(existingPods, nodes))
 			p := pl.(*Fit)
+			nodeInfo, err := p.handle.SnapshotSharedLister().NodeInfos().Get(nodes[0].Name)
+			if err != nil {
+				b.Errorf("failed to get node %q from snapshot: %v", nodes[0].Name, err)
+			}
 
 			b.ResetTimer()
 
 			requestedPod := st.MakePod().Req(map[v1.ResourceName]string{"cpu": "1000", "memory": "2000"}).Obj()
 			for i := 0; i < b.N; i++ {
-				_, status := p.Score(ctx, state, requestedPod, nodes[0].Name)
+				_, status := p.Score(ctx, state, requestedPod, nodeInfo)
 				if !status.IsSuccess() {
 					b.Errorf("unexpected status: %v", status)
 				}

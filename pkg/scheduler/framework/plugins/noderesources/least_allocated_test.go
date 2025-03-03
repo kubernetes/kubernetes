@@ -419,7 +419,11 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
+				nodeInfo, err := snapshot.Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, nodeInfo)
 				if status.Code() != test.wantStatusCode {
 					t.Errorf("unexpected status code, want: %v, got: %v", test.wantStatusCode, status.Code())
 				}

@@ -192,12 +192,7 @@ func (pl *PodTopologySpread) PreScore(
 // Score invoked at the Score extension point.
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
-func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
-
+func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 	s, err := getPreScoreState(cycleState)
 	if err != nil {

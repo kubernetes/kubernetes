@@ -1137,7 +1137,8 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		}
 		// Run Score method for each node in parallel.
 		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-			nodeName := nodes[index].Node().Name
+			nodeInfo := nodes[index]
+			nodeName := nodeInfo.Node().Name
 			logger := logger
 			if verboseLogs {
 				logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
@@ -1148,7 +1149,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 					logger := klog.LoggerWithName(logger, pl.Name())
 					ctx = klog.NewContext(ctx, logger)
 				}
-				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
+				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeInfo)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
 					errCh.SendErrorWithCancel(err, cancel)
@@ -1217,12 +1218,12 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	return allNodePluginScores, nil
 }
 
-func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl framework.ScorePlugin, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	if !state.ShouldRecordPluginMetrics() {
-		return pl.Score(ctx, state, pod, nodeName)
+		return pl.Score(ctx, state, pod, nodeInfo)
 	}
 	startTime := time.Now()
-	s, status := pl.Score(ctx, state, pod, nodeName)
+	s, status := pl.Score(ctx, state, pod, nodeInfo)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.Score, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return s, status
 }
