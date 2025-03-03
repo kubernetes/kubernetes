@@ -45,10 +45,10 @@ var (
 		StrictCPUReservationOption,
 		PreferAlignByUnCoreCacheOption,
 	)
-	betaOptions = sets.New[string](
+	betaOptions   = sets.New[string]()
+	stableOptions = sets.New[string](
 		FullPCPUsOnlyOption,
 	)
-	stableOptions = sets.New[string]()
 )
 
 // CheckPolicyOptionAvailable verifies if the given option can be used depending on the Feature Gate Settings.
@@ -66,6 +66,7 @@ func CheckPolicyOptionAvailable(option string) error {
 		return fmt.Errorf("CPU Manager Policy Beta-level Options not enabled, but option %q provided", option)
 	}
 
+	// if the option is stable, we need no CPUManagerPolicy*Options feature gate check
 	return nil
 }
 
