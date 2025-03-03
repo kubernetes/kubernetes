@@ -33,7 +33,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
-	netutils "k8s.io/utils/net"
 )
 
 // Kubernetes UDP services can be affected by stale conntrack entries.
@@ -130,7 +129,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 		// and the reply source (--reply-src) is not IP of any serving endpoint, we clear the entry.
 		endpoints, ok := serviceIPEndpointIPs[net.JoinHostPort(origDst, origPortDstStr)]
 		if ok && !endpoints.Has(replySrc) {
-			filters = append(filters, filterForIPPortNAT(origDst, replySrc, entry.Forward.DstPort, v1.ProtocolUDP))
+			filters = append(filters, filterForIPPortNAT(entry.Forward.DstIP, entry.Forward.DstPort, entry.Reverse.SrcIP, v1.ProtocolUDP))
 		}
 
 		// if the original port destination (--orig-port-dst) of the flow is service
@@ -138,7 +137,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 		// we clear the entry.
 		endpoints, ok = serviceNodePortEndpointIPs[origPortDst]
 		if ok && !endpoints.Has(replySrc) {
-			filters = append(filters, filterForPortNAT(replySrc, origPortDst, v1.ProtocolUDP))
+			filters = append(filters, filterForPortNAT(entry.Forward.DstPort, entry.Reverse.SrcIP, v1.ProtocolUDP))
 		}
 	}
 
@@ -169,31 +168,31 @@ var protocolMap = map[v1.Protocol]uint8{
 // filterForIPPortNAT returns *conntrackFilter to delete the conntrack entries for connections
 // specified by the destination IP (original direction) and destination port (original direction)
 // and source IP (reply direction).
-func filterForIPPortNAT(origin, dest string, dstPort uint16, protocol v1.Protocol) *conntrackFilter {
-	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "reply-src", dest, "protocol", protocol)
+func filterForIPPortNAT(origDst net.IP, origPortDst uint16, replySrc net.IP, protocol v1.Protocol) *conntrackFilter {
+	klog.V(6).InfoS("Adding conntrack filter for cleanup", "orig-dst", origDst.String(), "orig-port-dst", origPortDst, "reply-src", replySrc.String(), "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{
-			dstIP:   netutils.ParseIPSloppy(origin),
-			dstPort: dstPort,
+			dstIP:   origDst,
+			dstPort: origPortDst,
 		},
 		reply: &connectionTuple{
-			srcIP: netutils.ParseIPSloppy(dest),
+			srcIP: replySrc,
 		},
 	}
 }
 
 // filterForPortNAT returns *conntrackFilter to delete the conntrack entries for connections
 // specified by the destination Port (original direction) and source IP (reply direction).
-func filterForPortNAT(dest string, port int, protocol v1.Protocol) *conntrackFilter {
-	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-port-dst", port, "reply-src", dest, "protocol", protocol)
+func filterForPortNAT(origPortDst uint16, replySrc net.IP, protocol v1.Protocol) *conntrackFilter {
+	klog.V(6).InfoS("Adding conntrack filter for cleanup", "orig-port-dst", origPortDst, "reply-src", replySrc.String(), "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{
-			dstPort: uint16(port),
+			dstPort: origPortDst,
 		},
 		reply: &connectionTuple{
-			srcIP: netutils.ParseIPSloppy(dest),
+			srcIP: replySrc,
 		},
 	}
 }
