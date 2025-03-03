@@ -747,9 +747,9 @@
     version: "1.33"
 - name: ListFromCacheSnapshot
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
+    preRelease: Beta
     version: "1.33"
 - name: LoadBalancerIPMode
   versionedSpecs:
