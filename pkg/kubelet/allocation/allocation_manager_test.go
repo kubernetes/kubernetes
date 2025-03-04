@@ -110,7 +110,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		name: "steady state",
 		pod:  pod,
 		allocs: state.PodResourceAllocation{
-			string(pod.UID): map[string]v1.ResourceRequirements{
+			pod.UID: map[string]v1.ResourceRequirements{
 				"c1":                  *pod.Spec.Containers[0].Resources.DeepCopy(),
 				"c2":                  *pod.Spec.Containers[1].Resources.DeepCopy(),
 				"c1-restartable-init": *pod.Spec.InitContainers[0].Resources.DeepCopy(),
@@ -127,7 +127,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		name: "missing container allocation",
 		pod:  pod,
 		allocs: state.PodResourceAllocation{
-			string(pod.UID): map[string]v1.ResourceRequirements{
+			pod.UID: map[string]v1.ResourceRequirements{
 				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
 			},
 		},
@@ -136,7 +136,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		name: "resized container",
 		pod:  pod,
 		allocs: state.PodResourceAllocation{
-			string(pod.UID): map[string]v1.ResourceRequirements{
+			pod.UID: map[string]v1.ResourceRequirements{
 				"c1":                  *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
 				"c2":                  *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
 				"c1-restartable-init": *resizedPod.Spec.InitContainers[0].Resources.DeepCopy(),

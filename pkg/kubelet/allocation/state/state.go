@@ -23,10 +23,7 @@ import (
 )
 
 // PodResourceAllocation type is used in tracking resources allocated to pod's containers
-type PodResourceAllocation map[string]map[string]v1.ResourceRequirements
-
-// PodResizeStatus type is used in tracking the last resize decision for pod
-type PodResizeStatus map[string]v1.PodResizeStatus
+type PodResourceAllocation map[types.UID]map[string]v1.ResourceRequirements
 
 // Clone returns a copy of PodResourceAllocation
 func (pr PodResourceAllocation) Clone() PodResourceAllocation {
@@ -42,14 +39,14 @@ func (pr PodResourceAllocation) Clone() PodResourceAllocation {
 
 // Reader interface used to read current pod resource allocation state
 type Reader interface {
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
+	GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 	GetPodResourceAllocation() PodResourceAllocation
 }
 
 type writer interface {
-	SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error
-	SetPodResourceAllocation(podUID string, alloc map[string]v1.ResourceRequirements) error
-	Delete(podUID string, containerName string) error
+	SetContainerResourceAllocation(podUID types.UID, containerName string, alloc v1.ResourceRequirements) error
+	SetPodResourceAllocation(podUID types.UID, alloc map[string]v1.ResourceRequirements) error
+	Delete(podUID types.UID, containerName string) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
 }

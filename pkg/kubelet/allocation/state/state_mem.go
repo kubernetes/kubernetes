@@ -43,7 +43,7 @@ func NewStateMemory(alloc PodResourceAllocation) State {
 	}
 }
 
-func (s *stateMemory) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
+func (s *stateMemory) GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -57,7 +57,7 @@ func (s *stateMemory) GetPodResourceAllocation() PodResourceAllocation {
 	return s.podAllocation.Clone()
 }
 
-func (s *stateMemory) SetContainerResourceAllocation(podUID string, containerName string, alloc v1.ResourceRequirements) error {
+func (s *stateMemory) SetContainerResourceAllocation(podUID types.UID, containerName string, alloc v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -70,7 +70,7 @@ func (s *stateMemory) SetContainerResourceAllocation(podUID string, containerNam
 	return nil
 }
 
-func (s *stateMemory) SetPodResourceAllocation(podUID string, alloc map[string]v1.ResourceRequirements) error {
+func (s *stateMemory) SetPodResourceAllocation(podUID types.UID, alloc map[string]v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -79,7 +79,7 @@ func (s *stateMemory) SetPodResourceAllocation(podUID string, alloc map[string]v
 	return nil
 }
 
-func (s *stateMemory) deleteContainer(podUID string, containerName string) {
+func (s *stateMemory) deleteContainer(podUID types.UID, containerName string) {
 	delete(s.podAllocation[podUID], containerName)
 	if len(s.podAllocation[podUID]) == 0 {
 		delete(s.podAllocation, podUID)
@@ -87,7 +87,7 @@ func (s *stateMemory) deleteContainer(podUID string, containerName string) {
 	klog.V(3).InfoS("Deleted pod resource allocation", "podUID", podUID, "containerName", containerName)
 }
 
-func (s *stateMemory) Delete(podUID string, containerName string) error {
+func (s *stateMemory) Delete(podUID types.UID, containerName string) error {
 	s.Lock()
 	defer s.Unlock()
 	if len(containerName) == 0 {
