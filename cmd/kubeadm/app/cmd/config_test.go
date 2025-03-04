@@ -399,9 +399,9 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 				t.Fatalf("Error from running the print command: %v", err)
 			}
 
-			gvkmap, err := kubeadmutil.SplitYAMLDocuments(output.Bytes())
+			gvkmap, err := kubeadmutil.SplitConfigDocuments(output.Bytes())
 			if err != nil {
-				t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
+				t.Fatalf("unexpected failure of SplitConfigDocuments: %v", err)
 			}
 
 			gotKinds := []string{}
