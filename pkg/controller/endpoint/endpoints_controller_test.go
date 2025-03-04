@@ -317,6 +317,9 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				labelManagedBy: controllerName,
+			},
 		},
 		Subsets: nil,
 	})
@@ -346,6 +349,9 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				labelManagedBy: controllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
@@ -376,6 +382,9 @@ func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				labelManagedBy: controllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{
@@ -501,6 +510,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -524,6 +534,7 @@ func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -652,6 +663,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -701,6 +713,7 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -746,6 +759,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -792,6 +806,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -838,6 +853,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -861,6 +877,9 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				labelManagedBy: controllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
@@ -887,6 +906,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -909,6 +929,9 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			ResourceVersion: "1",
 			Name:            "foo",
 			Namespace:       ns,
+			Labels: map[string]string{
+				labelManagedBy: controllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -972,6 +995,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			ResourceVersion: "",
 			Name:            "foo",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1022,6 +1046,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	}}
 
 	serviceLabels[v1.IsHeadlessService] = ""
+	serviceLabels[labelManagedBy] = controllerName
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
@@ -1074,6 +1099,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	}
 
 	serviceLabels[v1.IsHeadlessService] = ""
+	serviceLabels[labelManagedBy] = controllerName
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1183,6 +1209,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				"a":                  "b",
 				v1.IsHeadlessService: "",
 			},
@@ -1212,7 +1239,8 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
-				"foo": "bar",
+				labelManagedBy: controllerName,
+				"foo":          "bar",
 			},
 		},
 		Subsets: []v1.EndpointSubset{},
@@ -1236,6 +1264,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1281,6 +1310,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1327,6 +1357,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1361,6 +1392,7 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1580,6 +1612,7 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
 			},
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1636,6 +1669,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
 			},
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1690,6 +1724,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				labelManagedBy:       controllerName,
 				v1.IsHeadlessService: "",
 			}, // Annotation not set anymore.
 		},
