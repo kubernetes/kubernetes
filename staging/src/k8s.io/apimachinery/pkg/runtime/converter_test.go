@@ -36,9 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 )
 
 var simpleEquality = conversion.EqualitiesOrDie(
@@ -640,9 +640,9 @@ func TestUnknownFields(t *testing.T) {
 // with the various validation directives (Ignore, Warn, Strict)
 func BenchmarkFromUnstructuredWithValidation(b *testing.B) {
 	re := regexp.MustCompile("^I$")
-	f := fuzz.NewWithSeed(1).NilChance(0.1).SkipFieldsWithPattern(re)
+	f := randfill.NewWithSeed(1).NilChance(0.1).SkipFieldsWithPattern(re)
 	iObj := &I{}
-	f.Fuzz(&iObj)
+	f.Fill(&iObj)
 
 	unstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(iObj)
 	if err != nil {

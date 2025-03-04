@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -38,8 +38,8 @@ import (
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		// provide non-empty values for fields with defaults, so the defaulter doesn't change values during round-trip
-		func(obj *kubeletconfig.KubeletConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
+		func(obj *kubeletconfig.KubeletConfiguration, c randfill.Continue) {
+			c.FillNoCustom(obj)
 			obj.EnableServer = true
 			obj.Authentication.Anonymous.Enabled = true
 			obj.Authentication.Webhook.Enabled = false

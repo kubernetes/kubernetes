@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/randfill"
 )
 
 func TestLabelSelectorAsSelector(t *testing.T) {
@@ -188,8 +188,8 @@ func TestResetObjectMetaForStatus(t *testing.T) {
 	existingMeta := &ObjectMeta{}
 
 	// fuzz the existingMeta to set every field, no nils
-	f := fuzz.New().NilChance(0).NumElements(1, 1).MaxDepth(10)
-	f.Fuzz(existingMeta)
+	f := randfill.New().NilChance(0).NumElements(1, 1).MaxDepth(10)
+	f.Fill(existingMeta)
 	ResetObjectMetaForStatus(meta, existingMeta)
 
 	// not all fields are stomped during the reset.  These fields should not have been set. False

@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/applyconfigurations"
 	v1mf "k8s.io/client-go/applyconfigurations/core/v1"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -166,22 +166,22 @@ func fuzzObject(t *testing.T, gvk schema.GroupVersionKind) runtime.Object {
 			// Ensure that InitContainers and their statuses are not generated. This
 			// is because in this test we are simply doing json operations, in which
 			// those disappear.
-			func(s *api.PodSpec, c fuzz.Continue) {
-				c.FuzzNoCustom(s)
+			func(s *api.PodSpec, c randfill.Continue) {
+				c.FillNoCustom(s)
 				s.InitContainers = nil
 			},
-			func(s *api.PodStatus, c fuzz.Continue) {
-				c.FuzzNoCustom(s)
+			func(s *api.PodStatus, c randfill.Continue) {
+				c.FillNoCustom(s)
 				s.InitContainerStatuses = nil
 			},
 			// Apply configuration types do not have managed fields, so we exclude
 			// them in our fuzz test cases.
-			func(s *v1.ObjectMeta, c fuzz.Continue) {
-				c.FuzzNoCustom(s)
+			func(s *v1.ObjectMeta, c randfill.Continue) {
+				c.FillNoCustom(s)
 				s.ManagedFields = nil
 				s.SelfLink = ""
 			},
-		).Fuzz(internalObj)
+		).Fill(internalObj)
 
 	item, err := legacyscheme.Scheme.New(externalVersion.WithKind(kind))
 	if err != nil {

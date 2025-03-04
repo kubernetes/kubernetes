@@ -27,7 +27,7 @@ import (
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -704,15 +704,15 @@ func refEqual(x spec.Ref, y spec.Ref) bool {
 func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 	// 1000 iterations runs for ~2 seconds with race detection enabled
 	for i := 0; i < 1000; i++ {
-		f := fuzz.New()
+		f := randfill.New()
 		seed := time.Now().UnixNano()
 		randSource := rand.New(rand.NewSource(seed))
 		f.RandSource(randSource)
 		t.Logf("iteration %d with seed %d", i, seed)
 
-		fuzzFuncs(f, func(ref *spec.Ref, c fuzz.Continue, visible bool) {
+		fuzzFuncs(f, func(ref *spec.Ref, c randfill.Continue, visible bool) {
 			var url string
-			if c.RandBool() {
+			if c.Bool() {
 				url = fmt.Sprintf("http://%d", c.Intn(100000))
 			} else {
 				url = "#/definitions/test"
@@ -726,7 +726,7 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 
 		// create go-openapi object and fuzz it (we start here because we have the powerful fuzzer already
 		s := &spec.Schema{}
-		f.Fuzz(s)
+		f.Fill(s)
 
 		// convert to apiextensions v1beta1
 		bs, err := json.Marshal(s)
@@ -790,7 +790,7 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 }
 
 // fuzzFuncs is copied from kube-openapi/pkg/aggregator. It fuzzes go-openapi/spec schemata.
-func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visible bool)) {
+func fuzzFuncs(f *randfill.Filler, refFunc func(ref *spec.Ref, c randfill.Continue, visible bool)) {
 	invisible := 0 // == 0 means visible, > 0 means invisible
 	depth := 0
 	maxDepth := 3
@@ -802,14 +802,14 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 		f.NumElements(0, max(0, maxDepth-depth))
 	}
 	updateFuzzer(depth)
-	enter := func(o interface{}, recursive bool, c fuzz.Continue) {
+	enter := func(o interface{}, recursive bool, c randfill.Continue) {
 		if recursive {
 			depth++
 			updateFuzzer(depth)
 		}
 
 		invisible++
-		c.FuzzNoCustom(o)
+		c.FillNoCustom(o)
 		invisible--
 	}
 	leave := func(recursive bool) {
@@ -819,31 +819,31 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 		}
 	}
 	f.Funcs(
-		func(ref *spec.Ref, c fuzz.Continue) {
+		func(ref *spec.Ref, c randfill.Continue) {
 			refFunc(ref, c, invisible == 0)
 		},
-		func(sa *spec.SchemaOrStringArray, c fuzz.Continue) {
+		func(sa *spec.SchemaOrStringArray, c randfill.Continue) {
 			*sa = spec.SchemaOrStringArray{}
-			if c.RandBool() {
-				c.Fuzz(&sa.Schema)
+			if c.Bool() {
+				c.Fill(&sa.Schema)
 			} else {
-				c.Fuzz(&sa.Property)
+				c.Fill(&sa.Property)
 			}
 			if sa.Schema == nil && len(sa.Property) == 0 {
 				*sa = spec.SchemaOrStringArray{Schema: &spec.Schema{}}
 			}
 		},
-		func(url *spec.SchemaURL, c fuzz.Continue) {
+		func(url *spec.SchemaURL, c randfill.Continue) {
 			*url = spec.SchemaURL("http://url")
 		},
-		func(s *spec.Dependencies, c fuzz.Continue) {
+		func(s *spec.Dependencies, c randfill.Continue) {
 			enter(s, false, c)
 			defer leave(false)
 
 			// and nothing with invisible==false
 		},
-		func(p *spec.SimpleSchema, c fuzz.Continue) {
-			// gofuzz is broken and calls this even for *SimpleSchema fields, ignoring NilChance, leading to infinite recursion
+		func(p *spec.SimpleSchema, c randfill.Continue) {
+			// randfill is broken and calls this even for *SimpleSchema fields, ignoring NilChance, leading to infinite recursion
 			if c.Float64() > nilChance(depth) {
 				return
 			}
@@ -851,7 +851,7 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 			enter(p, true, c)
 			defer leave(true)
 
-			c.FuzzNoCustom(p)
+			c.FillNoCustom(p)
 
 			// reset JSON fields to some correct JSON
 			if p.Default != nil {
@@ -859,12 +859,12 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 			}
 			p.Example = nil
 		},
-		func(s *spec.SwaggerSchemaProps, c fuzz.Continue) {
+		func(s *spec.SwaggerSchemaProps, c randfill.Continue) {
 			// nothing allowed
 			*s = spec.SwaggerSchemaProps{}
 		},
-		func(s *spec.SchemaProps, c fuzz.Continue) {
-			// gofuzz is broken and calls this even for *SchemaProps fields, ignoring NilChance, leading to infinite recursion
+		func(s *spec.SchemaProps, c randfill.Continue) {
+			// randfill is broken and calls this even for *SchemaProps fields, ignoring NilChance, leading to infinite recursion
 			if c.Float64() > nilChance(depth) {
 				return
 			}
@@ -872,9 +872,9 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 			enter(s, true, c)
 			defer leave(true)
 
-			c.FuzzNoCustom(s)
+			c.FillNoCustom(s)
 
-			if c.RandBool() {
+			if c.Bool() {
 				types := []string{"object", "array", "boolean", "string", "integer", "number"}
 				s.Type = []string{types[c.Intn(len(types))]}
 			} else {
@@ -891,7 +891,7 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 
 			if len(s.Type) == 1 && s.Type[0] == "array" {
 				s.Items = &spec.SchemaOrArray{Schema: &spec.Schema{}}
-				c.Fuzz(s.Items.Schema)
+				c.Fill(s.Items.Schema)
 			} else {
 				s.Items = nil
 			}
@@ -904,7 +904,7 @@ func fuzzFuncs(f *fuzz.Fuzzer, refFunc func(ref *spec.Ref, c fuzz.Continue, visi
 				s.Enum[i] = "42"
 			}
 		},
-		func(i *interface{}, c fuzz.Continue) {
+		func(i *interface{}, c randfill.Continue) {
 			// do nothing for examples and defaults. These are free form JSON fields.
 		},
 	)

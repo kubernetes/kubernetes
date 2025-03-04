@@ -20,17 +20,17 @@ import (
 	"fmt"
 	"net/netip"
 
-	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	utilpointer "k8s.io/utils/pointer"
+	"sigs.k8s.io/randfill"
 )
 
 // Funcs returns the fuzzer functions for the networking api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(np *networking.NetworkPolicyPeer, c fuzz.Continue) {
-			c.FuzzNoCustom(np) // fuzz self without calling this function again
+		func(np *networking.NetworkPolicyPeer, c randfill.Continue) {
+			c.FillNoCustom(np) // fuzz self without calling this function again
 			// TODO: Implement a fuzzer to generate valid keys, values and operators for
 			// selector requirements.
 			if np.IPBlock != nil {
@@ -40,23 +40,23 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
-		func(np *networking.NetworkPolicy, c fuzz.Continue) {
-			c.FuzzNoCustom(np) // fuzz self without calling this function again
+		func(np *networking.NetworkPolicy, c randfill.Continue) {
+			c.FillNoCustom(np) // fuzz self without calling this function again
 			// TODO: Implement a fuzzer to generate valid keys, values and operators for
 			// selector requirements.
 			if len(np.Spec.PolicyTypes) == 0 {
 				np.Spec.PolicyTypes = []networking.PolicyType{networking.PolicyTypeIngress}
 			}
 		},
-		func(path *networking.HTTPIngressPath, c fuzz.Continue) {
-			c.FuzzNoCustom(path) // fuzz self without calling this function again
+		func(path *networking.HTTPIngressPath, c randfill.Continue) {
+			c.FillNoCustom(path) // fuzz self without calling this function again
 			pathTypes := []networking.PathType{networking.PathTypeExact, networking.PathTypePrefix, networking.PathTypeImplementationSpecific}
 			path.PathType = &pathTypes[c.Rand.Intn(len(pathTypes))]
 		},
-		func(p *networking.ServiceBackendPort, c fuzz.Continue) {
-			c.FuzzNoCustom(p)
+		func(p *networking.ServiceBackendPort, c randfill.Continue) {
+			c.FillNoCustom(p)
 			// clear one of the fields
-			if c.RandBool() {
+			if c.Bool() {
 				p.Name = ""
 				if p.Number == 0 {
 					p.Number = 1
@@ -68,8 +68,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
-		func(p *networking.IngressClass, c fuzz.Continue) {
-			c.FuzzNoCustom(p) // fuzz self without calling this function again
+		func(p *networking.IngressClass, c randfill.Continue) {
+			c.FillNoCustom(p) // fuzz self without calling this function again
 			// default Parameters to Cluster
 			if p.Spec.Parameters == nil || p.Spec.Parameters.Scope == nil {
 				p.Spec.Parameters = &networking.IngressClassParametersReference{
@@ -77,16 +77,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
-		func(obj *networking.IPAddress, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *networking.IPAddress, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			// length in bytes of the IP Family: IPv4: 4 bytes IPv6: 16 bytes
 			boolean := []bool{false, true}
 			is6 := boolean[c.Rand.Intn(2)]
 			ip := generateRandomIP(is6, c)
 			obj.Name = ip
 		},
-		func(obj *networking.ServiceCIDR, c fuzz.Continue) {
-			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+		func(obj *networking.ServiceCIDR, c randfill.Continue) {
+			c.FillNoCustom(obj) // fuzz self without calling this function again
 			boolean := []bool{false, true}
 
 			is6 := boolean[c.Rand.Intn(2)]
@@ -100,7 +100,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
-func generateRandomIP(is6 bool, c fuzz.Continue) string {
+func generateRandomIP(is6 bool, c randfill.Continue) string {
 	n := 4
 	if is6 {
 		n = 16
@@ -118,7 +118,7 @@ func generateRandomIP(is6 bool, c fuzz.Continue) string {
 	panic(fmt.Sprintf("invalid IP %v", bytes))
 }
 
-func generateRandomCIDR(is6 bool, c fuzz.Continue) string {
+func generateRandomCIDR(is6 bool, c randfill.Continue) string {
 	ip, err := netip.ParseAddr(generateRandomIP(is6, c))
 	if err != nil {
 		// generateRandomIP already panics if returns a not valid ip
