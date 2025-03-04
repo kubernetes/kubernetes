@@ -5625,6 +5625,14 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, field.Forbidden(specPath, "Pod running on node without support for resize"))
 	}
 
+	// The rest of the validation assumes that the containers are in the same order,
+	// so we proceed only if that assumption is true.
+	containerOrderErrs := validatePodResizeContainerOrdering(newPod, oldPod, specPath)
+	allErrs = append(allErrs, containerOrderErrs...)
+	if containerOrderErrs != nil {
+		return allErrs
+	}
+
 	// Do not allow removing resource requests/limits on resize.
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
 		for ix, ctr := range oldPod.Spec.InitContainers {
@@ -5690,6 +5698,31 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		// This likely means that the user has made changes to resources other than CPU and Memory.
 		errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
 		allErrs = append(allErrs, errs)
+	}
+	return allErrs
+}
+
+// validatePodResizeContainerOrdering validates container ordering for a resize request.
+// We do not allow adding, removing, re-ordering, or renaming containers on resize.
+func validatePodResizeContainerOrdering(newPod, oldPod *core.Pod, specPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("containers"), "containers may not be added or removed on resize"))
+	} else {
+		for i, oldCtr := range oldPod.Spec.Containers {
+			if newPod.Spec.Containers[i].Name != oldCtr.Name {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("containers").Index(i).Child("name"), "containers may not be renamed or reordered on resize"))
+			}
+		}
+	}
+	if len(newPod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers"), "initContainers may not be added or removed on resize"))
+	} else {
+		for i, oldCtr := range oldPod.Spec.InitContainers {
+			if newPod.Spec.InitContainers[i].Name != oldCtr.Name {
+				allErrs = append(allErrs, field.Forbidden(specPath.Child("initContainers").Index(i).Child("name"), "initContainers may not be renamed or reordered on resize"))
+			}
+		}
 	}
 	return allErrs
 }

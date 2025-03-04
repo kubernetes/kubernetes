@@ -2643,15 +2643,25 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 			),
 			expected: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("2"),
-				podtest.SetContainers(podtest.MakeContainer("container1",
-					podtest.SetContainerResources(api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("100m"),
-							api.ResourceMemory: resource.MustParse("1Gi"),
-						},
-					}),
-				)),
-				podtest.SetGeneration(1),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2713,17 +2723,26 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 			),
 			expected: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("2"),
-				podtest.SetContainers(podtest.MakeContainer("container1",
-					podtest.SetContainerResources(api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("100m"),
-							api.ResourceMemory: resource.MustParse("2Gi"), // Updated resource
-						},
-					}),
-				)),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("2Gi"), // Updated resource
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
 				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
 							api.ResourceCPU:    resource.MustParse("100m"),
@@ -2809,15 +2828,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 			expected: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("2"),
 				podtest.SetContainers(
-					podtest.MakeContainer("container1",
-						podtest.SetContainerResources(api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
-								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
-							},
-						}),
-					),
-					podtest.MakeContainer("container2",
+					podtest.MakeContainer("container2", // Order changed
 						podtest.SetContainerResources(api.ResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
@@ -2825,10 +2836,17 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 							},
 						}),
 					),
+					podtest.MakeContainer("container1", // Order changed
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
 				),
 				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("container1",
 							api.ResourceList{
