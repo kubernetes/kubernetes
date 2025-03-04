@@ -96,14 +96,14 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 		},
 		{
 			option:            DistributeCPUsAcrossNUMAOption,
-			featureGate:       pkgfeatures.CPUManagerPolicyAlphaOptions,
+			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
 			featureGateEnable: true,
 			expectedAvailable: true,
 		},
 		{
 			option:            DistributeCPUsAcrossNUMAOption,
 			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
-			featureGateEnable: true,
+			featureGateEnable: false,
 			expectedAvailable: false,
 		},
 		{

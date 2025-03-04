@@ -39,7 +39,6 @@ const (
 
 var (
 	alphaOptions = sets.New[string](
-		DistributeCPUsAcrossNUMAOption,
 		AlignBySocketOption,
 		DistributeCPUsAcrossCoresOption,
 		StrictCPUReservationOption,
@@ -47,6 +46,7 @@ var (
 	)
 	betaOptions = sets.New[string](
 		FullPCPUsOnlyOption,
+		DistributeCPUsAcrossNUMAOption,
 	)
 	stableOptions = sets.New[string]()
 )
