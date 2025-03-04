@@ -96,6 +96,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/userns"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -370,6 +371,10 @@ func newTestKubeletWithImageList(
 		ShutdownGracePeriodCriticalPods: 0,
 	})
 	kubelet.shutdownManager = shutdownManager
+	kubelet.usernsManager, err = userns.MakeUserNsManager(kubelet)
+	if err != nil {
+		t.Fatalf("Failed to create UserNsManager: %v", err)
+	}
 	kubelet.admitHandlers.AddPodAdmitHandler(shutdownManager)
 
 	// Add this as cleanup predicate pod admitter
