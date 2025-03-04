@@ -17,12 +17,15 @@ limitations under the License.
 package runtime_test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,6 +33,9 @@ import (
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	fieldtesting "k8s.io/apimachinery/pkg/util/validation/field/testing"
 )
 
 type testConversions struct {
@@ -1009,3 +1015,101 @@ func TestMetaValuesUnregisteredConvert(t *testing.T) {
 		t.Errorf("Expected %v, got %v", e, a)
 	}
 }
+
+func TestRegisterValidate(t *testing.T) {
+	invalidValue := field.Invalid(field.NewPath("testString"), "", "Invalid value").WithOrigin("invalid-value")
+	invalidLength := field.Invalid(field.NewPath("testString"), "", "Invalid length").WithOrigin("invalid-length")
+	invalidStatusErr := field.Invalid(field.NewPath("testString"), "", "Invalid condition").WithOrigin("invalid-condition")
+	invalidIfOptionErr := field.Invalid(field.NewPath("testString"), "", "Invalid when option is set").WithOrigin("invalid-when-option-set")
+
+	testCases := []struct {
+		name        string
+		object      runtime.Object
+		oldObject   runtime.Object
+		subresource []string
+		options     sets.Set[string]
+		expected    field.ErrorList
+	}{
+		{
+			name:     "single error",
+			object:   &TestType1{},
+			expected: field.ErrorList{invalidValue},
+		},
+		{
+			name:     "multiple errors",
+			object:   &TestType2{},
+			expected: field.ErrorList{invalidValue, invalidLength},
+		},
+		{
+			name:      "update error",
+			object:    &TestType2{},
+			oldObject: &TestType2{},
+			expected:  field.ErrorList{invalidLength},
+		},
+		{
+			name:     "options error",
+			object:   &TestType1{},
+			options:  sets.New("option1"),
+			expected: field.ErrorList{invalidIfOptionErr},
+		},
+		{
+			name:        "subresource error",
+			object:      &TestType1{},
+			subresource: []string{"status"},
+			expected:    field.ErrorList{invalidStatusErr},
+		},
+	}
+
+	s := runtime.NewScheme()
+	ctx := context.Background()
+
+	// register multiple types for testing to ensure registration is working as expected
+	s.AddValidationFunc(&TestType1{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList {
+		if op.Options.Has("option1") {
+			return field.ErrorList{invalidIfOptionErr}
+		}
+		if len(subresources) == 1 && subresources[0] == "status" {
+			return field.ErrorList{invalidStatusErr}
+		}
+		return field.ErrorList{invalidValue}
+	})
+
+	s.AddValidationFunc(&TestType2{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList {
+		if oldObject != nil {
+			return field.ErrorList{invalidLength}
+		}
+		return field.ErrorList{invalidValue, invalidLength}
+	})
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var results field.ErrorList
+			if tc.oldObject == nil {
+				results = s.Validate(ctx, tc.options, tc.object, tc.subresource...)
+			} else {
+				results = s.ValidateUpdate(ctx, tc.options, tc.object, tc.oldObject, tc.subresource...)
+			}
+			fieldtesting.MatchErrors(t, tc.expected, results, fieldtesting.Match().ByType().ByField().ByOrigin())
+		})
+	}
+}
+
+type TestType1 struct {
+	Version    string `json:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	TestString string `json:"testString"`
+}
+
+func (TestType1) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+
+func (TestType1) DeepCopyObject() runtime.Object { return nil }
+
+type TestType2 struct {
+	Version    string `json:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	TestString string `json:"testString"`
+}
+
+func (TestType2) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+
+func (TestType2) DeepCopyObject() runtime.Object { return nil }
