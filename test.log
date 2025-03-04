@@ -1,0 +1,22 @@
++++ [0303 18:07:05] Set GOMAXPROCS automatically to 8
++++ [0303 18:07:05] Checking etcd is on PATH
+/usr/local/google/home/sizhang/k8s.io/kubernetes/third_party/etcd/etcd
++++ [0303 18:07:05] Starting etcd instance
+/usr/local/google/home/sizhang/Projects/kubernetes/third_party/etcd:/usr/local/google/home/sizhang/Projects/kubernetes/_output/local/go/bin:/usr/local/google/home/sizhang/miniconda3/bin:/usr/local/google/home/sizhang/miniconda3/condabin:/usr/local/google/home/sizhang/go/bin:/usr/local/google/home/sizhang/minconda/bin:/usr/local/google/home/sizhang/.gvm/pkgsets/go1.23/global/bin:/usr/local/google/home/sizhang/.gvm/gos/go1.23/bin:/usr/local/google/home/sizhang/.gvm/pkgsets/go1.23/global/overlay/bin:/usr/local/google/home/sizhang/.gvm/bin:/usr/local/google/home/sizhang/.nvm/versions/node/v22.14.0/bin:/usr/local/google/home/sizhang/.local/bin:/usr/lib/google-golang/bin:/usr/local/buildtools/java/jdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/google/home/sizhang/k8s.io/kubernetes/third_party/etcd:/usr/local/google/home/sizhang/Projects/kubernetes/third_party/etcd
+etcd --advertise-client-urls http://127.0.0.1:2379 --data-dir /tmp/tmp.HoXfMXVA5E --listen-client-urls http://127.0.0.1:2379 --log-level=warn 2> "/dev/null" >/dev/null
+Waiting for etcd to come up.
++++ [0303 18:07:07] On try 1, etcd: : {"health":"true","reason":""}
+{"header":{"cluster_id":"14841639068965178418","member_id":"10276657743932975437","revision":"2","raft_term":"2"}}Periodically scraping etcd to /tmp/test.WtH9up/etcd-scrapes .
++++ [0303 18:07:07] Running integration test cases
+make[1]: Entering directory '/usr/local/google/home/sizhang/Projects/kubernetes'
++++ [0303 18:07:07] Normalizing Go targets
++++ [0303 18:07:08] Running tests without code coverage 
+I0303 18:09:46.304960 1311405 etcd.go:73] etcd already running at http://127.0.0.1:2379
+I0303 18:10:13.550796 1311405 with_retry.go:234] "Got a Retry-After response" delay="1s" attempt=1 url="https://127.0.0.1:41211/apis/coordination.k8s.io/v1/namespaces/kube-system/leases/leader-election-controller?timeout=1s"
+E0303 18:10:13.551058 1311405 leaderelection.go:322] Failed to release lock: Put "https://127.0.0.1:41211/apis/coordination.k8s.io/v1/namespaces/kube-system/leases/leader-election-controller?timeout=1s": context deadline exceeded
+ok  	k8s.io/kubernetes/test/integration/etcd	29.211s
+
+DONE 214 tests in 206.753s
+make[1]: Leaving directory '/usr/local/google/home/sizhang/Projects/kubernetes'
++++ [0303 18:10:35] Cleaning up etcd
++++ [0303 18:10:35] Integration test cleanup complete
