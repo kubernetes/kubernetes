@@ -387,6 +387,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		PodLevelResourcesEnabled:                          utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
 		AllowInvalidLabelValueInRequiredNodeAffinity:      false,
 		AllowSidecarResizePolicy:                          utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		AllowResizeRestartPolicyPreferNoRestart:           utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingPreferNoRestart),
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -421,6 +422,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowPodLifecycleSleepActionZeroValue = opts.AllowPodLifecycleSleepActionZeroValue || podLifecycleSleepActionZeroValueInUse(oldPodSpec)
 		// If oldPod has resize policy set on the restartable init container, we must allow it
 		opts.AllowSidecarResizePolicy = opts.AllowSidecarResizePolicy || hasRestartableInitContainerResizePolicy(oldPodSpec)
+		opts.AllowResizeRestartPolicyPreferNoRestart = opts.AllowResizeRestartPolicyPreferNoRestart || hasResizeRestartPolicyPreferNoRestart(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -1418,4 +1420,21 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+func hasResizeRestartPolicyPreferNoRestart(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	found := false
+	VisitContainers(podSpec, Containers|InitContainers, func(c *api.Container, _ ContainerType) bool {
+		for _, p := range c.ResizePolicy {
+			if p.RestartPolicy == api.ResizeRestartPolicyPreferNoRestart {
+				found = true
+				return false // short-circuit
+			}
+		}
+		return true // keep going
+	})
+	return found
 }
