@@ -20,16 +20,23 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -618,4 +625,115 @@ func sampleExistsInSamples(s *model.Sample, samples model.Samples) bool {
 		}
 	}
 	return false
+}
+
+func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
+	clean := overrideConsistencyCheckerTimings(5*time.Second, time.Second)
+	defer clean()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	rt, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/metrics", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second * 5)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		err := resp.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+	digest, err := parseDigestMetric(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digest.etcd) == 0 {
+		t.Error("Expected at least one digest collected")
+	}
+	if diff := cmp.Diff(digest.etcd, digest.cache); diff != "" {
+		t.Errorf("Etcd and Cache digest differ:\n%s", diff)
+	}
+}
+
+func overrideConsistencyCheckerTimings(period, delay time.Duration) func() {
+	tmpPeriod := cacher.ConsistencyCheckPeriod
+	tmpDelay := cacher.ConsistencyCheckDelay
+	cacher.ConsistencyCheckDelay = delay
+	cacher.ConsistencyCheckPeriod = period
+	return func() {
+		cacher.ConsistencyCheckDelay = tmpDelay
+		cacher.ConsistencyCheckPeriod = tmpPeriod
+	}
+}
+
+func parseDigestMetric(r io.Reader) (digests, error) {
+	digests := digests{
+		etcd:  map[digestKey]string{},
+		cache: map[digestKey]string{},
+	}
+	metric, err := parseMetric(r, "apiserver_storage_digest")
+	if err != nil {
+		return digests, err
+	}
+	for _, m := range metric.GetMetric() {
+		storage := ""
+		key := digestKey{}
+		digest := ""
+		for _, label := range m.GetLabel() {
+			switch label.GetName() {
+			case "storage":
+				storage = label.GetValue()
+			case "resource":
+				key.resource = label.GetValue()
+			case "resource_version":
+				key.resourceVersion = label.GetValue()
+			case "digest":
+				digest = label.GetValue()
+			default:
+				return digests, fmt.Errorf("Unknown label: %v", label.GetName())
+			}
+		}
+		switch storage {
+		case "etcd":
+			digests.etcd[key] = digest
+		case "cache":
+			digests.cache[key] = digest
+		default:
+			return digests, fmt.Errorf("Unknown storage: %v", storage)
+		}
+	}
+	return digests, nil
+}
+
+type digests struct {
+	etcd  map[digestKey]string
+	cache map[digestKey]string
+}
+
+type digestKey struct {
+	resource        string
+	resourceVersion string
+}
+
+func parseMetric(r io.Reader, name string) (*dto.MetricFamily, error) {
+	var parser expfmt.TextParser
+	mfs, err := parser.TextToMetricFamilies(r)
+	if err != nil {
+		return nil, err
+	}
+	for metricName, metric := range mfs {
+		if metricName == name {
+			return metric, nil
+		}
+	}
+	return nil, fmt.Errorf("Metric not found %q", name)
 }
