@@ -186,3 +186,10 @@ func GetAuditIDTruncated(ctx context.Context) string {
 
 	return string(auditID)
 }
+
+func DeepcopyAuditContextEvent(ac *AuditContext) *auditinternal.Event {
+	ac.annotationMutex.Lock()
+	defer ac.annotationMutex.Unlock()
+
+	return ac.Event.DeepCopy()
+}
