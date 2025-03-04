@@ -100,8 +100,7 @@ type BuiltInAuthenticationOptions struct {
 
 // AnonymousAuthenticationOptions contains anonymous authentication options for API Server
 type AnonymousAuthenticationOptions struct {
-	Allow       bool
-	areFlagsSet func() bool
+	Allow bool
 }
 
 // BootstrapTokenAuthenticationOptions contains bootstrap token authentication options for API Server
@@ -120,9 +119,6 @@ type OIDCAuthenticationOptions struct {
 	GroupsPrefix   string
 	SigningAlgs    []string
 	RequiredClaims map[string]string
-
-	// areFlagsConfigured is a function that returns true if any of the oidc-* flags are configured.
-	areFlagsConfigured func() bool
 }
 
 // ServiceAccountAuthenticationOptions contains service account authentication options for API Server
@@ -183,8 +179,7 @@ func (o *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 // WithAnonymous set default value for anonymous authentication
 func (o *BuiltInAuthenticationOptions) WithAnonymous() *BuiltInAuthenticationOptions {
 	o.Anonymous = &AnonymousAuthenticationOptions{
-		Allow:       true,
-		areFlagsSet: func() bool { return false },
+		Allow: true,
 	}
 	return o
 }
@@ -204,9 +199,8 @@ func (o *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOp
 // WithOIDC set default value for OIDC authentication
 func (o *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
 	o.OIDC = &OIDCAuthenticationOptions{
-		areFlagsConfigured: func() bool { return false },
-		UsernameClaim:      "sub",
-		SigningAlgs:        []string{"RS256"},
+		UsernameClaim: "sub",
+		SigningAlgs:   []string{"RS256"},
 	}
 	return o
 }
@@ -245,14 +239,14 @@ func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptio
 }
 
 // Validate checks invalid config combination
-func (o *BuiltInAuthenticationOptions) Validate() []error {
+func (o *BuiltInAuthenticationOptions) Validate(fs *pflag.FlagSet) []error {
 	if o == nil {
 		return nil
 	}
 
 	var allErrors []error
 
-	allErrors = append(allErrors, o.validateOIDCOptions()...)
+	allErrors = append(allErrors, o.validateOIDCOptions(fs)...)
 
 	if o.ServiceAccounts != nil && len(o.ServiceAccounts.Issuers) > 0 {
 		seen := make(map[string]bool)
@@ -337,10 +331,6 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Enables anonymous requests to the secure port of the API server. "+
 			"Requests that are not rejected by another authentication method are treated as anonymous requests. "+
 			"Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.")
-
-		o.Anonymous.areFlagsSet = func() bool {
-			return fs.Changed("anonymous-auth")
-		}
 	}
 
 	if o.BootstrapToken != nil {
@@ -393,18 +383,6 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"A key=value pair that describes a required claim in the ID Token. "+
 			"If set, the claim is verified to be present in the ID Token with a matching value. "+
 			"Repeat this flag to specify multiple claims.")
-
-		o.OIDC.areFlagsConfigured = func() bool {
-			return fs.Changed(oidcIssuerURLFlag) ||
-				fs.Changed(oidcClientIDFlag) ||
-				fs.Changed(oidcCAFileFlag) ||
-				fs.Changed(oidcUsernameClaimFlag) ||
-				fs.Changed(oidcUsernamePrefixFlag) ||
-				fs.Changed(oidcGroupsClaimFlag) ||
-				fs.Changed(oidcGroupsPrefixFlag) ||
-				fs.Changed(oidcSigningAlgsFlag) ||
-				fs.Changed(oidcRequiredClaimFlag)
-		}
 	}
 
 	if o.RequestHeader != nil {
@@ -472,7 +450,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ToAuthenticationConfig convert BuiltInAuthenticationOptions to kubeauthenticator.Config. Returns
 // an empty config if o is nil.
-func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticator.Config, error) {
+func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig(fs *pflag.FlagSet) (kubeauthenticator.Config, error) {
 	if o == nil {
 		return kubeauthenticator.Config{}, nil
 	}
@@ -572,7 +550,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 	// Set up anonymous authenticator from config file or flags
 	if o.Anonymous != nil {
 		switch {
-		case ret.AuthenticationConfig.Anonymous != nil && o.Anonymous.areFlagsSet():
+		case ret.AuthenticationConfig.Anonymous != nil && o.Anonymous.areFlagsSet(fs):
 			// Flags and config file are mutually exclusive
 			return kubeauthenticator.Config{}, field.Forbidden(field.NewPath("anonymous"), "--anonynous-auth flag cannot be set when anonymous field is configured in authentication configuration file")
 		case ret.AuthenticationConfig.Anonymous != nil:
@@ -654,6 +632,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 // The input context controls the lifecycle of background goroutines started to reload the authentication config file.
 func (o *BuiltInAuthenticationOptions) ApplyTo(
 	ctx context.Context,
+	fs *pflag.FlagSet,
 	authInfo *genericapiserver.AuthenticationInfo,
 	secureServing *genericapiserver.SecureServingInfo,
 	egressSelector *egressselector.EgressSelector,
@@ -670,7 +649,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 		return errors.New("uninitialized OpenAPIConfig")
 	}
 
-	authenticatorConfig, err := o.ToAuthenticationConfig()
+	authenticatorConfig, err := o.ToAuthenticationConfig(fs)
 	if err != nil {
 		return err
 	}
@@ -823,12 +802,12 @@ func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltIn
 	}
 }
 
-func (o *BuiltInAuthenticationOptions) validateOIDCOptions() []error {
+func (o *BuiltInAuthenticationOptions) validateOIDCOptions(fs *pflag.FlagSet) []error {
 	var allErrors []error
 
 	// Existing validation when jwt authenticator is configured with oidc-* flags
 	if len(o.AuthenticationConfigFile) == 0 {
-		if o.OIDC != nil && o.OIDC.areFlagsConfigured() && (len(o.OIDC.IssuerURL) == 0 || len(o.OIDC.ClientID) == 0) {
+		if o.OIDC != nil && o.OIDC.areFlagsConfigured(fs) && (len(o.OIDC.IssuerURL) == 0 || len(o.OIDC.ClientID) == 0) {
 			allErrors = append(allErrors, fmt.Errorf("oidc-issuer-url and oidc-client-id must be specified together when any oidc-* flags are set"))
 		}
 
@@ -843,7 +822,7 @@ func (o *BuiltInAuthenticationOptions) validateOIDCOptions() []error {
 	}
 
 	// Authentication config file and oidc-* flags are mutually exclusive
-	if o.OIDC != nil && o.OIDC.areFlagsConfigured() {
+	if o.OIDC != nil && o.OIDC.areFlagsConfigured(fs) {
 		allErrors = append(allErrors, fmt.Errorf("authentication-config file and oidc-* flags are mutually exclusive"))
 	}
 
@@ -892,4 +871,20 @@ func loadAuthenticationConfigFromData(data []byte) (*apiserver.AuthenticationCon
 	}
 
 	return configuration, nil
+}
+
+func (o *OIDCAuthenticationOptions) areFlagsConfigured(fs *pflag.FlagSet) bool {
+	return fs != nil && (fs.Changed(oidcIssuerURLFlag) ||
+		fs.Changed(oidcClientIDFlag) ||
+		fs.Changed(oidcCAFileFlag) ||
+		fs.Changed(oidcUsernameClaimFlag) ||
+		fs.Changed(oidcUsernamePrefixFlag) ||
+		fs.Changed(oidcGroupsClaimFlag) ||
+		fs.Changed(oidcGroupsPrefixFlag) ||
+		fs.Changed(oidcSigningAlgsFlag) ||
+		fs.Changed(oidcRequiredClaimFlag))
+}
+
+func (o *AnonymousAuthenticationOptions) areFlagsSet(fs *pflag.FlagSet) bool {
+	return fs != nil && fs.Changed("anonymous-auth")
 }
