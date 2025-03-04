@@ -12,6 +12,16 @@
             "default": "",
             "type": "string"
           },
+          "emulationMajor": {
+            "default": "",
+            "description": "EmulationMajor is the major version of the emulation version",
+            "type": "string"
+          },
+          "emulationMinor": {
+            "default": "",
+            "description": "EmulationMinor is the minor version of the emulation version",
+            "type": "string"
+          },
           "gitCommit": {
             "default": "",
             "type": "string"
@@ -30,10 +40,22 @@
           },
           "major": {
             "default": "",
+            "description": "Major is the major version of the binary version",
+            "type": "string"
+          },
+          "minCompatibilityMajor": {
+            "default": "",
+            "description": "MinCompatibilityMajor is the major version of the minimum compatibility version",
+            "type": "string"
+          },
+          "minCompatibilityMinor": {
+            "default": "",
+            "description": "MinCompatibilityMinor is the minor version of the minimum compatibility version",
             "type": "string"
           },
           "minor": {
             "default": "",
+            "description": "Minor is the minor version of the binary version",
             "type": "string"
           },
           "platform": {
@@ -44,6 +66,10 @@
         "required": [
           "major",
           "minor",
+          "emulationMajor",
+          "emulationMinor",
+          "minCompatibilityMajor",
+          "minCompatibilityMinor",
           "gitVersion",
           "gitCommit",
           "gitTreeState",
@@ -72,8 +98,8 @@
   "paths": {
     "/version/": {
       "get": {
-        "description": "get the code version",
-        "operationId": "getCodeVersion",
+        "description": "get the version information for this server",
+        "operationId": "getVersion",
         "responses": {
           "200": {
             "content": {
