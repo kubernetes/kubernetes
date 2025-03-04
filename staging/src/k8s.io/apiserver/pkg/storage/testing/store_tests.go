@@ -622,7 +622,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, watchCacheEnabled, consistentReadsSupported bool) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -660,7 +660,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		rvMatch                    metav1.ResourceVersionMatch
 		prefix                     string
 		pred                       storage.SelectionPredicate
-		ignoreForWatchCache        bool
+		skip                       bool
 		expectedOut                []example.Pod
 		expectedAlternatives       [][]example.Pod
 		expectContinue             bool
@@ -872,7 +872,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			// limit if RV=0 is specified, returning whole list of objects.
 			// While this should eventually get fixed, for now we're explicitly
 			// ignoring this testcase for watchcache.
-			ignoreForWatchCache:        true,
+			skip:                       watchCacheEnabled,
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64(1),
@@ -891,7 +891,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			// limit if RV=0 is specified, returning whole list of objects.
 			// While this should eventually get fixed, for now we're explicitly
 			// ignoring this testcase for watchcache.
-			ignoreForWatchCache:        true,
+			skip:                       watchCacheEnabled,
 			expectedOut:                []example.Pod{*createdPods[1]},
 			expectContinue:             true,
 			expectedRemainingItemCount: utilpointer.Int64(1),
@@ -1272,9 +1272,12 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRV:    fmt.Sprint(continueRV),
 		},
 		{
-			name:        "test List with resource version after writes, match=Exact",
-			prefix:      "/pods/",
-			pred:        storage.Everything,
+			name:   "test List with resource version after writes, match=Exact",
+			prefix: "/pods/",
+			pred:   storage.Everything,
+			// Write for this revision was done outside resource and was not observed by cache.
+			// Supporting consistent read is required to avoid returning future revision error.
+			skip:        !consistentReadsSupported,
 			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 			rv:          fmt.Sprint(continueRV + 1),
 			rvMatch:     metav1.ResourceVersionMatchExact,
@@ -1403,8 +1406,11 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			rv:                         fmt.Sprint(continueRV + 1),
-			rvMatch:                    metav1.ResourceVersionMatchExact,
+			rv:      fmt.Sprint(continueRV + 1),
+			rvMatch: metav1.ResourceVersionMatchExact,
+			// Write for this revision was done outside resource and was not observed by cache.
+			// Supporting consistent read is required to avoid returning future revision error.
+			skip:                       !consistentReadsSupported,
 			expectedOut:                []example.Pod{*updatedPod},
 			expectRV:                   fmt.Sprint(continueRV + 1),
 			expectContinue:             true,
@@ -1507,7 +1513,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			// doesn't automatically preclude some scenarios from happening.
 			t.Parallel()
 
-			if ignoreWatchCacheTests && tt.ignoreForWatchCache {
+			if tt.skip {
 				t.Skip()
 			}
 
