@@ -78,6 +78,11 @@ const (
 	// Enable ClusterTrustBundle Kubelet projected volumes.  Depends on ClusterTrustBundle.
 	ClusterTrustBundleProjection featuregate.Feature = "ClusterTrustBundleProjection"
 
+	// owner: @sreeram-venkitesh
+	// 
+	// Enables configuring custom stop signals for containers from container lifecycle
+	ContainerStopSignals featuregate.Feature = "ContainerStopSignals"
+
 	// owner: @szuecs
 	//
 	// Enable nodes to change CPUCFSQuotaPeriod
