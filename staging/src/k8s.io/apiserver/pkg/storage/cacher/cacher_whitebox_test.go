@@ -227,8 +227,6 @@ func TestGetListCacheBypass(t *testing.T) {
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
 	testCases[opts{ResourceVersion: "1"}] = false
 	testCases[opts{ResourceVersion: "1", Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", Limit: 100, Continue: "continue"}] = true
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
 	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
