@@ -1211,7 +1211,7 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 	tn := g.discovered.typeNodes[t]
 
 	variables := tn.typeValidations.Variables
-	slices.SortFunc(variables, func(a, b *validators.VariableGen) int {
+	slices.SortFunc(variables, func(a, b validators.VariableGen) int {
 		return cmp.Compare(a.Variable.Name, b.Variable.Name)
 	})
 	for _, variable := range variables {

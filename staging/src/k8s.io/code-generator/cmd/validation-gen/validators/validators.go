@@ -232,7 +232,7 @@ type Validations struct {
 
 	// Variables holds any variables which must be generated to perform
 	// validation.  Variables are not permitted in every context.
-	Variables []*VariableGen
+	Variables []VariableGen
 
 	// Comments holds comments to emit (without the leanding "//").
 	Comments []string
@@ -259,12 +259,12 @@ func (v *Validations) Len() int {
 	return len(v.Functions) + len(v.Variables) + len(v.Comments)
 }
 
-func (v *Validations) AddFunction(f FunctionGen) {
-	v.Functions = append(v.Functions, f)
+func (v *Validations) AddFunction(fn FunctionGen) {
+	v.Functions = append(v.Functions, fn)
 }
 
-func (v *Validations) AddVariable(variable *VariableGen) {
-	v.Variables = append(v.Variables, variable)
+func (v *Validations) AddVariable(vr VariableGen) {
+	v.Variables = append(v.Variables, vr)
 }
 
 func (v *Validations) AddComment(comment string) {
@@ -391,8 +391,8 @@ func (fg FunctionGen) WithComment(comment string) FunctionGen {
 }
 
 // Variable creates a VariableGen for a given function name and extraArgs.
-func Variable(variable PrivateVar, initFunc FunctionGen) *VariableGen {
-	return &VariableGen{
+func Variable(variable PrivateVar, initFunc FunctionGen) VariableGen {
+	return VariableGen{
 		Variable: variable,
 		InitFunc: initFunc,
 	}
