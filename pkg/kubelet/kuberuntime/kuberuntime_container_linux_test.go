@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -34,6 +35,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1257,6 +1259,53 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			expectSwap(tc.cgroupVersion, c2ExpectedSwap, resourcesC2)
 		})
 	}
+}
+
+func TestGenerateUpdatePodSandboxResourcesRequest(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	podRequestCPU := resource.MustParse("400m")
+	podLimitMemory := resource.MustParse("256Mi")
+	podOverheadCPU := resource.MustParse("100m")
+	podOverheadMemory := resource.MustParse("64Mi")
+	enforceCPULimits := true
+	m.cpuCFSQuota = true
+
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "foo",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: podRequestCPU,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    podRequestCPU,
+							v1.ResourceMemory: podLimitMemory,
+						},
+					},
+				},
+			},
+			Overhead: v1.ResourceList{
+				v1.ResourceCPU:    podOverheadCPU,
+				v1.ResourceMemory: podOverheadMemory,
+			},
+		},
+	}
+
+	expectedLcr := m.calculateSandboxResources(pod)
+	expectedLcrOverhead := m.convertOverheadToLinuxResources(pod)
+
+	podResourcesCfg := cm.ResourceConfigForPod(pod, enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
+	assert.NotNil(t, podResourcesCfg)
+
+	updatePodSandboxRequest := m.generateUpdatePodSandboxResourcesRequest("123", pod, podResourcesCfg)
+	assert.NotNil(t, updatePodSandboxRequest)
+
+	assert.Equal(t, expectedLcr, updatePodSandboxRequest.Resources)
+	assert.Equal(t, expectedLcrOverhead, updatePodSandboxRequest.Overhead)
 }
 
 type CgroupVersion string
