@@ -221,6 +221,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 	}
 
 	flagValue := true
+	timeout := int64(1)
 	for i := 0; i < capacity; i++ {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
@@ -238,7 +239,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 					UsageRestrictedToNode:    &flagValue,
 					BindingConditions:        []string{"DeviceAttached"},
 					BindingFailureConditions: []string{"AttachmentFailed"},
-					BindingTimeout:           &metav1.Duration{Duration: 1 * time.Minute},
+					BindingTimeoutSeconds:    &timeout,
 				},
 			},
 		)

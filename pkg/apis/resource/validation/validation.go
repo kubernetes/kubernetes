@@ -555,8 +555,8 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field
 	if len(device.BindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), resource.BindingFailureConditionsMaxSize))
 	}
-	if device.BindingTimeout != nil && device.BindingTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeout, "must be greater than zero"))
+	if device.BindingTimeoutSeconds != nil && *device.BindingTimeoutSeconds <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeoutSeconds, "must be greater than zero"))
 	}
 	return allErrs
 }
@@ -771,8 +771,8 @@ func validateDeviceStatus(device resource.AllocatedDeviceStatus, fldPath *field.
 	if len(device.BindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
 		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), resource.BindingFailureConditionsMaxSize))
 	}
-	if device.BindingTimeout != nil && device.BindingTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeout, "must be greater than zero"))
+	if device.BindingTimeoutSeconds != nil && *device.BindingTimeoutSeconds <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeoutSeconds, "must be greater than zero"))
 	}
 	return allErrs
 }

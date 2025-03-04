@@ -159,14 +159,14 @@ var (
 	// for DRA Device Binding Conditions
 	bindingConditions        = []string{"condition"}
 	bindingFailureConditions = []string{"failed"}
-	bindingTimeout           = &metav1.Duration{Duration: 15 * time.Second}
+	bindingTimeout           = int64(15)
 
 	fabricSlice = func() *resourceapi.ResourceSlice {
 		res := st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
 		res.Spec.Devices[0].Basic.UsageRestrictedToNode = ptr.To(true)
 		res.Spec.Devices[0].Basic.BindingConditions = bindingConditions
 		res.Spec.Devices[0].Basic.BindingFailureConditions = bindingFailureConditions
-		res.Spec.Devices[0].Basic.BindingTimeout = bindingTimeout
+		res.Spec.Devices[0].Basic.BindingTimeoutSeconds = &bindingTimeout
 		res.Spec.NodeSelector = st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		return res
 	}()
@@ -181,7 +181,7 @@ var (
 				UsageRestrictedToNode:    ptr.To(true),
 				BindingConditions:        bindingConditions,
 				BindingFailureConditions: bindingFailureConditions,
-				BindingTimeout:           bindingTimeout,
+				BindingTimeoutSeconds:    &bindingTimeout,
 			}},
 		},
 		NodeSelector: st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj(),
@@ -195,7 +195,7 @@ var (
 			UsageRestrictedToNode:    ptr.To(true),
 			BindingConditions:        bindingConditions,
 			BindingFailureConditions: bindingFailureConditions,
-			BindingTimeout:           bindingTimeout,
+			BindingTimeoutSeconds:    &bindingTimeout,
 		},
 	}
 
@@ -212,7 +212,7 @@ var (
 				},
 				BindingConditions:        bindingConditions,
 				BindingFailureConditions: bindingFailureConditions,
-				BindingTimeout:           bindingTimeout,
+				BindingTimeoutSeconds:    &bindingTimeout,
 			},
 		}).
 		Obj()
@@ -230,7 +230,7 @@ var (
 				},
 				BindingConditions:        bindingConditions,
 				BindingFailureConditions: bindingFailureConditions,
-				BindingTimeout:           bindingTimeout,
+				BindingTimeoutSeconds:    &bindingTimeout,
 			},
 		}).
 		Obj()

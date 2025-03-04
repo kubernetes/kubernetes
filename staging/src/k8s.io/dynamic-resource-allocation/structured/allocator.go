@@ -336,7 +336,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 						allocationResult.Devices.Results[i].UsageRestrictedToNode = &device.Basic.UsageRestrictedToNode
 						allocationResult.Devices.Results[i].BindingConditions = device.Basic.BindingConditions
 						allocationResult.Devices.Results[i].BindingFailureConditions = device.Basic.BindingFailureConditions
-						allocationResult.Devices.Results[i].BindingTimeout = device.Basic.BindingTimeout
+						allocationResult.Devices.Results[i].BindingTimeoutSeconds = device.Basic.BindingTimeoutSeconds
 					}
 				}
 			}

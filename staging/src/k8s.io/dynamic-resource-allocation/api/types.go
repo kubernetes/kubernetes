@@ -54,7 +54,7 @@ type BasicDevice struct {
 	UsageRestrictedToNode    bool
 	BindingConditions        []string
 	BindingFailureConditions []string
-	BindingTimeout           *metav1.Duration
+	BindingTimeoutSeconds    *int64
 }
 
 type QualifiedName string

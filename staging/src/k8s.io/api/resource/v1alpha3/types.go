@@ -249,14 +249,14 @@ type BasicDevice struct {
 	// +listType=atomic
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,5,rep,name=bindingFailureConditions"`
 
-	// BindingTimeout indicates the prepare timeout period.
+	// BindingTimeoutSeconds indicates the prepare timeout period.
 	// If the timeout period is exceeded before all BindingConditions reach a True state,
 	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
 	//
-	// The default timeout if not set is 10 minutes.
+	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty" protobuf:"bytes,6,opt,name=bindingTimeout"`
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,6,opt,name=bindingTimeoutSeconds"`
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -893,14 +893,14 @@ type DeviceRequestAllocationResult struct {
 	// +listType=atomic
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
 
-	// BindingTimeout indicates the prepare timeout period.
+	// BindingTimeoutSeconds indicates the prepare timeout period.
 	// If the timeout period is exceeded before all BindingConditions reach a True state,
 	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
 	//
-	// The default timeout if not set is 10 minutes.
+	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty" protobuf:"bytes,9,opt,name=bindingTimeout"`
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,6,opt,name=bindingTimeoutSeconds"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1164,15 +1164,15 @@ type AllocatedDeviceStatus struct {
 	// +optional
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,9,opt,name=bindingFailureConditions"`
 
-	// BindingTimeout is a copy of the BindingTimeout
+	// BindingTimeoutSeconds is a copy of the BindingTimeoutSeconds
 	// as defined for the device at the time when it was allocated.
 	// If the timeout period is exceeded before all BindingConditions reach a True state,
 	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
 	//
-	// The default timeout if not set is 10 minutes.
+	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeout *metav1.Duration `json:"bindingTimeout,omitempty" protobuf:"bytes,10,opt,name=bindingTimeout"`
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,6,opt,name=bindingTimeoutSeconds"`
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.

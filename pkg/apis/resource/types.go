@@ -247,14 +247,14 @@ type BasicDevice struct {
 	// +listType=atomic
 	BindingFailureConditions []string
 
-	// BindingTimeout indicates the prepare timeout period.
+	// BindingTimeoutSeconds indicates the prepare timeout period.
 	// If the timeout period is exceeded before all BindingConditions reach a True state,
 	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
 	//
-	// The default timeout if not set is 10 minutes.
+	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeout *metav1.Duration
+	BindingTimeoutSeconds *int64
 }
 
 // DeviceCapacity describes a quantity associated with a device.
@@ -897,14 +897,14 @@ type DeviceRequestAllocationResult struct {
 	// +listType=atomic
 	BindingFailureConditions []string
 
-	// BindingTimeout indicates the prepare timeout period.
+	// BindingTimeoutSeconds indicates the prepare timeout period.
 	// If the timeout period is exceeded before all BindingConditions reach a True state,
 	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
 	//
-	// The default timeout if not set is 10 minutes.
+	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeout *metav1.Duration
+	BindingTimeoutSeconds *int64
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1155,15 +1155,15 @@ type AllocatedDeviceStatus struct {
 	// +optional
 	BindingFailureConditions []string
 
-	// BindingTimeout is a copy of the BindingTimeout
+	// BindingTimeoutSeconds is a copy of the BindingTimeoutSeconds
 	// as defined for the device at the time when it was allocated.
 	// If the timeout period is exceeded before all BindingConditions reach a True state,
 	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
 	//
-	// The default timeout if not set is 10 minutes.
+	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeout *metav1.Duration
+	BindingTimeoutSeconds *int64
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.

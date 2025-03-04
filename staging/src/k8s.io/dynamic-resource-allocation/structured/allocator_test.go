@@ -369,7 +369,7 @@ func sliceWithOneDeviceAndBindingConditions(name, node, pool, driver string, bin
 // deviceRequestAllocationResult returns an DeviceRequestAllocationResult object for testing purposes,
 // specifying the driver, pool, device, usage restriction, binding conditions,
 // binding failure conditions, and binding timeout.
-func deviceRequestAllocationResult(request, driver, pool, device string, usageRestrictedToNode *bool, bindingConditions, bindingFailureConditions []string, bindingTimeout *metav1.Duration) resourceapi.DeviceRequestAllocationResult {
+func deviceRequestAllocationResult(request, driver, pool, device string, usageRestrictedToNode *bool, bindingConditions, bindingFailureConditions []string, bindingTimeout *int64) resourceapi.DeviceRequestAllocationResult {
 	return resourceapi.DeviceRequestAllocationResult{
 		Request:                  request,
 		Driver:                   driver,
@@ -378,7 +378,7 @@ func deviceRequestAllocationResult(request, driver, pool, device string, usageRe
 		UsageRestrictedToNode:    usageRestrictedToNode,
 		BindingConditions:        bindingConditions,
 		BindingFailureConditions: bindingFailureConditions,
-		BindingTimeout:           bindingTimeout,
+		BindingTimeoutSeconds:    bindingTimeout,
 	}
 }
 

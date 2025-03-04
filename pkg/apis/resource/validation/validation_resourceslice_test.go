@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,10 +80,10 @@ func testResourceSliceWithBindingConditions(name, nodeName, driverName string, n
 	return slice
 }
 
-func testResouceSliceWithBindingTimeout(name, nodeName, driverName string, numDevices int, bindingTimeout *metav1.Duration) *resourceapi.ResourceSlice {
+func testResouceSliceWithBindingTimeout(name, nodeName, driverName string, numDevices int, bindingTimeout *int64) *resourceapi.ResourceSlice {
 	slice := testResourceSlice(name, nodeName, driverName, numDevices)
 	for i := range slice.Spec.Devices {
-		slice.Spec.Devices[i].Basic.BindingTimeout = bindingTimeout
+		slice.Spec.Devices[i].Basic.BindingTimeoutSeconds = bindingTimeout
 	}
 	return slice
 }
@@ -95,6 +94,8 @@ func TestValidateResourceSlice(t *testing.T) {
 	driverName := "test.example.com"
 	now := metav1.Now()
 	badValue := "spaces not allowed"
+	badTimeout := int64(-1)
+	goodTimeout := int64(10)
 
 	scenarios := map[string]struct {
 		slice        *resourceapi.ResourceSlice
@@ -477,11 +478,11 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4", "condition5", "condition6", "condition7"}),
 		},
 		"good-binding-timeout": {
-			slice: testResouceSliceWithBindingTimeout(goodName, goodName, driverName, 1, &metav1.Duration{Duration: 10 * time.Second}),
+			slice: testResouceSliceWithBindingTimeout(goodName, goodName, driverName, 1, &goodTimeout),
 		},
 		"bad-binding-timeout": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingTimeout"), &metav1.Duration{Duration: -1 * time.Second}, "must be greater than zero")},
-			slice:        testResouceSliceWithBindingTimeout(goodName, goodName, driverName, 1, &metav1.Duration{Duration: -1 * time.Second}),
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingTimeout"), &badTimeout, "must be greater than zero")},
+			slice:        testResouceSliceWithBindingTimeout(goodName, goodName, driverName, 1, &badTimeout),
 		},
 	}
 

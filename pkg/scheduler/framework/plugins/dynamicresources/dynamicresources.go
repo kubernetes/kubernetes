@@ -826,21 +826,21 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	// We need to decide how long we should wait for the device to be attached to the node.
-	timeoutDefault := 10 * time.Minute
-	timeout := 0 * time.Minute
+	timeoutDefault := int64(600)
+	timeout := int64(0)
 	for _, claim := range state.claims {
 		for _, device := range claim.Status.Devices {
-			if device.BindingTimeout != nil && timeout < device.BindingTimeout.Duration {
-				timeout = device.BindingTimeout.Duration
+			if device.BindingTimeoutSeconds != nil && timeout < *device.BindingTimeoutSeconds {
+				timeout = *device.BindingTimeoutSeconds
 			}
 		}
 	}
-	if timeout == 0*time.Minute {
+	if timeout == 0 {
 		timeout = timeoutDefault
 	}
 
 	// We need to wait for the device to be attached to the node.
-	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true,
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Duration(timeout)*time.Second, true,
 		func(ctx context.Context) (bool, error) {
 			for claimIndex, claim := range state.claims {
 				claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
@@ -962,7 +962,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 							UsageRestrictedToNode:    device.UsageRestrictedToNode,
 							BindingConditions:        device.BindingConditions,
 							BindingFailureConditions: device.BindingFailureConditions,
-							BindingTimeout:           device.BindingTimeout,
+							BindingTimeoutSeconds:    device.BindingTimeoutSeconds,
 						}
 						claim.Status.Devices = append(claim.Status.Devices, ad)
 					}
