@@ -213,6 +213,10 @@ type BasicDevice struct {
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// [ResourceSlicePatch] objects that match this device must also be
+	// consulted to determine the full set of attributes for this device.
+	//
 	// +optional
 	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,1,rep,name=attributes"`
 
@@ -221,8 +225,24 @@ type BasicDevice struct {
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	//
+	// When the DRAAdminControlledDeviceAttributes feature gate is enabled,
+	// [ResourceSlicePatch] objects that match this device must also be
+	// consulted to determine the full capacity for this device.
+	//
 	// +optional
 	Capacity map[QualifiedName]resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
+
+	// If specified, the device's taints.
+	//
+	// The maximum number of taints is 8.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,3,rep,name=taints"`
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -287,8 +307,77 @@ type DeviceAttribute struct {
 	VersionValue *string `json:"version,omitempty" protobuf:"bytes,5,opt,name=version"`
 }
 
+// NullableDeviceAttribute must have exactly one field set.
+// It has the exact same fields as a DeviceAttribute plus `null` as
+// an additional alternative.
+type NullableDeviceAttribute struct {
+	DeviceAttribute `json:",inline" protobuf:"bytes,1,opt,name=deviceAttribute"`
+
+	// NullValue, if set, marks an intentionally empty attribute.
+	//
+	// +optional
+	// +oneOf=ValueType
+	NullValue *NullValue `json:"null,omitempty" protobuf:"bytes,2,opt,name=null"`
+}
+
+// NullValue denotes the value of an attribute to be removed by a [NullableDeviceAttribute].
+type NullValue struct{}
+
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
+
+// DeviceTaintsMaxLength is the maximum number of taints per device.
+const DeviceTaintsMaxLength = 8
+
+// The device this DeviceTaint is attached to has the "effect" on
+// any claim and, through the claim, to pods that do not tolerate
+// the Taint.
+type DeviceTaint struct {
+	// The taint key to be applied to a device.
+	// Must be a label name.
+	//
+	// +required
+	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
+
+	// The taint value corresponding to the taint key.
+	// Must be a label value.
+	//
+	// +optional
+	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+
+	// The effect of the taint on claims that do not tolerate the taint
+	// and through such claims on the pods using them.
+	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+	// nodes is not valid here.
+	//
+	// +required
+	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,opt,name=effect,casttype=DeviceTaintEffect"`
+
+	// ^^^^
+	//
+	// Implementing PreferNoSchedule would depend on a scoring solution for DRA.
+	// It might get added as part of that.
+
+	// TimeAdded represents the time at which the taint was added.
+	// For NoExecute taints, the current time is set automatically
+	// when adding such a taint. There is no default for other taints.
+	//
+	// +optional
+	TimeAdded *metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
+}
+
+// +enum
+type DeviceTaintEffect string
+
+const (
+	// Do not allow new pods to schedule which use a tainted device unless they tolerate the taint,
+	// but allow all pods submitted to Kubelet without going through the scheduler
+	// to start, and allow all already-running pods to continue running.
+	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
+
+	// Evict any already-running pods that do not tolerate the device taint.
+	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
@@ -466,10 +555,34 @@ type DeviceRequest struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,6,opt,name=adminAccess"`
+
+	// If specified, the request's tolerations.
+	//
+	// Tolerations for NoSchedule are required to allocate a
+	// device which has a taint with that effect. The same applies
+	// to NoExecute.
+	//
+	// In addition, should any of the allocated devices get tainted
+	// with NoExecute after allocation and that effect is not tolerated,
+	// then all pods consuming the ResourceClaim get deleted to evict
+	// them. The scheduler will not let new pods reserve the claim while
+	// it has these tainted devices. Once all pods are evicted, the
+	// claim will get deallocated.
+	//
+	// The maximum number of tolerations is 16.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,7,opt,name=tolerations"`
 }
 
 const (
-	DeviceSelectorsMaxSize = 32
+	DeviceSelectorsMaxSize     = 32
+	DeviceTolerationsMaxLength = 16
 )
 
 type DeviceAllocationMode string
@@ -666,6 +779,56 @@ type OpaqueDeviceConfiguration struct {
 // OpaqueParametersMaxLength is the maximum length of the raw data in an
 // [OpaqueDeviceConfiguration.Parameters] field.
 const OpaqueParametersMaxLength = 10 * 1024
+
+// The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches
+// the triple <key,value,effect> using the matching operator <operator>.
+type DeviceToleration struct {
+	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
+	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+	// Must be a label name.
+	//
+	// +optional
+	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+
+	// Operator represents a key's relationship to the value.
+	// Valid operators are Exists and Equal. Defaults to Equal.
+	// Exists is equivalent to wildcard for value, so that a ResourceClaim can
+	// tolerate all taints of a particular category.
+	//
+	// +optional
+	Operator DeviceTolerationOperator `json:"operator,omitempty" protobuf:"bytes,2,opt,name=operator,casttype=DeviceTolerationOperator"`
+
+	// Value is the taint value the toleration matches to.
+	// If the operator is Exists, the value should be empty, otherwise just a regular string.
+	// Must be a label value.
+	//
+	// +optional
+	Value string `json:"value,omitempty" protobuf:"bytes,3,opt,name=value"`
+
+	// Effect indicates the taint effect to match. Empty means match all taint effects.
+	// When specified, allowed values are NoSchedule and NoExecute.
+	//
+	// +optional
+	Effect DeviceTaintEffect `json:"effect,omitempty" protobuf:"bytes,4,opt,name=effect,casttype=DeviceTaintEffect"`
+
+	// TolerationSeconds represents the period of time the toleration (which must be
+	// of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+	// it is not set, which means tolerate the taint forever (do not evict). Zero and
+	// negative values will be treated as 0 (evict immediately) by the system.
+	//
+	// +optional
+	TolerationSeconds *int64 `json:"tolerationSeconds,omitempty" protobuf:"varint,5,opt,name=tolerationSeconds"`
+}
+
+// A toleration operator is the set of operators that can be used in a toleration.
+//
+// +enum
+type DeviceTolerationOperator string
+
+const (
+	DeviceTolerationOpExists DeviceTolerationOperator = "Exists"
+	DeviceTolerationOpEqual  DeviceTolerationOperator = "Equal"
+)
 
 // ResourceClaimStatus tracks whether the resource has been allocated and what
 // the result of that was.
@@ -1105,4 +1268,169 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// ResourceSlicePatch objects define modifications to [ResourceSlice] objects.
+// [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker]
+// can be used to view fully resolved [ResourceSlice] objects which include
+// these modifications.
+type ResourceSlicePatch struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec contains modifications to ResourceSlices.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec ResourceSlicePatchSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+}
+
+// ResourceSlicePatchSpec contains modifications to ResourceSlices.
+type ResourceSlicePatchSpec struct {
+	// Devices defines how to patch device attributes and taints.
+	Devices DevicePatch `json:"devices" protobuf:"bytes,1,name=devices"`
+}
+
+// DevicePatch selects one or more devices by class, driver, pool, device names
+// and/or CEL selectors. All of these criteria must be satisfied by a device, otherwise
+// it is ignored by the patch. A DevicePatch with no selection criteria is
+// valid and matches all devices.
+type DevicePatch struct {
+	// Filter defines which device(s) the patch is applied to.
+	//
+	// +optional
+	Filter *DevicePatchFilter `json:"filter,omitempty" protobuf:"bytes,1,opt,name=filter"`
+
+	// If a ResourceSlice and a DevicePatch define the same attribute or
+	// capacity, the value of the DevicePatch is used. If multiple
+	// different DevicePatches match the same device, then the one with
+	// the highest priority wins. If priorities are equal, the older
+	// patch wins. This ensures that adding a new patch does not
+	// accidentally change the effect of some existing patch unless
+	// that is clearly intended according to the priority.
+	//
+	// +optional
+	Priority *int32 `json:"priority,omitempty" protobuf:"varint,2,opt,name=priority"`
+
+	// Attributes defines the set of attributes to patch for matching devices.
+	// The name of each attribute must be unique in that set and
+	// include the domain prefix.
+	//
+	// In contrast to attributes in a ResourceSlice, entries here are allowed to
+	// be marked as empty by setting their null field. Such entries remove the
+	// corresponding attribute in a ResourceSlice, if there is one, instead of
+	// overriding it. Because entries get removed and are not allowed in
+	// slices, CEL expressions do not need need to deal with null values.
+	//
+	// The maximum number of attributes and capacities in the DevicePatch combined is 32.
+	// This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes
+	// feature gate.
+	//
+	// +optional
+	// +featureGate:DRAAdminControlledDeviceAttributes
+	Attributes map[FullyQualifiedName]NullableDeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,3,rep,name=attributes"`
+
+	// Capacity defines the set of capacities to patch for matching devices.
+	// The name of each capacity must be unique in that set and
+	// include the domain prefix.
+	//
+	// Removing a capacity is not supported. It can be reduced to 0 instead.
+	//
+	// The maximum number of attributes and capacities in the DevicePatch combined is 32.
+	// This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes
+	// feature gate.
+	//
+	// +optional
+	// +featureGate:DRAAdminControlledDeviceAttributes
+	Capacity map[FullyQualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,4,rep,name=capacity"`
+
+	// If specified, the device's taints. Taints with unique key and effect
+	// get added to the set of taints of the device. When key and effect
+	// are used in multiple places, the same precedence rules as for attributes apply
+	// (see the priority field).
+	//
+	// The maximum number of tolerations is 16.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,5,rep,name=taints"`
+}
+
+// DevicePatchFilter defines which device(s) a [DevicePatch] applies to.
+type DevicePatchFilter struct {
+	// If DeviceClassName is set, the selectors defined there must be
+	// satisfied by a device to be patched. This field corresponds
+	// to class.metadata.name.
+	//
+	// +optional
+	DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
+
+	// If driver is set, only devices from that driver are patched.
+	// This fields corresponds to slice.spec.driver.
+	//
+	// +optional
+	Driver *string `json:"driver,omitempty" protobuf:"bytes,2,opt,name=driver"`
+
+	// If pool is set, only devices in that pool are patched.
+	//
+	// Also setting the driver name may be useful to avoid
+	// ambiguity when different drivers use the same pool name,
+	// but this is not required because selecting pools from
+	// different drivers may also be useful, for example when
+	// drivers with node-local devices use the node name as
+	// their pool name.
+	//
+	// +optional
+	Pool *string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
+
+	// If device is set, only devices with that name are patched.
+	// This field corresponds to slice.spec.devices[].name.
+	//
+	// Setting also driver and pool may be required to avoid ambiguity,
+	// but is not required.
+	//
+	// +optional
+	Device *string `json:"device,omitempty" protobuf:"bytes,4,opt,name=device"`
+
+	// Selectors define criteria which must be satisfied by a
+	// device to be patched. All selectors must be satisfied.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+}
+
+// DeviceCapacity describes a quantity associated with a device.
+type DeviceCapacity struct {
+	// Value defines how much of a certain device capacity is available.
+	//
+	// +required
+	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
+
+	// potential future addition: fields which define how to "consume"
+	// capacity (= share a single device between different consumers).
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// ResourceSlicePatchList is a collection of ResourceSlicePatches.
+type ResourceSlicePatchList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of resource slice patches.
+	Items []ResourceSlicePatch `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

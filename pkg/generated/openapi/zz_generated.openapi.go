@@ -916,6 +916,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.DeviceAllocationConfiguration":                                            schema_k8sio_api_resource_v1alpha3_DeviceAllocationConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceAllocationResult":                                                   schema_k8sio_api_resource_v1alpha3_DeviceAllocationResult(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceAttribute":                                                          schema_k8sio_api_resource_v1alpha3_DeviceAttribute(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceCapacity":                                                           schema_k8sio_api_resource_v1alpha3_DeviceCapacity(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceClaim":                                                              schema_k8sio_api_resource_v1alpha3_DeviceClaim(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceClaimConfiguration":                                                 schema_k8sio_api_resource_v1alpha3_DeviceClaimConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceClass":                                                              schema_k8sio_api_resource_v1alpha3_DeviceClass(ref),
@@ -924,10 +925,16 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.DeviceClassSpec":                                                          schema_k8sio_api_resource_v1alpha3_DeviceClassSpec(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceConfiguration":                                                      schema_k8sio_api_resource_v1alpha3_DeviceConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceConstraint":                                                         schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref),
+		"k8s.io/api/resource/v1alpha3.DevicePatch":                                                              schema_k8sio_api_resource_v1alpha3_DevicePatch(ref),
+		"k8s.io/api/resource/v1alpha3.DevicePatchFilter":                                                        schema_k8sio_api_resource_v1alpha3_DevicePatchFilter(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequest":                                                            schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult":                                            schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceSelector":                                                           schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceTaint":                                                              schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceToleration":                                                         schema_k8sio_api_resource_v1alpha3_DeviceToleration(ref),
 		"k8s.io/api/resource/v1alpha3.NetworkDeviceData":                                                        schema_k8sio_api_resource_v1alpha3_NetworkDeviceData(ref),
+		"k8s.io/api/resource/v1alpha3.NullValue":                                                                schema_k8sio_api_resource_v1alpha3_NullValue(ref),
+		"k8s.io/api/resource/v1alpha3.NullableDeviceAttribute":                                                  schema_k8sio_api_resource_v1alpha3_NullableDeviceAttribute(ref),
 		"k8s.io/api/resource/v1alpha3.OpaqueDeviceConfiguration":                                                schema_k8sio_api_resource_v1alpha3_OpaqueDeviceConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceClaim":                                                            schema_k8sio_api_resource_v1alpha3_ResourceClaim(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceClaimConsumerReference":                                           schema_k8sio_api_resource_v1alpha3_ResourceClaimConsumerReference(ref),
@@ -940,6 +947,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.ResourcePool":                                                             schema_k8sio_api_resource_v1alpha3_ResourcePool(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSlice":                                                            schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSliceList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceSlicePatch":                                                       schema_k8sio_api_resource_v1alpha3_ResourceSlicePatch(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceSlicePatchList":                                                   schema_k8sio_api_resource_v1alpha3_ResourceSlicePatchList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceSlicePatchSpec":                                                   schema_k8sio_api_resource_v1alpha3_ResourceSlicePatchSpec(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSliceSpec":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref),
 		"k8s.io/api/resource/v1beta1.AllocatedDeviceStatus":                                                     schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		"k8s.io/api/resource/v1beta1.AllocationResult":                                                          schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
@@ -961,6 +971,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.DeviceRequest":                                                             schema_k8sio_api_resource_v1beta1_DeviceRequest(ref),
 		"k8s.io/api/resource/v1beta1.DeviceRequestAllocationResult":                                             schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.DeviceSelector":                                                            schema_k8sio_api_resource_v1beta1_DeviceSelector(ref),
+		"k8s.io/api/resource/v1beta1.DeviceTaint":                                                               schema_k8sio_api_resource_v1beta1_DeviceTaint(ref),
+		"k8s.io/api/resource/v1beta1.DeviceToleration":                                                          schema_k8sio_api_resource_v1beta1_DeviceToleration(ref),
 		"k8s.io/api/resource/v1beta1.NetworkDeviceData":                                                         schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref),
 		"k8s.io/api/resource/v1beta1.OpaqueDeviceConfiguration":                                                 schema_k8sio_api_resource_v1beta1_OpaqueDeviceConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.ResourceClaim":                                                             schema_k8sio_api_resource_v1beta1_ResourceClaim(ref),
@@ -46806,7 +46818,7 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"attributes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, [ResourceSlicePatch] objects that match this device must also be consulted to determine the full set of attributes for this device.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -46821,7 +46833,7 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 					},
 					"capacity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+							Description: "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, [ResourceSlicePatch] objects that match this device must also be consulted to determine the full capacity for this device.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -46833,11 +46845,30 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the device's taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceTaint"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -47034,6 +47065,28 @@ func schema_k8sio_api_resource_v1alpha3_DeviceAttribute(ref common.ReferenceCall
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceCapacity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCapacity describes a quantity associated with a device.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value defines how much of a certain device capacity is available.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"value"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -47380,6 +47433,145 @@ func schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref common.ReferenceCal
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_DevicePatch(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DevicePatch selects one or more devices by class, driver, pool, device names and/or CEL selectors. All of these criteria must be satisfied by a device, otherwise it is ignored by the patch. A DevicePatch with no selection criteria is valid and matches all devices.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"filter": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Filter defines which device(s) the patch is applied to.",
+							Ref:         ref("k8s.io/api/resource/v1alpha3.DevicePatchFilter"),
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If a ResourceSlice and a DevicePatch define the same attribute or capacity, the value of the DevicePatch is used. If multiple different DevicePatches match the same device, then the one with the highest priority wins. If priorities are equal, the older patch wins. This ensures that adding a new patch does not accidentally change the effect of some existing patch unless that is clearly intended according to the priority.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"attributes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Attributes defines the set of attributes to patch for matching devices. The name of each attribute must be unique in that set and include the domain prefix.\n\nIn contrast to attributes in a ResourceSlice, entries here are allowed to be marked as empty by setting their null field. Such entries remove the corresponding attribute in a ResourceSlice, if there is one, instead of overriding it. Because entries get removed and are not allowed in slices, CEL expressions do not need need to deal with null values.\n\nThe maximum number of attributes and capacities in the DevicePatch combined is 32. This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes feature gate.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.NullableDeviceAttribute"),
+									},
+								},
+							},
+						},
+					},
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Capacity defines the set of capacities to patch for matching devices. The name of each capacity must be unique in that set and include the domain prefix.\n\nRemoving a capacity is not supported. It can be reduced to 0 instead.\n\nThe maximum number of attributes and capacities in the DevicePatch combined is 32. This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes feature gate.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceCapacity"),
+									},
+								},
+							},
+						},
+					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the device's taints. Taints with unique key and effect get added to the set of taints of the device. When key and effect are used in multiple places, the same precedence rules as for attributes apply (see the priority field).\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceTaint"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.DeviceCapacity", "k8s.io/api/resource/v1alpha3.DevicePatchFilter", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/api/resource/v1alpha3.NullableDeviceAttribute"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DevicePatchFilter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DevicePatchFilter defines which device(s) a [DevicePatch] applies to.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"deviceClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If DeviceClassName is set, the selectors defined there must be satisfied by a device to be patched. This field corresponds to class.metadata.name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"driver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If driver is set, only devices from that driver are patched. This fields corresponds to slice.spec.driver.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"pool": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If pool is set, only devices in that pool are patched.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"device": {
+						SchemaProps: spec.SchemaProps{
+							Description: "If device is set, only devices with that name are patched. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"selectors": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Selectors define criteria which must be satisfied by a device to be patched. All selectors must be satisfied.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceSelector"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.DeviceSelector"},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -47443,12 +47635,31 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref common.ReferenceCallba
 							Format:      "",
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceToleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceSelector"},
+			"k8s.io/api/resource/v1alpha3.DeviceSelector", "k8s.io/api/resource/v1alpha3.DeviceToleration"},
 	}
 }
 
@@ -47526,6 +47737,102 @@ func schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref common.ReferenceCallb
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_DeviceTaint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The device this DeviceTaint is attached to has the \"effect\" on any claim and, through the claim, to pods that do not tolerate the Taint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint key to be applied to a device. Must be a label name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint value corresponding to the taint key. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"timeAdded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TimeAdded represents the time at which the taint was added. For NoExecute taints, the current time is set automatically when adding such a taint. There is no default for other taints.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+				},
+				Required: []string{"key", "effect"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceToleration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"operator": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a ResourceClaim can tolerate all taints of a particular category.\n\n\nPossible enum values:\n - `\"Equal\"`\n - `\"Exists\"`",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Equal", "Exists"},
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"tolerationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_NetworkDeviceData(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -47570,6 +47877,66 @@ func schema_k8sio_api_resource_v1alpha3_NetworkDeviceData(ref common.ReferenceCa
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_NullValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NullValue denotes the value of an attribute to be removed by a [NullableDeviceAttribute].",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_NullableDeviceAttribute(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NullableDeviceAttribute must have exactly one field set. It has the exact same fields as a DeviceAttribute plus `null` as an additional alternative.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"int": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValue is a number.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"bool": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValue is a true/false value.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"string": {
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValue is a string. Must not be longer than 64 characters.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"version": {
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"null": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NullValue, if set, marks an intentionally empty attribute.",
+							Ref:         ref("k8s.io/api/resource/v1alpha3.NullValue"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.NullValue"},
 	}
 }
 
@@ -48099,6 +48466,124 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref common.ReferenceCa
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_ResourceSlicePatch(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSlicePatch objects define modifications to [ResourceSlice] objects. [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker] can be used to view fully resolved [ResourceSlice] objects which include these modifications.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec contains modifications to ResourceSlices.\n\nChanging the spec automatically increments the metadata.generation number.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceSlicePatchSpec"),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.ResourceSlicePatchSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourceSlicePatchList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSlicePatchList is a collection of ResourceSlicePatches.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of resource slice patches.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.ResourceSlicePatch"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.ResourceSlicePatch", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourceSlicePatchSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSlicePatchSpec contains modifications to ResourceSlices.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"devices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Devices defines how to patch device attributes and taints.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/resource/v1alpha3.DevicePatch"),
+						},
+					},
+				},
+				Required: []string{"devices"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.DevicePatch"},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -48280,7 +48765,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 				Properties: map[string]spec.Schema{
 					"attributes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+							Description: "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full set of attributes for this device.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -48295,7 +48780,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 					},
 					"capacity": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+							Description: "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full capacity for this device.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -48308,11 +48793,30 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"taints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the device's taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceTaint"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity"},
+			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity", "k8s.io/api/resource/v1beta1.DeviceTaint"},
 	}
 }
 
@@ -48940,12 +49444,31 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallbac
 							Format:      "",
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceToleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name", "deviceClassName"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceSelector"},
+			"k8s.io/api/resource/v1beta1.DeviceSelector", "k8s.io/api/resource/v1beta1.DeviceToleration"},
 	}
 }
 
@@ -48995,10 +49518,31 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							Format:      "",
 						},
 					},
+					"tolerations": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceToleration"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"request", "driver", "pool", "device"},
 			},
 		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.DeviceToleration"},
 	}
 }
 
@@ -49020,6 +49564,102 @@ func schema_k8sio_api_resource_v1beta1_DeviceSelector(ref common.ReferenceCallba
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1beta1.CELDeviceSelector"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceTaint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The device this DeviceTaint is attached to has the \"effect\" on any claim and, through the claim, to pods that do not tolerate the Taint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint key to be applied to a device. Must be a label name.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The taint value corresponding to the taint key. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"timeAdded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TimeAdded represents the time at which the taint was added. For NoExecute taints, the current time is set automatically when adding such a taint. There is no default for other taints.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+				},
+				Required: []string{"key", "effect"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceToleration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"operator": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a ResourceClaim can tolerate all taints of a particular category.\n\n\nPossible enum values:\n - `\"Equal\"`\n - `\"Exists\"`",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Equal", "Exists"},
+						},
+					},
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string. Must be a label value.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"effect": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.\n\n\nPossible enum values:\n - `\"NoExecute\"` Evict any already-running pods that do not tolerate the device taint.\n - `\"NoSchedule\"` Do not allow new pods to schedule which use a tainted device unless they tolerate the taint, but allow all pods submitted to Kubelet without going through the scheduler to start, and allow all already-running pods to continue running.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"NoExecute", "NoSchedule"},
+						},
+					},
+					"tolerationSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
+			},
+		},
 	}
 }
 

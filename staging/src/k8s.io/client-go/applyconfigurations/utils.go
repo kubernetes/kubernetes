@@ -1610,6 +1610,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceAllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAttribute"):
 		return &resourcev1alpha3.DeviceAttributeApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceCapacity"):
+		return &resourcev1alpha3.DeviceCapacityApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaim"):
 		return &resourcev1alpha3.DeviceClaimApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaimConfiguration"):
@@ -1624,14 +1626,24 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceConfigurationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceConstraint"):
 		return &resourcev1alpha3.DeviceConstraintApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DevicePatch"):
+		return &resourcev1alpha3.DevicePatchApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DevicePatchFilter"):
+		return &resourcev1alpha3.DevicePatchFilterApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &resourcev1alpha3.DeviceRequestApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
 		return &resourcev1alpha3.DeviceRequestAllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSelector"):
 		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
+		return &resourcev1alpha3.DeviceTaintApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceToleration"):
+		return &resourcev1alpha3.DeviceTolerationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &resourcev1alpha3.NetworkDeviceDataApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("NullableDeviceAttribute"):
+		return &resourcev1alpha3.NullableDeviceAttributeApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &resourcev1alpha3.OpaqueDeviceConfigurationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1650,6 +1662,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourcePoolApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlice"):
 		return &resourcev1alpha3.ResourceSliceApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlicePatch"):
+		return &resourcev1alpha3.ResourceSlicePatchApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlicePatchSpec"):
+		return &resourcev1alpha3.ResourceSlicePatchSpecApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &resourcev1alpha3.ResourceSliceSpecApplyConfiguration{}
 
@@ -1692,6 +1708,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceRequestAllocationResultApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceSelector"):
 		return &applyconfigurationsresourcev1beta1.DeviceSelectorApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceTaint"):
+		return &applyconfigurationsresourcev1beta1.DeviceTaintApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceToleration"):
+		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):

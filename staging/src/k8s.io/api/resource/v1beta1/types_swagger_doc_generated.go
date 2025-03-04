@@ -53,8 +53,9 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 
 var map_BasicDevice = map[string]string{
 	"":           "BasicDevice defines one device instance.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full set of attributes for this device.",
+	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, ResourceSlicePatch objects that match this device must also be consulted to determine the full capacity for this device.",
+	"taints":     "If specified, the device's taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {
@@ -206,6 +207,7 @@ var map_DeviceRequest = map[string]string{
 	"allocationMode":  "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
 	"count":           "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
 	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+	"tolerations":     "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 }
 
 func (DeviceRequest) SwaggerDoc() map[string]string {
@@ -219,6 +221,7 @@ var map_DeviceRequestAllocationResult = map[string]string{
 	"pool":        "This name together with the driver name and the device name field identify which device was allocated (`<driver name>/<pool name>/<device name>`).\n\nMust not be longer than 253 characters and may contain one or more DNS sub-domains separated by slashes.",
 	"device":      "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
 	"adminAccess": "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+	"tolerations": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {
@@ -232,6 +235,31 @@ var map_DeviceSelector = map[string]string{
 
 func (DeviceSelector) SwaggerDoc() map[string]string {
 	return map_DeviceSelector
+}
+
+var map_DeviceTaint = map[string]string{
+	"":          "The device this DeviceTaint is attached to has the \"effect\" on any claim and, through the claim, to pods that do not tolerate the Taint.",
+	"key":       "The taint key to be applied to a device. Must be a label name.",
+	"value":     "The taint value corresponding to the taint key. Must be a label value.",
+	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added. For NoExecute taints, the current time is set automatically when adding such a taint. There is no default for other taints.",
+}
+
+func (DeviceTaint) SwaggerDoc() map[string]string {
+	return map_DeviceTaint
+}
+
+var map_DeviceToleration = map[string]string{
+	"":                  "The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+	"key":               "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",
+	"operator":          "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a ResourceClaim can tolerate all taints of a particular category.",
+	"value":             "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string. Must be a label value.",
+	"effect":            "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.",
+	"tolerationSeconds": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+}
+
+func (DeviceToleration) SwaggerDoc() map[string]string {
+	return map_DeviceToleration
 }
 
 var map_NetworkDeviceData = map[string]string{

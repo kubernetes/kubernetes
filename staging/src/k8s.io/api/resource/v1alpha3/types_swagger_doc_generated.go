@@ -53,8 +53,9 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 
 var map_BasicDevice = map[string]string{
 	"":           "BasicDevice defines one device instance.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, [ResourceSlicePatch] objects that match this device must also be consulted to determine the full set of attributes for this device.",
+	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.\n\nWhen the DRAAdminControlledDeviceAttributes feature gate is enabled, [ResourceSlicePatch] objects that match this device must also be consulted to determine the full capacity for this device.",
+	"taints":     "If specified, the device's taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {
@@ -110,6 +111,15 @@ var map_DeviceAttribute = map[string]string{
 
 func (DeviceAttribute) SwaggerDoc() map[string]string {
 	return map_DeviceAttribute
+}
+
+var map_DeviceCapacity = map[string]string{
+	"":      "DeviceCapacity describes a quantity associated with a device.",
+	"value": "Value defines how much of a certain device capacity is available.",
+}
+
+func (DeviceCapacity) SwaggerDoc() map[string]string {
+	return map_DeviceCapacity
 }
 
 var map_DeviceClaim = map[string]string{
@@ -189,6 +199,32 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 	return map_DeviceConstraint
 }
 
+var map_DevicePatch = map[string]string{
+	"":           "DevicePatch selects one or more devices by class, driver, pool, device names and/or CEL selectors. All of these criteria must be satisfied by a device, otherwise it is ignored by the patch. A DevicePatch with no selection criteria is valid and matches all devices.",
+	"filter":     "Filter defines which device(s) the patch is applied to.",
+	"priority":   "If a ResourceSlice and a DevicePatch define the same attribute or capacity, the value of the DevicePatch is used. If multiple different DevicePatches match the same device, then the one with the highest priority wins. If priorities are equal, the older patch wins. This ensures that adding a new patch does not accidentally change the effect of some existing patch unless that is clearly intended according to the priority.",
+	"attributes": "Attributes defines the set of attributes to patch for matching devices. The name of each attribute must be unique in that set and include the domain prefix.\n\nIn contrast to attributes in a ResourceSlice, entries here are allowed to be marked as empty by setting their null field. Such entries remove the corresponding attribute in a ResourceSlice, if there is one, instead of overriding it. Because entries get removed and are not allowed in slices, CEL expressions do not need need to deal with null values.\n\nThe maximum number of attributes and capacities in the DevicePatch combined is 32. This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes feature gate.",
+	"capacity":   "Capacity defines the set of capacities to patch for matching devices. The name of each capacity must be unique in that set and include the domain prefix.\n\nRemoving a capacity is not supported. It can be reduced to 0 instead.\n\nThe maximum number of attributes and capacities in the DevicePatch combined is 32. This is an alpha field and requires enabling the DRAAdminControlledDeviceAttributes feature gate.",
+	"taints":     "If specified, the device's taints. Taints with unique key and effect get added to the set of taints of the device. When key and effect are used in multiple places, the same precedence rules as for attributes apply (see the priority field).\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+}
+
+func (DevicePatch) SwaggerDoc() map[string]string {
+	return map_DevicePatch
+}
+
+var map_DevicePatchFilter = map[string]string{
+	"":                "DevicePatchFilter defines which device(s) a [DevicePatch] applies to.",
+	"deviceClassName": "If DeviceClassName is set, the selectors defined there must be satisfied by a device to be patched. This field corresponds to class.metadata.name.",
+	"driver":          "If driver is set, only devices from that driver are patched. This fields corresponds to slice.spec.driver.",
+	"pool":            "If pool is set, only devices in that pool are patched.\n\nAlso setting the driver name may be useful to avoid ambiguity when different drivers use the same pool name, but this is not required because selecting pools from different drivers may also be useful, for example when drivers with node-local devices use the node name as their pool name.",
+	"device":          "If device is set, only devices with that name are patched. This field corresponds to slice.spec.devices[].name.\n\nSetting also driver and pool may be required to avoid ambiguity, but is not required.",
+	"selectors":       "Selectors define criteria which must be satisfied by a device to be patched. All selectors must be satisfied.",
+}
+
+func (DevicePatchFilter) SwaggerDoc() map[string]string {
+	return map_DevicePatchFilter
+}
+
 var map_DeviceRequest = map[string]string{
 	"":                "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
 	"name":            "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
@@ -197,6 +233,7 @@ var map_DeviceRequest = map[string]string{
 	"allocationMode":  "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
 	"count":           "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
 	"adminAccess":     "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+	"tolerations":     "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 }
 
 func (DeviceRequest) SwaggerDoc() map[string]string {
@@ -225,6 +262,31 @@ func (DeviceSelector) SwaggerDoc() map[string]string {
 	return map_DeviceSelector
 }
 
+var map_DeviceTaint = map[string]string{
+	"":          "The device this DeviceTaint is attached to has the \"effect\" on any claim and, through the claim, to pods that do not tolerate the Taint.",
+	"key":       "The taint key to be applied to a device. Must be a label name.",
+	"value":     "The taint value corresponding to the taint key. Must be a label value.",
+	"effect":    "The effect of the taint on claims that do not tolerate the taint and through such claims on the pods using them. Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for nodes is not valid here.",
+	"timeAdded": "TimeAdded represents the time at which the taint was added. For NoExecute taints, the current time is set automatically when adding such a taint. There is no default for other taints.",
+}
+
+func (DeviceTaint) SwaggerDoc() map[string]string {
+	return map_DeviceTaint
+}
+
+var map_DeviceToleration = map[string]string{
+	"":                  "The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+	"key":               "Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys. Must be a label name.",
+	"operator":          "Operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a ResourceClaim can tolerate all taints of a particular category.",
+	"value":             "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string. Must be a label value.",
+	"effect":            "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and NoExecute.",
+	"tolerationSeconds": "TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.",
+}
+
+func (DeviceToleration) SwaggerDoc() map[string]string {
+	return map_DeviceToleration
+}
+
 var map_NetworkDeviceData = map[string]string{
 	"":                "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
 	"interfaceName":   "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 characters.",
@@ -234,6 +296,23 @@ var map_NetworkDeviceData = map[string]string{
 
 func (NetworkDeviceData) SwaggerDoc() map[string]string {
 	return map_NetworkDeviceData
+}
+
+var map_NullValue = map[string]string{
+	"": "NullValue denotes the value of an attribute to be removed by a [NullableDeviceAttribute].",
+}
+
+func (NullValue) SwaggerDoc() map[string]string {
+	return map_NullValue
+}
+
+var map_NullableDeviceAttribute = map[string]string{
+	"":     "NullableDeviceAttribute must have exactly one field set. It has the exact same fields as a DeviceAttribute plus `null` as an additional alternative.",
+	"null": "NullValue, if set, marks an intentionally empty attribute.",
+}
+
+func (NullableDeviceAttribute) SwaggerDoc() map[string]string {
+	return map_NullableDeviceAttribute
 }
 
 var map_OpaqueDeviceConfiguration = map[string]string{
@@ -358,6 +437,35 @@ var map_ResourceSliceList = map[string]string{
 
 func (ResourceSliceList) SwaggerDoc() map[string]string {
 	return map_ResourceSliceList
+}
+
+var map_ResourceSlicePatch = map[string]string{
+	"":         "ResourceSlicePatch objects define modifications to [ResourceSlice] objects. [k8s.io/dynamic-resource-allocation/resourceslice/tracker.Tracker] can be used to view fully resolved [ResourceSlice] objects which include these modifications.",
+	"metadata": "Standard object metadata",
+	"spec":     "Spec contains modifications to ResourceSlices.\n\nChanging the spec automatically increments the metadata.generation number.",
+}
+
+func (ResourceSlicePatch) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatch
+}
+
+var map_ResourceSlicePatchList = map[string]string{
+	"":         "ResourceSlicePatchList is a collection of ResourceSlicePatches.",
+	"metadata": "Standard list metadata",
+	"items":    "Items is the list of resource slice patches.",
+}
+
+func (ResourceSlicePatchList) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatchList
+}
+
+var map_ResourceSlicePatchSpec = map[string]string{
+	"":        "ResourceSlicePatchSpec contains modifications to ResourceSlices.",
+	"devices": "Devices defines how to patch device attributes and taints.",
+}
+
+func (ResourceSlicePatchSpec) SwaggerDoc() map[string]string {
+	return map_ResourceSlicePatchSpec
 }
 
 var map_ResourceSliceSpec = map[string]string{

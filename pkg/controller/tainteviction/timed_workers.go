@@ -102,9 +102,12 @@ func CreateWorkerQueue(f func(ctx context.Context, fireAt time.Time, args *WorkA
 
 func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+		logger := klog.FromContext(ctx)
+		logger.V(4).Info("Firing worker", "item", key, "firedTime", fireAt)
 		err := q.workFunc(ctx, fireAt, args)
 		q.Lock()
 		defer q.Unlock()
+		logger.V(4).Info("Worker finished, removing", "item", key, "err", err)
 		delete(q.workers, key)
 		return err
 	}
@@ -114,14 +117,14 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Con
 func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
 
 	q.Lock()
 	defer q.Unlock()
 	if _, exists := q.workers[key]; exists {
-		logger.Info("Trying to add already existing work, skipping", "args", args)
+		logger.V(4).Info("Trying to add already existing work, skipping", "item", key, "createTime", createdAt, "firedTime", fireAt)
 		return
 	}
+	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
 	worker := createWorker(ctx, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
 	q.workers[key] = worker
 }
