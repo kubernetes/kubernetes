@@ -600,6 +600,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		return nil, err
 	}
 
+	skipCheck := evaluator.AllowExceededQuota(a)
 	for _, index := range interestingQuotaIndexes {
 		resourceQuota := outQuotas[index]
 		deltaUsage, ok := deltaUsageIndexMap[index]
@@ -610,18 +611,20 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
 		requestedUsage := quota.Mask(deltaUsage, hardResources)
 		newUsage := quota.Add(resourceQuota.Status.Used, requestedUsage)
-		maskedNewUsage := quota.Mask(newUsage, quota.ResourceNames(requestedUsage))
 
-		if allowed, exceeded := quota.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {
-			failedRequestedUsage := quota.Mask(requestedUsage, exceeded)
-			failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
-			failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
-			return nil, admission.NewForbidden(a,
-				fmt.Errorf("exceeded quota: %s, requested: %s, used: %s, limited: %s",
-					resourceQuota.Name,
-					prettyPrint(failedRequestedUsage),
-					prettyPrint(failedUsed),
-					prettyPrint(failedHard)))
+		if !skipCheck {
+			maskedNewUsage := quota.Mask(newUsage, quota.ResourceNames(requestedUsage))
+			if allowed, exceeded := quota.LessThanOrEqual(maskedNewUsage, resourceQuota.Status.Hard); !allowed {
+				failedRequestedUsage := quota.Mask(requestedUsage, exceeded)
+				failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
+				failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
+				return nil, admission.NewForbidden(a,
+					fmt.Errorf("exceeded quota: %s, requested: %s, used: %s, limited: %s",
+						resourceQuota.Name,
+						prettyPrint(failedRequestedUsage),
+						prettyPrint(failedUsed),
+						prettyPrint(failedHard)))
+			}
 		}
 
 		// update to the new usage number

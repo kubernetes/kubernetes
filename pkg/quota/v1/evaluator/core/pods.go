@@ -189,6 +189,11 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	}
 }
 
+// AllowExceededQuota returns true if the evaluator should skip the exceeded check when updating a resource quota.
+func (p *podEvaluator) AllowExceededQuota(a admission.Attributes) bool {
+	return false
+}
+
 // Matches returns true if the evaluator matches the specified quota with the provided input item
 func (p *podEvaluator) Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error) {
 	return generic.Matches(resourceQuota, item, p.MatchingResources, podMatchesScopeFunc)

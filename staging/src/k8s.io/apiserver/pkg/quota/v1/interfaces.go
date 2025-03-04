@@ -50,6 +50,8 @@ type Evaluator interface {
 	// Handles determines if quota could be impacted by the specified attribute.
 	// If true, admission control must perform quota processing for the operation, otherwise it is safe to ignore quota.
 	Handles(operation admission.Attributes) bool
+	// AllowExceededQuota determines if the specified operation should be allowed to exceed quota.
+	AllowExceededQuota(a admission.Attributes) bool
 	// Matches returns true if the specified quota matches the input item
 	Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error)
 	// MatchingScopes takes the input specified list of scopes and input object and returns the set of scopes that matches input object.

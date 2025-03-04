@@ -257,6 +257,11 @@ func (o *objectCountEvaluator) Handles(a admission.Attributes) bool {
 	return operation == admission.Create
 }
 
+// AllowExceededQuota returns true if the object count evaluator should skip the exceeded check when updating a resource quota.
+func (o *objectCountEvaluator) AllowExceededQuota(a admission.Attributes) bool {
+	return false
+}
+
 // Matches returns true if the evaluator matches the specified quota with the provided input item
 func (o *objectCountEvaluator) Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error) {
 	return Matches(resourceQuota, item, o.MatchingResources, MatchesNoScopeFunc)
