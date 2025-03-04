@@ -279,9 +279,7 @@ func getConfigMapDataFor(authenticationInfo ClusterAuthenticationInfo) (map[stri
 		"requestheader-group-headers":        authenticationInfo.RequestHeaderGroupHeaders.Value(),
 		"requestheader-extra-headers-prefix": authenticationInfo.RequestHeaderExtraHeaderPrefixes.Value(),
 		"requestheader-allowed-names":        authenticationInfo.RequestHeaderAllowedNames.Value(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) {
-		sliceWritesMapping["requestheader-uid-headers"] = authenticationInfo.RequestHeaderUIDHeaders.Value()
+		"requestheader-uid-headers":          authenticationInfo.RequestHeaderUIDHeaders.Value(),
 	}
 	var err error
 	for key, configData := range sliceWritesMapping {
