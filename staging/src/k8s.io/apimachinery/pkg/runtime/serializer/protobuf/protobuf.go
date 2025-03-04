@@ -72,10 +72,18 @@ func IsNotMarshalable(err error) bool {
 // is passed, the encoded object will have group, version, and kind fields set. If typer is nil, the objects will be written
 // as-is (any type info passed with the object will be used).
 func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
+	return NewSerializerWithOptions(creater, typer, SerializerOptions{})
+}
+
+// NewSerializerWithOptions creates a Protobuf serializer that handles encoding versioned objects into the proper wire form. If a typer
+// is passed, the encoded object will have group, version, and kind fields set. If typer is nil, the objects will be written
+// as-is (any type info passed with the object will be used).
+func NewSerializerWithOptions(creater runtime.ObjectCreater, typer runtime.ObjectTyper, opts SerializerOptions) *Serializer {
 	return &Serializer{
 		prefix:  protoEncodingPrefix,
 		creater: creater,
 		typer:   typer,
+		options: opts,
 	}
 }
 
@@ -84,6 +92,14 @@ type Serializer struct {
 	prefix  []byte
 	creater runtime.ObjectCreater
 	typer   runtime.ObjectTyper
+
+	options SerializerOptions
+}
+
+// SerializerOptions holds the options which are used to configure a Proto serializer.
+type SerializerOptions struct {
+	// StreamingCollectionsEncoding enables encoding collection, one item at the time, drastically reducing memory needed.
+	StreamingCollectionsEncoding bool
 }
 
 var _ runtime.Serializer = &Serializer{}
@@ -207,6 +223,12 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.
 				Kind:       kind.Kind,
 				APIVersion: kind.GroupVersion().String(),
 			},
+		}
+	}
+	if s.options.StreamingCollectionsEncoding {
+		_, listMeta, items, err := getListMeta(obj)
+		if err == nil {
+			return streamingEncodeUnknownList(w, unk, listMeta, items)
 		}
 	}
 
