@@ -21,14 +21,12 @@ package winkernel
 
 import (
 	"encoding/json"
-
-	"github.com/Microsoft/hnslib/hcn"
-	"github.com/stretchr/testify/assert"
-
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/Microsoft/hnslib/hcn"
+	"github.com/stretchr/testify/assert"
 )
 
 const (

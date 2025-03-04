@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hnslib/hcn"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
