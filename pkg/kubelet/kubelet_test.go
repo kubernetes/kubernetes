@@ -2711,7 +2711,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		expectedAllocatedLims v1.ResourceList
 		expectedResize        v1.PodResizeStatus
 		expectBackoffReset    bool
-		goos                  string
+		annotations           map[string]string
 	}{
 		{
 			name:                  "Request CPU and memory decrease - expect InProgress",
@@ -2781,12 +2781,12 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectedResize:        "",
 		},
 		{
-			name:                  "windows node, expect Infeasible",
+			name:                  "static pod, expect Infeasible",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:        v1.PodResizeStatusInfeasible,
-			goos:                  "windows",
+			annotations:           map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
 		},
 		{
 			name:                  "Increase CPU from min shares",
@@ -2873,11 +2873,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	for _, tt := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
 			t.Run(tt.name, func(t *testing.T) {
-				oldGOOS := goos
-				defer func() { goos = oldGOOS }()
-				if tt.goos != "" {
-					goos = tt.goos
-				}
 				kubelet.statusManager = status.NewFakeManager()
 
 				var originalPod *v1.Pod
@@ -2889,6 +2884,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					originalPod = testPod1.DeepCopy()
 					originalCtr = &originalPod.Spec.Containers[0]
 				}
+				originalPod.Annotations = tt.annotations
 				originalCtr.Resources.Requests = tt.originalRequests
 				originalCtr.Resources.Limits = tt.originalLimits
 
