@@ -23,6 +23,12 @@ import (
 )
 
 var (
+	// This is a generic feature for tests which only require alpha API and alpha feature gate enablement
+	Alpha = framework.WithFeature(framework.ValidFeatures.Add("Alpha"))
+
+	// This is a generic feature for tests which only require beta API and beta feature gate enablement
+	Beta = framework.WithFeature(framework.ValidFeatures.Add("Beta"))
+
 	// Please keep the list in alphabetical order.
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
@@ -59,12 +65,6 @@ var (
 
 	// Owner: sig-autoscaling
 	ClusterSizeAutoscalingScaleUp = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterTrustBundle = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundle"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterTrustBundleProjection = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundleProjection"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterUpgrade"))
