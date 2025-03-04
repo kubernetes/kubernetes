@@ -58,7 +58,7 @@ const (
 	noSignerKey       = "no-signer"
 )
 
-var _ = SIGDescribe(feature.Alpha, framework.WithFeatureGate(features.ClusterTrustBundle), framework.WithFeatureGate(features.ClusterTrustBundleProjection), func() {
+var _ = SIGDescribe(feature.Beta, framework.WithFeatureGate(features.ClusterTrustBundle), framework.WithFeatureGate(features.ClusterTrustBundleProjection), func() {
 	f := framework.NewDefaultFramework("projected-clustertrustbundle")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
