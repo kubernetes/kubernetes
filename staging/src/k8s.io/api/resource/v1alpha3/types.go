@@ -900,7 +900,7 @@ type DeviceRequestAllocationResult struct {
 	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,6,opt,name=bindingTimeoutSeconds"`
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,9,opt,name=bindingTimeoutSeconds"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1172,7 +1172,7 @@ type AllocatedDeviceStatus struct {
 	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,6,opt,name=bindingTimeoutSeconds"`
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,10,opt,name=bindingTimeoutSeconds"`
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.
