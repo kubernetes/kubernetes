@@ -1574,10 +1574,10 @@ func (e *WorkloadExecutor) runOp(op realOp, opIndex int) error {
 func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) error {
 	nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), op, e.tCtx.Client())
 	if err != nil {
-		return fmt.Errorf("op %d: %w", opIndex, err)
+		return err
 	}
 	if err := nodePreparer.PrepareNodes(e.tCtx, e.nextNodeIndex); err != nil {
-		return fmt.Errorf("op %d: %w", opIndex, err)
+		return err
 	}
 	e.nextNodeIndex += op.Count
 	return nil
@@ -1586,14 +1586,14 @@ func (e *WorkloadExecutor) runCreateNodesOp(opIndex int, op *createNodesOp) erro
 func (e *WorkloadExecutor) runCreateNamespaceOp(opIndex int, op *createNamespacesOp) error {
 	nsPreparer, err := newNamespacePreparer(e.tCtx, op)
 	if err != nil {
-		return fmt.Errorf("op %d: %w", opIndex, err)
+		return err
 	}
 	if err := nsPreparer.prepare(e.tCtx); err != nil {
 		err2 := nsPreparer.cleanup(e.tCtx)
 		if err2 != nil {
 			err = fmt.Errorf("prepare: %w; cleanup: %w", err, err2)
 		}
-		return fmt.Errorf("op %d: %w", opIndex, err)
+		return err
 	}
 	for _, n := range nsPreparer.namespaces() {
 		if _, ok := e.numPodsScheduledPerNamespace[n]; ok {
@@ -1608,20 +1608,20 @@ func (e *WorkloadExecutor) runCreateNamespaceOp(opIndex int, op *createNamespace
 func (e *WorkloadExecutor) runBarrierOp(opIndex int, op *barrierOp) error {
 	for _, namespace := range op.Namespaces {
 		if _, ok := e.numPodsScheduledPerNamespace[namespace]; !ok {
-			return fmt.Errorf("op %d: unknown namespace %s", opIndex, namespace)
+			return fmt.Errorf("unknown namespace %s", namespace)
 		}
 	}
 	switch op.StageRequirement {
 	case Attempted:
 		if err := waitUntilPodsAttempted(e.tCtx, e.podInformer, op.LabelSelector, op.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
-			return fmt.Errorf("op %d: %w", opIndex, err)
+			return err
 		}
 	case Scheduled:
 		// Default should be treated like "Scheduled", so handling both in the same way.
 		fallthrough
 	default:
 		if err := waitUntilPodsScheduled(e.tCtx, e.podInformer, op.LabelSelector, op.Namespaces, e.numPodsScheduledPerNamespace); err != nil {
-			return fmt.Errorf("op %d: %w", opIndex, err)
+			return err
 		}
 		// At the end of the barrier, we can be sure that there are no pods
 		// pending scheduling in the namespaces that we just blocked on.
@@ -1670,7 +1670,7 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 
 	if op.CollectMetrics {
 		if e.collectorCtx != nil {
-			return fmt.Errorf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
+			return fmt.Errorf("Metrics collection is overlapping. Probably second collector was started before stopping a previous one")
 		}
 		var err error
 		e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
@@ -1679,7 +1679,7 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 		}
 	}
 	if err := createPodsRapidly(e.tCtx, namespace, op); err != nil {
-		return fmt.Errorf("op %d: %w", opIndex, err)
+		return err
 	}
 	switch {
 	case op.SkipWaitToCompletion:
@@ -1688,11 +1688,11 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 		e.numPodsScheduledPerNamespace[namespace] += op.Count
 	case op.SteadyState:
 		if err := createPodsSteadily(e.tCtx, namespace, e.podInformer, op); err != nil {
-			return fmt.Errorf("op %d: %w", opIndex, err)
+			return err
 		}
 	default:
 		if err := waitUntilPodsScheduledInNamespace(e.tCtx, e.podInformer, nil, namespace, op.Count); err != nil {
-			return fmt.Errorf("op %d: error in waiting for pods to get scheduled: %w", opIndex, err)
+			return fmt.Errorf("error in waiting for pods to get scheduled: %w", err)
 		}
 	}
 	if op.CollectMetrics {
@@ -1714,7 +1714,7 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) error 
 
 	podsToDelete, err := e.podInformer.Lister().Pods(op.Namespace).List(labelSelector)
 	if err != nil {
-		return fmt.Errorf("op %d: error in listing pods in the namespace %s: %w", opIndex, op.Namespace, err)
+		return fmt.Errorf("error in listing pods in the namespace %s: %w", op.Namespace, err)
 	}
 
 	deletePods := func(opIndex int) {
@@ -1771,7 +1771,7 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 	// Ensure the namespace exists.
 	nsObj := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}
 	if _, err := e.tCtx.Client().CoreV1().Namespaces().Create(e.tCtx, nsObj, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("op %d: unable to create namespace %v: %w", opIndex, namespace, err)
+		return fmt.Errorf("unable to create namespace %v: %w", namespace, err)
 	}
 
 	var churnFns []func(name string) string
@@ -1779,12 +1779,12 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 	for i, path := range op.TemplatePaths {
 		unstructuredObj, gvk, err := getUnstructuredFromFile(path)
 		if err != nil {
-			return fmt.Errorf("op %d: unable to parse the %v-th template path: %w", opIndex, i, err)
+			return fmt.Errorf("unable to parse the %v-th template path: %w", i, err)
 		}
 		// Obtain GVR.
 		mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 		if err != nil {
-			return fmt.Errorf("op %d: unable to find GVR for %v: %w", opIndex, gvk, err)
+			return fmt.Errorf("unable to find GVR for %v: %w", gvk, err)
 		}
 		gvr := mapping.Resource
 		// Distinguish cluster-scoped with namespaced API objects.
@@ -1870,7 +1870,7 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 func (e *WorkloadExecutor) runDefaultOp(opIndex int, op realOp) error {
 	runable, ok := op.(runnableOp)
 	if !ok {
-		return fmt.Errorf("op %d: invalid op %v", opIndex, op)
+		return fmt.Errorf("invalid op %v", op)
 	}
 	for _, namespace := range runable.requiredNamespaces() {
 		err := createNamespaceIfNotPresent(e.tCtx, namespace, &e.numPodsScheduledPerNamespace)
@@ -1884,7 +1884,7 @@ func (e *WorkloadExecutor) runDefaultOp(opIndex int, op realOp) error {
 
 func (e *WorkloadExecutor) runStartCollectingMetricsOp(opIndex int, op *startCollectingMetricsOp) error {
 	if e.collectorCtx != nil {
-		return fmt.Errorf("op %d: Metrics collection is overlapping. Probably second collector was started before stopping a previous one", opIndex)
+		return fmt.Errorf("Metrics collection is overlapping. Probably second collector was started before stopping a previous one")
 	}
 	var err error
 	e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, op.Name, op.Namespaces, op.LabelSelector)
