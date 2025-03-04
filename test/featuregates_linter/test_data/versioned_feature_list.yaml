@@ -1066,9 +1066,9 @@
     version: "1.29"
 - name: RemoteRequestHeaderUID
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
-    preRelease: Alpha
+    preRelease: Beta
     version: "1.32"
 - name: ResilientWatchCacheInitialization
   versionedSpecs:
