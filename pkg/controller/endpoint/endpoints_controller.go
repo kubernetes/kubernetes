@@ -23,7 +23,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -67,13 +66,19 @@ const (
 	// endpoint resource and indicates that the number of endpoints have been truncated to
 	// maxCapacity
 	truncated = "truncated"
+
+	// labelManagedBy is a label for recognizing Endpoints managed by this controller.
+	labelManagedBy = "endpoints.kubernetes.io/managed-by"
+
+	// controllerName is the name of this controller
+	controllerName = "endpoint-controller"
 )
 
 // NewEndpointController returns a new *Controller.
 func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
 
 	e := &Controller{
 		client: client,
@@ -460,19 +465,11 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
 
 	// Compare the sorted subsets and labels
-	// Remove the HeadlessService label from the endpoints if it exists,
-	// as this won't be set on the service itself
-	// and will cause a false negative in this diff check.
-	// But first check if it has that label to avoid expensive copies.
-	compareLabels := currentEndpoints.Labels
-	if _, ok := currentEndpoints.Labels[v1.IsHeadlessService]; ok {
-		compareLabels = utillabels.CloneAndRemoveLabel(currentEndpoints.Labels, v1.IsHeadlessService)
-	}
 	// When comparing the subsets, we ignore the difference in ResourceVersion of Pod to avoid unnecessary Endpoints
 	// updates caused by Pod updates that we don't care, e.g. annotation update.
 	if !createEndpoints &&
 		endpointSubsetsEqualIgnoreResourceVersion(currentEndpoints.Subsets, subsets) &&
-		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
+		labelsCorrectForEndpoints(currentEndpoints.Labels, service.Labels) &&
 		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
 		logger.V(5).Info("endpoints are equal, skipping update", "service", klog.KObj(service))
 		return nil
@@ -506,6 +503,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	} else {
 		newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
 	}
+	newEndpoints.Labels[labelManagedBy] = controllerName
 
 	logger.V(4).Info("Update endpoints", "service", klog.KObj(service), "readyEndpoints", totalReadyEps, "notreadyEndpoints", totalNotReadyEps)
 	var updatedEndpoints *v1.Endpoints
@@ -717,4 +715,25 @@ var semanticIgnoreResourceVersion = conversion.EqualitiesOrDie(
 // have equal attributes but excludes ResourceVersion of Pod.
 func endpointSubsetsEqualIgnoreResourceVersion(subsets1, subsets2 []v1.EndpointSubset) bool {
 	return semanticIgnoreResourceVersion.DeepEqual(subsets1, subsets2)
+}
+
+// labelsCorrectForEndpoints tests that epLabels is correctly derived from svcLabels
+// (ignoring the v1.IsHeadlessService label).
+func labelsCorrectForEndpoints(epLabels, svcLabels map[string]string) bool {
+	if epLabels[labelManagedBy] != controllerName {
+		return false
+	}
+
+	// Every label in epLabels except v1.IsHeadlessService and labelManagedBy should
+	// correspond to a label in svcLabels, and svcLabels should not have any other
+	// labels that aren't in epLabels.
+	skipped := 0
+	for k, v := range epLabels {
+		if k == v1.IsHeadlessService || k == labelManagedBy {
+			skipped++
+		} else if sv, exists := svcLabels[k]; !exists || sv != v {
+			return false
+		}
+	}
+	return len(svcLabels) == len(epLabels)-skipped
 }
