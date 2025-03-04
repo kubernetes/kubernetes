@@ -29,6 +29,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
@@ -241,6 +242,7 @@ func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
 
 func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	ctx := context.Background()
+	logger := klog.FromContext(ctx)
 	assert := assert.New(t)
 
 	podStats := []statsapi.PodStats{
@@ -272,7 +274,7 @@ func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, nil)
 	mockStatsProvider.EXPECT().GetCgroupCPUAndMemoryStats("/kubepods", false).Return(cgroupStatsMap["/pods"].cs, nil)
 
-	provider := NewSummaryProvider(mockStatsProvider)
+	provider := NewSummaryProvider(logger, mockStatsProvider)
 	summary, err := provider.GetCPUAndMemoryStats(ctx)
 	assert.NoError(err)
 
