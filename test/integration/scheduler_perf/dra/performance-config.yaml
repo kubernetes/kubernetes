@@ -386,3 +386,38 @@
       measurePods: 2500
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
+
+# DRABindingConditionsTest evaluates the implementation of DRA Device Binding Conditions.
+- name: DRABindingConditionsTest
+  featureGates:
+    DynamicResourceAllocation: true
+    DRADeviceBindingConditions: true
+    DRAResourceClaimDeviceStatus: true
+  workloadTemplate:
+    - opcode: createNodes
+      count: 1
+      nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    - opcode: createResourceDriver
+      driverName: test-driver.cdi.k8s.io
+      nodes: scheduler-perf-dra-*
+      maxClaimsPerNode: 1
+    - opcode: createAny
+      templatePath: templates/deviceclass.yaml
+    - opcode: createAny
+      namespace: test
+      count: 1
+      templatePath: templates/resourceclaim.yaml
+    - opcode: updateDeviceConditions
+      namespace: test
+      claimName: "test-claim-0"
+      conditions:
+        - type: "DeviceAttached"
+          status: "True"
+    - opcode: createPods
+      namespace: test
+      count: 1
+      podTemplatePath: templates/pod-with-claim-ref.yaml
+      collectMetrics: true
+  workloads:
+    - name: fast
+      labels: [integration-test, short]

@@ -351,6 +351,37 @@ func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *re
 	return slice(name, nodeSelection, pool, driver, device(device1, nil, nil))
 }
 
+// generate a ResourceSlice object with the given parameters and one device with restricted usage
+func sliceWithOneDeviceAndRestrictedUsage(name string, nodeSelection any, pool, driver string) *resourceapi.ResourceSlice {
+	d := device(device1, nil, nil)
+	d.Basic.UsageRestrictedToNode = ptr.To(true)
+	return slice(name, nodeSelection, pool, driver, d)
+}
+
+// generate a ResourceSlice object with the given parameters and one device with binding conditions
+func sliceWithOneDeviceAndBindingConditions(name, node, pool, driver string, bindingConditions, bindingFailureConditions []string) *resourceapi.ResourceSlice {
+	slice := sliceWithOneDevice(name, node, pool, driver)
+	slice.Spec.Devices[0].Basic.BindingConditions = bindingConditions
+	slice.Spec.Devices[0].Basic.BindingFailureConditions = bindingFailureConditions
+	return slice
+}
+
+// deviceRequestAllocationResult returns an DeviceRequestAllocationResult object for testing purposes,
+// specifying the driver, pool, device, usage restriction, binding conditions,
+// binding failure conditions, and binding timeout.
+func deviceRequestAllocationResult(request, driver, pool, device string, usageRestrictedToNode *bool, bindingConditions, bindingFailureConditions []string, bindingTimeout *int64) resourceapi.DeviceRequestAllocationResult {
+	return resourceapi.DeviceRequestAllocationResult{
+		Request:                  request,
+		Driver:                   driver,
+		Pool:                     pool,
+		Device:                   device,
+		UsageRestrictedToNode:    usageRestrictedToNode,
+		BindingConditions:        bindingConditions,
+		BindingFailureConditions: bindingFailureConditions,
+		BindingTimeoutSeconds:    bindingTimeout,
+	}
+}
+
 func TestAllocator(t *testing.T) {
 	nonExistentAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "NonExistentAttribute")
 	boolAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "boolAttribute")
@@ -360,6 +391,7 @@ func TestAllocator(t *testing.T) {
 
 	testcases := map[string]struct {
 		adminAccess      bool
+		deviceBinding    bool
 		claimsToAllocate []*resourceapi.ResourceClaim
 		allocatedDevices []DeviceID
 		classes          []*resourceapi.DeviceClass
@@ -1426,6 +1458,37 @@ func TestAllocator(t *testing.T) {
 
 			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
 		},
+		"device-binding-conditions": {
+			deviceBinding: true,
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1))),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
+			node:    node(node1, region1),
+
+			expectResults: []any{
+				resourceapi.AllocationResult{
+					Devices: resourceapi.DeviceAllocationResult{
+						Results: []resourceapi.DeviceRequestAllocationResult{
+							deviceRequestAllocationResult(req0, driverA, pool1, device1, ptr.To(false), []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+						},
+					},
+					NodeSelector: localNodeSelector(node1),
+				},
+			},
+		},
+		"node-restriction": {
+			deviceBinding:    true,
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices:           objects(sliceWithOneDeviceAndRestrictedUsage(slice1, localNodeSelector(node1), pool1, driverA)),
+			node:             node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -1444,7 +1507,7 @@ func TestAllocator(t *testing.T) {
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			slices := slices.Clone(tc.slices)
 
-			allocator, err := NewAllocator(ctx, tc.adminAccess, claimsToAllocate, sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
+			allocator, err := NewAllocator(ctx, tc.adminAccess, tc.deviceBinding, claimsToAllocate, sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)

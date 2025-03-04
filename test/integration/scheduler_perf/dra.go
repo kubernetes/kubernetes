@@ -219,6 +219,7 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
+	timeout := int64(1)
 	for i := 0; i < capacity; i++ {
 		slice.Spec.Devices = append(slice.Spec.Devices,
 			resourceapi.Device{
@@ -233,6 +234,9 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 						"memory": {Value: resource.MustParse("1Gi")},
 					},
+					BindingConditions:        []string{"DeviceAttached"},
+					BindingFailureConditions: []string{"AttachmentFailed"},
+					BindingTimeoutSeconds:    &timeout,
 				},
 			},
 		)
@@ -321,7 +325,7 @@ claims:
 			}
 		}
 
-		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
+		allocator, err := structured.NewAllocator(tCtx, utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess), utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions), []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
 		rand.Shuffle(len(nodes), func(i, j int) {
@@ -340,5 +344,53 @@ claims:
 			}
 		}
 		tCtx.Fatalf("Could not allocate claim %d out of %d", i, len(claims))
+	}
+}
+
+type updateDeviceConditionsOp struct {
+	Opcode     operationCode
+	Namespace  string
+	ClaimName  string
+	Conditions []metav1.Condition
+}
+
+func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
+	if op.Namespace == "" || op.ClaimName == "" || len(op.Conditions) == 0 {
+		return fmt.Errorf("Namespace, ClaimName, and Conditions must be set")
+	}
+	return nil
+}
+
+func (op *updateDeviceConditionsOp) patchParams(w *workload) (realOp, error) {
+	return op, op.isValid(false)
+}
+
+func (op *updateDeviceConditionsOp) collectsMetrics() bool {
+	return false
+}
+
+func (op *updateDeviceConditionsOp) requiredNamespaces() []string {
+	return []string{op.Namespace}
+}
+
+func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
+	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Get(tCtx, op.ClaimName, metav1.GetOptions{})
+	if err != nil {
+		tCtx.Fatalf("get claim %s/%s: %v", op.Namespace, op.ClaimName, err)
+	}
+
+	claim = claim.DeepCopy()
+	for i := range claim.Status.Devices {
+		claim.Status.Devices[i].Conditions = op.Conditions
+		for condIdx, cond := range claim.Status.Devices[i].Conditions {
+			cond.LastTransitionTime = metav1.Now()
+			cond.Reason = "Test"
+			cond.Message = "Test"
+			claim.Status.Devices[i].Conditions[condIdx] = cond
+		}
+	}
+	_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	if err != nil {
+		tCtx.Fatalf("Failed to update device conditions: %s", err)
 	}
 }
