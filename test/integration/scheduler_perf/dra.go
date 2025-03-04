@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -220,7 +219,6 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 		},
 	}
 
-	flagValue := true
 	timeout := int64(1)
 	for i := 0; i < capacity; i++ {
 		slice.Spec.Devices = append(slice.Spec.Devices,
@@ -236,7 +234,6 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 						"memory": {Value: resource.MustParse("1Gi")},
 					},
-					UsageRestrictedToNode:    &flagValue,
 					BindingConditions:        []string{"DeviceAttached"},
 					BindingFailureConditions: []string{"AttachmentFailed"},
 					BindingTimeoutSeconds:    &timeout,
@@ -353,12 +350,13 @@ claims:
 type updateDeviceConditionsOp struct {
 	Opcode     operationCode
 	Namespace  string
+	ClaimName  string
 	Conditions []metav1.Condition
 }
 
 func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
-	if op.Namespace == "" || len(op.Conditions) == 0 {
-		return fmt.Errorf("namespace and conditions must be set")
+	if op.Namespace == "" || op.ClaimName == "" || len(op.Conditions) == 0 {
+		return fmt.Errorf("Namespace, ClaimName, and Conditions must be set")
 	}
 	return nil
 }
@@ -376,27 +374,9 @@ func (op *updateDeviceConditionsOp) requiredNamespaces() []string {
 }
 
 func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
-	// Wait for the pod to be created.
-	claimName := ""
-	retry := 0
-	for {
-		claimList, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
-		if retry > 40 {
-			tCtx.Fatalf("no claims found in namespace %s", op.Namespace)
-			break
-		}
-		if err != nil || len(claimList.Items) == 0 {
-			retry++
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		claimName = claimList.Items[0].GetName()
-		break
-	}
-
-	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Get(tCtx, claimName, metav1.GetOptions{})
+	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Get(tCtx, op.ClaimName, metav1.GetOptions{})
 	if err != nil {
-		tCtx.Fatalf("get claim %s/%s: %v", op.Namespace, claimName, err)
+		tCtx.Fatalf("get claim %s/%s: %v", op.Namespace, op.ClaimName, err)
 	}
 
 	claim = claim.DeepCopy()
@@ -410,5 +390,7 @@ func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
 		}
 	}
 	_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
-	tCtx.ExpectNoError(err, "update device conditions")
+	if err != nil {
+		tCtx.Fatalf("Failed to update device conditions: %s", err)
+	}
 }

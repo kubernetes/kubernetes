@@ -386,7 +386,9 @@
       measurePods: 2500
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
-- name: BindingSuccess
+
+# DRABindingConditionsTest evaluates the implementation of DRA Device Binding Conditions.
+- name: DRABindingConditionsTest
   featureGates:
     DynamicResourceAllocation: true
     DRADeviceBindingConditions: true
@@ -404,21 +406,18 @@
     - opcode: createAny
       namespace: test
       count: 1
-      templatePath: templates/resourceclaimtemplate.yaml
-    - opcode: createPods
-      namespace: test
-      count: 1
-      podTemplatePath: templates/pod-with-claim-template.yaml
-      collectMetrics: true
-      steadyState: true
+      templatePath: templates/resourceclaim.yaml
     - opcode: updateDeviceConditions
       namespace: test
-      claimName: "test-claim-1"
-      PodName: "test-dra-0"
+      claimName: "test-claim-0"
       conditions:
         - type: "DeviceAttached"
           status: "True"
+    - opcode: createPods
+      namespace: test
+      count: 1
+      podTemplatePath: templates/pod-with-claim-ref.yaml
+      collectMetrics: true
   workloads:
     - name: fast
-      labels: [integration-test, short, binding]
-      params: {}
+      labels: [integration-test, short]
