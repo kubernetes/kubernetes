@@ -610,7 +610,7 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 		return 0
 	}
 	cpuQuantity := container.Resources.Requests[v1.ResourceCPU]
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+	/*if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		containerStatuses := pod.Status.ContainerStatuses
 		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && podutil.IsRestartableInitContainer(container) {
 			if len(pod.Status.InitContainerStatuses) != 0 {
@@ -633,7 +633,7 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 				cpuQuantity = cs.AllocatedResources[v1.ResourceCPU]
 			}
 		}
-	}
+	}*/
 	cpuValue := cpuQuantity.Value()
 	if cpuValue*1000 != cpuQuantity.MilliValue() {
 		klog.V(5).InfoS("Exclusive CPU allocation skipped, pod requested non-integral CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpu", cpuValue)
