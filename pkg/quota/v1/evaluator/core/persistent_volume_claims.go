@@ -94,11 +94,25 @@ func (p *pvcEvaluator) GroupResource() schema.GroupResource {
 
 // Handles returns true if the evaluator should handle the specified operation.
 func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
-	if a.GetSubresource() != "" {
+	op := a.GetOperation()
+	switch a.GetSubresource() {
+	case "":
+		return op == admission.Create || op == admission.Update
+	case "status":
+		pvc, err1 := toExternalPersistentVolumeClaimOrError(a.GetObject())
+		oldPVC, err2 := toExternalPersistentVolumeClaimOrError(a.GetOldObject())
+		if err1 != nil || err2 != nil {
+			return false
+		}
+		return RequiresQuotaReplenish(pvc, oldPVC)
+	default:
 		return false
 	}
-	op := a.GetOperation()
-	return admission.Create == op || admission.Update == op
+}
+
+// AllowExceededQuota returns true if the evaluator should skip the exceeded check when updating a resource quota.
+func (p *pvcEvaluator) AllowExceededQuota(a admission.Attributes) bool {
+	return a.GetSubresource() == "status"
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item

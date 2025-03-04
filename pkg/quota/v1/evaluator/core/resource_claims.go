@@ -75,6 +75,11 @@ func (p *claimEvaluator) Handles(a admission.Attributes) bool {
 	return admission.Create == op || admission.Update == op
 }
 
+// AllowExceededQuota returns true if the evaluator should skip the exceeded check when updating a resource quota.
+func (p *claimEvaluator) AllowExceededQuota(a admission.Attributes) bool {
+	return false
+}
+
 // Matches returns true if the evaluator matches the specified quota with the provided input item
 func (p *claimEvaluator) Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error) {
 	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
