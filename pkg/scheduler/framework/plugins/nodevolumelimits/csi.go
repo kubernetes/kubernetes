@@ -63,7 +63,8 @@ type CSILimits struct {
 	scLister      storagelisters.StorageClassLister
 	vaLister      storagelisters.VolumeAttachmentLister
 
-	randomVolumeIDPrefix string
+	enableCSIMigrationPortworx bool
+	randomVolumeIDPrefix       string
 
 	translator InTreeToCSITranslator
 }
@@ -377,7 +378,7 @@ func (pl *CSILimits) checkAttachableInlineVolume(logger klog.Logger, vol *v1.Vol
 	if err != nil {
 		return fmt.Errorf("looking up provisioner name for volume %s: %w", vol.Name, err)
 	}
-	if !isCSIMigrationOn(csiNode, inTreeProvisionerName) {
+	if !isCSIMigrationOn(csiNode, inTreeProvisionerName, pl.enableCSIMigrationPortworx) {
 		csiNodeName := ""
 		if csiNode != nil {
 			csiNodeName = csiNode.Name
@@ -438,7 +439,7 @@ func (pl *CSILimits) getCSIDriverInfo(logger klog.Logger, csiNode *storagev1.CSI
 			return "", ""
 		}
 
-		if !isCSIMigrationOn(csiNode, pluginName) {
+		if !isCSIMigrationOn(csiNode, pluginName, pl.enableCSIMigrationPortworx) {
 			logger.V(5).Info("CSI Migration of plugin is not enabled", "plugin", pluginName)
 			return "", ""
 		}
@@ -486,7 +487,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(logger klog.Logger, csiNode *storage
 
 	provisioner := storageClass.Provisioner
 	if pl.translator.IsMigratableIntreePluginByName(provisioner) {
-		if !isCSIMigrationOn(csiNode, provisioner) {
+		if !isCSIMigrationOn(csiNode, provisioner, pl.enableCSIMigrationPortworx) {
 			logger.V(5).Info("CSI Migration of provisioner is not enabled", "provisioner", provisioner)
 			return "", ""
 		}
@@ -513,13 +514,14 @@ func NewCSI(_ context.Context, _ runtime.Object, handle framework.Handle, fts fe
 	csiTranslator := csitrans.New()
 
 	return &CSILimits{
-		csiNodeLister:        csiNodesLister,
-		pvLister:             pvLister,
-		pvcLister:            pvcLister,
-		scLister:             scLister,
-		vaLister:             vaLister,
-		randomVolumeIDPrefix: rand.String(32),
-		translator:           csiTranslator,
+		csiNodeLister:              csiNodesLister,
+		pvLister:                   pvLister,
+		pvcLister:                  pvcLister,
+		scLister:                   scLister,
+		vaLister:                   vaLister,
+		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
+		randomVolumeIDPrefix:       rand.String(32),
+		translator:                 csiTranslator,
 	}, nil
 }
 

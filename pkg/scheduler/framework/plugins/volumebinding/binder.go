@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -45,7 +44,7 @@ import (
 	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
@@ -203,7 +202,9 @@ type PodVolumeClaims struct {
 }
 
 type volumeBinder struct {
-	kubeClient clientset.Interface
+	kubeClient                  clientset.Interface
+	enableVolumeAttributesClass bool
+	enableCSIMigrationPortworx  bool
 
 	classLister   storagelisters.StorageClassLister
 	podLister     corelisters.PodLister
@@ -238,6 +239,7 @@ type CapacityCheck struct {
 func NewVolumeBinder(
 	logger klog.Logger,
 	kubeClient clientset.Interface,
+	fts feature.Features,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
 	csiNodeInformer storageinformers.CSINodeInformer,
@@ -247,15 +249,17 @@ func NewVolumeBinder(
 	capacityCheck CapacityCheck,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
 	b := &volumeBinder{
-		kubeClient:    kubeClient,
-		podLister:     podInformer.Lister(),
-		classLister:   storageClassInformer.Lister(),
-		nodeLister:    nodeInformer.Lister(),
-		csiNodeLister: csiNodeInformer.Lister(),
-		pvcCache:      NewPVCAssumeCache(logger, pvcInformer.Informer()),
-		pvCache:       NewPVAssumeCache(logger, pvInformer.Informer()),
-		bindTimeout:   bindTimeout,
-		translator:    csitrans.New(),
+		kubeClient:                  kubeClient,
+		enableVolumeAttributesClass: fts.EnableVolumeAttributesClass,
+		enableCSIMigrationPortworx:  fts.EnableCSIMigrationPortworx,
+		podLister:                   podInformer.Lister(),
+		classLister:                 storageClassInformer.Lister(),
+		nodeLister:                  nodeInformer.Lister(),
+		csiNodeLister:               csiNodeInformer.Lister(),
+		pvcCache:                    NewPVCAssumeCache(logger, pvcInformer.Informer()),
+		pvCache:                     NewPVAssumeCache(logger, pvInformer.Informer()),
+		bindTimeout:                 bindTimeout,
+		translator:                  csitrans.New(),
 	}
 
 	b.csiDriverLister = capacityCheck.CSIDriverInformer.Lister()
@@ -855,7 +859,7 @@ func (b *volumeBinder) findMatchingVolumes(logger klog.Logger, pod *v1.Pod, clai
 		pvs := unboundVolumesDelayBinding[storageClassName]
 
 		// Find a matching PV
-		pv, err := volume.FindMatchingVolume(pvc, pvs, node, chosenPVs, true, utilfeature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass))
+		pv, err := volume.FindMatchingVolume(pvc, pvs, node, chosenPVs, true, b.enableVolumeAttributesClass)
 		if err != nil {
 			return false, nil, nil, err
 		}
@@ -1033,7 +1037,7 @@ func (a byPVCSize) Less(i, j int) bool {
 }
 
 // isCSIMigrationOnForPlugin checks if CSI migration is enabled for a given plugin.
-func isCSIMigrationOnForPlugin(pluginName string) bool {
+func isCSIMigrationOnForPlugin(pluginName string, enableCSIMigrationPortworx bool) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
 		return true
@@ -1044,7 +1048,7 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:
-		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+		return enableCSIMigrationPortworx
 	}
 	return false
 }
@@ -1083,7 +1087,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(logger klog.Logger, pv *v1.Persistent
 		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
 	}
 
-	if !isCSIMigrationOnForPlugin(pluginName) {
+	if !isCSIMigrationOnForPlugin(pluginName, b.enableCSIMigrationPortworx) {
 		return pv, nil
 	}
 

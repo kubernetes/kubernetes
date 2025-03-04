@@ -24,6 +24,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,6 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -125,7 +129,7 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 	wc := &testWatchCache{}
 	wc.bookmarkRevision = make(chan int64, 1)
 	wc.stopCh = make(chan struct{})
-	pr := newConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
+	pr := progress.NewConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
 	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr)
 	// To preserve behavior of tests that assume a given capacity,
@@ -1163,6 +1167,49 @@ func TestSuggestedWatchChannelSize(t *testing.T) {
 	}
 }
 
+func TestCapacityUpperBound(t *testing.T) {
+	testCases := []struct {
+		name               string
+		eventFreshDuration time.Duration
+		expected           int
+	}{
+		{
+			name:               "default eventFreshDuration",
+			eventFreshDuration: DefaultEventFreshDuration, // 75s
+			expected:           defaultUpperBoundCapacity, // 100 * 1024
+		},
+		{
+			name:               "lower eventFreshDuration, capacity limit unchanged",
+			eventFreshDuration: 45 * time.Second,          // 45s
+			expected:           defaultUpperBoundCapacity, // 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled up",
+			eventFreshDuration: 4 * DefaultEventFreshDuration, // 4 * 75s
+			expected:           4 * defaultUpperBoundCapacity, // 4 * 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled and rounded up",
+			eventFreshDuration: 3 * DefaultEventFreshDuration, // 3 * 75s
+			expected:           4 * defaultUpperBoundCapacity, // 4 * 100 * 1024
+		},
+		{
+			name:               "higher eventFreshDuration, capacity limit scaled up and capped",
+			eventFreshDuration: DefaultEventFreshDuration << 20, // 2^20 * 75s
+			expected:           defaultUpperBoundCapacity << 14, // 2^14 * 100 * 1024
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			capacity := capacityUpperBound(test.eventFreshDuration)
+			if test.expected != capacity {
+				t.Errorf("expected %v, got %v", test.expected, capacity)
+			}
+		})
+	}
+}
+
 func BenchmarkWatchCache_updateCache(b *testing.B) {
 	store := newTestWatchCache(defaultUpperBoundCapacity, DefaultEventFreshDuration, &cache.Indexers{})
 	defer store.Stop()
@@ -1246,4 +1293,102 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCacheSnapshots(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+	defer store.Stop()
+	store.upperBoundCapacity = 3
+	store.lowerBoundCapacity = 1
+	clock := store.clock.(*testingclock.FakeClock)
+
+	_, found := store.snapshots.GetLessOrEqual(100)
+	assert.False(t, found, "Expected empty cache to not include any snapshots")
+
+	t.Log("Test cache on rev 100")
+	require.NoError(t, store.Add(makeTestPod("foo", 100)))
+	require.NoError(t, store.Update(makeTestPod("foo", 200)))
+	clock.Step(time.Second)
+	require.NoError(t, store.Delete(makeTestPod("foo", 300)))
+
+	t.Log("Test cache on rev 100")
+	_, found = store.snapshots.GetLessOrEqual(99)
+	assert.False(t, found, "Expected store to not include rev 99")
+	lister, found := store.snapshots.GetLessOrEqual(100)
+	assert.True(t, found, "Expected store to not include rev 100")
+	elements := lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 100), elements[0].(*storeElement).Object)
+
+	t.Log("Overflow cache to remove rev 100")
+	require.NoError(t, store.Add(makeTestPod("foo", 400)))
+	_, found = store.snapshots.GetLessOrEqual(100)
+	assert.False(t, found, "Expected overfilled cache to delete oldest rev 100")
+
+	t.Log("Test cache on rev 200")
+	lister, found = store.snapshots.GetLessOrEqual(200)
+	assert.True(t, found, "Expected store to still keep rev 200")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 200), elements[0].(*storeElement).Object)
+
+	t.Log("Test cache on rev 300")
+	lister, found = store.snapshots.GetLessOrEqual(300)
+	assert.True(t, found, "Expected store to still keep rev 300")
+	elements = lister.ListPrefix("", "")
+	assert.Empty(t, elements)
+
+	t.Log("Test cache on rev 400")
+	lister, found = store.snapshots.GetLessOrEqual(400)
+	assert.True(t, found, "Expected store to still keep rev 400")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 400), elements[0].(*storeElement).Object)
+
+	t.Log("Add event outside the event fresh window to force cache capacity downsize")
+	assert.Equal(t, 3, store.capacity)
+	clock.Step(DefaultEventFreshDuration + 1)
+	require.NoError(t, store.Update(makeTestPod("foo", 500)))
+	assert.Equal(t, 1, store.capacity)
+	assert.Equal(t, 1, store.snapshots.snapshots.Len())
+	_, found = store.snapshots.GetLessOrEqual(499)
+	assert.False(t, found, "Expected overfilled cache to delete events below 500")
+
+	t.Log("Test cache on rev 500")
+	lister, found = store.snapshots.GetLessOrEqual(500)
+	assert.True(t, found, "Expected store to still keep rev 500")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 500), elements[0].(*storeElement).Object)
+
+	t.Log("Add event to force capacity upsize")
+	require.NoError(t, store.Update(makeTestPod("foo", 600)))
+	assert.Equal(t, 2, store.capacity)
+	assert.Equal(t, 2, store.snapshots.snapshots.Len())
+
+	t.Log("Test cache on rev 600")
+	lister, found = store.snapshots.GetLessOrEqual(600)
+	assert.True(t, found, "Expected replace to be snapshotted")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*storeElement).Object)
+
+	t.Log("Replace cache to remove history")
+	_, found = store.snapshots.GetLessOrEqual(500)
+	assert.True(t, found, "Confirm that cache stores history before replace")
+	err := store.Replace([]interface{}{makeTestPod("foo", 600)}, "700")
+	require.NoError(t, err)
+	_, found = store.snapshots.GetLessOrEqual(500)
+	assert.False(t, found, "Expected replace to remove history")
+	_, found = store.snapshots.GetLessOrEqual(600)
+	assert.False(t, found, "Expected replace to remove history")
+
+	t.Log("Test cache on rev 700")
+	lister, found = store.snapshots.GetLessOrEqual(700)
+	assert.True(t, found, "Expected replace to be snapshotted")
+	elements = lister.ListPrefix("", "")
+	assert.Len(t, elements, 1)
+	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*storeElement).Object)
 }

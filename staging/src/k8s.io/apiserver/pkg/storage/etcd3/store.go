@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +36,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -84,6 +87,9 @@ type store struct {
 	leaseManager        *leaseManager
 	decoder             Decoder
 	listErrAggrFactory  func() ListErrorAggregator
+
+	resourcePrefix string
+	newListFunc    func() runtime.Object
 }
 
 func (s *store) RequestWatchProgress(ctx context.Context) error {
@@ -185,10 +191,13 @@ func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc fu
 		leaseManager:        newDefaultLeaseManager(c.Client, leaseManagerConfig),
 		decoder:             decoder,
 		listErrAggrFactory:  listErrAggrFactory,
+
+		resourcePrefix: resourcePrefix,
+		newListFunc:    newListFunc,
 	}
 
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
-		return storage.GetCurrentResourceVersionFromStorage(ctx, s, newListFunc, resourcePrefix, w.objectType)
+		return s.GetCurrentResourceVersion(ctx)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
 		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
@@ -675,6 +684,37 @@ func (s *store) resolveGetListRev(continueKey string, continueRV int64, opts sto
 		return withRev, fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
 	}
 	return withRev, nil
+}
+
+func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
+	emptyList := s.newListFunc()
+	pred := storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.Everything(),
+		Limit: 1, // just in case we actually hit something
+	}
+
+	err := s.GetList(ctx, s.resourcePrefix, storage.ListOptions{Predicate: pred}, emptyList)
+	if err != nil {
+		return 0, err
+	}
+	emptyListAccessor, err := meta.ListAccessor(emptyList)
+	if err != nil {
+		return 0, err
+	}
+	if emptyListAccessor == nil {
+		return 0, fmt.Errorf("unable to extract a list accessor from %T", emptyList)
+	}
+
+	currentResourceVersion, err := strconv.Atoi(emptyListAccessor.GetResourceVersion())
+	if err != nil {
+		return 0, err
+	}
+
+	if currentResourceVersion == 0 {
+		return 0, fmt.Errorf("the current resource version must be greater than 0")
+	}
+	return uint64(currentResourceVersion), nil
 }
 
 // GetList implements storage.Interface.

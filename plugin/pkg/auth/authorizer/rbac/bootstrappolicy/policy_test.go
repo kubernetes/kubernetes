@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -282,6 +283,42 @@ func TestClusterRoleLabel(t *testing.T) {
 		}
 		if got, want := accessor.GetLabels(), map[string]string{"kubernetes.io/bootstrapping": "rbac-defaults"}; !reflect.DeepEqual(got, want) {
 			t.Errorf("ClusterRoleBinding: %s GetLabels() = %s, want %s", accessor.GetName(), got, want)
+		}
+	}
+}
+
+func TestNodeRuleVerbsConsistency(t *testing.T) {
+	rules := bootstrappolicy.NodeRules()
+	for _, rule := range rules {
+		verbs := rule.Verbs
+		if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+			t.Errorf("The NodeRule has Verb `List` but does not have Verb `Watch`.")
+		}
+	}
+}
+
+func TestClusterRoleVerbsConsistency(t *testing.T) {
+	roles := bootstrappolicy.ClusterRoles()
+	for _, role := range roles {
+		for _, rule := range role.Rules {
+			verbs := rule.Verbs
+			if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+				t.Errorf("The ClusterRole %s has Verb `List` but does not have Verb `Watch`.", role.Name)
+			}
+		}
+	}
+}
+
+func TestNamespaceRoleVerbsConsistency(t *testing.T) {
+	namespaceRoles := bootstrappolicy.NamespaceRoles()
+	for namespace, roles := range namespaceRoles {
+		for _, role := range roles {
+			for _, rule := range role.Rules {
+				verbs := rule.Verbs
+				if slices.Contains(verbs, "list") && !slices.Contains(verbs, "watch") {
+					t.Errorf("The Role %s/%s has Verb `List` but does not have Verb `Watch`.", namespace, role.Name)
+				}
+			}
 		}
 	}
 }

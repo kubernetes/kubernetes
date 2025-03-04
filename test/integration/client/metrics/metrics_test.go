@@ -50,7 +50,9 @@ func TestAPIServerTransportMetrics(t *testing.T) {
 	// reset default registry metrics
 	legacyregistry.Reset()
 
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	flags := framework.DefaultTestServerFlags()
+	flags = append(flags, "--runtime-config=api/all=true,api/beta=true")
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)

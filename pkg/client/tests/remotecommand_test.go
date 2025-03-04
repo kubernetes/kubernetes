@@ -29,8 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -124,7 +122,9 @@ func fakeServer(t *testing.T, requestReceived chan struct{}, testName string, ex
 		}
 
 		opts, err := remotecommand.NewOptions(req)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 		if exec {
 			cmd := req.URL.Query()[api.ExecCommandParam]
 			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)

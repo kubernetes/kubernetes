@@ -136,7 +136,9 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 		writer.WriteHeader(http.StatusOK)
 
 		err = json.NewEncoder(writer).Encode(token)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	})
 
 	mux.HandleFunc(authWebPath, func(writer http.ResponseWriter, request *http.Request) {
@@ -150,7 +152,9 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 		writer.WriteHeader(http.StatusOK)
 
 		err := json.NewEncoder(writer).Encode(keySet)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	})
 
 	return oidcServer

@@ -85,7 +85,7 @@ func (args *Args) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.Var(NewGVPackagesValue(gvsBuilder, nil), "input",
-		"group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
+		`group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format "group1/version1,group2/version2...". The order in which group/versions are listed defines the order of the generated client code. To avoid non-deterministic output, sort this list before providing it to client-gen.`)
 	fs.Var(NewGVTypesValue(&args.IncludedTypesOverrides, []string{}), "included-types-overrides",
 		"list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
 	fs.Var(NewInputBasePathValue(gvsBuilder, inputBase), "input-base",
