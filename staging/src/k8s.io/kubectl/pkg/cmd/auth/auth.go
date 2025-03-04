@@ -33,9 +33,16 @@ func NewCmdAuth(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Co
 		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
+	var asUserExtra map[string]string
+
+	cmds.PersistentFlags().StringToStringVar(&asUserExtra, "as-user-extra", nil, "Additional user attributes for impersonation")
 	cmds.AddCommand(NewCmdCanI(f, streams))
 	cmds.AddCommand(NewCmdReconcile(f, streams))
 	cmds.AddCommand(NewCmdWhoAmI(f, streams))
+
+	for _, subCmd := range cmds.Commands() {
+		subCmd.PersistentFlags().StringToStringVar(&asUserExtra, "as-user-extra", nil, "Additional user attributes for impersonation")
+	}
 
 	return cmds
 }
