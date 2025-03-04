@@ -66,6 +66,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
 
+	// Owner: sig-api-machinery
+	// Marks tests that require coordinated leader election
+	CoordinatedLeaderElection = framework.WithFeature(framework.ValidFeatures.Add("CoordinatedLeaderElection"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
 
