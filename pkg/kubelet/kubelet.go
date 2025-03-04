@@ -1009,7 +1009,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
-	klet.usernsManager, err = userns.MakeUserNsManager(klet)
+	klet.usernsManager, err = userns.MakeUserNsManager(logger, klet)
 	if err != nil {
 		return nil, fmt.Errorf("create user namespace manager: %w", err)
 	}

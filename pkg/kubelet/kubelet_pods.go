@@ -565,7 +565,9 @@ func truncatePodHostnameIfNeeded(podName, hostname string) (string, error) {
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
 func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
-	return kl.usernsManager.GetOrCreateUserNamespaceMappings(pod, runtimeHandler)
+	// Use context.TODO() because we currently do not have a proper logger to pass in.
+	// This should be replaced with an appropriate context when refactoring this function to accept a context parameter.
+	return kl.usernsManager.GetOrCreateUserNamespaceMappings(context.TODO(), pod, runtimeHandler)
 }
 
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
@@ -1223,7 +1225,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 
 	// Remove orphaned pod user namespace allocations (if any).
 	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
-	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(allPods, runningRuntimePods); err != nil {
+	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(ctx, allPods, runningRuntimePods); err != nil {
 		klog.ErrorS(err, "Failed cleaning up orphaned pod user namespaces allocations")
 	}
 
