@@ -177,7 +177,13 @@ func (o *RolloutHistoryOptions) Run() error {
 			}
 
 			if o.Revision > 0 {
-				printer.PrintObj(historyInfo[o.Revision], o.Out)
+				// Ensure the specified revision exists before printing
+				revision, exists := historyInfo[o.Revision]
+				if !exists {
+					return fmt.Errorf("unable to find the specified revision")
+				}
+
+				printer.PrintObj(revision, o.Out)
 			} else {
 				sortedKeys := make([]int64, 0, len(historyInfo))
 				for k := range historyInfo {
