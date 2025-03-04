@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -536,7 +537,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	// and users should not be that surprised.
 	// It should happen only in very rare case when scheduler schedules
 	// a pod and user deletes a PVC that's used by it at the same time.
-	if pvc.ObjectMeta.DeletionTimestamp != nil {
+	if pvc.ObjectMeta.DeletionTimestamp != nil && !slices.Contains(pvc.Finalizers, util.PVCProtectionFinalizer) {
 		return nil, errors.New("PVC is being deleted")
 	}
 
