@@ -132,6 +132,9 @@ func mergeEditionFeatures(parentDesc protoreflect.Descriptor, child *descriptorp
 		if sep := goFeatures.StripEnumPrefix; sep != nil {
 			parentFS.StripEnumPrefix = int(*sep)
 		}
+		if al := goFeatures.ApiLevel; al != nil {
+			parentFS.APILevel = int(*al)
+		}
 	}
 
 	return parentFS

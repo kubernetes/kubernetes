@@ -21,7 +21,7 @@ import (
 
 	libcontainerutils "k8s.io/kubernetes/third_party/forked/libcontainer/utils"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 )
 
 const (
