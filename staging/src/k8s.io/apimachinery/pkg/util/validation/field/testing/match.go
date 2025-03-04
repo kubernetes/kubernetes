@@ -26,50 +26,16 @@ import (
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// MatchErrors compares two ErrorLists with the specified matcher, and fails
-// the test if they don't match. If a given "want" error matches multiple "got"
-// errors, they will all be consumed. This might be OK (e.g. if there are
-// multiple errors on the same field from the same origin) or it might be an
-// insufficiently specific matcher, so these will be logged.
-func MatchErrors(t *testing.T, want, got field.ErrorList, matcher *Matcher) {
-	t.Helper()
-
-	remaining := got
-	for _, w := range want {
-		tmp := make(field.ErrorList, 0, len(remaining))
-		n := 0
-		for _, g := range remaining {
-			if matcher.Matches(w, g) {
-				n++
-			} else {
-				tmp = append(tmp, g)
-			}
-		}
-		if n == 0 {
-			t.Errorf("expected an error matching:\n%s", matcher.Render(w))
-		} else if n > 1 {
-			// This is not necessarily and error, but it's worth logging in
-			// case it's not what the test author intended.
-			t.Logf("multiple errors matched:\n%s", matcher.Render(w))
-		}
-		remaining = tmp
-	}
-	if len(remaining) > 0 {
-		for _, e := range remaining {
-			t.Errorf("unmatched error:\n%s", Match().Exactly().Render(e))
-		}
-	}
-}
-
-// Match returns a new Matcher.
-func Match() *Matcher {
-	return &Matcher{}
-}
-
-// Matcher is a helper for comparing field.Error objects.
-type Matcher struct {
-	matchType                bool
-	matchField               bool
+// ErrorMatcher is a helper for comparing field.Error objects.
+type ErrorMatcher struct {
+	// TODO(thockin): consider whether type is ever NOT required, maybe just
+	// assume it.
+	matchType bool
+	// TODO(thockin): consider whether field could be assumed - if the
+	// "want" error has a nil field, don't match on field.
+	matchField bool
+	// TODO(thockin): consider whether value could be assumed - if the
+	// "want" error has a nil value, don't match on field.
 	matchValue               bool
 	matchOrigin              bool
 	matchDetail              func(want, got string) bool
@@ -78,7 +44,7 @@ type Matcher struct {
 
 // Matches returns true if the two field.Error objects match according to the
 // configured criteria.
-func (m *Matcher) Matches(want, got *field.Error) bool {
+func (m ErrorMatcher) Matches(want, got *field.Error) bool {
 	if m.matchType && want.Type != got.Type {
 		return false
 	}
@@ -105,8 +71,8 @@ func (m *Matcher) Matches(want, got *field.Error) bool {
 }
 
 // Render returns a string representation of the specified Error object,
-// according to the criteria configured in the Matcher.
-func (m *Matcher) Render(e *field.Error) string {
+// according to the criteria configured in the ErrorMatcher.
+func (m ErrorMatcher) Render(e *field.Error) string {
 	buf := strings.Builder{}
 
 	comma := func() {
@@ -138,66 +104,104 @@ func (m *Matcher) Render(e *field.Error) string {
 	return "{" + buf.String() + "}"
 }
 
-// Exactly configures the matcher to match all fields exactly.
-func (m *Matcher) Exactly() *Matcher {
+// Exactly returns a derived ErrorMatcher which matches all fields exactly.
+func (m ErrorMatcher) Exactly() ErrorMatcher {
 	return m.ByType().ByField().ByValue().ByOrigin().ByDetailExact()
 }
 
-// Exactly configures the matcher to match errors by type.
-func (m *Matcher) ByType() *Matcher {
+// ByType returns a derived ErrorMatcher which also matches by type.
+func (m ErrorMatcher) ByType() ErrorMatcher {
 	m.matchType = true
 	return m
 }
 
-// ByField configures the matcher to match errors by field path.
-func (m *Matcher) ByField() *Matcher {
+// ByField returns a derived ErrorMatcher which also matches by field path.
+func (m ErrorMatcher) ByField() ErrorMatcher {
 	m.matchField = true
 	return m
 }
 
-// ByValue configures the matcher to match errors by the errant value.
-func (m *Matcher) ByValue() *Matcher {
+// ByValue returns a derived ErrorMatcher which also matches by the errant
+// value.
+func (m ErrorMatcher) ByValue() ErrorMatcher {
 	m.matchValue = true
 	return m
 }
 
-// ByOrigin configures the matcher to match errors by the origin.
-func (m *Matcher) ByOrigin() *Matcher {
+// ByOrigin returns a derived ErrorMatcher which also matches by the origin.
+func (m ErrorMatcher) ByOrigin() ErrorMatcher {
 	m.matchOrigin = true
 	return m
 }
 
-// RequireOriginWhenInvalid configures the matcher to require the Origin field
-// to be set when the Type is Invalid and the matcher is matching by Origin.
-func (m *Matcher) RequireOriginWhenInvalid() *Matcher {
+// RequireOriginWhenInvalid returns a derived ErrorMatcher which also requires
+// the Origin field to be set when the Type is Invalid and the matcher is
+// matching by Origin.
+func (m ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher {
 	m.requireOriginWhenInvalid = true
 	return m
 }
 
-// ByDetailExact configures the matcher to match errors by the exact detail
-// string.
-func (m *Matcher) ByDetailExact() *Matcher {
+// ByDetailExact returns a derived ErrorMatcher which also matches errors by
+// the exact detail string.
+func (m ErrorMatcher) ByDetailExact() ErrorMatcher {
 	m.matchDetail = func(want, got string) bool {
 		return got == want
 	}
 	return m
 }
 
-// ByDetailSubstring configures the matcher to match errors by a substring of
-// the detail string.
-func (m *Matcher) ByDetailSubstring() *Matcher {
+// ByDetailSubstring returns a derived ErrorMatcher which also matches errors
+// by a substring of the detail string.
+func (m ErrorMatcher) ByDetailSubstring() ErrorMatcher {
 	m.matchDetail = func(want, got string) bool {
 		return strings.Contains(got, want)
 	}
 	return m
 }
 
-// ByDetailRegexp configures the matcher to match errors by a regular
-// expression of the detail string, where the "want" string is assumed to be a
-// valid regular expression.
-func (m *Matcher) ByDetailRegexp() *Matcher {
+// ByDetailRegexp returns a derived ErrorMatcher which also matches errors by a
+// regular expression of the detail string, where the "want" string is assumed
+// to be a valid regular expression.
+func (m ErrorMatcher) ByDetailRegexp() ErrorMatcher {
 	m.matchDetail = func(want, got string) bool {
 		return regexp.MustCompile(want).MatchString(got)
 	}
 	return m
+}
+
+// Test compares two ErrorLists by the criteria configured in this matcher, and
+// fails the test if they don't match. If a given "want" error matches multiple
+// "got" errors, they will all be consumed. This might be OK (e.g. if there are
+// multiple errors on the same field from the same origin) or it might be an
+// insufficiently specific matcher, so these will be logged.
+func (m ErrorMatcher) Test(t *testing.T, want, got field.ErrorList) {
+	t.Helper()
+
+	remaining := got
+	for _, w := range want {
+		tmp := make(field.ErrorList, 0, len(remaining))
+		n := 0
+		for _, g := range remaining {
+			if m.Matches(w, g) {
+				n++
+			} else {
+				tmp = append(tmp, g)
+			}
+		}
+		if n == 0 {
+			t.Errorf("expected an error matching:\n%s", m.Render(w))
+		} else if n > 1 {
+			// This is not necessarily and error, but it's worth logging in
+			// case it's not what the test author intended.
+			t.Logf("multiple errors matched:\n%s", m.Render(w))
+		}
+		remaining = tmp
+	}
+	if len(remaining) > 0 {
+		for _, e := range remaining {
+			exactly := m.Exactly() // makes a copy
+			t.Errorf("unmatched error:\n%s", exactly.Render(e))
+		}
+	}
 }
