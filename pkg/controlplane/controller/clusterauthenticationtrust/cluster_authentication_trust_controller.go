@@ -261,13 +261,10 @@ func getConfigMapDataFor(authenticationInfo ClusterAuthenticationInfo) (map[stri
 		if err != nil {
 			return nil, err
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.RemoteRequestHeaderUID) && len(authenticationInfo.RequestHeaderUIDHeaders.Value()) > 0 {
-			data["requestheader-uid-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderUIDHeaders.Value())
-			if err != nil {
-				return nil, err
-			}
+		data["requestheader-uid-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderUIDHeaders.Value())
+		if err != nil {
+			return nil, err
 		}
-
 		data["requestheader-group-headers"], err = jsonSerializeStringSlice(authenticationInfo.RequestHeaderGroupHeaders.Value())
 		if err != nil {
 			return nil, err
