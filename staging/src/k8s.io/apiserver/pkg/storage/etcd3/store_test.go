@@ -249,7 +249,7 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, compactStorage(client.Client), false)
+	storagetesting.RunTestList(ctx, t, store, compactStorage(client.Client), false, true)
 }
 
 func TestConsistentList(t *testing.T) {
