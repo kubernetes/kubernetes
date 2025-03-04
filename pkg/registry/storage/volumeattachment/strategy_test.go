@@ -78,7 +78,7 @@ func TestVolumeAttachmentStrategy(t *testing.T) {
 
 	volumeAttachment := getValidVolumeAttachment("valid-attachment")
 
-	Strategy.PrepareForCreate(ctx, volumeAttachment)
+	Strategy.PrepareForCreate(ctx, volumeAttachment, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, volumeAttachment)
 	if len(errs) != 0 {
@@ -88,7 +88,7 @@ func TestVolumeAttachmentStrategy(t *testing.T) {
 	// Create with status should drop status
 	statusVolumeAttachment := volumeAttachment.DeepCopy()
 	statusVolumeAttachment.Status = storage.VolumeAttachmentStatus{Attached: true}
-	Strategy.PrepareForCreate(ctx, statusVolumeAttachment)
+	Strategy.PrepareForCreate(ctx, statusVolumeAttachment, fieldValidation string) ([]string, error)
 	if !apiequality.Semantic.DeepEqual(statusVolumeAttachment, volumeAttachment) {
 		t.Errorf("unexpected objects difference after creating with status: %v", cmp.Diff(statusVolumeAttachment, volumeAttachment))
 	}
@@ -124,7 +124,7 @@ func TestVolumeAttachmentStrategySourceInlineSpec(t *testing.T) {
 
 	volumeAttachment := getValidVolumeAttachmentWithInlineSpec("valid-attachment")
 	volumeAttachmentSaved := volumeAttachment.DeepCopy()
-	Strategy.PrepareForCreate(ctx, volumeAttachment)
+	Strategy.PrepareForCreate(ctx, volumeAttachment, fieldValidation string) ([]string, error)
 	if volumeAttachment.Spec.Source.InlineVolumeSpec == nil {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForCreate")
 	}
@@ -192,7 +192,7 @@ func TestUpdatePreventsStatusWrite(t *testing.T) {
 func TestCreatePreventsStatusWrite(t *testing.T) {
 	va := getValidVolumeAttachment("valid-attachment")
 	va.Status.Attached = true
-	Strategy.PrepareForCreate(context.TODO(), va)
+	Strategy.PrepareForCreate(context.TODO(), va, fieldValidation string) ([]string, error)
 	if va.Status.Attached {
 		t.Errorf("expected status to be false got %v", va.Status.Attached)
 	}

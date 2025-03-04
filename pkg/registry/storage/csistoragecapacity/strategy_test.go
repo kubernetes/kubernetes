@@ -72,7 +72,7 @@ func TestCSIStorageCapacityStrategy(t *testing.T) {
 
 	capacity := getValidCSIStorageCapacity("valid", "")
 	original := capacity.DeepCopy()
-	Strategy.PrepareForCreate(ctx, capacity)
+	Strategy.PrepareForCreate(ctx, capacity, fieldValidation string) ([]string, error)
 	errs := Strategy.Validate(ctx, capacity)
 	if len(errs) != 0 {
 		t.Errorf("unexpected error validating %v", errs)
@@ -157,7 +157,7 @@ func TestCSIStorageCapacityValidation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			oldCapacity := test.old.DeepCopy()
-			Strategy.PrepareForCreate(ctx, oldCapacity)
+			Strategy.PrepareForCreate(ctx, oldCapacity, fieldValidation string) ([]string, error)
 			errs := Strategy.Validate(ctx, oldCapacity)
 			if len(errs) != 0 {
 				t.Errorf("unexpected validating errors for create: %v", errs)

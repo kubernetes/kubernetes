@@ -87,7 +87,7 @@ func TestCronJobStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, cronJob)
+	Strategy.PrepareForCreate(ctx, cronJob, fieldValidation string) ([]string, error)
 	if len(cronJob.Status.Active) != 0 {
 		t.Errorf("CronJob does not allow setting status on create")
 	}

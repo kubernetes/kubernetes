@@ -136,7 +136,7 @@ func makeDataSourceRef(apiGroup, kind, name string, namespace *string) *api.Type
 	}
 }
 
-func TestPrepareForCreate(t *testing.T) {
+func TestPrepareForCreate(t *testing.T, fieldValidation string) ([]string, error) {
 	ctx := genericapirequest.NewDefaultContext()
 
 	ns := "ns1"
@@ -356,7 +356,7 @@ func TestPrepareForCreate(t *testing.T) {
 			}
 
 			// Method under test
-			Strategy.PrepareForCreate(ctx, &pvc)
+			Strategy.PrepareForCreate(ctx, &pvc, fieldValidation string) ([]string, error)
 
 			if !reflect.DeepEqual(pvc.Spec.DataSource, test.want) {
 				t.Errorf("data source does not match, test: %s, anyEnabled: %v, dataSource: %v, expected: %v",

@@ -56,9 +56,10 @@ func (volumeAttachmentStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	volumeAttachment := obj.(*storage.VolumeAttachment)
 	volumeAttachment.Status = storage.VolumeAttachmentStatus{}
+	return nil, nil
 }
 
 func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

@@ -68,9 +68,10 @@ func (serviceCIDRStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.
 }
 
 // PrepareForCreate clears the status of an ServiceCIDR before creation.
-func (serviceCIDRStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (serviceCIDRStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	_ = obj.(*networking.ServiceCIDR)
 
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

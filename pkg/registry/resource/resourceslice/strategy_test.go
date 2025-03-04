@@ -51,7 +51,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	slice := slice.DeepCopy()
 
-	Strategy.PrepareForCreate(ctx, slice)
+	Strategy.PrepareForCreate(ctx, slice, fieldValidation string) ([]string, error)
 	errs := Strategy.Validate(ctx, slice)
 	if len(errs) != 0 {
 		t.Errorf("unexpected error validating for create %v", errs)

@@ -43,7 +43,7 @@ func TestVolumeAttributesClassStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(ctx, class)
+	Strategy.PrepareForCreate(ctx, class, fieldValidation string) ([]string, error)
 
 	errs := Strategy.Validate(ctx, class)
 	if len(errs) != 0 {

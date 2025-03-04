@@ -19,6 +19,7 @@ package resourceclaim
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -68,12 +69,12 @@ func (resourceclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 	return fields
 }
 
-func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (resourceclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	claim := obj.(*resource.ResourceClaim)
 	// Status must not be set by user on create.
 	claim.Status = resource.ResourceClaimStatus{}
 
-	dropDisabledFields(claim, nil)
+	return dropDisabledFields(claim, nil, fieldValidation), nil
 }
 
 func (resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -97,7 +98,7 @@ func (resourceclaimStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	oldClaim := old.(*resource.ResourceClaim)
 	newClaim.Status = oldClaim.Status
 
-	dropDisabledFields(newClaim, oldClaim)
+	dropDisabledFields(newClaim, oldClaim, "" /* TODO */)
 }
 
 func (resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -143,7 +144,7 @@ func (resourceclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 	metav1.ResetObjectMetaForStatus(&newClaim.ObjectMeta, &oldClaim.ObjectMeta)
 
 	dropDeallocatedStatusDevices(newClaim, oldClaim)
-	dropDisabledFields(newClaim, oldClaim)
+	dropDisabledFields(newClaim, oldClaim, "" /* TODO */)
 }
 
 func (resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -182,12 +183,13 @@ func toSelectableFields(claim *resource.ResourceClaim) fields.Set {
 }
 
 // dropDisabledFields removes fields which are covered by a feature gate.
-func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
-	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
-	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
+func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim, fieldValidation string) (warnings []string) {
+	warnings = append(warnings, dropDisabledDRAAdminAccessFields(newClaim, oldClaim, fieldValidation)...)
+	warnings = append(warnings, dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim, fieldValidation)...)
+	return
 }
 
-func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim) {
+func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim, fieldValidation string) (warnings []string) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
 		// No need to drop anything.
 		return
@@ -202,16 +204,28 @@ func dropDisabledDRAAdminAccessFields(newClaim, oldClaim *resource.ResourceClaim
 		return
 	}
 
+	warn := fieldValidation != metav1.FieldValidationIgnore
 	for i := range newClaim.Spec.Devices.Requests {
-		newClaim.Spec.Devices.Requests[i].AdminAccess = nil
+		if newClaim.Spec.Devices.Requests[i].AdminAccess != nil {
+			newClaim.Spec.Devices.Requests[i].AdminAccess = nil
+			if warn {
+				warnings = append(warnings, fmt.Sprintf("spec.devices.requests[%d].adminAccess: %s disabled", i, features.DRAAdminAccess))
+			}
+		}
 	}
 
 	if newClaim.Status.Allocation == nil {
 		return
 	}
 	for i := range newClaim.Status.Allocation.Devices.Results {
-		newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
+		if newClaim.Status.Allocation.Devices.Results[i].AdminAccess != nil {
+			newClaim.Status.Allocation.Devices.Results[i].AdminAccess = nil
+			if warn {
+				warnings = append(warnings, fmt.Sprintf("status.allocation.devices.results[%d].adminAccess: %s disabled", i, features.DRAAdminAccess))
+			}
+		}
 	}
+	return
 }
 
 func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
@@ -236,12 +250,18 @@ func draAdminAccessFeatureInUse(claim *resource.ResourceClaim) bool {
 	return false
 }
 
-func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim) {
+func dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim *resource.ResourceClaim, fieldValidation string) (warnings []string) {
 	isDRAResourceClaimDeviceStatusInUse := (oldClaim != nil && len(oldClaim.Status.Devices) > 0)
 	// drop resourceClaim.Status.Devices field if feature gate is not enabled and it was not in use
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) && !isDRAResourceClaimDeviceStatusInUse {
-		newClaim.Status.Devices = nil
+		if len(newClaim.Status.Devices) > 0 {
+			newClaim.Status.Devices = nil
+			if fieldValidation != metav1.FieldValidationIgnore {
+				warnings = append(warnings, fmt.Sprintf("status.allocation.devices: %s disabled", features.DRAResourceClaimDeviceStatus))
+			}
+		}
 	}
+	return
 }
 
 // dropDeallocatedStatusDevices removes the status.devices that were allocated

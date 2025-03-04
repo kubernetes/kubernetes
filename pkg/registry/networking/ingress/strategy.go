@@ -67,12 +67,13 @@ func (ingressStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set 
 }
 
 // PrepareForCreate clears the status of an Ingress before creation.
-func (ingressStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (ingressStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	ingress := obj.(*networking.Ingress)
 	// create cannot set status
 	ingress.Status = networking.IngressStatus{}
 
 	ingress.Generation = 1
+	return nil, nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

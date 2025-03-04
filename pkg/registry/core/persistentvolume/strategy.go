@@ -63,7 +63,7 @@ func (persistentvolumeStrategy) GetResetFields() map[fieldpath.APIVersion]*field
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 	pvutil.DropDisabledSpecFields(&pv.Spec, nil)
@@ -71,6 +71,7 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 	pv.Status.Phase = api.VolumePending
 	now := NowFunc()
 	pv.Status.LastPhaseTransitionTime = &now
+	return nil, nil
 }
 
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

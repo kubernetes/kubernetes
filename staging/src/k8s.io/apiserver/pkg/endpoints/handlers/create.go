@@ -116,7 +116,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		defaultGVK := scope.Kind
 		original := r.New()
 
-		validationDirective := fieldValidation(options.FieldValidation)
+		options.FieldValidation = fieldValidation(options.FieldValidation)
+		validationDirective := options.FieldValidation
 		decodeSerializer := s.Serializer
 		if validationDirective == metav1.FieldValidationWarn || validationDirective == metav1.FieldValidationStrict {
 			decodeSerializer = s.StrictSerializer
