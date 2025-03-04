@@ -2872,6 +2872,44 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 	return true, v1.PodResizeStatusInProgress, ""
 }
 
+// Generate pod resize complete msg
+func resizeCompleteMsgGenerate(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) string {
+	var containerMsgs []string
+	for _, c := range allocatedPod.Spec.Containers {
+		if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
+			if cs.State != kubecontainer.ContainerStateRunning {
+				// If the container isn't running, it isn't resizing.
+				continue
+			}
+			cpuReq, hasCPUReq := c.Resources.Requests[v1.ResourceCPU]
+			cpuLim, hasCPULim := c.Resources.Limits[v1.ResourceCPU]
+			memReq, hasMemReq := c.Resources.Requests[v1.ResourceMemory]
+			memLim, hasMemLim := c.Resources.Limits[v1.ResourceMemory]
+			var containerMsg strings.Builder
+			containerMsg.WriteString(fmt.Sprintf("{Container: %s, ", c.Name))
+			if hasCPUReq {
+				containerMsg.WriteString(fmt.Sprintf("Requested CPU: %d ", cpuReq.MilliValue()))
+			}
+			if hasCPULim {
+				containerMsg.WriteString(fmt.Sprintf("Limits CPU: %d ", cpuLim.MilliValue()))
+			}
+			if hasMemReq {
+				containerMsg.WriteString(fmt.Sprintf("Requested memory: %s ", memReq.String()))
+			}
+			if hasMemLim {
+				containerMsg.WriteString(fmt.Sprintf("Limits memory: %s ", memLim.String()))
+			}
+			containerMsg.WriteByte('}')
+			containerMsgs = append(containerMsgs, containerMsg.String())
+		}
+	}
+	// Connect all the resource information of the containers with commas
+	allContainerMsgs := strings.Join(containerMsgs, ", ")
+	// Generate final message
+	finalMsg := fmt.Sprintf("Pod resize complete, {%s}", allContainerMsgs)
+	return finalMsg
+}
+
 // handlePodResourcesResize returns the "allocated pod", which should be used for all resource
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
@@ -2885,6 +2923,11 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress)
 		} else {
 			// (Desired == Allocated == Actual) => clear the resize status.
+			if pod.Status.Resize == v1.PodResizeStatusInProgress {
+				msg := resizeCompleteMsgGenerate(allocatedPod, podStatus)
+				kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+			}
+
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 		}
 		// Pod allocation does not need to be updated.
@@ -2922,6 +2965,10 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		// status immediately, rather than waiting for the next SyncPod iteration.
 		if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
 			// In this case, consider the resize complete.
+			if pod.Status.Resize == v1.PodResizeStatusInProgress {
+				msg := resizeCompleteMsgGenerate(allocatedPod, podStatus)
+				kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+			}
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 			return allocatedPod, nil
 		}
