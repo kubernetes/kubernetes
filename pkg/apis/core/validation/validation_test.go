@@ -22844,7 +22844,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			},
 		}},
 		// TODO: This expected message is not perfect, and will be fixed in #129900.
-		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Index(0), "foo", "exists in both matchLabelKeys and labelSelector").WithOrigin("overlappingKeys")},
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
 	}, {
 		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
 		constraints: []core.TopologySpreadConstraint{{
