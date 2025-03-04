@@ -23515,7 +23515,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 	}
 }
 
-func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
+func TestValidatePodTemplateSpecSeccomp(t *testing.T) { // TODO: This function name should be more general, and will be fixed in #130155.
 	rootFld := field.NewPath("template")
 	tests := []struct {
 		description string
@@ -23592,9 +23592,672 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 					}))),
 			),
 		},
+	}, {
+		description: "invalid soft pod affinity, key in MatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:  &metav1.LabelSelector{},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"/key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod affinity, key in MatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:  &metav1.LabelSelector{},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"/key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod anti-affinity, key in MatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:  &metav1.LabelSelector{},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"/key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod anti-affinity, key in MatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:  &metav1.LabelSelector{},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"/key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod affinity, key in MismatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("mismatchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:     &metav1.LabelSelector{},
+									TopologyKey:       "k8s.io/zone",
+									MismatchLabelKeys: []string{"/key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod affinity, key in MismatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("mismatchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:     &metav1.LabelSelector{},
+								TopologyKey:       "k8s.io/zone",
+								MismatchLabelKeys: []string{"/key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod anti-affinity, key in MismatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("mismatchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:     &metav1.LabelSelector{},
+									TopologyKey:       "k8s.io/zone",
+									MismatchLabelKeys: []string{"/key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod anti-affinity, key in MismatchLabelKeys isn't correctly defined",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("mismatchLabelKeys").Index(0), "/key", "prefix part must be non-empty").WithOrigin("labelKey"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:     &metav1.LabelSelector{},
+								TopologyKey:       "k8s.io/zone",
+								MismatchLabelKeys: []string{"/key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod affinity, key exists in both MatchLabelKeys and LabelSelector.MatchExpressions",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value1"},
+											},
+										},
+									},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod affinity, key exists in both MatchLabelKeys and LabelSelector.MatchExpressions",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1"},
+										},
+									},
+								},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod anti-affinity, key exists in both MatchLabelKeys and LabelSelector.MatchExpressions",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value1"},
+											},
+										},
+									},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod anti-affinity, key exists in both MatchLabelKeys and LabelSelector.MatchExpressions",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1"},
+										},
+									},
+								},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod affinity, key exists in both MatchLabelKeys and LabelSelector.MatchLabels",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"key": "value1",
+										},
+									},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod affinity, key exists in both MatchLabelKeys and LabelSelector.MatchLabels",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"key": "value1",
+									},
+								},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod anti-affinity, key exists in both MatchLabelKeys and LabelSelector.MatchLabels",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"key": "value1",
+										},
+									},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod anti-affinity, key exists in both MatchLabelKeys and LabelSelector.MatchLabels",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and labelSelector"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"key": "value1",
+									},
+								},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod affinity, key exists in both MatchLabelKeys and MismatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and mismatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:     &metav1.LabelSelector{},
+									TopologyKey:       "k8s.io/zone",
+									MatchLabelKeys:    []string{"key"},
+									MismatchLabelKeys: []string{"key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod affinity, key exists in both MatchLabelKeys and MismatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and mismatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:     &metav1.LabelSelector{},
+								TopologyKey:       "k8s.io/zone",
+								MatchLabelKeys:    []string{"key"},
+								MismatchLabelKeys: []string{"key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod anti-affinity, key exists in both MatchLabelKeys and MismatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and mismatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:     &metav1.LabelSelector{},
+									TopologyKey:       "k8s.io/zone",
+									MatchLabelKeys:    []string{"key"},
+									MismatchLabelKeys: []string{"key"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod anti-affinity, key exists in both MatchLabelKeys and MismatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(0), "key", "exists in both matchLabelKeys and mismatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:     &metav1.LabelSelector{},
+								TopologyKey:       "k8s.io/zone",
+								MatchLabelKeys:    []string{"key"},
+								MismatchLabelKeys: []string{"key"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod affinity, duplicate keys in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:  &metav1.LabelSelector{},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key1", "key2", "key1"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod affinity, duplicate keys in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:  &metav1.LabelSelector{},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key1", "key2", "key1"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod anti-affinity, duplicate keys in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:  &metav1.LabelSelector{},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key1", "key2", "key1"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod anti-affinity, duplicate keys in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:  &metav1.LabelSelector{},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key1", "key2", "key1"},
+							},
+						},
+					},
+				}),
+			),
+		},
 	},
 	}
-
 	for i, test := range tests {
 		err := ValidatePodTemplateSpec(test.spec, rootFld, PodValidationOptions{})
 		assert.Equal(t, test.expectedErr, err, "TestCase[%d]: %s", i, test.description)

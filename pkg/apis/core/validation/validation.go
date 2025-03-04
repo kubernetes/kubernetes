@@ -8018,30 +8018,45 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 	// On the other hand, we may want to have labelSelector with the key specified in mismatchLabelKeys.
 	// because the mismatchLabelKeys will be `NotIn` labelSelector
 	// and we may want to filter Pods further with other labelSelector with that key.
-
-	// labelKeysMap is keyed by label key and valued by the index of label key in labelKeys.
 	if labelSelector != nil {
-		labelKeysMap := map[string]int{}
-		for i, key := range matchLabelKeys {
-			labelKeysMap[key] = i
-		}
 		labelSelectorKeys := sets.New[string]()
 		for key := range labelSelector.MatchLabels {
 			labelSelectorKeys.Insert(key)
 		}
-		for _, matchExpression := range labelSelector.MatchExpressions {
-			key := matchExpression.Key
-			if i, ok := labelKeysMap[key]; ok && labelSelectorKeys.Has(key) {
-				// Before validateLabelKeysWithSelector is called, the labelSelector has already got the selector created from matchLabelKeys.
-				// Here, we found the duplicate key in labelSelector and the key is specified in labelKeys.
-				// Meaning that the same key is specified in both labelSelector and matchLabelKeys/mismatchLabelKeys.
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+		if strings.Contains(fldPath.String(), "template.spec") { // PodTemplateSpec validation
+			// uniqueMatchLabelKeys is used to check if the keys in matchLabelKeys are unique.
+			uniqueMatchLabelKeys := sets.New[string]()
+			for _, matchExpression := range labelSelector.MatchExpressions {
+				labelSelectorKeys.Insert(matchExpression.Key)
 			}
-
-			labelSelectorKeys.Insert(key)
+			for i, key := range matchLabelKeys {
+				if labelSelectorKeys.Has(key) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+				}
+				if uniqueMatchLabelKeys.Has(key) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "is duplicated in matchLabelKeys"))
+				}
+				uniqueMatchLabelKeys.Insert(key)
+			}
+		} else { // PodSpec validation
+			// labelKeysMap is keyed by label key and valued by the index of label key in labelKeys.
+			labelKeysMap := map[string]int{}
+			for i, key := range matchLabelKeys {
+				labelKeysMap[key] = i
+			}
+			for _, matchExpression := range labelSelector.MatchExpressions {
+				key := matchExpression.Key
+				if i, ok := labelKeysMap[key]; ok && labelSelectorKeys.Has(key) {
+					// Before validateLabelKeysWithSelector is called, the labelSelector has already got the selector created from matchLabelKeys.
+					// Here, we found the duplicate key in labelSelector and the key is specified in labelKeys.
+					// Meaning that the same key is specified in both labelSelector and matchLabelKeys/mismatchLabelKeys.
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+				}
+				labelSelectorKeys.Insert(key)
+			}
 		}
-	}
 
+	}
 	// 3. validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
 	mismatchLabelKeysSet := sets.New(mismatchLabelKeys...)
 	for i, k := range matchLabelKeys {
