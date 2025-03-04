@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/antiaffinity"
 	certapproval "k8s.io/kubernetes/plugin/pkg/admission/certificates/approval"
 	"k8s.io/kubernetes/plugin/pkg/admission/certificates/ctbattest"
+	"k8s.io/kubernetes/plugin/pkg/admission/certificates/podcertificatemaxexpiration"
 	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
 	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
@@ -89,6 +90,7 @@ var AllOrderedPlugins = []string{
 	runtimeclass.PluginName,                 // RuntimeClass
 	certapproval.PluginName,                 // CertificateApproval
 	certsigning.PluginName,                  // CertificateSigning
+	podcertificatemaxexpiration.PluginName,  // PodCertificateMaxExpiration
 	ctbattest.PluginName,                    // ClusterTrustBundleAttest
 	certsubjectrestriction.PluginName,       // CertificateSubjectRestriction
 	defaultingressclass.PluginName,          // DefaultIngressClass
@@ -137,6 +139,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	certapproval.Register(plugins)
 	certsigning.Register(plugins)
 	ctbattest.Register(plugins)
+	podcertificatemaxexpiration.Register(plugins)
 	certsubjectrestriction.Register(plugins)
 }
 

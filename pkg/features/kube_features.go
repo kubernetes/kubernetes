@@ -460,6 +460,18 @@ const (
 	// Requires the CRI implementation supports supplying the required stats.
 	PodAndContainerStatsFromCRI featuregate.Feature = "PodAndContainerStatsFromCRI"
 
+	// owner: @ahmedtd
+	// alpha: v1.33
+	//
+	// Enable PodCertificateRequest objects.
+	PodCertificateRequest featuregate.Feature = "PodCertificateRequest"
+
+	// owner: @ahmedtd
+	// alpha: v1.33
+	//
+	// Enable podCertificate Kubelet projected volumes.  Depends on PodCertificateRequest.
+	PodCertificateProjection featuregate.Feature = "PodCertificateProjection"
+
 	// owner: @ahg-g
 	//
 	// Enables controlling pod ranking on replicaset scale-down.

@@ -80,6 +80,9 @@ func TestNodeAuthorizer(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzEnabled, genericfeatures.AuthorizeWithSelectors, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, selectorAuthzEnabled, features.AuthorizeNodeWithSelectors, true)
 
+	podCertificateProjectionEnabled := utilfeature.DefaultFeatureGate.DeepCopy()
+	featuregatetesting.SetFeatureGateDuringTest(t, podCertificateProjectionEnabled, features.PodCertificateProjection, true)
+
 	featureVariants := []struct {
 		suffix   string
 		features featuregate.FeatureGate
@@ -218,6 +221,18 @@ func TestNodeAuthorizer(t *testing.T) {
 			name:   "disallowed svcacct token create - non create",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
 			expect: authorizer.DecisionNoOpinion,
+		},
+		{
+			name:     "allowed svcacct token create when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "serviceaccounts", Subresource: "token", Name: "svcacct0-node0", Namespace: "ns0"},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
+		},
+		{
+			name:     "allowed svcacct get when PodCertificateProjection is enabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "serviceaccounts", Name: "svcacct0-node0", Namespace: "ns0"},
+			expect:   authorizer.DecisionAllow,
+			features: podCertificateProjectionEnabled,
 		},
 		{
 			name:   "disallowed get lease in namespace other than kube-node-lease - feature enabled",

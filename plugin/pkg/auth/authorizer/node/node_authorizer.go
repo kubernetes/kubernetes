@@ -135,6 +135,12 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case vaResource:
 			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
+			if r.features.Enabled(features.PodCertificateProjection) {
+				if attrs.GetSubresource() == "token" {
+					return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
+				}
+				return r.authorizeGet(nodeName, serviceAccountVertexType, attrs)
+			}
 			return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
 		case leaseResource:
 			return r.authorizeLease(nodeName, attrs)
