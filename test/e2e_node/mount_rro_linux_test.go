@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -34,9 +33,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-// Usage:
-// make test-e2e-node TEST_ARGS='--service-feature-gates=RecursiveReadOnlyMounts=true --kubelet-flags="--feature-gates=RecursiveReadOnlyMounts=true"' FOCUS="Mount recursive read-only" SKIP=""
-var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", feature.RecursiveReadOnlyMounts, func() {
+var _ = SIGDescribe("Mount recursive read-only [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("mount-rro")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Mount recursive read-only", func() {
