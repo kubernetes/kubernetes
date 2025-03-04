@@ -1385,7 +1385,7 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 				ginkgo.By("verifying initial pod Cpus allowed list value")
 				gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 					WithArguments(f, newPod, tc.containers).
-					Should(gomega.BeNil(), "failed to verify initial Pod CPUsAllowedListValue")
+					Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 			}
 
 			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, isRollback bool) {
@@ -1416,11 +1416,11 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 					if isInPlacePodVerticalScalingExclusiveCPUsEnabled {
 						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, tc.expected).
-							Should(gomega.BeNil(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
+							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
 					} else {
 						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, tc.containers).
-							Should(gomega.BeNil(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
+							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
 					}
 				}
 			}
@@ -2124,7 +2124,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 				ginkgo.By("verifying initial pod Cpus allowed list value")
 				gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 					WithArguments(f, newPod, tc.containers).
-					Should(gomega.BeNil(), "failed to verify initial Pod CPUsAllowedListValue")
+					Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 			}
 
 			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, isRollback bool) {
@@ -2155,11 +2155,11 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 					if isInPlacePodVerticalScalingExclusiveCPUsEnabled {
 						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, expectedContainers).
-							Should(gomega.BeNil(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
+							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
 					} else {
 						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, tc.containers).
-							Should(gomega.BeNil(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
+							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
 					}
 				}
 			}
@@ -2363,7 +2363,7 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 					ginkgo.By("verifying initial pod Cpus allowed list value")
 					gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 						WithArguments(f, newPod, testContainers).
-						Should(gomega.BeNil(), "failed to verify initial Pod CPUsAllowedListValue")
+						Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 				}
 				return newPod
 			}
@@ -2399,11 +2399,11 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 					if isInPlacePodVerticalScalingExclusiveCPUsEnabled {
 						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, expectedContainers).
-							Should(gomega.BeNil(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
+							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
 					} else {
 						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, initialContainers).
-							Should(gomega.BeNil(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
+							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
 					}
 				}
 			}

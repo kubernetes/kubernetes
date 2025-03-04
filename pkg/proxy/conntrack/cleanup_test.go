@@ -34,7 +34,10 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )
@@ -306,9 +309,15 @@ func TestCleanStaleEntries(t *testing.T) {
 	t.Logf("entries before cleanup %d after cleanup %d", len(entriesBeforeCleanup), len(entriesAfterCleanup))
 	fake := NewFake()
 	fake.entries = entriesBeforeCleanup
-	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
 
+	legacyregistry.MustRegister(metrics.ReconcileConntrackFlowsDeletedEntriesTotal)
+	CleanStaleEntries(fake, testIPFamily, svcPortMap, endpointsMap)
 	actualEntries, _ := fake.ListEntries(ipFamilyMap[testIPFamily])
+
+	metricCount, err := testutil.GetCounterMetricValue(metrics.ReconcileConntrackFlowsDeletedEntriesTotal.WithLabelValues(string(testIPFamily)))
+	require.NoError(t, err)
+	require.Equal(t, int(metricCount), len(entriesBeforeCleanup)-len(entriesAfterCleanup))
+
 	require.Equal(t, len(entriesAfterCleanup), len(actualEntries))
 
 	// sort the actual flows before comparison

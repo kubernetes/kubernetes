@@ -58,9 +58,6 @@ const (
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
-	// owner: @tallclair
-	AppArmor featuregate.Feature = "AppArmor"
-
 	// owner: @liggitt
 	// kep: https://kep.k8s.io/4601
 	//

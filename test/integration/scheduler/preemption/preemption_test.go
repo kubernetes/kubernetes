@@ -59,7 +59,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -175,7 +174,7 @@ func TestPreemption(t *testing.T) {
 	}
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -874,7 +873,7 @@ func TestAsyncPreemption(t *testing.T) {
 			}
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
-					SchedulerName: pointer.String(v1.DefaultSchedulerName),
+					SchedulerName: ptr.To(v1.DefaultSchedulerName),
 					Plugins: &configv1.Plugins{
 						MultiPoint: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
@@ -1654,7 +1653,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			t.Run(fmt.Sprintf("%s (Async preemption enabled: %v)", tt.name, asyncPreemptionEnabled), func(t *testing.T) {
 				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 					Profiles: []configv1.KubeSchedulerProfile{{
-						SchedulerName: pointer.String(v1.DefaultSchedulerName),
+						SchedulerName: ptr.To(v1.DefaultSchedulerName),
 						Plugins:       tt.customPlugins,
 					}},
 				})
@@ -2146,7 +2145,7 @@ func TestPreferNominatedNode(t *testing.T) {
 func TestReadWriteOncePodPreemption(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Filter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
