@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -199,7 +199,12 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 		ginkgo.By("Creating a VolumeAttributesClass")
 		createdVAC, err := vacClient.Create(ctx, initialVAC, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create the requested VolumeAttributesClass")
-		defer vacClient.Delete(ctx, createdVAC.Name, metav1.DeleteOptions{})
+		defer func() {
+			err := vacClient.Delete(ctx, createdVAC.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				framework.Logf("Warning: Failed to delete VolumeAttributesClass %q: %v", createdVAC.Name, err)
+			}
+		}()
 
 		ginkgo.By("Verifying that the vac-protection finalizer is set")
 		vac, err := vacClient.Get(ctx, createdVAC.Name, metav1.GetOptions{})
@@ -209,20 +214,25 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 
 		// Simulate VAC being in use
 		ginkgo.By("Creating a PVC that uses the VolumeAttributesClass")
-		pvc := &corev1.PersistentVolumeClaim{
+		pvc := &v1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "e2e-pvc-",
 			},
-			Spec: corev1.PersistentVolumeClaimSpec{
+			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeAttributesClassName: &createdVAC.Name,
-				AccessModes:               []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources:                 corev1.VolumeResourceRequirements{Requests: corev1.ResourceList{corev1.ResourceStorage: resource.MustParse("1")}},
+				AccessModes:               []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources:                 v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1")}},
 			},
 		}
 		pvcClient := f.ClientSet.CoreV1().PersistentVolumeClaims(f.Namespace.Name)
 		createdPVC, err := pvcClient.Create(ctx, pvc, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "Failed to create PVC using VolumeAttributesClass %q", createdVAC.Name)
-		defer pvcClient.Delete(ctx, createdPVC.Name, metav1.DeleteOptions{})
+		defer func() {
+			err := pvcClient.Delete(ctx, createdPVC.Name, metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				framework.Logf("Warning: Failed to delete PVC %q: %v", createdVAC.Name, err)
+			}
+		}()
 
 		ginkgo.By("Attempting to delete the VolumeAttributesClass should be stuck")
 		err = vacClient.Delete(ctx, createdVAC.Name, metav1.DeleteOptions{})
@@ -258,7 +268,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 				break watchLoop
 			}
 		}
-		gomega.Expect(finalizerRemoved).Should(gomega.BeFalse(), "Finalizer have been removed before deletion")
+		gomega.Expect(finalizerRemoved).Should(gomega.BeFalseBecause("Finalizer was unexpectedly removed before deletion for VolumeAttributesClass %q", createdVAC.Name))
 
 		ginkgo.By(fmt.Sprintf("Deleting PVC %q to make the vac unused", createdPVC.Name))
 		err = pvcClient.Delete(ctx, createdPVC.Name, metav1.DeleteOptions{})
@@ -271,7 +281,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 				return true, nil // PVC is deleted
 			}
 			return false, nil
-		})).WithTimeout(30 * time.Second).Should(gomega.BeTrue())
+		})).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("Expected PVC %q to be deleted, but it still exists", createdPVC.Name))
 		framework.ExpectNoError(err, "Timeout while waiting for PVC %q deletion", createdPVC.Name)
 
 		ginkgo.By(fmt.Sprintf("Confirming final deletion of VolumeAttributesClass %q", createdVAC.Name))
@@ -281,7 +291,7 @@ var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass
 				return true, nil // VAC is deleted
 			}
 			return false, nil
-		})).WithTimeout(30 * time.Second).Should(gomega.BeTrue())
+		})).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("Expected VolumeAttributesClass %q to be deleted, but it still exists", createdVAC.Name))
 
 		framework.ExpectNoError(err, "Timeout while waiting to confirm VolumeAttributesClass %q deletion", createdVAC.Name)
 	})
