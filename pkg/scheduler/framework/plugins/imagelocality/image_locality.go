@@ -23,6 +23,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -92,7 +94,8 @@ func calculatePriority(sumScores int64, numContainers int) int64 {
 	return framework.MaxNodeScore * (sumScores - minThreshold) / (maxThreshold - minThreshold)
 }
 
-// sumImageScores returns the sum of image scores of all the containers that are already on the node.
+// sumImageScores returns the sum of image scores of all the containers, including init containers and
+// imageVolumes specified in the pod's spec, that are already on the node.
 // Each image receives a raw score of its size, scaled by scaledImageScore. The raw scores are later used to calculate
 // the final score.
 func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int) int64 {
@@ -105,6 +108,16 @@ func sumImageScores(nodeInfo *framework.NodeInfo, pod *v1.Pod, totalNumNodes int
 	for _, container := range pod.Spec.Containers {
 		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
+		for _, volume := range pod.Spec.Volumes {
+			if volume.Image == nil {
+				continue
+			}
+			if state, ok := nodeInfo.ImageStates[normalizedImageName(volume.Image.Reference)]; ok {
+				sum += scaledImageScore(state, totalNumNodes)
+			}
 		}
 	}
 	return sum

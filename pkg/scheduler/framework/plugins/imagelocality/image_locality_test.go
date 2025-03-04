@@ -26,7 +26,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -88,6 +91,24 @@ func TestImageLocalityPriority(t *testing.T) {
 			},
 			{
 				Image: "gcr.io/40",
+			},
+		},
+	}
+
+	testImageVolume := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image: "gcr.io/30",
+			},
+		},
+		Volumes: []v1.Volume{
+			{
+				Name: "imageVolume",
+				VolumeSource: v1.VolumeSource{
+					Image: &v1.ImageVolumeSource{
+						Reference: "gcr.io/300",
+					},
+				},
 			},
 		},
 	}
@@ -236,11 +257,12 @@ func TestImageLocalityPriority(t *testing.T) {
 	nodeWithNoImages := v1.NodeStatus{}
 
 	tests := []struct {
-		pod          *v1.Pod
-		pods         []*v1.Pod
-		nodes        []*v1.Node
-		expectedList framework.NodeScoreList
-		name         string
+		featureEnabled bool
+		pod            *v1.Pod
+		pods           []*v1.Pod
+		nodes          []*v1.Node
+		expectedList   framework.NodeScoreList
+		name           string
 	}{
 		{
 			// Pod: gcr.io/40 gcr.io/250
@@ -252,10 +274,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: gcr.io/250:latest 250MB
 			// Score: 100 * (250M/2 - 23M)/(1000M * 2 - 23M) = 5
-			pod:          &v1.Pod{Spec: test40250},
-			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 5}},
-			name:         "two images spread on two nodes, prefer the larger image one",
+			featureEnabled: false,
+			pod:            &v1.Pod{Spec: test40250},
+			nodes:          []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 5}},
+			name:           "two images spread on two nodes, prefer the larger image one",
 		},
 		{
 			// Pod: gcr.io/40 gcr.io/300
@@ -267,10 +290,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: not present
 			// Score: 0
-			pod:          &v1.Pod{Spec: test40300},
-			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 7}, {Name: "node2", Score: 0}},
-			name:         "two images on one node, prefer this node",
+			featureEnabled: false,
+			pod:            &v1.Pod{Spec: test40300},
+			nodes:          []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node25010)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: 7}, {Name: "node2", Score: 0}},
+			name:           "two images on one node, prefer this node",
 		},
 		{
 			// Pod: gcr.io/4000 gcr.io/10
@@ -282,10 +306,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: gcr.io/10:latest 10MB
 			// Score: 0 (10M/2 < 23M, min-threshold)
-			pod:          &v1.Pod{Spec: testMinMax},
-			nodes:        []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
-			name:         "if exceed limit, use limit",
+			featureEnabled: false,
+			pod:            &v1.Pod{Spec: testMinMax},
+			nodes:          []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
+			name:           "if exceed limit, use limit",
 		},
 		{
 			// Pod: gcr.io/4000 gcr.io/10
@@ -301,10 +326,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node3
 			// Image:
 			// Score: 0
-			pod:          &v1.Pod{Spec: testMinMax},
-			nodes:        []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010), makeImageNode("node3", nodeWithNoImages)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 66}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
-			name:         "if exceed limit, use limit (with node which has no images present)",
+			featureEnabled: false,
+			pod:            &v1.Pod{Spec: testMinMax},
+			nodes:          []*v1.Node{makeImageNode("node1", node400030), makeImageNode("node2", node25010), makeImageNode("node3", nodeWithNoImages)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: 66}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
+			name:           "if exceed limit, use limit (with node which has no images present)",
 		},
 		{
 			// Pod: gcr.io/300 gcr.io/600 gcr.io/900
@@ -320,10 +346,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node3
 			// Image:
 			// Score: 0
-			pod:          &v1.Pod{Spec: test300600900},
-			nodes:        []*v1.Node{makeImageNode("node1", node60040900), makeImageNode("node2", node300600900), makeImageNode("node3", nodeWithNoImages)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 36}, {Name: "node3", Score: 0}},
-			name:         "pod with multiple large images, node2 is preferred",
+			featureEnabled: false,
+			pod:            &v1.Pod{Spec: test300600900},
+			nodes:          []*v1.Node{makeImageNode("node1", node60040900), makeImageNode("node2", node300600900), makeImageNode("node3", nodeWithNoImages)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: 32}, {Name: "node2", Score: 36}, {Name: "node3", Score: 0}},
+			name:           "pod with multiple large images, node2 is preferred",
 		},
 		{
 			// Pod: gcr.io/30 gcr.io/40
@@ -335,10 +362,27 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: 100 * (30M - 23M) / (1000M * 2 - 23M) = 0
 			// Score: 0
-			pod:          &v1.Pod{Spec: test3040},
-			nodes:        []*v1.Node{makeImageNode("node1", node203040), makeImageNode("node2", node400030)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
-			name:         "pod with multiple small images",
+			featureEnabled: false,
+			pod:            &v1.Pod{Spec: test3040},
+			nodes:          []*v1.Node{makeImageNode("node1", node203040), makeImageNode("node2", node400030)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
+			name:           "pod with multiple small images",
+		},
+		{
+			// Pod: gcr.io/300 gcr.io/30
+
+			// Node1
+			// Image: gcr.io/300:latest 300MB
+			// Score: 100 * (300M * 1/2 - 23M) / (1000M - 23M) = 12
+
+			// Node2
+			// Image: gcr.io/30:latest 30MB
+			// Score:  100 * (30M - 23M) / (1000M - 23M) = 0
+			featureEnabled: true,
+			pod:            &v1.Pod{Spec: testImageVolume},
+			nodes:          []*v1.Node{makeImageNode("node1", node300600900), makeImageNode("node2", node400030)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: 12}, {Name: "node2", Score: 0}},
+			name:           "pod with ImageVolume",
 		},
 		{
 			// Pod: gcr.io/30  InitContainers: gcr.io/300
@@ -350,10 +394,11 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Node2
 			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB, gcr.io/40:latest 40MB
 			// Score: 100 * (30M * 1/2  - 23M) / (1000M * 2 - 23M) = 0
-			pod:          &v1.Pod{Spec: test30Init300},
-			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node203040)},
-			expectedList: []framework.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
-			name:         "include InitContainers: two images spread on two nodes, prefer the larger image one",
+			featureEnabled: false,
+			pod:            &v1.Pod{Spec: test30Init300},
+			nodes:          []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node203040)},
+			expectedList:   []framework.NodeScore{{Name: "node1", Score: 6}, {Name: "node2", Score: 0}},
+			name:           "include InitContainers: two images spread on two nodes, prefer the larger image one",
 		},
 	}
 
@@ -362,6 +407,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, test.featureEnabled)
 
 			snapshot := cache.NewSnapshot(nil, test.nodes)
 			state := framework.NewCycleState()
