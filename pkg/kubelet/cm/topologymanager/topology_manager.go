@@ -188,7 +188,17 @@ func NewManager(topology []cadvisorapi.Node, topologyPolicyName string, topology
 		scope: scope,
 	}
 
+	manager.initializeMetrics()
+
 	return manager, nil
+}
+
+func (m *manager) initializeMetrics() {
+	// ensure the values exist
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedNUMANode).Add(0)
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Add(0)
 }
 
 func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint {
