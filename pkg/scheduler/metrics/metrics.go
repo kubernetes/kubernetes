@@ -290,6 +290,7 @@ func InitMetrics() {
 
 	PermitWaitDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
+			// TODO: Find an integration test where this metric is logged and verify bucket sizes.
 			Subsystem:      SchedulerSubsystem,
 			Name:           "permit_wait_duration_seconds",
 			Help:           "Duration of waiting on permit.",
@@ -333,6 +334,7 @@ func InitMetrics() {
 
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
+			// TODO: Find an integration test where this metric is logged and verify bucket sizes.
 			Subsystem:      SchedulerSubsystem,
 			Name:           "preemption_goroutines_duration_seconds",
 			Help:           "Duration in seconds for running goroutines for the preemption.",
