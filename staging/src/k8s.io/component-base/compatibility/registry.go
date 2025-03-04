@@ -102,6 +102,9 @@ type componentGlobalsRegistry struct {
 	// When the `--feature-gates` flag is parsed, it would not take effect until Set() is called,
 	// because the emulation version needs to be set before the feature gate is set.
 	featureGatesConfig map[string][]string
+	// featureGatesConfigFlags stores a pointer to the flag value, allowing other commands
+	// to append to the feature gates configuration rather than overwriting it
+	featureGatesConfigFlags *cliflag.ColonSeparatedMultimapStringString
 	// set stores if the Set() function for the registry is already called.
 	set bool
 }
@@ -120,6 +123,7 @@ func (r *componentGlobalsRegistry) Reset() {
 	r.componentGlobals = make(map[string]*ComponentGlobals)
 	r.emulationVersionConfig = nil
 	r.featureGatesConfig = nil
+	r.featureGatesConfigFlags = nil
 	r.set = false
 }
 
@@ -226,11 +230,6 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 			globals.featureGate.Close()
 		}
 	}
-	if r.emulationVersionConfig != nil || r.featureGatesConfig != nil {
-		klog.Warning("calling componentGlobalsRegistry.AddFlags more than once, the registry will be set by the latest flags")
-	}
-	r.emulationVersionConfig = []string{}
-	r.featureGatesConfig = make(map[string][]string)
 
 	fs.StringSliceVar(&r.emulationVersionConfig, "emulated-version", r.emulationVersionConfig, ""+
 		"The versions different components emulate their capabilities (APIs, features, ...) of.\n"+
@@ -238,7 +237,10 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'. Options are:\n"+strings.Join(r.unsafeVersionFlagOptions(true), "\n")+
 		"If the component is not specified, defaults to \"kube\"")
 
-	fs.Var(cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig), "feature-gates", "Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.\n"+
+	if r.featureGatesConfigFlags == nil {
+		r.featureGatesConfigFlags = cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig)
+	}
+	fs.Var(r.featureGatesConfigFlags, "feature-gates", "Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.\n"+
 		"If the component is not specified, defaults to \"kube\". This flag can be repeatedly invoked. For example: --feature-gates 'wardle:featureA=true,wardle:featureB=false' --feature-gates 'kube:featureC=true'"+
 		"Options are:\n"+strings.Join(r.unsafeKnownFeatures(), "\n"))
 }
@@ -415,7 +417,7 @@ func (r *componentGlobalsRegistry) SetEmulationVersionMapping(fromComponent, toC
 		return fmt.Errorf("EmulationVersion from %s to %s already exists", fromComponent, toComponent)
 	}
 	versionMapping[toComponent] = f
-	klog.V(klogLevel).Infof("setting the default EmulationVersion of %s based on mapping from the default EmulationVersion of %s", fromComponent, toComponent)
+	klog.V(klogLevel).Infof("setting the default EmulationVersion of %s based on mapping from the default EmulationVersion of %s", toComponent, fromComponent)
 	defaultFromVersion := r.componentGlobals[fromComponent].effectiveVersion.EmulationVersion()
 	emulationVersions, err := r.getFullEmulationVersionConfig(map[string]*version.Version{fromComponent: defaultFromVersion})
 	if err != nil {
