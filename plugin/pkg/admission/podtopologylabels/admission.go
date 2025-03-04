@@ -38,24 +38,49 @@ import (
 // PluginName is a string with the name of the plugin
 const PluginName = "PodTopologyLabels"
 
+// defaultConfig is the configuration used for the default instantiation of the plugin.
+// This is the configured used by kube-apiserver.
+// It is not exported to avoid any chance of accidentally mutating the variable.
+var defaultConfig = Config{
+	Labels: []string{"topology.k8s.io/zone", "topology.k8s.io/region", "kubernetes.io/hostname"},
+}
+
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(_ io.Reader) (admission.Interface, error) {
-		plugin := NewPodTopologyPlugin()
+		plugin := NewPodTopologyPlugin(defaultConfig)
 		return plugin, nil
 	})
 }
 
+// Config contains configuration for instances of the podtopologylabels admission plugin.
+// This is not exposed as user-facing APIServer configuration, however can be used by
+// platform operators when building custom topology label plugins.
+type Config struct {
+	// Labels is set of explicit label keys to be copied from the Node object onto
+	// pod Binding objects during admission.
+	Labels []string
+	// Domains is a set of label key prefixes used to copy across label values
+	// for all labels with a given domain prefix.
+	// For example, `example.com` would match all labels matching `example.com/*`.
+	// Keys without a domain portion (i.e. those not containing a /) will never match.
+	Domains []string
+	// Suffixes is a set of label key domain suffixes used to copy label values for
+	// all labels of a given subdomain.
+	// This acts as a suffix match on the domain portion of label keys.
+	// If a suffix does not have a leading '.', one will be prepended to avoid
+	// programmer errors with values like `example.com` matching `notexample.com`.
+	// Keys without a domain portion (i.e. those not containing a /) will never match.
+	Suffixes []string
+}
+
 // NewPodTopologyPlugin initializes a Plugin
-func NewPodTopologyPlugin() *Plugin {
+func NewPodTopologyPlugin(c Config) *Plugin {
 	return &Plugin{
-		Handler: admission.NewHandler(admission.Create),
-		// Always copy zone and region labels.
-		labels: sets.New("topology.k8s.io/zone", "topology.k8s.io/region"),
-		// Also support copying arbitrary custom topology labels.
-		domains: sets.New("topology.k8s.io"),
-		// Copy any sub-domains of topology.k8s.io as well.
-		suffixes: sets.New(".topology.k8s.io"),
+		Handler:  admission.NewHandler(admission.Create),
+		labels:   sets.New(c.Labels...),
+		domains:  sets.New(c.Domains...),
+		suffixes: sets.New(c.Suffixes...),
 	}
 }
 

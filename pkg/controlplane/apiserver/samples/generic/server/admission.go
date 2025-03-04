@@ -30,7 +30,6 @@ import (
 	certsigning "k8s.io/kubernetes/plugin/pkg/admission/certificates/signing"
 	certsubjectrestriction "k8s.io/kubernetes/plugin/pkg/admission/certificates/subjectrestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
-	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 )
 
@@ -49,8 +48,6 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		certsubjectrestriction.PluginName,    // CertificateSubjectRestriction
 		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
 		mutatingadmissionpolicy.PluginName,   // MutatingAdmissionPolicy
-		podtopologylabels.PluginName,         // PodTopologyLabels, only active when feature gate PodTopologyLabelsAdmission is enabled.
-		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 	)
 
 	return sets.New(options.AllOrderedPlugins...).Difference(defaultOnPlugins)
