@@ -173,10 +173,6 @@ var (
 
 			// https://issues.redhat.com/browse/OCPBUGS-45273
 			`\[sig-network\] Services should implement NodePort and HealthCheckNodePort correctly when ExternalTrafficPolicy changes`,
-
-			// https://issues.redhat.com/browse/OCPBUGS-45274
-			// https://github.com/kubernetes/kubernetes/issues/129056
-			`\[sig-node\] PodRejectionStatus Kubelet should reject pod when the node didn't have enough resource`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

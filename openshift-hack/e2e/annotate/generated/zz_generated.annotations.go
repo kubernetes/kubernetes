@@ -1757,7 +1757,7 @@ var Annotations = map[string]string{
 
 	"[sig-node] PodOSRejection [NodeConformance] Kubelet [LinuxOnly] should reject pod when the node OS doesn't match pod's OS": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-node] PodRejectionStatus Kubelet should reject pod when the node didn't have enough resource": " [Disabled:RebaseInProgress] [Suite:k8s]",
+	"[sig-node] PodRejectionStatus Kubelet should reject pod when the node didn't have enough resource": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-node] PodTemplates should delete a collection of pod templates [Conformance]": " [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
