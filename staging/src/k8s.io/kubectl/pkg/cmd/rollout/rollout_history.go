@@ -180,7 +180,7 @@ func (o *RolloutHistoryOptions) Run() error {
 				// Ensure the specified revision exists before printing
 				revision, exists := historyInfo[o.Revision]
 				if !exists {
-					return fmt.Errorf("error: unable to find the specified revision")
+					return fmt.Errorf("unable to find the specified revision")
 				}
 
 				printer.PrintObj(revision, o.Out)
