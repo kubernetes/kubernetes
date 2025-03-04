@@ -609,7 +609,7 @@ type ScorePlugin interface {
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
-	Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status)
+	Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeInfo *NodeInfo) (int64, *Status)
 
 	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
 	ScoreExtensions() ScoreExtensions

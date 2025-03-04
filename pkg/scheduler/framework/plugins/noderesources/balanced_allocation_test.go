@@ -399,7 +399,11 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 						t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 					}
 				}
-				hostResult, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, test.nodes[i].Name)
+				nodeInfo, err := snapshot.Get(test.nodes[i].Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", test.nodes[i].Name, err)
+				}
+				hostResult, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}

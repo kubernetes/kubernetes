@@ -458,7 +458,7 @@ func (pl *VolumeBinding) PreScore(ctx context.Context, cs *framework.CycleState,
 }
 
 // Score invoked at the score extension point.
-func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	if pl.scorer == nil {
 		return 0, nil
 	}
@@ -466,6 +466,7 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, po
 	if err != nil {
 		return 0, framework.AsStatus(err)
 	}
+	nodeName := nodeInfo.Node().Name
 	podVolumes, ok := state.podVolumesByNode[nodeName]
 	if !ok {
 		return 0, nil

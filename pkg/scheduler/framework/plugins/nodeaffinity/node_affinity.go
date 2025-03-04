@@ -256,12 +256,7 @@ func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.Cycl
 // Score returns the sum of the weights of the terms that match the Node.
 // Terms came from the Pod .spec.affinity.nodeAffinity and from the plugin's
 // default affinity.
-func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
-
+func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 
 	var count int64
