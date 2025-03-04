@@ -26,6 +26,16 @@
     lockToDefault: true
     preRelease: GA
     version: "1.30"
+- name: AggregatedDiscoveryRemoveBetaType
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
+  - default: true
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.33"
 - name: AllowDNSOnlyNodeCSR
   versionedSpecs:
   - default: true
