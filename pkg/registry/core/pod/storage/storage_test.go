@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -42,8 +43,11 @@ import (
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -676,12 +680,15 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.SetPodTopologyLabels, true)
 	// Suddenly, a wild scheduler appears:
 	_, err = bindingStorage.Create(ctx, "foo", &api.Binding{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   metav1.NamespaceDefault,
 			Name:        "foo",
-			Annotations: map[string]string{"label1": "value1"},
+			Annotations: map[string]string{"annotation1": "value1"},
+			Labels:      map[string]string{"label1": "label-value1"},
 		},
 		Target: api.ObjectReference{Name: "machine"},
 	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -695,8 +702,11 @@ func TestEtcdCreateWithContainersNotFound(t *testing.T) {
 	}
 	pod := obj.(*api.Pod)
 
-	if !(pod.Annotations != nil && pod.Annotations["label1"] == "value1") {
+	if !(pod.Annotations != nil && pod.Annotations["annotation1"] == "value1") {
 		t.Fatalf("Pod annotations don't match the expected: %v", pod.Annotations)
+	}
+	if !(pod.Labels != nil && pod.Labels["label1"] == "label-value1") {
+		t.Fatalf("Pod labels don't match the expected: %v", pod.Labels)
 	}
 }
 
