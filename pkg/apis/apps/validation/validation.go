@@ -134,6 +134,10 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(replicaStartOrdinal), fldPath.Child("ordinals.start"))...)
 	}
 
+	if len(spec.ServiceName) > 0 {
+		allErrs = append(allErrs, apivalidation.ValidateDNS1123Label(spec.ServiceName, fldPath.Child("serviceName"))...)
+	}
+
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
 	} else {

@@ -768,3 +768,35 @@ func TestStatefulSetStartOrdinal(t *testing.T) {
 		})
 	}
 }
+func TestStatefulSetPodSubdomain(t *testing.T) {
+	tCtx, closeFn, rm, informers, c := scSetup(t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(c, "test-pod-subdomain", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	cancel := runControllerAndInformers(tCtx, rm, informers)
+	defer cancel()
+
+	// create a headless service
+	serviceName := "test-service"
+	service := newHeadlessService(ns.Name)
+	service.Name = serviceName
+	createHeadlessService(t, c, service)
+
+	// create StatefulSet with the service name
+	sts := newSTS("sts", ns.Name, 3)
+	sts.Spec.ServiceName = serviceName
+	stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+	sts = stss[0]
+	waitSTSStable(t, c, sts)
+
+	// get pods and verify subdomain
+	labelMap := labelMap()
+	podClient := c.CoreV1().Pods(ns.Name)
+	pods := getPods(t, podClient, labelMap)
+
+	for _, pod := range pods.Items {
+		if pod.Spec.Subdomain != serviceName {
+			t.Errorf("Pod %s has incorrect subdomain: got %s, want %s", pod.Name, pod.Spec.Subdomain, serviceName)
+		}
+	}
+}
