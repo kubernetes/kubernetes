@@ -57,6 +57,28 @@ func TestPodTopologyLabels(t *testing.T) {
 				"topology.k8s.io/region": "region",
 			},
 		},
+		{
+			name: "subdomains of topology.k8s.io are not copied",
+			targetNodeLabels: map[string]string{
+				"sub.topology.k8s.io/zone": "zone",
+				"topology.k8s.io/region":   "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.k8s.io/region": "region",
+			},
+		},
+		{
+			name: "custom topology.k8s.io labels are not copied",
+			targetNodeLabels: map[string]string{
+				"topology.k8s.io/custom": "thing",
+				"topology.k8s.io/zone":   "zone",
+				"topology.k8s.io/region": "region",
+			},
+			expectedPodLabels: map[string]string{
+				"topology.k8s.io/zone":   "zone",
+				"topology.k8s.io/region": "region",
+			},
+		},
 	}
 	// Enable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
 	// on start up and not on each invocation at runtime.
@@ -70,8 +92,10 @@ func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
 		{
 			name: "does nothing when the feature is not enabled",
 			targetNodeLabels: map[string]string{
-				"topology.k8s.io/zone":   "zone",
-				"topology.k8s.io/region": "region",
+				"topology.k8s.io/zone":     "zone",
+				"topology.k8s.io/region":   "region",
+				"topology.k8s.io/custom":   "thing",
+				"sub.topology.k8s.io/zone": "zone",
 			},
 			expectedPodLabels: map[string]string{},
 		},

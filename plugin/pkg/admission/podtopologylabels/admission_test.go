@@ -54,6 +54,7 @@ func TestPodTopology(t *testing.T) {
 			targetNodeLabels: map[string]string{
 				"topology.k8s.io/zone":      "zone1",
 				"topology.k8s.io/region":    "region1",
+				"topology.k8s.io/arbitrary": "something",
 				"non-topology.k8s.io/label": "something", // verify we don't unexpectedly copy non topology.k8s.io labels.
 			},
 			expectedBindingLabels: map[string]string{
@@ -62,21 +63,23 @@ func TestPodTopology(t *testing.T) {
 			},
 		},
 		{
-			name: "copies arbitrary topology labels",
+			name: "does not copy arbitrary topology labels",
 			targetNodeLabels: map[string]string{
+				"topology.k8s.io/zone":      "zone1",
 				"topology.k8s.io/arbitrary": "something",
 			},
 			expectedBindingLabels: map[string]string{
-				"topology.k8s.io/arbitrary": "something",
+				"topology.k8s.io/zone": "zone1",
 			},
 		},
 		{
-			name: "copies topology labels that use a subdomain",
+			name: "does not copy topology labels that use a subdomain",
 			targetNodeLabels: map[string]string{
-				"something.topology.k8s.io/a-thing": "value",
+				"topology.k8s.io/region":   "region1",
+				"sub.topology.k8s.io/zone": "value",
 			},
 			expectedBindingLabels: map[string]string{
-				"something.topology.k8s.io/a-thing": "value",
+				"topology.k8s.io/region": "region1",
 			},
 		},
 		{
@@ -167,7 +170,7 @@ func TestPodTopology(t *testing.T) {
 // newHandlerForTest returns the admission controller configured for testing.
 func newHandlerForTest(c kubernetes.Interface) (*Plugin, informers.SharedInformerFactory, error) {
 	factory := informers.NewSharedInformerFactory(c, 5*time.Minute)
-	handler := NewPodTopologyPlugin()
+	handler := NewPodTopologyPlugin(defaultConfig) // todo: write additional test cases with non-default config.
 	pluginInitializer := genericadmissioninitializer.New(c, nil, factory, nil, feature.DefaultFeatureGate, nil, nil)
 	pluginInitializer.Initialize(handler)
 	return handler, factory, admission.ValidateInitialization(handler)

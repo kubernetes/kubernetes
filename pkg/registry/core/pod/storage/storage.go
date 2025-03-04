@@ -247,20 +247,12 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podUID types
 		for k, v := range annotations {
 			pod.Annotations[k] = v
 		}
+		// Copy all labels from the Binding over to the Pod object, but do not
+		// overwrite any existing labels that have been previously set, to avoid
+		// changing any existing behaviour for pods that may be defined with a
+		// template by users and created by higher-level controllers.
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodTopologyLabelsAdmission) {
-			// If any labels are present on the Binding, copy them across to the Pod.
-			if len(labels) > 0 {
-				if pod.Labels == nil {
-					pod.Labels = make(map[string]string)
-				}
-				for k, v := range labels {
-					if _, ok := pod.Labels[k]; ok {
-						// don't overwrite labels that are already present on the Pod
-						continue
-					}
-					pod.Labels[k] = v
-				}
-			}
+			copyLabelsWithoutOverwriting(pod, labels)
 		}
 		podutil.UpdatePodCondition(&pod.Status, &api.PodCondition{
 			Type:   api.PodScheduled,
@@ -270,6 +262,24 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podUID types
 		return pod, nil
 	}), dryRun, nil)
 	return finalPod, err
+}
+
+func copyLabelsWithoutOverwriting(pod *api.Pod, labels map[string]string) {
+	if len(labels) == 0 {
+		// nothing to do
+		return
+	}
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	// Iterate over the binding's labels and copy them across to the Pod.
+	for k, v := range labels {
+		if _, ok := pod.Labels[k]; ok {
+			// don't overwrite labels that are already present on the Pod
+			continue
+		}
+		pod.Labels[k] = v
+	}
 }
 
 // assignPod assigns the given pod to the given machine.
