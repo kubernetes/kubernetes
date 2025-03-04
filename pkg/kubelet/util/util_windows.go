@@ -25,6 +25,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 const npipeProtocol = "npipe"
@@ -55,7 +57,7 @@ func LocalEndpoint(path, file string) (string, error) {
 var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
 
 // GetBootTime returns the time at which the machine was started, truncated to the nearest second
-func GetBootTime() (time.Time, error) {
+func GetBootTime(logger klog.Logger) (time.Time, error) {
 	currentTime := time.Now()
 	output, _, err := tickCount.Call()
 	if errno, ok := err.(syscall.Errno); !ok || errno != 0 {

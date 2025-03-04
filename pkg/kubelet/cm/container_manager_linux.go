@@ -209,7 +209,10 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	isSwapOn, err := swap.IsSwapOn()
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
+	isSwapOn, err := swap.IsSwapOn(logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine if swap is on: %w", err)
 	}
@@ -219,7 +222,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, fmt.Errorf("running with swap on is not supported, please disable swap or set --fail-swap-on flag to false")
 		}
 
-		if !swap.IsTmpfsNoswapOptionSupported(mountUtil, nodeConfig.KubeletRootDir) {
+		if !swap.IsTmpfsNoswapOptionSupported(logger, mountUtil, nodeConfig.KubeletRootDir) {
 			nodeRef := nodeRefFromNode(string(nodeConfig.NodeName))
 			recorder.Event(nodeRef, v1.EventTypeWarning, events.PossibleMemoryBackedVolumesOnDisk,
 				"The tmpfs noswap option is not supported. Memory-backed volumes (e.g. secrets, emptyDirs, etc.) "+
