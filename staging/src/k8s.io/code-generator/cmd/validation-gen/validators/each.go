@@ -250,8 +250,8 @@ func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Typ
 
 // ForEachVal returns a validation that applies a function to each element of
 // a list or map.
-func ForEachVal(fldPath *field.Path, t *types.Type, fn *FunctionGen) (Validations, error) {
-	return globalEachVal.getValidations(fldPath, t, Validations{Functions: []*FunctionGen{fn}})
+func ForEachVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
+	return globalEachVal.getValidations(fldPath, t, Validations{Functions: []FunctionGen{fn}})
 }
 
 func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
@@ -377,8 +377,8 @@ func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Valida
 
 // ForEachKey returns a validation that applies a function to each key of
 // a map.
-func ForEachKey(_ *field.Path, t *types.Type, fn *FunctionGen) (Validations, error) {
-	return globalEachKey.getValidations(t, Validations{Functions: []*FunctionGen{fn}})
+func ForEachKey(_ *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
+	return globalEachKey.getValidations(t, Validations{Functions: []FunctionGen{fn}})
 }
 
 func (ektv eachKeyTagValidator) Docs() TagDoc {

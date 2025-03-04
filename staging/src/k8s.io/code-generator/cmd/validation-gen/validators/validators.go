@@ -228,7 +228,7 @@ type Validations struct {
 	//        Args[N] <Args[N]Type>)
 	//
 	// The standard arguments are not included in the FunctionGen.Args list.
-	Functions []*FunctionGen
+	Functions []FunctionGen
 
 	// Variables holds any variables which must be generated to perform
 	// validation.  Variables are not permitted in every context.
@@ -259,7 +259,7 @@ func (v *Validations) Len() int {
 	return len(v.Functions) + len(v.Variables) + len(v.Comments)
 }
 
-func (v *Validations) AddFunction(f *FunctionGen) {
+func (v *Validations) AddFunction(f FunctionGen) {
 	v.Functions = append(v.Functions, f)
 }
 
@@ -336,12 +336,12 @@ type VariableGen interface {
 	Var() PrivateVar
 
 	// Init generates the function call that the variable is assigned to.
-	Init() *FunctionGen
+	Init() FunctionGen
 }
 
 // Function creates a FunctionGen for a given function name and extraArgs.
-func Function(tagName string, flags FunctionFlags, function types.Name, extraArgs ...any) *FunctionGen {
-	return &FunctionGen{
+func Function(tagName string, flags FunctionFlags, function types.Name, extraArgs ...any) FunctionGen {
+	return FunctionGen{
 		TagName:  tagName,
 		Flags:    flags,
 		Function: function,
@@ -386,26 +386,26 @@ type FunctionGen struct {
 	Comments []string
 }
 
-// WithTypeArgs sets the type arguments for a FunctionGen.
-func (fg *FunctionGen) WithTypeArgs(typeArgs ...types.Name) *FunctionGen {
+// WithTypeArgs returns a derived FunctionGen with type arguments.
+func (fg FunctionGen) WithTypeArgs(typeArgs ...types.Name) FunctionGen {
 	fg.TypeArgs = typeArgs
 	return fg
 }
 
-// WithConditions sets the conditions for a FunctionGen.
-func (fg *FunctionGen) WithConditions(conditions Conditions) *FunctionGen {
+// WithConditions returns a derived FunctionGen with conditions.
+func (fg FunctionGen) WithConditions(conditions Conditions) FunctionGen {
 	fg.Conditions = conditions
 	return fg
 }
 
-// AddComment adds a comment to a FunctionGen.
-func (fg *FunctionGen) AddComment(comment string) *FunctionGen {
+// WithComment returns a new FunctionGen with a comment.
+func (fg FunctionGen) WithComment(comment string) FunctionGen {
 	fg.Comments = append(fg.Comments, comment)
 	return fg
 }
 
 // Variable creates a VariableGen for a given function name and extraArgs.
-func Variable(variable PrivateVar, init *FunctionGen) VariableGen {
+func Variable(variable PrivateVar, init FunctionGen) VariableGen {
 	return &variableGen{
 		variable: variable,
 		init:     init,
@@ -414,7 +414,7 @@ func Variable(variable PrivateVar, init *FunctionGen) VariableGen {
 
 type variableGen struct {
 	variable PrivateVar
-	init     *FunctionGen
+	init     FunctionGen
 }
 
 func (v variableGen) TagName() string {
@@ -425,7 +425,7 @@ func (v variableGen) Var() PrivateVar {
 	return v.variable
 }
 
-func (v variableGen) Init() *FunctionGen {
+func (v variableGen) Init() FunctionGen {
 	return v.init
 }
 
@@ -433,7 +433,7 @@ func (v variableGen) Init() *FunctionGen {
 // regular validation function (op, fldPath, obj, oldObj) and calls another
 // validation function with the same signature, plus extra args if needed.
 type WrapperFunction struct {
-	Function *FunctionGen
+	Function FunctionGen
 	ObjType  *types.Type
 }
 

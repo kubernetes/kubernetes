@@ -1093,11 +1093,11 @@ func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typ
 // Emitted code assumes that the value in question is always a pair of nilable
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
-func emitCallsToValidators(c *generator.Context, validations []*validators.FunctionGen, sw *generator.SnippetWriter) {
+func emitCallsToValidators(c *generator.Context, validations []validators.FunctionGen, sw *generator.SnippetWriter) {
 	// Helper func
-	sort := func(in []*validators.FunctionGen) []*validators.FunctionGen {
-		sooner := make([]*validators.FunctionGen, 0, len(in))
-		later := make([]*validators.FunctionGen, 0, len(in))
+	sort := func(in []validators.FunctionGen) []validators.FunctionGen {
+		sooner := make([]validators.FunctionGen, 0, len(in))
+		later := make([]validators.FunctionGen, 0, len(in))
 
 		for _, fg := range in {
 			isShortCircuit := (fg.Flags.IsSet(validators.ShortCircuit))
