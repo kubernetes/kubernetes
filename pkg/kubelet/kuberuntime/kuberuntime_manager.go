@@ -692,12 +692,15 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 		enforceCPULimits = false
 		klog.V(2).InfoS("Disabled CFS quota", "pod", klog.KObj(pod))
 	}
-	podResources := cm.ResourceConfigForPod(pod, enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
+	cpuPeriod := uint64((m.cpuCFSQuotaPeriod.Duration) / time.Microsecond)
+	podResources := cm.ResourceConfigForPod(pod, enforceCPULimits, cpuPeriod, false)
 	if podResources == nil {
 		klog.ErrorS(nil, "Unable to get resource configuration", "pod", pod.Name)
 		result.Fail(fmt.Errorf("unable to get resource configuration processing resize for pod %s", pod.Name))
 		return
 	}
+
+	const maxValue = int64(-1)
 	setPodCgroupConfig := func(rName v1.ResourceName, setLimitValue bool) error {
 		var err error
 		switch rName {
@@ -732,7 +735,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 	resizeContainers := func(rName v1.ResourceName, currPodCgLimValue, newPodCgLimValue, currPodCgReqValue, newPodCgReqValue int64) error {
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
-		if newPodCgLimValue > currPodCgLimValue {
+		if newPodCgLimValue > currPodCgLimValue || (newPodCgLimValue == maxValue && currPodCgLimValue != maxValue) {
 			if err = setPodCgroupConfig(rName, true); err != nil {
 				return err
 			}
@@ -754,13 +757,14 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 				return err
 			}
 		}
-		if newPodCgLimValue < currPodCgLimValue {
+		if newPodCgLimValue < currPodCgLimValue && newPodCgLimValue != maxValue {
 			if err = setPodCgroupConfig(rName, true); err != nil {
 				return err
 			}
 		}
 		return err
 	}
+
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
 		currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 		if err != nil {
@@ -781,9 +785,8 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 				return
 			}
 		} else {
-			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
-			// TODO(#128675): This does not support removing limits.
-			podResources.Memory = currentPodMemoryConfig.Memory
+			value := maxValue
+			podResources.Memory = &value
 		}
 		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
 			result.Fail(errResize)
@@ -804,11 +807,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 			return
 		}
 
-		// Default pod CPUQuota to the current CPUQuota if no limit is set to prevent the pod limit
-		// from updating.
-		// TODO(#128675): This does not support removing limits.
 		if podResources.CPUQuota == nil {
-			podResources.CPUQuota = currentPodCpuConfig.CPUQuota
+			val := maxValue
+			podResources.CPUQuota = &val
+			// CPUPeriod is not set in podResources by ResourceConfigForPod() when no limit is configured.
+			// This is necessary for update the CPU limit in the runtime.
+			podResources.CPUPeriod = &cpuPeriod
 		}
 		if errResize := resizeContainers(v1.ResourceCPU, *currentPodCpuConfig.CPUQuota, *podResources.CPUQuota,
 			int64(*currentPodCpuConfig.CPUShares), int64(*podResources.CPUShares)); errResize != nil {
