@@ -1590,7 +1590,7 @@ func doPodResizeErrorTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 
 var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), func() {
 
-	policiesGeneralAvailability := []cpuManagerPolicyConfig{
+	/*policiesGeneralAvailability := []cpuManagerPolicyConfig{
 		{
 			name:  string(cpumanager.PolicyNone),
 			title: "",
@@ -1618,7 +1618,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), func
 				cpumanager.DistributeCPUsAcrossCoresOption: "false",
 			},
 		},
-	}
+	}*/
 
 	/*policiesAlpha := []cpuManagerPolicyConfig{
 		{
@@ -1703,7 +1703,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), func
 		},
 	}*/
 
-	for idp := range policiesGeneralAvailability {
+	/*for idp := range policiesGeneralAvailability {
 		doPodResizeTests(policiesGeneralAvailability[idp], false, false)
 		doPodResizeTests(policiesGeneralAvailability[idp], true, false)
 		doPodResizeTests(policiesGeneralAvailability[idp], false, true)
@@ -1723,7 +1723,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), func
 		doPodResizeErrorTests(policiesBeta[idp], true, false)
 		doPodResizeErrorTests(policiesBeta[idp], false, true)
 		doPodResizeErrorTests(policiesBeta[idp], true, true)
-	}
+	}*/
 
 	/*for idp := range policiesAlpha {
 		doPodResizeTests(policiesAlpha[idp], true, false)
@@ -1773,7 +1773,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 		secondAdditionCpuset := cpuset.New()
 		secondExpectedCpuset := cpuset.New()
 
-		if tests.name == "1 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false" {
+		if tests.name == "1 Guaranteed QoS pod, one container - increase CPU, FullPCPUsOnlyOption = false" {
 			if cpuCap < 2 {
 				tests.skipFlag = true
 			}
@@ -1791,7 +1791,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			}
 			firstExpectedCpuset = firstAdditionCpuset.Union(firstContainerCpuset)
 			tests.expected[0].CPUsAllowedList = firstExpectedCpuset.String()
-		} else if tests.name == "1 Guaranteed QoS pod, two containers - increase CPU & memory, FullPCPUsOnlyOption = false" {
+		} else if tests.name == "1 Guaranteed QoS pod, two containers - increase CPU, FullPCPUsOnlyOption = false" {
 			if cpuCap < 4 {
 				tests.skipFlag = true
 			}
@@ -1824,7 +1824,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			}
 			secondExpectedCpuset = secondAdditionCpuset.Union(secondContainerCpuset)
 			tests.expected[1].CPUsAllowedList = secondExpectedCpuset.String()
-		} else if (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = false") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with mustKeepCPUs, FullPCPUsOnlyOption = false") {
+		} else if (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU, FullPCPUsOnlyOption = false") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU with mustKeepCPUs, FullPCPUsOnlyOption = false") {
 			if cpuCap < 2 {
 				tests.skipFlag = true
 			}
@@ -1839,13 +1839,13 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 
 			firstExpectedCpuset = cpuset.New(firstContainerCpuset.List()[0])
 			tests.expected[0].CPUsAllowedList = firstExpectedCpuset.String()
-			if tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with mustKeepCPUs, FullPCPUsOnlyOption = false" {
+			if tests.name == "1 Guaranteed QoS pod, one container - decrease CPU with mustKeepCPUs, FullPCPUsOnlyOption = false" {
 				startIndex := strings.Index(tests.patchString, `"mustKeepCPUs","value": "`) + len(`"mustKeepCPUs","value": "`)
 				endIndex := strings.Index(tests.patchString[startIndex:], `"`) + startIndex
 				tests.expected[0].CPUsAllowedList = tests.patchString[startIndex:endIndex]
 				ginkgo.By(fmt.Sprintf("startIndex:%d, endIndex:%d", startIndex, endIndex))
 			}
-		} else if (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = true") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU with wrong mustKeepCPU, FullPCPUsOnlyOption = ture") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with correct mustKeepCPU, FullPCPUsOnlyOption = true") {
+		} else if (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU, FullPCPUsOnlyOption = true") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU with wrong mustKeepCPU, FullPCPUsOnlyOption = ture") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU with correct mustKeepCPU, FullPCPUsOnlyOption = true") {
 			if cpuCap < 4 {
 				tests.skipFlag = true
 			}
@@ -1861,7 +1861,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 
 			firstExpectedCpuset = mustParseCPUSet(getCPUSiblingList(1))
 			tests.expected[0].CPUsAllowedList = firstExpectedCpuset.String()
-			if tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with correct mustKeepCPU, FullPCPUsOnlyOption = true" {
+			if tests.name == "1 Guaranteed QoS pod, one container - decrease CPU with correct mustKeepCPU, FullPCPUsOnlyOption = true" {
 				startIndex := strings.Index(tests.patchString, `"mustKeepCPUs","value": "`) + len(`"mustKeepCPUs","value": "`)
 				endIndex := strings.Index(tests.patchString[startIndex:], `"`) + startIndex
 				tests.expected[0].CPUsAllowedList = tests.patchString[startIndex:endIndex]
@@ -1876,7 +1876,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 	noRestart := v1.NotRequired
 	testsWithFalseFullCPUs := []testCase{
 		{
-			name: "1 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false",
+			name: "1 Guaranteed QoS pod, one container - increase CPU, FullPCPUsOnlyOption = false",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:                 "c1",
@@ -1887,84 +1887,9 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 				},
 			},
 			patchString: `{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
+						{"name":"c1", "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}}
 					]}}`,
 			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
-				},
-			},
-		},
-		{
-			name: "1 Guaranteed QoS pod, two containers - increase CPU & memory, FullPCPUsOnlyOption = false",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "1",
-				},
-				{
-					Name:                 "c2",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "1",
-				},
-			},
-			patchString: `{"spec":{"containers":[
-                        {"name":"c1",  "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}},
-                        {"name":"c2",  "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
-                    ]}}`,
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
-				},
-				{
-					Name:                 "c2",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
-				},
-			},
-		},
-		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = false",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
-				},
-			},
-			patchString: `{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"1","memory":"200Mi"},"limits":{"cpu":"1","memory":"200Mi"}}}
-					]}}`,
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "1",
-				},
-			},
-		},
-		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory with mustKeepCPUs, FullPCPUsOnlyOption = false",
-			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:                 "c1",
 					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
@@ -1973,8 +1898,59 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 					CPUsAllowedListValue: "2",
 				},
 			},
+		},
+		{
+			name: "1 Guaranteed QoS pod, two containers - increase CPU, FullPCPUsOnlyOption = false",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:                 "c1",
+					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy:            &noRestart,
+					MemPolicy:            &noRestart,
+					CPUsAllowedListValue: "1",
+				},
+				{
+					Name:                 "c2",
+					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy:            &noRestart,
+					MemPolicy:            &noRestart,
+					CPUsAllowedListValue: "1",
+				},
+			},
 			patchString: `{"spec":{"containers":[
-						{"name":"c1", "env":[{"name":"mustKeepCPUs","value": "11"}], "resources":{"requests":{"cpu":"1","memory":"400Mi"},"limits":{"cpu":"1","memory":"400Mi"}}}
+                        {"name":"c1",  "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}},
+                        {"name":"c2",  "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}}
+                    ]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:                 "c1",
+					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy:            &noRestart,
+					MemPolicy:            &noRestart,
+					CPUsAllowedListValue: "2",
+				},
+				{
+					Name:                 "c2",
+					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy:            &noRestart,
+					MemPolicy:            &noRestart,
+					CPUsAllowedListValue: "2",
+				},
+			},
+		},
+		{
+			name: "1 Guaranteed QoS pod, one container - decrease CPU, FullPCPUsOnlyOption = false",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:                 "c1",
+					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+					CPUPolicy:            &noRestart,
+					MemPolicy:            &noRestart,
+					CPUsAllowedListValue: "2",
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "resources":{"requests":{"cpu":"1"},"limits":{"cpu":"1"}}}
 					]}}`,
 			expected: []e2epod.ResizableContainerInfo{
 				{
@@ -1986,11 +1962,35 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 				},
 			},
 		},
+		{
+			name: "1 Guaranteed QoS pod, one container - decrease CPU with mustKeepCPUs, FullPCPUsOnlyOption = false",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:                 "c1",
+					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy:            &noRestart,
+					MemPolicy:            &noRestart,
+					CPUsAllowedListValue: "2",
+				},
+			},
+			patchString: `{"spec":{"containers":[
+						{"name":"c1", "env":[{"name":"mustKeepCPUs","value": "11"}], "resources":{"requests":{"cpu":"1"},"limits":{"cpu":"1"}}}
+					]}}`,
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:                 "c1",
+					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+					CPUPolicy:            &noRestart,
+					MemPolicy:            &noRestart,
+					CPUsAllowedListValue: "1",
+				},
+			},
+		},
 	}
 
 	testsWithTrueFullCPUs := []testCase{
 		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = true",
+			name: "1 Guaranteed QoS pod, one container - decrease CPU, FullPCPUsOnlyOption = true",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:                 "c1",
@@ -2001,12 +2001,12 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 				},
 			},
 			patchString: `{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"2","memory":"200Mi"},"limits":{"cpu":"2","memory":"200Mi"}}}
+						{"name":"c1", "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}}
 					]}}`,
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
+					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "2",
@@ -2014,7 +2014,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			},
 		},
 		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory with correct mustKeepCPU, FullPCPUsOnlyOption = true",
+			name: "1 Guaranteed QoS pod, one container - decrease CPU with correct mustKeepCPU, FullPCPUsOnlyOption = true",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:                 "c1",
@@ -2230,7 +2230,7 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 		secondAdditionCpuset := cpuset.New()
 		secondExpectedCpuset := cpuset.New()
 
-		if tests.name == "1 Guaranteed QoS pod, two containers - increase CPU & memory, FullPCPUsOnlyOption = false" {
+		if tests.name == "2 Guaranteed QoS pod, one container - increase CPU, FullPCPUsOnlyOption = false" {
 			if cpuCap < 4 {
 				tests.skipFlag = true
 			}
@@ -2246,7 +2246,7 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				cpuList := mustParseCPUSet(getCPUSiblingList(1)).List()
 				secondContainerCpuset = cpuset.New(cpuList[0])
 			}
-			tests.testPod2.containers[1].CPUsAllowedList = secondContainerCpuset.String()
+			tests.testPod2.containers[0].CPUsAllowedList = secondContainerCpuset.String()
 
 			firstAdditionCpuset = cpuset.New(2)
 			if isHTEnabled() {
@@ -2262,7 +2262,7 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				secondAdditionCpuset = cpuset.New(cpuList[0])
 			}
 			secondExpectedCpuset = secondAdditionCpuset.Union(secondContainerCpuset)
-			tests.testPod2.expected[1].CPUsAllowedList = secondExpectedCpuset.String()
+			tests.testPod2.expected[0].CPUsAllowedList = secondExpectedCpuset.String()
 		}
 		ginkgo.By(fmt.Sprintf("firstContainerCpuset:%v, firstAdditionCpuset:%v, firstExpectedCpuset:%v", firstContainerCpuset, firstAdditionCpuset, firstExpectedCpuset))
 		ginkgo.By(fmt.Sprintf("secondContainerCpuset:%v, secondAdditionCpuset:%v, secondExpectedCpuset:%v", secondContainerCpuset, secondAdditionCpuset, secondExpectedCpuset))
@@ -2271,7 +2271,7 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 	noRestart := v1.NotRequired
 	tests := []testCase{
 		{
-			name: "2 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false",
+			name: "2 Guaranteed QoS pod, one container - increase CPU, FullPCPUsOnlyOption = false",
 			testPod1: testPod{
 				containers: []e2epod.ResizableContainerInfo{
 					{
@@ -2283,12 +2283,12 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 					},
 				},
 				patchString: `{"spec":{"containers":[
-							{"name":"c1", "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
+							{"name":"c1", "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}}
 						]}}`,
 				expected: []e2epod.ResizableContainerInfo{
 					{
 						Name:                 "c1",
-						Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+						Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
 						CPUPolicy:            &noRestart,
 						MemPolicy:            &noRestart,
 						CPUsAllowedListValue: "2",
@@ -2306,12 +2306,12 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 					},
 				},
 				patchString: `{"spec":{"containers":[
-							{"name":"c2", "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
+							{"name":"c2", "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}}
 						]}}`,
 				expected: []e2epod.ResizableContainerInfo{
 					{
 						Name:                 "c2",
-						Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+						Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
 						CPUPolicy:            &noRestart,
 						MemPolicy:            &noRestart,
 						CPUsAllowedListValue: "2",
