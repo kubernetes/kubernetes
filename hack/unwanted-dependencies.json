@@ -27,7 +27,7 @@
       "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/golang/protobuf": "replace with google.golang.org/protobuf",
       "github.com/golang/groupcache": "unmaintained",
-      "github.com/google/gofuzz": "unmaintained, archive mode",
+      "github.com/google/gofuzz": "unmaintained, use sigs.k8s.io/randfill",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
@@ -183,17 +183,7 @@
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ],
       "github.com/google/gofuzz": [
-        "github.com/json-iterator/go",
-        "k8s.io/apiextensions-apiserver",
-        "k8s.io/apimachinery",
-        "k8s.io/apiserver",
-        "k8s.io/client-go",
-        "k8s.io/code-generator",
-        "k8s.io/kube-aggregator",
-        "k8s.io/kube-openapi",
-        "k8s.io/kubernetes",
-        "k8s.io/sample-apiserver",
-        "sigs.k8s.io/structured-merge-diff/v4"
+        "github.com/json-iterator/go"
       ],
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
@@ -284,7 +274,6 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
-      "github.com/google/gofuzz",
       "github.com/google/shlex",
       "github.com/gregjones/httpcache",
       "github.com/grpc-ecosystem/go-grpc-prometheus",
