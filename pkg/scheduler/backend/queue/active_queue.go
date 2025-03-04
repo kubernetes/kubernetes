@@ -61,14 +61,55 @@ type activeQueuer interface {
 // underLock() method should be used to protect these methods.
 type unlockedActiveQueuer interface {
 	unlockedActiveQueueReader
-	AddOrUpdate(pInfo *framework.QueuedPodInfo)
+	// add adds a new pod to the activeQ.
+	// The event should show which event triggered this addition and is used for the metric recording.
+	// This method should be called in activeQueue.underLock().
+	add(pInfo *framework.QueuedPodInfo, event string)
 }
 
 // unlockedActiveQueueReader defines activeQ read-only methods that are not protected by the lock itself.
 // underLock() or underRLock() method should be used to protect these methods.
 type unlockedActiveQueueReader interface {
-	Get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
-	Has(pInfo *framework.QueuedPodInfo) bool
+	// get returns the pod matching pInfo inside the activeQ.
+	// Returns false if the pInfo doesn't exist in the queue.
+	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+	get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
+	// has returns if pInfo exists in the queue.
+	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+	has(pInfo *framework.QueuedPodInfo) bool
+}
+
+// unlockedActiveQueue defines activeQ methods that are not protected by the lock itself.
+// activeQueue.underLock() or activeQueue.underRLock() method should be used to protect these methods.
+type unlockedActiveQueue struct {
+	queue *heap.Heap[*framework.QueuedPodInfo]
+}
+
+func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo]) *unlockedActiveQueue {
+	return &unlockedActiveQueue{
+		queue: queue,
+	}
+}
+
+// add adds a new pod to the activeQ.
+// The event should show which event triggered this addition and is used for the metric recording.
+// This method should be called in activeQueue.underLock().
+func (uaq *unlockedActiveQueue) add(pInfo *framework.QueuedPodInfo, event string) {
+	uaq.queue.AddOrUpdate(pInfo)
+	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
+}
+
+// get returns the pod matching pInfo inside the activeQ.
+// Returns false if the pInfo doesn't exist in the queue.
+// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+func (uaq *unlockedActiveQueue) get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool) {
+	return uaq.queue.Get(pInfo)
+}
+
+// has returns if pInfo exists in the queue.
+// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+func (uaq *unlockedActiveQueue) has(pInfo *framework.QueuedPodInfo) bool {
+	return uaq.queue.Has(pInfo)
 }
 
 // activeQueue implements activeQueuer. All of the fields have to be protected using the lock.
@@ -84,6 +125,10 @@ type activeQueue struct {
 	// activeQ is heap structure that scheduler actively looks at to find pods to
 	// schedule. Head of heap is the highest priority pod.
 	queue *heap.Heap[*framework.QueuedPodInfo]
+
+	// unlockedQueue is a wrapper of queue providing methods that are not locked themselves
+	// and can be used in the underLock() or underRLock().
+	unlockedQueue *unlockedActiveQueue
 
 	// cond is a condition that is notified when the pod is added to activeQ.
 	// It is used with lock.
@@ -134,6 +179,7 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 		inFlightEvents:               list.New(),
 		isSchedulingQueueHintEnabled: isSchedulingQueueHintEnabled,
 		metricsRecorder:              metricRecorder,
+		unlockedQueue:                newUnlockedActiveQueue(queue),
 	}
 	aq.cond.L = &aq.lock
 
@@ -146,7 +192,7 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 func (aq *activeQueue) underLock(fn func(unlockedActiveQ unlockedActiveQueuer)) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
-	fn(aq.queue)
+	fn(aq.unlockedQueue)
 }
 
 // underLock runs the fn function under the lock.RLock.
@@ -155,7 +201,7 @@ func (aq *activeQueue) underLock(fn func(unlockedActiveQ unlockedActiveQueuer)) 
 func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueueReader)) {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
-	fn(aq.queue)
+	fn(aq.unlockedQueue)
 }
 
 // update updates the pod in activeQ if oldPodInfo is already in the queue.
