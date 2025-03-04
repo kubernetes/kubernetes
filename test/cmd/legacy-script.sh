@@ -535,6 +535,14 @@ runTests() {
     record_command run_explain_crd_with_additional_properties_tests
   fi
 
+  #################
+  # Explain depth #
+  #################
+
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+    record_command run_explain_crd_with_depth_tests
+  fi
+
   #########################
   # Assert categories     #
   #########################
