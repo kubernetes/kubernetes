@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog/v2"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -386,7 +387,7 @@ func verifyContainerRestarts(gotStatuses []v1.ContainerStatus, wantStatuses []v1
 	return utilerrors.NewAggregate(errs)
 }
 
-func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *PodClient, pod *v1.Pod) *v1.Pod {
+func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	// Wait for resize to complete.
 	framework.ExpectNoError(WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "resize status cleared", f.Timeouts.PodStart,
@@ -395,7 +396,14 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 				// This is a terminal resize state
 				return false, fmt.Errorf("resize is infeasible")
 			}
-			return pod.Status.Resize == "", nil
+			// TODO: Replace this check with a combination of checking the status.observedGeneration
+			// and the resize status when available.
+			if resourceErrs := VerifyPodStatusResources(pod, expectedContainers); resourceErrs != nil {
+				klog.Errorf("container status resources don't match expected: %v", formatErrors(resourceErrs))
+				return false, nil
+			}
+
+			return true, nil
 		}), "pod should finish resizing")
 
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
@@ -406,19 +414,6 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
 
-	// Put each error on a new line for readability.
-	formatErrors := func(err error) error {
-		var agg utilerrors.Aggregate
-		if !errors.As(err, &agg) {
-			return err
-		}
-
-		errStrings := make([]string, len(agg.Errors()))
-		for i, err := range agg.Errors() {
-			errStrings[i] = err.Error()
-		}
-		return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
-	}
 	// Verify Pod Containers Cgroup Values
 	var errs []error
 	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers); cgroupErrs != nil {
@@ -459,4 +454,18 @@ func ResizeContainerPatch(containers []ResizableContainerInfo) (string, error) {
 	}
 
 	return string(patchBytes), nil
+}
+
+func formatErrors(err error) error {
+	// Put each error on a new line for readability.
+	var agg utilerrors.Aggregate
+	if !errors.As(err, &agg) {
+		return err
+	}
+
+	errStrings := make([]string, len(agg.Errors()))
+	for i, err := range agg.Errors() {
+		errStrings[i] = err.Error()
+	}
+	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
 }
