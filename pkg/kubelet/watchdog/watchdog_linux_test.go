@@ -20,16 +20,16 @@ limitations under the License.
 package watchdog
 
 import (
-	"bytes"
 	"errors"
-	"flag"
+	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
 
 // Mock syncLoopHealthChecker
@@ -83,8 +83,8 @@ func TestNewHealthChecker(t *testing.T) {
 				enabledVal: tt.mockEnabled,
 				enabledErr: tt.mockErr,
 			}
-
-			_, err := NewHealthChecker(&mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
+			logger, _ := ktesting.NewTestContext(t)
+			_, err := NewHealthChecker(logger, &mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -139,9 +139,8 @@ func TestHealthCheckerStart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Capture logs
-			logBuffer := setupLogging(t)
-
+			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			logger := tCtx.Logger()
 			// Mock SdWatchdogEnabled to return a valid value
 			mockClient := &mockWatchdogClient{
 				enabledVal: tt.enabledVal,
@@ -150,20 +149,22 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Create a healthChecker
-			hc, err := NewHealthChecker(&mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, WithWatchdogClient(mockClient))
+			hc, err := NewHealthChecker(logger, &mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, WithWatchdogClient(mockClient))
 			if err != nil {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
 			}
 
 			// Start the health checker
-			hc.Start()
+			hc.Start(tCtx)
 
 			// Wait for a short period to allow the health check to run
 			time.Sleep(2 * interval)
 
 			// Check logs to verify the health check ran
-			klog.Flush()
-			logs := logBuffer.String()
+			logs, err := retrieveTestLoggerBuffer(logger)
+			if err != nil {
+				t.Fatalf("retrieveTestLoggerBuffer() failed: %v", err)
+			}
 			for _, expectedLog := range tt.expectedLogs {
 				if !strings.Contains(logs, expectedLog) {
 					t.Errorf("Expected log '%s' not found in logs: %s", expectedLog, logs)
@@ -173,37 +174,15 @@ func TestHealthCheckerStart(t *testing.T) {
 	}
 }
 
-// threadSafeBuffer is a thread-safe wrapper around bytes.Buffer.
-type threadSafeBuffer struct {
-	buffer bytes.Buffer
-	mu     sync.Mutex
-}
-
-func (b *threadSafeBuffer) Write(p []byte) (n int, err error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buffer.Write(p)
-}
-
-func (b *threadSafeBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buffer.String()
-}
-
-// setupLogging sets up logging to capture output using a thread-safe buffer.
-func setupLogging(t *testing.T) *threadSafeBuffer {
-	flags := &flag.FlagSet{}
-	klog.InitFlags(flags)
-	if err := flags.Set("v", "5"); err != nil {
-		t.Fatal(err)
+// retrieveTestLoggerBuffer extracts and returns the log buffer content as a string from the given test context.
+func retrieveTestLoggerBuffer(logger klog.Logger) (string, error) {
+	// Retrieve the logger's output destination (sink)
+	sink := logger.GetSink()
+	underlyingSink, ok := sink.(ktesting.Underlier)
+	if !ok {
+		return "", fmt.Errorf("failed to cast sink to Underlier")
 	}
-	klog.LogToStderr(false)
 
-	logBuffer := &threadSafeBuffer{}
-
-	// Set the output to the thread-safe buffer
-	klog.SetOutput(logBuffer)
-
-	return logBuffer
+	// grants access to the in-memory copy of the log entries.
+	return underlyingSink.GetBuffer().String(), nil
 }
