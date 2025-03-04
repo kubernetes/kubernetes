@@ -13430,6 +13430,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsGroupPolicy
       type:
         scalar: string
+    - name: nodeAllocatableUpdatePeriodSeconds
+      type:
+        scalar: numeric
     - name: podInfoOnMount
       type:
         scalar: boolean
@@ -13805,6 +13808,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsGroupPolicy
       type:
         scalar: string
+    - name: nodeAllocatableUpdatePeriodSeconds
+      type:
+        scalar: numeric
     - name: podInfoOnMount
       type:
         scalar: boolean

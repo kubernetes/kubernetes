@@ -17,18 +17,24 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
+	"crypto/sha256"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -244,6 +250,12 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 			volumeToMount.VolumeToMount,
 			rc.nodeName,
 			rc.actualStateOfWorld)
+		if err != nil && rc.isResourceExhaustedError(volumeToMount) {
+			driverName := volumeToMount.VolumeSpec.PersistentVolume.Spec.CSI.Driver
+			if updateErr := csi.UpdateCSINodeAllocatableFromDriver(driverName); updateErr != nil {
+				klog.ErrorS(updateErr, "Reactive update: failed to update CSINode allocatable", "driver", driverName)
+			}
+		}
 		if err != nil && !isExpectedError(err) {
 			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
 		}
@@ -268,6 +280,37 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 			klog.InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.AttachVolume started", ""), "pod", klog.KObj(volumeToMount.Pod))
 		}
 	}
+}
+
+func (rc *reconciler) isResourceExhaustedError(volumeToMount cache.VolumeToMount) bool {
+	volumeHandle := volumeToMount.VolumeSpec.PersistentVolume.Spec.CSI.VolumeHandle
+	driver := volumeToMount.VolumeSpec.PersistentVolume.Spec.CSI.Driver
+
+	attachmentName := getAttachmentName(volumeHandle, driver, string(rc.nodeName))
+
+	attachment, err := getVolumeAttachment(rc.kubeClient, attachmentName)
+	if err != nil {
+		return false
+	}
+	if attachment.Status.AttachError != nil {
+		if strings.Contains(attachment.Status.AttachError.Message, "ResourceExhausted") {
+			return true
+		}
+	}
+	return false
+}
+
+func getVolumeAttachment(kubeClient clientset.Interface, attachmentName string) (*storagev1.VolumeAttachment, error) {
+	attachment, err := kubeClient.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return attachment, nil
+}
+
+func getAttachmentName(volName, csiDriverName, nodeName string) string {
+	result := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volName, csiDriverName, nodeName)))
+	return fmt.Sprintf("csi-%x", result)
 }
 
 func (rc *reconciler) unmountDetachDevices() {

@@ -90,6 +90,8 @@ var csiDrivers = &DriversStore{}
 
 var nim nodeinfomanager.Interface
 
+var csiPluginInstance *csiPlugin
+
 // PluginHandler is the plugin registration handler interface passed to the
 // pluginwatcher module in kubelet
 var PluginHandler = &RegistrationHandler{}
@@ -156,6 +158,90 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
+	if csiPluginInstance != nil {
+		go csiPluginInstance.startPeriodicAllocatableUpdate(pluginName)
+	}
+
+	return nil
+}
+
+func (p *csiPlugin) startPeriodicAllocatableUpdate(pluginName string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		klog.V(4).Infof("MutableCSINodeAllocatableCount gate is off; skipping updates for %q", pluginName)
+		return
+	}
+
+	csiObj, err := p.getCSIDriver(pluginName)
+	if err != nil {
+		klog.Errorf("Failed to get CSIDriver %q: %v", pluginName, err)
+		return
+	}
+	if csiObj == nil {
+		klog.Infof("CSIDriver %q not found in cluster; no periodic updates", pluginName)
+		return
+	}
+
+	if csiObj.Spec.NodeAllocatableUpdatePeriodSeconds == nil {
+		klog.V(4).Infof("CSIDriver %q: NodeAllocatableUpdatePeriodSeconds not set; skipping updates", pluginName)
+		return
+	}
+
+	period := time.Duration(*csiObj.Spec.NodeAllocatableUpdatePeriodSeconds) * time.Second
+
+	klog.Infof("CSIDriver %q: Starting periodic update loop at %v intervals", pluginName, period)
+
+	go wait.Until(func() {
+		err := p.doPeriodicAllocatableUpdate(pluginName)
+		if err != nil {
+			klog.Errorf("Allocatable update for %q failed: %v", pluginName, err)
+		}
+	}, period, nil)
+}
+
+func (p *csiPlugin) doPeriodicAllocatableUpdate(pluginName string) error {
+	if _, found := csiDrivers.Get(pluginName); !found {
+		return fmt.Errorf("driver %q no longer exists; stopping updates", pluginName)
+	}
+	return UpdateCSINodeAllocatableFromDriver(pluginName)
+}
+
+// UpdateCSINodeAllocatableFromDriver queries the CSI driver via NodeGetInfo,
+// converts the returned capacity to int32, and then updates the CSINode object using the NodeInfoManager.
+func UpdateCSINodeAllocatableFromDriver(driverName string) error {
+	// Create a CSI client for the driver.
+	csiClient, err := newCsiDriverClient(csiDriverName(driverName))
+	if err != nil {
+		return fmt.Errorf("failed to create CSI client for driver %q: %w", driverName, err)
+	}
+
+	// Use a timeout context for the NodeGetInfo call.
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+
+	// Query the CSI driver for updated capacity.
+	_, newCount, _, err := csiClient.NodeGetInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get NodeGetInfo from driver %q: %w", driverName, err)
+	}
+
+	// Convert the returned count (int64) to int32.
+	var allocCount int32
+	if newCount > 0 {
+		if newCount > (1<<31 - 1) {
+			allocCount = 1<<31 - 1
+		} else {
+			allocCount = int32(newCount)
+		}
+	} else {
+		allocCount = 0
+	}
+
+	// Update the CSINode's Allocatable field using the NodeInfoManager.
+	if err := nim.UpdateCSINodeAllocatable(driverName, allocCount); err != nil {
+		return fmt.Errorf("failed to update CSINode allocatable for driver %q: %w", driverName, err)
+	}
+
+	klog.V(4).InfoS("Updated CSINode allocatable capacity", "driver", driverName, "allocatableCount", allocCount)
 	return nil
 }
 
