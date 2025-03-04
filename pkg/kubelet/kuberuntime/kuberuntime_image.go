@@ -111,10 +111,11 @@ func (m *kubeGenericRuntimeManager) GetImageSize(ctx context.Context, image kube
 // ListImages gets all images currently on the machine.
 func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubecontainer.Image, error) {
 	var images []kubecontainer.Image
+	logger := klog.FromContext(ctx)
 
 	allImages, err := m.imageService.ListImages(ctx, nil)
 	if err != nil {
-		klog.ErrorS(err, "Failed to list images")
+		logger.Error(err, "Failed to list images")
 		return nil, err
 	}
 
@@ -126,7 +127,7 @@ func (m *kubeGenericRuntimeManager) ListImages(ctx context.Context) ([]kubeconta
 		// field is empty and log a warning message.
 		if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI) {
 			if img.Spec == nil || (img.Spec != nil && img.Spec.RuntimeHandler == "") {
-				klog.V(2).InfoS("WARNING: RuntimeHandler is empty", "ImageID", img.Id)
+				logger.V(2).Info("WARNING: RuntimeHandler is empty", "ImageID", img.Id)
 			}
 		}
 
