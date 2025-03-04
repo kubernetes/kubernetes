@@ -2401,18 +2401,18 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 
 // DaemonSets should be resynced when node labels or taints changed
 func TestUpdateNode(t *testing.T) {
-	var enqueued bool
 	cases := []struct {
-		test               string
-		newNode            *v1.Node
-		oldNode            *v1.Node
-		ds                 *apps.DaemonSet
-		expectedEventsFunc func(strategyType apps.DaemonSetUpdateStrategyType) int
-		shouldEnqueue      bool
-		expectedCreates    func() int
+		test                  string
+		newNode               *v1.Node
+		oldNode               *v1.Node
+		ds                    *apps.DaemonSet
+		expectedEventsFunc    func(strategyType apps.DaemonSetUpdateStrategyType) int
+		shouldEnqueueDS       bool
+		shouldQueueNodeUpdate bool
+		expectedCreates       func() int
 	}{
 		{
-			test:    "Nothing changed, should not enqueue",
+			test:    "Nothing changed, should not enqueue DS",
 			oldNode: newNode("node1", nil),
 			newNode: newNode("node1", nil),
 			ds: func() *apps.DaemonSet {
@@ -2420,11 +2420,12 @@ func TestUpdateNode(t *testing.T) {
 				ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 				return ds
 			}(),
-			shouldEnqueue:   false,
-			expectedCreates: func() int { return 0 },
+			shouldEnqueueDS:       false,
+			shouldQueueNodeUpdate: false,
+			expectedCreates:       func() int { return 0 },
 		},
 		{
-			test:    "Node labels changed",
+			test:    "Node labels changed to match DS selector, should enqueue DS",
 			oldNode: newNode("node1", nil),
 			newNode: newNode("node1", simpleNodeLabel),
 			ds: func() *apps.DaemonSet {
@@ -2432,23 +2433,25 @@ func TestUpdateNode(t *testing.T) {
 				ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 				return ds
 			}(),
-			shouldEnqueue:   true,
-			expectedCreates: func() int { return 0 },
+			shouldEnqueueDS:       true,
+			shouldQueueNodeUpdate: true,
+			expectedCreates:       func() int { return 0 },
 		},
 		{
-			test: "Node taints changed",
+			test: "Node taints changed, should enqueue DS",
 			oldNode: func() *v1.Node {
 				node := newNode("node1", nil)
 				setNodeTaint(node, noScheduleTaints)
 				return node
 			}(),
-			newNode:         newNode("node1", nil),
-			ds:              newDaemonSet("ds"),
-			shouldEnqueue:   true,
-			expectedCreates: func() int { return 0 },
+			newNode:               newNode("node1", nil),
+			ds:                    newDaemonSet("ds"),
+			shouldEnqueueDS:       true,
+			shouldQueueNodeUpdate: true,
+			expectedCreates:       func() int { return 0 },
 		},
 		{
-			test:    "Node Allocatable changed",
+			test:    "Node Allocatable changed, should not enqueue DS",
 			oldNode: newNode("node1", nil),
 			newNode: func() *v1.Node {
 				node := newNode("node1", nil)
@@ -2471,7 +2474,8 @@ func TestUpdateNode(t *testing.T) {
 				}
 				return 0
 			},
-			shouldEnqueue: false,
+			shouldEnqueueDS:       false,
+			shouldQueueNodeUpdate: false,
 			expectedCreates: func() int {
 				return 1
 			},
@@ -2479,42 +2483,104 @@ func TestUpdateNode(t *testing.T) {
 	}
 	for _, c := range cases {
 		for _, strategy := range updateStrategies() {
-			logger, ctx := ktesting.NewTestContext(t)
-			manager, podControl, _, err := newTestController(ctx)
-			if err != nil {
-				t.Fatalf("error creating DaemonSets controller: %v", err)
-			}
-			err = manager.nodeStore.Add(c.oldNode)
-			if err != nil {
-				t.Fatal(err)
-			}
-			c.ds.Spec.UpdateStrategy = *strategy
-			err = manager.dsStore.Add(c.ds)
-			if err != nil {
-				t.Fatal(err)
-			}
+			t.Run(fmt.Sprintf("%s with %s update strategy", c.test, strategy.Type),
+				func(t *testing.T) {
+					logger, ctx := ktesting.NewTestContext(t)
+					manager, podControl, _, err := newTestController(ctx)
+					if err != nil {
+						t.Fatalf("error creating DaemonSets controller: %v", err)
+					}
 
-			expectedEvents := 0
-			if c.expectedEventsFunc != nil {
-				expectedEvents = c.expectedEventsFunc(strategy.Type)
-			}
-			expectedCreates := 0
-			if c.expectedCreates != nil {
-				expectedCreates = c.expectedCreates()
-			}
-			expectSyncDaemonSets(t, manager, c.ds, podControl, expectedCreates, 0, expectedEvents)
+					err = manager.nodeStore.Add(c.oldNode)
+					if err != nil {
+						t.Fatal(err)
+					}
 
-			manager.enqueueDaemonSet = func(ds *apps.DaemonSet) {
-				if ds.Name == "ds" {
-					enqueued = true
-				}
-			}
+					c.ds.Spec.UpdateStrategy = *strategy
+					err = manager.dsStore.Add(c.ds)
+					if err != nil {
+						t.Fatal(err)
+					}
 
-			enqueued = false
-			manager.updateNode(logger, c.oldNode, c.newNode)
-			if enqueued != c.shouldEnqueue {
-				t.Errorf("Test case: '%s', expected: %t, got: %t", c.test, c.shouldEnqueue, enqueued)
-			}
+					expectedEvents := 0
+					if c.expectedEventsFunc != nil {
+						expectedEvents = c.expectedEventsFunc(strategy.Type)
+					}
+					expectedCreates := 0
+					if c.expectedCreates != nil {
+						expectedCreates = c.expectedCreates()
+					}
+					expectSyncDaemonSets(t, manager, c.ds, podControl, expectedCreates, 0, expectedEvents)
+
+					manager.updateNode(logger, c.oldNode, c.newNode)
+
+					if c.shouldQueueNodeUpdate {
+						if got, want := manager.nodeUpdateQueue.Len(), 1; got != want {
+							t.Fatalf("nodeUpdateQueue.Len() = %v, want %v", got, want)
+						}
+
+						key, done := manager.nodeUpdateQueue.Get()
+						if key == nil || done {
+							t.Fatalf("failed to get node update for node %v", c.newNode.Name)
+						}
+
+						if key.nodeName != c.newNode.Name {
+							t.Fatalf("expected node name %v, got %v", c.newNode.Name, key.nodeName)
+						}
+
+						if !reflect.DeepEqual(key.oldLabels, c.oldNode.Labels) {
+							t.Fatalf("expected old labels %v, got %v", c.oldNode.Labels, key.oldLabels)
+						}
+						if !reflect.DeepEqual(key.oldTaints, c.oldNode.Spec.Taints) {
+							t.Fatalf("expected old taints %v, got %v", c.oldNode.Spec.Taints, key.oldTaints)
+						}
+
+						err = manager.nodeStore.Update(c.newNode)
+						if err != nil {
+							t.Fatal(err)
+						}
+
+						err = manager.syncNodeUpdate(ctx, key)
+						if err != nil {
+							t.Fatalf("unexpected error syncing node update: %v", err)
+						}
+						manager.nodeUpdateQueue.Done(key)
+
+						if c.shouldEnqueueDS {
+							if got, want := manager.queue.Len(), 1; got != want {
+								t.Fatalf("queue.Len() = %v, want %v", got, want)
+							}
+
+							dsKey, done := manager.queue.Get()
+							if dsKey == "" || done {
+								t.Fatalf("failed to enqueue controller for node %v", c.newNode.Name)
+							}
+
+							expectedKey, err := controller.KeyFunc(c.ds)
+							if err != nil {
+								t.Fatalf("couldn't get key for daemon set: %v", err)
+							}
+
+							if dsKey != expectedKey {
+								t.Fatalf("expected DaemonSet key %v, got %v", expectedKey, dsKey)
+							}
+
+							manager.queue.Done(dsKey)
+						} else {
+							if got, want := manager.queue.Len(), 0; got != want {
+								t.Fatalf("queue.Len() = %v, want %v", got, want)
+							}
+						}
+					} else {
+						if got, want := manager.nodeUpdateQueue.Len(), 0; got != want {
+							t.Fatalf("nodeUpdateQueue.Len() = %v, want %v", got, want)
+						}
+
+						if got, want := manager.queue.Len(), 0; got != want {
+							t.Fatalf("queue.Len() = %v, want %v", got, want)
+						}
+					}
+				})
 		}
 	}
 }
@@ -2872,6 +2938,7 @@ func TestAddNode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
+
 	node1 := newNode("node1", nil)
 	ds := newDaemonSet("ds")
 	ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
@@ -2879,19 +2946,73 @@ func TestAddNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	manager.addNode(logger, node1)
+	if got, want := manager.nodeUpdateQueue.Len(), 1; got != want {
+		t.Fatalf("nodeUpdateQueue.Len() = %v, want %v", got, want)
+	}
+	key, done := manager.nodeUpdateQueue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to get node update for node %v", node1.Name)
+	}
+
+	if key.nodeName != node1.Name {
+		t.Fatalf("expected node name %v, got %v", node1.Name, key.nodeName)
+	}
+
+	err = manager.syncNodeUpdate(ctx, key)
+	if err != nil {
+		t.Fatalf("unexpected error syncing node update: %v", err)
+	}
+	manager.nodeUpdateQueue.Done(key)
+
 	if got, want := manager.queue.Len(), 0; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
 
 	node2 := newNode("node2", simpleNodeLabel)
 	manager.addNode(logger, node2)
+
+	if got, want := manager.nodeUpdateQueue.Len(), 1; got != want {
+		t.Fatalf("nodeUpdateQueue.Len() = %v, want %v", got, want)
+	}
+
+	key, done = manager.nodeUpdateQueue.Get()
+	if key == nil || done {
+		t.Fatalf("failed to get node update for node %v", node2.Name)
+	}
+
+	if key.nodeName != node2.Name {
+		t.Fatalf("expected node name %v, got %v", node2.Name, key.nodeName)
+	}
+
+	err = manager.nodeStore.Add(node2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = manager.syncNodeUpdate(ctx, key)
+	if err != nil {
+		t.Fatalf("unexpected error syncing node update: %v", err)
+	}
+	manager.nodeUpdateQueue.Done(key)
+
 	if got, want := manager.queue.Len(), 1; got != want {
 		t.Fatalf("queue.Len() = %v, want %v", got, want)
 	}
-	key, done := manager.queue.Get()
-	if key == "" || done {
+
+	dsKey, done := manager.queue.Get()
+	if dsKey == "" || done {
 		t.Fatalf("failed to enqueue controller for node %v", node2.Name)
+	}
+
+	expectedKey, err := controller.KeyFunc(ds)
+	if err != nil {
+		t.Fatalf("couldn't get key for daemon set: %v", err)
+	}
+
+	if dsKey != expectedKey {
+		t.Fatalf("expected DaemonSet key %v, got %v", expectedKey, dsKey)
 	}
 }
 
