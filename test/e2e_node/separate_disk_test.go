@@ -18,15 +18,19 @@ package e2enode
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -167,26 +171,28 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 
 // LocalStorageEviction tests that the node responds to IMAGE FS pressure by evicting pods.
 var _ = SIGDescribe("ImageStorageEviction", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.SeparateDisk, func() {
-	testRunner(
-		framework.NewDefaultFramework("local-storage-imagefs-test"),
-		EvictionTestConfig{
-			Signal:                  string(evictionapi.SignalImageFsAvailable),
-			PressureTimeout:         15 * time.Minute,
-			ExpectedNodeCondition:   v1.NodeDiskPressure,
-			ExpectedStarvedResource: v1.ResourceEphemeralStorage,
-			IsHardEviction:          true,
-			ThresholdPercentage:     "10%", // Use percentage instead of absolute threshold
-			MetricsLogger:           logDiskMetrics,
-			ResourceGetter: func(summary *kubeletstatsv1alpha1.Summary) uint64 {
-				return *summary.Node.Runtime.ImageFs.AvailableBytes
-			},
-		},
-		[]podEvictSpec{
+	f := framework.NewDefaultFramework("local-storage-imagefs-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	expectedNodeCondition := v1.NodeDiskPressure
+	expectedStarvedResource := v1.ResourceEphemeralStorage
+	pressureTimeout := 15 * time.Minute
+
+	diskTestInMb := 12000
+
+	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalImageFsAvailable): "10%"}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			ginkgo.By(fmt.Sprintf("EvictionHard %s", initialConfig.EvictionHard))
+		})
+		specs := []podEvictSpec{
 			{
 				evictionPriority: 1,
-				pod:              diskConsumingPod("best-effort-disk", 12000, nil, v1.ResourceRequirements{}),
+				pod:              diskConsumingPod("best-effort-disk", diskTestInMb, nil, v1.ResourceRequirements{}),
 			},
-		})
+		}
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, specs)
+	})
 })
 
 // ImageStorageVolumeEviction tests that the node responds to node disk pressure by evicting pods.
@@ -209,7 +215,7 @@ var _ = SIGDescribe("ImageStorageVolumeEviction", framework.WithSlow(), framewor
 		},
 		[]podEvictSpec{
 			{
-				evictionPriority: 1,
+				evictionPriority: 1, // This pod should exceed disk capacity on nodefs since writing to a volume
 				pod: diskConsumingPod("container-emptydir-disk-limit", 16000, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
 					v1.ResourceRequirements{}),
 			},
