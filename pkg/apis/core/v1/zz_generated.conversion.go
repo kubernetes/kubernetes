@@ -6105,6 +6105,7 @@ func Convert_url_Values_To_v1_PodAttachOptions(in *url.Values, out *corev1.PodAt
 
 func autoConvert_v1_PodCondition_To_core_PodCondition(in *corev1.PodCondition, out *core.PodCondition, s conversion.Scope) error {
 	out.Type = core.PodConditionType(in.Type)
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Status = core.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
@@ -6120,6 +6121,7 @@ func Convert_v1_PodCondition_To_core_PodCondition(in *corev1.PodCondition, out *
 
 func autoConvert_core_PodCondition_To_v1_PodCondition(in *core.PodCondition, out *corev1.PodCondition, s conversion.Scope) error {
 	out.Type = corev1.PodConditionType(in.Type)
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Status = corev1.ConditionStatus(in.Status)
 	out.LastProbeTime = in.LastProbeTime
 	out.LastTransitionTime = in.LastTransitionTime
@@ -6811,6 +6813,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *corev1.PodSpe
 }
 
 func autoConvert_v1_PodStatus_To_core_PodStatus(in *corev1.PodStatus, out *core.PodStatus, s conversion.Scope) error {
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Phase = core.PodPhase(in.Phase)
 	out.Conditions = *(*[]core.PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
@@ -6831,6 +6834,7 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *corev1.PodStatus, out *core.
 }
 
 func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *corev1.PodStatus, s conversion.Scope) error {
+	out.ObservedGeneration = in.ObservedGeneration
 	out.Phase = corev1.PodPhase(in.Phase)
 	out.Conditions = *(*[]corev1.PodCondition)(unsafe.Pointer(&in.Conditions))
 	out.Message = in.Message
