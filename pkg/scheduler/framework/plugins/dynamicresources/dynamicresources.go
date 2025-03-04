@@ -813,7 +813,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	needWait := false
 	for _, claim := range state.claims {
 		for _, device := range claim.Status.Devices {
-			if device.BindingConditions != nil {
+			if len(device.BindingConditions) > 0 {
 				needWait = true
 				break
 			}
@@ -954,7 +954,7 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			// if the claim has devices with binding conditions, we need to store them in the claim status
 			if pl.enableDeviceBindingConditions {
 				for _, device := range allocation.Devices.Results {
-					if device.BindingConditions != nil {
+					if len(device.BindingConditions) > 0 {
 						ad := resourceapi.AllocatedDeviceStatus{
 							Driver:                   device.Driver,
 							Device:                   device.Device,

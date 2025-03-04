@@ -72,7 +72,7 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 	return slice
 }
 
-func testResouceSliceWithBindingConditions(name, nodeName, driverName string, numDevices int, bindingConditions, bindingFailureConditions []string) *resourceapi.ResourceSlice {
+func testResourceSliceWithBindingConditions(name, nodeName, driverName string, numDevices int, bindingConditions, bindingFailureConditions []string) *resourceapi.ResourceSlice {
 	slice := testResourceSlice(name, nodeName, driverName, numDevices)
 	for i := range slice.Spec.Devices {
 		slice.Spec.Devices[i].Basic.BindingConditions = bindingConditions
@@ -466,15 +466,15 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"good-binding-conditions": {
-			slice: testResouceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4"}),
+			slice: testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4"}),
 		},
 		"too-many-binding-conditions": {
 			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
-			slice:        testResouceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2", "condition3", "conditions4", "conditions5"}, []string{"condition5", "condition6"}),
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2", "condition3", "condition4", "condition5"}, []string{"condition5", "condition6"}),
 		},
 		"too-many-binding-failure-conditions": {
 			wantFailures: field.ErrorList{field.TooMany(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
-			slice:        testResouceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4", "condition5", "condition6", "condition7"}),
+			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4", "condition5", "condition6", "condition7"}),
 		},
 		"good-binding-timeout": {
 			slice: testResouceSliceWithBindingTimeout(goodName, goodName, driverName, 1, &metav1.Duration{Duration: 10 * time.Second}),

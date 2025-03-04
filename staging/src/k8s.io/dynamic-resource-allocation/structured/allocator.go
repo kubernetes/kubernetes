@@ -332,7 +332,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			// If deviceBindingConditions are enabled, we need to populate the AllocatedDeviceStatus.
 			if a.deviceBindingEnabled {
 				for _, device := range internal.slice.Spec.Devices {
-					if device.Name == internal.id.Device && device.Basic.BindingConditions != nil {
+					if device.Name == internal.id.Device && len(device.Basic.BindingConditions) > 0 {
 						allocationResult.Devices.Results[i].UsageRestrictedToNode = &device.Basic.UsageRestrictedToNode
 						allocationResult.Devices.Results[i].BindingConditions = device.Basic.BindingConditions
 						allocationResult.Devices.Results[i].BindingFailureConditions = device.Basic.BindingFailureConditions
