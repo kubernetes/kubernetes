@@ -234,8 +234,6 @@ func InitMetrics() {
 		[]string{"attempts"})
 
 	PodSchedulingAttempts = metrics.NewHistogram(
-		// Note that the unit is ms, so values displayed in logs need to be divided by 1000
-		// - because metric.Observe(1[attempt]) will actually record 1000[ms] in this case.
 		&metrics.HistogramOpts{
 			Subsystem:      SchedulerSubsystem,
 			Name:           "pod_scheduling_attempts",
@@ -290,7 +288,6 @@ func InitMetrics() {
 
 	PermitWaitDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			// TODO: Find an integration test where this metric is logged and verify bucket sizes.
 			Subsystem:      SchedulerSubsystem,
 			Name:           "permit_wait_duration_seconds",
 			Help:           "Duration of waiting on permit.",
