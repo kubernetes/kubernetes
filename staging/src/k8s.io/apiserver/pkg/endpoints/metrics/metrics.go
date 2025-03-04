@@ -715,7 +715,7 @@ func CanonicalVerb(verb string, scope string) string {
 // LIST, APPLY from PATCH and CONNECT from others.
 func CleanVerb(verb string, request *http.Request, requestInfo *request.RequestInfo) string {
 	reportedVerb := verb
-	if suggestedVerb := getVerbIfWatch(request); suggestedVerb == "WATCH" {
+	if suggestedVerb := getVerbIfWatch(request, requestInfo); suggestedVerb == "WATCH" {
 		reportedVerb = "WATCH"
 	}
 	// normalize the legacy WATCHLIST to WATCH to ensure users aren't surprised by metrics
@@ -771,8 +771,15 @@ func cleanVerb(verb, suggestedVerb string, request *http.Request, requestInfo *r
 	return OtherRequestMethod
 }
 
-// getVerbIfWatch additionally ensures that GET or List would be transformed to WATCH
-func getVerbIfWatch(req *http.Request) string {
+// getVerbIfWatch determines if a request is a WATCH request based on
+// requestInfo.verb, http.Request query parameters and path.
+func getVerbIfWatch(req *http.Request, requestInfo *request.RequestInfo) string {
+	// If requestInfo.Verb is present, we should prioritize that.
+	if requestInfo != nil && requestInfo.Verb == "watch" {
+		return "WATCH"
+	}
+
+	// If the method is GET or LIST, check for the "watch" query parameter.
 	if strings.ToUpper(req.Method) == "GET" || strings.ToUpper(req.Method) == "LIST" {
 		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
 		if values := req.URL.Query()["watch"]; len(values) > 0 {
@@ -781,6 +788,12 @@ func getVerbIfWatch(req *http.Request) string {
 			}
 		}
 	}
+
+	// check the deprecated path pattern for watch
+	if strings.HasPrefix(req.URL.Path, "/api/v1/watch/") {
+		return "WATCH"
+	}
+
 	return ""
 }
 
