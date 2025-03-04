@@ -1132,7 +1132,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindReasons: volumebinding.ConflictReasons{volumebinding.ErrReasonNodeConflict},
 			},
 			eventReason: "FailedScheduling",
-			expectError: makePredicateError("1 node(s) had volume node affinity conflict"),
+			expectError: makePredicateError("1 node(s) didn't match PersistentVolume's node affinity"),
 		},
 		{
 			name: "unbound/no matches",
@@ -1148,7 +1148,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				FindReasons: volumebinding.ConflictReasons{volumebinding.ErrReasonBindConflict, volumebinding.ErrReasonNodeConflict},
 			},
 			eventReason: "FailedScheduling",
-			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind, 1 node(s) had volume node affinity conflict"),
+			expectError: makePredicateError("1 node(s) didn't find available persistent volumes to bind, 1 node(s) didn't match PersistentVolume's node affinity"),
 		},
 		{
 			name:               "unbound/found matches/bind succeeds",
