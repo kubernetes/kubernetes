@@ -20,7 +20,7 @@ limitations under the License.
 package util
 
 import (
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 )
 
 // IsCgroup2UnifiedMode returns true if the cgroup v2 unified mode is enabled

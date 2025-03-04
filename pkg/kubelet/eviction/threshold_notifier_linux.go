@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
 )
