@@ -3343,13 +3343,115 @@ func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.P
 	return allErrors
 }
 
-func validateLifecycle(lifecycle *core.Lifecycle, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+var supportedStopSignalsLinux = sets.New(
+	core.Sigabrt,
+	core.Sigalrm,
+	core.Sigbus,
+	core.Sigchld,
+	core.Sigcld,
+	core.Sigcont,
+	core.Sigfpe,
+	core.Sighup,
+	core.Sigill,
+	core.Sigint,
+	core.Sigio,
+	core.Sigiot,
+	core.Sigkill,
+	core.Sigpipe,
+	core.Sigpoll,
+	core.Sigprof,
+	core.Sigpwr,
+	core.Sigquit,
+	core.Sigsegv,
+	core.Sigstkflt,
+	core.Sigstop,
+	core.Sigsys,
+	core.Sigterm,
+	core.Sigtrap,
+	core.Sigtstp,
+	core.Sigttin,
+	core.Sigttou,
+	core.Sigurg,
+	core.Sigusr1,
+	core.Sigusr2,
+	core.Sigvtalrm,
+	core.Sigwinch,
+	core.Sigxcpu,
+	core.Sigxfsz)
+
+var supportedStopSignalsWindows = sets.New(core.Sigkill, core.Sigterm)
+
+func validateStopSignal(stopSignal *core.Signal, fldPath *field.Path, os *core.PodOS) field.ErrorList {
+	allErrors := field.ErrorList{}
+
+	if os == nil {
+		allErrors = append(allErrors, field.Forbidden(fldPath, "may not be set for containers with empty .spec.os.name"))
+	} else if os.Name == core.Windows {
+		switch *stopSignal {
+		case core.Sigkill, core.Sigterm:
+			break
+		case "":
+			allErrors = append(allErrors, field.Required(fldPath, ""))
+		default:
+			allErrors = append(allErrors, field.NotSupported(fldPath, stopSignal, sets.List(supportedStopSignalsWindows)))
+		}
+	} else if os.Name == core.Linux {
+		switch *stopSignal {
+		case core.Sigabrt,
+			core.Sigalrm,
+			core.Sigbus,
+			core.Sigchld,
+			core.Sigcld,
+			core.Sigcont,
+			core.Sigfpe,
+			core.Sighup,
+			core.Sigill,
+			core.Sigint,
+			core.Sigio,
+			core.Sigiot,
+			core.Sigkill,
+			core.Sigpipe,
+			core.Sigpoll,
+			core.Sigprof,
+			core.Sigpwr,
+			core.Sigquit,
+			core.Sigsegv,
+			core.Sigstkflt,
+			core.Sigstop,
+			core.Sigsys,
+			core.Sigterm,
+			core.Sigtrap,
+			core.Sigtstp,
+			core.Sigttin,
+			core.Sigttou,
+			core.Sigurg,
+			core.Sigusr1,
+			core.Sigusr2,
+			core.Sigvtalrm,
+			core.Sigwinch,
+			core.Sigxcpu,
+			core.Sigxfsz:
+			break
+		case "":
+			allErrors = append(allErrors, field.Required(fldPath, ""))
+		default:
+			allErrors = append(allErrors, field.NotSupported(fldPath, stopSignal, sets.List(supportedStopSignalsLinux)))
+		}
+	}
+
+	return allErrors
+}
+
+func validateLifecycle(lifecycle *core.Lifecycle, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, os *core.PodOS) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if lifecycle.PostStart != nil {
 		allErrs = append(allErrs, validateHandler(handlerFromLifecycle(lifecycle.PostStart), gracePeriod, fldPath.Child("postStart"), opts)...)
 	}
 	if lifecycle.PreStop != nil {
 		allErrs = append(allErrs, validateHandler(handlerFromLifecycle(lifecycle.PreStop), gracePeriod, fldPath.Child("preStop"), opts)...)
+	}
+	if lifecycle.StopSignal != nil {
+		allErrs = append(allErrs, validateStopSignal(lifecycle.StopSignal, fldPath.Child("stopSignal"), os)...)
 	}
 	return allErrs
 }
@@ -3494,7 +3596,7 @@ func validateFieldAllowList(value interface{}, allowedFields map[string]bool, er
 }
 
 // validateInitContainers is called by pod spec and template validation to validate the list of init containers
-func validateInitContainers(containers []core.Container, regularContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
+func validateInitContainers(containers []core.Container, os *core.PodOS, regularContainers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	allNames := sets.Set[string]{}
@@ -3528,7 +3630,7 @@ func validateInitContainers(containers []core.Container, regularContainers []cor
 		switch {
 		case restartAlways:
 			if ctr.Lifecycle != nil {
-				allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, idxPath.Child("lifecycle"), opts)...)
+				allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, idxPath.Child("lifecycle"), opts, os)...)
 			}
 			allErrs = append(allErrs, validateLivenessProbe(ctr.LivenessProbe, gracePeriod, idxPath.Child("livenessProbe"), opts)...)
 			allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, gracePeriod, idxPath.Child("readinessProbe"), opts)...)
@@ -3632,7 +3734,7 @@ func validateHostUsers(spec *core.PodSpec, fldPath *field.Path) field.ErrorList 
 }
 
 // validateContainers is called by pod spec and template validation to validate the list of regular containers.
-func validateContainers(containers []core.Container, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
+func validateContainers(containers []core.Container, os *core.PodOS, volumes map[string]core.VolumeSource, podClaimNames sets.Set[string], gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions, podRestartPolicy *core.RestartPolicy, hostUsers bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
@@ -3660,7 +3762,7 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 		// Regular init container and ephemeral container validation will return
 		// field.Forbidden() for these paths.
 		if ctr.Lifecycle != nil {
-			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, path.Child("lifecycle"), opts)...)
+			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, gracePeriod, path.Child("lifecycle"), opts, os)...)
 		}
 		allErrs = append(allErrs, validateLivenessProbe(ctr.LivenessProbe, gracePeriod, path.Child("livenessProbe"), opts)...)
 		allErrs = append(allErrs, validateReadinessProbe(ctr.ReadinessProbe, gracePeriod, path.Child("readinessProbe"), opts)...)
@@ -4213,8 +4315,8 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 	allErrs = append(allErrs, vErrs...)
 	podClaimNames := gatherPodResourceClaimNames(spec.ResourceClaims)
 	allErrs = append(allErrs, validatePodResourceClaims(podMeta, spec.ResourceClaims, fldPath.Child("resourceClaims"))...)
-	allErrs = append(allErrs, validateContainers(spec.Containers, vols, podClaimNames, gracePeriod, fldPath.Child("containers"), opts, &spec.RestartPolicy, hostUsers)...)
-	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, podClaimNames, gracePeriod, fldPath.Child("initContainers"), opts, &spec.RestartPolicy, hostUsers)...)
+	allErrs = append(allErrs, validateContainers(spec.Containers, spec.OS, vols, podClaimNames, gracePeriod, fldPath.Child("containers"), opts, &spec.RestartPolicy, hostUsers)...)
+	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.OS, spec.Containers, vols, podClaimNames, gracePeriod, fldPath.Child("initContainers"), opts, &spec.RestartPolicy, hostUsers)...)
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, podClaimNames, fldPath.Child("ephemeralContainers"), opts, &spec.RestartPolicy, hostUsers)...)
 
 	if opts.PodLevelResourcesEnabled {
