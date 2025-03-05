@@ -1427,7 +1427,7 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 		collector := collector
 		err := collector.init()
 		if err != nil {
-			return nil, nil, fmt.Errorf("op %d: Failed to initialize data collector: %w", opIndex, err)
+			return nil, nil, fmt.Errorf("failed to initialize data collector: %w", err)
 		}
 		tCtx.TB().Cleanup(func() {
 			collectorCtx.Cancel("cleaning up")
@@ -1443,7 +1443,7 @@ func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup,
 
 func stopCollectingMetrics(tCtx ktesting.TContext, collectorCtx ktesting.TContext, collectorWG *sync.WaitGroup, threshold float64, tms thresholdMetricSelector, opIndex int, collectors []testDataCollector) ([]DataItem, error) {
 	if collectorCtx == nil {
-		return nil, fmt.Errorf("op %d: Missing startCollectingMetrics operation before stopping", opIndex)
+		return nil, fmt.Errorf("missing startCollectingMetrics operation before stopping")
 	}
 	collectorCtx.Cancel("collecting metrics, collector must stop first")
 	collectorWG.Wait()
