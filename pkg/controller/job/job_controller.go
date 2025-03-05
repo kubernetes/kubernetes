@@ -595,7 +595,7 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 	// all controllers there will still be some replica instability. One way to handle this is
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
-	logger.Info("enqueueing job", "key", key, "delay", delay)
+	logger.V(2).Info("enqueueing job", "key", key, "delay", delay)
 	jm.queue.AddAfter(key, delay)
 }
 

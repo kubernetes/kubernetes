@@ -678,7 +678,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		logger.Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
+		logger.V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
