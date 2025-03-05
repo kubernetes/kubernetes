@@ -142,8 +142,10 @@ func (sc *stateCheckpoint) SetPodResourceAllocation(podUID types.UID, alloc map[
 func (sc *stateCheckpoint) Delete(podUID types.UID, containerName string) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
-	sc.cache.Delete(podUID, containerName)
-	return sc.storeState()
+	// Skip writing the checkpoint for pod deletion, since there is no side effect to
+	// keeping a deleted pod. Deleted pods will eventually be cleaned up by RemoveOrphanedPods.
+	// The deletion will be stored the next time a non-delete update is made.
+	return sc.cache.Delete(podUID, "")
 }
 
 func (sc *stateCheckpoint) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
