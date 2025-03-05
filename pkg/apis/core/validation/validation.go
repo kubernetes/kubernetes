@@ -3884,10 +3884,10 @@ func validateAffinity(affinity *core.Affinity, opts PodValidationOptions, fldPat
 			allErrs = append(allErrs, validateNodeAffinity(affinity.NodeAffinity, opts, fldPath.Child("nodeAffinity"))...)
 		}
 		if affinity.PodAffinity != nil {
-			allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, opts.AllowInvalidLabelValueInSelector, fldPath.Child("podAffinity"))...)
+			allErrs = append(allErrs, validatePodAffinity(affinity.PodAffinity, opts, fldPath.Child("podAffinity"))...)
 		}
 		if affinity.PodAntiAffinity != nil {
-			allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, opts.AllowInvalidLabelValueInSelector, fldPath.Child("podAntiAffinity"))...)
+			allErrs = append(allErrs, validatePodAntiAffinity(affinity.PodAntiAffinity, opts, fldPath.Child("podAntiAffinity"))...)
 		}
 	}
 
@@ -4691,16 +4691,16 @@ func ValidatePreferredSchedulingTerms(terms []core.PreferredSchedulingTerm, fldP
 }
 
 // validatePodAffinityTerm tests that the specified podAffinityTerm fields have valid data
-func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, allowInvalidLabelValueInSelector bool, fldPath *field.Path) field.ErrorList {
+func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, ValidatePodAffinityTermSelector(podAffinityTerm, allowInvalidLabelValueInSelector, fldPath)...)
+	allErrs = append(allErrs, ValidatePodAffinityTermSelector(podAffinityTerm, opts.AllowInvalidLabelValueInSelector, fldPath)...)
 	for _, name := range podAffinityTerm.Namespaces {
 		for _, msg := range ValidateNamespaceName(name, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
 		}
 	}
-	allErrs = append(allErrs, validateMatchLabelKeysAndMismatchLabelKeys(fldPath, podAffinityTerm.MatchLabelKeys, podAffinityTerm.MismatchLabelKeys, podAffinityTerm.LabelSelector)...)
+	allErrs = append(allErrs, validateMatchLabelKeysAndMismatchLabelKeys(fldPath, podAffinityTerm.MatchLabelKeys, podAffinityTerm.MismatchLabelKeys, podAffinityTerm.LabelSelector, opts.ResourceIsPod)...)
 	if len(podAffinityTerm.TopologyKey) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can not be empty"))
 	}
@@ -4708,28 +4708,28 @@ func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, allowInvalidL
 }
 
 // validatePodAffinityTerms tests that the specified podAffinityTerms fields have valid data
-func validatePodAffinityTerms(podAffinityTerms []core.PodAffinityTerm, allowInvalidLabelValueInSelector bool, fldPath *field.Path) field.ErrorList {
+func validatePodAffinityTerms(podAffinityTerms []core.PodAffinityTerm, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, podAffinityTerm := range podAffinityTerms {
-		allErrs = append(allErrs, validatePodAffinityTerm(podAffinityTerm, allowInvalidLabelValueInSelector, fldPath.Index(i))...)
+		allErrs = append(allErrs, validatePodAffinityTerm(podAffinityTerm, opts, fldPath.Index(i))...)
 	}
 	return allErrs
 }
 
 // validateWeightedPodAffinityTerms tests that the specified weightedPodAffinityTerms fields have valid data
-func validateWeightedPodAffinityTerms(weightedPodAffinityTerms []core.WeightedPodAffinityTerm, allowInvalidLabelValueInSelector bool, fldPath *field.Path) field.ErrorList {
+func validateWeightedPodAffinityTerms(weightedPodAffinityTerms []core.WeightedPodAffinityTerm, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for j, weightedTerm := range weightedPodAffinityTerms {
 		if weightedTerm.Weight <= 0 || weightedTerm.Weight > 100 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(j).Child("weight"), weightedTerm.Weight, "must be in the range 1-100"))
 		}
-		allErrs = append(allErrs, validatePodAffinityTerm(weightedTerm.PodAffinityTerm, allowInvalidLabelValueInSelector, fldPath.Index(j).Child("podAffinityTerm"))...)
+		allErrs = append(allErrs, validatePodAffinityTerm(weightedTerm.PodAffinityTerm, opts, fldPath.Index(j).Child("podAffinityTerm"))...)
 	}
 	return allErrs
 }
 
 // validatePodAntiAffinity tests that the specified podAntiAffinity fields have valid data
-func validatePodAntiAffinity(podAntiAffinity *core.PodAntiAffinity, allowInvalidLabelValueInSelector bool, fldPath *field.Path) field.ErrorList {
+func validatePodAntiAffinity(podAntiAffinity *core.PodAntiAffinity, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// TODO:Uncomment below code once RequiredDuringSchedulingRequiredDuringExecution is implemented.
 	// if podAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
@@ -4737,12 +4737,12 @@ func validatePodAntiAffinity(podAntiAffinity *core.PodAntiAffinity, allowInvalid
 	//		fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
 	// }
 	if podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, allowInvalidLabelValueInSelector,
-			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, validatePodAffinityTerms(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			opts, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	if podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, allowInvalidLabelValueInSelector,
-			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			opts, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	return allErrs
 }
@@ -4764,7 +4764,7 @@ func validateNodeAffinity(na *core.NodeAffinity, opts PodValidationOptions, fldP
 }
 
 // validatePodAffinity tests that the specified podAffinity fields have valid data
-func validatePodAffinity(podAffinity *core.PodAffinity, allowInvalidLabelValueInSelector bool, fldPath *field.Path) field.ErrorList {
+func validatePodAffinity(podAffinity *core.PodAffinity, opts PodValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// TODO:Uncomment below code once RequiredDuringSchedulingRequiredDuringExecution is implemented.
 	// if podAffinity.RequiredDuringSchedulingRequiredDuringExecution != nil {
@@ -4772,12 +4772,12 @@ func validatePodAffinity(podAffinity *core.PodAffinity, allowInvalidLabelValueIn
 	//		fldPath.Child("requiredDuringSchedulingRequiredDuringExecution"))...)
 	// }
 	if podAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution, allowInvalidLabelValueInSelector,
-			fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, validatePodAffinityTerms(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			opts, fldPath.Child("requiredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	if podAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
-		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution, allowInvalidLabelValueInSelector,
-			fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
+		allErrs = append(allErrs, validateWeightedPodAffinityTerms(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			opts, fldPath.Child("preferredDuringSchedulingIgnoredDuringExecution"))...)
 	}
 	return allErrs
 }
@@ -8005,7 +8005,7 @@ func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusion
 // - validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
 // - validate that the user doens't specify the same key in both matchLabelKeys and labelSelector.
 // - validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
-func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector, resourceIsPod bool) field.ErrorList {
 	var allErrs field.ErrorList
 	// 1. validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
 	allErrs = append(allErrs, validateLabelKeys(fldPath.Child("matchLabelKeys"), matchLabelKeys, labelSelector)...)
@@ -8023,22 +8023,7 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 		for key := range labelSelector.MatchLabels {
 			labelSelectorKeys.Insert(key)
 		}
-		if strings.Contains(fldPath.String(), "template.spec") { // PodTemplateSpec validation
-			// uniqueMatchLabelKeys is used to check if the keys in matchLabelKeys are unique.
-			uniqueMatchLabelKeys := sets.New[string]()
-			for _, matchExpression := range labelSelector.MatchExpressions {
-				labelSelectorKeys.Insert(matchExpression.Key)
-			}
-			for i, key := range matchLabelKeys {
-				if labelSelectorKeys.Has(key) {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "exists in both matchLabelKeys and labelSelector"))
-				}
-				if uniqueMatchLabelKeys.Has(key) {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "is duplicated in matchLabelKeys"))
-				}
-				uniqueMatchLabelKeys.Insert(key)
-			}
-		} else { // PodSpec validation
+		if resourceIsPod { // PodSpec validation
 			// labelKeysMap is keyed by label key and valued by the index of label key in labelKeys.
 			labelKeysMap := map[string]int{}
 			for i, key := range matchLabelKeys {
@@ -8054,8 +8039,22 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 				}
 				labelSelectorKeys.Insert(key)
 			}
+		} else { // PodTemplateSpec validation
+			// uniqueMatchLabelKeys is used to check if the keys in matchLabelKeys are unique.
+			uniqueMatchLabelKeys := sets.New[string]()
+			for _, matchExpression := range labelSelector.MatchExpressions {
+				labelSelectorKeys.Insert(matchExpression.Key)
+			}
+			for i, key := range matchLabelKeys {
+				if labelSelectorKeys.Has(key) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+				}
+				if uniqueMatchLabelKeys.Has(key) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "is duplicated in matchLabelKeys"))
+				}
+				uniqueMatchLabelKeys.Insert(key)
+			}
 		}
-
 	}
 	// 3. validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
 	mismatchLabelKeysSet := sets.New(mismatchLabelKeys...)
