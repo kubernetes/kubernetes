@@ -91,7 +91,7 @@
     "/version/": {
       "get": {
         "description": "get the version information for this server",
-        "operationId": "getVersion",
+        "operationId": "getCodeVersion",
         "responses": {
           "200": {
             "content": {

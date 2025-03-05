@@ -43,7 +43,7 @@ func (v Version) Install(c *restful.Container) {
 	versionWS.Route(
 		versionWS.GET("/").To(v.handleVersion).
 			Doc("get the version information for this server").
-			Operation("getVersion").
+			Operation("getCodeVersion").
 			Produces(restful.MIME_JSON).
 			Consumes(restful.MIME_JSON).
 			Writes(version.Info{}))

@@ -86014,7 +86014,7 @@
           "application/json"
         ],
         "description": "get the version information for this server",
-        "operationId": "getVersion",
+        "operationId": "getCodeVersion",
         "produces": [
           "application/json"
         ],
