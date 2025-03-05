@@ -62,6 +62,11 @@ var (
 			// host. Enabling the test would result in the  bastion being created for every parallel test execution.
 			// Given that we have existing oc and WMCO tests that cover this functionality, we can safely disable it.
 			`\[Feature:NodeLogQuery\]`,
+
+			// volumegroupsnapshot in csi-hostpath tests requires changes in the test yaml files,
+			// which are done by a script upstream. In OCP, we added a separate driver csi-hostpath-groupsnapshot,
+			// that will not be skipped by any rule here.
+			`\[Driver: csi-hostpath\].*\[Feature:volumegroupsnapshot\]`,
 		},
 		// tests that are known broken and need to be fixed upstream or in openshift
 		// always add an issue here
