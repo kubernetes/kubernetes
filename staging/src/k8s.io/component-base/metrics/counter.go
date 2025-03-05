@@ -36,16 +36,11 @@ type Counter struct {
 	selfCollector
 }
 
-type CounterWithContext struct {
-	*Counter
-	ctx context.Context
-}
+// The metric must be register-able.
+var _ Registerable = &Counter{}
 
 // The implementation of the Metric interface is expected by testutil.GetCounterMetricValue.
 var _ Metric = &Counter{}
-
-// All supported exemplar metric types implement the metricWithExemplar interface.
-var _ metricWithExemplar = &CounterWithContext{}
 
 // NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
@@ -104,8 +99,31 @@ func (c *Counter) initializeDeprecatedMetric() {
 	c.initializeMetric()
 }
 
+func (c *Counter) Add(v float64) {
+	c.CounterMetric.Add(v)
+}
+
+func (c *Counter) Inc() {
+	c.CounterMetric.Inc()
+}
+
+// CounterWithContext is the wrapper of Counter with context.
+// It allows for passing contextual counters without copying their internal lock(s).
+type CounterWithContext struct {
+	ctx context.Context
+	*Counter
+}
+
+// Post-equipping a counter with context, folks should be able to use it as a regular counter, with exemplar support.
+var _ Registerable = &Counter{}
+var _ Metric = &CounterWithContext{}
+var _ metricWithExemplar = &CounterWithContext{}
+
 // WithContext allows the normal Counter metric to pass in context.
 func (c *Counter) WithContext(ctx context.Context) *CounterWithContext {
+	// Return reference to a new counter as modifying the existing one overrides the older context,
+	// and blocks with semaphores. So this is a better option, see:
+	// https://github.com/kubernetes/kubernetes/pull/128575#discussion_r1829509144.
 	return &CounterWithContext{
 		ctx:     ctx,
 		Counter: c,
@@ -127,14 +145,6 @@ func (c *CounterWithContext) withExemplar(v float64) {
 	}
 
 	c.CounterMetric.Add(v)
-}
-
-func (c *Counter) Add(v float64) {
-	c.CounterMetric.Add(v)
-}
-
-func (c *Counter) Inc() {
-	c.CounterMetric.Inc()
 }
 
 func (c *CounterWithContext) Add(v float64) {
@@ -302,51 +312,12 @@ type CounterVecWithContext struct {
 	ctx context.Context
 }
 
-// CounterVecWithContextWithCounter is the wrapper of CounterVecWithContext with counter.
-type CounterVecWithContextWithCounter struct {
-	*CounterVecWithContext
-	counter CounterMetric
-}
-
-// withExemplar attaches an exemplar to the metric.
-func (vcc *CounterVecWithContextWithCounter) withExemplar(v float64) {
-	if m, ok := vcc.counter.(prometheus.ExemplarAdder); ok {
-		maybeSpanCtx := trace.SpanContextFromContext(vcc.ctx)
-		if maybeSpanCtx.IsValid() && maybeSpanCtx.IsSampled() {
-			exemplarLabels := prometheus.Labels{
-				"trace_id": maybeSpanCtx.TraceID().String(),
-				"span_id":  maybeSpanCtx.SpanID().String(),
-			}
-			m.AddWithExemplar(v, exemplarLabels)
-			return
-		}
-	}
-
-	vcc.counter.Add(v)
-}
-
-// Add adds the given value to the counter with the provided labels.
-func (vcc *CounterVecWithContextWithCounter) Add(v float64) {
-	vcc.withExemplar(v)
-}
-
-// Inc increments the counter with the provided labels.
-func (vcc *CounterVecWithContextWithCounter) Inc() {
-	vcc.withExemplar(1)
-}
-
 // WithLabelValues is the wrapper of CounterVec.WithLabelValues.
-func (vc *CounterVecWithContext) WithLabelValues(lvs ...string) *CounterVecWithContextWithCounter {
-	return &CounterVecWithContextWithCounter{
-		CounterVecWithContext: vc,
-		counter:               vc.CounterVec.WithLabelValues(lvs...),
-	}
+func (vc *CounterVecWithContext) WithLabelValues(lvs ...string) CounterMetric {
+	return vc.CounterVec.WithLabelValues(lvs...)
 }
 
 // With is the wrapper of CounterVec.With.
-func (vc *CounterVecWithContext) With(labels map[string]string) *CounterVecWithContextWithCounter {
-	return &CounterVecWithContextWithCounter{
-		CounterVecWithContext: vc,
-		counter:               vc.CounterVec.With(labels),
-	}
+func (vc *CounterVecWithContext) With(labels map[string]string) CounterMetric {
+	return vc.CounterVec.With(labels)
 }
