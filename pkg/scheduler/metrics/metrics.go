@@ -331,11 +331,11 @@ func InitMetrics() {
 
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
-			// TODO: Find an integration test where this metric is logged and verify bucket sizes.
-			Subsystem:      SchedulerSubsystem,
-			Name:           "preemption_goroutines_duration_seconds",
-			Help:           "Duration in seconds for running goroutines for the preemption.",
-			Buckets:        metrics.ExponentialBuckets(0.01, 2, 20),
+			Subsystem: SchedulerSubsystem,
+			Name:      "preemption_goroutines_duration_seconds",
+			Help:      "Duration in seconds for running goroutines for the preemption.",
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~0.5s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.000001, 2, 20),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"result"})
