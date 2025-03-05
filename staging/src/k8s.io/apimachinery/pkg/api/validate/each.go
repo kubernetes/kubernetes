@@ -18,7 +18,9 @@ package validate
 
 import (
 	"context"
+	"sort"
 
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -78,6 +80,46 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 	for key := range newMap {
 		// Note: the field path is the field, not the key.
 		errs = append(errs, validator(ctx, op, fldPath, &key, nil)...)
+	}
+	return errs
+}
+
+// Unique verifies that each element of newSlice is unique.  This function can
+// only be used on types that are directly comparable. For non-comparable
+// types, use UniqueNonComparable.
+func Unique[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
+	return unique(fldPath, newSlice, func(a, b T) bool { return a == b })
+}
+
+// UniqueNonComparable verifies that each element of newSlice is unique. Unlike
+// Unique, this function can be used with types that are not directly
+// comparable, at the cost of performance.
+func UniqueNonComparable[T any](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
+	return unique(fldPath, newSlice, func(a, b T) bool { return equality.Semantic.DeepEqual(a, b) })
+}
+
+// unique compares every element of the slice with every other element and
+// returns errors for non-unique items.
+func unique[T any](fldPath *field.Path, slice []T, cmp func(T, T) bool) field.ErrorList {
+	var dups []int
+	for i, val := range slice {
+		for j := i + 1; j < len(slice); j++ {
+			other := slice[j]
+			if cmp(val, other) {
+				if dups == nil {
+					dups = make([]int, 0, len(slice))
+				}
+				if lookup(dups, j, func(a, b int) bool { return a == b }) == nil {
+					dups = append(dups, j)
+				}
+			}
+		}
+	}
+
+	var errs field.ErrorList
+	sort.Ints(dups)
+	for _, i := range dups {
+		errs = append(errs, field.Duplicate(fldPath.Index(i), slice[i]))
 	}
 	return errs
 }
