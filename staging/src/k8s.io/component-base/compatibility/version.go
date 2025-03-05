@@ -185,7 +185,12 @@ func (m *effectiveVersion) Info() *apimachineryversion.Info {
 		return nil
 	}
 
-	info := binVer.Info()
+	info := baseversion.Get()
+	info.Major = version.Itoa(binVer.Major())
+	info.Minor = version.Itoa(binVer.Minor())
+	if info.GitVersion == "" {
+		info.GitVersion = binVer.String()
+	}
 
 	if ev := m.EmulationVersion(); ev != nil {
 		info.EmulationMajor = version.Itoa(ev.Major())
@@ -197,7 +202,7 @@ func (m *effectiveVersion) Info() *apimachineryversion.Info {
 		info.MinCompatibilityMinor = version.Itoa(mcv.Minor())
 	}
 
-	return info
+	return &info
 }
 
 // NewEffectiveVersion creates a MutableEffectiveVersion from the binaryVersion.
@@ -236,5 +241,5 @@ func NewEffectiveVersionFromString(binaryVer, emulationVerFloor, minCompatibilit
 
 func defaultBuildBinaryVersion() *version.Version {
 	verInfo := baseversion.Get()
-	return version.MustParse(verInfo.String()).WithInfo(verInfo)
+	return version.MustParse(verInfo.String())
 }
