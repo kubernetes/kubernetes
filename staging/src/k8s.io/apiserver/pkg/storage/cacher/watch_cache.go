@@ -322,13 +322,11 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 			return err
 		}
 		if w.snapshots != nil {
-			if orderedLister, ordered := w.store.(orderedLister); ordered {
-				if w.isCacheFullLocked() {
-					oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
-					w.snapshots.RemoveLess(oldestRV)
-				}
-				w.snapshots.Add(w.resourceVersion, orderedLister)
+			if w.isCacheFullLocked() {
+				oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
+				w.snapshots.RemoveLess(oldestRV)
 			}
+			w.snapshots.Add(w.resourceVersion, w.store)
 		}
 		return err
 	}(); err != nil {
@@ -522,19 +520,11 @@ func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion 
 			}, matchValue.IndexName, err
 		}
 	}
-	if store, ok := w.store.(orderedLister); ok {
-		result := store.ListPrefix(key, "")
-		return listResp{
-			Items:           result,
-			ResourceVersion: w.resourceVersion,
-		}, "", nil
-	}
-	result := w.store.List()
-	result, err = filterPrefixAndOrder(key, result)
+	result := w.store.ListPrefix(key, "")
 	return listResp{
 		Items:           result,
 		ResourceVersion: w.resourceVersion,
-	}, "", err
+	}, "", nil
 }
 
 func filterPrefixAndOrder(prefix string, items []interface{}) ([]interface{}, error) {
@@ -648,9 +638,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 	if w.snapshots != nil {
 		w.snapshots.Reset()
-		if orderedLister, ordered := w.store.(orderedLister); ordered {
-			w.snapshots.Add(version, orderedLister)
-		}
+		w.snapshots.Add(version, w.store)
 	}
 	w.listResourceVersion = version
 	w.resourceVersion = version

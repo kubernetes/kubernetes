@@ -40,7 +40,6 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -384,9 +383,6 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	var indexFields = []string{"spec.nodeName"}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
-		indexFields = append(indexFields, "metadata.namespace")
-	}
 	return storage.SelectionPredicate{
 		Label:       label,
 		Field:       field,
@@ -422,9 +418,6 @@ func NamespaceIndexFunc(obj interface{}) ([]string, error) {
 func Indexers() *cache.Indexers {
 	var indexers = cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
-		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
 	}
 	return &indexers
 }
