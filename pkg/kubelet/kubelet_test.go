@@ -2575,11 +2575,11 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			}
 			kubelet.HandlePodAdditions([]*v1.Pod{tc.pod})
 
-			allocatedResources, found := kubelet.allocationManager.GetContainerResourceAllocation(string(tc.pod.UID), tc.pod.Spec.Containers[0].Name)
+			allocatedResources, found := kubelet.allocationManager.GetContainerResourceAllocation(tc.pod.UID, tc.pod.Spec.Containers[0].Name)
 			if !found {
 				t.Fatalf("resource allocation should exist: (pod: %#v, container: %s)", tc.pod, tc.pod.Spec.Containers[0].Name)
 			}
-			assert.Equal(t, tc.expectedPodResourceAllocation[string(tc.pod.UID)][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
+			assert.Equal(t, tc.expectedPodResourceAllocation[tc.pod.UID][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
 		})
 	}
 }
@@ -2949,7 +2949,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
 				assert.Equal(t, tt.expectedAllocatedLims, updatedPodCtr.Resources.Limits, "updated pod spec limits")
 
-				alloc, found := kubelet.allocationManager.GetContainerResourceAllocation(string(newPod.UID), updatedPodCtr.Name)
+				alloc, found := kubelet.allocationManager.GetContainerResourceAllocation(newPod.UID, updatedPodCtr.Name)
 				require.True(t, found, "container allocation")
 				assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
 				assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")

@@ -34,7 +34,7 @@ const podStatusManagerStateFile = "pod_status_manager_state"
 // AllocationManager tracks pod resource allocations.
 type Manager interface {
 	// GetContainerResourceAllocation returns the AllocatedResources value for the container
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
+	GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 
 	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
 	// This function does a deep copy only if updates are needed.
@@ -83,7 +83,7 @@ func NewInMemoryManager() Manager {
 
 // GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
 // If checkpoint manager has not been initialized, it returns nil, false
-func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
+func (m *manager) GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
 	return m.state.GetContainerResourceAllocation(podUID, containerName)
 }
 
@@ -96,7 +96,7 @@ func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 }
 
 func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*v1.Pod, bool) {
-	allocated, found := allocs[string(pod.UID)]
+	allocated, found := allocs[pod.UID]
 	if !found {
 		return pod, false
 	}
@@ -149,11 +149,11 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 		}
 	}
 
-	return m.state.SetPodResourceAllocation(string(pod.UID), podAlloc)
+	return m.state.SetPodResourceAllocation(pod.UID, podAlloc)
 }
 
 func (m *manager) DeletePodAllocation(uid types.UID) {
-	if err := m.state.Delete(string(uid), ""); err != nil {
+	if err := m.state.Delete(uid, ""); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
 		klog.V(3).ErrorS(err, "Failed to delete pod allocation", "podUID", uid)
 	}

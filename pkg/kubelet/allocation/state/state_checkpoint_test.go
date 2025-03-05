@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 )
 
@@ -138,7 +139,7 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	// pretend that the old checkpoint is unaware for the field ResizeStatusEntries
 	const checkpointContent = `{"data":"{\"allocationEntries\":{\"pod1\":{\"container1\":{\"requests\":{\"cpu\":\"1Ki\",\"memory\":\"1Ki\"}}}}}","checksum":1555601526}`
 	expectedPodResourceAllocationInfo := &PodResourceAllocationInfo{
-		AllocationEntries: map[string]map[string]v1.ResourceRequirements{
+		AllocationEntries: map[types.UID]map[string]v1.ResourceRequirements{
 			"pod1": {
 				"container1": {
 					Requests: v1.ResourceList{
