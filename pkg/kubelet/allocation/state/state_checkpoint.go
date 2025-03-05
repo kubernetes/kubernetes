@@ -139,7 +139,7 @@ func (sc *stateCheckpoint) SetPodResourceAllocation(podUID types.UID, alloc map[
 }
 
 // Delete deletes allocations for specified pod
-func (sc *stateCheckpoint) Delete(podUID types.UID, containerName string) error {
+func (sc *stateCheckpoint) DeletePod(podUID types.UID) error {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	// Skip writing the checkpoint for pod deletion, since there is no side effect to
@@ -177,7 +177,7 @@ func (sc *noopStateCheckpoint) SetPodResourceAllocation(_ types.UID, _ map[strin
 	return nil
 }
 
-func (sc *noopStateCheckpoint) Delete(_ types.UID, _ string) error {
+func (sc *noopStateCheckpoint) DeletePod(_ types.UID) error {
 	return nil
 }
 
