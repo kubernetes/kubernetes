@@ -6,7 +6,7 @@ This document describes how you can use the Kubernetes command-line integration 
 
 ### All Tests
 
-To run this entire suite, execute `make test-cmd` from the top level.  This will import each file containing tests functions
+To run this entire suite, execute `make test-cmd` from the top level.  This will import each file containing tests functions.
 
 ### Specific Tests
 
