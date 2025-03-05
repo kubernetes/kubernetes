@@ -32,6 +32,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
@@ -2348,4 +2349,104 @@ func BenchmarkEventHandlers(b *testing.B) {
 			}
 		})
 	}
+}
+
+func BenchmarkInitialSync(b *testing.B) {
+	newInformerFactory := func() informers.SharedInformerFactory {
+		resourceSlices := make([]runtime.Object, 500)
+		for i := range resourceSlices {
+			resourceSlices[i] = &resourceapi.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "slice-" + strconv.Itoa(i),
+				},
+				Spec: resourceapi.ResourceSliceSpec{
+					Pool: resourceapi.ResourcePool{
+						Name: "pool-" + strconv.Itoa(i),
+					},
+					Driver: "test-" + strconv.Itoa(i%10) + ".example.com",
+					Devices: func() []resourceapi.Device {
+						devices := make([]resourceapi.Device, 128)
+						for j := range devices {
+							devices[j] = resourceapi.Device{
+								Name:  "dev-" + strconv.Itoa(j),
+								Basic: &resourceapi.BasicDevice{},
+							}
+						}
+						return devices
+					}(),
+				},
+			}
+		}
+		kubeClient := fake.NewSimpleClientset(resourceSlices...)
+		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
+		return informerFactory
+	}
+
+	waitForSync := func(b *testing.B, reg cache.ResourceEventHandlerRegistration) {
+		require.Eventually(b, reg.HasSynced, 1*time.Second, 1*time.Millisecond)
+	}
+
+	handler := cache.ResourceEventHandlerFuncs{}
+
+	b.Run("plain-informer", func(b *testing.B) {
+		logger, ctx := ktesting.NewTestContext(b)
+		ctx = klog.NewContext(ctx, logger.V(2))
+
+		loop := func() {
+			b.StopTimer()
+			ctx, cancel := context.WithCancel(ctx)
+			informerFactory := newInformerFactory()
+			b.StartTimer()
+			defer func() {
+				b.StopTimer()
+				cancel()
+				informerFactory.Shutdown()
+				b.StartTimer()
+			}()
+
+			reg, err := informerFactory.Resource().V1beta1().ResourceSlices().Informer().AddEventHandler(handler)
+			require.NoError(b, err)
+			informerFactory.Start(ctx.Done())
+			waitForSync(b, reg)
+		}
+
+		b.ResetTimer()
+		for range b.N {
+			loop()
+		}
+	})
+
+	b.Run("tracker", func(b *testing.B) {
+		logger, ctx := ktesting.NewTestContext(b)
+		ctx = klog.NewContext(ctx, logger.V(2))
+		ctx, cancel := context.WithCancel(ctx)
+		b.Cleanup(cancel)
+
+		loop := func() {
+			b.StopTimer()
+			ctx, cancel := context.WithCancel(ctx)
+			informerFactory := newInformerFactory()
+			b.StartTimer()
+			defer func() {
+				b.StopTimer()
+				cancel()
+				informerFactory.Shutdown()
+				b.StartTimer()
+			}()
+
+			opts := Options{
+				EnableAdminControlledAttributes: false,
+			}
+			tracker, err := StartTracker(ctx, informerFactory, opts)
+			require.NoError(b, err)
+			reg := tracker.AddEventHandler(handler)
+			informerFactory.Start(ctx.Done())
+			waitForSync(b, reg)
+		}
+
+		b.ResetTimer()
+		for range b.N {
+			loop()
+		}
+	})
 }
