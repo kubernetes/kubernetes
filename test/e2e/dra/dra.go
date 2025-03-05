@@ -1354,6 +1354,26 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	}
 
+	partitionableDevicesTests := func() {
+		nodes := NewNodes(f, 1, 1)
+
+		driver := NewDriver(f, nodes, perNode(-1, nodes), []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			{
+				"device-1-1": {},
+			},
+		}...)
+		_ = driver
+		// b := newBuilder(f, driver)
+		// _ = b
+
+		f.It("foo", feature.DRAPartitionableDevices, func(ctx context.Context) {
+			time.Sleep(10 * time.Second)
+			rsList, err := f.ClientSet.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			framework.Logf("resourceSlices %v", rsList)
+		})
+	}
+
 	ginkgo.Context("on single node", func() {
 		singleNodeTests()
 	})
@@ -1368,6 +1388,10 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	ginkgo.Context("with v1beta2 API", func() {
 		v1beta2Tests()
+	})
+
+	ginkgo.Context("with partitionable devices", func() {
+		partitionableDevicesTests()
 	})
 
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123699): move most of the test below into `testDriver` so that they get
