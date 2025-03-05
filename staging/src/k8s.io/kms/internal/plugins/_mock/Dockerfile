@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.24.0-bullseye AS builder
+# NOTE: this is just a default placeholder for convenience
+# To build this image properly, please invoke test/e2e/testing-manifests/auth/encrypt/run-e2e.sh
+ARG BUILDER_IMAGE=golang:latest
+FROM $BUILDER_IMAGE AS builder
 
 WORKDIR /workspace
 

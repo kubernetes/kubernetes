@@ -27,6 +27,7 @@ set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/../../../../.. && pwd -P)"
 source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/build/common.sh"
 
 readonly cluster_name="kms"
 readonly registry_name="kind-registry"
@@ -38,7 +39,8 @@ build_and_push_mock_plugin() {
         --no-cache \
         --platform linux/amd64 \
         --output=type=docker \
-        --build-arg=GOTOOLCHAIN="${GOTOOLCHAIN}" \
+        --build-arg=GOTOOLCHAIN="${GOTOOLCHAIN:?}" \
+        --build-arg=BUILDER_IMAGE="${KUBE_CROSS_IMAGE:?}:${KUBE_CROSS_VERSION:?}" \
         -t localhost:5000/mock-kms-provider:e2e \
         -f staging/src/k8s.io/kms/internal/plugins/_mock/Dockerfile staging/src/k8s.io/ \
         --progress=plain;
