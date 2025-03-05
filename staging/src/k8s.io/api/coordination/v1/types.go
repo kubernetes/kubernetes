@@ -54,6 +54,7 @@ type LeaseSpec struct {
 	// holderIdentity contains the identity of the holder of a current lease.
 	// If Coordinated Leader Election is used, the holder identity must be
 	// equal to the elected LeaseCandidate.metadata.name field.
+	// foo=bar
 	// +optional
 	HolderIdentity *string `json:"holderIdentity,omitempty" protobuf:"bytes,1,opt,name=holderIdentity"`
 	// leaseDurationSeconds is a duration that candidates for a lease need
