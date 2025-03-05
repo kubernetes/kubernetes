@@ -1230,12 +1230,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
-- name: SetPodTopologyLabels
+- name: PodTopologyLabelsAdmission
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.32"
+    version: "1.33"
 - name: SidecarContainers
   versionedSpecs:
   - default: false
