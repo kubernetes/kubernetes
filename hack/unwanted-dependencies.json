@@ -290,7 +290,6 @@
       "github.com/grpc-ecosystem/go-grpc-prometheus",
       "github.com/grpc-ecosystem/grpc-gateway",
       "github.com/json-iterator/go",
-      "github.com/klauspost/compress",
       "github.com/mailru/easyjson",
       "github.com/modern-go/concurrent",
       "github.com/modern-go/reflect2",

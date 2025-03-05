@@ -243,6 +243,7 @@ func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 
 	s := &summary{
 		desc: desc,
+		now:  opts.now,
 
 		objectives:       opts.Objectives,
 		sortedObjectives: make([]float64, 0, len(opts.Objectives)),
@@ -280,6 +281,8 @@ type summary struct {
 
 	desc *Desc
 
+	now func() time.Time
+
 	objectives       map[float64]float64
 	sortedObjectives []float64
 
@@ -307,7 +310,7 @@ func (s *summary) Observe(v float64) {
 	s.bufMtx.Lock()
 	defer s.bufMtx.Unlock()
 
-	now := time.Now()
+	now := s.now()
 	if now.After(s.hotBufExpTime) {
 		s.asyncFlush(now)
 	}
@@ -326,7 +329,7 @@ func (s *summary) Write(out *dto.Metric) error {
 	s.bufMtx.Lock()
 	s.mtx.Lock()
 	// Swap bufs even if hotBuf is empty to set new hotBufExpTime.
-	s.swapBufs(time.Now())
+	s.swapBufs(s.now())
 	s.bufMtx.Unlock()
 
 	s.flushColdBuf()

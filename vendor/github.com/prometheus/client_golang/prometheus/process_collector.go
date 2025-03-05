@@ -23,6 +23,7 @@ import (
 
 type processCollector struct {
 	collectFn         func(chan<- Metric)
+	describeFn        func(chan<- *Desc)
 	pidFn             func() (int, error)
 	reportErrors      bool
 	cpuTotal          *Desc
@@ -122,31 +123,33 @@ func NewProcessCollector(opts ProcessCollectorOpts) Collector {
 	// Set up process metric collection if supported by the runtime.
 	if canCollectProcess() {
 		c.collectFn = c.processCollect
+		c.describeFn = c.describe
 	} else {
-		c.collectFn = func(ch chan<- Metric) {
-			c.reportError(ch, nil, errors.New("process metrics not supported on this platform"))
-		}
+		c.collectFn = c.errorCollectFn
+		c.describeFn = c.errorDescribeFn
 	}
 
 	return c
 }
 
-// Describe returns all descriptions of the collector.
-func (c *processCollector) Describe(ch chan<- *Desc) {
-	ch <- c.cpuTotal
-	ch <- c.openFDs
-	ch <- c.maxFDs
-	ch <- c.vsize
-	ch <- c.maxVsize
-	ch <- c.rss
-	ch <- c.startTime
-	ch <- c.inBytes
-	ch <- c.outBytes
+func (c *processCollector) errorCollectFn(ch chan<- Metric) {
+	c.reportError(ch, nil, errors.New("process metrics not supported on this platform"))
+}
+
+func (c *processCollector) errorDescribeFn(ch chan<- *Desc) {
+	if c.reportErrors {
+		ch <- NewInvalidDesc(errors.New("process metrics not supported on this platform"))
+	}
 }
 
 // Collect returns the current state of all metrics of the collector.
 func (c *processCollector) Collect(ch chan<- Metric) {
 	c.collectFn(ch)
+}
+
+// Describe returns all descriptions of the collector.
+func (c *processCollector) Describe(ch chan<- *Desc) {
+	c.describeFn(ch)
 }
 
 func (c *processCollector) reportError(ch chan<- Metric, desc *Desc, err error) {

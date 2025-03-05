@@ -35,6 +35,7 @@ require (
 )
 
 replace (
+	github.com/prometheus/client_golang => github.com/liggitt/client_golang v1.21.2-0.20250305160129-7a4928dcd6a9
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

@@ -288,7 +288,7 @@ func NewGoCollector(opts ...func(o *internal.GoCollectorOptions)) Collector {
 }
 
 func attachOriginalName(desc, origName string) string {
-	return fmt.Sprintf("%s Sourced from %s", desc, origName)
+	return fmt.Sprintf("%s Sourced from %s.", desc, origName)
 }
 
 // Describe returns all descriptions of the collector.

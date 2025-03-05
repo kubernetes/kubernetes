@@ -19,7 +19,9 @@ require (
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241209162323-e6fa225c2576 // indirect
 	google.golang.org/grpc v1.68.1 // indirect
-	google.golang.org/protobuf v1.36.1 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace github.com/prometheus/client_golang => github.com/liggitt/client_golang v1.21.2-0.20250305160129-7a4928dcd6a9

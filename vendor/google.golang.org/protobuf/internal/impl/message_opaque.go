@@ -56,9 +56,6 @@ func opaqueInitHook(mi *MessageInfo) bool {
 		usePresence, _ := usePresenceForField(si, fd)
 
 		switch {
-		case fd.IsWeak():
-			// Weak fields are no different for opaque.
-			fi = fieldInfoForWeakMessage(fd, si.weakOffset)
 		case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
 			// Oneofs are no different for opaque.
 			fi = fieldInfoForOneof(fd, si.oneofsByName[fd.ContainingOneof().Name()], mi.Exporter, si.oneofWrappersByNumber[fd.Number()])
@@ -88,9 +85,7 @@ func opaqueInitHook(mi *MessageInfo) bool {
 	mi.oneofs = map[protoreflect.Name]*oneofInfo{}
 	for i := 0; i < mi.Desc.Oneofs().Len(); i++ {
 		od := mi.Desc.Oneofs().Get(i)
-		if !od.IsSynthetic() {
-			mi.oneofs[od.Name()] = makeOneofInfo(od, si.structInfo, mi.Exporter)
-		}
+		mi.oneofs[od.Name()] = makeOneofInfoOpaque(mi, od, si.structInfo, mi.Exporter)
 	}
 
 	mi.denseFields = make([]*fieldInfo, fds.Len()*2)
@@ -119,12 +114,32 @@ func opaqueInitHook(mi *MessageInfo) bool {
 	return true
 }
 
+func makeOneofInfoOpaque(mi *MessageInfo, od protoreflect.OneofDescriptor, si structInfo, x exporter) *oneofInfo {
+	oi := &oneofInfo{oneofDesc: od}
+	if od.IsSynthetic() {
+		fd := od.Fields().Get(0)
+		index, _ := presenceIndex(mi.Desc, fd)
+		oi.which = func(p pointer) protoreflect.FieldNumber {
+			if p.IsNil() {
+				return 0
+			}
+			if !mi.present(p, index) {
+				return 0
+			}
+			return od.Fields().Get(0).Number()
+		}
+		return oi
+	}
+	// Dispatch to non-opaque oneof implementation for non-synthetic oneofs.
+	return makeOneofInfo(od, si, x)
+}
+
 func (mi *MessageInfo) fieldInfoForMapOpaque(si opaqueStructInfo, fd protoreflect.FieldDescriptor, fs reflect.StructField) fieldInfo {
 	ft := fs.Type
 	if ft.Kind() != reflect.Map {
 		panic(fmt.Sprintf("invalid type: got %v, want map kind", ft))
 	}
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	conv := NewConverter(ft, fd)
 	return fieldInfo{
 		fieldDesc: fd,
@@ -178,7 +193,7 @@ func (mi *MessageInfo) fieldInfoForScalarListOpaque(si opaqueStructInfo, fd prot
 		panic(fmt.Sprintf("invalid type: got %v, want slice kind", ft))
 	}
 	conv := NewConverter(reflect.PtrTo(ft), fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	return fieldInfo{
 		fieldDesc: fd,
@@ -228,7 +243,7 @@ func (mi *MessageInfo) fieldInfoForMessageListOpaque(si opaqueStructInfo, fd pro
 		panic(fmt.Sprintf("invalid type: got %v, want slice kind", ft))
 	}
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	fieldNumber := fd.Number()
 	return fieldInfo{
@@ -321,7 +336,7 @@ func (mi *MessageInfo) fieldInfoForMessageListOpaqueNoPresence(si opaqueStructIn
 		panic(fmt.Sprintf("invalid type: got %v, want slice kind", ft))
 	}
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
@@ -393,7 +408,7 @@ func (mi *MessageInfo) fieldInfoForScalarOpaque(si opaqueStructInfo, fd protoref
 		deref = true
 	}
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	var getter func(p pointer) protoreflect.Value
 	if !nullable {
@@ -462,7 +477,7 @@ func (mi *MessageInfo) fieldInfoForScalarOpaque(si opaqueStructInfo, fd protoref
 func (mi *MessageInfo) fieldInfoForMessageOpaque(si opaqueStructInfo, fd protoreflect.FieldDescriptor, fs reflect.StructField) fieldInfo {
 	ft := fs.Type
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, mi.Exporter)
+	fieldOffset := offsetOf(fs)
 	index, _ := presenceIndex(mi.Desc, fd)
 	fieldNumber := fd.Number()
 	elemType := fs.Type.Elem()
@@ -601,8 +616,6 @@ func usePresenceForField(si opaqueStructInfo, fd protoreflect.FieldDescriptor) (
 	usesPresenceArray := fd.HasPresence() && fd.Message() == nil && (fd.ContainingOneof() == nil || fd.ContainingOneof().IsSynthetic())
 	switch {
 	case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
-		return false, false
-	case fd.IsWeak():
 		return false, false
 	case fd.IsMap():
 		return false, false

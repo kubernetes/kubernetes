@@ -310,12 +310,9 @@ func aberrantAppendField(md *filedesc.Message, goType reflect.Type, tag, tagKey,
 	fd.L0.Parent = md
 	fd.L0.Index = n
 
-	if fd.L1.IsWeak || fd.L1.EditionFeatures.IsPacked {
+	if fd.L1.EditionFeatures.IsPacked {
 		fd.L1.Options = func() protoreflect.ProtoMessage {
 			opts := descopts.Field.ProtoReflect().New()
-			if fd.L1.IsWeak {
-				opts.Set(opts.Descriptor().Fields().ByName("weak"), protoreflect.ValueOfBool(true))
-			}
 			if fd.L1.EditionFeatures.IsPacked {
 				opts.Set(opts.Descriptor().Fields().ByName("packed"), protoreflect.ValueOfBool(fd.L1.EditionFeatures.IsPacked))
 			}

@@ -8,7 +8,6 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/errors"
-	"google.golang.org/protobuf/internal/flags"
 	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -172,10 +171,6 @@ func (o UnmarshalOptions) unmarshalMessageSlow(b []byte, m protoreflect.Message)
 		var err error
 		if fd == nil {
 			err = errUnknown
-		} else if flags.ProtoLegacy {
-			if fd.IsWeak() && fd.Message().IsPlaceholder() {
-				err = errUnknown // weak referent is not linked in
-			}
 		}
 
 		// Parse the field value.

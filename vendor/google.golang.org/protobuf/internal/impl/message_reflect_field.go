@@ -8,11 +8,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"sync"
 
-	"google.golang.org/protobuf/internal/flags"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
 type fieldInfo struct {
@@ -76,7 +73,7 @@ func fieldInfoForOneof(fd protoreflect.FieldDescriptor, fs reflect.StructField, 
 	isMessage := fd.Message() != nil
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		// NOTE: The logic below intentionally assumes that oneof fields are
 		// well-formatted. That is, the oneof interface never contains a
@@ -152,7 +149,7 @@ func fieldInfoForMap(fd protoreflect.FieldDescriptor, fs reflect.StructField, x 
 	conv := NewConverter(ft, fd)
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
@@ -205,7 +202,7 @@ func fieldInfoForList(fd protoreflect.FieldDescriptor, fs reflect.StructField, x
 	conv := NewConverter(reflect.PtrTo(ft), fd)
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
@@ -269,7 +266,7 @@ func fieldInfoForScalar(fd protoreflect.FieldDescriptor, fs reflect.StructField,
 		}
 	}
 	conv := NewConverter(ft, fd)
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 
 	// Generate specialized getter functions to avoid going through reflect.Value
 	if nullable {
@@ -332,85 +329,12 @@ func fieldInfoForScalar(fd protoreflect.FieldDescriptor, fs reflect.StructField,
 	}
 }
 
-func fieldInfoForWeakMessage(fd protoreflect.FieldDescriptor, weakOffset offset) fieldInfo {
-	if !flags.ProtoLegacy {
-		panic("no support for proto1 weak fields")
-	}
-
-	var once sync.Once
-	var messageType protoreflect.MessageType
-	lazyInit := func() {
-		once.Do(func() {
-			messageName := fd.Message().FullName()
-			messageType, _ = protoregistry.GlobalTypes.FindMessageByName(messageName)
-			if messageType == nil {
-				panic(fmt.Sprintf("weak message %v for field %v is not linked in", messageName, fd.FullName()))
-			}
-		})
-	}
-
-	num := fd.Number()
-	return fieldInfo{
-		fieldDesc: fd,
-		has: func(p pointer) bool {
-			if p.IsNil() {
-				return false
-			}
-			_, ok := p.Apply(weakOffset).WeakFields().get(num)
-			return ok
-		},
-		clear: func(p pointer) {
-			p.Apply(weakOffset).WeakFields().clear(num)
-		},
-		get: func(p pointer) protoreflect.Value {
-			lazyInit()
-			if p.IsNil() {
-				return protoreflect.ValueOfMessage(messageType.Zero())
-			}
-			m, ok := p.Apply(weakOffset).WeakFields().get(num)
-			if !ok {
-				return protoreflect.ValueOfMessage(messageType.Zero())
-			}
-			return protoreflect.ValueOfMessage(m.ProtoReflect())
-		},
-		set: func(p pointer, v protoreflect.Value) {
-			lazyInit()
-			m := v.Message()
-			if m.Descriptor() != messageType.Descriptor() {
-				if got, want := m.Descriptor().FullName(), messageType.Descriptor().FullName(); got != want {
-					panic(fmt.Sprintf("field %v has mismatching message descriptor: got %v, want %v", fd.FullName(), got, want))
-				}
-				panic(fmt.Sprintf("field %v has mismatching message descriptor: %v", fd.FullName(), m.Descriptor().FullName()))
-			}
-			p.Apply(weakOffset).WeakFields().set(num, m.Interface())
-		},
-		mutable: func(p pointer) protoreflect.Value {
-			lazyInit()
-			fs := p.Apply(weakOffset).WeakFields()
-			m, ok := fs.get(num)
-			if !ok {
-				m = messageType.New().Interface()
-				fs.set(num, m)
-			}
-			return protoreflect.ValueOfMessage(m.ProtoReflect())
-		},
-		newMessage: func() protoreflect.Message {
-			lazyInit()
-			return messageType.New()
-		},
-		newField: func() protoreflect.Value {
-			lazyInit()
-			return protoreflect.ValueOfMessage(messageType.New())
-		},
-	}
-}
-
 func fieldInfoForMessage(fd protoreflect.FieldDescriptor, fs reflect.StructField, x exporter) fieldInfo {
 	ft := fs.Type
 	conv := NewConverter(ft, fd)
 
 	// TODO: Implement unsafe fast path?
-	fieldOffset := offsetOf(fs, x)
+	fieldOffset := offsetOf(fs)
 	return fieldInfo{
 		fieldDesc: fd,
 		has: func(p pointer) bool {
@@ -419,7 +343,7 @@ func fieldInfoForMessage(fd protoreflect.FieldDescriptor, fs reflect.StructField
 			}
 			rv := p.Apply(fieldOffset).AsValueOf(fs.Type).Elem()
 			if fs.Type.Kind() != reflect.Ptr {
-				return !isZero(rv)
+				return !rv.IsZero()
 			}
 			return !rv.IsNil()
 		},
@@ -466,7 +390,7 @@ func makeOneofInfo(od protoreflect.OneofDescriptor, si structInfo, x exporter) *
 	oi := &oneofInfo{oneofDesc: od}
 	if od.IsSynthetic() {
 		fs := si.fieldsByNumber[od.Fields().Get(0).Number()]
-		fieldOffset := offsetOf(fs, x)
+		fieldOffset := offsetOf(fs)
 		oi.which = func(p pointer) protoreflect.FieldNumber {
 			if p.IsNil() {
 				return 0
@@ -479,7 +403,7 @@ func makeOneofInfo(od protoreflect.OneofDescriptor, si structInfo, x exporter) *
 		}
 	} else {
 		fs := si.oneofsByName[od.Name()]
-		fieldOffset := offsetOf(fs, x)
+		fieldOffset := offsetOf(fs)
 		oi.which = func(p pointer) protoreflect.FieldNumber {
 			if p.IsNil() {
 				return 0
@@ -496,42 +420,4 @@ func makeOneofInfo(od protoreflect.OneofDescriptor, si structInfo, x exporter) *
 		}
 	}
 	return oi
-}
-
-// isZero is identical to reflect.Value.IsZero.
-// TODO: Remove this when Go1.13 is the minimally supported Go version.
-func isZero(v reflect.Value) bool {
-	switch v.Kind() {
-	case reflect.Bool:
-		return !v.Bool()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.Int() == 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return v.Uint() == 0
-	case reflect.Float32, reflect.Float64:
-		return math.Float64bits(v.Float()) == 0
-	case reflect.Complex64, reflect.Complex128:
-		c := v.Complex()
-		return math.Float64bits(real(c)) == 0 && math.Float64bits(imag(c)) == 0
-	case reflect.Array:
-		for i := 0; i < v.Len(); i++ {
-			if !isZero(v.Index(i)) {
-				return false
-			}
-		}
-		return true
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
-		return v.IsNil()
-	case reflect.String:
-		return v.Len() == 0
-	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			if !isZero(v.Field(i)) {
-				return false
-			}
-		}
-		return true
-	default:
-		panic(&reflect.ValueError{Method: "reflect.Value.IsZero", Kind: v.Kind()})
-	}
 }

@@ -9,10 +9,11 @@ godebug default=go1.24
 require (
 	github.com/gogo/protobuf v1.3.2
 	google.golang.org/grpc v1.68.1
-	google.golang.org/protobuf v1.36.1
+	google.golang.org/protobuf v1.36.5
 )
 
 require (
+	github.com/google/go-cmp v0.7.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
