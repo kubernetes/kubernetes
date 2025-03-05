@@ -962,6 +962,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.30"
+- name: PodTopologyLabelsAdmission
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: PortForwardWebsockets
   versionedSpecs:
   - default: false
@@ -1230,12 +1236,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
-- name: PodTopologyLabelsAdmission
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.33"
 - name: SidecarContainers
   versionedSpecs:
   - default: false
