@@ -147,6 +147,17 @@ var (
 		[]string{"resource"},
 	)
 
+	WatchCacheReady = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "ready",
+			Help:           "Readiness of the watch cache broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
 	WatchCacheInitializations = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -195,6 +206,7 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
+		legacyregistry.MustRegister(WatchCacheReady)
 		legacyregistry.MustRegister(WatchCacheInitializations)
 		legacyregistry.MustRegister(WatchCacheReadWait)
 		legacyregistry.MustRegister(ConsistentReadTotal)
