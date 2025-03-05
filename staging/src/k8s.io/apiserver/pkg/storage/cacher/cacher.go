@@ -474,11 +474,13 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 		successfulList = true
 		c.ready.set(true)
 		klog.V(1).Infof("cacher (%v): initialized", c.groupResource.String())
+		metrics.WatchCacheReady.WithLabelValues(c.groupResource.String()).Set(1)
 		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.String()).Inc()
 	})
 	defer func() {
 		if successfulList {
 			c.ready.set(false)
+			metrics.WatchCacheReady.WithLabelValues(c.groupResource.String()).Set(0)
 		}
 	}()
 
