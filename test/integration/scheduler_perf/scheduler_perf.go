@@ -1515,9 +1515,11 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *workload, informerFact
 		workload:                     w,
 	}
 
-	defer executor.wg.Wait()
-	defer executor.collectorWG.Wait()
-	defer tCtx.Cancel("workload is done")
+	tCtx.TB().Cleanup(func() {
+		tCtx.Cancel("workload is done")
+		executor.collectorWG.Wait()
+		executor.wg.Wait()
+	})
 
 	for opIndex, op := range unrollWorkloadTemplate(tCtx, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
