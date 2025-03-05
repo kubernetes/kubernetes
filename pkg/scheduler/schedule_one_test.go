@@ -667,17 +667,20 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	preBindErr := errors.New("on PreBind")
 
 	table := []struct {
-		name                string
-		injectBindError     error
-		sendPod             *v1.Pod
-		registerPluginFuncs []tf.RegisterPluginFunc
-		expectErrorPod      *v1.Pod
-		expectForgetPod     *v1.Pod
-		expectAssumedPod    *v1.Pod
-		expectError         error
-		expectBind          *v1.Binding
-		eventReason         string
-		mockResult          mockScheduleResult
+		name                          string
+		injectBindError               error
+		sendPod                       *v1.Pod
+		registerPluginFuncs           []tf.RegisterPluginFunc
+		expectErrorPod                *v1.Pod
+		expectForgetPod               *v1.Pod
+		expectAssumedPod              *v1.Pod
+		shouldVerifyPodsInQueues      bool
+		expectPodMovedToBackoffQ      *v1.Pod
+		expectPodMovedToUnschedulable *v1.Pod
+		expectError                   error
+		expectBind                    *v1.Binding
+		eventReason                   string
+		mockResult                    mockScheduleResult
 	}{
 		{
 			name:       "error reserve pod",
@@ -712,11 +715,14 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			registerPluginFuncs: []tf.RegisterPluginFunc{
 				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(framework.AsStatus(preBindErr))),
 			},
-			expectErrorPod:   podWithID("foo", testNode.Name),
-			expectForgetPod:  podWithID("foo", testNode.Name),
-			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr),
-			eventReason:      "FailedScheduling",
+			expectErrorPod:                podWithID("foo", testNode.Name),
+			expectForgetPod:               podWithID("foo", testNode.Name),
+			expectAssumedPod:              podWithID("foo", testNode.Name),
+			expectError:                   fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr),
+			eventReason:                   "FailedScheduling",
+			shouldVerifyPodsInQueues:      true,
+			expectPodMovedToBackoffQ:      podWithID("foo", testNode.Name),
+			expectPodMovedToUnschedulable: nil,
 		},
 		{
 			name:             "bind assumed pod scheduled",
@@ -858,6 +864,16 @@ func TestSchedulerScheduleOne(t *testing.T) {
 					return len(queue.InFlightPods()) == 0, nil
 				}); err != nil {
 					t.Errorf("in-flight pods should be always empty after SchedulingOne. It has %v Pods", len(queue.InFlightPods()))
+				}
+				if item.shouldVerifyPodsInQueues {
+					if item.expectPodMovedToBackoffQ != nil &&
+						!podListContainsPod(queue.PodsInBackoffQ(), item.expectPodMovedToBackoffQ) {
+						t.Errorf("Expected to find pod in backoffQ, but it's not there.\nWant: %v,\ngot: %v", item.expectPodMovedToBackoffQ, queue.PodsInBackoffQ())
+					}
+					if item.expectPodMovedToUnschedulable != nil &&
+						!podListContainsPod(queue.UnschedulablePods(), item.expectPodMovedToUnschedulable) {
+						t.Errorf("Expected to find pod in unschedulable pods, but it's not there.\nWant: %v,\ngot: %v", item.expectPodMovedToUnschedulable, queue.UnschedulablePods())
+					}
 				}
 				stopFunc()
 			})
