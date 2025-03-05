@@ -740,6 +740,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.ContainerManager,
 		klet.containerLogManager,
 		klet.runtimeClassManager,
+		klet.allocationManager,
 		seccompDefault,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
@@ -2886,8 +2887,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 
 	if !updated {
 		// Desired resources == allocated resources. Check whether a resize is in progress.
-		resizeInProgress := !allocatedResourcesMatchStatus(allocatedPod, podStatus)
-		if resizeInProgress {
+		if kl.isPodResizeInProgress(allocatedPod, podStatus) {
 			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
 			kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress)
 		} else {
@@ -2928,11 +2928,11 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		}
 		allocatedPod = pod
 
-		// Special case when the updated allocation matches the actual resources. This can occur
+		// Special case when the updated allocation matches the actuated resources. This can occur
 		// when reverting a resize that hasn't been actuated, or when making an equivalent change
 		// (such as CPU requests below MinShares). This is an optimization to clear the resize
 		// status immediately, rather than waiting for the next SyncPod iteration.
-		if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
+		if !kl.isPodResizeInProgress(allocatedPod, podStatus) {
 			// In this case, consider the resize complete.
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 			return allocatedPod, nil
@@ -2950,6 +2950,46 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		}
 	}
 	return allocatedPod, nil
+}
+
+// isPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
+// for any running containers. Specifically, the following differences are ignored:
+// - Non-resizable containers: non-restartable init containers, ephemeral containers
+// - Non-resizable resources: only CPU & memory are resizable
+// - Non-actuated resources: memory requests are not actuated
+// - Non-running containers: they will be sized correctly when (re)started
+func (kl *Kubelet) isPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	return !podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
+		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) (shouldContinue bool) {
+			if !isResizableContainer(allocatedContainer, containerType) {
+				return true
+			}
+
+			containerStatus := podStatus.FindContainerStatusByName(allocatedContainer.Name)
+			if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+				// If the container isn't running, it doesn't need to be resized.
+				return true
+			}
+
+			actuatedResources, _ := kl.allocationManager.GetActuatedResources(allocatedPod.UID, allocatedContainer.Name)
+			allocatedResources := allocatedContainer.Resources
+
+			// Memory requests are excluded since they don't need to be actuated.
+			return allocatedResources.Requests[v1.ResourceCPU].Equal(actuatedResources.Requests[v1.ResourceCPU]) &&
+				allocatedResources.Limits[v1.ResourceCPU].Equal(actuatedResources.Limits[v1.ResourceCPU]) &&
+				allocatedResources.Limits[v1.ResourceMemory].Equal(actuatedResources.Limits[v1.ResourceMemory])
+		})
+}
+
+func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
+	switch containerType {
+	case podutil.InitContainers:
+		return podutil.IsRestartableInitContainer(container)
+	case podutil.Containers:
+		return true
+	default:
+		return false
+	}
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.

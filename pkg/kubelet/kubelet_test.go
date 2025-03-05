@@ -2595,7 +2595,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
-	cpu1m := resource.MustParse("1m")
 	cpu2m := resource.MustParse("2m")
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -2805,24 +2804,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectBackoffReset:    true,
 		},
 		{
-			name:                  "Equivalent min CPU shares",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1m},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu2m},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu2m},
-			expectedResize:        "",
-			// Even though the resize isn't being actuated, we still clear the container backoff
-			// since the allocation is changing.
-			expectBackoffReset: true,
-		},
-		{
-			name:                  "Equivalent min CPU shares - already allocated",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu2m},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1m},
-			newResourcesAllocated: true,
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1m},
-			expectedResize:        "",
-		},
-		{
 			name:                  "Increase CPU from min limit",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 			originalLimits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
@@ -2844,35 +2825,11 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectedResize:        v1.PodResizeStatusInProgress,
 			expectBackoffReset:    true,
 		},
-		{
-			name:                  "Equivalent min CPU limit",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			originalLimits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")}, // Unchanged
-			newLimits:             v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
-			expectedResize:        "",
-			// Even though the resize isn't being actuated, we still clear the container backoff
-			// since the allocation is changing.
-			expectBackoffReset: true,
-		},
-		{
-			name:                  "Equivalent min CPU limit - already allocated",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			originalLimits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")}, // Unchanged
-			newLimits:             v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			newResourcesAllocated: true,
-			expectedResize:        "",
-		},
 	}
 
 	for _, tt := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
-			t.Run(tt.name, func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s/sidecar=%t", tt.name, isSidecarContainer), func(t *testing.T) {
 				kubelet.statusManager = status.NewFakeManager()
 
 				var originalPod *v1.Pod
@@ -2905,6 +2862,8 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				} else {
 					require.NoError(t, kubelet.allocationManager.SetPodAllocation(newPod))
 				}
+				require.NoError(t, kubelet.allocationManager.SetActuatedResources(originalPod, nil))
+				t.Cleanup(func() { kubelet.allocationManager.DeletePod(originalPod.UID) })
 
 				podStatus := &kubecontainer.PodStatus{
 					ID:        originalPod.UID,
@@ -3458,6 +3417,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.containerManager,
 		kubelet.containerLogManager,
 		kubelet.runtimeClassManager,
+		kubelet.allocationManager,
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
@@ -3712,6 +3672,261 @@ func TestRecordAdmissionRejection(t *testing.T) {
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), "kubelet_admission_rejections_total"); err != nil {
 				t.Error(err)
 			}
+		})
+	}
+}
+
+func TestIsPodResizeInProgress(t *testing.T) {
+	type testResources struct {
+		cpuReq, cpuLim, memReq, memLim int64
+	}
+	type testContainer struct {
+		allocated               testResources
+		actuated                *testResources
+		nonSidecarInit, sidecar bool
+		isRunning               bool
+		unstarted               bool // Whether the container is missing from the pod status
+	}
+
+	tests := []struct {
+		name            string
+		containers      []testContainer
+		expectHasResize bool
+	}{{
+		name: "simple running container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "simple unstarted container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			unstarted: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "simple resized container/cpu req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{150, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/cpu limit",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 300, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/mem req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 150, 200},
+			isRunning: true,
+		}},
+		// Memory requests aren't actuated and should be ignored.
+		expectHasResize: false,
+	}, {
+		name: "simple resized container/cpu+mem req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{150, 200, 150, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/mem limit",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 300},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "terminated resized container",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200},
+			isRunning: false,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "non-sidecar init container",
+		containers: []testContainer{{
+			allocated:      testResources{100, 200, 100, 200},
+			nonSidecarInit: true,
+			isRunning:      true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "non-resized sidecar",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "resized sidecar",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "several containers and a resize",
+		containers: []testContainer{{
+			allocated:      testResources{100, 200, 100, 200},
+			nonSidecarInit: true,
+			isRunning:      true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			unstarted: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200}, // Resized
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "best-effort pod",
+		containers: []testContainer{{
+			allocated: testResources{},
+			actuated:  &testResources{},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "burstable pod/not resizing",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100},
+			actuated:  &testResources{cpuReq: 100},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "burstable pod/resized",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100},
+			actuated:  &testResources{cpuReq: 500},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}}
+
+	mkRequirements := func(r testResources) v1.ResourceRequirements {
+		res := v1.ResourceRequirements{
+			Requests: v1.ResourceList{},
+			Limits:   v1.ResourceList{},
+		}
+		if r.cpuReq != 0 {
+			res.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuReq, resource.DecimalSI)
+		}
+		if r.cpuLim != 0 {
+			res.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuLim, resource.DecimalSI)
+		}
+		if r.memReq != 0 {
+			res.Requests[v1.ResourceMemory] = *resource.NewQuantity(r.memReq, resource.DecimalSI)
+		}
+		if r.memLim != 0 {
+			res.Limits[v1.ResourceMemory] = *resource.NewQuantity(r.memLim, resource.DecimalSI)
+		}
+		return res
+	}
+	mkContainer := func(index int, c testContainer) v1.Container {
+		container := v1.Container{
+			Name:      fmt.Sprintf("c%d", index),
+			Resources: mkRequirements(c.allocated),
+		}
+		if c.sidecar {
+			container.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+		}
+		return container
+	}
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	am := kl.allocationManager
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+			}
+			t.Cleanup(func() { am.DeletePod(pod.UID) })
+			podStatus := &kubecontainer.PodStatus{
+				ID:   pod.UID,
+				Name: pod.Name,
+			}
+			for i, c := range test.containers {
+				// Add the container to the pod
+				container := mkContainer(i, c)
+				if c.nonSidecarInit || c.sidecar {
+					pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
+				} else {
+					pod.Spec.Containers = append(pod.Spec.Containers, container)
+				}
+
+				// Add the container to the pod status, if it's started.
+				if !test.containers[i].unstarted {
+					cs := kubecontainer.Status{
+						Name: container.Name,
+					}
+					if test.containers[i].isRunning {
+						cs.State = kubecontainer.ContainerStateRunning
+					} else {
+						cs.State = kubecontainer.ContainerStateExited
+					}
+					podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, &cs)
+				}
+
+				// Register the actuated container (if needed)
+				if c.actuated != nil {
+					actuatedContainer := container.DeepCopy()
+					actuatedContainer.Resources = mkRequirements(*c.actuated)
+					require.NoError(t, am.SetActuatedResources(pod, actuatedContainer))
+
+					fetched, found := am.GetActuatedResources(pod.UID, container.Name)
+					require.True(t, found)
+					assert.Equal(t, actuatedContainer.Resources, fetched)
+				} else {
+					_, found := am.GetActuatedResources(pod.UID, container.Name)
+					require.False(t, found)
+				}
+			}
+			require.NoError(t, am.SetPodAllocation(pod))
+
+			hasResizedResources := kl.isPodResizeInProgress(pod, podStatus)
+			require.Equal(t, test.expectHasResize, hasResizedResources, "hasResizedResources")
 		})
 	}
 }
