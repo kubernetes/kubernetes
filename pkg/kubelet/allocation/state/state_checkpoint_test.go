@@ -19,13 +19,13 @@ package state
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 )
 
@@ -124,6 +124,22 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 
 			actual = newSC.GetPodResourceAllocation()
 			verifyPodResourceAllocation(t, &tt.args.podResourceAllocation, &actual, "restored pod resource allocation is not equal to original pod resource allocation")
+
+			checkpointPath := filepath.Join(testDir, testCheckpoint)
+			require.FileExists(t, checkpointPath)
+			require.NoError(t, os.Remove(checkpointPath)) // Remove the checkpoint file to track whether it's re-written.
+
+			// Setting the pod allocations to the same values should not re-write the checkpoint.
+			for podUID, alloc := range tt.args.podResourceAllocation {
+				require.NoError(t, originalSC.SetPodResourceAllocation(podUID, alloc))
+				require.NoFileExists(t, checkpointPath, "checkpoint should not be re-written")
+			}
+
+			// Setting a new value should update the checkpoint.
+			require.NoError(t, originalSC.SetPodResourceAllocation("foo-bar", map[string]v1.ResourceRequirements{
+				"container1": {Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}},
+			}))
+			require.FileExists(t, checkpointPath, "checkpoint should be re-written")
 		})
 	}
 }
@@ -138,14 +154,12 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	// prepare old checkpoint, ResizeStatusEntries is unset,
 	// pretend that the old checkpoint is unaware for the field ResizeStatusEntries
 	const checkpointContent = `{"data":"{\"allocationEntries\":{\"pod1\":{\"container1\":{\"requests\":{\"cpu\":\"1Ki\",\"memory\":\"1Ki\"}}}}}","checksum":1555601526}`
-	expectedPodResourceAllocationInfo := &PodResourceAllocationInfo{
-		AllocationEntries: map[types.UID]map[string]v1.ResourceRequirements{
-			"pod1": {
-				"container1": {
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("1Ki"),
-						v1.ResourceMemory: resource.MustParse("1Ki"),
-					},
+	expectedPodResourceAllocation := PodResourceAllocation{
+		"pod1": {
+			"container1": {
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("1Ki"),
+					v1.ResourceMemory: resource.MustParse("1Ki"),
 				},
 			},
 		},
@@ -157,15 +171,14 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	require.NoError(t, err, "failed to create old checkpoint")
 
-	actualPodResourceAllocationInfo, err := restoreState(sc.checkpointManager, sc.checkpointName)
+	actualPodResourceAllocation, _, err := restoreState(sc.checkpointManager, sc.checkpointName)
 	require.NoError(t, err, "failed to restore state")
 
-	require.Equal(t, expectedPodResourceAllocationInfo, actualPodResourceAllocationInfo, "pod resource allocation info is not equal")
+	require.Equal(t, expectedPodResourceAllocation, actualPodResourceAllocation, "pod resource allocation info is not equal")
 
-	sc.cache = NewStateMemory(actualPodResourceAllocationInfo.AllocationEntries)
+	sc.cache = NewStateMemory(actualPodResourceAllocation)
 
-	actualPodResourceAllocationInfo = &PodResourceAllocationInfo{}
-	actualPodResourceAllocationInfo.AllocationEntries = sc.cache.GetPodResourceAllocation()
+	actualPodResourceAllocation = sc.cache.GetPodResourceAllocation()
 
-	require.Equal(t, expectedPodResourceAllocationInfo, actualPodResourceAllocationInfo, "pod resource allocation info is not equal")
+	require.Equal(t, expectedPodResourceAllocation, actualPodResourceAllocation, "pod resource allocation info is not equal")
 }
