@@ -68,7 +68,13 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// owning-sig: sig-node
+	// kep: https://kep.k8s.io/3570
+	// test-infra jobs:
+	// - https://testgrid.k8s.io/sig-node-kubelet#kubelet-serial-gce-e2e-cpu-manager
+	//
+	// This label is used for tests which need:
+	// - NUMA support available on the given node.
 	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
