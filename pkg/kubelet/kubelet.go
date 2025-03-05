@@ -2722,7 +2722,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.RemovePod(pod)
-		kl.allocationManager.DeletePodAllocation(pod.UID)
+		kl.allocationManager.DeletePod(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
