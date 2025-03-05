@@ -1672,7 +1672,7 @@ func (e *WorkloadExecutor) runCreatePodsOp(opIndex int, op *createPodsOp) error 
 
 	if op.CollectMetrics {
 		if e.collectorCtx != nil {
-			return fmt.Errorf("Metrics collection is overlapping. Probably second collector was started before stopping a previous one")
+			return fmt.Errorf("metrics collection is overlapping. Probably second collector was started before stopping a previous one")
 		}
 		var err error
 		e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, namespace, []string{namespace}, nil)
@@ -1886,7 +1886,7 @@ func (e *WorkloadExecutor) runDefaultOp(opIndex int, op realOp) error {
 
 func (e *WorkloadExecutor) runStartCollectingMetricsOp(opIndex int, op *startCollectingMetricsOp) error {
 	if e.collectorCtx != nil {
-		return fmt.Errorf("Metrics collection is overlapping. Probably second collector was started before stopping a previous one")
+		return fmt.Errorf("metrics collection is overlapping. Probably second collector was started before stopping a previous one")
 	}
 	var err error
 	e.collectorCtx, e.collectors, err = startCollectingMetrics(e.tCtx, &e.collectorWG, e.podInformer, e.testCase.MetricsCollectorConfig, e.throughputErrorMargin, opIndex, op.Name, op.Namespaces, op.LabelSelector)
