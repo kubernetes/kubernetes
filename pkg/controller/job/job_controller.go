@@ -1007,7 +1007,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
 			// updates.
-			if job.Spec.Suspend != nil && *job.Spec.Suspend {
+			if jobSuspended(&job) {
 				// Job can be in the suspended state only if it is NOT completed.
 				var isUpdated bool
 				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended", jm.clock.Now())
