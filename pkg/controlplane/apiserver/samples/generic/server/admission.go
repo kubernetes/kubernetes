@@ -50,7 +50,6 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy
 		mutatingadmissionpolicy.PluginName,   // MutatingAdmissionPolicy
 		podtopologylabels.PluginName,         // PodTopologyLabels, only active when feature gate PodTopologyLabelsAdmission is enabled.
-		validatingadmissionpolicy.PluginName, // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 	)
 
 	return sets.New(options.AllOrderedPlugins...).Difference(defaultOnPlugins)
