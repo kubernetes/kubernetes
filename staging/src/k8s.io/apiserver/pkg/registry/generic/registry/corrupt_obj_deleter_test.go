@@ -267,6 +267,46 @@ func TestUnsafeDeleteWithUnexpectedError(t *testing.T) {
 	}
 }
 
+func TestUnsafeDeleteWithAdmissionShouldBeSkipped(t *testing.T) {
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	object := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	// a) create the target object
+	_, err := registry.Create(ctx, object, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// b) wrap the storage layer to return corrupt object error
+	cs := &corruptStorage{
+		Interface: registry.Storage.Storage,
+		err:       storage.NewCorruptObjError("key", fmt.Errorf("untransformable")),
+	}
+	registry.Storage.Storage = cs
+
+	// c) set up a corrupt object deleter for the registry
+	deleter := NewCorruptObjectDeleter(registry)
+
+	// d) try unsafe-delete, but pass a validation that always fails
+	got := result{}
+	_, got.deleted, got.err = deleter.Delete(ctx, object.Name, func(_ context.Context, _ runtime.Object) error {
+		return fmt.Errorf("admission was not skipped")
+	}, &metav1.DeleteOptions{
+		IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
+	})
+
+	want := deleteWant{
+		deleted:  true,
+		checkErr: wantNoError,
+	}
+	want.verify(t, got)
+}
+
 type corruptStorage struct {
 	storage.Interface
 	err                 error
