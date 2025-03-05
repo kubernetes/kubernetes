@@ -26164,6 +26164,83 @@ func TestValidatePodResize(t *testing.T) {
 			new:  mkPodWithInitContainers(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, core.ContainerRestartPolicyAlways),
 			err:  "spec: Forbidden: only cpu and memory resources for sidecar containers are mutable",
 		}, {
+			test: "pod container addition",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers: Forbidden: containers may not be added or removed on resize",
+		}, {
+			test: "pod container removal",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers: Forbidden: containers may not be added or removed on resize",
+		}, {
+			test: "pod container reorder",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize, spec.containers[1].name: Forbidden: containers may not be renamed or reordered on resize",
+		},
+		{
+			test: "pod container rename",
+			old: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c1",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			new: podtest.MakePod("pod", podtest.SetContainers(
+				podtest.MakeContainer(
+					"c2",
+					podtest.SetContainerResources(core.ResourceRequirements{}),
+				),
+			)),
+			err: "spec.containers[0].name: Forbidden: containers may not be renamed or reordered on resize",
+		}, {
 			test: "change resize restart policy",
 			old:  mkPod(getResources("100m", "0", "1Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.NotRequired)),
 			new:  mkPod(getResources("100m", "0", "2Gi", ""), core.ResourceList{}, resizePolicy(core.ResourceCPU, core.RestartContainer)),
