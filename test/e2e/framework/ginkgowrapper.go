@@ -208,9 +208,9 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 		case label:
 			fullLabel := strings.Join(arg.parts, ":")
 			addLabel(fullLabel)
-			if arg.extraFeature != "" {
-				texts = append(texts, fmt.Sprintf("[%s]", arg.extraFeature))
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:"+arg.extraFeature))
+			if arg.alphaBetaLevel != "" {
+				texts = append(texts, fmt.Sprintf("[%[1]s] [Feature:%[1]s]", arg.alphaBetaLevel))
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:"+arg.alphaBetaLevel))
 			}
 			if fullLabel == "Serial" {
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Serial)
@@ -350,7 +350,8 @@ func withFeature(name Feature) interface{} {
 }
 
 // WithFeatureGate specifies that a certain test or group of tests depends on a
-// feature gate being enabled. The return value must be passed as additional
+// feature gate and the corresponding API group (if there is one)
+// being enabled. The return value must be passed as additional
 // argument to [framework.It], [framework.Describe], [framework.Context].
 //
 // The feature gate must be listed in
@@ -359,9 +360,15 @@ func withFeature(name Feature) interface{} {
 // also need to be removed.
 //
 // [Alpha] resp. [Beta] get added to the test name automatically depending
-// on the current stability level of the feature. Feature:Alpha resp.
-// Feature:Beta get added to the Ginkgo labels because this is a special
-// requirement for how the cluster needs to be configured.
+// on the current stability level of the feature, to emulate historic
+// usage of those tags.
+//
+// In addition, [Feature:Alpha] resp. [Feature:Beta] get added to support
+// skipping a test with a dependency on an alpha or beta feature gate in
+// jobs which use the traditional \[Feature:.*\] skip regular expression.
+//
+// For label filtering, Feature:Alpha resp. Feature:Beta get added to the
+// Ginkgo labels.
 //
 // If the test can run in any cluster that has alpha resp. beta features and
 // API groups enabled, then annotating it with just WithFeatureGate is
@@ -390,7 +397,7 @@ func withFeatureGate(featureGate featuregate.Feature) interface{} {
 	}
 
 	l := newLabel("FeatureGate", string(featureGate))
-	l.extraFeature = level
+	l.alphaBetaLevel = level
 	return l
 }
 
@@ -536,9 +543,10 @@ func withFlaky() interface{} {
 type label struct {
 	// parts get concatenated with ":" to build the full label.
 	parts []string
-	// extra is an optional feature name. It gets added as [<extraFeature>]
-	// to the test name and as Feature:<extraFeature> to the labels.
-	extraFeature string
+	// alphaBetaLevel is "Alpha", "Beta" or empty for GA features
+	// It gets added as [<level>] [Feature:<level>]
+	// to the test name and as Feature:<level> to the labels.
+	alphaBetaLevel string
 	// explanation gets set for each label to help developers
 	// who pass a label to a ginkgo function. They need to use
 	// the corresponding framework function instead.
@@ -565,7 +573,7 @@ func TagsEqual(a, b interface{}) bool {
 	if !ok {
 		return false
 	}
-	if al.extraFeature != bl.extraFeature {
+	if al.alphaBetaLevel != bl.alphaBetaLevel {
 		return false
 	}
 	return slices.Equal(al.parts, bl.parts)
