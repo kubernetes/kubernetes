@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 )
 
@@ -36,6 +37,7 @@ type stateCheckpoint struct {
 	cache             State
 	checkpointManager checkpointmanager.CheckpointManager
 	checkpointName    string
+	lastChecksum      checksum.Checksum
 }
 
 // NewStateCheckpoint creates new State for keeping track of pod resource allocations with checkpoint backend
@@ -45,7 +47,7 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager for pod allocation tracking: %v", err)
 	}
 
-	praInfo, err := restoreState(checkpointManager, checkpointName)
+	pra, checksum, err := restoreState(checkpointManager, checkpointName)
 	if err != nil {
 		//lint:ignore ST1005 user-facing error message
 		return nil, fmt.Errorf("could not restore state from checkpoint: %w, please drain this node and delete pod allocation checkpoint file %q before restarting Kubelet",
@@ -53,33 +55,31 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 	}
 
 	stateCheckpoint := &stateCheckpoint{
-		cache:             NewStateMemory(praInfo.AllocationEntries),
+		cache:             NewStateMemory(pra),
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
+		lastChecksum:      checksum,
 	}
 	return stateCheckpoint, nil
 }
 
 // restores state from a checkpoint and creates it if it doesn't exist
-func restoreState(checkpointManager checkpointmanager.CheckpointManager, checkpointName string) (*PodResourceAllocationInfo, error) {
-	var err error
+func restoreState(checkpointManager checkpointmanager.CheckpointManager, checkpointName string) (PodResourceAllocation, checksum.Checksum, error) {
 	checkpoint := &Checkpoint{}
-
-	if err = checkpointManager.GetCheckpoint(checkpointName, checkpoint); err != nil {
+	if err := checkpointManager.GetCheckpoint(checkpointName, checkpoint); err != nil {
 		if err == errors.ErrCheckpointNotFound {
-			return &PodResourceAllocationInfo{
-				AllocationEntries: make(map[types.UID]map[string]v1.ResourceRequirements),
-			}, nil
+			return nil, 0, nil
 		}
-		return nil, err
+		return nil, 0, err
 	}
-	klog.V(2).InfoS("State checkpoint: restored pod resource allocation state from checkpoint")
+
 	praInfo, err := checkpoint.GetPodResourceAllocationInfo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pod resource allocation info: %w", err)
+		return nil, 0, fmt.Errorf("failed to get pod resource allocation info: %w", err)
 	}
 
-	return praInfo, nil
+	klog.V(2).InfoS("State checkpoint: restored pod resource allocation state from checkpoint")
+	return praInfo.AllocationEntries, checkpoint.Checksum, nil
 }
 
 // saves state to a checkpoint, caller is responsible for locking
@@ -92,11 +92,16 @@ func (sc *stateCheckpoint) storeState() error {
 	if err != nil {
 		return fmt.Errorf("failed to create checkpoint: %w", err)
 	}
+	if checkpoint.Checksum == sc.lastChecksum {
+		// No changes to the checkpoint => no need to re-write it.
+		return nil
+	}
 	err = sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
 		klog.ErrorS(err, "Failed to save pod allocation checkpoint")
 		return err
 	}
+	sc.lastChecksum = checkpoint.Checksum
 	return nil
 }
 
