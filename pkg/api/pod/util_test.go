@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -1016,7 +1017,7 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 	}
 }
 
-func TestDropDisabledPodStatusFields(t *testing.T) {
+func TestDropDisabledPodStatusFields_HostIPs(t *testing.T) {
 	podWithHostIPs := func() *api.PodStatus {
 		return &api.PodStatus{
 			HostIPs: makeHostIPs("10.0.0.1", "fd00:10::1"),
@@ -1081,6 +1082,104 @@ func makeHostIPs(ips ...string) []api.HostIP {
 		ret = append(ret, api.HostIP{IP: ip})
 	}
 	return ret
+}
+
+func TestDropDisabledPodStatusFields_ObservedGeneration(t *testing.T) {
+	now := metav1.NewTime(time.Now())
+
+	podWithObservedGen := func() *api.PodStatus {
+		return &api.PodStatus{
+			ObservedGeneration: 1,
+			Conditions: []api.PodCondition{{
+				LastProbeTime:      now,
+				LastTransitionTime: now,
+			}},
+		}
+	}
+	podWithObservedGenInConditions := func() *api.PodStatus {
+		return &api.PodStatus{
+			Conditions: []api.PodCondition{{
+				LastProbeTime:      now,
+				LastTransitionTime: now,
+				ObservedGeneration: 1,
+			}},
+		}
+	}
+
+	podWithoutObservedGen := func() *api.PodStatus {
+		return &api.PodStatus{
+			Conditions: []api.PodCondition{{
+				LastProbeTime:      now,
+				LastTransitionTime: now,
+			}},
+		}
+	}
+
+	tests := []struct {
+		name          string
+		podStatus     *api.PodStatus
+		oldPodStatus  *api.PodStatus
+		wantPodStatus *api.PodStatus
+	}{
+		{
+			name:         "old=without, new=without",
+			oldPodStatus: podWithoutObservedGen(),
+			podStatus:    podWithoutObservedGen(),
+
+			wantPodStatus: podWithoutObservedGen(),
+		},
+		{
+			name:         "old=without, new=with",
+			oldPodStatus: podWithoutObservedGen(),
+			podStatus:    podWithObservedGen(),
+
+			wantPodStatus: podWithoutObservedGen(),
+		},
+		{
+			name:         "old=with, new=without",
+			oldPodStatus: podWithObservedGen(),
+			podStatus:    podWithoutObservedGen(),
+
+			wantPodStatus: podWithoutObservedGen(),
+		},
+		{
+			name:         "old=with, new=with",
+			oldPodStatus: podWithObservedGen(),
+			podStatus:    podWithObservedGen(),
+
+			wantPodStatus: podWithObservedGen(),
+		},
+		{
+			name:         "old=without, new=withInConditions",
+			oldPodStatus: podWithoutObservedGen(),
+			podStatus:    podWithObservedGenInConditions(),
+
+			wantPodStatus: podWithoutObservedGen(),
+		},
+		{
+			name:         "old=withInConditions, new=without",
+			oldPodStatus: podWithObservedGenInConditions(),
+			podStatus:    podWithoutObservedGen(),
+
+			wantPodStatus: podWithoutObservedGen(),
+		},
+		{
+			name:         "old=withInConditions, new=withInCondtions",
+			oldPodStatus: podWithObservedGenInConditions(),
+			podStatus:    podWithObservedGenInConditions(),
+
+			wantPodStatus: podWithObservedGenInConditions(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dropDisabledPodStatusFields(tt.podStatus, tt.oldPodStatus, &api.PodSpec{}, &api.PodSpec{})
+
+			if !reflect.DeepEqual(tt.podStatus, tt.wantPodStatus) {
+				t.Errorf("dropDisabledStatusFields() = %v, want %v", tt.podStatus, tt.wantPodStatus)
+			}
+		})
+	}
 }
 
 func TestDropNodeInclusionPolicyFields(t *testing.T) {
