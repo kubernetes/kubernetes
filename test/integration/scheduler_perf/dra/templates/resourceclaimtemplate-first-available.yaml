@@ -1,0 +1,14 @@
+apiVersion: resource.k8s.io/v1alpha3
+kind: ResourceClaimTemplate
+metadata:
+  name: test-claim-template
+spec:
+  spec:
+    devices:
+      requests:
+      - name: req-0
+        firstAvailable:
+        - name: sub-0
+          deviceClassName: no-such-class
+        - name: sub-1
+          deviceClassName: test-class
