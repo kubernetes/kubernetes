@@ -2065,6 +2065,11 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	klog.V(4).InfoS("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// We don't evaluate pending resizes for terminating pods - proceed with the allocated resources.
+		pod, _ = kl.allocationManager.UpdatePodFromAllocation(pod)
+	}
+
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
@@ -2209,6 +2214,11 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	defer otelSpan.End()
 	klog.V(4).InfoS("SyncTerminatedPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatedPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// Terminated pods can no longer be resized. Proceed with the allocated resources.
+		pod, _ = kl.allocationManager.UpdatePodFromAllocation(pod)
+	}
 
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
