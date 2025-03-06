@@ -151,26 +151,3 @@ func isFinishedPodWithTrackingFinalizer(pod *v1.Pod) bool {
 	}
 	return (pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded) && hasJobTrackingFinalizer(pod)
 }
-
-type jobUIDCache struct {
-	sync.RWMutex
-	set sets.Set[types.UID]
-}
-
-func (j *jobUIDCache) add(uid types.UID) {
-	j.Lock()
-	defer j.Unlock()
-	j.set.Insert(uid)
-}
-
-func (j *jobUIDCache) remove(uid types.UID) {
-	j.Lock()
-	defer j.Unlock()
-	j.set.Delete(uid)
-}
-
-func (j *jobUIDCache) exists(uid types.UID) bool {
-	j.RLock()
-	defer j.RUnlock()
-	return j.set.Has(uid)
-}
