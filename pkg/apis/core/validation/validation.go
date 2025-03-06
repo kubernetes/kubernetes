@@ -5465,7 +5465,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	// Pod QoS is immutable
 	allErrs = append(allErrs, ValidateImmutableField(newPod.Status.QOSClass, oldPod.Status.QOSClass, fldPath.Child("qosClass"))...)
 
-	// Note: there is no check that ContainerStatuses, InitContainerStatuses, and EphemeralContainerStatuses doesn't have duplicate conatainer names
+	// Note: there is no check that ContainerStatuses, InitContainerStatuses, and EphemeralContainerStatuses doesn't have duplicate container names
 	// or statuses of containers that are not defined in the pod spec. Changing this may lead to a breaking changes. So consumers of those fields
 	// must account for unexpected data. Kubelet will never report statuses like this.
 	//
@@ -8036,7 +8036,7 @@ func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusion
 
 // validateMatchLabelKeysAndMismatchLabelKeys checks if both matchLabelKeys and mismatchLabelKeys are valid.
 // - validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
-// - validate that the user doens't specify the same key in both matchLabelKeys and labelSelector.
+// - validate that the user doesn't specify the same key in both matchLabelKeys and labelSelector.
 // - validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
 func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
 	var allErrs field.ErrorList
@@ -8044,7 +8044,7 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 	allErrs = append(allErrs, validateLabelKeys(fldPath.Child("matchLabelKeys"), matchLabelKeys, labelSelector)...)
 	allErrs = append(allErrs, validateLabelKeys(fldPath.Child("mismatchLabelKeys"), mismatchLabelKeys, labelSelector)...)
 
-	// 2. validate that the user doens't specify the same key in both matchLabelKeys and labelSelector.
+	// 2. validate that the user doesn't specify the same key in both matchLabelKeys and labelSelector.
 	// It doesn't make sense to have the labelselector with the key specified in matchLabelKeys
 	// because the matchLabelKeys will be `In` labelSelector which matches with only one value in the key
 	// and we cannot make any further filtering with that key.
