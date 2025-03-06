@@ -1396,7 +1396,11 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			var gotList framework.NodeScoreList
 			for _, n := range tt.nodes {
 				nodeName := n.Name
-				score, status := p.Score(ctx, state, tt.pod, nodeName)
+				nodeInfo, err := p.sharedLister.NodeInfos().Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.Score(ctx, state, tt.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
@@ -1463,13 +1467,21 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
+			nodeInfos := make([]*framework.NodeInfo, len(filteredNodes))
+			for i, n := range filteredNodes {
+				nodeInfo, err := p.sharedLister.NodeInfos().Get(n.Name)
+				if err != nil {
+					b.Fatalf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				nodeInfos[i] = nodeInfo
+			}
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
 				var gotList framework.NodeScoreList
-				for _, n := range filteredNodes {
-					nodeName := n.Name
-					score, status := p.Score(ctx, state, tt.pod, nodeName)
+				for _, nodeInfo := range nodeInfos {
+					nodeName := nodeInfo.Node().Name
+					score, status := p.Score(ctx, state, tt.pod, nodeInfo)
 					if !status.IsSuccess() {
 						b.Fatalf("unexpected error: %v", status)
 					}

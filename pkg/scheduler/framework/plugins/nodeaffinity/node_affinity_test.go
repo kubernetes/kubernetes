@@ -1212,9 +1212,10 @@ func TestNodeAffinityPriority(t *testing.T) {
 				}
 			}
 			var gotList framework.NodeScoreList
-			for _, n := range test.nodes {
-				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
+			nodeInfos := tf.BuildNodeInfos(test.nodes)
+			for _, nodeInfo := range nodeInfos {
+				nodeName := nodeInfo.Node().Name
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
