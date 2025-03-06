@@ -622,7 +622,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, ignoreWatchCacheTests bool) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -648,10 +648,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	// Use compact to increase etcd global revision without changes to any resources.
-	// The increase in resources version comes from Kubernetes compaction updating hidden key.
-	// Used to test consistent List to confirm it returns latest etcd revision.
-	compaction(ctx, t, initialRV)
+	// Increase RV to test consistent List.
+	increaseRV(ctx, t)
 	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
@@ -1591,7 +1589,7 @@ func ExpectContinueMatches(t *testing.T, expect, got string) {
 	t.Errorf("expected continue token: %s, got: %s", expectDecoded, gotDecoded)
 }
 
-func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, cacheEnabled, consistentReadsSupported bool) {
+func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, cacheEnabled, consistentReadsSupported bool) {
 	outPod := &example.Pod{}
 	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
@@ -1599,7 +1597,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 		t.Errorf("Unexpected error: %v", err)
 	}
 	lastObjecRV := outPod.ResourceVersion
-	compaction(ctx, t, outPod.ResourceVersion)
+	increaseRV(ctx, t)
 	parsedRV, _ := strconv.Atoi(outPod.ResourceVersion)
 	currentRV := fmt.Sprintf("%d", parsedRV+1)
 
@@ -1609,7 +1607,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 	}
 
 	secondNonConsistentReadRV := lastObjecRV
-	if consistentReadsSupported {
+	if !cacheEnabled || consistentReadsSupported {
 		secondNonConsistentReadRV = currentRV
 	}
 
@@ -1749,7 +1747,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	return initialRV, created, updated, nil
 }
 
-func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Compaction, store storage.Interface) {
+func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV IncreaseRVFunc, store storage.Interface) {
 	key, prevStoredObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
 
@@ -1763,10 +1761,8 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Co
 		t.Fatalf("update failed: %v", err)
 	}
 	objRV, _ := strconv.Atoi(storedObj.ResourceVersion)
-	// Use compact to increase etcd global revision without changes to any resources.
-	// The increase in resources version comes from Kubernetes compaction updating hidden key.
-	// Used to test consistent List to confirm it returns latest etcd revision.
-	compaction(ctx, t, prevStoredObj.ResourceVersion)
+	// Increase RV to test consistent List.
+	increaseRV(ctx, t)
 
 	tests := []struct {
 		name                 string
@@ -2320,6 +2316,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 }
 
 type Compaction func(ctx context.Context, t *testing.T, resourceVersion string)
+type IncreaseRVFunc func(ctx context.Context, t *testing.T)
 
 func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
 	if compaction == nil {

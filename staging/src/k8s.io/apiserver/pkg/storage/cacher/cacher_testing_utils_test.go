@@ -78,7 +78,7 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
-func compactStorage(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
+func compactWatchCache(c *CacheDelegator, client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
@@ -117,12 +117,16 @@ func compactStorage(c *CacheDelegator, client *clientv3.Client) storagetesting.C
 			c.cacher.watchCache.startIndex++
 		}
 		c.cacher.watchCache.listResourceVersion = rv
-
-		if _, err = client.KV.Put(ctx, "compact_rev_key", resourceVersion); err != nil {
-			t.Fatalf("Could not update compact_rev_key: %v", err)
-		}
-		if _, err = client.Compact(ctx, int64(rv)); err != nil {
+		if _, err := client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Could not compact: %v", err)
+		}
+	}
+}
+
+func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) {
+		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+			t.Fatalf("Could not update increaseRV: %v", err)
 		}
 	}
 }
