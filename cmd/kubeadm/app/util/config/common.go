@@ -492,13 +492,3 @@ func defaultEmptyMigrateMutators() migrateMutators {
 
 	return *mutators
 }
-
-// isKubeadmConfigPresent checks if a kubeadm config type is found in the provided document map
-func isKubeadmConfigPresent(docmap kubeadmapi.DocumentMap) bool {
-	for gvk := range docmap {
-		if gvk.Group == kubeadmapi.GroupName {
-			return true
-		}
-	}
-	return false
-}
