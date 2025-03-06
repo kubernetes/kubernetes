@@ -11775,6 +11775,152 @@ func TestValidatePod(t *testing.T) {
 				}),
 			),
 		},
+		"invalid soft pod affinity, duplicate key exists in MatchLabelKeys": {
+			expectedError: "is duplicated in matchLabelKeys",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											// These ones should be created from MatchLabelKeys.
+											{
+												Key:      "key1",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value1"},
+											},
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value2"},
+											},
+											{
+												Key:      "key1",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value1"},
+											},
+										},
+									},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key1", "key2", "key1"},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"invalid hard pod affinity, duplicate key exists in MatchLabelKeys": {
+			expectedError: "is duplicated in matchLabelKeys",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										// These ones should be created from MatchLabelKeys.
+										{
+											Key:      "key1",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1"},
+										},
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value2"},
+										},
+										{
+											Key:      "key1",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1"},
+										},
+									},
+								},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key1", "key2", "key1"},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"invalid soft pod anti-affinity, duplicate key exists in MatchLabelKeys": {
+			expectedError: "is duplicated in matchLabelKeys",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											// These ones should be created from MatchLabelKeys.
+											{
+												Key:      "key1",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value1"},
+											},
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value2"},
+											},
+											{
+												Key:      "key1",
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{"value1"},
+											},
+										},
+									},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key1", "key2", "key1"},
+								},
+							},
+						},
+					},
+				}),
+			),
+		},
+		"invalid hard pod anti-affinity, duplicate key exists in MatchLabelKeys": {
+			expectedError: "is duplicated in matchLabelKeys",
+			spec: *podtest.MakePod("123",
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										// These ones should be created from MatchLabelKeys.
+										{
+											Key:      "key1",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1"},
+										},
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value2"},
+										},
+										{
+											Key:      "key1",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1"},
+										},
+									},
+								},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key1", "key2", "key1"},
+							},
+						},
+					},
+				}),
+			),
+		},
 		"invalid toleration key": {
 			expectedError: "spec.tolerations[0].key",
 			spec: *podtest.MakePod("123",
@@ -22841,6 +22987,18 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("overlappingKeys"),
 		},
 	}, {
+		name: "duplicate key exists in MatchLabelKeys",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"key1", "key2", "key1"},
+			LabelSelector:     &metav1.LabelSelector{},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(2), nil, "").WithOrigin("duplicatedMatchLabelKeys"),
+		},
+	}, {
 		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
@@ -23515,7 +23673,7 @@ func TestValidateSeccompAnnotationsAndFieldsMatch(t *testing.T) {
 	}
 }
 
-func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
+func TestValidatePodTemplateSpecSeccomp(t *testing.T) { // TODO: This function name should be more general, and will be fixed in #130155.
 	rootFld := field.NewPath("template")
 	tests := []struct {
 		description string
@@ -23590,6 +23748,128 @@ func TestValidatePodTemplateSpecSeccomp(t *testing.T) {
 							Type: core.SeccompProfileTypeRuntimeDefault,
 						},
 					}))),
+			),
+		},
+	}, {
+		description: "invalid soft pod affinity, duplicate key exists in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:  &metav1.LabelSelector{},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key1", "key2", "key1"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod affinity, duplicate key exists in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAffinity: &core.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:  &metav1.LabelSelector{},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key1", "key2", "key1"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid soft pod anti-affinity, duplicate key exists in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("preferredDuringSchedulingIgnoredDuringExecution").Index(0).Child("podAffinityTerm").Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []core.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: core.PodAffinityTerm{
+									LabelSelector:  &metav1.LabelSelector{},
+									TopologyKey:    "k8s.io/zone",
+									MatchLabelKeys: []string{"key1", "key2", "key1"},
+								},
+								Weight: 10,
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid hard pod anti-affinity, duplicate key exists in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("affinity").Child("podAntiAffinity").Child("requiredDuringSchedulingIgnoredDuringExecution").Index(0).Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetAffinity(&core.Affinity{
+					PodAntiAffinity: &core.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []core.PodAffinityTerm{
+							{
+								LabelSelector:  &metav1.LabelSelector{},
+								TopologyKey:    "k8s.io/zone",
+								MatchLabelKeys: []string{"key1", "key2", "key1"},
+							},
+						},
+					},
+				}),
+			),
+		},
+	}, {
+		description: "invalid topology spread constraint, duplicate key exists in MatchLabelKeys",
+		fldPath:     rootFld,
+		expectedErr: field.ErrorList{
+			field.Invalid(rootFld.Child("spec").Child("topologySpreadConstraints").Index(0).Child("matchLabelKeys").Index(2), "key1", "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"),
+		},
+		spec: &core.PodTemplateSpec{
+			Spec: podtest.MakePodSpec(
+				podtest.SetContainers(
+					podtest.MakeContainer("test1"),
+				),
+				podtest.SetTopologySpreadConstraints(core.TopologySpreadConstraint{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					LabelSelector:     &metav1.LabelSelector{},
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MatchLabelKeys:    []string{"key1", "key2", "key1"},
+				}),
 			),
 		},
 	},

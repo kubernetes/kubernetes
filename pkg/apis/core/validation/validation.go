@@ -8056,6 +8056,9 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 	if labelSelector != nil {
 		labelKeysMap := map[string]int{}
 		for i, key := range matchLabelKeys {
+			if _, ok := labelKeysMap[key]; ok {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"))
+			}
 			labelKeysMap[key] = i
 		}
 		labelSelectorKeys := sets.New[string]()
@@ -8106,11 +8109,22 @@ func validateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys 
 		allErrs = append(allErrs, field.Forbidden(fldPath, "must not be specified when labelSelector is not set"))
 	}
 
+	// uniqueMatchLabelKeys is used to check if the keys in matchLabelKeys are unique.
+	uniqueMatchLabelKeys := sets.New[string]()
+
 	for i, key := range matchLabelKeys {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 		if labelSelectorKeys.Has(key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("overlappingKeys"))
 		}
+		// Check if the key is duplicated in matchLabelKeys TopologySpreadConstraint.
+		// validateMatchLabelKeysInTopologySpread() will be removed after #129874 merged,
+		// and validateMatchLabelKeysAndMismatchLabelKeys() will be used for TopologySpreadConstraint validation.
+		// The same check will be done in validateMatchLabelKeysAndMismatchLabelKeys() instead.
+		if uniqueMatchLabelKeys.Has(key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"))
+		}
+		uniqueMatchLabelKeys.Insert(key)
 	}
 
 	return allErrs
