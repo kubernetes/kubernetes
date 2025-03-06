@@ -27,21 +27,17 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero-values.
-	}).ExpectValidateFalseByPath(map[string][]string{
-		"otherStructField": {"type OtherStruct", "field Struct.OtherStructField"}, // optional for structs is just documentation
-	})
+	}).ExpectValid()
 
 	st.Value(&Struct{
 		StringField:         "abc",
 		StringPtrField:      ptr.To("xyz"),
-		OtherStructField:    OtherStruct{},
 		OtherStructPtrField: &OtherStruct{},
 		SliceField:          []string{"a", "b"},
 		MapField:            map[string]string{"a": "b", "c": "d"},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"stringField":         {"field Struct.StringField"},
 		"stringPtrField":      {"field Struct.StringPtrField"},
-		"otherStructField":    {"type OtherStruct", "field Struct.OtherStructField"},
 		"otherStructPtrField": {"type OtherStruct", "field Struct.OtherStructPtrField"},
 		"sliceField":          {"field Struct.SliceField"},
 		"mapField":            {"field Struct.MapField"},

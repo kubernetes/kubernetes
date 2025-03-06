@@ -35,9 +35,7 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.StringPtrField"
 	StringPtrField *string `json:"stringPtrField"`
 
-	// +k8s:optional
-	// +k8s:validateFalse="field Struct.OtherStructField"
-	OtherStructField OtherStruct `json:"otherStructField"`
+	// non-pointer struct fields cannot be optional
 
 	// +k8s:optional
 	// +k8s:validateFalse="field Struct.OtherStructPtrField"
