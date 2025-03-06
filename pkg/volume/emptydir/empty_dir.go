@@ -18,10 +18,9 @@ package emptydir
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 	"os"
 	"path/filepath"
-
-	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -279,8 +278,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	ownershipChanger := volume.NewVolumeOwnership(ed, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
-	_ = ownershipChanger.ChangePermissions()
+	volume.SetVolumeOwnership(ed, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
 
 	// If setting up the quota fails, just log a message but don't actually error out.
 	// We'll use the old du mechanism in this case, at least until we support
