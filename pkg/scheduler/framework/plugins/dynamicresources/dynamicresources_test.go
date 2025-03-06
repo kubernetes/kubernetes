@@ -861,10 +861,11 @@ func TestPlugin(t *testing.T) {
 			claims:                   []*resourceapi.ResourceClaim{claimWithPrioritzedList},
 			classes:                  []*resourceapi.DeviceClass{deviceClass},
 			want: want{
-				filter: perNodeResult{
-					workerNode.Name: {
-						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: has subrequests, but the feature is disabled`),
-					},
+				prefilter: result{
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: has subrequests, but the DRAPrioritizedList feature is disabled`),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
 				},
 			},
 		},
