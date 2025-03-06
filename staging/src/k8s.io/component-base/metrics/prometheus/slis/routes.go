@@ -38,8 +38,8 @@ type SLIMetrics struct{}
 func (s SLIMetrics) Install(m mux) {
 	installOnce.Do(func() {
 		Register(Registry)
-		m.Handle("/metrics/slis", metrics.HandlerFor(Registry, metrics.HandlerOpts{}))
 	})
+	m.Handle("/metrics/slis", metrics.HandlerFor(Registry, metrics.HandlerOpts{}))
 }
 
 type SLIMetricsWithReset struct{}
@@ -48,6 +48,6 @@ type SLIMetricsWithReset struct{}
 func (s SLIMetricsWithReset) Install(m mux) {
 	installWithResetOnce.Do(func() {
 		Register(Registry)
-		m.Handle("/metrics/slis", metrics.HandlerWithReset(Registry, metrics.HandlerOpts{}))
 	})
+	m.Handle("/metrics/slis", metrics.HandlerWithReset(Registry, metrics.HandlerOpts{}))
 }
