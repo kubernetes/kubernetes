@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	healthTimeout = 30 * time.Second // Configurable later if needed
+	healthTimeout = 30 * time.Second
 )
 
 // healthInfoCache is a cache of known device health.
@@ -141,11 +141,11 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 				if existing.Health != updated.Health {
 					changed = true
 				}
-				// Add new device health status
+				// Add  device to new device health status list
 				newDevices = append(newDevices, updated)
-				// Remove from reported devices
+				// Remove from reported device list
 				delete(reported, key)
-				// If machine surpasses health timeout set to unknown
+				// If device surpasses health timeout set to unknown
 			} else if existing.Health != "Unknown" && now.Sub(existing.LastUpdated) > healthTimeout {
 				existing.Health = "Unknown"
 				existing.LastUpdated = now
