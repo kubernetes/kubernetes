@@ -549,11 +549,29 @@ func ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx context.Context, f 
 			pod, err = f.ClientSet.CoreV1().Pods(nsName).Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to get pod %q in namespace %q", pod.Name, nsName)
 			if pod.DeletionTimestamp == nil {
-				framework.Failf("Pod %q in namespace %q does not have a metadata.deletionTimestamp set", pod.Name, nsName)
+				framework.Logf("Pod %q in namespace %q does not yet have a metadata.deletionTimestamp set, retrying...", pod.Name, nsName)
+				return false, nil
 			}
-			_, err = f.ClientSet.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
+			ns, err := f.ClientSet.CoreV1().Namespaces().Get(ctx, nsName, metav1.GetOptions{})
 			if err != nil && apierrors.IsNotFound(err) {
 				return false, fmt.Errorf("namespace %s was deleted unexpectedly", nsName)
+			}
+			ginkgo.By("Read namespace status")
+			nsResource := v1.SchemeGroupVersion.WithResource("namespaces")
+			unstruct, err := f.DynamicClient.Resource(nsResource).Get(ctx, ns.Name, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "failed to fetch NamespaceStatus %s", ns)
+			nsStatus, err := unstructuredToNamespace(unstruct)
+			framework.ExpectNoError(err, "Getting the status of the namespace %s", ns)
+			gomega.Expect(nsStatus.Status.Phase).To(gomega.Equal(v1.NamespaceTerminating), "The phase returned was %v", nsStatus.Status.Phase)
+			hasContextFailure := false
+			for _, cond := range nsStatus.Status.Conditions {
+				if cond.Type == v1.NamespaceDeletionContentFailure {
+					hasContextFailure = true
+				}
+			}
+			if !hasContextFailure {
+				framework.Logf("Namespace %q does not yet have a NamespaceDeletionContentFailure condition, retrying...", nsName)
+				return false, nil
 			}
 			return true, nil
 		}))
