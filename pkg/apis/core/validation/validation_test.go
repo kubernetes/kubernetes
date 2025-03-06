@@ -20894,8 +20894,8 @@ func TestValidateEndpointsCreate(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			errs := ValidateEndpointsCreate(&v.endpoints)
 			// TODO: set .RequireOriginWhenInvalid() once metadata is done
-			matcher := fldtest.Match().ByType().ByField().ByOrigin()
-			fldtest.MatchErrors(t, v.expectedErrs, errs, matcher)
+			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher.Test(t, v.expectedErrs, errs)
 		})
 	}
 }
@@ -22891,8 +22891,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath, tc.opts)
-			matcher := fldtest.Match().ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
-			fldtest.MatchErrors(t, tc.wantFieldErrors, errs, matcher)
+			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
+			matcher.Test(t, tc.wantFieldErrors, errs)
 		})
 	}
 }
