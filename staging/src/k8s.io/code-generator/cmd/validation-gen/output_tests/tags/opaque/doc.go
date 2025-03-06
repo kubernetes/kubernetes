@@ -49,31 +49,16 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.SliceOfStructField vals"
 	SliceOfStructField []OtherStruct `json:"sliceOfStructField"`
 
-	// +k8s:validateFalse="field Struct.SliceOfStructPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.SliceOfStructPtrField vals"
-	SliceOfStructPtrField []*OtherStruct `json:"sliceOfStructPtrField"`
-
 	// +k8s:validateFalse="field Struct.SliceOfOpaqueStructField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.SliceOfOpaqueStructField vals"
 	// +k8s:eachVal=+k8s:opaqueType
 	SliceOfOpaqueStructField []OtherStruct `json:"sliceOfOpaqueStructField"`
-
-	// +k8s:validateFalse="field Struct.SliceOfOpaqueStructPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.SliceOfOpaqueStructPtrField vals"
-	// +k8s:eachVal=+k8s:opaqueType
-	SliceOfOpaqueStructPtrField []*OtherStruct `json:"sliceOfOpaqueStructPtrField"`
 
 	// +k8s:validateFalse="field Struct.ListMapOfStructField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListMapOfStructField vals"
 	// +k8s:listType=map
 	// +k8s:listMapKey=stringField
 	ListMapOfStructField []OtherStruct `json:"listMapOfStructField"`
-
-	// +k8s:validateFalse="field Struct.ListMapOfStructPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListMapOfStructPtrField vals"
-	// +k8s:listType=map
-	// +k8s:listMapKey=stringField
-	ListMapOfStructPtrField []*OtherStruct `json:"listMapOfStructPtrField"`
 
 	// +k8s:validateFalse="field Struct.ListMapOfOpaqueStructField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListMapOfOpaqueStructField vals"
@@ -82,22 +67,10 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:opaqueType
 	ListMapOfOpaqueStructField []OtherStruct `json:"listMapOfOpaqueStructField"`
 
-	// +k8s:validateFalse="field Struct.ListMapOfOpaqueStructPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListMapOfOpaqueStructPtrField vals"
-	// +k8s:listType=map
-	// +k8s:listMapKey=stringField
-	// +k8s:eachVal=+k8s:opaqueType
-	ListMapOfOpaqueStructPtrField []*OtherStruct `json:"listMapOfOpaqueStructPtrField"`
-
 	// +k8s:validateFalse="field Struct.MapOfStringToStructField"
 	// +k8s:eachKey=+k8s:validateFalse="field Struct.MapOfStringToStructField keys"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapOfStringToStructField vals"
 	MapOfStringToStructField map[OtherString]OtherStruct `json:"mapOfStringToStructField"`
-
-	// +k8s:validateFalse="field Struct.MapOfStringToStructPtrField"
-	// +k8s:eachKey=+k8s:validateFalse="field Struct.MapOfStringToStructPtrField keys"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapOfStringToStructPtrField vals"
-	MapOfStringToStructPtrField map[OtherString]*OtherStruct `json:"mapOfStringToStructPtrField"`
 
 	// +k8s:validateFalse="field Struct.MapOfStringToOpaqueStructField"
 	// +k8s:eachKey=+k8s:validateFalse="field Struct.MapOfStringToOpaqueStructField keys"
@@ -105,13 +78,6 @@ type Struct struct {
 	// +k8s:eachKey=+k8s:opaqueType
 	// +k8s:eachVal=+k8s:opaqueType
 	MapOfStringToOpaqueStructField map[OtherString]OtherStruct `json:"mapOfStringToOpaqueStructField"`
-
-	// +k8s:validateFalse="field Struct.MapOfStringToOpaqueStructPtrField"
-	// +k8s:eachKey=+k8s:validateFalse="field Struct.MapOfStringToOpaqueStructPtrField keys"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapOfStringToOpaqueStructPtrField vals"
-	// +k8s:eachKey=+k8s:opaqueType
-	// +k8s:eachVal=+k8s:opaqueType
-	MapOfStringToOpaqueStructPtrField map[OtherString]*OtherStruct `json:"mapOfStringToOpaqueStructPtrField"`
 }
 
 // +k8s:validateFalse="type OtherStruct"

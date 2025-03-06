@@ -18,8 +18,6 @@ package sliceofprimitive
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -31,13 +29,10 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		ListField:        []string{"zero", "one"},
-		ListPtrField:     []*string{ptr.To("zero"), ptr.To("one")},
 		ListTypedefField: []StringType{StringType("zero"), StringType("one")},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"listField[0]":        {"field Struct.ListField[*]"},
 		"listField[1]":        {"field Struct.ListField[*]"},
-		"listPtrField[0]":     {"field Struct.ListPtrField[*]"},
-		"listPtrField[1]":     {"field Struct.ListPtrField[*]"},
 		"listTypedefField[0]": {"field Struct.ListTypedefField[*]"},
 		"listTypedefField[1]": {"field Struct.ListTypedefField[*]"},
 	})

@@ -18,8 +18,6 @@ package typedeftoslice
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -31,13 +29,10 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		ListField:        ListType{"zero", "one"},
-		ListPtrField:     ListPtrType{ptr.To("zero"), ptr.To("one")},
 		ListTypedefField: ListTypedefType{StringType("zero"), StringType("one")},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"listField[0]":        {"type ListType[*]", "field Struct.ListField[*]"},
 		"listField[1]":        {"type ListType[*]", "field Struct.ListField[*]"},
-		"listPtrField[0]":     {"type ListPtrType[*]", "field Struct.ListPtrField[*]"},
-		"listPtrField[1]":     {"type ListPtrType[*]", "field Struct.ListPtrField[*]"},
 		"listTypedefField[0]": {"type ListTypedefType[*]", "field Struct.ListTypedefField[*]"},
 		"listTypedefField[1]": {"type ListTypedefType[*]", "field Struct.ListTypedefField[*]"},
 	})

@@ -18,8 +18,6 @@ package mapofprimitive
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -31,13 +29,10 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		MapField:        map[string]string{"a": "A", "b": "B"},
-		MapPtrField:     map[string]*string{"a": ptr.To("A"), "b": ptr.To("B")},
 		MapTypedefField: map[string]StringType{"a": "A", "b": "B"},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"mapField[a]":        {"field Struct.MapField[*]"},
 		"mapField[b]":        {"field Struct.MapField[*]"},
-		"mapPtrField[a]":     {"field Struct.MapPtrField[*]"},
-		"mapPtrField[b]":     {"field Struct.MapPtrField[*]"},
 		"mapTypedefField[a]": {"field Struct.MapTypedefField[*]"},
 		"mapTypedefField[b]": {"field Struct.MapTypedefField[*]"},
 	})

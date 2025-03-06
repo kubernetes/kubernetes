@@ -33,17 +33,9 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapField[*]"
 	MapField map[string]OtherStruct `json:"mapField"`
 
-	// +k8s:validateFalse="field Struct.MapPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapPtrField[*]"
-	MapPtrField map[string]*OtherStruct `json:"mapPtrField"`
-
 	// +k8s:validateFalse="field Struct.MapTypedefField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapTypedefField[*]"
 	MapTypedefField map[string]OtherTypedefStruct `json:"mapTypedefField"`
-
-	// +k8s:validateFalse="field Struct.MapTypedefPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapTypedefPtrField[*]"
-	MapTypedefPtrField map[string]*OtherTypedefStruct `json:"mapTypedefPtrField"`
 
 	UnvalidatedMapField map[string]string `json:"UnvalidatedMapField"`
 }
