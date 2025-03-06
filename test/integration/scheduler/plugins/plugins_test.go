@@ -1057,6 +1057,11 @@ func TestScorePlugin(t *testing.T) {
 			if numScoreCalled := scorePlugin.deepCopy().numScoreCalled; numScoreCalled == 0 {
 				t.Errorf("Expected the score plugin to be called.")
 			}
+
+			if scorePlugin.highScoreNode == "" && !test.fail {
+	                        t.Errorf("Expected the highScoreNode to be set, but it was empty.")
+                        }
+
 		})
 	}
 }
