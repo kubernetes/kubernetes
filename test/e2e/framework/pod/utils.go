@@ -43,7 +43,7 @@ const InfiniteSleepCommand = "trap exit TERM; while true; do sleep 1; done"
 //
 // This is useful for testing scenarios where the container is terminated
 // with a non-zero exit code.
-const InfiniteSleepCommandWithoutGracefulShutdown = "while true; do sleep 1; done"
+const InfiniteSleepCommandWithoutGracefulShutdown = "while true; do sleep 100000; done"
 
 // GenerateScriptCmd generates the corresponding command lines to execute a command.
 func GenerateScriptCmd(command string) []string {

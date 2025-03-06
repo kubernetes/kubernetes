@@ -806,8 +806,8 @@ func testPodContainerRestartWithHooks(ctx context.Context, f *framework.Framewor
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
 	ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, pod)
-	err = e2epod.WaitTimeoutForPodRunningInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
-	framework.ExpectNoError(err, "while waiting for pod to be running")
+	err = e2epod.WaitTimeoutForPodRunningReadyInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
+	framework.ExpectNoError(err, "while waiting for pod to be running and ready")
 
 	ginkgo.By("Failing liveness probe")
 	hooks.FailLivenessProbe(pod, probeFilePath)

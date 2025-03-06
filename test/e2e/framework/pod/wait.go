@@ -84,6 +84,27 @@ func BeRunningNoRetries() types.GomegaMatcher {
 	)
 }
 
+// BeRunningReadyNoRetries verifies that a pod starts running and has a ready
+// condition of status true. It's a permanent failure when the pod enters some
+// other permanent phase.
+func BeRunningReadyNoRetries() types.GomegaMatcher {
+	return gomega.And(
+		// This additional matcher checks for the final error condition.
+		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed, v1.PodSucceeded:
+				return false, gomega.StopTrying(fmt.Sprintf("Expected pod to reach phase %q, got final phase %q instead:\n%s", v1.PodRunning, pod.Status.Phase, format.Object(pod, 1)))
+			default:
+				return true, nil
+			}
+		}),
+		BeInPhase(v1.PodRunning),
+		gcustom.MakeMatcher(func(pod *v1.Pod) (bool, error) {
+			return podutils.IsPodReady(pod), nil
+		}).WithMessage("Expected pod to have a ready condition of status true"),
+	)
+}
+
 // BeInPhase matches if pod.status.phase is the expected phase.
 func BeInPhase(phase v1.PodPhase) types.GomegaMatcher {
 	// A simple implementation of this would be:
@@ -524,6 +545,16 @@ func WaitTimeoutForPodRunningInNamespace(ctx context.Context, c clientset.Interf
 	return framework.Gomega().Eventually(ctx, framework.RetryNotFound(framework.GetObject(c.CoreV1().Pods(namespace).Get, podName, metav1.GetOptions{}))).
 		WithTimeout(timeout).
 		Should(BeRunningNoRetries())
+}
+
+// WaitTimeoutForPodRunningReadyInNamespace waits the given timeout duration for the specified pod to become running
+// and have a ready condition of status true.
+// It does not need to exist yet when this function gets called and the pod is not expected to be recreated
+// when it succeeds or fails.
+func WaitTimeoutForPodRunningReadyInNamespace(ctx context.Context, c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+	return framework.Gomega().Eventually(ctx, framework.RetryNotFound(framework.GetObject(c.CoreV1().Pods(namespace).Get, podName, metav1.GetOptions{}))).
+		WithTimeout(timeout).
+		Should(BeRunningReadyNoRetries())
 }
 
 // WaitForPodRunningInNamespace waits default amount of time (podStartTimeout) for the specified pod to become running.
