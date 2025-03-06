@@ -226,6 +226,8 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if newPod.Status.QOSClass == "" {
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
+
+	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
