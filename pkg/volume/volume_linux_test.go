@@ -332,16 +332,32 @@ func TestSetVolumeOwnershipMode(t *testing.T) {
 func TestProgressTracking(t *testing.T) {
 	alwaysApplyPolicy := v1.FSGroupChangeAlways
 	var expectedGID int64 = 9999
+
+	//  capture original variable
+	originalfilePermissionChangeFunc := filePermissionChangeFunc
+	originalProgressReportDuration := progressReportDuration
+	originalfirstEventReportDuration := firstEventReportDuration
+
 	var permissionSleepDuration = 5 * time.Millisecond
-	// how often to report the events
+
+	// Override how often progress is reported
 	progressReportDuration = 200 * time.Millisecond
+	// Override when first event about progress is reported
 	firstEventReportDuration = 50 * time.Millisecond
 
-	filePermissionChangeFunc = func(filename string, fsGroup *int64, _ bool, _ os.FileInfo) error {
-		t.Logf("Calling file permission change for %s with gid %d", filename, *fsGroup)
+	// Override how permission change is applied, so as to artificially slow
+	// permission change
+	filePermissionChangeFunc = func(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
 		time.Sleep(permissionSleepDuration)
+		originalfilePermissionChangeFunc(filename, fsGroup, readonly, info)
 		return nil
 	}
+	t.Cleanup(func() {
+		filePermissionChangeFunc = originalfilePermissionChangeFunc
+		progressReportDuration = originalProgressReportDuration
+		firstEventReportDuration = originalfirstEventReportDuration
+	})
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod1",
