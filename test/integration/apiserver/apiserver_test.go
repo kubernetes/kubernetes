@@ -33,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	guuid "github.com/google/uuid"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apps "k8s.io/api/apps/v1"
@@ -389,59 +390,66 @@ func TestListOptions(t *testing.T) {
 	for _, watchCacheEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-
-			var storageTransport *storagebackend.TransportConfig
-			clientSet, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
-				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-					opts.Etcd.EnableWatchCache = watchCacheEnabled
-					storageTransport = &opts.Etcd.StorageConfig.Transport
-				},
-			})
-			defer tearDownFn()
-
-			ns := framework.CreateNamespaceOrDie(clientSet, "list-options", t)
-			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-
-			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
-
-			var compactedRv, oldestUncompactedRv string
-			for i := 0; i < 15; i++ {
-				rs := newRS(ns.Name)
-				rs.Name = fmt.Sprintf("test-%d", i)
-				created, err := rsClient.Create(tCtx, rs, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if i == 0 {
-					compactedRv = created.ResourceVersion // We compact this first resource version below
-				}
-				// delete the first 5, and then compact them
-				if i < 5 {
-					var zero int64
-					if err := rsClient.Delete(tCtx, rs.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero}); err != nil {
-						t.Fatal(err)
-					}
-					oldestUncompactedRv = created.ResourceVersion
-				}
+			prefix := path.Join("/", guuid.New().String(), "registry")
+			etcdConfig := storagebackend.Config{
+				Prefix:    prefix,
+				Transport: storagebackend.TransportConfig{ServerList: []string{framework.GetEtcdURL()}},
 			}
-
-			// compact some of the revision history in etcd so we can test "too old" resource versions
-			rawClient, kvClient, err := integration.GetEtcdClients(*storageTransport)
+			rawClient, kvClient, err := integration.GetEtcdClients(etcdConfig.Transport)
 			if err != nil {
 				t.Fatal(err)
 			}
 			// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
 			// close the client (which we can do by closing rawClient).
-			defer rawClient.Close()
+			defer func() {
+				err := rawClient.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
 
-			revision, err := strconv.Atoi(oldestUncompactedRv)
+			var compactedRv string
+			var oldestUncompactedRv int64
+			for i := 0; i < 15; i++ {
+				rs := newRS("default")
+				rs.Name = fmt.Sprintf("test-%d", i)
+				serializer := protobuf.NewSerializer(nil, nil)
+				buf := bytes.Buffer{}
+				err := serializer.Encode(rs, &buf)
+				if err != nil {
+					t.Fatal(err)
+				}
+				key := prefix + "/replicasets/default/" + rs.Name
+
+				resp, err := kvClient.Put(tCtx, key, buf.String())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if i == 0 {
+					compactedRv = strconv.FormatInt(resp.Header.Revision, 10) // We compact this first resource version below
+				}
+				// delete the first 5, and then compact them
+				if i < 5 {
+					if _, err := kvClient.Delete(tCtx, key); err != nil {
+						t.Fatal(err)
+					}
+					oldestUncompactedRv = resp.Header.Revision
+				}
+			}
+			_, err = kvClient.Compact(tCtx, int64(oldestUncompactedRv))
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = kvClient.Compact(tCtx, int64(revision))
-			if err != nil {
-				t.Fatal(err)
-			}
+
+			clientSet, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					opts.Etcd.EnableWatchCache = watchCacheEnabled
+					opts.Etcd.StorageConfig = etcdConfig
+				},
+			})
+			defer tearDownFn()
+
+			rsClient := clientSet.AppsV1().ReplicaSets("default")
 
 			listObj, err := rsClient.List(tCtx, metav1.ListOptions{
 				Limit: 6,
