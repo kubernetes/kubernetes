@@ -1188,9 +1188,23 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
-// Device sets the devices field of the inner object.
-func (wrapper *ResourceSliceWrapper) Device(name string, attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *ResourceSliceWrapper {
-	wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{Attributes: attrs}})
+// Device extends the devices field of the inner object.
+// The device must have a name and may have arbitrary additional fields.
+func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *ResourceSliceWrapper {
+	device := resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{}}
+	for _, field := range otherFields {
+		switch typedField := field.(type) {
+		case map[resourceapi.QualifiedName]resourceapi.DeviceAttribute:
+			device.Basic.Attributes = typedField
+		case map[resourceapi.QualifiedName]resourceapi.DeviceCapacity:
+			device.Basic.Capacity = typedField
+		case resourceapi.DeviceTaint:
+			device.Basic.Taints = append(device.Basic.Taints, typedField)
+		default:
+			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))
+		}
+	}
+	wrapper.Spec.Devices = append(wrapper.Spec.Devices, device)
 	return wrapper
 }
 

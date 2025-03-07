@@ -95,7 +95,7 @@ var (
 
 	// Node with "instance-1" device and no device attributes.
 	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
-	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
+	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 
 	// Node with same device, but now with a "healthy" boolean attribute.
 	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node

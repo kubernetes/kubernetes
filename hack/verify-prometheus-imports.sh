@@ -37,6 +37,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 # See: https://github.com/kubernetes/kubernetes/issues/89267
 allowed_prometheus_importers=(
   ./cluster/images/etcd-version-monitor/etcd-version-monitor.go
+  ./pkg/controller/devicetainteviction/device_taint_eviction_test.go
   ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram.go
   ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram_test.go
   ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram_vec.go

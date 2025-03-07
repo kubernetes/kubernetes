@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tainteviction contains the logic implementing taint-based eviction
-// for Pods running on Nodes with NoExecute taints.
-package tainteviction
+// Package devicetainteviction contains the logic implementing taint-based eviction
+// for Pods using tainted devices (https://github.com/kubernetes/enhancements/issues/5055).
+package devicetainteviction
