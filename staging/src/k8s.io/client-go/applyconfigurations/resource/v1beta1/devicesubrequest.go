@@ -30,6 +30,7 @@ type DeviceSubRequestApplyConfiguration struct {
 	Selectors       []DeviceSelectorApplyConfiguration    `json:"selectors,omitempty"`
 	AllocationMode  *resourcev1beta1.DeviceAllocationMode `json:"allocationMode,omitempty"`
 	Count           *int64                                `json:"count,omitempty"`
+	Tolerations     []DeviceTolerationApplyConfiguration  `json:"tolerations,omitempty"`
 }
 
 // DeviceSubRequestApplyConfiguration constructs a declarative configuration of the DeviceSubRequest type for use with
@@ -80,5 +81,18 @@ func (b *DeviceSubRequestApplyConfiguration) WithAllocationMode(value resourcev1
 // If called multiple times, the Count field is set to the value of the last call.
 func (b *DeviceSubRequestApplyConfiguration) WithCount(value int64) *DeviceSubRequestApplyConfiguration {
 	b.Count = &value
+	return b
+}
+
+// WithTolerations adds the given value to the Tolerations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Tolerations field.
+func (b *DeviceSubRequestApplyConfiguration) WithTolerations(values ...*DeviceTolerationApplyConfiguration) *DeviceSubRequestApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTolerations")
+		}
+		b.Tolerations = append(b.Tolerations, *values[i])
+	}
 	return b
 }

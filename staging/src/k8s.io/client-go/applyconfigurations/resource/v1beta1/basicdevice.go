@@ -27,6 +27,7 @@ import (
 type BasicDeviceApplyConfiguration struct {
 	Attributes map[resourcev1beta1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
 	Capacity   map[resourcev1beta1.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
+	Taints     []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
 }
 
 // BasicDeviceApplyConfiguration constructs a declarative configuration of the BasicDevice type for use with
@@ -59,6 +60,19 @@ func (b *BasicDeviceApplyConfiguration) WithCapacity(entries map[resourcev1beta1
 	}
 	for k, v := range entries {
 		b.Capacity[k] = v
+	}
+	return b
+}
+
+// WithTaints adds the given value to the Taints field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Taints field.
+func (b *BasicDeviceApplyConfiguration) WithTaints(values ...*DeviceTaintApplyConfiguration) *BasicDeviceApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTaints")
+		}
+		b.Taints = append(b.Taints, *values[i])
 	}
 	return b
 }

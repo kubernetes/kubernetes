@@ -251,6 +251,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.DeviceTaint)(nil), (*resource.DeviceTaint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeviceTaint_To_resource_DeviceTaint(a.(*resourcev1beta1.DeviceTaint), b.(*resource.DeviceTaint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceTaint)(nil), (*resourcev1beta1.DeviceTaint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceTaint_To_v1beta1_DeviceTaint(a.(*resource.DeviceTaint), b.(*resourcev1beta1.DeviceTaint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.DeviceToleration)(nil), (*resource.DeviceToleration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeviceToleration_To_resource_DeviceToleration(a.(*resourcev1beta1.DeviceToleration), b.(*resource.DeviceToleration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceToleration)(nil), (*resourcev1beta1.DeviceToleration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceToleration_To_v1beta1_DeviceToleration(a.(*resource.DeviceToleration), b.(*resourcev1beta1.DeviceToleration), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*resourcev1beta1.NetworkDeviceData)(nil), (*resource.NetworkDeviceData)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_NetworkDeviceData_To_resource_NetworkDeviceData(a.(*resourcev1beta1.NetworkDeviceData), b.(*resource.NetworkDeviceData), scope)
 	}); err != nil {
@@ -453,6 +473,7 @@ func Convert_resource_AllocationResult_To_v1beta1_AllocationResult(in *resource.
 func autoConvert_v1beta1_BasicDevice_To_resource_BasicDevice(in *resourcev1beta1.BasicDevice, out *resource.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[resource.QualifiedName]resource.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[resource.QualifiedName]resource.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	out.Taints = *(*[]resource.DeviceTaint)(unsafe.Pointer(&in.Taints))
 	return nil
 }
 
@@ -464,6 +485,7 @@ func Convert_v1beta1_BasicDevice_To_resource_BasicDevice(in *resourcev1beta1.Bas
 func autoConvert_resource_BasicDevice_To_v1beta1_BasicDevice(in *resource.BasicDevice, out *resourcev1beta1.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	out.Taints = *(*[]resourcev1beta1.DeviceTaint)(unsafe.Pointer(&in.Taints))
 	return nil
 }
 
@@ -804,6 +826,7 @@ func autoConvert_v1beta1_DeviceRequest_To_resource_DeviceRequest(in *resourcev1b
 	out.Count = in.Count
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	out.FirstAvailable = *(*[]resource.DeviceSubRequest)(unsafe.Pointer(&in.FirstAvailable))
+	out.Tolerations = *(*[]resource.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
@@ -820,6 +843,7 @@ func autoConvert_resource_DeviceRequest_To_v1beta1_DeviceRequest(in *resource.De
 	out.Count = in.Count
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	out.FirstAvailable = *(*[]resourcev1beta1.DeviceSubRequest)(unsafe.Pointer(&in.FirstAvailable))
+	out.Tolerations = *(*[]resourcev1beta1.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
@@ -834,6 +858,7 @@ func autoConvert_v1beta1_DeviceRequestAllocationResult_To_resource_DeviceRequest
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.Tolerations = *(*[]resource.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
@@ -848,6 +873,7 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1beta1_DeviceRequest
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.Tolerations = *(*[]resourcev1beta1.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
@@ -882,6 +908,7 @@ func autoConvert_v1beta1_DeviceSubRequest_To_resource_DeviceSubRequest(in *resou
 	out.Selectors = *(*[]resource.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.AllocationMode = resource.DeviceAllocationMode(in.AllocationMode)
 	out.Count = in.Count
+	out.Tolerations = *(*[]resource.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
@@ -896,12 +923,67 @@ func autoConvert_resource_DeviceSubRequest_To_v1beta1_DeviceSubRequest(in *resou
 	out.Selectors = *(*[]resourcev1beta1.DeviceSelector)(unsafe.Pointer(&in.Selectors))
 	out.AllocationMode = resourcev1beta1.DeviceAllocationMode(in.AllocationMode)
 	out.Count = in.Count
+	out.Tolerations = *(*[]resourcev1beta1.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
 	return nil
 }
 
 // Convert_resource_DeviceSubRequest_To_v1beta1_DeviceSubRequest is an autogenerated conversion function.
 func Convert_resource_DeviceSubRequest_To_v1beta1_DeviceSubRequest(in *resource.DeviceSubRequest, out *resourcev1beta1.DeviceSubRequest, s conversion.Scope) error {
 	return autoConvert_resource_DeviceSubRequest_To_v1beta1_DeviceSubRequest(in, out, s)
+}
+
+func autoConvert_v1beta1_DeviceTaint_To_resource_DeviceTaint(in *resourcev1beta1.DeviceTaint, out *resource.DeviceTaint, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = resource.DeviceTaintEffect(in.Effect)
+	out.TimeAdded = (*v1.Time)(unsafe.Pointer(in.TimeAdded))
+	return nil
+}
+
+// Convert_v1beta1_DeviceTaint_To_resource_DeviceTaint is an autogenerated conversion function.
+func Convert_v1beta1_DeviceTaint_To_resource_DeviceTaint(in *resourcev1beta1.DeviceTaint, out *resource.DeviceTaint, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeviceTaint_To_resource_DeviceTaint(in, out, s)
+}
+
+func autoConvert_resource_DeviceTaint_To_v1beta1_DeviceTaint(in *resource.DeviceTaint, out *resourcev1beta1.DeviceTaint, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = resourcev1beta1.DeviceTaintEffect(in.Effect)
+	out.TimeAdded = (*v1.Time)(unsafe.Pointer(in.TimeAdded))
+	return nil
+}
+
+// Convert_resource_DeviceTaint_To_v1beta1_DeviceTaint is an autogenerated conversion function.
+func Convert_resource_DeviceTaint_To_v1beta1_DeviceTaint(in *resource.DeviceTaint, out *resourcev1beta1.DeviceTaint, s conversion.Scope) error {
+	return autoConvert_resource_DeviceTaint_To_v1beta1_DeviceTaint(in, out, s)
+}
+
+func autoConvert_v1beta1_DeviceToleration_To_resource_DeviceToleration(in *resourcev1beta1.DeviceToleration, out *resource.DeviceToleration, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Operator = resource.DeviceTolerationOperator(in.Operator)
+	out.Value = in.Value
+	out.Effect = resource.DeviceTaintEffect(in.Effect)
+	out.TolerationSeconds = (*int64)(unsafe.Pointer(in.TolerationSeconds))
+	return nil
+}
+
+// Convert_v1beta1_DeviceToleration_To_resource_DeviceToleration is an autogenerated conversion function.
+func Convert_v1beta1_DeviceToleration_To_resource_DeviceToleration(in *resourcev1beta1.DeviceToleration, out *resource.DeviceToleration, s conversion.Scope) error {
+	return autoConvert_v1beta1_DeviceToleration_To_resource_DeviceToleration(in, out, s)
+}
+
+func autoConvert_resource_DeviceToleration_To_v1beta1_DeviceToleration(in *resource.DeviceToleration, out *resourcev1beta1.DeviceToleration, s conversion.Scope) error {
+	out.Key = in.Key
+	out.Operator = resourcev1beta1.DeviceTolerationOperator(in.Operator)
+	out.Value = in.Value
+	out.Effect = resourcev1beta1.DeviceTaintEffect(in.Effect)
+	out.TolerationSeconds = (*int64)(unsafe.Pointer(in.TolerationSeconds))
+	return nil
+}
+
+// Convert_resource_DeviceToleration_To_v1beta1_DeviceToleration is an autogenerated conversion function.
+func Convert_resource_DeviceToleration_To_v1beta1_DeviceToleration(in *resource.DeviceToleration, out *resourcev1beta1.DeviceToleration, s conversion.Scope) error {
+	return autoConvert_resource_DeviceToleration_To_v1beta1_DeviceToleration(in, out, s)
 }
 
 func autoConvert_v1beta1_NetworkDeviceData_To_resource_NetworkDeviceData(in *resourcev1beta1.NetworkDeviceData, out *resource.NetworkDeviceData, s conversion.Scope) error {

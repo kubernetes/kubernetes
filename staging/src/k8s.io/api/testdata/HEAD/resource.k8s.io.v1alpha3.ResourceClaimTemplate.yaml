@@ -96,7 +96,19 @@ spec:
           selectors:
           - cel:
               expression: expressionValue
+          tolerations:
+          - effect: effectValue
+            key: keyValue
+            operator: operatorValue
+            tolerationSeconds: 5
+            value: valueValue
         name: nameValue
         selectors:
         - cel:
             expression: expressionValue
+        tolerations:
+        - effect: effectValue
+          key: keyValue
+          operator: operatorValue
+          tolerationSeconds: 5
+          value: valueValue

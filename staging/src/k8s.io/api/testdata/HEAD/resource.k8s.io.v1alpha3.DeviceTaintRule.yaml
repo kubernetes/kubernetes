@@ -1,5 +1,5 @@
 apiVersion: resource.k8s.io/v1alpha3
-kind: ResourceSlice
+kind: DeviceTaintRule
 metadata:
   annotations:
     annotationsKey: annotationsValue
@@ -33,38 +33,16 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  allNodes: true
-  devices:
-  - basic:
-      attributes:
-        attributesKey:
-          bool: true
-          int: 2
-          string: stringValue
-          version: versionValue
-      capacity:
-        capacityKey: "0"
-      taints:
-      - effect: effectValue
-        key: keyValue
-        timeAdded: "2004-01-01T01:01:01Z"
-        value: valueValue
-    name: nameValue
-  driver: driverValue
-  nodeName: nodeNameValue
-  nodeSelector:
-    nodeSelectorTerms:
-    - matchExpressions:
-      - key: keyValue
-        operator: operatorValue
-        values:
-        - valuesValue
-      matchFields:
-      - key: keyValue
-        operator: operatorValue
-        values:
-        - valuesValue
-  pool:
-    generation: 2
-    name: nameValue
-    resourceSliceCount: 3
+  deviceSelector:
+    device: deviceValue
+    deviceClassName: deviceClassNameValue
+    driver: driverValue
+    pool: poolValue
+    selectors:
+    - cel:
+        expression: expressionValue
+  taint:
+    effect: effectValue
+    key: keyValue
+    timeAdded: "2004-01-01T01:01:01Z"
+    value: valueValue
