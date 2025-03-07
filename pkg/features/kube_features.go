@@ -510,6 +510,12 @@ const (
 	// Allows zero value for sleep duration in SleepAction in container lifecycle hooks
 	PodLifecycleSleepActionAllowZero featuregate.Feature = "PodLifecycleSleepActionAllowZero"
 
+	// owner: @natasha41575
+	// kep: http://kep.k8s.io/5067
+	//
+	// Enables the pod to report status.ObservedGeneration to reflect the generation of the last observed podspec.
+	PodObservedGenerationTracking featuregate.Feature = "PodObservedGenerationTracking"
+
 	// owner: @Huang-Wei
 	// kep: https://kep.k8s.io/3521
 	//

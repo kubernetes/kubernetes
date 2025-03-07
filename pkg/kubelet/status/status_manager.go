@@ -235,6 +235,9 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	// Make sure we're caching a deep copy.
 	status = *status.DeepCopy()
 
+	// Set the observedGeneration for this pod status.
+	status.ObservedGeneration = podutil.GetPodObservedGenerationIfEnabled(pod)
+
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
@@ -297,9 +300,10 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 			status.Conditions = append(status.Conditions, condition)
 		}
 	}
+
 	allContainerStatuses := append(status.InitContainerStatuses, status.ContainerStatuses...)
-	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(&pod.Spec, status.Conditions, allContainerStatuses, status.Phase))
-	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(&pod.Spec, allContainerStatuses, status.Phase))
+	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(pod, status.Conditions, allContainerStatuses, status.Phase))
+	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(pod, allContainerStatuses, status.Phase))
 	m.updateStatusInternal(pod, status, false, false)
 }
 
@@ -599,6 +603,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		status.StartTime = &now
 	}
 
+	// prevent sending unnecessary patches
+	if oldStatus.ObservedGeneration > status.ObservedGeneration {
+		status.ObservedGeneration = oldStatus.ObservedGeneration
+	}
+
 	normalizeStatus(pod, &status)
 
 	// Perform some more extensive logging of container termination state to assist in
@@ -814,7 +823,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		return
 	}
 
-	mergedStatus := mergePodStatus(pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
+	mergedStatus := mergePodStatus(pod, pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
 
 	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(context.TODO(), m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
 	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
@@ -992,7 +1001,7 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 // mergePodStatus merges oldPodStatus and newPodStatus to preserve where pod conditions
 // not owned by kubelet and to ensure terminal phase transition only happens after all
 // running containers have terminated. This method does not modify the old status.
-func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers bool) v1.PodStatus {
+func mergePodStatus(pod *v1.Pod, oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers bool) v1.PodStatus {
 	podConditions := make([]v1.PodCondition, 0, len(oldPodStatus.Conditions)+len(newPodStatus.Conditions))
 
 	for _, c := range oldPodStatus.Conditions {
@@ -1054,10 +1063,10 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	// See https://issues.k8s.io/108594 for more details.
 	if podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
 		if podutil.IsPodReadyConditionTrue(newPodStatus) || podutil.IsContainersReadyConditionTrue(newPodStatus) {
-			containersReadyCondition := generateContainersReadyConditionForTerminalPhase(newPodStatus.Phase)
+			containersReadyCondition := generateContainersReadyConditionForTerminalPhase(pod, newPodStatus.Phase)
 			podutil.UpdatePodCondition(&newPodStatus, &containersReadyCondition)
 
-			podReadyCondition := generatePodReadyConditionForTerminalPhase(newPodStatus.Phase)
+			podReadyCondition := generatePodReadyConditionForTerminalPhase(pod, newPodStatus.Phase)
 			podutil.UpdatePodCondition(&newPodStatus, &podReadyCondition)
 		}
 	}
@@ -1070,7 +1079,7 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	if len(pod.Spec.ReadinessGates) == 0 {
 		return false
 	}
-	podReadyCondition := GeneratePodReadyCondition(&pod.Spec, pod.Status.Conditions, pod.Status.ContainerStatuses, pod.Status.Phase)
+	podReadyCondition := GeneratePodReadyCondition(pod, pod.Status.Conditions, pod.Status.ContainerStatuses, pod.Status.Phase)
 	i, curCondition := podutil.GetPodConditionFromList(pod.Status.Conditions, v1.PodReady)
 	// Only reconcile if "Ready" condition is present and Status or Message is not expected
 	if i >= 0 && (curCondition.Status != podReadyCondition.Status || curCondition.Message != podReadyCondition.Message) {

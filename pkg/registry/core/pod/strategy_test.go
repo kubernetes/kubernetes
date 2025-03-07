@@ -3396,6 +3396,161 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "preserve old status.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+		},
+		{
+			description: "preserve old conditions.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:   "old=without,new=with",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "removed-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   "old=with,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
