@@ -50,6 +50,11 @@ type Device struct {
 type BasicDevice struct {
 	Attributes map[QualifiedName]DeviceAttribute
 	Capacity   map[QualifiedName]DeviceCapacity
+
+	UsageRestrictedToNode    bool
+	BindingConditions        []string
+	BindingFailureConditions []string
+	BindingTimeoutSeconds    *int64
 }
 
 type QualifiedName string
