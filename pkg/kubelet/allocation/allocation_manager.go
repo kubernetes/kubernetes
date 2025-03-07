@@ -31,6 +31,21 @@ import (
 // podStatusManagerStateFile is the file name where status manager stores its state
 const podStatusManagerStateFile = "pod_status_manager_state"
 
+// PodAllocation Store pod resize info
+type PodAllocation struct {
+	// Resources v1.ResourceRequirements   // <-- Eventually, pod level resources go here
+	InitContainers []ContainerAllocation
+	Containers []ContainerAllocation
+  }
+  
+type ContainerAllocation struct {
+	Name string
+	Resources v1.ResourceRequirements
+  }
+
+type PodAllocations map[string]PodAllocation
+var PodAllocs = make(PodAllocations)
+
 // AllocationManager tracks pod resource allocations.
 type Manager interface {
 	// GetContainerResourceAllocation returns the AllocatedResources value for the container
@@ -95,6 +110,99 @@ func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
 	return updatePodFromAllocation(pod, allocs)
 }
 
+
+// Compare req1 and req2, if differnt, store req2 resource to diffReq
+func compareAndStoreDiff(req1, req2 v1.ResourceRequirements) v1.ResourceRequirements {
+	var diffReq v1.ResourceRequirements
+
+	//Compare Requests resource
+	diffReq.Requests = make(v1.ResourceList)
+	for key, val1 := range req1.Requests {
+		if val2, exists := req2.Requests[key];!exists ||!val2.Equal(val1) {
+			diffReq.Requests[key] = val1
+		}			
+	}
+
+	// Cpmpare Limits resource
+	diffReq.Limits = make(v1.ResourceList)
+	for key, val1 := range req1.Limits {
+		if val2, exists := req2.Limits[key];!exists ||!val2.Equal(val1) {
+			diffReq.Limits[key] = val1			
+		}
+	}
+	return diffReq
+}
+
+// Check Requests and Limists are empty
+func IsResourceRequirementsEmpty(req v1.ResourceRequirements) bool {
+	// Check Requests nil
+	if len(req.Requests) > 0 {
+		return false
+	}
+	// Check Limits nil
+	if len(req.Limits) > 0 {
+		return false
+	}
+	return true
+}
+
+// Get container resize resource and store as json format
+func compareAndSaveResizeResource(pod *v1.Pod, c v1.Container, req1, req2 v1.ResourceRequirements, podAllocs PodAllocations){
+
+	diffReq := compareAndStoreDiff(req1, req2)
+
+	if IsResourceRequirementsEmpty(diffReq) {
+		return
+	}
+
+	podName := pod.ObjectMeta.Name
+	containerName := c.Name
+	podAlloc, exists := podAllocs[podName]
+	if!exists {
+		podAlloc = PodAllocation{}
+	}
+	
+	found := false
+	// If SidecarContainers feature and Restartble container, store resize info to podAllocs
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		if podutil.IsRestartableInitContainer(&c){
+			found := false
+			for i, container := range podAlloc.InitContainers {
+				if container.Name == containerName {
+					podAlloc.InitContainers[i].Resources = diffReq
+					found = true
+					break
+				}
+			}
+
+			if!found {		
+				podAlloc.InitContainers = append(podAlloc.InitContainers, ContainerAllocation{
+					Name:      containerName,
+					Resources: diffReq,
+				})
+			}
+			podAllocs[podName] = podAlloc
+			return
+		}
+	}
+
+	// Non-init containers store resize info to podAllocs
+	for i, container := range podAlloc.Containers {
+		if container.Name == containerName {
+			podAlloc.Containers[i].Resources = diffReq
+			found = true
+			break
+		}
+	}
+	if!found {		
+		podAlloc.Containers = append(podAlloc.Containers, ContainerAllocation{
+			Name:      containerName,
+			Resources: diffReq,
+		})
+	}
+	podAllocs[podName] = podAlloc 	
+}
+
 func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*v1.Pod, bool) {
 	allocated, found := allocs[pod.UID]
 	if !found {
@@ -107,6 +215,7 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*
 			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
 				// Allocation differs from pod spec, retrieve the allocation
 				if !updated {
+					compareAndSaveResizeResource(pod, c, c.Resources, cAlloc, PodAllocs)					
 					// If this is the first update to be performed, copy the pod
 					pod = pod.DeepCopy()
 					updated = true

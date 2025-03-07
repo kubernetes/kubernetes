@@ -33,6 +33,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"encoding/json"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	inuserns "github.com/moby/sys/userns"
@@ -2878,42 +2879,55 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 	return true, v1.PodResizeStatusInProgress, ""
 }
 
-// Generate pod resize complete msg
-func resizeCompleteMsgGenerate(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) string {
-	var containerMsgs []string
-	for _, c := range allocatedPod.Spec.Containers {
-		if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
-			if cs.State != kubecontainer.ContainerStateRunning {
-				// If the container isn't running, it isn't resizing.
-				continue
-			}
-			cpuReq, hasCPUReq := c.Resources.Requests[v1.ResourceCPU]
-			cpuLim, hasCPULim := c.Resources.Limits[v1.ResourceCPU]
-			memReq, hasMemReq := c.Resources.Requests[v1.ResourceMemory]
-			memLim, hasMemLim := c.Resources.Limits[v1.ResourceMemory]
-			var containerMsg strings.Builder
-			containerMsg.WriteString(fmt.Sprintf("{Container: %s, ", c.Name))
-			if hasCPUReq {
-				containerMsg.WriteString(fmt.Sprintf("Requested CPU: %d ", cpuReq.MilliValue()))
-			}
-			if hasCPULim {
-				containerMsg.WriteString(fmt.Sprintf("Limits CPU: %d ", cpuLim.MilliValue()))
-			}
-			if hasMemReq {
-				containerMsg.WriteString(fmt.Sprintf("Requested memory: %s ", memReq.String()))
-			}
-			if hasMemLim {
-				containerMsg.WriteString(fmt.Sprintf("Limits memory: %s ", memLim.String()))
-			}
-			containerMsg.WriteByte('}')
-			containerMsgs = append(containerMsgs, containerMsg.String())
-		}
+// Get pod resizing info in json format
+func getPodResizeInfo(podName string) (string, error) {
+	// Check podAllocs info
+	var jsonData []byte
+	var err error
+
+	podAlloc, exists := allocation.PodAllocs[podName]
+	if!exists {
+		return "", fmt.Errorf("Pod %s info nil", podName)
 	}
-	// Connect all the resource information of the containers with commas
-	allContainerMsgs := strings.Join(containerMsgs, ", ")
-	// Generate final message
-	finalMsg := fmt.Sprintf("Pod resize complete, {%s}", allContainerMsgs)
-	return finalMsg
+
+	klog.InfoS("compareAndStoreDiff request diff", "InitContainers", len(podAlloc.InitContainers), "Containers", len(podAlloc.Containers))
+
+	if len(podAlloc.InitContainers) > 0 &&  len(podAlloc.Containers) > 0{
+		jsonData, err = json.Marshal(podAlloc)
+	} else if len(podAlloc.InitContainers) > 0 && len(podAlloc.Containers) == 0{
+		jsonData, err = json.Marshal(podAlloc.InitContainers)
+
+		// Defines a temporary structure that only contains the InitContainers word
+		type ContainerOnly struct {
+			InitContainers []allocation.ContainerAllocation `json:"InitContainers"`
+		}
+		// Defines a temporary structure，Assign the InitContainers in PodAllocation to it
+		initcontainerOnly := ContainerOnly{
+			InitContainers: podAlloc.InitContainers,
+		}
+		jsonData, err = json.Marshal(initcontainerOnly)
+
+	} else if len(podAlloc.InitContainers) == 0 && len(podAlloc.Containers) > 0{
+		// Defines a temporary structure that only contains the Containers word
+		type ContainerOnly struct {
+		Containers []allocation.ContainerAllocation `json:"Containers"`
+		}
+		// Defines a temporary structure，Assign the Containers in PodAllocation to it
+		containerOnly := ContainerOnly{
+			Containers: podAlloc.Containers,
+		}
+		jsonData, err = json.Marshal(containerOnly)
+	} 
+
+	if err != nil {
+		return "", fmt.Errorf("JSON error: %w", err)
+	}
+
+	finalMsg := fmt.Sprintf("Pod resize completed, %s", string(jsonData))
+	   
+	// Clear resize data after pod resize complete
+	delete(allocation.PodAllocs, podName)
+	return finalMsg, nil
 }
 
 // handlePodResourcesResize returns the "allocated pod", which should be used for all resource
@@ -2930,11 +2944,12 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress)
 		} else {
 			// (Desired == Allocated == Actual) => clear the resize status.
-			if pod.Status.Resize == v1.PodResizeStatusInProgress {
-				msg := resizeCompleteMsgGenerate(allocatedPod, podStatus)
-				kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
-			}
-
+			if pod.Status.Resize == v1.PodResizeStatusInProgress {			
+				msg, error := getPodResizeInfo(pod.ObjectMeta.Name)								
+				if error == nil{
+					kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+				}			
+			}			
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 		}
 		// Pod allocation does not need to be updated.
@@ -2978,8 +2993,10 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
 			// In this case, consider the resize complete.
 			if pod.Status.Resize == v1.PodResizeStatusInProgress {
-				msg := resizeCompleteMsgGenerate(allocatedPod, podStatus)
-				kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+				msg, error := getPodResizeInfo(pod.ObjectMeta.Name)								
+				if error == nil{
+					kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+				}			
 			}
 			kl.statusManager.SetPodResizeStatus(pod.UID, "")
 			return allocatedPod, nil
