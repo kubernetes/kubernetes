@@ -982,6 +982,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: PodObservedGenerationTracking
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: PodReadyToStartContainersCondition
   versionedSpecs:
   - default: false

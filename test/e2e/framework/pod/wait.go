@@ -306,7 +306,7 @@ func WaitForPodsRunningReady(ctx context.Context, c clientset.Interface, ns stri
 
 }
 
-// WaitForPodCondition waits a pods to be matched to the given condition.
+// WaitForPodCondition waits for a pod to be matched to the given condition.
 // The condition callback may use gomega.StopTrying to abort early.
 func WaitForPodCondition(ctx context.Context, c clientset.Interface, ns, podName, conditionDesc string, timeout time.Duration, condition podCondition) error {
 	return framework.Gomega().
@@ -322,6 +322,21 @@ func WaitForPodCondition(ctx context.Context, c clientset.Interface, ns, podName
 			}
 			return func() string {
 				return fmt.Sprintf("expected pod to be %s, got instead:\n%s", conditionDesc, format.Object(pod, 1))
+			}, nil
+		}))
+}
+
+// WaitForPodObservedGeneration waits for a pod to have the given observed generation.
+func WaitForPodObservedGeneration(ctx context.Context, c clientset.Interface, ns, podName string, expectedGeneration int64, timeout time.Duration) error {
+	return framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(c.CoreV1().Pods(ns).Get, podName, metav1.GetOptions{}))).
+		WithTimeout(timeout).
+		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+			if pod.Status.ObservedGeneration == expectedGeneration {
+				return nil, nil
+			}
+			return func() string {
+				return fmt.Sprintf("expected pod generation to be %d, got %d instead:\n", expectedGeneration, pod.Status.ObservedGeneration)
 			}, nil
 		}))
 }
