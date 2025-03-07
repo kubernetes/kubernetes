@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/stats"
 	"k8s.io/klog/v2"
 )
 
@@ -40,7 +41,7 @@ type registerService func(s *grpc.Server)
 
 // startGRPCServer sets up the GRPC server on a Unix domain socket and spawns a goroutine
 // which handles requests for arbitrary services.
-func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, grpcStatsHandlers []stats.Handler, endpoint endpoint, services ...registerService) (*grpcServer, error) {
 	ctx := klog.NewContext(context.Background(), logger)
 
 	s := &grpcServer{
@@ -70,6 +71,9 @@ func startGRPCServer(logger klog.Logger, grpcVerbosity int, unaryInterceptors []
 	finalStreamInterceptors = append(finalStreamInterceptors, streamInterceptors...)
 	opts = append(opts, grpc.ChainUnaryInterceptor(finalUnaryInterceptors...))
 	opts = append(opts, grpc.ChainStreamInterceptor(finalStreamInterceptors...))
+	for _, handler := range grpcStatsHandlers {
+		opts = append(opts, grpc.StatsHandler(handler))
+	}
 	s.server = grpc.NewServer(opts...)
 	for _, service := range services {
 		service(s.server)
