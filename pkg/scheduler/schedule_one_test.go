@@ -26,6 +26,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1080,7 +1081,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 		expectPodIsInFlightAtRunPreBindPlugins bool
 	}{
 		{
-			name:                  "error permit pod",
+			name:                  "error on permit",
 			sendPod:               podWithID("foo", ""),
 			mockSchedulePodResult: okScheduleResult,
 			registerPluginFuncs: []tf.RegisterPluginFunc{
@@ -1094,18 +1095,34 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			expectPodIsInFlightAtFailureHandler: true,
 		},
 		{
-			name:                  "error wait on permit pod",
+			name:                  "error on wait on permit",
 			sendPod:               podWithID("foo", ""),
 			mockSchedulePodResult: okScheduleResult,
 			registerPluginFuncs: []tf.RegisterPluginFunc{
-				tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(framework.NewStatus(framework.Success), time.Minute)),
+				tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(framework.NewStatus(framework.Wait), time.Minute)),
 			},
 			expectErrorPod:                         podWithID("foo", testNode.Name),
 			expectAssumedPod:                       podWithID("foo", testNode.Name),
 			expectError:                            waitOnPermitErr,
 			eventReason:                            "FailedScheduling",
 			mockWaitOnPermitResult:                 framework.AsStatus(waitOnPermitErr),
-			mockRunPreBindPluginsResult:            nil,
+			expectedNumCallsToFailureHandler:       1,
+			expectPodIsInFlightAtFailureHandler:    true,
+			expectPodIsInFlightAtWaitOnPermit:      true,
+			expectPodIsInFlightAtRunPreBindPlugins: false,
+		},
+		{
+			name:                  "pod rejected while wait on permit",
+			sendPod:               podWithID("foo", ""),
+			mockSchedulePodResult: okScheduleResult,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(framework.NewStatus(framework.Wait), time.Minute)),
+			},
+			expectErrorPod:                         podWithID("foo", testNode.Name),
+			expectAssumedPod:                       podWithID("foo", testNode.Name),
+			expectError:                            waitOnPermitErr,
+			eventReason:                            "FailedScheduling",
+			mockWaitOnPermitResult:                 framework.NewStatus(framework.Unschedulable, waitOnPermitErr.Error()),
 			expectedNumCallsToFailureHandler:       1,
 			expectPodIsInFlightAtFailureHandler:    true,
 			expectPodIsInFlightAtWaitOnPermit:      true,
@@ -1116,14 +1133,14 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			sendPod:               podWithID("foo", ""),
 			mockSchedulePodResult: okScheduleResult,
 			registerPluginFuncs: []tf.RegisterPluginFunc{
-				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(framework.AsStatus(preBindErr))),
+				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(framework.NewStatus(framework.Unschedulable))),
 			},
 			expectErrorPod:                         podWithID("foo", testNode.Name),
 			expectAssumedPod:                       podWithID("foo", testNode.Name),
 			expectError:                            preBindErr,
 			eventReason:                            "FailedScheduling",
 			mockWaitOnPermitResult:                 framework.NewStatus(framework.Success),
-			mockRunPreBindPluginsResult:            framework.AsStatus(preBindErr),
+			mockRunPreBindPluginsResult:            framework.NewStatus(framework.Unschedulable, preBindErr.Error()),
 			expectedNumCallsToFailureHandler:       1,
 			expectPodIsInFlightAtFailureHandler:    false,
 			expectPodIsInFlightAtWaitOnPermit:      true,
@@ -1293,12 +1310,11 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				if diff := cmp.Diff(item.expectErrorPod, gotPod); diff != "" {
 					t.Errorf("Unexpected error pod (-want,+got):\n%s", diff)
 				}
-				if item.expectError == nil || gotError == nil {
-					if !errors.Is(gotError, item.expectError) {
-						t.Errorf("Unexpected error. Wanted %v, got %v", item.expectError, gotError)
-					}
-				} else if diff := cmp.Diff(item.expectError, gotError, cmpopts.EquateErrors()); diff != "" {
-					t.Errorf("Unexpected error (-want,+got):\n%s", diff)
+				if (item.expectError == nil || gotError == nil) && item.expectError != gotError {
+					t.Errorf("Unexpected error. Wanted %v, got %v", item.expectError, gotError)
+				}
+				if item.expectError != nil && !strings.Contains(gotError.Error(), item.expectError.Error()) {
+					t.Errorf("Unexpected error. Wanted %v, got %v", item.expectError.Error(), gotError.Error())
 				}
 				if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
 					t.Errorf("Unexpected binding (-want,+got):\n%s", diff)
