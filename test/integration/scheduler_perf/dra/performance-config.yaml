@@ -633,3 +633,41 @@
       measurePods: 2500
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
+
+#
+- name: BindingSuccess
+  featureGates:
+    DynamicResourceAllocation: true
+    DRADeviceBindingConditions: true
+    DRAResourceClaimDeviceStatus: true
+  workloadTemplate:
+    - opcode: createNodes
+      count: 1
+      nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    - opcode: createResourceDriver
+      driverName: test-driver.cdi.k8s.io
+      nodes: scheduler-perf-dra-*
+      maxClaimsPerNode: 1
+    - opcode: createAny
+      templatePath: templates/deviceclass.yaml
+    - opcode: createAny
+      namespace: test
+      count: 1
+      templatePath: templates/resourceclaimtemplate.yaml
+    - opcode: createPods
+      namespace: test
+      count: 1
+      podTemplatePath: templates/pod-with-claim-template.yaml
+      collectMetrics: true
+      steadyState: true
+    - opcode: updateDeviceConditions
+      namespace: test
+      claimName: "test-claim-0"
+      PodName: "test-dra-0"
+      conditions:
+        - type: "DeviceAttached"
+          status: "True"
+  workloads:
+    - name: fast
+      labels: [integration-test, short, binding]
+      params: {}

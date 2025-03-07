@@ -95,6 +95,7 @@ const (
 	sleepOpcode                  operationCode = "sleep"
 	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
 	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
+	updateDeviceConditionsOpcode operationCode = "updateDeviceConditions"
 )
 
 const (
@@ -498,6 +499,8 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		sleepOpcode:                  &sleepOp{},
 		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
 		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
+		updateDeviceConditionsOpcode: &updateDeviceConditionsOp{},
+
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	// First determine the opcode using lenient decoding (= ignore extra fields).
