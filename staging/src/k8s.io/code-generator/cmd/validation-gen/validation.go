@@ -27,14 +27,15 @@ import (
 	"strings"
 	"unicode"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/code-generator/cmd/validation-gen/validators"
 )
 
 func mkPkgNames(pkg string, names ...string) []types.Name {
@@ -345,7 +346,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 
 	// Discover into this type before extracting type validations.
 	switch t.Kind {
-	case types.Builtin:
+	case types.Builtin, types.Interface:
 		// Nothing more to do.
 	case types.Alias:
 		// Discover the underlying type.

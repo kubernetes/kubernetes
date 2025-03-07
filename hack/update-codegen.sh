@@ -430,8 +430,16 @@ function codegen::validation() {
         tag_pkgs+=("./$dir")
     done
 
+    # This list needs to cover all of the types used transitively from the
+    # main API types. Validations defined on types in these packages will be
+    # used, but not regenerated, unless they are also listed as a "regular"
+    # input on the command-line.
     local extra_pkgs=(
         k8s.io/apimachinery/pkg/apis/meta/v1
+        k8s.io/apimachinery/pkg/api/resource
+        k8s.io/apimachinery/pkg/runtime
+        k8s.io/apimachinery/pkg/types
+        k8s.io/apimachinery/pkg/util/intstr
     )
 
     kube::log::status "Generating validation code for ${#tag_pkgs[@]} targets"
