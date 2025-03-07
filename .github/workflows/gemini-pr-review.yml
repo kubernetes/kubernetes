@@ -1,0 +1,43 @@
+name: Gemini PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, labeled]
+  pull_request_review_comment:
+    types: [created, deleted]
+  issue_comment:
+    types: [created, deleted]
+
+jobs:
+  gemini_review:
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, 'api-review') && ${{ github.event.issue.pull_request }}
+
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        # with:
+        # fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+          cache: 'pip' # caching pip dependencies
+
+      - name: Install dependencies
+        run: pip install google-generativeai requests PyGithub google-cloud-storage
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
+      - name: Run Gemini review script
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python ./hack/gemini_review.py
