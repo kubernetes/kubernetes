@@ -50,6 +50,7 @@ type Device struct {
 type BasicDevice struct {
 	Attributes map[QualifiedName]DeviceAttribute
 	Capacity   map[QualifiedName]DeviceCapacity
+	Taints     []DeviceTaintAtom
 }
 
 type QualifiedName string
@@ -66,3 +67,18 @@ type DeviceAttribute struct {
 type DeviceCapacity struct {
 	Value resource.Quantity
 }
+
+type DeviceTaintAtom struct {
+	Key       string
+	Value     string
+	Effect    DeviceTaintEffect
+	TimeAdded *metav1.Time
+}
+
+type DeviceTaintEffect string
+
+const (
+	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
+
+	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
+)

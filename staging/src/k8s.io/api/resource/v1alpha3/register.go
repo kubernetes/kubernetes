@@ -52,6 +52,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ResourceClaimTemplateList{},
 		&ResourceSlice{},
 		&ResourceSliceList{},
+		&DeviceTaint{},
+		&DeviceTaintList{},
 	)
 
 	// Add the watch version that applies
