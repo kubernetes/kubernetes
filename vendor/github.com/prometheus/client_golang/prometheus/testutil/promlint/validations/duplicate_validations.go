@@ -14,7 +14,7 @@
 package validations
 
 import (
-	"fmt"
+	"errors"
 	"reflect"
 
 	dto "github.com/prometheus/client_model/go"
@@ -27,7 +27,7 @@ func LintDuplicateMetric(mf *dto.MetricFamily) []error {
 	for i, m := range mf.Metric {
 		for _, k := range mf.Metric[i+1:] {
 			if reflect.DeepEqual(m.Label, k.Label) {
-				problems = append(problems, fmt.Errorf("metric not unique"))
+				problems = append(problems, errors.New("metric not unique"))
 				break
 			}
 		}

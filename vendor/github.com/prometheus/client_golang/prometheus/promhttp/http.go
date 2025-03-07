@@ -41,11 +41,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/klauspost/compress/zstd"
 	"github.com/prometheus/common/expfmt"
 
 	"github.com/prometheus/client_golang/internal/github.com/golang/gddo/httputil"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp/internal"
 )
 
 const (
@@ -65,7 +65,13 @@ const (
 	Zstd     Compression = "zstd"
 )
 
-var defaultCompressionFormats = []Compression{Identity, Gzip, Zstd}
+func defaultCompressionFormats() []Compression {
+	if internal.NewZstdWriter != nil {
+		return []Compression{Identity, Gzip, Zstd}
+	} else {
+		return []Compression{Identity, Gzip}
+	}
+}
 
 var gzipPool = sync.Pool{
 	New: func() interface{} {
@@ -138,7 +144,7 @@ func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerO
 	// Select compression formats to offer based on default or user choice.
 	var compressions []string
 	if !opts.DisableCompression {
-		offers := defaultCompressionFormats
+		offers := defaultCompressionFormats()
 		if len(opts.OfferedCompressions) > 0 {
 			offers = opts.OfferedCompressions
 		}
@@ -207,7 +213,13 @@ func HandlerForTransactional(reg prometheus.TransactionalGatherer, opts HandlerO
 		if encodingHeader != string(Identity) {
 			rsp.Header().Set(contentEncodingHeader, encodingHeader)
 		}
-		enc := expfmt.NewEncoder(w, contentType)
+
+		var enc expfmt.Encoder
+		if opts.EnableOpenMetricsTextCreatedSamples {
+			enc = expfmt.NewEncoder(w, contentType, expfmt.WithCreatedLines())
+		} else {
+			enc = expfmt.NewEncoder(w, contentType)
+		}
 
 		// handleError handles the error according to opts.ErrorHandling
 		// and returns true if we have to abort after the handling.
@@ -408,6 +420,21 @@ type HandlerOpts struct {
 	// (which changes the identity of the resulting series on the Prometheus
 	// server).
 	EnableOpenMetrics bool
+	// EnableOpenMetricsTextCreatedSamples specifies if this handler should add, extra, synthetic
+	// Created Timestamps for counters, histograms and summaries, which for the current
+	// version of OpenMetrics are defined as extra series with the same name and "_created"
+	// suffix. See also the OpenMetrics specification for more details
+	// https://github.com/prometheus/OpenMetrics/blob/v1.0.0/specification/OpenMetrics.md#counter-1
+	//
+	// Created timestamps are used to improve the accuracy of reset detection,
+	// but the way it's designed in OpenMetrics 1.0 it also dramatically increases cardinality
+	// if the scraper does not handle those metrics correctly (converting to created timestamp
+	// instead of leaving those series as-is). New OpenMetrics versions might improve
+	// this situation.
+	//
+	// Prometheus introduced the feature flag 'created-timestamp-zero-ingestion'
+	// in version 2.50.0 to handle this situation.
+	EnableOpenMetricsTextCreatedSamples bool
 	// ProcessStartTime allows setting process start timevalue that will be exposed
 	// with "Process-Start-Time-Unix" response header along with the metrics
 	// payload. This allow callers to have efficient transformations to cumulative
@@ -445,14 +472,12 @@ func negotiateEncodingWriter(r *http.Request, rw io.Writer, compressions []strin
 
 	switch selected {
 	case "zstd":
-		// TODO(mrueg): Replace klauspost/compress with stdlib implementation once https://github.com/golang/go/issues/62513 is implemented.
-		z, err := zstd.NewWriter(rw, zstd.WithEncoderLevel(zstd.SpeedFastest))
-		if err != nil {
-			return nil, "", func() {}, err
+		if internal.NewZstdWriter == nil {
+			// The content encoding was not implemented yet.
+			return nil, "", func() {}, fmt.Errorf("content compression format not recognized: %s. Valid formats are: %s", selected, defaultCompressionFormats())
 		}
-
-		z.Reset(rw)
-		return z, selected, func() { _ = z.Close() }, nil
+		writer, closeWriter, err := internal.NewZstdWriter(rw)
+		return writer, selected, closeWriter, err
 	case "gzip":
 		gz := gzipPool.Get().(*gzip.Writer)
 		gz.Reset(rw)
@@ -462,6 +487,6 @@ func negotiateEncodingWriter(r *http.Request, rw io.Writer, compressions []strin
 		return rw, selected, func() {}, nil
 	default:
 		// The content encoding was not implemented yet.
-		return nil, "", func() {}, fmt.Errorf("content compression format not recognized: %s. Valid formats are: %s", selected, defaultCompressionFormats)
+		return nil, "", func() {}, fmt.Errorf("content compression format not recognized: %s. Valid formats are: %s", selected, defaultCompressionFormats())
 	}
 }

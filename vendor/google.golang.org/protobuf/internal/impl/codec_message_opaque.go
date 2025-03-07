@@ -45,19 +45,16 @@ func (mi *MessageInfo) makeOpaqueCoderMethods(t reflect.Type, si opaqueStructInf
 		var childMessage *MessageInfo
 		switch {
 		case fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic():
-			fieldOffset = offsetOf(fs, mi.Exporter)
-		case fd.IsWeak():
-			fieldOffset = si.weakOffset
-			funcs = makeWeakMessageFieldCoder(fd)
+			fieldOffset = offsetOf(fs)
 		case fd.Message() != nil && !fd.IsMap():
-			fieldOffset = offsetOf(fs, mi.Exporter)
+			fieldOffset = offsetOf(fs)
 			if fd.IsList() {
 				childMessage, funcs = makeOpaqueRepeatedMessageFieldCoder(fd, ft)
 			} else {
 				childMessage, funcs = makeOpaqueMessageFieldCoder(fd, ft)
 			}
 		default:
-			fieldOffset = offsetOf(fs, mi.Exporter)
+			fieldOffset = offsetOf(fs)
 			childMessage, funcs = fieldCoder(fd, ft)
 		}
 		cf := &coderFieldInfo{

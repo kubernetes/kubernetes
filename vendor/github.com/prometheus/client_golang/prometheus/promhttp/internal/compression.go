@@ -1,4 +1,4 @@
-// Copyright 2023 The Prometheus Authors
+// Copyright 2025 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -11,16 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build wasip1
-// +build wasip1
+package internal
 
-package prometheus
+import (
+	"io"
+)
 
-func canCollectProcess() bool {
-	return false
-}
-
-func (*processCollector) processCollect(chan<- Metric) {
-	// noop on this platform
-	return
-}
+// NewZstdWriter enables zstd write support if non-nil.
+var NewZstdWriter func(rw io.Writer) (_ io.Writer, closeWriter func(), _ error)
