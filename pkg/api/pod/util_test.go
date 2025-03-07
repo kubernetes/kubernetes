@@ -4115,7 +4115,7 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 		{
 			name:    "no lifecycle hooks",
 			podSpec: &api.PodSpec{},
-			expectAllowPodLifecycleSleepActionZeroValue: false,
+			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 		{
 			name: "Prestop with non-zero second duration",
@@ -4132,7 +4132,7 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 					},
 				},
 			},
-			expectAllowPodLifecycleSleepActionZeroValue: false,
+			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 		{
 			name: "PostStart with non-zero second duration",
@@ -4149,7 +4149,7 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 					},
 				},
 			},
-			expectAllowPodLifecycleSleepActionZeroValue: false,
+			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 		{
 			name: "PreStop with zero seconds",
