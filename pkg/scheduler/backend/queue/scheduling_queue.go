@@ -132,6 +132,8 @@ type SchedulingQueue interface {
 	PendingPods() ([]*v1.Pod, string)
 	InFlightPods() []*v1.Pod
 	PodsInActiveQ() []*v1.Pod
+	// PodsInBackoffQ returns all the Pods in the backoffQ.
+	PodsInBackoffQ() []*v1.Pod
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -155,7 +157,7 @@ type PriorityQueue struct {
 	*nominator
 
 	stop  chan struct{}
-	clock clock.Clock
+	clock clock.WithTicker
 
 	// lock takes precedence and should be taken first,
 	// before any other locks in the queue (activeQueue.lock or nominator.nLock).
@@ -209,7 +211,7 @@ type clusterEvent struct {
 }
 
 type priorityQueueOptions struct {
-	clock                             clock.Clock
+	clock                             clock.WithTicker
 	podInitialBackoffDuration         time.Duration
 	podMaxBackoffDuration             time.Duration
 	podMaxInUnschedulablePodsDuration time.Duration
@@ -224,7 +226,7 @@ type priorityQueueOptions struct {
 type Option func(*priorityQueueOptions)
 
 // WithClock sets clock for PriorityQueue, the default clock is clock.RealClock.
-func WithClock(clock clock.Clock) Option {
+func WithClock(clock clock.WithTicker) Option {
 	return func(o *priorityQueueOptions) {
 		o.clock = clock
 	}
@@ -334,7 +336,7 @@ func NewPriorityQueue(
 		stop:                              make(chan struct{}),
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		activeQ:                           newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](lessFn), metrics.NewActivePodsRecorder()), isSchedulingQueueHintEnabled, options.metricsRecorder),
-		backoffQ:                          newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration),
+		backoffQ:                          newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessFn, isPopFromBackoffQEnabled),
 		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
@@ -352,9 +354,9 @@ func NewPriorityQueue(
 
 // Run starts the goroutine to pump from backoffQ to activeQ
 func (p *PriorityQueue) Run(logger klog.Logger) {
-	go wait.Until(func() {
+	go p.backoffQ.waitUntilAlignedWithOrderingWindow(func() {
 		p.flushBackoffQCompleted(logger)
-	}, 1.0*time.Second, p.stop)
+	}, p.stop)
 	go wait.Until(func() {
 		p.flushUnschedulablePodsLeftover(logger)
 	}, 30*time.Second, p.stop)
@@ -1177,6 +1179,11 @@ func (p *PriorityQueue) PodsInActiveQ() []*v1.Pod {
 	return p.activeQ.list()
 }
 
+// PodsInBackoffQ returns all the Pods in the backoffQ.
+func (p *PriorityQueue) PodsInBackoffQ() []*v1.Pod {
+	return p.backoffQ.list()
+}
+
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
 
 // GetPod searches for a pod in the activeQ, backoffQ, and unschedulablePods.
@@ -1215,9 +1222,7 @@ func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	defer p.lock.RUnlock()
 	result := p.activeQ.list()
 	activeQLen := len(result)
-	for _, pInfo := range p.backoffQ.list() {
-		result = append(result, pInfo.Pod)
-	}
+	result = append(result, p.backoffQ.list()...)
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		result = append(result, pInfo.Pod)
 	}

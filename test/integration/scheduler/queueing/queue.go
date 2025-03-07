@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -2264,6 +2265,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	t.Helper()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	logger, _ := ktesting.NewTestContext(t)
 
 	opts := []scheduler.Option{scheduler.WithPodInitialBackoffSeconds(0), scheduler.WithPodMaxBackoffSeconds(0)}
 	if tt.EnablePlugins != nil {
@@ -2303,6 +2305,7 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 	)
 	testutils.SyncSchedulerInformerFactory(testCtx)
 
+	testCtx.Scheduler.SchedulingQueue.Run(logger)
 	defer testCtx.Scheduler.SchedulingQueue.Close()
 
 	cs, ns, ctx := testCtx.ClientSet, testCtx.NS.Name, testCtx.Ctx

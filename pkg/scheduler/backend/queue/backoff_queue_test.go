@@ -17,6 +17,7 @@ limitations under the License.
 package queue
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -69,7 +70,7 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bq := newBackoffQueue(clock.RealClock{}, tt.initialBackoffDuration, tt.maxBackoffDuration)
+			bq := newBackoffQueue(clock.RealClock{}, tt.initialBackoffDuration, tt.maxBackoffDuration, newDefaultQueueSort(), true)
 			if got := bq.calculateBackoffDuration(tt.podInfo); got != tt.want {
 				t.Errorf("backoffQueue.calculateBackoffDuration() = %v, want %v", got, tt.want)
 			}
@@ -84,7 +85,7 @@ func TestBackoffQueue_popEachBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod0").Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-time.Second),
+			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -100,7 +101,7 @@ func TestBackoffQueue_popEachBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Obj(),
 			},
-			Timestamp: fakeClock.Now().Add(-time.Second),
+			Timestamp: fakeClock.Now().Add(-2 * time.Second),
 			Attempts:  1,
 		},
 		"pod3": {
@@ -148,11 +149,104 @@ func TestBackoffQueue_popEachBackoffCompleted(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		for _, popFromBackoffQEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s popFromBackoffQEnabled(%v)", tt.name, popFromBackoffQEnabled), func(t *testing.T) {
+				logger, _ := ktesting.NewTestContext(t)
+				bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, newDefaultQueueSort(), popFromBackoffQEnabled)
+				for _, podName := range tt.podsInBackoff {
+					bq.add(logger, podInfos[podName], framework.EventUnscheduledPodAdd.Label())
+				}
+				var gotPods []string
+				bq.popEachBackoffCompleted(logger, func(pInfo *framework.QueuedPodInfo) {
+					gotPods = append(gotPods, pInfo.Pod.Name)
+				})
+				if diff := cmp.Diff(tt.wantPods, gotPods); diff != "" {
+					t.Errorf("Unexpected pods moved (-want, +got):\n%s", diff)
+				}
+				podsToStayInBackoff := len(tt.podsInBackoff) - len(tt.wantPods)
+				if bq.len() != podsToStayInBackoff {
+					t.Errorf("Expected %v pods to stay in backoffQ, but got: %v", podsToStayInBackoff, bq.len())
+				}
+			})
+		}
+	}
+}
+
+func TestBackoffQueueOrdering(t *testing.T) {
+	// Align the fake clock with ordering window.
+	fakeClock := testingclock.NewFakeClock(time.Now().Truncate(backoffQOrderingWindowDuration))
+	podInfos := []*framework.QueuedPodInfo{
+		{
+			PodInfo: &framework.PodInfo{
+				Pod: st.MakePod().Name("pod0").Priority(1).Obj(),
+			},
+			Timestamp:            fakeClock.Now(),
+			Attempts:             1,
+			UnschedulablePlugins: sets.New("plugin"),
+		},
+		{
+			PodInfo: &framework.PodInfo{
+				Pod: st.MakePod().Name("pod1").Priority(1).Obj(),
+			},
+			Timestamp:            fakeClock.Now().Add(-time.Second),
+			Attempts:             1,
+			UnschedulablePlugins: sets.New("plugin"),
+		},
+		{
+			PodInfo: &framework.PodInfo{
+				Pod: st.MakePod().Name("pod2").Priority(2).Obj(),
+			},
+			Timestamp:            fakeClock.Now().Add(-2*time.Second + time.Millisecond),
+			Attempts:             1,
+			UnschedulablePlugins: sets.New("plugin"),
+		},
+		{
+			PodInfo: &framework.PodInfo{
+				Pod: st.MakePod().Name("pod3").Priority(1).Obj(),
+			},
+			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Attempts:             1,
+			UnschedulablePlugins: sets.New("plugin"),
+		},
+		{
+			PodInfo: &framework.PodInfo{
+				Pod: st.MakePod().Name("pod4").Priority(2).Obj(),
+			},
+			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Attempts:             1,
+			UnschedulablePlugins: sets.New("plugin"),
+		},
+		{
+			PodInfo: &framework.PodInfo{
+				Pod: st.MakePod().Name("pod5").Priority(1).Obj(),
+			},
+			Timestamp:            fakeClock.Now().Add(-3 * time.Second),
+			Attempts:             1,
+			UnschedulablePlugins: sets.New("plugin"),
+		},
+	}
+	tests := []struct {
+		name                   string
+		popFromBackoffQEnabled bool
+		wantPods               []string
+	}{
+		{
+			name:                   "Pods with the same window are ordered by priority if PopFromBackoffQ is enabled",
+			popFromBackoffQEnabled: true,
+			wantPods:               []string{"pod5", "pod4", "pod2", "pod3"},
+		},
+		{
+			name:                   "Pods priority doesn't matter if PopFromBackoffQ is disabled",
+			popFromBackoffQEnabled: false,
+			wantPods:               []string{"pod5", "pod3", "pod4", "pod2"},
+		},
+	}
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration)
-			for _, podName := range tt.podsInBackoff {
-				bq.add(logger, podInfos[podName], framework.EventUnscheduledPodAdd.Label())
+			bq := newBackoffQueue(fakeClock, DefaultPodInitialBackoffDuration, DefaultPodMaxBackoffDuration, newDefaultQueueSort(), tt.popFromBackoffQEnabled)
+			for _, podInfo := range podInfos {
+				bq.add(logger, podInfo, framework.EventUnscheduledPodAdd.Label())
 			}
 			var gotPods []string
 			bq.popEachBackoffCompleted(logger, func(pInfo *framework.QueuedPodInfo) {
@@ -160,10 +254,6 @@ func TestBackoffQueue_popEachBackoffCompleted(t *testing.T) {
 			})
 			if diff := cmp.Diff(tt.wantPods, gotPods); diff != "" {
 				t.Errorf("Unexpected pods moved (-want, +got):\n%s", diff)
-			}
-			podsToStayInBackoff := len(tt.podsInBackoff) - len(tt.wantPods)
-			if bq.len() != podsToStayInBackoff {
-				t.Errorf("Expected %v pods to stay in backoffQ, but got: %v", podsToStayInBackoff, bq.len())
 			}
 		})
 	}

@@ -886,6 +886,9 @@ func TestAsyncPreemption(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
+			testCtx.Scheduler.SchedulingQueue.Run(logger)
+			defer testCtx.Scheduler.SchedulingQueue.Close()
+
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, true)
 
 			createdPods := []*v1.Pod{}
