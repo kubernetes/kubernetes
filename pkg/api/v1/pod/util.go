@@ -428,3 +428,21 @@ func GetPodObservedGenerationIfEnabled(pod *v1.Pod) int64 {
 	}
 	return 0
 }
+
+// We will emit condition.observedGeneration if the feature is enabled OR if condition.observedGeneration is already set.
+// This protects against an infinite loop of kubelet trying to clear the value after the FG is turned off, and
+// the API server preserving existing values when an incoming update tries to clear it.
+func GetPodObservedGenerationIfEnabledOnCondition(pod *v1.Pod, conditionType v1.PodConditionType) int64 {
+	if pod == nil {
+		return 0
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking) {
+		return pod.Generation
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == conditionType && condition.ObservedGeneration != 0 {
+			return pod.Generation
+		}
+	}
+	return 0
+}

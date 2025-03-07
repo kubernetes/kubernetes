@@ -341,6 +341,30 @@ func WaitForPodObservedGeneration(ctx context.Context, c clientset.Interface, ns
 		}))
 }
 
+// WaitForPodConditionObservedGeneration waits for a pod condition to have the given observed generation.
+func WaitForPodConditionObservedGeneration(ctx context.Context, c clientset.Interface, ns, podName string, conditionType v1.PodConditionType, expectedGeneration int64, timeout time.Duration) error {
+	return framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(c.CoreV1().Pods(ns).Get, podName, metav1.GetOptions{}))).
+		WithTimeout(timeout).
+		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == conditionType {
+					if condition.ObservedGeneration == expectedGeneration {
+						return nil, nil
+					} else {
+						return func() string {
+							return fmt.Sprintf("expected condition %s generation to be %d, got %d instead:\n", conditionType, expectedGeneration, condition.ObservedGeneration)
+						}, nil
+					}
+				}
+			}
+
+			return func() string {
+				return fmt.Sprintf("could not find condition %s:\n", conditionType)
+			}, nil
+		}))
+}
+
 // Range determines how many items must exist and how many must match a certain
 // condition. Values <= 0 are ignored.
 // TODO (?): move to test/e2e/framework/range
