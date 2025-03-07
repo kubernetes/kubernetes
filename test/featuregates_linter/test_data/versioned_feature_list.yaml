@@ -438,13 +438,13 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
-- name: DRAPrioritizedList
+- name: DRADeviceBindingConditions
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
-- name: DRADeviceBindingConditions
+- name: DRAPrioritizedList
   versionedSpecs:
   - default: false
     lockToDefault: false
