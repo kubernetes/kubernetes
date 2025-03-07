@@ -262,6 +262,14 @@ const (
 	// based on "structured parameters".
 	DynamicResourceAllocation featuregate.Feature = "DynamicResourceAllocation"
 
+	// owner: @KobayashiD27
+	// kep: http://kep.k8s.io/5007
+	// alpha: v1.33
+	//
+	// Enables support for the ResourceClaim.status.devices.FabricAttached field and for setting this
+	// status from DRA drivers.
+	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
+
 	// owner: @lauralorenz
 	// kep: https://kep.k8s.io/4603
 	//
@@ -1165,6 +1173,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	DynamicResourceAllocation: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	DRADeviceBindingConditions: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	KubeletCrashLoopBackOffMax: {
