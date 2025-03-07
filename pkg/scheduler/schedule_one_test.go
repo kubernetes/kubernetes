@@ -883,13 +883,13 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	}
 }
 
-// Tests the logic moving pods to unschedulable backoffQ upon failure.
-// This needs to be a separate test case, because TestSchedulerScheduleOne mocks the FailureHandler function (which contains the logic tested here).
-func TestScheduleOneFailure(t *testing.T) {
+// Tests the logic moving pods to unschedulable or backoffQ upon failure after Permit (needed to fix issue https://github.com/kubernetes/kubernetes/issues/129967).
+// TODO: Add tests for failure handling logic when failure happens in earlier stages.
+// This needs to be a separate test case, because TestSchedulerScheduleOne mocks the FailureHandler function.
+func TestScheduleOneFailsOnPrebindOrBind(t *testing.T) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	client := clientsetfake.NewClientset(&testNode)
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
-	errS := errors.New("scheduler")
 	errB := errors.New("binder")
 	preBindErr := errors.New("on PreBind")
 
@@ -903,75 +903,45 @@ func TestScheduleOneFailure(t *testing.T) {
 		expectAssumedPod              *v1.Pod
 		expectPodMovedToBackoffQ      *v1.Pod
 		expectPodMovedToUnschedulable *v1.Pod
-		expectError                   error
 		expectBind                    *v1.Binding
 		eventReason                   string
 		mockResult                    mockScheduleResult
 	}{
 		{
-			name:       "error reserve pod",
-			sendPod:    podWithID("foo", ""),
-			mockResult: mockScheduleResult{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
-			registerPluginFuncs: []tf.RegisterPluginFunc{
-				tf.RegisterReservePlugin("FakeReserve", tf.NewFakeReservePlugin(framework.NewStatus(framework.Error, "reserve error"))),
-			},
-			expectErrorPod:                podWithID("foo", testNode.Name),
-			expectForgetPod:               podWithID("foo", testNode.Name),
-			expectAssumedPod:              podWithID("foo", testNode.Name),
-			expectError:                   fmt.Errorf(`running Reserve plugin "FakeReserve": %w`, errors.New("reserve error")),
-			expectPodMovedToBackoffQ:      podWithID("foo", testNode.Name),
-			expectPodMovedToUnschedulable: nil,
-			eventReason:                   "FailedScheduling",
-		},
-		{
-			name:       "error permit pod",
-			sendPod:    podWithID("foo", ""),
-			mockResult: mockScheduleResult{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
-			registerPluginFuncs: []tf.RegisterPluginFunc{
-				tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(framework.NewStatus(framework.Error, "permit error"), time.Minute)),
-			},
-			expectErrorPod:                podWithID("foo", testNode.Name),
-			expectForgetPod:               podWithID("foo", testNode.Name),
-			expectAssumedPod:              podWithID("foo", testNode.Name),
-			expectError:                   fmt.Errorf(`running Permit plugin "FakePermit": %w`, errors.New("permit error")),
-			eventReason:                   "FailedScheduling",
-			expectPodMovedToBackoffQ:      podWithID("foo", testNode.Name),
-			expectPodMovedToUnschedulable: nil,
-		},
-		{
-			name:       "error prebind pod",
+			name:       "prebind failed with status code rejected",
 			sendPod:    podWithID("foo", ""),
 			mockResult: mockScheduleResult{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			registerPluginFuncs: []tf.RegisterPluginFunc{
 				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(framework.NewStatus(framework.Unschedulable, "foo"))),
 			},
-			expectErrorPod:   podWithID("foo", testNode.Name),
-			expectForgetPod:  podWithID("foo", testNode.Name),
-			expectAssumedPod: podWithID("foo", testNode.Name),
-			expectError:      fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr),
-			// This check fails for now, but will pass after code fix
+			expectErrorPod:                podWithID("foo", testNode.Name),
+			expectForgetPod:               podWithID("foo", testNode.Name),
+			expectAssumedPod:              podWithID("foo", testNode.Name),
 			expectPodMovedToBackoffQ:      podWithID("foo", testNode.Name),
 			expectPodMovedToUnschedulable: nil,
 			eventReason:                   "FailedScheduling",
 		},
 		{
-			name:                          "error pod failed scheduling",
-			sendPod:                       podWithID("foo", ""),
-			mockResult:                    mockScheduleResult{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, errS},
-			expectError:                   errS,
-			expectErrorPod:                podWithID("foo", ""),
+			name:       "prebind failed with status code error",
+			sendPod:    podWithID("foo", ""),
+			mockResult: mockScheduleResult{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(framework.AsStatus(preBindErr))),
+			},
+			expectErrorPod:                podWithID("foo", testNode.Name),
+			expectForgetPod:               podWithID("foo", testNode.Name),
+			expectAssumedPod:              podWithID("foo", testNode.Name),
 			expectPodMovedToBackoffQ:      podWithID("foo", testNode.Name),
 			expectPodMovedToUnschedulable: nil,
 			eventReason:                   "FailedScheduling",
 		},
 		{
-			name:                          "error bind forget pod failed scheduling",
+			name:                          "binding failed",
 			sendPod:                       podWithID("foo", ""),
 			mockResult:                    mockScheduleResult{ScheduleResult{SuggestedHost: testNode.Name, EvaluatedNodes: 1, FeasibleNodes: 1}, nil},
 			expectBind:                    &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: types.UID("foo")}, Target: v1.ObjectReference{Kind: "Node", Name: testNode.Name}},
 			expectAssumedPod:              podWithID("foo", testNode.Name),
 			injectBindError:               errB,
-			expectError:                   fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", errors.New("binder")),
 			expectErrorPod:                podWithID("foo", testNode.Name),
 			expectForgetPod:               podWithID("foo", testNode.Name),
 			expectPodMovedToBackoffQ:      podWithID("foo", testNode.Name),
