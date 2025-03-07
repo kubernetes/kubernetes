@@ -757,6 +757,16 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path, share
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 	}
 
+	if len(device.BindingConditions) > resource.BindingConditionsMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingConditions"), len(device.BindingConditions), resource.BindingConditionsMaxSize))
+	}
+	if len(device.BindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(device.BindingFailureConditions), resource.BindingFailureConditionsMaxSize))
+	}
+	if device.BindingTimeoutSeconds != nil && *device.BindingTimeoutSeconds <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), device.BindingTimeoutSeconds, "must be greater than zero"))
+	}
+
 	return allErrs
 }
 
