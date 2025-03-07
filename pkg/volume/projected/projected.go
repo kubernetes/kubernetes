@@ -17,6 +17,8 @@ limitations under the License.
 package projected
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -26,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
@@ -373,7 +376,6 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				}
 			} else {
 				errlist = append(errlist, fmt.Errorf("ClusterTrustBundle projection requires either name or signerName to be set"))
-				continue
 			}
 
 			mode := *s.source.DefaultMode
@@ -386,6 +388,52 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				Mode:   mode,
 				FsUser: mounterArgs.FsUser,
 			}
+		case source.PodCertificate != nil:
+			podID := podcertificate.PodIdentity{
+				Namespace:          s.pod.ObjectMeta.Namespace,
+				PodName:            s.pod.ObjectMeta.Name,
+				PodUID:             string(s.pod.ObjectMeta.UID),
+				ServiceAccountName: s.pod.Spec.ServiceAccountName,
+			}
+
+			path := source.PodCertificate.CredentialBundlePath
+			if path == "" {
+				path = source.PodCertificate.KeyPath
+			}
+
+			key, certificates, err := s.plugin.kvHost.GetPodCertificateCredentialBundle(context.TODO(), podID, s.volName, path, source.PodCertificate.SignerName, source.PodCertificate.KeyType)
+			if err != nil {
+				errlist = append(errlist, err)
+				continue
+			}
+
+			mode := *s.source.DefaultMode
+			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+				mode = 0600
+			}
+
+			if source.PodCertificate.CredentialBundlePath != "" {
+				credentialBundle := bytes.Buffer{}
+				credentialBundle.Write(key)
+				credentialBundle.Write(certificates)
+				payload[source.PodCertificate.CredentialBundlePath] = volumeutil.FileProjection{
+					Data:   credentialBundle.Bytes(),
+					Mode:   mode,
+					FsUser: mounterArgs.FsUser,
+				}
+			} else {
+				payload[source.PodCertificate.KeyPath] = volumeutil.FileProjection{
+					Data:   key,
+					Mode:   mode,
+					FsUser: mounterArgs.FsUser,
+				}
+				payload[source.PodCertificate.CertificateChainPath] = volumeutil.FileProjection{
+					Data:   certificates,
+					Mode:   mode,
+					FsUser: mounterArgs.FsUser,
+				}
+			}
+
 		}
 	}
 	return payload, utilerrors.NewAggregate(errlist)
@@ -413,6 +461,14 @@ func (c *projectedVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	c.plugin.deleteServiceAccountToken(c.podUID)
+
+	for _, source := range c.sources {
+		switch {
+		case source.PodCertificate != nil:
+			c.plugin.kvHost.ForgetPodCertificateCredentialBundle(context.TODO(), string(c.podUID), c.volName, source.PodCertificate.CredentialBundlePath)
+		}
+	}
+
 	return nil
 }
 
