@@ -41,11 +41,12 @@ func (limitrangeStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (limitrangeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (limitrangeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
 	limitRange := obj.(*api.LimitRange)
 	if len(limitRange.Name) == 0 {
 		limitRange.Name = string(uuid.NewUUID())
 	}
+	return nil, nil
 }
 
 func (limitrangeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

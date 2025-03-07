@@ -17,13 +17,16 @@ limitations under the License.
 package dra
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
@@ -32,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -208,15 +212,62 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 	claim := claim.DeepCopy()
 	claim.Namespace = namespace
 	claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
-	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create claim")
+	cfg := tCtx.RESTConfig()
+
+	var warningHandler warningHandler
+	cfg.WarningHandlerWithContext = &warningHandler
+	client, err := clientset.NewForConfig(cfg)
+	tCtx.ExpectNoError(err, "construct client set")
+
+	createdClaim, err := client.ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{FieldValidation: metav1.FieldValidationStrict})
 	if adminAccessEnabled {
-		if !ptr.Deref(claim.Spec.Devices.Requests[0].AdminAccess, false) {
+		tCtx.ExpectNoError(err, "create claim")
+		if !ptr.Deref(createdClaim.Spec.Devices.Requests[0].AdminAccess, false) {
 			tCtx.Fatal("should store AdminAccess in ResourceClaim")
 		}
+		assert.Empty(tCtx, warningHandler.warnings, "expected no warnings")
 	} else {
-		if claim.Spec.Devices.Requests[0].AdminAccess != nil {
+		require.Equal(tCtx, err, &apierrors.StatusError{ErrStatus: metav1.Status{
+			Status:  "Failure",
+			Reason:  metav1.StatusReasonBadRequest,
+			Code:    http.StatusBadRequest,
+			Message: "object contains unsupported fields",
+			Details: &metav1.StatusDetails{
+				Causes: []metav1.StatusCause{
+					{Field: "spec.devices.requests[0].adminAccess", Message: "DRAAdminAccess disabled", Type: metav1.CauseTypeUnsupported},
+				},
+			},
+		}}, "expected strict field validation error")
+
+		// Try again with only warnings (the default).
+		createdClaim, err = client.ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create claim")
+		if createdClaim.Spec.Devices.Requests[0].AdminAccess != nil {
 			tCtx.Fatal("should drop AdminAccess in ResourceClaim")
 		}
+		assert.Equal(tCtx, warningHandler.warnings, []warning{
+			{code: 299 /* Miscellaneous Persistent Warning */, agent: "-", text: "spec.devices.requests[0].adminAccess: DRAAdminAccess disabled"},
+		}, "expected dropped field warning")
+
 	}
+}
+
+type warning struct {
+	code  int
+	agent string
+	text  string
+}
+
+type warningHandler struct {
+	warnings []warning
+}
+
+func (w *warningHandler) HandleWarningHeaderWithContext(ctx context.Context, code int, agent string, text string) {
+	// "resource.k8s.io/v1beta1 ResourceClaim is deprecated in v1.35+, unavailable in v1.38+"
+	// may get triggered depending on what is considered the current version when running tests.
+	// Ignore it.
+	if strings.Contains(text, " is deprecated in ") {
+		return
+	}
+	w.warnings = append(w.warnings, warning{code: code, agent: agent, text: text})
 }

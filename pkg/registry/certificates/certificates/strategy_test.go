@@ -135,7 +135,7 @@ func TestStrategyCreate(t *testing.T) {
 		tc := tc
 		t.Run(k, func(t *testing.T) {
 			obj := tc.obj
-			Strategy.PrepareForCreate(tc.ctx, obj)
+			Strategy.PrepareForCreate(tc.ctx, obj, fieldValidation string) ([]string, error)
 			if !reflect.DeepEqual(obj, tc.expectedObj) {
 				t.Errorf("object diff: %s", cmp.Diff(obj, tc.expectedObj))
 			}

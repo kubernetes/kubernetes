@@ -42,7 +42,8 @@ func (csiNodeStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set on creation.
-func (csiNodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (csiNodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object, fieldValidation string) ([]string, error) {
+	return nil, nil
 }
 
 func (csiNodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

@@ -85,7 +85,7 @@ func TestIngressStrategy(t *testing.T) {
 	}
 
 	ingress := newIngress()
-	Strategy.PrepareForCreate(ctx, &ingress)
+	Strategy.PrepareForCreate(ctx, &ingress, fieldValidation string) ([]string, error)
 	if len(ingress.Status.LoadBalancer.Ingress) != 0 {
 		t.Error("Ingress should not allow setting status on create")
 	}
