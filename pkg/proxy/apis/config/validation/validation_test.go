@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -517,7 +519,10 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			errs := validateClientConnectionConfiguration(testCase.ccc, newPath)
-			assert.Equal(t, testCase.expectedErrs, errs, "did not get expected validation errors")
+			cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "Origin"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
+			if diff := cmp.Diff(testCase.expectedErrs, errs, cmpOpts...); diff != "" {
+				t.Errorf("did not get expected validation errors (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }

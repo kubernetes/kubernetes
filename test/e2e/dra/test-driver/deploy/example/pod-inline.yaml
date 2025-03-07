@@ -28,13 +28,13 @@ spec:
   restartPolicy: Never
   containers:
   - name: with-resource
-    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
     command: ["sh", "-c", "set && mount && ls -la /dev/"]
     resources:
       claims:
       - name: resource
   - name: without-resource
-    image: registry.k8s.io/e2e-test-images/busybox:1.29-2
+    image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
     command: ["sh", "-c", "set && mount && ls -la /dev/"]
   resourceClaims:
   - name: resource

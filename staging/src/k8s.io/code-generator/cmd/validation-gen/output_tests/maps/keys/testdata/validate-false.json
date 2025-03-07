@@ -1,0 +1,37 @@
+{
+    "*eachkey.Struct": {
+      "": [
+        "type Struct"
+      ],
+      "mapField": [
+        "field Struct.MapField",
+        "field Struct.MapField(keys)",
+        "field Struct.MapField(keys)"
+      ],
+      "mapTypeField": [
+        "field Struct.MapTypeField",
+        "field Struct.MapTypeField(keys)",
+        "field Struct.MapTypeField(keys)"
+      ],
+      "mapTypedefField": [
+        "field Struct.MapTypedefField",
+        "field Struct.MapTypedefField(keys)",
+        "field Struct.MapTypedefField(keys)"
+      ],
+      "mapValidatedTypedefField": [
+        "ValidatedStringType",
+        "ValidatedStringType",
+        "field Struct.MapValidatedTypedefField",
+        "field Struct.MapValidatedTypedefField(keys)",
+        "field Struct.MapValidatedTypedefField(keys)"
+      ],
+      "validatedMapTypeField": [
+        "ValidatedMapType",
+        "field Struct.ValidatedMapTypeField",
+        "field Struct.ValidatedMapTypeField(keys)",
+        "field Struct.ValidatedMapTypeField(keys)",
+        "type ValidatedMapType(keys)",
+        "type ValidatedMapType(keys)"
+      ]
+    }
+  }

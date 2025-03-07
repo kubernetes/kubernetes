@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - johnbelamaric
+  - klueska
+  - pohly
+reviewers:
+  - pohly
+  - bart0sh
+labels:
+  - sig/node
+  - wg/device-management

@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/util/feature"
@@ -824,6 +825,10 @@ func TestSuccessPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
+			if !tc.enableBackoffLimitPerIndex {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, tc.enableBackoffLimitPerIndex)
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -1028,6 +1033,7 @@ func TestBackoffLimitPerIndex_DelayedPodDeletion(t *testing.T) {
 // TestBackoffLimitPerIndex_Reenabling tests handling of pod failures when
 // reenabling the BackoffLimitPerIndex feature.
 func TestBackoffLimitPerIndex_Reenabling(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, true)
@@ -3425,6 +3431,10 @@ func BenchmarkLargeIndexedJob(b *testing.B) {
 	for name, tc := range cases {
 		b.Run(name, func(b *testing.B) {
 			enableJobBackoffLimitPerIndex := tc.backoffLimitPerIndex != nil
+			if !enableJobBackoffLimitPerIndex {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(b, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(b, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {
@@ -3512,6 +3522,10 @@ func BenchmarkLargeFailureHandling(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			enableJobBackoffLimitPerIndex := tc.backoffLimitPerIndex != nil
 			timeout := ptr.Deref(tc.customTimeout, wait.ForeverTestTimeout)
+			if !enableJobBackoffLimitPerIndex {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(b, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(b, feature.DefaultFeatureGate, features.JobBackoffLimitPerIndex, enableJobBackoffLimitPerIndex)
 			b.ResetTimer()
 			for n := 0; n < b.N; n++ {

@@ -95,7 +95,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "delete", "patch").Groups(batchGroup).Resources("jobs").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("cronjobs/status").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(batchGroup).Resources("cronjobs/finalizers").RuleOrDie(),
-			rbacv1helpers.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -146,7 +146,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "endpoint-controller"},
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services", "pods").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "delete").Groups(legacyGroup).Resources("endpoints").RuleOrDie(),
 			rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints/restricted").RuleOrDie(),
 			eventsRule(),
 		},
@@ -159,7 +159,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			// The controller needs to be able to set a service's finalizers to be able to create an EndpointSlice
 			// resource that is owned by the service and sets blockOwnerDeletion=true in its ownerRef.
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("services/finalizers").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -175,7 +175,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			// resource that is owned by the endpoint and sets blockOwnerDeletion=true in its ownerRef.
 			// see https://github.com/openshift/kubernetes/blob/8691466059314c3f7d6dcffcbb76d14596ca716c/pkg/controller/endpointslicemirroring/utils.go#L87-L88
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints/finalizers").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "delete").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -231,11 +231,11 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(autoscalingGroup).Resources("horizontalpodautoscalers/status").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "update").Groups("*").Resources("*/scale").RuleOrDie(),
-			rbacv1helpers.NewRule("list").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			// allow listing resource, custom, and external metrics
-			rbacv1helpers.NewRule("list").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list").Groups(externalMetricsGroup).Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "watch").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(externalMetricsGroup).Resources("*").RuleOrDie(),
 			eventsRule(),
 		},
 	})
@@ -261,11 +261,11 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		role := rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "node-controller"},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "update", "delete", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch", "update", "delete", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
 				// used for pod deletion
 				rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
-				rbacv1helpers.NewRule("list", "get", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "watch", "get", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 				eventsRule(),
 			},
 		}
@@ -295,7 +295,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 			},
 		}
@@ -507,7 +507,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				// need list to get current RV for any resource
 				// need patch for SSA of any resource
 				// need create because SSA of a deleted resource will be interpreted as a create request, these always fail with a conflict error because UID is set
-				rbacv1helpers.NewRule("list", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "watch", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(storageVersionMigrationGroup).Resources("storageversionmigrations/status").RuleOrDie(),
 			},
 		})

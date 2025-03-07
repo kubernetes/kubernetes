@@ -3163,45 +3163,6 @@
       },
       "type": "object"
     },
-    "io.k8s.api.authentication.v1beta1.SelfSubjectReview": {
-      "description": "SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request. When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or request header authentication is used, any extra keys will have their case ignored and returned as lowercase.",
-      "properties": {
-        "apiVersion": {
-          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-          "type": "string"
-        },
-        "kind": {
-          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-          "type": "string"
-        },
-        "metadata": {
-          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
-          "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
-        },
-        "status": {
-          "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.SelfSubjectReviewStatus",
-          "description": "Status is filled in by the server with the user attributes."
-        }
-      },
-      "type": "object",
-      "x-kubernetes-group-version-kind": [
-        {
-          "group": "authentication.k8s.io",
-          "kind": "SelfSubjectReview",
-          "version": "v1beta1"
-        }
-      ]
-    },
-    "io.k8s.api.authentication.v1beta1.SelfSubjectReviewStatus": {
-      "description": "SelfSubjectReviewStatus is filled by the kube-apiserver and sent back to a user.",
-      "properties": {
-        "userInfo": {
-          "$ref": "#/definitions/io.k8s.api.authentication.v1.UserInfo",
-          "description": "User attributes of the user making this request."
-        }
-      },
-      "type": "object"
-    },
     "io.k8s.api.authorization.v1.FieldSelectorAttributes": {
       "description": "FieldSelectorAttributes indicates a field limited access. Webhook authors are encouraged to * ensure rawSelector and requirements are not both set * consider the requirements field if set * not try to parse or consider the rawSelector field if set. This is to avoid another CVE-2022-2880 (i.e. getting different systems to agree on how exactly to parse a query is not something we want), see https://www.oxeye.io/resources/golang-parameter-smuggling-attack for more details. For the *SubjectAccessReview endpoints of the kube-apiserver: * If rawSelector is empty and requirements are empty, the request is not limited. * If rawSelector is present and requirements are empty, the rawSelector will be parsed and limited if the parsing succeeds. * If rawSelector is empty and requirements are present, the requirements should be honored * If rawSelector is present and requirements are present, the request is invalid.",
       "properties": {
@@ -4690,7 +4651,7 @@
           "type": "integer"
         },
         "backoffLimitPerIndex": {
-          "description": "Specifies the limit for the number of retries within an index before marking this index as failed. When enabled the number of failures per index is kept in the pod's batch.kubernetes.io/job-index-failure-count annotation. It can only be set when Job's completionMode=Indexed, and the Pod's restart policy is Never. The field is immutable. This field is beta-level. It can be used when the `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).",
+          "description": "Specifies the limit for the number of retries within an index before marking this index as failed. When enabled the number of failures per index is kept in the pod's batch.kubernetes.io/job-index-failure-count annotation. It can only be set when Job's completionMode=Indexed, and the Pod's restart policy is Never. The field is immutable.",
           "format": "int32",
           "type": "integer"
         },
@@ -4712,7 +4673,7 @@
           "type": "boolean"
         },
         "maxFailedIndexes": {
-          "description": "Specifies the maximal number of failed indexes before marking the Job as failed, when backoffLimitPerIndex is set. Once the number of failed indexes exceeds this number the entire Job is marked as Failed and its execution is terminated. When left as null the job continues execution of all of its indexes and is marked with the `Complete` Job condition. It can only be specified when backoffLimitPerIndex is set. It can be null or up to completions. It is required and must be less than or equal to 10^4 when is completions greater than 10^5. This field is beta-level. It can be used when the `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).",
+          "description": "Specifies the maximal number of failed indexes before marking the Job as failed, when backoffLimitPerIndex is set. Once the number of failed indexes exceeds this number the entire Job is marked as Failed and its execution is terminated. When left as null the job continues execution of all of its indexes and is marked with the `Complete` Job condition. It can only be specified when backoffLimitPerIndex is set. It can be null or up to completions. It is required and must be less than or equal to 10^4 when is completions greater than 10^5.",
           "format": "int32",
           "type": "integer"
         },
@@ -4788,7 +4749,7 @@
           "type": "integer"
         },
         "failedIndexes": {
-          "description": "FailedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set. The indexes are represented in the text format analogous as for the `completedIndexes` field, ie. they are kept as decimal integers separated by commas. The numbers are listed in increasing order. Three or more consecutive numbers are compressed and represented by the first and last element of the series, separated by a hyphen. For example, if the failed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". The set of failed indexes cannot overlap with the set of completed indexes.\n\nThis field is beta-level. It can be used when the `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).",
+          "description": "FailedIndexes holds the failed indexes when spec.backoffLimitPerIndex is set. The indexes are represented in the text format analogous as for the `completedIndexes` field, ie. they are kept as decimal integers separated by commas. The numbers are listed in increasing order. Three or more consecutive numbers are compressed and represented by the first and last element of the series, separated by a hyphen. For example, if the failed indexes are 1, 3, 4, 5 and 7, they are represented as \"1,3-5,7\". The set of failed indexes cannot overlap with the set of completed indexes.",
           "type": "string"
         },
         "ready": {
@@ -4897,7 +4858,7 @@
       "description": "PodFailurePolicyRule describes how a pod failure is handled when the requirements are met. One of onExitCodes and onPodConditions, but not both, can be used in each rule.",
       "properties": {
         "action": {
-          "description": "Specifies the action taken on a pod failure when the requirements are satisfied. Possible values are:\n\n- FailJob: indicates that the pod's job is marked as Failed and all\n  running pods are terminated.\n- FailIndex: indicates that the pod's index is marked as Failed and will\n  not be restarted.\n  This value is beta-level. It can be used when the\n  `JobBackoffLimitPerIndex` feature gate is enabled (enabled by default).\n- Ignore: indicates that the counter towards the .backoffLimit is not\n  incremented and a replacement pod is created.\n- Count: indicates that the pod is handled in the default way - the\n  counter towards the .backoffLimit is incremented.\nAdditional values are considered to be added in the future. Clients should react to an unknown action by skipping the rule.",
+          "description": "Specifies the action taken on a pod failure when the requirements are satisfied. Possible values are:\n\n- FailJob: indicates that the pod's job is marked as Failed and all\n  running pods are terminated.\n- FailIndex: indicates that the pod's index is marked as Failed and will\n  not be restarted.\n- Ignore: indicates that the counter towards the .backoffLimit is not\n  incremented and a replacement pod is created.\n- Count: indicates that the pod is handled in the default way - the\n  counter towards the .backoffLimit is incremented.\nAdditional values are considered to be added in the future. Clients should react to an unknown action by skipping the rule.",
           "type": "string"
         },
         "onExitCodes": {
@@ -14750,7 +14711,7 @@
       "description": "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
       "properties": {
         "conditions": {
-          "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
+          "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.\n\nMust not contain more than 8 entries.",
           "items": {
             "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
           },
@@ -14860,7 +14821,7 @@
           "description": "Opaque provides driver-specific configuration parameters."
         },
         "requests": {
-          "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
+          "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
           "items": {
             "type": "string"
           },
@@ -14960,7 +14921,7 @@
           "description": "Opaque provides driver-specific configuration parameters."
         },
         "requests": {
-          "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.",
+          "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
           "items": {
             "type": "string"
           },
@@ -15077,7 +15038,7 @@
           "type": "string"
         },
         "requests": {
-          "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.",
+          "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the constraint applies to all subrequests.",
           "items": {
             "type": "string"
           },
@@ -15088,31 +15049,39 @@
       "type": "object"
     },
     "io.k8s.api.resource.v1alpha3.DeviceRequest": {
-      "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
+      "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
       "properties": {
         "adminAccess": {
-          "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+          "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
           "type": "boolean"
         },
         "allocationMode": {
-          "description": "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+          "description": "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
           "type": "string"
         },
         "count": {
-          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.",
           "format": "int64",
           "type": "integer"
         },
         "deviceClassName": {
-          "description": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+          "description": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required if no subrequests are specified in the firstAvailable list and no class can be set if subrequests are specified in the firstAvailable list. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
           "type": "string"
+        },
+        "firstAvailable": {
+          "description": "FirstAvailable contains subrequests, of which exactly one will be satisfied by the scheduler to satisfy this request. It tries to satisfy them in the order in which they are listed here. So if there are two entries in the list, the scheduler will only check the second one if it determines that the first one cannot be used.\n\nThis field may only be set in the entries of DeviceClaim.Requests.\n\nDRA does not yet implement scoring, so the scheduler will select the first set of devices that satisfies all the requests in the claim. And if the requirements can be satisfied on more than one node, other scheduling features will determine which node is chosen. This means that the set of devices allocated to a claim might not be the optimal set available to the cluster. Scoring will be implemented later.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceSubRequest"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
         },
         "name": {
           "description": "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
           "type": "string"
         },
         "selectors": {
-          "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
+          "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceSelector"
           },
@@ -15121,8 +15090,7 @@
         }
       },
       "required": [
-        "name",
-        "deviceClassName"
+        "name"
       ],
       "type": "object"
     },
@@ -15146,7 +15114,7 @@
           "type": "string"
         },
         "request": {
-          "description": "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+          "description": "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
           "type": "string"
         }
       },
@@ -15168,6 +15136,41 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1alpha3.DeviceSubRequest": {
+      "description": "DeviceSubRequest describes a request for device provided in the claim.spec.devices.requests[].firstAvailable array. Each is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nDeviceSubRequest is similar to Request, but doesn't expose the AdminAccess or FirstAvailable fields, as those can only be set on the top-level request. AdminAccess is not supported for requests with a prioritized list, and recursive FirstAvailable fields are not supported.",
+      "properties": {
+        "allocationMode": {
+          "description": "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AlloctionMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+          "type": "string"
+        },
+        "count": {
+          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "deviceClassName": {
+          "description": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this subrequest.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name can be used to reference this subrequest in the list of constraints or the list of configurations for the claim. References must use the format <main request>/<subrequest>.\n\nMust be a DNS label.",
+          "type": "string"
+        },
+        "selectors": {
+          "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceSelector"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "name",
+        "deviceClassName"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.resource.v1alpha3.NetworkDeviceData": {
       "description": "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
       "properties": {
@@ -15180,7 +15183,7 @@
           "type": "string"
         },
         "ips": {
-          "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.",
+          "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.\n\nMust not contain more than 16 entries.",
           "items": {
             "type": "string"
           },
@@ -15570,7 +15573,7 @@
       "description": "AllocatedDeviceStatus contains the status of an allocated device, if the driver chooses to report it. This may include driver-specific information.",
       "properties": {
         "conditions": {
-          "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.",
+          "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.\n\nMust not contain more than 8 entries.",
           "items": {
             "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
           },
@@ -15680,7 +15683,7 @@
           "description": "Opaque provides driver-specific configuration parameters."
         },
         "requests": {
-          "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.",
+          "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
           "items": {
             "type": "string"
           },
@@ -15793,7 +15796,7 @@
           "description": "Opaque provides driver-specific configuration parameters."
         },
         "requests": {
-          "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.",
+          "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
           "items": {
             "type": "string"
           },
@@ -15910,7 +15913,7 @@
           "type": "string"
         },
         "requests": {
-          "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.",
+          "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the constraint applies to all subrequests.",
           "items": {
             "type": "string"
           },
@@ -15921,31 +15924,39 @@
       "type": "object"
     },
     "io.k8s.api.resource.v1beta1.DeviceRequest": {
-      "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nA DeviceClassName is currently required. Clients must check that it is indeed set. It's absence indicates that something changed in a way that is not supported by the client yet, in which case it must refuse to handle the request.",
+      "description": "DeviceRequest is a request for devices required for a claim. This is typically a request for a single resource like a device, but can also ask for several identical devices.",
       "properties": {
         "adminAccess": {
-          "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
+          "description": "AdminAccess indicates that this is a claim for administrative access to the device(s). Claims with AdminAccess are expected to be used for monitoring or other management services for a device.  They ignore all ordinary claims to the device with respect to access modes and any resource allocations.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
           "type": "boolean"
         },
         "allocationMode": {
-          "description": "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+          "description": "AllocationMode and its related fields define how devices are allocated to satisfy this request. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This request is for all of the matching devices in a pool.\n  At least one device must exist on the node for the allocation to succeed.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AllocationMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other requests must specify this field.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
           "type": "string"
         },
         "count": {
-          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.",
           "format": "int64",
           "type": "integer"
         },
         "deviceClassName": {
-          "description": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+          "description": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this request.\n\nA class is required if no subrequests are specified in the firstAvailable list and no class can be set if subrequests are specified in the firstAvailable list. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
           "type": "string"
         },
+        "firstAvailable": {
+          "description": "FirstAvailable contains subrequests, of which exactly one will be satisfied by the scheduler to satisfy this request. It tries to satisfy them in the order in which they are listed here. So if there are two entries in the list, the scheduler will only check the second one if it determines that the first one cannot be used.\n\nThis field may only be set in the entries of DeviceClaim.Requests.\n\nDRA does not yet implement scoring, so the scheduler will select the first set of devices that satisfies all the requests in the claim. And if the requirements can be satisfied on more than one node, other scheduling features will determine which node is chosen. This means that the set of devices allocated to a claim might not be the optimal set available to the cluster. Scoring will be implemented later.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceSubRequest"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        },
         "name": {
-          "description": "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label.",
+          "description": "Name can be used to reference this request in a pod.spec.containers[].resources.claims entry and in a constraint of the claim.\n\nMust be a DNS label and unique among all DeviceRequests in a ResourceClaim.",
           "type": "string"
         },
         "selectors": {
-          "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
+          "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceSelector"
           },
@@ -15954,8 +15965,7 @@
         }
       },
       "required": [
-        "name",
-        "deviceClassName"
+        "name"
       ],
       "type": "object"
     },
@@ -15979,7 +15989,7 @@
           "type": "string"
         },
         "request": {
-          "description": "Request is the name of the request in the claim which caused this device to be allocated. Multiple devices may have been allocated per request.",
+          "description": "Request is the name of the request in the claim which caused this device to be allocated. If it references a subrequest in the firstAvailable list on a DeviceRequest, this field must include both the name of the main request and the subrequest using the format <main request>/<subrequest>.\n\nMultiple devices may have been allocated per request.",
           "type": "string"
         }
       },
@@ -16001,6 +16011,41 @@
       },
       "type": "object"
     },
+    "io.k8s.api.resource.v1beta1.DeviceSubRequest": {
+      "description": "DeviceSubRequest describes a request for device provided in the claim.spec.devices.requests[].firstAvailable array. Each is typically a request for a single resource like a device, but can also ask for several identical devices.\n\nDeviceSubRequest is similar to Request, but doesn't expose the AdminAccess or FirstAvailable fields, as those can only be set on the top-level request. AdminAccess is not supported for requests with a prioritized list, and recursive FirstAvailable fields are not supported.",
+      "properties": {
+        "allocationMode": {
+          "description": "AllocationMode and its related fields define how devices are allocated to satisfy this subrequest. Supported values are:\n\n- ExactCount: This request is for a specific number of devices.\n  This is the default. The exact number is provided in the\n  count field.\n\n- All: This subrequest is for all of the matching devices in a pool.\n  Allocation will fail if some devices are already allocated,\n  unless adminAccess is requested.\n\nIf AlloctionMode is not specified, the default mode is ExactCount. If the mode is ExactCount and count is not specified, the default count is one. Any other subrequests must specify this field.\n\nMore modes may get added in the future. Clients must refuse to handle requests with unknown modes.",
+          "type": "string"
+        },
+        "count": {
+          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+          "format": "int64",
+          "type": "integer"
+        },
+        "deviceClassName": {
+          "description": "DeviceClassName references a specific DeviceClass, which can define additional configuration and selectors to be inherited by this subrequest.\n\nA class is required. Which classes are available depends on the cluster.\n\nAdministrators may use this to restrict which devices may get requested by only installing classes with selectors for permitted devices. If users are free to request anything without restrictions, then administrators can create an empty DeviceClass for users to reference.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name can be used to reference this subrequest in the list of constraints or the list of configurations for the claim. References must use the format <main request>/<subrequest>.\n\nMust be a DNS label.",
+          "type": "string"
+        },
+        "selectors": {
+          "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this subrequest. All selectors must be satisfied for a device to be considered.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceSelector"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "required": [
+        "name",
+        "deviceClassName"
+      ],
+      "type": "object"
+    },
     "io.k8s.api.resource.v1beta1.NetworkDeviceData": {
       "description": "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
       "properties": {
@@ -16013,7 +16058,7 @@
           "type": "string"
         },
         "ips": {
-          "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.",
+          "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.\n\nMust not contain more than 16 entries.",
           "items": {
             "type": "string"
           },
@@ -49730,123 +49775,6 @@
           "group": "authentication.k8s.io",
           "kind": "TokenReview",
           "version": "v1"
-        }
-      }
-    },
-    "/apis/authentication.k8s.io/v1beta1/": {
-      "get": {
-        "consumes": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf",
-          "application/cbor"
-        ],
-        "description": "get available resources",
-        "operationId": "getAuthenticationV1beta1APIResources",
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf",
-          "application/cbor"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResourceList"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "authentication_v1beta1"
-        ]
-      }
-    },
-    "/apis/authentication.k8s.io/v1beta1/selfsubjectreviews": {
-      "parameters": [
-        {
-          "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-          "in": "query",
-          "name": "dryRun",
-          "type": "string",
-          "uniqueItems": true
-        },
-        {
-          "$ref": "#/parameters/fieldManager-Qy4HdaTW"
-        },
-        {
-          "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
-          "in": "query",
-          "name": "fieldValidation",
-          "type": "string",
-          "uniqueItems": true
-        },
-        {
-          "$ref": "#/parameters/pretty-tJGM1-ng"
-        }
-      ],
-      "post": {
-        "consumes": [
-          "*/*"
-        ],
-        "description": "create a SelfSubjectReview",
-        "operationId": "createAuthenticationV1beta1SelfSubjectReview",
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.SelfSubjectReview"
-            }
-          }
-        ],
-        "produces": [
-          "application/json",
-          "application/yaml",
-          "application/vnd.kubernetes.protobuf",
-          "application/cbor"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.SelfSubjectReview"
-            }
-          },
-          "201": {
-            "description": "Created",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.SelfSubjectReview"
-            }
-          },
-          "202": {
-            "description": "Accepted",
-            "schema": {
-              "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.SelfSubjectReview"
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "schemes": [
-          "https"
-        ],
-        "tags": [
-          "authentication_v1beta1"
-        ],
-        "x-kubernetes-action": "post",
-        "x-kubernetes-group-version-kind": {
-          "group": "authentication.k8s.io",
-          "kind": "SelfSubjectReview",
-          "version": "v1beta1"
         }
       }
     },

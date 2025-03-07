@@ -55,7 +55,7 @@ import (
 	schedulerutils "k8s.io/kubernetes/test/integration/scheduler"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // imported from testutils
@@ -355,7 +355,7 @@ func (sp *ScorePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -367,7 +367,7 @@ func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p
 	score := int64(1)
 	if sp.numScoreCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
-		sp.highScoreNode = nodeName
+		sp.highScoreNode = nodeInfo.Node().Name
 		score = framework.MaxNodeScore
 	}
 	return score, nil
@@ -383,7 +383,7 @@ func (sp *ScoreWithNormalizePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -919,7 +919,7 @@ func TestPostFilterPlugin(t *testing.T) {
 			// Setup plugins for testing.
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
-					SchedulerName: pointer.String(v1.DefaultSchedulerName),
+					SchedulerName: ptr.To(v1.DefaultSchedulerName),
 					Plugins: &configv1.Plugins{
 						Filter: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
@@ -1208,7 +1208,7 @@ func TestPrebindPlugin(t *testing.T) {
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
-						SchedulerName: pointer.String(v1.DefaultSchedulerName),
+						SchedulerName: ptr.To(v1.DefaultSchedulerName),
 						Plugins: &configv1.Plugins{
 							PreBind: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
@@ -1218,7 +1218,7 @@ func TestPrebindPlugin(t *testing.T) {
 						},
 					},
 					{
-						SchedulerName: pointer.String("2nd-scheduler"),
+						SchedulerName: ptr.To("2nd-scheduler"),
 						Plugins: &configv1.Plugins{
 							Filter: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
@@ -1748,7 +1748,7 @@ func TestBindPlugin(t *testing.T) {
 			// Setup initial unreserve and bind plugins for testing.
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
-					SchedulerName: pointer.String(v1.DefaultSchedulerName),
+					SchedulerName: ptr.To(v1.DefaultSchedulerName),
 					Plugins: &configv1.Plugins{
 						MultiPoint: configv1.PluginSet{
 							Disabled: []configv1.Plugin{
@@ -2461,7 +2461,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{
 					{
-						SchedulerName: pointer.String(v1.DefaultSchedulerName),
+						SchedulerName: ptr.To(v1.DefaultSchedulerName),
 						Plugins: &configv1.Plugins{
 							Permit: configv1.PluginSet{
 								Enabled: []configv1.Plugin{
@@ -2647,7 +2647,7 @@ func TestActivatePods(t *testing.T) {
 	// Setup initial filter plugin for testing.
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.String(v1.DefaultSchedulerName),
+			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				PreFilter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -2823,7 +2823,7 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 				// Setup plugins for testing.
 				cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 					Profiles: []configv1.KubeSchedulerProfile{{
-						SchedulerName: pointer.String(v1.DefaultSchedulerName),
+						SchedulerName: ptr.To(v1.DefaultSchedulerName),
 						Plugins: &configv1.Plugins{
 							PreEnqueue: configv1.PluginSet{
 								Enabled: []configv1.Plugin{

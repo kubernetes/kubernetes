@@ -555,7 +555,16 @@ type PortMapping struct {
 	Protocol Protocol `protobuf:"varint,1,opt,name=protocol,proto3,enum=runtime.v1.Protocol" json:"protocol,omitempty"`
 	// Port number within the container. Default: 0 (not specified).
 	ContainerPort int32 `protobuf:"varint,2,opt,name=container_port,json=containerPort,proto3" json:"container_port,omitempty"`
-	// Port number on the host. Default: 0 (not specified).
+	// Port number on the host to map the container port to.
+	//
+	//   - Valid host port range is 1-65535.
+	//   - The value 0 has explicit semantic meaning: it indicates NO host port should be allocated.
+	//   - The value 0 does NOT indicate dynamic port allocation. Future implementations
+	//     of dynamic allocation will use different values/semantics.
+	//   - Implementations MUST handle the case where this field is explicitly set to 0,
+	//     This field SHOULD be omitted when no port is required.
+	//
+	// Default: If omitted, container port will not be exposed on the host.
 	HostPort int32 `protobuf:"varint,3,opt,name=host_port,json=hostPort,proto3" json:"host_port,omitempty"`
 	// Host IP.
 	HostIp               string   `protobuf:"bytes,4,opt,name=host_ip,json=hostIp,proto3" json:"host_ip,omitempty"`

@@ -593,13 +593,14 @@ done`}
 	})
 
 	/*
-		Testcase: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex despite some failing
+		Release: v1.33
+		Testname: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex despite some failing
 		Description: Create an indexed job and ensure that all indexes are either failed or succeeded, depending
 		on the end state of the corresponding pods. Pods with odd indexes fail, while the pods with even indexes
 		succeeded. Also, verify that the number of failed pods doubles the number of failing indexes, as the
 		backoffLimitPerIndex=1, allowing for one pod recreation before marking that indexed failed.
 	*/
-	ginkgo.It("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
+	framework.ConformanceIt("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(4)
 		backoffLimit := int32(6) // default value
@@ -627,12 +628,13 @@ done`}
 	})
 
 	/*
-		Testcase: Terminate job execution when the maxFailedIndexes is exceeded
+		Release: v1.33
+		Testname: Terminate job execution when the maxFailedIndexes is exceeded
 		Description: Create an indexed job with backoffLimitPerIndex and maxFailedIndexes.
 		Verify the job execution is terminated as soon as the number of failed
 		indexes exceeds maxFailedIndexes.
 	*/
-	ginkgo.It("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
+	framework.ConformanceIt("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
 		// we use parallelism=1 to make sure in the asserts only one pod was created
 		parallelism := int32(1)
 		completions := int32(4)
@@ -661,13 +663,65 @@ done`}
 	})
 
 	/*
-		Testcase: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
+		Testname: Track the failure count per index in Pod annotation when backoffLimitPerIndex is used
+		Description: Create an indexed job and ensure that the Pods are
+		re-created with the failure-count Pod annotation set properly to
+		indicate the number of so-far failures per index.
+	*/
+	ginkgo.It("should record the failure-count in the Pod annotation when using backoffLimitPerIndex", func(ctx context.Context) {
+		jobName := "e2e-backofflimitperindex-" + utilrand.String(5)
+		label := map[string]string{batchv1.JobNameLabel: jobName}
+		labelSelector := labels.SelectorFromSet(label).String()
+
+		parallelism := int32(2)
+		completions := int32(2)
+		backoffLimit := int32(6) // default value
+
+		job := e2ejob.NewTestJob("fail", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.BackoffLimit = nil
+		job.Spec.BackoffLimitPerIndex = ptr.To[int32](1)
+		job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+
+		tracker := NewIndexedPodAnnotationTracker(jobName, f.Namespace.Name, labelSelector, batchv1.JobCompletionIndexAnnotation, batchv1.JobIndexFailureCountAnnotation)
+		trackerCancel := tracker.Start(ctx, f.ClientSet)
+		ginkgo.DeferCleanup(trackerCancel)
+
+		ginkgo.By("Creating an indexed job with backoffLimit per index and failing pods")
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to fail as there are failed indexes")
+		err = e2ejob.WaitForJobFailed(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verify the failure-count annotation on Pods")
+		// Since the Job is already failed all the relevant Pod events are
+		// already being distributed. Still, there might be a little bit of lag
+		// between the events being receiced by the Job controller and the test
+		// code so we need to wait a little bit.
+		gomega.Eventually(ctx, tracker.cloneTrackedAnnotations).
+			WithTimeout(15 * time.Second).
+			WithPolling(500 * time.Millisecond).
+			Should(gomega.Equal(map[int][]string{0: {"0", "1"}, 1: {"0", "1"}}))
+
+		ginkgo.By("Verifying the Job status fields")
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		gomega.Expect(job.Status.FailedIndexes).Should(gomega.HaveValue(gomega.Equal("0,1")))
+		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal(""))
+		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(4)))
+		gomega.Expect(job.Status.Succeeded).Should(gomega.Equal(int32(0)))
+	})
+
+	/*
+		Release: v1.33
+		Testname: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
 		Description: Create an indexed job with backoffLimitPerIndex, and podFailurePolicy
 		with the FailIndex action. Verify the failed pods matching the pod failure policy
 		result in marking the corresponding indexes as failed without restarts, despite
 		backoffLimitPerIndex > 0.
 	*/
-	ginkgo.It("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
+	framework.ConformanceIt("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(2)
 		backoffLimit := int32(6) // default value

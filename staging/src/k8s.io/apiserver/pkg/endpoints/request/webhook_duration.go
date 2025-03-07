@@ -116,6 +116,12 @@ type LatencyTrackers struct {
 	// Validate webhooks are done in parallel, so max function is used.
 	ValidatingWebhookTracker DurationTracker
 
+	// AuthenticationTracker tracks the latency incurred by Authentication of request
+	AuthenticationTracker DurationTracker
+
+	// AuthorizationTracker tracks the latency incurred by Authorization of request
+	AuthorizationTracker DurationTracker
+
 	// APFQueueWaitTracker tracks the latency incurred by queue wait times
 	// from priority & fairness.
 	APFQueueWaitTracker DurationTracker
@@ -179,6 +185,8 @@ func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) co
 	return WithValue(parent, latencyTrackersKey, &LatencyTrackers{
 		MutatingWebhookTracker:   newSumLatencyTracker(c),
 		ValidatingWebhookTracker: newMaxLatencyTracker(c),
+		AuthenticationTracker:    newSumLatencyTracker(c),
+		AuthorizationTracker:     newMaxLatencyTracker(c),
 		APFQueueWaitTracker:      newMaxLatencyTracker(c),
 		StorageTracker:           newSumLatencyTracker(c),
 		TransformTracker:         newSumLatencyTracker(c),
@@ -243,6 +251,22 @@ func TrackResponseWriteLatency(ctx context.Context, d time.Duration) {
 	}
 }
 
+// TrackAuthenticationLatency is used to track latency incurred
+// by Authentication phase of request.
+func TrackAuthenticationLatency(ctx context.Context, d time.Duration) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.AuthenticationTracker.TrackDuration(d)
+	}
+}
+
+// TrackAuthorizationLatency is used to track latency incurred
+// by Authorization phase of request.
+func TrackAuthorizationLatency(ctx context.Context, d time.Duration) {
+	if tracker, ok := LatencyTrackersFrom(ctx); ok {
+		tracker.AuthorizationTracker.TrackDuration(d)
+	}
+}
+
 // TrackAPFQueueWaitLatency is used to track latency incurred
 // by priority and fairness queues.
 func TrackAPFQueueWaitLatency(ctx context.Context, d time.Duration) {
@@ -275,6 +299,8 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 		validatingWebhookLatencyKey = "apiserver.latency.k8s.io/validating-webhook"
 		decodeLatencyKey            = "apiserver.latency.k8s.io/decode-response-object"
 		apfQueueWaitLatencyKey      = "apiserver.latency.k8s.io/apf-queue-wait"
+		authenticationLatencyKey    = "apiserver.latency.k8s.io/authentication"
+		authorizationLatencyKey     = "apiserver.latency.k8s.io/authorization"
 	)
 
 	tracker, ok := LatencyTrackersFrom(ctx)
@@ -306,6 +332,12 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 	}
 	if latency := tracker.APFQueueWaitTracker.GetLatency(); latency != 0 {
 		annotations[apfQueueWaitLatencyKey] = latency.String()
+	}
+	if latency := tracker.AuthenticationTracker.GetLatency(); latency != 0 {
+		annotations[authenticationLatencyKey] = latency.String()
+	}
+	if latency := tracker.AuthorizationTracker.GetLatency(); latency != 0 {
+		annotations[authorizationLatencyKey] = latency.String()
 	}
 	return annotations
 }

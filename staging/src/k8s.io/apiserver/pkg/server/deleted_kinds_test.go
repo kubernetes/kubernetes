@@ -42,10 +42,16 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20)},
 		},
 		{
-			name:           "alpha",
+			name:           "alpha .0",
 			currentVersion: "v1.20.0-alpha.0.62+a5d22854a2ac21",
-			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true},
+			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true, isAlphaZero: true},
 		},
+		{
+			name:           "alpha not .0",
+			currentVersion: "v1.20.0-alpha.1.62+a5d22854a2ac21",
+			expected:       resourceExpirationEvaluator{currentVersion: apimachineryversion.MajorMinor(1, 20), isAlpha: true, isAlphaZero: false},
+		},
+
 		{
 			name:           "maintenance",
 			currentVersion: "v1.20.1",
@@ -195,6 +201,17 @@ func Test_resourceExpirationEvaluator_shouldServe(t *testing.T) {
 			},
 			restStorage: storageRemovedIn(1, 20),
 			expected:    false,
+		},
+		{
+			name: "removed-in-curr-but-alpha-but-strict-and-alpha-zero",
+			resourceExpirationEvaluator: resourceExpirationEvaluator{
+				currentVersion:               apimachineryversion.MajorMinor(1, 20),
+				isAlpha:                      true,
+				isAlphaZero:                  true,
+				strictRemovedHandlingInAlpha: true,
+			},
+			restStorage: storageRemovedIn(1, 20),
+			expected:    true,
 		},
 		{
 			name: "removed-in-prev-deferral-does-not-help",

@@ -1,0 +1,59 @@
+{
+    "*typedefs.T1": {
+      "": [
+        "type T1"
+      ],
+      "e1": [
+        "field T1.E1",
+        "type E1"
+      ],
+      "e2": [
+        "field T1.E2",
+        "type E2"
+      ],
+      "e3": [
+        "field T1.E3",
+        "type E3"
+      ],
+      "e4": [
+        "field T1.E4",
+        "type E4"
+      ],
+      "e4.s": [
+        "field T2.S"
+      ],
+      "pe1": [
+        "field T1.PE1",
+        "type E1"
+      ],
+      "pe2": [
+        "field T1.PE2",
+        "type E2"
+      ],
+      "pe3": [
+        "field T1.PE3",
+        "type E3"
+      ],
+      "pe4": [
+        "field T1.PE4",
+        "type E4"
+      ],
+      "pe4.s": [
+        "field T2.S"
+      ],
+      "pt2": [
+        "field T1.PT2",
+        "type T2"
+      ],
+      "pt2.s": [
+        "field T2.S"
+      ],
+      "t2": [
+        "field T1.T2",
+        "type T2"
+      ],
+      "t2.s": [
+        "field T2.S"
+      ]
+    }
+  }

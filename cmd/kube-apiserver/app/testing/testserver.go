@@ -339,7 +339,6 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	s.ServiceClusterIPRanges = "10.0.0.0/16"
 	s.Etcd.StorageConfig = *storageConfig
-	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err

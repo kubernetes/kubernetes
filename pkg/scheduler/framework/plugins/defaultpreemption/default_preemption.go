@@ -136,10 +136,14 @@ func (pl *DefaultPreemption) calculateNumCandidates(numNodes int32) int32 {
 	return n
 }
 
+// getOffsetRand is a dedicated random source for GetOffsetAndNumCandidates calls.
+// It defaults to rand.Int31n, but is a package variable so it can be overridden to make unit tests deterministic.
+var getOffsetRand = rand.Int31n
+
 // GetOffsetAndNumCandidates chooses a random offset and calculates the number
 // of candidates that should be shortlisted for dry running preemption.
 func (pl *DefaultPreemption) GetOffsetAndNumCandidates(numNodes int32) (int32, int32) {
-	return rand.Int31n(numNodes), pl.calculateNumCandidates(numNodes)
+	return getOffsetRand(numNodes), pl.calculateNumCandidates(numNodes)
 }
 
 // This function is not applicable for out-of-tree preemption plugins that exercise

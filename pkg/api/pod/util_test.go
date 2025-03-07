@@ -4657,3 +4657,92 @@ func TestValidateInvalidLabelValueInNodeSelectorOption(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
+	testCases := []struct {
+		name                                        string
+		podSpec                                     *api.PodSpec
+		expectAllowPodLifecycleSleepActionZeroValue bool
+	}{
+		{
+			name:    "no lifecycle hooks",
+			podSpec: &api.PodSpec{},
+			expectAllowPodLifecycleSleepActionZeroValue: false,
+		},
+		{
+			name: "Prestop with non-zero second duration",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PreStop: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectAllowPodLifecycleSleepActionZeroValue: false,
+		},
+		{
+			name: "PostStart with non-zero second duration",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PostStart: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectAllowPodLifecycleSleepActionZeroValue: false,
+		},
+		{
+			name: "PreStop with zero seconds",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PreStop: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 0,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectAllowPodLifecycleSleepActionZeroValue: true,
+		},
+		{
+			name: "PostStart with zero seconds",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PostStart: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 0,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectAllowPodLifecycleSleepActionZeroValue: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.podSpec, nil, nil)
+			assert.Equal(t, tc.expectAllowPodLifecycleSleepActionZeroValue, gotOptions.AllowPodLifecycleSleepActionZeroValue, "AllowPodLifecycleSleepActionZeroValue")
+		})
+	}
+}

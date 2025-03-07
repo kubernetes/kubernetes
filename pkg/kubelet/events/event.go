@@ -62,6 +62,7 @@ const (
 	VolumeResizeFailed                   = "VolumeResizeFailed"
 	VolumeResizeSuccess                  = "VolumeResizeSuccessful"
 	FileSystemResizeFailed               = "FileSystemResizeFailed"
+	VolumePermissionChangeInProgress     = "VolumePermissionChangeInProgress"
 	FileSystemResizeSuccess              = "FileSystemResizeSuccessful"
 	FailedMapVolume                      = "FailedMapVolume"
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"

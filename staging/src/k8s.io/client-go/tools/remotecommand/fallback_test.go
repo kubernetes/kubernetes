@@ -49,7 +49,9 @@ func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
 		defer conns.conn.Close()
 		// Loopback the STDIN stream onto the STDOUT stream.
 		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	defer websocketServer.Close()
 
@@ -180,7 +182,9 @@ func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
 		defer conns.conn.Close()
 		// Loopback the STDIN stream onto the STDOUT stream.
 		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
 	}))
 	defer websocketServer.Close()
 

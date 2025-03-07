@@ -77,6 +77,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
@@ -662,7 +663,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.mirrorPodClient = kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager()
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker, klet.getRootDir())
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+	klet.allocationManager = allocation.NewManager(klet.getRootDir())
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
@@ -1147,6 +1149,9 @@ type Kubelet struct {
 	// consult the pod worker.
 	statusManager status.Manager
 
+	// allocationManager manages allocated resources for pods.
+	allocationManager allocation.Manager
+
 	// resyncInterval is the interval between periodic full reconciliations of
 	// pods on this node.
 	resyncInterval time.Duration
@@ -1268,12 +1273,6 @@ type Kubelet struct {
 	// nodeStatusReportFrequency is the frequency that kubelet posts node
 	// status to master. It is only used when node lease feature is enabled.
 	nodeStatusReportFrequency time.Duration
-
-	// delayAfterNodeStatusChange is the one-time random duration that we add to the next node status report interval
-	// every time when there's an actual node status change. But all future node status update that is not caused by
-	// real status change will stick with nodeStatusReportFrequency. The random duration is a uniform distribution over
-	// [-0.5*nodeStatusReportFrequency, 0.5*nodeStatusReportFrequency]
-	delayAfterNodeStatusChange time.Duration
 
 	// lastStatusReportTime is the time when node status was last reported.
 	lastStatusReportTime time.Time
@@ -1884,7 +1883,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// handlePodResourcesResize updates the pod to use the allocated resources. This should come
 	// before the main business logic of SyncPod, so that a consistent view of the pod is used
 	// across the sync loop.
-	if kuberuntime.IsInPlacePodVerticalScalingAllowed(pod) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Handle pod resize here instead of doing it in HandlePodUpdates because
 		// this conveniently retries any Deferred resize requests
 		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
@@ -2066,6 +2065,11 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 	klog.V(4).InfoS("SyncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// We don't evaluate pending resizes for terminating pods - proceed with the allocated resources.
+		pod, _ = kl.allocationManager.UpdatePodFromAllocation(pod)
+	}
+
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	if podStatusFn != nil {
 		podStatusFn(&apiPodStatus)
@@ -2210,6 +2214,11 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	defer otelSpan.End()
 	klog.V(4).InfoS("SyncTerminatedPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatedPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		// Terminated pods can no longer be resized. Proceed with the allocated resources.
+		pod, _ = kl.allocationManager.UpdatePodFromAllocation(pod)
+	}
 
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
@@ -2644,7 +2653,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
-				allocatedPod, _ := kl.statusManager.UpdatePodFromAllocation(pod)
+				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
 
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(allocatedPods, allocatedPod); !ok {
@@ -2657,7 +2666,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					continue
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
-				if err := kl.statusManager.SetPodAllocation(allocatedPod); err != nil {
+				if err := kl.allocationManager.SetPodAllocation(allocatedPod); err != nil {
 					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
@@ -2713,6 +2722,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.RemovePod(pod)
+		kl.allocationManager.DeletePodAllocation(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2816,10 +2826,6 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed.
 func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) {
-	if goos == "windows" {
-		return false, v1.PodResizeStatusInfeasible, "Resizing Windows pods is not supported"
-	}
-
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
 			if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
@@ -2914,7 +2920,8 @@ func resizeCompleteMsgGenerate(allocatedPod *v1.Pod, podStatus *kubecontainer.Po
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
 func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error) {
-	allocatedPod, updated := kl.statusManager.UpdatePodFromAllocation(pod)
+	allocatedPod, updated := kl.allocationManager.UpdatePodFromAllocation(pod)
+
 	if !updated {
 		// Desired resources == allocated resources. Check whether a resize is in progress.
 		resizeInProgress := !allocatedResourcesMatchStatus(allocatedPod, podStatus)
@@ -2932,6 +2939,11 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		}
 		// Pod allocation does not need to be updated.
 		return allocatedPod, nil
+	} else if resizable, msg := kuberuntime.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeInfeasible, msg)
+		kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInfeasible)
+		return allocatedPod, nil
 	}
 
 	kl.podResizeMutex.Lock()
@@ -2940,7 +2952,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 	fit, resizeStatus, resizeMsg := kl.canResizePod(pod)
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := kl.statusManager.SetPodAllocation(pod); err != nil {
+		if err := kl.allocationManager.SetPodAllocation(pod); err != nil {
 			return nil, err
 		}
 		for i, container := range pod.Spec.Containers {

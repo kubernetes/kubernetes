@@ -58,9 +58,6 @@ const (
 	// Enables usage of any object for volume data source in PVCs
 	AnyVolumeDataSource featuregate.Feature = "AnyVolumeDataSource"
 
-	// owner: @tallclair
-	AppArmor featuregate.Feature = "AppArmor"
-
 	// owner: @liggitt
 	// kep: https://kep.k8s.io/4601
 	//
@@ -153,6 +150,21 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
+	// owner: @thockin
+	// kep: http://kep.k8s.io/5073:
+	// beta: v1.33
+	//
+	// Enable declarative validation of APIs, where declared.
+	DeclarativeValidation featuregate.Feature = "DeclarativeValidation"
+
+	// owner: @thockin
+	// kep: http://kep.k8s.io/5073:
+	// beta: v1.33
+	//
+	// Enable declarative_validation_mismatch metric which outputs # of mismatch occurrences between
+	// hand-written and declarative validation rules.
+	DeclarativeValidationMismatchMetric featuregate.Feature = "DeclarativeValidationMismatchMetric"
+
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
 	//
@@ -200,6 +212,14 @@ const (
 	// This feature gate is currently defined in KEP #4381. The intent
 	// is to move it into a separate KEP.
 	DRAAdminAccess featuregate.Feature = "DRAAdminAccess"
+
+	// owner: @mortent
+	// kep: http://kep.k8s.io/4816
+	//
+	// Enables support for providing a prioritized list of requests
+	// for resources. The first entry that can be satisfied will
+	// be selected.
+	DRAPrioritizedList featuregate.Feature = "DRAPrioritizedList"
 
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
@@ -293,13 +313,6 @@ const (
 	//
 	// Allows to delegate reconciliation of a Job object to an external controller.
 	JobManagedBy featuregate.Feature = "JobManagedBy"
-
-	// owner: @mimowo
-	// kep: https://kep.k8s.io/3329
-	//
-	// Allow users to specify handling of pod failures based on container exit codes
-	// and pod conditions.
-	JobPodFailurePolicy featuregate.Feature = "JobPodFailurePolicy"
 
 	// owner: @kannon92
 	// kep : https://kep.k8s.io/3939
@@ -435,6 +448,12 @@ const (
 
 	// Permits kubelet to run with swap enabled.
 	NodeSwap featuregate.Feature = "NodeSwap"
+
+	// owner: @cici37
+	// kep: https://kep.k8s.io/5080
+	//
+	// Enables ordered namespace deletion.
+	OrderedNamespaceDeletion featuregate.Feature = "OrderedNamespaceDeletion"
 
 	// owner: @RomanBednar
 	// kep: https://kep.k8s.io/3762
@@ -667,6 +686,10 @@ const (
 
 	// Enables support for the StorageVersionMigrator controller.
 	StorageVersionMigrator featuregate.Feature = "StorageVersionMigrator"
+
+	// owner: @serathius
+	// Allow API server to encode collections item by item, instead of all at once.
+	StreamingCollectionEncodingToJSON featuregate.Feature = "StreamingCollectionEncodingToJSON"
 
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433

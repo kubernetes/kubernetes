@@ -52,7 +52,9 @@ const (
 func TestStorageVersionGarbageCollection(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIServerIdentity, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionAPI, true)
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	flags := framework.DefaultTestServerFlags()
+	flags = append(flags, fmt.Sprintf("--runtime-config=%s=true", apiserverinternalv1alpha1.SchemeGroupVersion))
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	kubeclient, err := kubernetes.NewForConfig(result.ClientConfig)

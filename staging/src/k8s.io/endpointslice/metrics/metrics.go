@@ -129,7 +129,7 @@ var (
 			Help:           "Number of Services using some specific trafficDistribution",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"traffic_distribution"}, // One of ["PreferClose", "ImplementationSpecific"]
+		[]string{"traffic_distribution"}, // A trafficDistribution value
 	)
 )
 

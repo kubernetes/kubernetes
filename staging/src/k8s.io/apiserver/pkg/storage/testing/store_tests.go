@@ -622,7 +622,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, ignoreWatchCacheTests bool) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -648,10 +648,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	// Use compact to increase etcd global revision without changes to any resources.
-	// The increase in resources version comes from Kubernetes compaction updating hidden key.
-	// Used to test consistent List to confirm it returns latest etcd revision.
-	compaction(ctx, t, initialRV)
+	// Increase RV to test consistent List.
+	increaseRV(ctx, t)
 	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
@@ -1189,6 +1187,310 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRVFunc: resourceVersionNotOlderThan(list.ResourceVersion),
 			expectedOut:  []example.Pod{},
 		},
+		// match=Exact
+		{
+			name:        "test List with resource version set before first write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{},
+			rv:          initialRV,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    initialRV,
+		},
+		{
+			name:        "test List with resource version of first write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[0]},
+			rv:          createdPods[0].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[0].ResourceVersion,
+		},
+		{
+			name:        "test List with resource version of second write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[0], *createdPods[1]},
+			rv:          createdPods[1].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[1].ResourceVersion,
+		},
+		{
+			name:        "test List with resource version of third write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[0], *createdPods[1], *createdPods[2]},
+			rv:          createdPods[2].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[2].ResourceVersion,
+		},
+		{
+			name:        "test List with resource version of fourth write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[0], *createdPods[1], *createdPods[2], *createdPods[3]},
+			rv:          createdPods[3].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[3].ResourceVersion,
+		},
+		{
+			name:        "test List with resource version of fifth write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[0], *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			rv:          createdPods[4].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[4].ResourceVersion,
+		},
+		{
+			name:        "test List with resource version of six write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*createdPods[0], *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4], *createdPods[5]},
+			rv:          createdPods[5].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    createdPods[5].ResourceVersion,
+		},
+		{
+			name:        "test List with resource version of seventh write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4], *createdPods[5]},
+			rv:          updatedPod.ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    updatedPod.ResourceVersion,
+		},
+		{
+			name:        "test List with resource version of eight write, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			rv:          fmt.Sprint(continueRV),
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    fmt.Sprint(continueRV),
+		},
+		{
+			name:        "test List with resource version after writes, match=Exact",
+			prefix:      "/pods/",
+			pred:        storage.Everything,
+			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			rv:          fmt.Sprint(continueRV + 1),
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    fmt.Sprint(continueRV + 1),
+		},
+		{
+			name:             "test List with future resource version, match=Exact",
+			prefix:           "/pods/",
+			pred:             storage.Everything,
+			rv:               fmt.Sprint(continueRV + 2),
+			rvMatch:          metav1.ResourceVersionMatchExact,
+			expectRVTooLarge: true,
+		},
+		// limit, match=Exact
+		{
+			name:   "test List with limit, resource version of second write, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			expectedOut:                []example.Pod{*createdPods[0]},
+			rv:                         createdPods[1].ResourceVersion,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[1].ResourceVersion))),
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectRV:                   createdPods[1].ResourceVersion,
+			expectedRemainingItemCount: utilpointer.Int64(1),
+		},
+		{
+			name:   "test List with limit, resource version of third write, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 2,
+			},
+			rv:                         createdPods[2].ResourceVersion,
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectedOut:                []example.Pod{*createdPods[0], *createdPods[1]},
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[2].ResourceVersion))),
+			expectRV:                   createdPods[2].ResourceVersion,
+			expectedRemainingItemCount: utilpointer.Int64(1),
+		},
+		{
+			name:   "test List with limit, resource version of fourth write, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 4,
+			},
+			rv:          createdPods[3].ResourceVersion,
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectedOut: []example.Pod{*createdPods[0], *createdPods[1], *createdPods[2], *createdPods[3]},
+			expectRV:    createdPods[3].ResourceVersion,
+		},
+		{
+			name:   "test List with limit, resource version of fifth write, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			rv:                         createdPods[4].ResourceVersion,
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectedOut:                []example.Pod{*createdPods[0]},
+			expectRV:                   createdPods[4].ResourceVersion,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
+			expectedRemainingItemCount: utilpointer.Int64(4),
+		},
+		{
+			name:   "test List with limit, resource version of six write, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 2,
+			},
+			rv:                         createdPods[5].ResourceVersion,
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectedOut:                []example.Pod{*createdPods[0], *createdPods[1]},
+			expectRV:                   createdPods[5].ResourceVersion,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
+			expectedRemainingItemCount: utilpointer.Int64(4),
+		},
+		{
+			name:   "test List with limit, resource version of seventh write, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 4,
+			},
+			rv:                         updatedPod.ResourceVersion,
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectedOut:                []example.Pod{*updatedPod, *createdPods[1], *createdPods[5], *createdPods[2]},
+			expectRV:                   updatedPod.ResourceVersion,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(updatedPod.ResourceVersion))),
+			expectedRemainingItemCount: utilpointer.Int64(2),
+		},
+		{
+			name:   "test List with limit, resource version of eight write, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 8,
+			},
+			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			rv:          fmt.Sprint(continueRV),
+			rvMatch:     metav1.ResourceVersionMatchExact,
+			expectRV:    fmt.Sprint(continueRV),
+		},
+		{
+			name:   "test List with limit, resource version after writes, match=Exact",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+				Limit: 1,
+			},
+			rv:                         fmt.Sprint(continueRV + 1),
+			rvMatch:                    metav1.ResourceVersionMatchExact,
+			expectedOut:                []example.Pod{*updatedPod},
+			expectRV:                   fmt.Sprint(continueRV + 1),
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(continueRV+1)),
+			expectedRemainingItemCount: utilpointer.Int64(4),
+		},
+		// Continue
+		{
+			name:   "test List with continue, resource version of second write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[1].ResourceVersion))),
+			},
+			expectedOut: []example.Pod{*createdPods[1]},
+			expectRV:    createdPods[1].ResourceVersion,
+		},
+		{
+			name:   "test List with continue, resource version of third write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    2,
+				Continue: encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[2].ResourceVersion))),
+			},
+			expectedOut: []example.Pod{*createdPods[2]},
+			expectRV:    createdPods[2].ResourceVersion,
+		},
+		{
+			name:   "test List with continue, resource version of fifth write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
+			},
+			expectedOut:                []example.Pod{*createdPods[1]},
+			expectRV:                   createdPods[4].ResourceVersion,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
+			expectedRemainingItemCount: utilpointer.Int64(3),
+		},
+		{
+			name:   "test List with continue, resource version of six write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    2,
+				Continue: encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
+			},
+			expectedOut:                []example.Pod{*createdPods[5], *createdPods[2]},
+			expectRV:                   createdPods[5].ResourceVersion,
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
+			expectedRemainingItemCount: utilpointer.Int64(2),
+		},
+		{
+			name:   "test List with continue, resource version of seventh write",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    4,
+				Continue: encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(updatedPod.ResourceVersion))),
+			},
+			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
+			expectRV:    updatedPod.ResourceVersion,
+		},
+		{
+			name:   "test List with continue, resource version after writes",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    1,
+				Continue: encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(continueRV+1)),
+			},
+			expectedOut:                []example.Pod{*createdPods[1]},
+			expectRV:                   fmt.Sprint(continueRV + 1),
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
+			expectedRemainingItemCount: utilpointer.Int64(3),
+		},
 	}
 
 	for _, tt := range tests {
@@ -1287,7 +1589,7 @@ func ExpectContinueMatches(t *testing.T, expect, got string) {
 	t.Errorf("expected continue token: %s, got: %s", expectDecoded, gotDecoded)
 }
 
-func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, cacheEnabled, consistentReadsSupported bool) {
+func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, cacheEnabled, consistentReadsSupported bool) {
 	outPod := &example.Pod{}
 	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
@@ -1295,7 +1597,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 		t.Errorf("Unexpected error: %v", err)
 	}
 	lastObjecRV := outPod.ResourceVersion
-	compaction(ctx, t, outPod.ResourceVersion)
+	increaseRV(ctx, t)
 	parsedRV, _ := strconv.Atoi(outPod.ResourceVersion)
 	currentRV := fmt.Sprintf("%d", parsedRV+1)
 
@@ -1305,7 +1607,7 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 	}
 
 	secondNonConsistentReadRV := lastObjecRV
-	if consistentReadsSupported {
+	if !cacheEnabled || consistentReadsSupported {
 		secondNonConsistentReadRV = currentRV
 	}
 
@@ -1445,7 +1747,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	return initialRV, created, updated, nil
 }
 
-func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Compaction, store storage.Interface) {
+func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV IncreaseRVFunc, store storage.Interface) {
 	key, prevStoredObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
 
@@ -1459,10 +1761,8 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Co
 		t.Fatalf("update failed: %v", err)
 	}
 	objRV, _ := strconv.Atoi(storedObj.ResourceVersion)
-	// Use compact to increase etcd global revision without changes to any resources.
-	// The increase in resources version comes from Kubernetes compaction updating hidden key.
-	// Used to test consistent List to confirm it returns latest etcd revision.
-	compaction(ctx, t, prevStoredObj.ResourceVersion)
+	// Increase RV to test consistent List.
+	increaseRV(ctx, t)
 
 	tests := []struct {
 		name                 string
@@ -2016,6 +2316,7 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 }
 
 type Compaction func(ctx context.Context, t *testing.T, resourceVersion string)
+type IncreaseRVFunc func(ctx context.Context, t *testing.T)
 
 func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
 	if compaction == nil {

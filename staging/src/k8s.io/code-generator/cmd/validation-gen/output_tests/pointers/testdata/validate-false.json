@@ -1,0 +1,31 @@
+{
+    "*pointers.T1": {
+      "pb": [
+        "field T1.PB"
+      ],
+      "pf": [
+        "field T1.PF"
+      ],
+      "pi": [
+        "field T1.PI"
+      ],
+      "ps": [
+        "field T1.PS"
+      ],
+      "pt2": [
+        "field T1.PT2"
+      ],
+      "pt2.pb": [
+        "field T2.PB"
+      ],
+      "pt2.pf": [
+        "field T2.PF"
+      ],
+      "pt2.pi": [
+        "field T2.PI"
+      ],
+      "pt2.ps": [
+        "field T2.PS"
+      ]
+    }
+  }

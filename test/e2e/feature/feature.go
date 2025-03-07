@@ -118,6 +118,19 @@ var (
 	// OWNER: sig-node
 	// Testing downward API huge pages
 	DownwardAPIHugePages = framework.WithFeature(framework.ValidFeatures.Add("DownwardAPIHugePages"))
+
+	// owning-sig: sig-scheduling
+	// kep: https://kep.k8s.io/4816
+	// test-infra jobs:
+	// - "ci-kind-dra-all" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
+	//
+	// This label is used for tests which need:
+	// - the DynamicResourceAllocation *and* DRAPrioritizedList feature gates
+	// - the resource.k8s.io API group
+	// - a container runtime where support for CDI (https://github.com/cncf-tags/container-device-interface)
+	//   is enabled such that passing CDI device IDs through CRI fields is supported
+	DRAPrioritizedList = framework.WithFeature(framework.ValidFeatures.Add("DRAPrioritizedList"))
+
 	// owning-sig: sig-node
 	// kep: https://kep.k8s.io/4381
 	// test-infra jobs:
@@ -191,20 +204,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	HPA = framework.WithFeature(framework.ValidFeatures.Add("HPA"))
-
-	// owning-sig: sig-storage
-	// kep: https://kep.k8s.io/2680
-	// test-infra jobs:
-	// - pull-kubernetes-e2e-storage-kind-alpha-features (need manual trigger)
-	// - ci-kubernetes-e2e-storage-kind-alpha-features
-	//
-	// When this label is added to a test, it means that the cluster must be created
-	// with the feature-gate "HonorPVReclaimPolicy=true".
-	//
-	// Once the feature are stable, this label should be removed and these tests will
-	// be run by default on any cluster. The test-infra job also should be updated to
-	// not focus on this feature anymore.
-	HonorPVReclaimPolicy = framework.WithFeature(framework.ValidFeatures.Add("HonorPVReclaimPolicy"))
 
 	// owner: sig-node
 	HostAccess = framework.WithFeature(framework.ValidFeatures.Add("HostAccess"))
@@ -285,6 +284,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	MemoryManager = framework.WithFeature(framework.ValidFeatures.Add("MemoryManager"))
 
+	// Owner: sig-api-machinery
+	// Marks tests that enforce ordered namespace deletion.
+	MutatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("MutatingAdmissionPolicy"))
+
 	// Owner: sig-network
 	// Marks tests that require working external DNS.
 	NetworkingDNS = framework.WithFeature(framework.ValidFeatures.Add("Networking-DNS"))
@@ -334,6 +337,10 @@ var (
 	// Tests aiming to verify oom_score functionality
 	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
 
+	// Owner: sig-api-machinery
+	// Marks tests that enforce ordered namespace deletion.
+	OrderedNamespaceDeletion = framework.WithFeature(framework.ValidFeatures.Add("OrderedNamespaceDeletion"))
+
 	// Owner: sig-node
 	// Verify ProcMount feature.
 	// Used in combination with user namespaces
@@ -380,9 +387,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RecoverVolumeExpansionFailure = framework.WithFeature(framework.ValidFeatures.Add("RecoverVolumeExpansionFailure"))
-
-	// RecursiveReadOnlyMounts (SIG-node, used for testing recursive read-only mounts <https://kep.k8s.io/3857>)
-	RecursiveReadOnlyMounts = framework.WithFeature(framework.ValidFeatures.Add("RecursiveReadOnlyMounts"))
 
 	// RelaxedEnvironmentVariableValidation used when we verify whether the pod can consume all printable ASCII characters as environment variable names,
 	// and whether the pod can consume configmap/secret that key starts with a number.

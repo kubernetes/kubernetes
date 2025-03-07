@@ -80,6 +80,10 @@ func Forever(f func(), period time.Duration) {
 	Until(f, period, NeverStop)
 }
 
+// jitterRand is a dedicated random source for jitter calculations.
+// It defaults to rand.Float64, but is a package variable so it can be overridden to make unit tests deterministic.
+var jitterRand = rand.Float64
+
 // Jitter returns a time.Duration between duration and duration + maxFactor *
 // duration.
 //
@@ -89,7 +93,7 @@ func Jitter(duration time.Duration, maxFactor float64) time.Duration {
 	if maxFactor <= 0.0 {
 		maxFactor = 1.0
 	}
-	wait := duration + time.Duration(rand.Float64()*maxFactor*float64(duration))
+	wait := duration + time.Duration(jitterRand()*maxFactor*float64(duration))
 	return wait
 }
 

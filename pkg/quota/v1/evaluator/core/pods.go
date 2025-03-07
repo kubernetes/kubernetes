@@ -170,6 +170,17 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	op := a.GetOperation()
 	switch a.GetSubresource() {
 	case "":
+		if op == admission.Update {
+			pod, err1 := toExternalPodOrError(a.GetObject())
+			oldPod, err2 := toExternalPodOrError(a.GetOldObject())
+			if err1 != nil || err2 != nil {
+				return false
+			}
+			// when scope changed
+			if IsTerminating(oldPod) != IsTerminating(pod) {
+				return true
+			}
+		}
 		return op == admission.Create
 	case "resize":
 		return op == admission.Update
@@ -333,9 +344,9 @@ func podMatchesScopeFunc(selector corev1.ScopedResourceSelectorRequirement, obje
 	}
 	switch selector.ScopeName {
 	case corev1.ResourceQuotaScopeTerminating:
-		return isTerminating(pod), nil
+		return IsTerminating(pod), nil
 	case corev1.ResourceQuotaScopeNotTerminating:
-		return !isTerminating(pod), nil
+		return !IsTerminating(pod), nil
 	case corev1.ResourceQuotaScopeBestEffort:
 		return isBestEffort(pod), nil
 	case corev1.ResourceQuotaScopeNotBestEffort:
@@ -393,7 +404,7 @@ func isBestEffort(pod *corev1.Pod) bool {
 	return qos.GetPodQOS(pod) == corev1.PodQOSBestEffort
 }
 
-func isTerminating(pod *corev1.Pod) bool {
+func IsTerminating(pod *corev1.Pod) bool {
 	if pod.Spec.ActiveDeadlineSeconds != nil && *pod.Spec.ActiveDeadlineSeconds >= int64(0) {
 		return true
 	}

@@ -31,6 +31,7 @@ import (
 	endpointutil "k8s.io/endpointslice/util"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 // podToEndpoint returns an Endpoint object generated from a Pod, a Node, and a Service for a particular addressType.
@@ -60,8 +61,7 @@ func podToEndpoint(pod *v1.Pod, node *v1.Node, service *v1.Service, addressType 
 	}
 
 	if node != nil && node.Labels[v1.LabelTopologyZone] != "" {
-		zone := node.Labels[v1.LabelTopologyZone]
-		ep.Zone = &zone
+		ep.Zone = ptr.To(node.Labels[v1.LabelTopologyZone])
 	}
 
 	if endpointutil.ShouldSetHostname(pod, service) {
@@ -84,19 +84,16 @@ func getEndpointPorts(logger klog.Logger, service *v1.Service, pod *v1.Pod) []di
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 
-		portName := servicePort.Name
-		portProto := servicePort.Protocol
 		portNum, err := findPort(pod, servicePort)
 		if err != nil {
 			logger.V(4).Info("Failed to find port for service", "service", klog.KObj(service), "err", err)
 			continue
 		}
 
-		i32PortNum := int32(portNum)
 		endpointPorts = append(endpointPorts, discovery.EndpointPort{
-			Name:        &portName,
-			Port:        &i32PortNum,
-			Protocol:    &portProto,
+			Name:        ptr.To(servicePort.Name),
+			Port:        ptr.To(int32(portNum)),
+			Protocol:    ptr.To(servicePort.Protocol),
 			AppProtocol: servicePort.AppProtocol,
 		})
 	}

@@ -374,7 +374,14 @@ func TestImageLocalityPriority(t *testing.T) {
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
+				// Currently, we use the snapshot instead of the tf.BuildNodeInfos to build the nodeInfo since some
+				// fields like ImageStates is essential for the Score plugin but the latter does not construct that.
+				// We should enhance the BuildNodeInfos to achieve feature parity with the core logic.
+				nodeInfo, err := snapshot.NodeInfos().Get(nodeName)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", nodeName, err)
+				}
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}

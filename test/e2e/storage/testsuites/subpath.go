@@ -793,10 +793,10 @@ func testPodContainerRestartWithHooks(ctx context.Context, f *framework.Framewor
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
 	pod.Spec.Containers[0].Image = e2epod.GetDefaultTestImage()
-	pod.Spec.Containers[0].Command = e2epod.GenerateScriptCmd(e2epod.InfiniteSleepCommand)
+	pod.Spec.Containers[0].Command = e2epod.GenerateScriptCmd(e2epod.InfiniteSleepCommandWithoutGracefulShutdown)
 	pod.Spec.Containers[0].Args = nil
 	pod.Spec.Containers[1].Image = e2epod.GetDefaultTestImage()
-	pod.Spec.Containers[1].Command = e2epod.GenerateScriptCmd(e2epod.InfiniteSleepCommand)
+	pod.Spec.Containers[1].Command = e2epod.GenerateScriptCmd(e2epod.InfiniteSleepCommandWithoutGracefulShutdown)
 	pod.Spec.Containers[1].Args = nil
 	hooks.AddLivenessProbe(pod, probeFilePath)
 

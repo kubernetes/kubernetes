@@ -18,6 +18,7 @@ package windows
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -50,7 +51,10 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 		framework.ExpectNoError(err, "Error finding Windows node")
 		framework.Logf("Using node: %v", targetNode.Name)
 
-		bootID := targetNode.Status.NodeInfo.BootID
+		bootID, err := strconv.Atoi(targetNode.Status.NodeInfo.BootID)
+		framework.ExpectNoError(err, "Error converting bootID to int")
+		framework.Logf("Initial BootID: %d", bootID)
+
 		windowsImage := imageutils.GetE2EImage(imageutils.Agnhost)
 
 		// Create Windows pod on the selected Windows node Using Agnhost
@@ -177,24 +181,40 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 
 		restartCount := 0
 
-		ginkgo.By("Waiting for nodes to be rebooted")
-		gomega.Eventually(ctx, func(ctx context.Context) string {
-			refreshNode, err := f.ClientSet.CoreV1().Nodes().Get(ctx, targetNode.Name, metav1.GetOptions{})
-			if err != nil {
-				return ""
+		timeout := time.After(time.Minute * 10)
+	FOR:
+		for {
+			select {
+			case <-timeout:
+				break FOR
+			default:
+				if restartCount > 0 {
+					break FOR
+				}
+				ginkgo.By("Then checking existed agn-test-pod is running on the rebooted host")
+				agnPodOut, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, agnPod.Name, metav1.GetOptions{})
+				if err == nil {
+					lastRestartCount := podutil.GetExistingContainerStatus(agnPodOut.Status.ContainerStatuses, "windows-container").RestartCount
+					restartCount = int(lastRestartCount - initialRestartCount)
+				}
+				time.Sleep(time.Second * 30)
 			}
-			return refreshNode.Status.NodeInfo.BootID
-		}).WithPolling(time.Second*30).WithTimeout(time.Minute*10).
-			Should(gomega.BeNumerically(">", bootID), "node was not rebooted")
+		}
 
-		ginkgo.By("Then checking existed agn-test-pod is running on the rebooted host")
-		agnPodOut, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, agnPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "getting pod info after reboot")
+		ginkgo.By("Checking whether the node is rebooted")
+		refreshNode, err := f.ClientSet.CoreV1().Nodes().Get(ctx, targetNode.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "Error getting node info after reboot")
+		currentbootID, err := strconv.Atoi(refreshNode.Status.NodeInfo.BootID)
+		framework.ExpectNoError(err, "Error converting bootID to int")
+		framework.Logf("current BootID: %d", currentbootID)
+		gomega.Expect(currentbootID).To(gomega.Equal(bootID+1), "BootID should be incremented by 1 after reboot")
 
-		lastRestartCount := podutil.GetExistingContainerStatus(agnPodOut.Status.ContainerStatuses, "windows-container").RestartCount
-		restartCount = int(lastRestartCount - initialRestartCount)
+		ginkgo.By("Checking whether agn-test-pod is rebooted")
 		gomega.Expect(restartCount).To(gomega.Equal(1), "restart count of agn-test-pod is 1")
+
+		agnPodOut, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, agnPod.Name, metav1.GetOptions{})
 		gomega.Expect(agnPodOut.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		framework.ExpectNoError(err, "getting pod info after reboot")
 		assertConsistentConnectivity(ctx, f, nginxPod.ObjectMeta.Name, "linux", linuxCheck(agnPodOut.Status.PodIP, 80), internalMaxTries)
 
 		// create another host process pod to check system boot time

@@ -62,6 +62,8 @@ import (
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
+	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
@@ -90,7 +92,6 @@ import (
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
@@ -272,7 +273,8 @@ func newTestKubeletWithImageList(
 	kubelet.mirrorPodClient = fakeMirrorClient
 	kubelet.podManager = kubepod.NewBasicPodManager()
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, kubelet.getRootDir())
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
+	kubelet.allocationManager = allocation.NewInMemoryManager()
 	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
 
 	kubelet.containerRuntime = fakeRuntime
@@ -2566,18 +2568,18 @@ func TestPodResourceAllocationReset(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.existingPodAllocation != nil {
 				// when kubelet restarts, AllocatedResources has already existed before adding pod
-				err := kubelet.statusManager.SetPodAllocation(tc.existingPodAllocation)
+				err := kubelet.allocationManager.SetPodAllocation(tc.existingPodAllocation)
 				if err != nil {
 					t.Fatalf("failed to set pod allocation: %v", err)
 				}
 			}
 			kubelet.HandlePodAdditions([]*v1.Pod{tc.pod})
 
-			allocatedResources, found := kubelet.statusManager.GetContainerResourceAllocation(string(tc.pod.UID), tc.pod.Spec.Containers[0].Name)
+			allocatedResources, found := kubelet.allocationManager.GetContainerResourceAllocation(tc.pod.UID, tc.pod.Spec.Containers[0].Name)
 			if !found {
 				t.Fatalf("resource allocation should exist: (pod: %#v, container: %s)", tc.pod, tc.pod.Spec.Containers[0].Name)
 			}
-			assert.Equal(t, tc.expectedPodResourceAllocation[string(tc.pod.UID)][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
+			assert.Equal(t, tc.expectedPodResourceAllocation[tc.pod.UID][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
 		})
 	}
 }
@@ -2709,7 +2711,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		expectedAllocatedLims v1.ResourceList
 		expectedResize        v1.PodResizeStatus
 		expectBackoffReset    bool
-		goos                  string
+		annotations           map[string]string
 	}{
 		{
 			name:                  "Request CPU and memory decrease - expect InProgress",
@@ -2779,12 +2781,12 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectedResize:        "",
 		},
 		{
-			name:                  "windows node, expect Infeasible",
+			name:                  "static pod, expect Infeasible",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			expectedResize:        v1.PodResizeStatusInfeasible,
-			goos:                  "windows",
+			annotations:           map[string]string{kubetypes.ConfigSourceAnnotationKey: kubetypes.FileSource},
 		},
 		{
 			name:                  "Increase CPU from min shares",
@@ -2871,11 +2873,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	for _, tt := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
 			t.Run(tt.name, func(t *testing.T) {
-				oldGOOS := goos
-				defer func() { goos = oldGOOS }()
-				if tt.goos != "" {
-					goos = tt.goos
-				}
 				kubelet.statusManager = status.NewFakeManager()
 
 				var originalPod *v1.Pod
@@ -2887,6 +2884,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					originalPod = testPod1.DeepCopy()
 					originalCtr = &originalPod.Spec.Containers[0]
 				}
+				originalPod.Annotations = tt.annotations
 				originalCtr.Resources.Requests = tt.originalRequests
 				originalCtr.Resources.Limits = tt.originalLimits
 
@@ -2903,9 +2901,9 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				}
 
 				if !tt.newResourcesAllocated {
-					require.NoError(t, kubelet.statusManager.SetPodAllocation(originalPod))
+					require.NoError(t, kubelet.allocationManager.SetPodAllocation(originalPod))
 				} else {
-					require.NoError(t, kubelet.statusManager.SetPodAllocation(newPod))
+					require.NoError(t, kubelet.allocationManager.SetPodAllocation(newPod))
 				}
 
 				podStatus := &kubecontainer.PodStatus{
@@ -2951,7 +2949,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
 				assert.Equal(t, tt.expectedAllocatedLims, updatedPodCtr.Resources.Limits, "updated pod spec limits")
 
-				alloc, found := kubelet.statusManager.GetContainerResourceAllocation(string(newPod.UID), updatedPodCtr.Name)
+				alloc, found := kubelet.allocationManager.GetContainerResourceAllocation(newPod.UID, updatedPodCtr.Name)
 				require.True(t, found, "container allocation")
 				assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
 				assert.Equal(t, tt.expectedAllocatedLims, alloc.Limits, "stored container limit allocation")

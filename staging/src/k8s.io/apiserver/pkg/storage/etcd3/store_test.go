@@ -28,6 +28,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/stretchr/testify/require"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/kubernetes"
 	"go.etcd.io/etcd/server/v3/embed"
@@ -171,7 +172,7 @@ func TestListPaging(t *testing.T) {
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(client.Client), store)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(client.Client), store)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
@@ -248,12 +249,12 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, compactStorage(client.Client), false)
+	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false)
 }
 
 func TestConsistentList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, store, compactStorage(client.Client), false, true)
+	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -312,15 +313,23 @@ func TestNamespaceScopedList(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedList(ctx, t, store)
 }
 
-func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
+func compactStorage(client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err = compact(ctx, etcdClient, 0, int64(rv)); err != nil {
+		if _, err = client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Unable to compact, %v", err)
+		}
+	}
+}
+
+func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) {
+		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+			t.Fatalf("Could not update increaseRV: %v", err)
 		}
 	}
 }
@@ -993,4 +1002,50 @@ func BenchmarkStoreList(b *testing.B) {
 
 func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
+}
+
+func TestGetCurrentResourceVersion(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+
+	makePod := func(name string) *example.Pod {
+		return &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
+		}
+	}
+	createPod := func(obj *example.Pod) *example.Pod {
+		key := "pods/" + obj.Namespace + "/" + obj.Name
+		out := &example.Pod{}
+		err := store.Create(context.TODO(), key, obj, out, 0)
+		require.NoError(t, err)
+		return out
+	}
+	getPod := func(name, ns string) *example.Pod {
+		key := "pods/" + ns + "/" + name
+		out := &example.Pod{}
+		err := store.Get(context.TODO(), key, storage.GetOptions{}, out)
+		require.NoError(t, err)
+		return out
+	}
+
+	// create a pod and make sure its RV is equal to the one maintained by etcd
+	pod := createPod(makePod("pod-1"))
+	currentStorageRV, err := store.GetCurrentResourceVersion(context.TODO())
+	require.NoError(t, err)
+	podRV, err := store.versioner.ParseResourceVersion(pod.ResourceVersion)
+	require.NoError(t, err)
+	require.Equal(t, currentStorageRV, podRV, "expected the global etcd RV to be equal to pod's RV")
+
+	// now make unrelated write and make sure the target function returns global etcd RV
+	resp, err := store.client.KV.Put(ctx, "compact_rev_key", pod.ResourceVersion)
+	require.NoError(t, err)
+	currentStorageRV, err = store.GetCurrentResourceVersion(context.TODO())
+	require.NoError(t, err)
+	require.NoError(t, err)
+	require.Equal(t, currentStorageRV, uint64(resp.Header.Revision), "expected the global etcd RV to be equal to replicaset's RV")
+
+	// ensure that the pod's RV hasn't been changed
+	currentPod := getPod(pod.Name, pod.Namespace)
+	currentPodRV, err := store.versioner.ParseResourceVersion(currentPod.ResourceVersion)
+	require.NoError(t, err)
+	require.Equal(t, currentPodRV, podRV, "didn't expect to see the pod's RV changed")
 }

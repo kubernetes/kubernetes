@@ -21,6 +21,8 @@ package conntrack
 
 import (
 	"errors"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/vishvananda/netlink"
@@ -34,8 +36,14 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+// Kubernetes UDP services can be affected by stale conntrack entries.
+// These entries may point to endpoints that no longer exist,
+// leading to packet loss and connectivity problems.
+
 // CleanStaleEntries scans conntrack table and removes any entries
 // for a service that do not correspond to a serving endpoint.
+// List existing conntrack entries and calculate the desired conntrack state
+// based on the current Services and Endpoints.
 func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 	svcPortMap proxy.ServicePortMap, endpointsMap proxy.EndpointsMap) {
 
@@ -52,7 +60,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 		}
 	}
 
-	// serviceIPEndpointIPs maps service IPs (ClusterIP, LoadBalancerIPs and ExternalIPs)
+	// serviceIPEndpointIPs maps service IPs (ClusterIP, LoadBalancerIPs and ExternalIPs) and Service Port
 	// to the set of serving endpoint IPs.
 	serviceIPEndpointIPs := make(map[string]sets.Set[string])
 	// serviceNodePortEndpointIPs maps service NodePort to the set of serving endpoint IPs.
@@ -79,14 +87,28 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 			}
 		}
 
-		serviceIPEndpointIPs[svc.ClusterIP().String()] = endpointIPs
+		// a Service without endpoints does not require to clean the conntrack entries associated.
+		if endpointIPs.Len() == 0 {
+			continue
+		}
+
+		// we need to filter entries that are directed to a Service IP:Port frontend
+		// that does not have a backend as part of the endpoints IPs
+		portStr := strconv.Itoa(svc.Port())
+		// clusterIP:Port
+		serviceIPEndpointIPs[net.JoinHostPort(svc.ClusterIP().String(), portStr)] = endpointIPs
+		// loadbalancerIP:Port
 		for _, loadBalancerIP := range svc.LoadBalancerVIPs() {
-			serviceIPEndpointIPs[loadBalancerIP.String()] = endpointIPs
+			serviceIPEndpointIPs[net.JoinHostPort(loadBalancerIP.String(), portStr)] = endpointIPs
 		}
+		// externalIP:Port
 		for _, externalIP := range svc.ExternalIPs() {
-			serviceIPEndpointIPs[externalIP.String()] = endpointIPs
+			serviceIPEndpointIPs[net.JoinHostPort(externalIP.String(), portStr)] = endpointIPs
 		}
+		// we need to filter entries that are directed to a *:NodePort
+		// that does not have a backend as part of the endpoints IPs
 		if svc.NodePort() != 0 {
+			// *:NodePort
 			serviceNodePortEndpointIPs[svc.NodePort()] = endpointIPs
 		}
 	}
@@ -98,26 +120,25 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 			continue
 		}
 
-		origDst := entry.Forward.DstIP.String()
-		origPortDst := int(entry.Forward.DstPort)
-		replySrc := entry.Reverse.SrcIP.String()
+		origDst := entry.Forward.DstIP.String()   // match Service IP
+		origPortDst := int(entry.Forward.DstPort) // match Service Port
+		origPortDstStr := strconv.Itoa(origPortDst)
+		replySrc := entry.Reverse.SrcIP.String() // match Serving Endpoint IP
 
 		// if the original destination (--orig-dst) of the entry is service IP (ClusterIP,
-		// LoadBalancerIPs or ExternalIPs) and the reply source (--reply-src) is not IP of
-		// any serving endpoint, we clear the entry.
-		if _, ok := serviceIPEndpointIPs[origDst]; ok {
-			if !serviceIPEndpointIPs[origDst].Has(replySrc) {
-				filters = append(filters, filterForNAT(origDst, replySrc, v1.ProtocolUDP))
-			}
+		// LoadBalancerIPs or ExternalIPs) and (--orig-port-dst) of the flow is service Port
+		// and the reply source (--reply-src) is not IP of any serving endpoint, we clear the entry.
+		endpoints, ok := serviceIPEndpointIPs[net.JoinHostPort(origDst, origPortDstStr)]
+		if ok && !endpoints.Has(replySrc) {
+			filters = append(filters, filterForIPPortNAT(origDst, replySrc, entry.Forward.DstPort, v1.ProtocolUDP))
 		}
 
 		// if the original port destination (--orig-port-dst) of the flow is service
 		// NodePort and the reply source (--reply-src) is not IP of any serving endpoint,
 		// we clear the entry.
-		if _, ok := serviceNodePortEndpointIPs[origPortDst]; ok {
-			if !serviceNodePortEndpointIPs[origPortDst].Has(replySrc) {
-				filters = append(filters, filterForPortNAT(replySrc, origPortDst, v1.ProtocolUDP))
-			}
+		endpoints, ok = serviceNodePortEndpointIPs[origPortDst]
+		if ok && !endpoints.Has(replySrc) {
+			filters = append(filters, filterForPortNAT(replySrc, origPortDst, v1.ProtocolUDP))
 		}
 	}
 
@@ -145,14 +166,16 @@ var protocolMap = map[v1.Protocol]uint8{
 	v1.ProtocolSCTP: unix.IPPROTO_SCTP,
 }
 
-// filterForNAT returns *conntrackFilter to delete the conntrack entries for connections
-// specified by the destination IP (original direction) and source IP (reply direction).
-func filterForNAT(origin, dest string, protocol v1.Protocol) *conntrackFilter {
+// filterForIPPortNAT returns *conntrackFilter to delete the conntrack entries for connections
+// specified by the destination IP (original direction) and destination port (original direction)
+// and source IP (reply direction).
+func filterForIPPortNAT(origin, dest string, dstPort uint16, protocol v1.Protocol) *conntrackFilter {
 	klog.V(6).InfoS("Adding conntrack filter for cleanup", "org-dst", origin, "reply-src", dest, "protocol", protocol)
 	return &conntrackFilter{
 		protocol: protocolMap[protocol],
 		original: &connectionTuple{
-			dstIP: netutils.ParseIPSloppy(origin),
+			dstIP:   netutils.ParseIPSloppy(origin),
+			dstPort: dstPort,
 		},
 		reply: &connectionTuple{
 			srcIP: netutils.ParseIPSloppy(dest),

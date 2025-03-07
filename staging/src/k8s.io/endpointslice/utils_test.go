@@ -34,15 +34,17 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestNewEndpointSlice(t *testing.T) {
 	ipAddressType := discovery.AddressTypeIPv4
 	portName := "foo"
-	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
-		ports:       []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}},
+		ports: []discovery.EndpointPort{{
+			Name:     &portName,
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}},
 		addressType: ipAddressType,
 	}
 	service := v1.Service{
@@ -258,11 +260,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				NodeName: pointer.String("node-1"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -278,11 +280,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				NodeName: pointer.String("node-1"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -298,11 +300,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(false),
-					Serving:     pointer.Bool(false),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(false),
+					Serving:     ptr.To(false),
+					Terminating: ptr.To(false),
 				},
-				NodeName: pointer.String("node-1"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -318,11 +320,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(false),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(false),
+					Terminating: ptr.To(false),
 				},
-				NodeName: pointer.String("node-1"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -339,12 +341,12 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				Zone:     pointer.String("us-central1-a"),
-				NodeName: pointer.String("node-1"),
+				Zone:     ptr.To("us-central1-a"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -361,12 +363,12 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				Zone:     pointer.String("us-central1-a"),
-				NodeName: pointer.String("node-1"),
+				Zone:     ptr.To("us-central1-a"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -383,13 +385,13 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
 				Hostname: &readyPodHostname.Spec.Hostname,
-				Zone:     pointer.String("us-central1-a"),
-				NodeName: pointer.String("node-1"),
+				Zone:     ptr.To("us-central1-a"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -405,11 +407,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(true),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(false),
+					Ready:       ptr.To(true),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(false),
 				},
-				NodeName: pointer.String("node-1"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -425,11 +427,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(false),
-					Serving:     pointer.Bool(true),
-					Terminating: pointer.Bool(true),
+					Ready:       ptr.To(false),
+					Serving:     ptr.To(true),
+					Terminating: ptr.To(true),
 				},
-				NodeName: pointer.String("node-1"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -445,11 +447,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       pointer.Bool(false),
-					Serving:     pointer.Bool(false),
-					Terminating: pointer.Bool(true),
+					Ready:       ptr.To(false),
+					Serving:     ptr.To(false),
+					Terminating: ptr.To(true),
 				},
-				NodeName: pointer.String("node-1"),
+				NodeName: ptr.To("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -514,7 +516,6 @@ func TestServiceControllerKey(t *testing.T) {
 }
 
 func TestGetEndpointPorts(t *testing.T) {
-	protoTCP := v1.ProtocolTCP
 	restartPolicyAlways := v1.ContainerRestartPolicyAlways
 
 	testCases := map[string]struct {
@@ -529,8 +530,8 @@ func TestGetEndpointPorts(t *testing.T) {
 						Name:        "http",
 						Port:        80,
 						TargetPort:  intstr.FromInt32(80),
-						Protocol:    protoTCP,
-						AppProtocol: pointer.String("example.com/custom-protocol"),
+						Protocol:    v1.ProtocolTCP,
+						AppProtocol: ptr.To("example.com/custom-protocol"),
 					}},
 				},
 			},
@@ -542,10 +543,10 @@ func TestGetEndpointPorts(t *testing.T) {
 				},
 			},
 			expectedPorts: []*discovery.EndpointPort{{
-				Name:        pointer.String("http"),
-				Port:        pointer.Int32(80),
-				Protocol:    &protoTCP,
-				AppProtocol: pointer.String("example.com/custom-protocol"),
+				Name:        ptr.To("http"),
+				Port:        ptr.To[int32](80),
+				Protocol:    ptr.To(v1.ProtocolTCP),
+				AppProtocol: ptr.To("example.com/custom-protocol"),
 			}},
 		},
 		"service with named port and AppProtocol on one port": {
@@ -555,12 +556,12 @@ func TestGetEndpointPorts(t *testing.T) {
 						Name:       "http",
 						Port:       80,
 						TargetPort: intstr.FromInt32(80),
-						Protocol:   protoTCP,
+						Protocol:   v1.ProtocolTCP,
 					}, {
 						Name:        "https",
-						Protocol:    protoTCP,
+						Protocol:    v1.ProtocolTCP,
 						TargetPort:  intstr.FromString("https"),
-						AppProtocol: pointer.String("https"),
+						AppProtocol: ptr.To("https"),
 					}},
 				},
 			},
@@ -570,20 +571,20 @@ func TestGetEndpointPorts(t *testing.T) {
 						Ports: []v1.ContainerPort{{
 							Name:          "https",
 							ContainerPort: int32(443),
-							Protocol:      protoTCP,
+							Protocol:      v1.ProtocolTCP,
 						}},
 					}},
 				},
 			},
 			expectedPorts: []*discovery.EndpointPort{{
-				Name:     pointer.String("http"),
-				Port:     pointer.Int32(80),
-				Protocol: &protoTCP,
+				Name:     ptr.To("http"),
+				Port:     ptr.To[int32](80),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}, {
-				Name:        pointer.String("https"),
-				Port:        pointer.Int32(443),
-				Protocol:    &protoTCP,
-				AppProtocol: pointer.String("https"),
+				Name:        ptr.To("https"),
+				Port:        ptr.To[int32](443),
+				Protocol:    ptr.To(v1.ProtocolTCP),
+				AppProtocol: ptr.To("https"),
 			}},
 		},
 		"service with named port for restartable init container": {
@@ -593,12 +594,12 @@ func TestGetEndpointPorts(t *testing.T) {
 						Name:       "http-sidecar",
 						Port:       8080,
 						TargetPort: intstr.FromInt32(8080),
-						Protocol:   protoTCP,
+						Protocol:   v1.ProtocolTCP,
 					}, {
 						Name:       "http",
 						Port:       8090,
 						TargetPort: intstr.FromString("http"),
-						Protocol:   protoTCP,
+						Protocol:   v1.ProtocolTCP,
 					}},
 				},
 			},
@@ -608,7 +609,7 @@ func TestGetEndpointPorts(t *testing.T) {
 						Ports: []v1.ContainerPort{{
 							Name:          "http-sidecar",
 							ContainerPort: int32(8080),
-							Protocol:      protoTCP,
+							Protocol:      v1.ProtocolTCP,
 						}},
 						RestartPolicy: &restartPolicyAlways,
 					}},
@@ -616,19 +617,19 @@ func TestGetEndpointPorts(t *testing.T) {
 						Ports: []v1.ContainerPort{{
 							Name:          "http",
 							ContainerPort: int32(8090),
-							Protocol:      protoTCP,
+							Protocol:      v1.ProtocolTCP,
 						}},
 					}},
 				},
 			},
 			expectedPorts: []*discovery.EndpointPort{{
-				Name:     pointer.String("http-sidecar"),
-				Port:     pointer.Int32(8080),
-				Protocol: &protoTCP,
+				Name:     ptr.To("http-sidecar"),
+				Port:     ptr.To[int32](8080),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}, {
-				Name:     pointer.String("http"),
-				Port:     pointer.Int32(8090),
-				Protocol: &protoTCP,
+				Name:     ptr.To("http"),
+				Port:     ptr.To[int32](8090),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}},
 		},
 		"service with same named port for regular and restartable init container": {
@@ -639,7 +640,7 @@ func TestGetEndpointPorts(t *testing.T) {
 							Name:       "http",
 							Port:       80,
 							TargetPort: intstr.FromString("http"),
-							Protocol:   protoTCP,
+							Protocol:   v1.ProtocolTCP,
 						}},
 				},
 			},
@@ -649,7 +650,7 @@ func TestGetEndpointPorts(t *testing.T) {
 						Ports: []v1.ContainerPort{{
 							Name:          "http",
 							ContainerPort: int32(8080),
-							Protocol:      protoTCP,
+							Protocol:      v1.ProtocolTCP,
 						}},
 						RestartPolicy: &restartPolicyAlways,
 					}},
@@ -657,15 +658,15 @@ func TestGetEndpointPorts(t *testing.T) {
 						Ports: []v1.ContainerPort{{
 							Name:          "http",
 							ContainerPort: int32(8090),
-							Protocol:      protoTCP,
+							Protocol:      v1.ProtocolTCP,
 						}},
 					}},
 				},
 			},
 			expectedPorts: []*discovery.EndpointPort{{
-				Name:     pointer.String("http"),
-				Port:     pointer.Int32(8090),
-				Protocol: &protoTCP,
+				Name:     ptr.To("http"),
+				Port:     ptr.To[int32](8090),
+				Protocol: ptr.To(v1.ProtocolTCP),
 			}},
 		},
 	}
@@ -1042,10 +1043,9 @@ func newClientset() *fake.Clientset {
 }
 
 func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta) {
-	portNum := int32(80)
 	portNameIntStr := intstr.IntOrString{
 		Type:   intstr.Int,
-		IntVal: portNum,
+		IntVal: 80,
 	}
 
 	svc := v1.Service{
@@ -1065,11 +1065,13 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 		},
 	}
 
-	addressType := discovery.AddressTypeIPv4
-	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
-		addressType: addressType,
-		ports:       []discovery.EndpointPort{{Name: &name, Port: &portNum, Protocol: &protocol}},
+		addressType: discovery.AddressTypeIPv4,
+		ports: []discovery.EndpointPort{{
+			Name:     &name,
+			Port:     &portNameIntStr.IntVal,
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}},
 	}
 
 	return svc, endpointMeta

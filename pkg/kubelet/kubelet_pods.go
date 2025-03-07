@@ -218,7 +218,7 @@ func (kl *Kubelet) getAllocatedPods() []*v1.Pod {
 
 	allocatedPods := make([]*v1.Pod, len(activePods))
 	for i, pod := range activePods {
-		allocatedPods[i], _ = kl.statusManager.UpdatePodFromAllocation(pod)
+		allocatedPods[i], _ = kl.allocationManager.UpdatePodFromAllocation(pod)
 	}
 	return allocatedPods
 }
@@ -1170,9 +1170,9 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// desired pods. Pods that must be restarted due to UID reuse, or leftover
 	// pods from previous runs, are not known to the pod worker.
 
-	allPodsByUID := make(map[types.UID]*v1.Pod)
+	allPodsByUID := make(sets.Set[types.UID])
 	for _, pod := range allPods {
-		allPodsByUID[pod.UID] = pod
+		allPodsByUID.Insert(pod.UID)
 	}
 
 	// Identify the set of pods that have workers, which should be all pods
@@ -1219,6 +1219,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	// Remove orphaned pod statuses not in the total list of known config pods
 	klog.V(3).InfoS("Clean up orphaned pod statuses")
 	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
+	kl.allocationManager.RemoveOrphanedPods(allPodsByUID)
 
 	// Remove orphaned pod user namespace allocations (if any).
 	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
@@ -1747,10 +1748,6 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 }
 
 func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodResizeStatus {
-	if kubetypes.IsStaticPod(allocatedPod) {
-		return ""
-	}
-
 	// If pod is terminal, clear the resize status.
 	if podIsTerminal {
 		kl.statusManager.SetPodResizeStatus(allocatedPod.UID, "")
@@ -2133,7 +2130,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		return status
 	}
 
-	convertContainerStatusResources := func(cName string, status *v1.ContainerStatus, cStatus *kubecontainer.Status, oldStatuses map[string]v1.ContainerStatus) *v1.ResourceRequirements {
+	convertContainerStatusResources := func(allocatedContainer *v1.Container, status *v1.ContainerStatus, cStatus *kubecontainer.Status, oldStatuses map[string]v1.ContainerStatus) *v1.ResourceRequirements {
+		cName := allocatedContainer.Name
 		// oldStatus should always exist if container is running
 		oldStatus, oldStatusFound := oldStatuses[cName]
 
@@ -2150,17 +2148,9 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 		}
 
-		// Always set the status to the latest allocated resources, even if it differs from the
-		// allocation used by the current sync loop.
-		alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName)
-		if !found {
-			// This case is expected for non-resizable containers (ephemeral & non-restartable init containers).
-			// Don't set status.Resources in this case.
-			return nil
-		}
 		if cStatus.State != kubecontainer.ContainerStateRunning {
 			// If the container isn't running, just use the allocated resources.
-			return &alloc
+			return allocatedContainer.Resources.DeepCopy()
 		}
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}
@@ -2169,7 +2159,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		// Status resources default to the allocated resources.
 		// For non-running containers this will be the reported values.
 		// For non-resizable resources, these values will also be used.
-		resources := alloc
+		resources := allocatedContainer.Resources.DeepCopy()
 		if resources.Limits != nil {
 			if cStatus.Resources != nil && cStatus.Resources.CPULimit != nil {
 				// If both the allocated & actual resources are at or below the minimum effective limit, preserve the
@@ -2200,7 +2190,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 		}
 
-		return &resources
+		return resources
 	}
 
 	convertContainerStatusUser := func(cStatus *kubecontainer.Status) *v1.ContainerUser {
@@ -2369,11 +2359,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		status := convertContainerStatus(cStatus, oldStatusPtr)
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-			status.Resources = convertContainerStatusResources(cName, status, cStatus, oldStatuses)
-
-			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {
-				if alloc, found := kl.statusManager.GetContainerResourceAllocation(string(pod.UID), cName); found {
-					status.AllocatedResources = alloc.Requests
+			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
+			if allocatedContainer != nil {
+				status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
+				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {
+					status.AllocatedResources = allocatedContainer.Resources.Requests
 				}
 			}
 		}

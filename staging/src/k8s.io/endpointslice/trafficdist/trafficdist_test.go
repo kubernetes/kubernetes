@@ -41,7 +41,7 @@ func TestReconcileHints_trafficDistribution_is_PreferClose(t *testing.T) {
 	}{
 		{
 			name:                "should set same zone hints",
-			trafficDistribution: ptrTo(corev1.ServiceTrafficDistributionPreferClose),
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
 			slicesToCreate: []*discoveryv1.EndpointSlice{
 				{
 					Endpoints: []discoveryv1.Endpoint{
@@ -173,7 +173,7 @@ func TestReconcileHints_trafficDistribution_is_PreferClose(t *testing.T) {
 		},
 		{
 			name:                "incorrect hints should be corrected",
-			trafficDistribution: ptrTo(corev1.ServiceTrafficDistributionPreferClose),
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
 			slicesToUpdate: []*discoveryv1.EndpointSlice{
 				{
 					Endpoints: []discoveryv1.Endpoint{
@@ -242,7 +242,7 @@ func TestReconcileHints_trafficDistribution_is_PreferClose(t *testing.T) {
 		},
 		{
 			name:                "unready endpoints should not trigger updates",
-			trafficDistribution: ptrTo(corev1.ServiceTrafficDistributionPreferClose),
+			trafficDistribution: ptr.To(corev1.ServiceTrafficDistributionPreferClose),
 			slicesUnchanged: []*discoveryv1.EndpointSlice{
 				{
 					Endpoints: []discoveryv1.Endpoint{
@@ -300,7 +300,7 @@ func TestReconcileHints_trafficDistribution_is_nil_or_empty(t *testing.T) {
 	}{
 		{
 			name:                "trafficDistribution='' should remove zone hints",
-			trafficDistribution: ptrTo(""),
+			trafficDistribution: ptr.To(""),
 			slicesToCreate: []*discoveryv1.EndpointSlice{
 				{
 					Endpoints: []discoveryv1.Endpoint{
@@ -459,12 +459,8 @@ func TestReconcileHints_doesNotMutateUnchangedSlices(t *testing.T) {
 	clonedEps := originalEps.DeepCopy()
 
 	// originalEps should not get modified.
-	ReconcileHints(ptrTo(corev1.ServiceTrafficDistributionPreferClose), nil, nil, []*discoveryv1.EndpointSlice{originalEps})
+	ReconcileHints(ptr.To(corev1.ServiceTrafficDistributionPreferClose), nil, nil, []*discoveryv1.EndpointSlice{originalEps})
 	if diff := cmp.Diff(clonedEps, originalEps); diff != "" {
 		t.Errorf("ReconcileHints(...) modified objects within slicesUnchanged, want objects within slicesUnchanged to remain unmodified: (-want, +got)\n%v", diff)
 	}
-}
-
-func ptrTo[T any](obj T) *T {
-	return &obj
 }
