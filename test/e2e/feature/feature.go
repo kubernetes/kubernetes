@@ -370,6 +370,10 @@ var (
 	// (used for testing specific log stream <https://kep.k8s.io/3288>)
 	PodLogsQuerySplitStreams = framework.WithFeature(framework.ValidFeatures.Add("PodLogsQuerySplitStreams"))
 
+	// Owner: sig-node
+	// Marks tests that require a cluster with PodObservedGenerationTracking
+	PodObservedGenerationTracking = framework.WithFeature(framework.ValidFeatures.Add("PodObservedGenerationTracking"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodPriority = framework.WithFeature(framework.ValidFeatures.Add("PodPriority"))
 

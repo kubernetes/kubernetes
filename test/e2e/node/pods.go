@@ -39,9 +39,12 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -414,6 +417,11 @@ var _ = SIGDescribe("Pods Extended", func() {
 			})
 		})
 	})
+})
+
+var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerationTracking, framework.WithFeatureGate(features.PodObservedGenerationTracking), func() {
+	f := framework.NewDefaultFramework("pods")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("Pod Generation", func() {
 		var podClient *e2epod.PodClient
@@ -507,7 +515,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				},
 			}
 
-			expectedPodGeneration := 1
+			expectedPodGeneration := int64(1)
 			for _, test := range tests {
 				ginkgo.By(test.name)
 				podClient.Update(ctx, podName, test.updateFn)
@@ -517,6 +525,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 					expectedPodGeneration++
 				}
 				gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
+				framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 20*time.Second))
 			}
 		})
 
@@ -554,6 +563,97 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to query for pod")
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(2))
+		})
+
+		ginkgo.It("issue 500 podspec updates and verify generation and observedGeneration eventually converge", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			value := strconv.Itoa(time.Now().Nanosecond())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+			pod.ObjectMeta.Labels = map[string]string{
+				"time": value,
+			}
+			pod.Spec.ActiveDeadlineSeconds = utilpointer.Int64(5000)
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod = podClient.CreateSync(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			for i := 0; i < 499; i++ {
+				podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
+					*pod.Spec.ActiveDeadlineSeconds--
+				})
+			}
+
+			// Verify pod observedGeneration converges to the expected generation.
+			expectedPodGeneration := int64(500)
+			framework.ExpectNoError(e2epod.WaitForPodObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, expectedPodGeneration, 30*time.Second))
+
+			// Verify pod generation converges to the expected generation.
+			pod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to query for pod")
+			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
+		})
+
+		ginkgo.It("pod rejected by kubelet should have updated generation and observedGeneration", func(ctx context.Context) {
+			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+			framework.ExpectNoError(err, "Failed to get a ready schedulable node")
+
+			// Create a pod that requests more CPU than the node has.
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-out-of-cpu",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "pod-out-of-cpu",
+							Image: imageutils.GetPauseImageName(),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: resource.MustParse("1000000000000"), // requests more CPU than any node has
+								},
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			// Force assign the Pod to a node in order to get rejection status.
+			binding := &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					UID:       pod.UID,
+				},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: node.Name,
+				},
+			}
+			framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Bind(ctx, binding, metav1.CreateOptions{}))
+
+			// Kubelet has rejected the pod.
+			err = e2epod.WaitForPodFailedReason(ctx, f.ClientSet, pod, "OutOfcpu", f.Timeouts.PodStart)
+			framework.ExpectNoError(err)
+
+			// Fetch the rejected Pod and verify the generation and observedGeneration.
+			gotPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(gotPod.Generation).To(gomega.BeEquivalentTo(1))
+			gomega.Expect(gotPod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(1))
 		})
 	})
 })
