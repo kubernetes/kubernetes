@@ -673,18 +673,17 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	preBindErr := errors.New("on PreBind")
 
 	table := []struct {
-		name                     string
-		injectBindError          error
-		sendPod                  *v1.Pod
-		registerPluginFuncs      []tf.RegisterPluginFunc
-		expectErrorPod           *v1.Pod
-		expectForgetPod          *v1.Pod
-		expectAssumedPod         *v1.Pod
-		shouldVerifyPodsInQueues bool
-		expectError              error
-		expectBind               *v1.Binding
-		eventReason              string
-		mockResult               mockScheduleResult
+		name                string
+		injectBindError     error
+		sendPod             *v1.Pod
+		registerPluginFuncs []tf.RegisterPluginFunc
+		expectErrorPod      *v1.Pod
+		expectForgetPod     *v1.Pod
+		expectAssumedPod    *v1.Pod
+		expectError         error
+		expectBind          *v1.Binding
+		eventReason         string
+		mockResult          mockScheduleResult
 	}{
 		{
 			name:       "error reserve pod",
@@ -719,15 +718,11 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			registerPluginFuncs: []tf.RegisterPluginFunc{
 				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(framework.AsStatus(preBindErr))),
 			},
-			expectErrorPod:           podWithID("foo", testNode.Name),
-			expectForgetPod:          podWithID("foo", testNode.Name),
-			expectAssumedPod:         podWithID("foo", testNode.Name),
-			expectError:              fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr),
-			eventReason:              "FailedScheduling",
-			shouldVerifyPodsInQueues: true,
-			// todo change this after fixing code
-			expectPodMovedToBackoffQ:      nil,                             // podWithID("foo", testNode.Name),
-			expectPodMovedToUnschedulable: podWithID("foo", testNode.Name), // nil
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
+			expectAssumedPod: podWithID("foo", testNode.Name),
+			expectError:      fmt.Errorf(`running PreBind plugin "FakePreBind": %w`, preBindErr),
+			eventReason:      "FailedScheduling",
 		},
 		{
 			name:             "bind assumed pod scheduled",
