@@ -1502,56 +1502,85 @@ func TestCustomSelection(t *testing.T) {
 		expected     map[string][]string
 	}{
 		{
-			name:         "only pods with specified label are preemptable: high priority",
+			name:         "filter for matching pod label: high priority",
 			eligiblePods: podLabelIsEligible("preemptible", "yes"),
-			nodeNames:    []string{"node1", "node2", "node3"},
+			nodeNames:    []string{"node1", "node2", "node3", "node4"},
 			pod:          st.MakePod().Name("p1").UID("p1").Priority(highPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("v1").UID("v1").Label("preemptible", "no").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Label("preemptible", "yes").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node4").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// must have "preemptible"="yes" label, others are not preemptible despite high priority
-			expected: map[string][]string{"node2": {"v2"}},
+			expected: map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
 		},
 		{
-			name:         "only pods with specified label are preemptable: mid priority",
+			name:         "filter for matching pod label: mid priority",
 			eligiblePods: podLabelIsEligible("preemptible", "yes"),
-			nodeNames:    []string{"node1", "node2", "node3"},
+			nodeNames:    []string{"node1", "node2", "node3", "node4"},
 			pod:          st.MakePod().Name("p2").UID("p2").Priority(midPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("v1").UID("v1").Label("preemptible", "no").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Label("preemptible", "yes").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node4").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// midPriority can preempt equal priority since we only look for matching pod label
-			expected: map[string][]string{"node2": {"v2"}},
+			expected: map[string][]string{"node3": {"v3"}},
 		},
 		{
-			name:         "only pods with specified label are preemptable: low priority",
+			name:         "filter for matching pod label: low priority",
 			eligiblePods: podLabelIsEligible("preemptible", "yes"),
-			nodeNames:    []string{"node1", "node2", "node3"},
+			nodeNames:    []string{"node1", "node2", "node3", "node4"},
 			pod:          st.MakePod().Name("p3").UID("p3").Priority(lowPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("v1").UID("v1").Label("preemptible", "no").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Label("preemptible", "yes").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node4").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// lowPriority can preempt higher priority since we only look for matching pod label
-			expected: map[string][]string{"node2": {"v2"}},
+			expected: map[string][]string{},
 		},
 		{
-			name:         "only pods on specified node name are preemptable",
+			name:         "filter for matching victim node: high priority",
+			eligiblePods: nodeNameIsEligible("node1"),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p3").UID("p3").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(midPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v5").UID("v5").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{"node1": {"v2", "v3"}},
+		},
+		{
+			name:         "filter for matching victim node: mid priority",
+			eligiblePods: nodeNameIsEligible("node1"),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p3").UID("p3").Priority(midPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(midPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v5").UID("v5").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{"node1": {"v3"}},
+		},
+		{
+			name:         "filter for matching victim node: low priority",
 			eligiblePods: nodeNameIsEligible("node1"),
 			nodeNames:    []string{"node1", "node2", "node3"},
 			pod:          st.MakePod().Name("p3").UID("p3").Priority(lowPriority).Req(largeRes).Obj(),
 			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(midPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v5").UID("v5").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// lowPriority can preempt higher priority since we only look for matching node name
-			expected: map[string][]string{"node1": {"v1"}},
+			expected: map[string][]string{},
 		},
 		{
 			name:         "only pods at or above specified priority can preempted: high priority",
@@ -1563,8 +1592,8 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// highPriority can preempt anything, including other highPriority
-			expected: map[string][]string{"node1": {"v1"}, "node2": {"v2"}, "node3": {"v3"}},
+			// highPriority can preempt anything, but not other highPriority
+			expected: map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
 		},
 		{
 			name:         "only pods at or above specified priority can preempted: mid priority",
@@ -1580,19 +1609,6 @@ func TestCustomSelection(t *testing.T) {
 			expected: map[string][]string{},
 		},
 		{
-			name:         "only pods at or above specified priority can preempted: low priority",
-			eligiblePods: priorityBelowThresholdCannotPreempt(highPriority),
-			nodeNames:    []string{"node1", "node2", "node3"},
-			pod:          st.MakePod().Name("p3").UID("p3").Priority(lowPriority).Req(largeRes).Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
-			},
-			// lowPriority can't preempt anything
-			expected: map[string][]string{},
-		},
-		{
 			name:         "only pods at or below specified priority can be preempted: high priority",
 			eligiblePods: priorityAboveThresholdCannotBePreempted(midPriority),
 			nodeNames:    []string{"node1", "node2", "node3"},
@@ -1602,20 +1618,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
-			// the lowPriority pod can always be preempted regardless of preemptor priority
-			expected: map[string][]string{"node3": {"v3"}},
-		},
-		{
-			name:         "only pods at or below specified priority can be preempted: low priority",
-			eligiblePods: priorityAboveThresholdCannotBePreempted(midPriority),
-			nodeNames:    []string{"node1", "node2", "node3"},
-			pod:          st.MakePod().Name("p2").UID("p2").Priority(lowPriority).Req(largeRes).Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
-			},
-			// the lowPriority pod can always be preempted regardless of preemptor priority
+			// the lowPriority pod can be preempted but not the midPriority pod
 			expected: map[string][]string{"node3": {"v3"}},
 		},
 		{

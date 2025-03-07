@@ -47,8 +47,8 @@ import (
 const Name = names.DefaultPreemption
 
 // IsEligiblePodFunc is a function which may be assigned to the DefaultPreemption plugin.
-// Implementations should return whether a given victim pod on the provided nodeInfo is eligible
-// to be preempted by the provided preemptor.
+// This may implement rules/filtering around preemption eligibility, which is in addition to
+// the internal requirement that the victim pod have lower priority than the preemptor pod.
 type IsEligiblePodFunc func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool
 
 // MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
@@ -71,8 +71,8 @@ type DefaultPreemption struct {
 	Evaluator *preemption.Evaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
-	// The default behavior is to allow any pods of lower priority to be preempted by any pods
-	// of higher priority.
+	// This filtering is in addition to the internal requirement that the victim pod have lower
+	// priority than the preemptor pod.
 	IsEligiblePod IsEligiblePodFunc
 
 	// MoreImportantPod is used to sort eligible victims in-place in descending order of highest to
@@ -112,9 +112,10 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 	}
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
 
-	// Default behavior: Any pods of lower priority may be preempted by any pods of higher priority.
+	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
+	// have lower priority than the preemptor pod.
 	pl.IsEligiblePod = func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
-		return corev1helpers.PodPriority(victim.Pod) < corev1helpers.PodPriority(preemptor)
+		return true
 	}
 
 	// Default behavior: Sort by descending priority, then by descending runtime duration as secondary ordering.
@@ -221,7 +222,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// As the first step, remove all pods eligible for preemption from the node and
 	// check if the given pod can be scheduled without them present.
 	for _, pi := range nodeInfo.Pods {
-		if pl.IsEligiblePod(nodeInfo, pi, pod) {
+		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
 				return nil, 0, framework.AsStatus(err)
@@ -316,7 +317,7 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
 			for _, p := range nodeInfo.Pods {
-				if pl.IsEligiblePod(nodeInfo, p, pod) && podTerminatingByPreemption(p.Pod) {
+				if pl.isPreemptionAllowed(nodeInfo, p, pod) && podTerminatingByPreemption(p.Pod) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
@@ -329,6 +330,12 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 // OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
 	return nil
+}
+
+// isPreemptionAllowed returns whether the victim residing on nodeInfo can be preempted by the preemptor
+func (pl *DefaultPreemption) isPreemptionAllowed(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+	// The victim must have lower priority than the preemptor, in addition to any filtering implemented by IsEligiblePod
+	return corev1helpers.PodPriority(victim.Pod) < corev1helpers.PodPriority(preemptor) && pl.IsEligiblePod(nodeInfo, victim, preemptor)
 }
 
 // podTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
