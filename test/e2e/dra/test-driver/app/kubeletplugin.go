@@ -241,6 +241,13 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 	return status.PluginRegistered
 }
 
+func (ex *ExamplePlugin) ResetRegistrationStatus() {
+	status := ex.d.RegistrationStatus()
+	if status != nil {
+		status.Reset()
+	}
+}
+
 // BlockGetInfo locks blockGetInfoMutex and returns unlocking function for it
 func (ex *ExamplePlugin) BlockGetInfo() func() {
 	ex.blockGetInfoMutex.Lock()
