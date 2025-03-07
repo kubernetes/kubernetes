@@ -39,7 +39,25 @@ func testResourceClaim(name string, namespace string, spec api.ResourceClaimSpec
 
 func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	classGpu := "gpu"
+	classTpu := "tpu"
 	validClaim := testResourceClaim("foo", "ns", api.ResourceClaimSpec{Devices: api.DeviceClaim{Requests: []api.DeviceRequest{{Name: "req-0", DeviceClassName: classGpu, AllocationMode: api.DeviceAllocationModeExactCount, Count: 1}}}})
+	validClaimWithPrioritizedList := testResourceClaim("foo", "ns", api.ResourceClaimSpec{
+		Devices: api.DeviceClaim{
+			Requests: []api.DeviceRequest{
+				{
+					Name: "req-0",
+					FirstAvailable: []api.DeviceSubRequest{
+						{
+							Name:            "subreq-0",
+							DeviceClassName: classGpu,
+							AllocationMode:  api.DeviceAllocationModeExactCount,
+							Count:           1,
+						},
+					},
+				},
+			},
+		},
+	})
 
 	evaluator := NewResourceClaimEvaluator(nil)
 	testCases := map[string]struct {
@@ -110,6 +128,61 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 			usage: corev1.ResourceList{
 				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
 				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+			},
+		},
+		"prioritized-list": {
+			claim: validClaimWithPrioritizedList,
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+			},
+		},
+		"prioritized-list-multiple-subrequests": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaimWithPrioritizedList.DeepCopy()
+				claim.Spec.Devices.Requests[0].FirstAvailable[0].Count = 2
+				claim.Spec.Devices.Requests[0].FirstAvailable = append(claim.Spec.Devices.Requests[0].FirstAvailable, api.DeviceSubRequest{
+					Name:            "subreq-1",
+					DeviceClassName: classGpu,
+					AllocationMode:  api.DeviceAllocationModeExactCount,
+					Count:           1,
+				})
+				return claim
+			}(),
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("2"),
+			},
+		},
+		"prioritized-list-multiple-subrequests-allocation-mode-all": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaimWithPrioritizedList.DeepCopy()
+				claim.Spec.Devices.Requests[0].FirstAvailable = append(claim.Spec.Devices.Requests[0].FirstAvailable, api.DeviceSubRequest{
+					Name:            "subreq-1",
+					DeviceClassName: classGpu,
+					AllocationMode:  api.DeviceAllocationModeAll,
+				})
+				return claim
+			}(),
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
+			},
+		},
+		"prioritized-list-multiple-subrequests-different-device-classes": {
+			claim: func() *api.ResourceClaim {
+				claim := validClaimWithPrioritizedList.DeepCopy()
+				claim.Spec.Devices.Requests[0].FirstAvailable = append(claim.Spec.Devices.Requests[0].FirstAvailable, api.DeviceSubRequest{
+					Name:            "subreq-1",
+					DeviceClassName: classTpu,
+					AllocationMode:  api.DeviceAllocationModeAll,
+				})
+				return claim
+			}(),
+			usage: corev1.ResourceList{
+				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"tpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
 			},
 		},
 	}

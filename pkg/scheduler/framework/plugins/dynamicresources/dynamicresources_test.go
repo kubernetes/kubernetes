@@ -117,9 +117,17 @@ var (
 		Namespace(namespace).
 		Request(className).
 		Obj()
+	claimWithPrioritzedList = st.MakeResourceClaim().
+				Name(claimName).
+				Namespace(namespace).
+				RequestWithPrioritizedList(className).
+				Obj()
 	pendingClaim = st.FromResourceClaim(claim).
 			OwnerReference(podName, podUID, podKind).
 			Obj()
+	pendingClaimWithPrioritizedList = st.FromResourceClaim(claimWithPrioritzedList).
+					OwnerReference(podName, podUID, podKind).
+					Obj()
 	allocationResult = &resourceapi.AllocationResult{
 		Devices: resourceapi.DeviceAllocationResult{
 			Results: []resourceapi.DeviceRequestAllocationResult{{
@@ -133,13 +141,33 @@ var (
 			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
 		}(),
 	}
+	allocationResultWithPrioritizedList = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:  driver,
+				Pool:    nodeName,
+				Device:  "instance-1",
+				Request: "req-1/subreq-1",
+			}},
+		},
+		NodeSelector: func() *v1.NodeSelector {
+			return st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		}(),
+	}
 	inUseClaim = st.FromResourceClaim(pendingClaim).
 			Allocation(allocationResult).
 			ReservedForPod(podName, types.UID(podUID)).
 			Obj()
+	inUseClaimWithPrioritizedList = st.FromResourceClaim(pendingClaimWithPrioritizedList).
+					Allocation(allocationResultWithPrioritizedList).
+					ReservedForPod(podName, types.UID(podUID)).
+					Obj()
 	allocatedClaim = st.FromResourceClaim(pendingClaim).
 			Allocation(allocationResult).
 			Obj()
+	allocatedClaimWithPrioritizedList = st.FromResourceClaim(pendingClaimWithPrioritizedList).
+						Allocation(allocationResultWithPrioritizedList).
+						Obj()
 
 	allocatedClaimWithWrongTopology = st.FromResourceClaim(allocatedClaim).
 					Allocation(&resourceapi.AllocationResult{NodeSelector: st.MakeNodeSelector().In("no-such-label", []string{"no-such-value"}, st.NodeSelectorTypeMatchExpressions).Obj()}).
@@ -199,6 +227,24 @@ func breakCELInClass(class *resourceapi.DeviceClass) *resourceapi.DeviceClass {
 	}
 
 	return class
+}
+
+func updateDeviceClassName(claim *resourceapi.ResourceClaim, deviceClassName string) *resourceapi.ResourceClaim {
+	claim = claim.DeepCopy()
+	for i := range claim.Spec.Devices.Requests {
+		// If the firstAvailable list is empty we update the device class name
+		// on the base request.
+		if len(claim.Spec.Devices.Requests[i].FirstAvailable) == 0 {
+			claim.Spec.Devices.Requests[i].DeviceClassName = deviceClassName
+		} else {
+			// If subrequests are specified, update the device class name on
+			// all of them.
+			for j := range claim.Spec.Devices.Requests[i].FirstAvailable {
+				claim.Spec.Devices.Requests[i].FirstAvailable[j].DeviceClassName = deviceClassName
+			}
+		}
+	}
+	return claim
 }
 
 // result defines the expected outcome of some operation. It covers
@@ -295,6 +341,8 @@ func TestPlugin(t *testing.T) {
 		// Feature gates. False is chosen so that the uncommon case
 		// doesn't need to be set.
 		disableDRA bool
+
+		enableDRAPrioritizedList bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -795,6 +843,69 @@ func TestPlugin(t *testing.T) {
 			},
 			disableDRA: true,
 		},
+		"claim-with-request-with-unknown-device-class": {
+			pod:    podWithClaimName,
+			claims: []*resourceapi.ResourceClaim{updateDeviceClassName(claim, "does-not-exist")},
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `request req-1: device class does-not-exist does not exist`),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
+		},
+		"claim-with-prioritized-list-feature-disabled": {
+			enableDRAPrioritizedList: false,
+			pod:                      podWithClaimName,
+			claims:                   []*resourceapi.ResourceClaim{claimWithPrioritzedList},
+			classes:                  []*resourceapi.DeviceClass{deviceClass},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: has subrequests, but the feature is disabled`),
+					},
+				},
+			},
+		},
+		"claim-with-prioritized-list-unknown-device-class": {
+			enableDRAPrioritizedList: true,
+			pod:                      podWithClaimName,
+			claims:                   []*resourceapi.ResourceClaim{updateDeviceClassName(claimWithPrioritzedList, "does-not-exist")},
+			want: want{
+				prefilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `request req-1/subreq-1: device class does-not-exist does not exist`),
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
+				},
+			},
+		},
+		"claim-with-prioritized-list": {
+			enableDRAPrioritizedList: true,
+			pod:                      podWithClaimName,
+			claims:                   []*resourceapi.ResourceClaim{pendingClaimWithPrioritizedList},
+			classes:                  []*resourceapi.DeviceClass{deviceClass},
+			objs:                     []apiruntime.Object{workerNodeSlice},
+			want: want{
+				reserve: result{
+					inFlightClaim: allocatedClaimWithPrioritizedList,
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaimWithPrioritizedList, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaimWithPrioritizedList.Finalizers
+								claim.Status = inUseClaimWithPrioritizedList.Status
+							}
+							return claim
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -809,6 +920,7 @@ func TestPlugin(t *testing.T) {
 			features := feature.Features{
 				EnableDRAAdminAccess:            tc.enableDRAAdminAccess,
 				EnableDynamicResourceAllocation: !tc.disableDRA,
+				EnableDRAPrioritizedList:        tc.enableDRAPrioritizedList,
 			}
 			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
