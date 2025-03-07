@@ -18,13 +18,14 @@ package library
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/google/cel-go/checker"
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-	"math"
 
 	"k8s.io/apiserver/pkg/cel"
 )
@@ -202,7 +203,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 
 			return &cost
 		}
-	case "quantity", "isQuantity":
+	case "quantity", "isQuantity", "semver", "isSemver":
 		if len(args) >= 1 {
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 			return &cost
@@ -236,7 +237,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// Simply dictionary lookup
 		cost := uint64(1)
 		return &cost
-	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		cost := uint64(1)
 		return &cost
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
@@ -486,7 +487,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 
 			return &checker.CallEstimate{CostEstimate: ipCompCost}
 		}
-	case "quantity", "isQuantity":
+	case "quantity", "isQuantity", "semver", "isSemver":
 		if target != nil {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
@@ -498,7 +499,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		}
 	case "format.named":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
-	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub":
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
 		// url accessors
