@@ -78,6 +78,11 @@ const (
 	// Also used as timeout in other tests because it's a good upper bound
 	// even when the test normally completes faster.
 	retryTestTimeout = kubeletRetryPeriod + 30*time.Second
+
+	// pluginMonitorTimeout is the duration after which Kubelet is expected to have closed
+	// the connection to the plugin if it doesn't get a response to the GetInfo gRPC calls.
+	// This is an upper bound, typically the kubelet is faster.
+	pluginMonitorTimeout = time.Minute
 )
 
 var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, func() {
@@ -119,6 +124,24 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			ginkgo.By("wait for Kubelet plugin re-registration")
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdriver.BeRegistered)
+		})
+
+		ginkgo.It("must unregister stuck plugin and re-register it when unstuck", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
+			ginkgo.By("block GetInfo GRPC to simulate plugin stuckness")
+			unblockGetInfo := kubeletPlugin.BlockGetInfo()
+
+			ginkgo.By("wait for plugin disconnect")
+			gomega.Eventually(kubeletPlugin.IsConnected).WithTimeout(pluginMonitorTimeout).Should(gomega.BeTrueBecause("plugin should be connected to call GetInfo"))
+			gomega.Eventually(kubeletPlugin.IsConnected).WithTimeout(pluginMonitorTimeout).Should(gomega.BeFalseBecause("plugin should be disconnected by Kubelet due to stuckness"))
+
+			ginkgo.By("unstuck plugin")
+			kubeletPlugin.ResetRegistrationStatus()
+			unblockGetInfo()
+
+			ginkgo.By("wait for plugin to be connected and registered again")
+			gomega.Eventually(kubeletPlugin.IsRegistered).WithTimeout(pluginMonitorTimeout).Should(gomega.BeTrueBecause("unstuck plugin should be registered again"))
 		})
 
 		ginkgo.It("must process pod created when kubelet is not running", func(ctx context.Context) {
