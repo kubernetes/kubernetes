@@ -367,6 +367,10 @@ type QueuedPodInfo struct {
 	// It's used to record the # attempts metric and calculate the backoff time this Pod is obliged to get before retrying.
 	Attempts int
 	// BackoffExpiration is the time when the Pod will complete its backoff.
+	// If the SchedulerPopFromBackoffQ feature is enabled,
+	// this is the time when the backoff ordering window to which the Pod belongs starts.
+	// Then, two Pods with the same BackoffExpiration are ordered by priority, rather than the exact expiration time,
+	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
 	BackoffExpiration time.Time
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
