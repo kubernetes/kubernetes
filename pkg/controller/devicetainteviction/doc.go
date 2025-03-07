@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tainteviction contains the logic implementing taint-based eviction
-// for Pods running on Nodes with NoExecute taints.
-package tainteviction
+// Package devicetainteviction contains the logic implementing taint-based eviction
+// for Pods using device with taints (https://github.com/kubernetes/enhancements/issues/5055).
+package devicetainteviction
