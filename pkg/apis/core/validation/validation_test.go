@@ -13898,6 +13898,50 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		test string
 	}{{
 		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				ObservedGeneration: 1,
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"set valid status.observedGeneration",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				Conditions: []core.PodCondition{{
+					Type:               core.PodScheduled,
+					Status:             core.ConditionTrue,
+					ObservedGeneration: 1,
+				}},
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"",
+		"set valid condition.observedGeneration",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				ObservedGeneration: -1,
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"status.observedGeneration: Invalid value: -1: must be a non-negative integer",
+		"set invalid status.observedGeneration",
+	}, {
+		*podtest.MakePod("foo",
+			podtest.SetStatus(core.PodStatus{
+				Conditions: []core.PodCondition{{
+					Type:               core.PodScheduled,
+					Status:             core.ConditionTrue,
+					ObservedGeneration: -1,
+				}},
+			}),
+		),
+		*podtest.MakePod("foo"),
+		"status.conditions[0].observedGeneration: Invalid value: -1: must be a non-negative integer",
+		"set invalid condition.observedGeneration",
+	}, {
+		*podtest.MakePod("foo",
 			podtest.SetNodeName("node1"),
 			podtest.SetStatus(core.PodStatus{
 				NominatedNodeName: "node1",
