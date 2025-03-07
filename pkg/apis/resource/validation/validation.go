@@ -199,6 +199,10 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 			},
 			fldPath.Child("firstAvailable"))...)
 	}
+	for i, toleration := range request.Tolerations {
+		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
+	}
+
 	return allErrs
 }
 
@@ -207,6 +211,9 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	for i, toleration := range subRequest.Tolerations {
+		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
+	}
 	return allErrs
 }
 
@@ -642,6 +649,9 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field
 	if combinedLen, max := len(device.Attributes)+len(device.Capacity), resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice; combinedLen > max {
 		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
 	}
+	for i, taint := range device.Taints {
+		allErrs = append(allErrs, validateDeviceTaint(taint, fldPath.Child("taints").Index(i))...)
+	}
 	return allErrs
 }
 
@@ -675,19 +685,12 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 		numFields++
 	}
 	if attribute.StringValue != nil {
-		if len(*attribute.StringValue) > resource.DeviceAttributeMaxValueLength {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("string"), "" /*unused*/, resource.DeviceAttributeMaxValueLength))
-		}
 		numFields++
+		allErrs = append(allErrs, validateDeviceAttributeStringValue(attribute.StringValue, fldPath.Child("string"))...)
 	}
 	if attribute.VersionValue != nil {
 		numFields++
-		if !semverRe.MatchString(*attribute.VersionValue) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), *attribute.VersionValue, "must be a string compatible with semver.org spec 2.0.0"))
-		}
-		if len(*attribute.VersionValue) > resource.DeviceAttributeMaxValueLength {
-			allErrs = append(allErrs, field.TooLong(fldPath.Child("version"), "" /*unused*/, resource.DeviceAttributeMaxValueLength))
-		}
+		allErrs = append(allErrs, validateDeviceAttributeVersionValue(attribute.VersionValue, fldPath.Child("version"))...)
 	}
 
 	switch numFields {
@@ -697,6 +700,25 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 		// Okay.
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath, attribute, "exactly one value must be specified"))
+	}
+	return allErrs
+}
+
+func validateDeviceAttributeStringValue(value *string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(*value) > resource.DeviceAttributeMaxValueLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength))
+	}
+	return allErrs
+}
+
+func validateDeviceAttributeVersionValue(value *string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if !semverRe.MatchString(*value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, "must be a string compatible with semver.org spec 2.0.0"))
+	}
+	if len(*value) > resource.DeviceAttributeMaxValueLength {
+		allErrs = append(allErrs, field.TooLong(fldPath, "" /*unused*/, resource.DeviceAttributeMaxValueLength))
 	}
 	return allErrs
 }
@@ -891,5 +913,125 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 		func(address string, fldPath *field.Path) field.ErrorList {
 			return validation.IsValidInterfaceAddress(fldPath, address)
 		}, stringKey, fldPath.Child("ips"))...)
+	return allErrs
+}
+
+// ValidateDeviceTaintRule tests if a DeviceTaintRule object is valid.
+func ValidateDeviceTaintRule(deviceTaint *resource.DeviceTaintRule) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMeta(&deviceTaint.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDeviceTaintRuleSpec(&deviceTaint.Spec, nil, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateDeviceTaintRuleUpdate tests if a DeviceTaintRule update is valid.
+func ValidateDeviceTaintRuleUpdate(deviceTaint, oldDeviceTaint *resource.DeviceTaintRule) field.ErrorList {
+	allErrs := corevalidation.ValidateObjectMetaUpdate(&deviceTaint.ObjectMeta, &oldDeviceTaint.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateDeviceTaintRuleSpec(&deviceTaint.Spec, &oldDeviceTaint.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateDeviceTaintRuleSpec(spec, oldSpec *resource.DeviceTaintRuleSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	var oldFilter *resource.DeviceTaintSelector
+	if oldSpec != nil {
+		oldFilter = oldSpec.DeviceSelector // +k8s:verify-mutation:reason=clone
+	}
+	allErrs = append(allErrs, validateDeviceTaintSelector(spec.DeviceSelector, oldFilter, fldPath.Child("deviceSelector"))...)
+	allErrs = append(allErrs, validateDeviceTaint(spec.Taint, fldPath.Child("taint"))...)
+	return allErrs
+}
+
+func validateDeviceTaintSelector(filter, oldFilter *resource.DeviceTaintSelector, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if filter == nil {
+		return allErrs
+	}
+	if filter.DeviceClassName != nil {
+		allErrs = append(allErrs, validateDeviceClassName(*filter.DeviceClassName, fldPath.Child("deviceClassName"))...)
+	}
+	if filter.Driver != nil {
+		allErrs = append(allErrs, validateDriverName(*filter.Driver, fldPath.Child("driver"))...)
+	}
+	if filter.Pool != nil {
+		allErrs = append(allErrs, validatePoolName(*filter.Pool, fldPath.Child("pool"))...)
+	}
+	if filter.Device != nil {
+		allErrs = append(allErrs, validateDeviceName(*filter.Device, fldPath.Child("device"))...)
+	}
+
+	// If the selectors are exactly as before, we treat the CEL expressions as "stored".
+	// Any change, including merely reordering selectors, triggers validation as new
+	// expressions.
+	stored := false
+	if oldFilter != nil {
+		stored = apiequality.Semantic.DeepEqual(filter.Selectors, oldFilter.Selectors)
+	}
+	allErrs = append(allErrs, validateSlice(filter.Selectors, resource.DeviceSelectorsMaxSize,
+		func(selector resource.DeviceSelector, fldPath *field.Path) field.ErrorList {
+			return validateSelector(selector, fldPath, stored)
+		},
+		fldPath.Child("selectors"))...)
+
+	return allErrs
+}
+
+var validDeviceTolerationOperators = []resource.DeviceTolerationOperator{resource.DeviceTolerationOpEqual, resource.DeviceTolerationOpExists}
+var validDeviceTaintEffects = sets.New(resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNoExecute)
+
+func validateDeviceTaint(taint resource.DeviceTaint, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, metav1validation.ValidateLabelName(taint.Key, fldPath.Child("key"))...) // Includes checking for non-empty.
+	if taint.Value != "" {
+		allErrs = append(allErrs, validateLabelValue(taint.Value, fldPath.Child("value"))...)
+	}
+	switch {
+	case taint.Effect == "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("effect"), "")) // Required in a taint.
+	case !validDeviceTaintEffects.Has(taint.Effect):
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), taint.Effect, sets.List(validDeviceTaintEffects)))
+	}
+
+	return allErrs
+}
+
+func validateDeviceToleration(toleration resource.DeviceToleration, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if toleration.Key != "" {
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(toleration.Key, fldPath.Child("key"))...)
+	}
+	switch toleration.Operator {
+	case resource.DeviceTolerationOpExists:
+		if toleration.Value != "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("value"), toleration.Value, "must be empty for operator `Exists`"))
+		}
+	case resource.DeviceTolerationOpEqual:
+		allErrs = append(allErrs, validateLabelValue(toleration.Value, fldPath.Child("value"))...)
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("operator"), ""))
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("operator"), toleration.Operator, validDeviceTolerationOperators))
+	}
+	switch {
+	case toleration.Effect == "":
+		// Optional in a toleration.
+	case !validDeviceTaintEffects.Has(toleration.Effect):
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("effect"), toleration.Effect, sets.List(validDeviceTaintEffects)))
+	}
+
+	return allErrs
+}
+
+func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// There's no metav1validation.ValidateLabelValue.
+	for _, msg := range validation.IsValidLabelValue(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+
 	return allErrs
 }

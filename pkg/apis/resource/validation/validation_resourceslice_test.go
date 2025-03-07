@@ -447,6 +447,47 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"taints": {
+			wantFailures: func() field.ErrorList {
+				fldPath := field.NewPath("spec", "devices").Index(0).Child("basic", "taints")
+				return field.ErrorList{
+					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must be non-empty"),
+					field.Invalid(fldPath.Index(2).Child("key"), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
+					field.Required(fldPath.Index(2).Child("effect"), ""),
+
+					field.Invalid(fldPath.Index(3).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
+					field.Invalid(fldPath.Index(3).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
+					field.NotSupported(fldPath.Index(3).Child("effect"), resourceapi.DeviceTaintEffect("some-other-op"), []resourceapi.DeviceTaintEffect{resourceapi.DeviceTaintEffectNoExecute, resourceapi.DeviceTaintEffectNoSchedule}),
+				}
+			}(),
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 3)
+				slice.Spec.Devices[0].Basic.Taints = []resourceapi.DeviceTaint{
+					{
+						// Minimal valid taint.
+						Key:    "example.com/taint",
+						Effect: resourceapi.DeviceTaintEffectNoExecute,
+					},
+					{
+						// Full valid taint, other key and effect.
+						Key:       "taint",
+						Value:     "tainted",
+						Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+						TimeAdded: ptr.To(metav1.Now()),
+					},
+					{
+						// Invalid, all empty!
+					},
+					{
+						// Invalid strings.
+						Key:    badName,
+						Value:  badName,
+						Effect: "some-other-op",
+					},
+				}
+				return slice
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {

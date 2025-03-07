@@ -17,6 +17,9 @@ limitations under the License.
 package fuzzer
 
 import (
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -55,6 +58,24 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 					resource.AllocationConfigSourceClass,
 					resource.AllocationConfigSourceClaim,
 				}[c.Int31n(2)]
+			}
+		},
+		func(r *resource.DeviceToleration, c randfill.Continue) {
+			c.FillNoCustom(r)
+			if r.Operator == "" {
+				r.Operator = []resource.DeviceTolerationOperator{
+					resource.DeviceTolerationOpEqual,
+					resource.DeviceTolerationOpExists,
+				}[c.Int31n(2)]
+			}
+		},
+		func(r *resource.DeviceTaint, c randfill.Continue) {
+			c.FillNoCustom(r)
+			if r.TimeAdded == nil {
+				// Current time is more or less random.
+				// Truncate to seconds because sub-second resolution
+				// does not survive round-tripping.
+				r.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
 			}
 		},
 		func(r *resource.OpaqueDeviceConfiguration, c randfill.Continue) {
