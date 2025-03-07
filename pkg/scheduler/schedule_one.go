@@ -302,18 +302,6 @@ func (sched *Scheduler) bindingCycle(
 
 	// Run "prebind" plugins.
 	if status := fwk.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
-		if status.IsRejected() {
-			fitErr := &framework.FitError{
-				NumAllNodes: 1,
-				Pod:         assumedPodInfo.Pod,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatus:         framework.NewDefaultNodeToStatus(),
-					UnschedulablePlugins: sets.New(status.Plugin()),
-				},
-			}
-			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, status)
-			return framework.NewStatus(status.Code()).WithError(fitErr)
-		}
 		return status
 	}
 
