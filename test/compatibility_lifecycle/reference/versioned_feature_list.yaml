@@ -443,6 +443,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: DRADeviceBindingConditions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: DRADeviceTaints
   versionedSpecs:
   - default: false
@@ -456,12 +462,6 @@
     preRelease: Alpha
     version: "1.33"
 - name: DRAPrioritizedList
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.33"
-- name: DRADeviceBindingConditions
   versionedSpecs:
   - default: false
     lockToDefault: false
