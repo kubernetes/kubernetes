@@ -719,7 +719,6 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
 	return allErrs
 }
 
