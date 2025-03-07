@@ -68,6 +68,8 @@ type ExamplePlugin struct {
 
 	unprepareResourcesFailure   error
 	failUnprepareResourcesMutex sync.Mutex
+
+	blockGetInfoMutex sync.Mutex
 }
 
 type GRPCCall struct {
@@ -166,6 +168,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		kubeletplugin.KubeClient(kubeClient),
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
+		kubeletplugin.GRPCInterceptor(ex.getInfoInterceptor),
 	)
 	// Both APIs get provided, the legacy one via wrapping. The options
 	// determine which one(s) really get served (by default, both).
@@ -237,6 +240,14 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 		return false
 	}
 	return status.PluginRegistered
+}
+
+// BlockGetInfo locks blockGetInfoMutex and returns unlocking function for it
+func (ex *ExamplePlugin) BlockGetInfo() func() {
+	ex.blockGetInfoMutex.Lock()
+	return func() {
+		ex.blockGetInfoMutex.Unlock()
+	}
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
@@ -586,3 +597,14 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
 	return ex.kubeClient.ResourceV1beta1().ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
 }
+
+// getInfoInterceptor is an interceptor that blocks GetInfo GRPC calls.
+// GetInfo is used by plugin watcher to check if plugin is alive, so blocking it is equivalent to plugin stuckness.
+func (ex *ExamplePlugin) getInfoInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	if info.FullMethod == "/pluginregistration.Registration/GetInfo" {
+		ex.blockGetInfoMutex.Lock()
+		defer ex.blockGetInfoMutex.Unlock()
+	}
+	return handler(ctx, req)
+}
+
