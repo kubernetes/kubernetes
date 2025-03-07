@@ -409,6 +409,12 @@ func (p *PodWrapper) Node(s string) *PodWrapper {
 	return p
 }
 
+// Tolerations sets `tolerations` as the tolerations of the inner pod.
+func (p *PodWrapper) Tolerations(tolerations []v1.Toleration) *PodWrapper {
+	p.Spec.Tolerations = tolerations
+	return p
+}
+
 // NodeSelector sets `m` as the nodeSelector of the inner pod.
 func (p *PodWrapper) NodeSelector(m map[string]string) *PodWrapper {
 	p.Spec.NodeSelector = m
