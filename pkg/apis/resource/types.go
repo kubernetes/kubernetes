@@ -233,6 +233,8 @@ type ResourcePool struct {
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+const BindingConditionsMaxSize = 4
+const BindingFailureConditionsMaxSize = 4
 
 // Defines the max number of shared counters that can be specified
 // in a ResourceSlice. The number is summed up across all sets.
@@ -322,6 +324,40 @@ type Device struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Taints []DeviceTaint
+
+	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	//
+	// +optional
+	UsageRestrictedToNode *bool
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	// The maximum number of binding conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingConditions []string
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	// The maximum number of binding failure conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingFailureConditions []string
+
+	// BindingTimeoutSeconds indicates the prepare timeout period.
+	// If the timeout period is exceeded before all BindingConditions reach a True state,
+	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
+	//
+	// The default timeout if not set is 600 seconds.
+	//
+	// +optional
+	BindingTimeoutSeconds *int64
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -1262,7 +1298,6 @@ type DeviceRequestAllocationResult struct {
 
 	// A copy of all tolerations specified in the request at the time
 	// when the device got allocated.
-	//
 	// The maximum number of tolerations is 16.
 	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
@@ -1272,9 +1307,41 @@ type DeviceRequestAllocationResult struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
+
+	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	// +optional
+	UsageRestrictedToNode *bool
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	// The maximum number of binding conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingConditions []string
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	// The maximum number of binding failure conditions is 4.
+	//
+	// +optional
+	// +listType=atomic
+	BindingFailureConditions []string
+
+	// BindingTimeoutSeconds indicates the prepare timeout period.
+	// If the timeout period is exceeded before all BindingConditions reach a True state,
+	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
+	//
+	// The default timeout if not set is 600 seconds.
+	//
+	// +optional
+	BindingTimeoutSeconds *int64
 }
 
-// DeviceAllocationConfiguration gets embedded in an AllocationResult.
 type DeviceAllocationConfiguration struct {
 	// Source records whether the configuration comes from a class and thus
 	// is not something that a normal user would have been able to set
