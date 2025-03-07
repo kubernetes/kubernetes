@@ -2939,7 +2939,7 @@ func TestZeroRequest(t *testing.T) {
 				{Spec: large1}, {Spec: noResources1},
 				{Spec: large2}, {Spec: small2},
 			},
-			expectedScore: 150,
+			expectedScore: 50,
 		},
 		{
 			pod:   &v1.Pod{Spec: small},
@@ -3105,10 +3105,10 @@ func Test_prioritizeNodes(t *testing.T) {
 						},
 						{
 							Name:  "NodeResourcesBalancedAllocation",
-							Score: 100,
+							Score: 0,
 						},
 					},
-					TotalScore: 110,
+					TotalScore: 10,
 				},
 				{
 					Name: "node2",
@@ -3119,10 +3119,10 @@ func Test_prioritizeNodes(t *testing.T) {
 						},
 						{
 							Name:  "NodeResourcesBalancedAllocation",
-							Score: 100,
+							Score: 0,
 						},
 					},
-					TotalScore: 200,
+					TotalScore: 100,
 				},
 			},
 		},
@@ -3172,10 +3172,10 @@ func Test_prioritizeNodes(t *testing.T) {
 						},
 						{
 							Name:  "NodeResourcesBalancedAllocation",
-							Score: 100,
+							Score: 0,
 						},
 					},
-					TotalScore: 420,
+					TotalScore: 320,
 				},
 				{
 					Name: "node2",
@@ -3190,10 +3190,10 @@ func Test_prioritizeNodes(t *testing.T) {
 						},
 						{
 							Name:  "NodeResourcesBalancedAllocation",
-							Score: 100,
+							Score: 0,
 						},
 					},
-					TotalScore: 330,
+					TotalScore: 230,
 				},
 			},
 		},
@@ -3222,10 +3222,10 @@ func Test_prioritizeNodes(t *testing.T) {
 						},
 						{
 							Name:  "NodeResourcesBalancedAllocation",
-							Score: 100,
+							Score: 0,
 						},
 					},
-					TotalScore: 110,
+					TotalScore: 10,
 				},
 				{
 					Name: "node2",
@@ -3236,10 +3236,10 @@ func Test_prioritizeNodes(t *testing.T) {
 						},
 						{
 							Name:  "NodeResourcesBalancedAllocation",
-							Score: 100,
+							Score: 0,
 						},
 					},
-					TotalScore: 200,
+					TotalScore: 100,
 				},
 			},
 		},
