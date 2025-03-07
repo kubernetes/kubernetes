@@ -667,20 +667,18 @@ func TestSchedulerScheduleOne(t *testing.T) {
 	preBindErr := errors.New("on PreBind")
 
 	table := []struct {
-		name                          string
-		injectBindError               error
-		sendPod                       *v1.Pod
-		registerPluginFuncs           []tf.RegisterPluginFunc
-		expectErrorPod                *v1.Pod
-		expectForgetPod               *v1.Pod
-		expectAssumedPod              *v1.Pod
-		shouldVerifyPodsInQueues      bool
-		expectPodMovedToBackoffQ      *v1.Pod
-		expectPodMovedToUnschedulable *v1.Pod
-		expectError                   error
-		expectBind                    *v1.Binding
-		eventReason                   string
-		mockResult                    mockScheduleResult
+		name                     string
+		injectBindError          error
+		sendPod                  *v1.Pod
+		registerPluginFuncs      []tf.RegisterPluginFunc
+		expectErrorPod           *v1.Pod
+		expectForgetPod          *v1.Pod
+		expectAssumedPod         *v1.Pod
+		shouldVerifyPodsInQueues bool
+		expectError              error
+		expectBind               *v1.Binding
+		eventReason              string
+		mockResult               mockScheduleResult
 	}{
 		{
 			name:       "error reserve pod",
@@ -866,17 +864,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				}); err != nil {
 					t.Errorf("in-flight pods should be always empty after SchedulingOne. It has %v Pods", len(queue.InFlightPods()))
 				}
-				// to trzeba przesunac poniewaz failurehandler jest mockowany
-				/*if item.shouldVerifyPodsInQueues {
-					if item.expectPodMovedToBackoffQ != nil &&
-						!podListContainsPod(queue.PodsInBackoffQ(), item.expectPodMovedToBackoffQ) {
-						t.Errorf("Expected to find pod in backoffQ, but it's not there.\nWant: %v,\ngot: %v", item.expectPodMovedToBackoffQ, queue.PodsInBackoffQ())
-					}
-					if item.expectPodMovedToUnschedulable != nil &&
-						!podListContainsPod(queue.UnschedulablePods(), item.expectPodMovedToUnschedulable) {
-						t.Errorf("Expected to find pod in unschedulable pods, but it's not there.\nWant: %v,\ngot: %v", item.expectPodMovedToUnschedulable, queue.UnschedulablePods())
-					}
-				}*/
 				stopFunc()
 			})
 		}
