@@ -12506,6 +12506,12 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: taints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceTaintAtom
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.CELDeviceSelector
   map:
     fields:
@@ -12684,6 +12690,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
           elementRelationship: atomic
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceToleration
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.DeviceRequestAllocationResult
   map:
     fields:
@@ -12706,6 +12718,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceToleration
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.DeviceSelector
   map:
     fields:
@@ -12735,6 +12753,95 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
           elementRelationship: atomic
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceToleration
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha3.DeviceTaint
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.DeviceTaintSpec
+      default: {}
+- name: io.k8s.api.resource.v1alpha3.DeviceTaintAtom
+  map:
+    fields:
+    - name: effect
+      type:
+        scalar: string
+      default: ""
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: timeAdded
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: value
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1alpha3.DeviceTaintFilter
+  map:
+    fields:
+    - name: device
+      type:
+        scalar: string
+    - name: deviceClassName
+      type:
+        scalar: string
+    - name: driver
+      type:
+        scalar: string
+    - name: pool
+      type:
+        scalar: string
+    - name: selectors
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceSelector
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha3.DeviceTaintSpec
+  map:
+    fields:
+    - name: filter
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.DeviceTaintFilter
+    - name: taint
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.DeviceTaintAtom
+      default: {}
+- name: io.k8s.api.resource.v1alpha3.DeviceToleration
+  map:
+    fields:
+    - name: effect
+      type:
+        scalar: string
+    - name: key
+      type:
+        scalar: string
+    - name: operator
+      type:
+        scalar: string
+    - name: tolerationSeconds
+      type:
+        scalar: numeric
+    - name: value
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1alpha3.NetworkDeviceData
   map:
     fields:
@@ -12968,6 +13075,12 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: taints
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceTaintAtom
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.CELDeviceSelector
   map:
     fields:
@@ -13152,6 +13265,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceSelector
           elementRelationship: atomic
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceToleration
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.DeviceRequestAllocationResult
   map:
     fields:
@@ -13174,6 +13293,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceToleration
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.DeviceSelector
   map:
     fields:
@@ -13203,6 +13328,47 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceSelector
           elementRelationship: atomic
+    - name: tolerations
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceToleration
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.DeviceTaintAtom
+  map:
+    fields:
+    - name: effect
+      type:
+        scalar: string
+      default: ""
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: timeAdded
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: value
+      type:
+        scalar: string
+- name: io.k8s.api.resource.v1beta1.DeviceToleration
+  map:
+    fields:
+    - name: effect
+      type:
+        scalar: string
+    - name: key
+      type:
+        scalar: string
+    - name: operator
+      type:
+        scalar: string
+    - name: tolerationSeconds
+      type:
+        scalar: numeric
+    - name: value
+      type:
+        scalar: string
 - name: io.k8s.api.resource.v1beta1.NetworkDeviceData
   map:
     fields:
