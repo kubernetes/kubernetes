@@ -105,10 +105,11 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 			status.Reason = events.PreemptContainer
 			status.Message = message
 			podutil.UpdatePodCondition(status, &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  v1.PodReasonTerminationByKubelet,
-				Message: "Pod was preempted by Kubelet to accommodate a critical pod.",
+				Type:               v1.DisruptionTarget,
+				ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(status, pod.Generation, v1.DisruptionTarget),
+				Status:             v1.ConditionTrue,
+				Reason:             v1.PodReasonTerminationByKubelet,
+				Message:            "Pod was preempted by Kubelet to accommodate a critical pod.",
 			})
 		})
 		if err != nil {

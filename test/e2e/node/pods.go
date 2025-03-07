@@ -655,6 +655,50 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			gomega.Expect(gotPod.Generation).To(gomega.BeEquivalentTo(1))
 			gomega.Expect(gotPod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(1))
 		})
+
+		ginkgo.It("pod observedGeneration field set in pod conditions", func(ctx context.Context) {
+			ginkgo.By("creating the pod")
+			name := "pod-generation-" + string(uuid.NewUUID())
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, name, nil, nil, nil)
+
+			// Set the pod image to something that doesn't exist to induce a pull error
+			// to start with.
+			agnImage := pod.Spec.Containers[0].Image
+			pod.Spec.Containers[0].Image = "some-image-that-doesnt-exist"
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			expectedPodConditions := []v1.PodConditionType{
+				v1.PodReadyToStartContainers,
+				v1.PodInitialized,
+				v1.PodReady,
+				v1.ContainersReady,
+				v1.PodScheduled,
+			}
+
+			ginkgo.By("verifying the pod conditions have observedGeneration values")
+			expectedObservedGeneration := int64(1)
+			for _, condition := range expectedPodConditions {
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, 30*time.Second))
+			}
+
+			ginkgo.By("updating pod to have a valid image")
+			podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
+				pod.Spec.Containers[0].Image = agnImage
+			})
+			expectedObservedGeneration++
+
+			ginkgo.By("verifying the pod conditions have updated observedGeneration values")
+			for _, condition := range expectedPodConditions {
+				framework.ExpectNoError(e2epod.WaitForPodConditionObservedGeneration(ctx, f.ClientSet, f.Namespace.Name, pod.Name, condition, expectedObservedGeneration, 30*time.Second))
+			}
+		})
 	})
 })
 

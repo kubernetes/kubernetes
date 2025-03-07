@@ -2020,7 +2020,9 @@ func TestMergePodStatus(t *testing.T) {
 
 	for _, tc := range useCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			output := mergePodStatus(tc.oldPodStatus(getPodStatus()), tc.newPodStatus(getPodStatus()), tc.hasRunningContainers)
+			oldPodStatus := tc.oldPodStatus(getPodStatus())
+			pod := &v1.Pod{Status: oldPodStatus}
+			output := mergePodStatus(pod, oldPodStatus, tc.newPodStatus(getPodStatus()), tc.hasRunningContainers)
 			if !conditionsEqual(output.Conditions, tc.expectPodStatus.Conditions) || !statusEqual(output, tc.expectPodStatus) {
 				t.Fatalf("unexpected output: %s", cmp.Diff(tc.expectPodStatus, output))
 			}
