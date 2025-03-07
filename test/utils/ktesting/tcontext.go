@@ -259,45 +259,8 @@ func Init(tb TB, opts ...InitOption) TContext {
 
 	ctx := interruptCtx
 	if c.PerTestOutput {
-		config := ktesting.NewConfig(
-			ktesting.AnyToString(func(v interface{}) string {
-				// For basic types where the string
-				// representation is "obvious" we use
-				// fmt.Sprintf because format.Object always
-				// adds a <"type"> prefix, which is too long
-				// for simple values.
-				switch v := v.(type) {
-				case int, int32, int64, uint, uint32, uint64, float32, float64, bool:
-					return fmt.Sprintf("%v", v)
-				case string:
-					return v
-				default:
-					return strings.TrimSpace(format.Object(v, 1))
-				}
-			}),
-			ktesting.VerbosityFlagName("v"),
-			ktesting.VModuleFlagName("vmodule"),
-			ktesting.BufferLogs(c.BufferLogs),
-		)
-
-		// Copy klog settings instead of making the ktesting logger
-		// configurable directly.
-		var fs flag.FlagSet
-		config.AddFlags(&fs)
-		for _, name := range []string{"v", "vmodule"} {
-			from := flag.CommandLine.Lookup(name)
-			to := fs.Lookup(name)
-			if err := to.Value.Set(from.Value.String()); err != nil {
-				panic(err)
-			}
-		}
-
-		// Ensure consistent logging: this klog.Logger writes to tb, adding the
-		// date/time header, and our own wrapper emulates that behavior for
-		// Log/Logf/...
-		logger := ktesting.NewLogger(tb, config)
+		logger := newLogger(tb, c.BufferLogs)
 		ctx = klog.NewContext(interruptCtx, logger)
-
 		tb = withKlogHeader(tb)
 	}
 
@@ -315,6 +278,47 @@ func Init(tb TB, opts ...InitOption) TContext {
 		}
 	}
 	return WithCancel(InitCtx(ctx, tb))
+}
+
+func newLogger(tb TB, bufferLogs bool) klog.Logger {
+	config := ktesting.NewConfig(
+		ktesting.AnyToString(func(v interface{}) string {
+			// For basic types where the string
+			// representation is "obvious" we use
+			// fmt.Sprintf because format.Object always
+			// adds a <"type"> prefix, which is too long
+			// for simple values.
+			switch v := v.(type) {
+			case int, int32, int64, uint, uint32, uint64, float32, float64, bool:
+				return fmt.Sprintf("%v", v)
+			case string:
+				return v
+			default:
+				return strings.TrimSpace(format.Object(v, 1))
+			}
+		}),
+		ktesting.VerbosityFlagName("v"),
+		ktesting.VModuleFlagName("vmodule"),
+		ktesting.BufferLogs(bufferLogs),
+	)
+
+	// Copy klog settings instead of making the ktesting logger
+	// configurable directly.
+	var fs flag.FlagSet
+	config.AddFlags(&fs)
+	for _, name := range []string{"v", "vmodule"} {
+		from := flag.CommandLine.Lookup(name)
+		to := fs.Lookup(name)
+		if err := to.Value.Set(from.Value.String()); err != nil {
+			panic(err)
+		}
+	}
+
+	// Ensure consistent logging: this klog.Logger writes to tb, adding the
+	// date/time header, and our own wrapper emulates that behavior for
+	// Log/Logf/...
+	logger := ktesting.NewLogger(tb, config)
+	return logger
 }
 
 type InitOption = initoption.InitOption
@@ -345,12 +349,13 @@ func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
 //	       ...
 //	   })
 //
-// WithTB sets up cancellation for the sub-test.
+// WithTB sets up cancellation for the sub-test and uses per-test output.
 //
 // A simpler API is to use TContext.Run as replacement
 // for [testing.T.Run].
 func WithTB(parentCtx TContext, tb TB) TContext {
-	tCtx := InitCtx(parentCtx, tb)
+	tCtx := InitCtx(klog.NewContext(parentCtx, newLogger(tb, false /* don't buffer log output */)), tb)
+
 	tCtx = WithCancel(tCtx)
 	tCtx = WithClients(tCtx,
 		parentCtx.RESTConfig(),
