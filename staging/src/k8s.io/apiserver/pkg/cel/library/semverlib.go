@@ -42,6 +42,16 @@ import (
 //	semver('Three') // error
 //	semver('Mi') // error
 //
+//	semver(<string>, <bool>) <Semver>
+//
+// Examples:
+//
+//	semver('1.0.0') // returns a Semver
+//	semver('0.1.0-alpha.1') // returns a Semver
+//	semver('200K') // error
+//	semver('Three') // error
+//	semver('Mi') // error
+//
 // isSemver
 //
 // Returns true if a string is a valid Semver. isSemver returns true if and
@@ -84,13 +94,27 @@ import (
 // semver("1.2.3").compareTo(semver("2.0.0")) // returns -1
 // semver("1.2.3").compareTo(semver("0.1.2")) // returns 1
 
-func SemverLib() cel.EnvOption {
+func SemverLib(options ...SemverOption) cel.EnvOption {
+	semverLib := &semverLibType{}
+	for _, o := range options {
+		semverLib = o(semverLib)
+	}
 	return cel.Lib(semverLib)
 }
 
-var semverLib = &semverLibType{}
+type semverLibType struct {
+	version uint32
+}
 
-type semverLibType struct{}
+// StringsOption is a functional interface for configuring the strings library.
+type SemverOption func(*semverLibType) *semverLibType
+
+func SemverVersion(version uint32) SemverOption {
+	return func(lib *semverLibType) *semverLibType {
+		lib.version = version
+		return lib
+	}
+}
 
 func (*semverLibType) LibraryName() string {
 	return "kubernetes.Semver"
@@ -100,8 +124,8 @@ func (*semverLibType) Types() []*cel.Type {
 	return []*cel.Type{apiservercel.SemverType}
 }
 
-func (*semverLibType) declarations() map[string][]cel.FunctionOpt {
-	return map[string][]cel.FunctionOpt{
+func (lib *semverLibType) declarations() map[string][]cel.FunctionOpt {
+	fnOpts := map[string][]cel.FunctionOpt{
 		"semver": {
 			cel.Overload("string_to_semver", []*cel.Type{cel.StringType}, apiservercel.SemverType, cel.UnaryBinding((stringToSemver))),
 		},
@@ -127,6 +151,11 @@ func (*semverLibType) declarations() map[string][]cel.FunctionOpt {
 			cel.MemberOverload("semver_patch", []*cel.Type{apiservercel.SemverType}, cel.IntType, cel.UnaryBinding(semverPatch)),
 		},
 	}
+	if lib.version >= 1 {
+		fnOpts["semver"] = append(fnOpts["semver"], cel.Overload("string_bool_to_semver", []*cel.Type{cel.StringType, cel.BoolType}, apiservercel.SemverType, cel.BinaryBinding((stringToSemverTolerant))))
+		fnOpts["isSemver"] = append(fnOpts["isSemver"], cel.Overload("is_semver_string_bool", []*cel.Type{cel.StringType, cel.BoolType}, cel.BoolType, cel.BinaryBinding(isSemverTolerant)))
+	}
+	return fnOpts
 }
 
 func (s *semverLibType) CompileOptions() []cel.EnvOption {
@@ -144,7 +173,15 @@ func (*semverLibType) ProgramOptions() []cel.ProgramOption {
 }
 
 func isSemver(arg ref.Val) ref.Val {
+	return isSemverTolerant(arg, types.Bool(false))
+}
+func isSemverTolerant(arg ref.Val, tolerantArg ref.Val) ref.Val {
 	str, ok := arg.Value().(string)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	tolerant, ok := tolerantArg.Value().(bool)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
@@ -153,7 +190,12 @@ func isSemver(arg ref.Val) ref.Val {
 	// used to validate the Kubernetes API. In the CEL base library
 	// we would have to use the regular expression from
 	// pkg/apis/resource/structured/namedresources/validation/validation.go.
-	_, err := semver.Parse(str)
+	var err error
+	if tolerant {
+		_, err = semver.ParseTolerant(str)
+	} else {
+		_, err = semver.Parse(str)
+	}
 	if err != nil {
 		return types.Bool(false)
 	}
@@ -162,7 +204,15 @@ func isSemver(arg ref.Val) ref.Val {
 }
 
 func stringToSemver(arg ref.Val) ref.Val {
+	return stringToSemverTolerant(arg, types.Bool(false))
+}
+func stringToSemverTolerant(arg ref.Val, tolerantArg ref.Val) ref.Val {
 	str, ok := arg.Value().(string)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(arg)
+	}
+
+	tolerant, ok := tolerantArg.Value().(bool)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(arg)
 	}
@@ -172,7 +222,13 @@ func stringToSemver(arg ref.Val) ref.Val {
 	// we would have to use the regular expression from
 	// pkg/apis/resource/structured/namedresources/validation/validation.go
 	// first before parsing.
-	v, err := semver.Parse(str)
+	var err error
+	var v semver.Version
+	if tolerant {
+		v, err = semver.ParseTolerant(str)
+	} else {
+		v, err = semver.Parse(str)
+	}
 	if err != nil {
 		return types.WrapErr(err)
 	}
