@@ -73,7 +73,7 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 
 	// overwrite specific labels
 	epSlice.Labels[discovery.LabelServiceName] = endpoints.Name
-	epSlice.Labels[discovery.LabelManagedBy] = controllerName
+	epSlice.Labels[discovery.LabelManagedBy] = ControllerName
 
 	// clone all annotations but EndpointsLastChangeTriggerTime and LastAppliedConfigAnnotation
 	for annotation, val := range endpoints.Annotations {
@@ -267,5 +267,5 @@ func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) b
 // EndpointSlices is the EndpointSlice controller.
 func managedByController(endpointSlice *discovery.EndpointSlice) bool {
 	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
-	return managedBy == controllerName
+	return managedBy == ControllerName
 }
