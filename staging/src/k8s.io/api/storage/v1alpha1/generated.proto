@@ -265,5 +265,9 @@ message VolumeError {
   // information.
   // +optional
   optional string message = 2;
+
+  // ResourceExhaust indicates that the maximum supported number of volumes that can be attached to the target node are already attached.
+  // +optional
+  optional bool resourceExhaust = 3;
 }
 

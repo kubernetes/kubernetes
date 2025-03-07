@@ -240,10 +240,12 @@ spec:
 status:
   attachError:
     message: messageValue
+    resourceExhaust: true
     time: "2001-01-01T01:01:01Z"
   attached: true
   attachmentMetadata:
     attachmentMetadataKey: attachmentMetadataValue
   detachError:
     message: messageValue
+    resourceExhaust: true
     time: "2001-01-01T01:01:01Z"
