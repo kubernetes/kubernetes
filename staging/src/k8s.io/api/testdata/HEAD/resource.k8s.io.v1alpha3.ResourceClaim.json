@@ -115,7 +115,15 @@
             "driver": "driverValue",
             "pool": "poolValue",
             "device": "deviceValue",
-            "adminAccess": true
+            "adminAccess": true,
+            "usageRestrictedToNode": true,
+            "bindingConditions": [
+              "bindingConditionsValue"
+            ],
+            "bindingFailureConditions": [
+              "bindingFailureConditionsValue"
+            ],
+            "bindingTimeoutSeconds": 9
           }
         ],
         "config": [
