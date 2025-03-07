@@ -254,6 +254,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 	}
 	pInfo.Attempts++
 	pInfo.BackoffExpiration = time.Time{}
+	pInfo.BackoffOrderingWindow = time.Time{}
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
 		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.

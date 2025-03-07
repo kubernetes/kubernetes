@@ -368,6 +368,10 @@ type QueuedPodInfo struct {
 	Attempts int
 	// BackoffExpiration is the time when the Pod will complete its backoff.
 	BackoffExpiration time.Time
+	// BackoffOrderingWindow is the time when the backoff ordering window to which the Pod belongs starts.
+	// Two Pods with the same BackoffOrderingWindow are ordered by priority, rather than exact time,
+	// to improve popping the Pods from backoffQ when PopFromBackoffQ feature is enabled.
+	BackoffOrderingWindow time.Time
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
