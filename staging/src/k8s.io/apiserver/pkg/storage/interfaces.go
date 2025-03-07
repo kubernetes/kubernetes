@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -328,4 +329,44 @@ type DeleteOptions struct {
 	// enabled by the caller only to facilitate unsafe deletion of corrupt
 	// object which otherwise can not be deleted using the normal flow
 	IgnoreStoreReadError bool
+}
+
+func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {
+	if opts.Recursive && len(opts.Predicate.Continue) > 0 {
+		continueKey, continueRV, err := DecodeContinue(opts.Predicate.Continue, keyPrefix)
+		if err != nil {
+			return 0, "", apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
+		}
+		if len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return 0, "", apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
+		}
+		// If continueRV > 0, the LIST request needs a specific resource version.
+		// continueRV==0 is invalid.
+		// If continueRV < 0, the request is for the latest resource version.
+		if continueRV > 0 {
+			withRev = continueRV
+		}
+		return withRev, continueKey, nil
+	}
+	if len(opts.ResourceVersion) == 0 {
+		return withRev, "", nil
+	}
+	parsedRV, err := versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return withRev, "", apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+	}
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchNotOlderThan:
+		// The not older than constraint is checked after we get a response from etcd,
+		// and returnedRV is then set to the revision we get from the etcd response.
+	case metav1.ResourceVersionMatchExact:
+		withRev = int64(parsedRV)
+	case "": // legacy case
+		if opts.Recursive && opts.Predicate.Limit > 0 && parsedRV > 0 {
+			withRev = int64(parsedRV)
+		}
+	default:
+		return withRev, "", fmt.Errorf("unknown ResourceVersionMatch value: %v", opts.ResourceVersionMatch)
+	}
+	return withRev, "", nil
 }
