@@ -23,11 +23,11 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Microsoft/hnslib/hcn"
-	"k8s.io/klog/v2"
 
-	"strings"
+	"k8s.io/klog/v2"
 )
 
 type HostNetworkService interface {

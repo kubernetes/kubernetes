@@ -175,7 +175,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				ctx,
 				ipt,
 				utilsysctl.New(),
-				exec.New(),
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
@@ -199,7 +198,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				s.PrimaryIPFamily,
 				iptInterface,
 				utilsysctl.New(),
-				exec.New(),
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
@@ -219,8 +217,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	} else if config.Mode == proxyconfigapi.ProxyModeIPVS {
-		execer := exec.New()
-		ipsetInterface := utilipset.New(execer)
+		ipsetInterface := utilipset.New()
 		ipvsInterface := utilipvs.New()
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
@@ -235,7 +232,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -263,7 +259,6 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -515,8 +510,7 @@ func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanup
 	// Clean up iptables and ipvs rules if switching to nftables, or if cleanupAndExit
 	if !isIPTablesBased(mode) || cleanupAndExit {
 		ipts, _ := getIPTables(v1.IPFamilyUnknown)
-		execer := exec.New()
-		ipsetInterface := utilipset.New(execer)
+		ipsetInterface := utilipset.New()
 		ipvsInterface := utilipvs.New()
 
 		for _, ipt := range ipts {
