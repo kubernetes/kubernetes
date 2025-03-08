@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
+	"github.com/opencontainers/cgroups/fscommon"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"

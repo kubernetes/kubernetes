@@ -16,7 +16,12 @@
 
 package ttrpc
 
-import "errors"
+import (
+	"errors"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
 
 var (
 	// ErrProtocol is a general error in the handling the protocol.
@@ -32,3 +37,44 @@ var (
 	// ErrStreamClosed is when the streaming connection is closed.
 	ErrStreamClosed = errors.New("ttrpc: stream closed")
 )
+
+// OversizedMessageErr is used to indicate refusal to send an oversized message.
+// It wraps a ResourceExhausted grpc Status together with the offending message
+// length.
+type OversizedMessageErr struct {
+	messageLength int
+	err           error
+}
+
+// OversizedMessageError returns an OversizedMessageErr error for the given message
+// length if it exceeds the allowed maximum. Otherwise a nil error is returned.
+func OversizedMessageError(messageLength int) error {
+	if messageLength <= messageLengthMax {
+		return nil
+	}
+
+	return &OversizedMessageErr{
+		messageLength: messageLength,
+		err:           status.Errorf(codes.ResourceExhausted, "message length %v exceed maximum message size of %v", messageLength, messageLengthMax),
+	}
+}
+
+// Error returns the error message for the corresponding grpc Status for the error.
+func (e *OversizedMessageErr) Error() string {
+	return e.err.Error()
+}
+
+// Unwrap returns the corresponding error with our grpc status code.
+func (e *OversizedMessageErr) Unwrap() error {
+	return e.err
+}
+
+// RejectedLength retrieves the rejected message length which triggered the error.
+func (e *OversizedMessageErr) RejectedLength() int {
+	return e.messageLength
+}
+
+// MaximumLength retrieves the maximum allowed message length that triggered the error.
+func (*OversizedMessageErr) MaximumLength() int {
+	return messageLengthMax
+}

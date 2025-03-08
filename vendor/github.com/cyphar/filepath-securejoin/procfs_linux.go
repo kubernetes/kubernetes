@@ -12,7 +12,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"sync"
 
 	"golang.org/x/sys/unix"
 )
@@ -54,7 +53,7 @@ func verifyProcRoot(procRoot *os.File) error {
 	return nil
 }
 
-var hasNewMountApi = sync.OnceValue(func() bool {
+var hasNewMountApi = sync_OnceValue(func() bool {
 	// All of the pieces of the new mount API we use (fsopen, fsconfig,
 	// fsmount, open_tree) were added together in Linux 5.1[1,2], so we can
 	// just check for one of the syscalls and the others should also be
@@ -192,11 +191,11 @@ func doGetProcRoot() (*os.File, error) {
 	return procRoot, err
 }
 
-var getProcRoot = sync.OnceValues(func() (*os.File, error) {
+var getProcRoot = sync_OnceValues(func() (*os.File, error) {
 	return doGetProcRoot()
 })
 
-var hasProcThreadSelf = sync.OnceValue(func() bool {
+var hasProcThreadSelf = sync_OnceValue(func() bool {
 	return unix.Access("/proc/thread-self/", unix.F_OK) == nil
 })
 
@@ -265,12 +264,20 @@ func procThreadSelf(procRoot *os.File, subpath string) (_ *os.File, _ procThread
 			Resolve: unix.RESOLVE_BENEATH | unix.RESOLVE_NO_XDEV | unix.RESOLVE_NO_MAGICLINKS,
 		})
 		if err != nil {
-			return nil, nil, fmt.Errorf("%w: %w", errUnsafeProcfs, err)
+			// TODO: Once we bump the minimum Go version to 1.20, we can use
+			// multiple %w verbs for this wrapping. For now we need to use a
+			// compatibility shim for older Go versions.
+			//err = fmt.Errorf("%w: %w", errUnsafeProcfs, err)
+			return nil, nil, wrapBaseError(err, errUnsafeProcfs)
 		}
 	} else {
 		handle, err = openatFile(procRoot, threadSelf+subpath, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%w: %w", errUnsafeProcfs, err)
+			// TODO: Once we bump the minimum Go version to 1.20, we can use
+			// multiple %w verbs for this wrapping. For now we need to use a
+			// compatibility shim for older Go versions.
+			//err = fmt.Errorf("%w: %w", errUnsafeProcfs, err)
+			return nil, nil, wrapBaseError(err, errUnsafeProcfs)
 		}
 		defer func() {
 			if Err != nil {
@@ -289,12 +296,17 @@ func procThreadSelf(procRoot *os.File, subpath string) (_ *os.File, _ procThread
 	return handle, runtime.UnlockOSThread, nil
 }
 
-var hasStatxMountId = sync.OnceValue(func() bool {
+// STATX_MNT_ID_UNIQUE is provided in golang.org/x/sys@v0.20.0, but in order to
+// avoid bumping the requirement for a single constant we can just define it
+// ourselves.
+const STATX_MNT_ID_UNIQUE = 0x4000
+
+var hasStatxMountId = sync_OnceValue(func() bool {
 	var (
 		stx unix.Statx_t
 		// We don't care which mount ID we get. The kernel will give us the
 		// unique one if it is supported.
-		wantStxMask uint32 = unix.STATX_MNT_ID_UNIQUE | unix.STATX_MNT_ID
+		wantStxMask uint32 = STATX_MNT_ID_UNIQUE | unix.STATX_MNT_ID
 	)
 	err := unix.Statx(-int(unix.EBADF), "/", 0, int(wantStxMask), &stx)
 	return err == nil && stx.Mask&wantStxMask != 0
@@ -310,7 +322,7 @@ func getMountId(dir *os.File, path string) (uint64, error) {
 		stx unix.Statx_t
 		// We don't care which mount ID we get. The kernel will give us the
 		// unique one if it is supported.
-		wantStxMask uint32 = unix.STATX_MNT_ID_UNIQUE | unix.STATX_MNT_ID
+		wantStxMask uint32 = STATX_MNT_ID_UNIQUE | unix.STATX_MNT_ID
 	)
 
 	err := unix.Statx(int(dir.Fd()), path, unix.AT_EMPTY_PATH|unix.AT_SYMLINK_NOFOLLOW, int(wantStxMask), &stx)

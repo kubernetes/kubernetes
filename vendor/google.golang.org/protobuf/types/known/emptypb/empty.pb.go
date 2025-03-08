@@ -38,6 +38,7 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+	unsafe "unsafe"
 )
 
 // A generic empty message that you can re-use to avoid defining duplicated
@@ -48,9 +49,9 @@ import (
 //	  rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);
 //	}
 type Empty struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Empty) Reset() {
@@ -85,7 +86,7 @@ func (*Empty) Descriptor() ([]byte, []int) {
 
 var File_google_protobuf_empty_proto protoreflect.FileDescriptor
 
-var file_google_protobuf_empty_proto_rawDesc = []byte{
+var file_google_protobuf_empty_proto_rawDesc = string([]byte{
 	0x0a, 0x1b, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
 	0x66, 0x2f, 0x65, 0x6d, 0x70, 0x74, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0f, 0x67,
 	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x22, 0x07,
@@ -98,16 +99,16 @@ var file_google_protobuf_empty_proto_rawDesc = []byte{
 	0x02, 0x03, 0x47, 0x50, 0x42, 0xaa, 0x02, 0x1e, 0x47, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x50,
 	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x57, 0x65, 0x6c, 0x6c, 0x4b, 0x6e, 0x6f, 0x77,
 	0x6e, 0x54, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
-}
+})
 
 var (
 	file_google_protobuf_empty_proto_rawDescOnce sync.Once
-	file_google_protobuf_empty_proto_rawDescData = file_google_protobuf_empty_proto_rawDesc
+	file_google_protobuf_empty_proto_rawDescData []byte
 )
 
 func file_google_protobuf_empty_proto_rawDescGZIP() []byte {
 	file_google_protobuf_empty_proto_rawDescOnce.Do(func() {
-		file_google_protobuf_empty_proto_rawDescData = protoimpl.X.CompressGZIP(file_google_protobuf_empty_proto_rawDescData)
+		file_google_protobuf_empty_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_google_protobuf_empty_proto_rawDesc), len(file_google_protobuf_empty_proto_rawDesc)))
 	})
 	return file_google_protobuf_empty_proto_rawDescData
 }
@@ -133,7 +134,7 @@ func file_google_protobuf_empty_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_google_protobuf_empty_proto_rawDesc,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_google_protobuf_empty_proto_rawDesc), len(file_google_protobuf_empty_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   1,
 			NumExtensions: 0,
@@ -144,7 +145,6 @@ func file_google_protobuf_empty_proto_init() {
 		MessageInfos:      file_google_protobuf_empty_proto_msgTypes,
 	}.Build()
 	File_google_protobuf_empty_proto = out.File
-	file_google_protobuf_empty_proto_rawDesc = nil
 	file_google_protobuf_empty_proto_goTypes = nil
 	file_google_protobuf_empty_proto_depIdxs = nil
 }
