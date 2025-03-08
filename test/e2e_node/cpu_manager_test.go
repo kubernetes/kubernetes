@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/utils/cpuset"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,10 +35,10 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/cpuset"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -868,7 +870,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
+			policyName:         kubeletconfig.StaticCPUManagerPolicy,
 			reservedSystemCPUs: cpuset.CPUSet{},
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -924,7 +926,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
@@ -947,7 +949,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
+				policyName:                       kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: true,
 			},
@@ -968,7 +970,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
+				policyName:                       kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: false,
 			},
@@ -990,7 +992,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
+			policyName:         kubeletconfig.StaticCPUManagerPolicy,
 			reservedSystemCPUs: cpuset.CPUSet{},
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)
