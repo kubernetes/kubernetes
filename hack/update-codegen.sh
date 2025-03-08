@@ -456,7 +456,7 @@ function codegen::validation() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        $(printf -- " --extra-pkg %s" "${extra_pkgs[@]}") \
+        $(printf -- " --readonly-pkg %s" "${extra_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
 
