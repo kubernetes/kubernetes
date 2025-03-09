@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -36,9 +38,10 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func noDefault(*core.Pod) error { return nil }
+func noDefault(klog.Logger, *core.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
@@ -79,7 +82,7 @@ func TestDecodeSinglePod(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	parsed, podOut, err := tryDecodeSinglePod(json, noDefault)
+	parsed, podOut, err := tryDecodeSinglePod(logger, json, noDefault)
 	if !parsed {
 		t.Errorf("expected to have parsed file: (%s)", string(json))
 	}
@@ -97,7 +100,7 @@ func TestDecodeSinglePod(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		parsed, podOut, err = tryDecodeSinglePod(yaml, noDefault)
+		parsed, podOut, err = tryDecodeSinglePod(logger, yaml, noDefault)
 		if !parsed {
 			t.Errorf("expected to have parsed file: (%s)", string(yaml))
 		}
@@ -111,6 +114,7 @@ func TestDecodeSinglePod(t *testing.T) {
 }
 
 func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
@@ -174,13 +178,14 @@ func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	_, _, err = tryDecodeSinglePod(json, noDefault)
+	_, _, err = tryDecodeSinglePod(logger, json, noDefault)
 	if !errors.Is(err, ErrStaticPodTriedToUseClusterTrustBundle) {
 		t.Errorf("Got error %q, want %q", err, ErrStaticPodTriedToUseClusterTrustBundle)
 	}
 }
 
 func TestDecodePodList(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
@@ -225,7 +230,7 @@ func TestDecodePodList(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	parsed, podListOut, err := tryDecodePodList(json, noDefault)
+	parsed, podListOut, err := tryDecodePodList(logger, json, noDefault)
 	if !parsed {
 		t.Errorf("expected to have parsed file: (%s)", string(json))
 	}
@@ -244,7 +249,7 @@ func TestDecodePodList(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 
-		parsed, podListOut, err = tryDecodePodList(yaml, noDefault)
+		parsed, podListOut, err = tryDecodePodList(logger, yaml, noDefault)
 		if !parsed {
 			t.Errorf("expected to have parsed file: (%s): %v", string(yaml), err)
 			continue
