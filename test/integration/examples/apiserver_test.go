@@ -481,12 +481,12 @@ func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool
 
 	// Since ClientCAs are provided by "client-ca::kube-system::extension-apiserver-authentication::client-ca-file" controller
 	// we need to wait until it picks up the configmap (via a lister) otherwise the response might contain an empty result.
-	// The following code waits up to ForeverTestTimeout seconds for ClientCA to show up otherwise it fails
+	// The following code waits up to 2 minutes (the trust controller only runs once a minute) for ClientCA to show up otherwise it fails
 	// maybe in the future this could be wired into the /readyz EP
 
 	// Now we want to verify that the client CA bundles properly reflect the values for the cluster-authentication
 	var firstKubeCANames []string
-	err = wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+	err = wait.Poll(1*time.Second, 2*time.Minute, func() (done bool, err error) {
 		firstKubeCANames, err = cert.GetClientCANamesForURL(kubeClientConfig.Host)
 		if err != nil {
 			return false, err
@@ -498,7 +498,7 @@ func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool
 	}
 	t.Log(firstKubeCANames)
 	var firstWardleCANames []string
-	err = wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+	err = wait.Poll(1*time.Second, 2*time.Minute, func() (done bool, err error) {
 		firstWardleCANames, err = cert.GetClientCANamesForURL(directWardleClientConfig.Host)
 		if err != nil {
 			return false, err
