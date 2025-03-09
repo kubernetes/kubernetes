@@ -806,6 +806,8 @@ type Resource struct {
 	AllowedPodNumber int
 	// ScalarResources
 	ScalarResources map[v1.ResourceName]int64
+	// DynamicResources maps exteneded resource name -> list of device class names
+	DynamicResources map[v1.ResourceName][]string
 }
 
 // NewResource creates a Resource from ResourceList

@@ -362,6 +362,9 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !resourceClaimStatusesEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update resource claim statues", nodeName))
 		}
+		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
+		}
 		return nil
 
 	default:
@@ -386,6 +389,40 @@ func resourceClaimStatusesEqual(statusA, statusB []api.PodResourceClaimStatus) b
 			return false
 		}
 		if claimNameA != nil && *claimNameA != *claimNameB {
+			return false
+		}
+	}
+	return true
+}
+
+func extendedResourceClaimStatusEqual(statusA, statusB *api.PodExtendedResourceClaimStatus) bool {
+	if statusA == nil && statusB == nil {
+		return true
+	}
+	if statusA != nil && statusB == nil {
+		return false
+	}
+	if statusA == nil && statusB != nil {
+		return false
+	}
+	if statusA.ResourceClaimName != statusB.ResourceClaimName {
+		return false
+	}
+	if len(statusA.Names) != len(statusB.Names) {
+		return false
+	}
+
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	for i := range statusA.Names {
+		if statusA.Names[i].ContainerName != statusB.Names[i].ContainerName {
+			return false
+		}
+		if statusA.Names[i].ExtendedResourceName != statusB.Names[i].ExtendedResourceName {
+			return false
+		}
+		if statusA.Names[i].RequestName != statusB.Names[i].RequestName {
 			return false
 		}
 	}
