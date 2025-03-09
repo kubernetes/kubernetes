@@ -303,6 +303,6 @@ func TestGetStaticPodToMirrorPodMap(t *testing.T) {
 		t.Fatalf("GetStaticPodToMirrorPodMap(): got %d static pods, wanted 1 static pod", len(m))
 	}
 	if gotMirrorPod, ok := m[staticPod]; !ok || gotMirrorPod.UID != mirrorPod.UID {
-		t.Fatalf("GetStaticPodToMirrorPodMap() did not return the correct mirror pod UID %s, wanted mirror pod UID %s", gotMirrorPod.UID, mirrorPod.UID)
+		t.Fatalf("GetStaticPodToMirrorPodMap(): got incorrect mirror pod UID %s, wanted mirror pod UID %s", gotMirrorPod.UID, mirrorPod.UID)
 	}
 }
