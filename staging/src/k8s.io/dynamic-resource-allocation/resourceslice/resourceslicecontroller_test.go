@@ -29,6 +29,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -50,21 +51,46 @@ func init() {
 func TestControllerSyncPool(t *testing.T) {
 
 	var (
-		ownerName      = "owner"
-		nodeUID        = types.UID("node-uid")
-		driverName     = "driver"
-		poolName       = "pool"
-		deviceName     = "device"
-		deviceName1    = "device-1"
-		deviceName2    = "device-2"
-		deviceName3    = "device-3"
-		deviceName4    = "device-4"
-		resourceSlice1 = "resource-slice-1"
-		resourceSlice2 = "resource-slice-2"
-		resourceSlice3 = "resource-slice-3"
-		generateName   = ownerName + "-" + driverName + "-"
-		generatedName1 = generateName + "0"
-		basicDevice    = &resourceapi.BasicDevice{
+		ownerName         = "owner"
+		nodeUID           = types.UID("node-uid")
+		driverName        = "driver"
+		poolName          = "pool"
+		deviceName        = "device"
+		deviceName1       = "device-1"
+		deviceName2       = "device-2"
+		deviceName3       = "device-3"
+		deviceName4       = "device-4"
+		capacityPoolName1 = "capacity-pool-1"
+		capacityPoolName2 = "capacity-pool-2"
+		resourceSlice1    = "resource-slice-1"
+		resourceSlice2    = "resource-slice-2"
+		resourceSlice3    = "resource-slice-3"
+		generateName      = ownerName + "-" + driverName + "-"
+		generatedName1    = generateName + "0"
+		capacity1         = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+			resourceapi.QualifiedName("memory"): {
+				Value: resource.MustParse("80Gi"),
+			},
+		}
+		capacity2 = map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+			resourceapi.QualifiedName("cpus"): {
+				Value: resource.MustParse("42"),
+			},
+		}
+		basicDevice = &resourceapi.BasicDevice{
+			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				"new-attribute": {StringValue: ptr.To("value")},
+			},
+		}
+		capacityPool1 = resourceapi.CapacityPool{
+			Name:     capacityPoolName1,
+			Capacity: capacity1,
+		}
+		capacityPool2 = resourceapi.CapacityPool{
+			Name:     capacityPoolName2,
+			Capacity: capacity2,
+		}
+		simpleCompositeDevice = &resourceapi.CompositeDevice{
 			Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 				"new-attribute": {StringValue: ptr.To("value")},
 			},
@@ -242,6 +268,155 @@ func TestControllerSyncPool(t *testing.T) {
 					Name:  deviceName,
 					Basic: basicDevice,
 				}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"update-slice-with-composite-device": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{
+							Devices: []resourceapi.Device{{
+								Name:      deviceName,
+								Composite: simpleCompositeDevice,
+							}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name:      deviceName,
+					Composite: simpleCompositeDevice,
+				}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"update-slice-with-basic-to-composite-device": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName, Basic: basicDevice}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{
+							Devices: []resourceapi.Device{{
+								Name:      deviceName,
+								Composite: simpleCompositeDevice,
+							}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name:      deviceName,
+					Composite: simpleCompositeDevice,
+				}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"update-slice-with-new-capacity-pool": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName, Composite: simpleCompositeDevice}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{
+							CapacityPools: []resourceapi.CapacityPool{capacityPool1, capacityPool2},
+							Devices: []resourceapi.Device{{
+								Name:      deviceName,
+								Composite: simpleCompositeDevice,
+							}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name:      deviceName,
+					Composite: simpleCompositeDevice,
+				}}).
+					CapacityPools([]resourceapi.CapacityPool{capacityPool1, capacityPool2}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"update-slice-with-updates-to-capacity-pool": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName, Composite: simpleCompositeDevice}}).
+					CapacityPools([]resourceapi.CapacityPool{capacityPool1}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{{
+							CapacityPools: []resourceapi.CapacityPool{
+								func() resourceapi.CapacityPool {
+									cp := capacityPool1.DeepCopy()
+									cp.Capacity = capacity2
+									return *cp
+								}(),
+							},
+							Devices: []resourceapi.Device{{
+								Name:      deviceName,
+								Composite: simpleCompositeDevice,
+							}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name:      deviceName,
+					Composite: simpleCompositeDevice,
+				}}).
+					CapacityPools([]resourceapi.CapacityPool{
+						func() resourceapi.CapacityPool {
+							cp := capacityPool1.DeepCopy()
+							cp.Capacity = capacity2
+							return *cp
+						}(),
+					}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
@@ -853,5 +1028,34 @@ func (r *ResourceSliceWrapper) AllNodes(allNodes bool) *ResourceSliceWrapper {
 // Devices sets the value of ResourceSlice.Spec.Devices
 func (r *ResourceSliceWrapper) Devices(devices []resourceapi.Device) *ResourceSliceWrapper {
 	r.Spec.Devices = devices
+	return r
+}
+
+func (r *ResourceSliceWrapper) CapacityPools(capacityPools []resourceapi.CapacityPool) *ResourceSliceWrapper {
+	r.Spec.CapacityPools = capacityPools
+	return r
+}
+
+func (r *ResourceSliceWrapper) CapacityPoolMixins(capacityPoolMixins []resourceapi.CapacityPoolMixin) *ResourceSliceWrapper {
+	if r.Spec.Mixins == nil {
+		r.Spec.Mixins = &resourceapi.ResourceSliceMixins{}
+	}
+	r.Spec.Mixins.CapacityPool = capacityPoolMixins
+	return r
+}
+
+func (r *ResourceSliceWrapper) DeviceMixins(deviceMixins []resourceapi.DeviceMixin) *ResourceSliceWrapper {
+	if r.Spec.Mixins == nil {
+		r.Spec.Mixins = &resourceapi.ResourceSliceMixins{}
+	}
+	r.Spec.Mixins.Device = deviceMixins
+	return r
+}
+
+func (r *ResourceSliceWrapper) DeviceCapacityConsumptionMixins(deviceCapacityConsumptionMixins []resourceapi.DeviceCapacityConsumptionMixin) *ResourceSliceWrapper {
+	if r.Spec.Mixins == nil {
+		r.Spec.Mixins = &resourceapi.ResourceSliceMixins{}
+	}
+	r.Spec.Mixins.DeviceCapacityConsumption = deviceCapacityConsumptionMixins
 	return r
 }
