@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/stats"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -223,6 +224,16 @@ func NodeUID(nodeUID types.UID) Option {
 	}
 }
 
+// GRPCStatsHandler is used to monitor RPC calls and connections.
+// Its methods are called by the gRPC server when connections and calls
+// are started and finished.
+func GRPCStatsHandler(option stats.Handler) Option {
+	return func(o *options) error {
+		o.grpcStatsHandlers = append(o.grpcStatsHandlers, option)
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -234,6 +245,7 @@ type options struct {
 	pluginRegistrationEndpoint endpoint
 	unaryInterceptors          []grpc.UnaryServerInterceptor
 	streamInterceptors         []grpc.StreamServerInterceptor
+	grpcStatsHandlers          []stats.Handler
 	kubeClient                 kubernetes.Interface
 
 	nodeV1alpha4 bool
@@ -337,7 +349,7 @@ func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (resu
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	var supportedServices []string
-	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
+	plugin, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, nil, o.draEndpoint, func(grpcServer *grpc.Server) {
 		for _, nodeServer := range nodeServers {
 			if nodeServer, ok := nodeServer.(drapbv1alpha4.NodeServer); ok && o.nodeV1alpha4 {
 				logger.V(5).Info("registering v1alpha4.Node gGRPC service")
@@ -369,7 +381,7 @@ func Start(ctx context.Context, nodeServers []interface{}, opts ...Option) (resu
 	}
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.grpcStatsHandlers, o.driverName, supportedServices, o.draAddress, o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}
