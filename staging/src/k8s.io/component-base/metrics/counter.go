@@ -298,26 +298,7 @@ func (v *CounterVec) ResetLabelAllowLists() {
 	v.LabelValueAllowLists = nil
 }
 
-// WithContext returns wrapped CounterVec with context
-func (v *CounterVec) WithContext(ctx context.Context) *CounterVecWithContext {
-	return &CounterVecWithContext{
-		ctx:        ctx,
-		CounterVec: v,
-	}
-}
-
-// CounterVecWithContext is the wrapper of CounterVec with context.
-type CounterVecWithContext struct {
-	*CounterVec
-	ctx context.Context
-}
-
-// WithLabelValues is the wrapper of CounterVec.WithLabelValues.
-func (vc *CounterVecWithContext) WithLabelValues(lvs ...string) CounterMetric {
-	return vc.CounterVec.WithLabelValues(lvs...)
-}
-
-// With is the wrapper of CounterVec.With.
-func (vc *CounterVecWithContext) With(labels map[string]string) CounterMetric {
-	return vc.CounterVec.With(labels)
+// WithContext is a no-op.
+func (v *CounterVec) WithContext(_ context.Context) *CounterVec {
+	return v
 }

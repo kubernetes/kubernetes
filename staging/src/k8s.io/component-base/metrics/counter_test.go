@@ -300,6 +300,13 @@ func TestCounterWithExemplar(t *testing.T) {
 		}
 		return arr
 	}
+	originalTraceID := trace.TraceID(fn(0))
+	originalSpanID := trace.SpanID(fn(1))
+	redundantCtxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     originalSpanID,
+		TraceID:    originalTraceID,
+		TraceFlags: trace.FlagsSampled,
+	}))
 	traceID := trace.TraceID(fn(1))
 	spanID := trace.SpanID(fn(2))
 	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
@@ -323,63 +330,30 @@ func TestCounterWithExemplar(t *testing.T) {
 	})
 	registry.MustRegister(counter)
 
-	// Call underlying exemplar methods.
-	counter.Add(toAdd)
-	counter.Inc()
-	counter.Inc()
+	// Call underlying exemplar methods, overriding the original span context.
+	counter.WithContext(redundantCtxForSpanCtx).Add(toAdd) // This should be counted, but it's context should be overridden.
+	counter.WithContext(redundantCtxForSpanCtx).Inc()      // This should be counted, but it's context should be overridden.
+	counter.Inc()                                          // This should be counted, and it's (parent's) context should be used.
 
-	// Gather.
-	mfs, err := registry.Gather()
-	if err != nil {
-		t.Fatalf("Gather failed %v", err)
-	}
-	if len(mfs) != 1 {
-		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
-	}
+	// Verify exemplar with the overridden span context.
+	exemplarGatherAndVerify(t, registry, traceID, spanID, 1, toAdd+2)
 
-	// Verify metric type.
-	mf := mfs[0]
-	var m *dto.Metric
-	switch mf.GetType() {
-	case dto.MetricType_COUNTER:
-		m = mfs[0].GetMetric()[0]
-	default:
-		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
-	}
+	// Modify span context.
+	altTraceID := trace.TraceID(fn(2))
+	altSpanID := trace.SpanID(fn(3))
+	altCtxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     altSpanID,
+		TraceID:    altTraceID,
+		TraceFlags: trace.FlagsSampled,
+	}))
 
-	// Verify value.
-	want := toAdd + 2
-	got := m.GetCounter().GetValue()
-	if got != want {
-		t.Fatalf("Got %f, wanted %f as the count", got, want)
-	}
+	// Call underlying exemplar methods with different span context.
+	counter.WithContext(ctxForSpanCtx).Add(toAdd) // This should be counted, but it's context should be overridden.
+	counter.WithContext(ctxForSpanCtx).Inc()      // This should be counted, but it's context should be overridden.
+	counter.WithContext(altCtxForSpanCtx).Inc()   // This should be counted, and it's context should be used.
 
-	// Verify exemplars.
-	e := m.GetCounter().GetExemplar()
-	if e == nil {
-		t.Fatalf("Got nil exemplar, wanted an exemplar")
-	}
-	eLabels := e.GetLabel()
-	if eLabels == nil {
-		t.Fatalf("Got nil exemplar label, wanted an exemplar label")
-	}
-	if len(eLabels) != 2 {
-		t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(eLabels))
-	}
-	for _, l := range eLabels {
-		switch *l.Name {
-		case "trace_id":
-			if *l.Value != traceID.String() {
-				t.Fatalf("Got %s as traceID, wanted %s", *l.Value, traceID.String())
-			}
-		case "span_id":
-			if *l.Value != spanID.String() {
-				t.Fatalf("Got %s as spanID, wanted %s", *l.Value, spanID.String())
-			}
-		default:
-			t.Fatalf("Got unexpected label %s", *l.Name)
-		}
-	}
+	// Verify exemplar with different span context.
+	exemplarGatherAndVerify(t, registry, altTraceID, altSpanID, 1, 2*toAdd+4)
 
 	// Verify that all contextual counter calls are exclusive.
 	contextualCounter := NewCounter(&CounterOpts{
@@ -421,41 +395,72 @@ func TestCounterWithExemplar(t *testing.T) {
 			contextualCounter: contextualCounterB,
 		},
 	}
-	for _, run := range runs {
+	for i, run := range runs {
 		registry.MustRegister(run.contextualCounter)
 		run.contextualCounter.Inc()
-
-		mfs, err = registry.Gather()
-		if err != nil {
-			t.Fatalf("Gather failed %v", err)
-		}
-		if len(mfs) != 2 {
-			t.Fatalf("Got %v metric families, Want: 2 metric families", len(mfs))
-		}
-
-		dtoMetric := mfs[0].GetMetric()[0]
-		if dtoMetric.GetCounter().GetExemplar() == nil {
-			t.Fatalf("Got nil exemplar, wanted an exemplar")
-		}
-		dtoMetricLabels := dtoMetric.GetCounter().GetExemplar().GetLabel()
-		if len(dtoMetricLabels) != 2 {
-			t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(dtoMetricLabels))
-		}
-		for _, l := range dtoMetricLabels {
-			switch *l.Name {
-			case "trace_id":
-				if *l.Value != run.traceID.String() {
-					t.Fatalf("Got %s as traceID, wanted %s", *l.Value, run.traceID.String())
-				}
-			case "span_id":
-				if *l.Value != run.spanID.String() {
-					t.Fatalf("Got %s as spanID, wanted %s", *l.Value, run.spanID.String())
-				}
-			default:
-				t.Fatalf("Got unexpected label %s", *l.Name)
-			}
-		}
-
+		exemplarGatherAndVerify(t, registry, run.traceID, run.spanID, 2, float64(i+1))
 		registry.Unregister(run.contextualCounter)
+	}
+}
+
+func exemplarGatherAndVerify(t *testing.T,
+	registry *kubeRegistry,
+	traceID trace.TraceID,
+	spanID trace.SpanID,
+	expectedMetricFamilies int,
+	expectedValue float64,
+) {
+
+	// Gather.
+	mfs, err := registry.Gather()
+	if err != nil {
+		t.Fatalf("Gather failed %v", err)
+	}
+	if len(mfs) != expectedMetricFamilies {
+		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
+	}
+
+	// Verify metric type.
+	mf := mfs[0]
+	var m *dto.Metric
+	switch mf.GetType() {
+	case dto.MetricType_COUNTER:
+		m = mfs[0].GetMetric()[0]
+	default:
+		t.Fatalf("Got %v metric type, Want: %v metric type", mf.GetType(), dto.MetricType_COUNTER)
+	}
+
+	// Verify value.
+	want := expectedValue
+	got := m.GetCounter().GetValue()
+	if got != want {
+		t.Fatalf("Got %f, wanted %f as the count", got, want)
+	}
+
+	// Verify exemplars.
+	e := m.GetCounter().GetExemplar()
+	if e == nil {
+		t.Fatalf("Got nil exemplar, wanted an exemplar")
+	}
+	eLabels := e.GetLabel()
+	if eLabels == nil {
+		t.Fatalf("Got nil exemplar label, wanted an exemplar label")
+	}
+	if len(eLabels) != 2 {
+		t.Fatalf("Got %v exemplar labels, wanted 2 exemplar labels", len(eLabels))
+	}
+	for _, l := range eLabels {
+		switch *l.Name {
+		case "trace_id":
+			if *l.Value != traceID.String() {
+				t.Fatalf("Got %s as traceID, wanted %s", *l.Value, traceID.String())
+			}
+		case "span_id":
+			if *l.Value != spanID.String() {
+				t.Fatalf("Got %s as spanID, wanted %s", *l.Value, spanID.String())
+			}
+		default:
+			t.Fatalf("Got unexpected label %s", *l.Name)
+		}
 	}
 }
