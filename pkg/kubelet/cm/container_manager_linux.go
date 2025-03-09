@@ -603,9 +603,14 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 		if err != nil {
 			return fmt.Errorf("failed to get rootfs info: %v", err)
 		}
+		// TODO: Initialize container manager capacity, not change it when manager starting.
+		// The capacity should be immutable.
+		// Cadvisor RootFsInfo is available only when cadvisor started.
+		newCap := cm.capacity.DeepCopy()
 		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
-			cm.capacity[rName] = rCap
+			newCap[rName] = rCap
 		}
+		cm.capacity = newCap
 	}
 
 	// Ensure that node allocatable configuration is valid.
