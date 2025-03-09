@@ -508,18 +508,14 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 		"--use-service-account-credentials=false",
 	}
 	err = fs.Parse(args)
-	if err != nil {
-		t.Errorf("error parsing the arguments, error : %v", err)
-	}
+	require.NoError(t, err, "unexpected error: %s", err)
 
 	fs.VisitAll(func(f *pflag.Flag) {
 		fmt.Printf("%s: %s\n", f.Name, f.Value)
 	})
 
 	c, err := s.Config([]string{"foo", "bar"}, []string{}, nil, []string{"foo", "bar", "baz"}, []string{})
-	if err != nil {
-		t.Errorf("error generating config, error : %v", err)
-	}
+	require.NoError(t, err, "unexpected error: %s", err)
 
 	expected := &appconfig.Config{
 		ComponentConfig: cpconfig.CloudControllerManagerConfiguration{
