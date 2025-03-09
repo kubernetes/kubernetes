@@ -45,10 +45,10 @@ var (
 		StrictCPUReservationOption,
 		PreferAlignByUnCoreCacheOption,
 	)
-	betaOptions = sets.New[string](
+	betaOptions   = sets.New[string]()
+	stableOptions = sets.New[string](
 		FullPCPUsOnlyOption,
 	)
-	stableOptions = sets.New[string]()
 )
 
 // CheckPolicyOptionAvailable verifies if the given option can be used depending on the Feature Gate Settings.
