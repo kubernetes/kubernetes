@@ -79,8 +79,9 @@ func doPodResizeTests() {
 		testRollback bool
 	}
 
-	noRestart := v1.NotRequired
-	doRestart := v1.RestartContainer
+	// TODO(tallclair): Change to PreferNoRestart once InPlacePodVerticalScalingPreferNoRestart graduates to beta.j
+	noRestart := v1.ResizeRestartPolicyNotRequired
+	doRestart := v1.ResizeRestartPolicyRestartContainer
 	tests := []testCase{
 		{
 			name: "Guaranteed QoS pod, one container - increase CPU & memory",
