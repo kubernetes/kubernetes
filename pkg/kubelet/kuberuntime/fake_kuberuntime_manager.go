@@ -32,6 +32,7 @@ import (
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
@@ -119,6 +120,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		logManager:             logManager,
 		memoryThrottlingFactor: 0.9,
 		podLogsDirectory:       fakePodLogsDirectory,
+		allocationManager:      allocation.NewInMemoryManager(),
 	}
 
 	typedVersion, err := runtimeService.Version(ctx, kubeRuntimeAPIVersion)
