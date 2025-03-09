@@ -368,8 +368,10 @@ func MachineInfo(nodeName string,
 				delete(node.Status.Allocatable, k)
 			}
 		}
+		capacity := node.Status.Capacity.DeepCopy()
+		capacity[v1.ResourceMemory] = cm.GetAllocatableMemory(capacity)
 		allocatableReservation := nodeAllocatableReservationFunc()
-		for k, v := range node.Status.Capacity {
+		for k, v := range capacity {
 			value := v.DeepCopy()
 			if res, exists := allocatableReservation[k]; exists {
 				value.Sub(res)
@@ -386,19 +388,6 @@ func MachineInfo(nodeName string,
 				klog.V(2).InfoS("Updated allocatable", "device", k, "allocatable", v.Value())
 			}
 			node.Status.Allocatable[k] = v
-		}
-		// for every huge page reservation, we need to remove it from allocatable memory
-		for k, v := range node.Status.Capacity {
-			if v1helper.IsHugePageResourceName(k) {
-				allocatableMemory := node.Status.Allocatable[v1.ResourceMemory]
-				value := v.DeepCopy()
-				allocatableMemory.Sub(value)
-				if allocatableMemory.Sign() < 0 {
-					// Negative Allocatable resources don't make sense.
-					allocatableMemory.Set(0)
-				}
-				node.Status.Allocatable[v1.ResourceMemory] = allocatableMemory
-			}
 		}
 		return nil
 	}
