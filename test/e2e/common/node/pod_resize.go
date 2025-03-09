@@ -1159,7 +1159,7 @@ func doPodResizeTests() {
 				e2epod.VerifyPodResources(patchedPod, expectedContainers)
 
 				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod)
+				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
 				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
 			}
 
