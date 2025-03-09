@@ -176,6 +176,13 @@ var baseOptsWithoutStrictCost = []VersionedOptions{
 			ext.TwoVarComprehensions(),
 		},
 	},
+	// Semver
+	{
+		IntroducedVersion: version.MajorMinor(1, 33),
+		EnvOptions: []cel.EnvOption{
+			library.SemverLib(library.SemverVersion(1)),
+		},
+	},
 }
 
 var (

@@ -33,13 +33,14 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/ext"
 
+	"k8s.io/utils/ptr"
+
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/util/version"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -297,7 +298,7 @@ func newCompiler() *compiler {
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
 
-				environment.UnversionedLib(library.SemverLib),
+				library.SemverLib(library.SemverVersion(0)),
 
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
