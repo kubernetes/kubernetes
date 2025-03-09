@@ -21,8 +21,11 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	storageapi "k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -56,6 +59,7 @@ func newPlugin() *storageProtectionPlugin {
 var (
 	pvResource  = api.Resource("persistentvolumes")
 	pvcResource = api.Resource("persistentvolumeclaims")
+	vacResource = storageapi.Resource("volumeattributesclasses")
 )
 
 // Admit sets finalizer on all PVCs(PVs). The finalizer is removed by
@@ -69,6 +73,11 @@ func (c *storageProtectionPlugin) Admit(ctx context.Context, a admission.Attribu
 		return c.admitPV(a)
 	case pvcResource:
 		return c.admitPVC(a)
+	case vacResource:
+		if feature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass) {
+			return c.admitVAC(a)
+		}
+		return nil
 
 	default:
 		return nil
@@ -117,5 +126,28 @@ func (c *storageProtectionPlugin) admitPVC(a admission.Attributes) error {
 
 	klog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
 	pvc.Finalizers = append(pvc.Finalizers, volumeutil.PVCProtectionFinalizer)
+	return nil
+}
+
+func (c *storageProtectionPlugin) admitVAC(a admission.Attributes) error {
+	if len(a.GetSubresource()) != 0 {
+		return nil
+	}
+
+	vac, ok := a.GetObject().(*storageapi.VolumeAttributesClass)
+	// if we can't convert the obj to VAC, just return
+	if !ok {
+		klog.V(2).Infof("can't convert the obj to VAC to %s", vac.Name)
+		return nil
+	}
+	for _, f := range vac.Finalizers {
+		if f == volumeutil.VACProtectionFinalizer {
+			// Finalizer is already present, nothing to do
+			return nil
+		}
+	}
+	klog.V(4).Infof("adding VAC protection finalizer to %s", vac.Name)
+	vac.Finalizers = append(vac.Finalizers, volumeutil.VACProtectionFinalizer)
+
 	return nil
 }

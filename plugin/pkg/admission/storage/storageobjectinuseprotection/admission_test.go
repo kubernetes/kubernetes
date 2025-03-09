@@ -26,7 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	storageapi "k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -49,11 +53,24 @@ func TestAdmit(t *testing.T) {
 			Name: "pv",
 		},
 	}
+
+	vac := &storageapi.VolumeAttributesClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "VolumeAttributesClass",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vac",
+		},
+	}
+
 	claimWithFinalizer := claim.DeepCopy()
 	claimWithFinalizer.Finalizers = []string{volumeutil.PVCProtectionFinalizer}
 
 	pvWithFinalizer := pv.DeepCopy()
 	pvWithFinalizer.Finalizers = []string{volumeutil.PVProtectionFinalizer}
+
+	vacWithFinalizer := vac.DeepCopy()
+	vacWithFinalizer.Finalizers = []string{volumeutil.VACProtectionFinalizer}
 
 	tests := []struct {
 		name           string
@@ -63,38 +80,57 @@ func TestAdmit(t *testing.T) {
 		namespace      string
 	}{
 		{
-			"create -> add finalizer",
+			"persistentvolumeclaims: create -> add finalizer",
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claim,
 			claimWithFinalizer,
 			claim.Namespace,
 		},
 		{
-			"finalizer already exists -> no new finalizer",
+			"persistentvolumeclaims: finalizer already exists -> no new finalizer",
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claimWithFinalizer,
 			claimWithFinalizer,
 			claimWithFinalizer.Namespace,
 		},
 		{
-			"create -> add finalizer",
+			"persistentvolumes: create -> add finalizer",
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pv,
 			pvWithFinalizer,
 			pv.Namespace,
 		},
 		{
-			"finalizer already exists -> no new finalizer",
+			"persistentvolumes: finalizer already exists -> no new finalizer",
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pvWithFinalizer,
 			pvWithFinalizer,
 			pvWithFinalizer.Namespace,
+		},
+		{
+			"volumeattributesclasses: create -> add finalizer",
+			storageapi.SchemeGroupVersion.WithResource("volumeattributesclasses"),
+			vac,
+			vacWithFinalizer,
+			vac.Namespace,
+		},
+		{
+			"volumeattributesclasses: finalizer already exists -> no new finalizer",
+			storageapi.SchemeGroupVersion.WithResource("volumeattributesclasses"),
+			vacWithFinalizer,
+			vacWithFinalizer,
+			vac.Namespace,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := newPlugin()
+
+			// Enable feature gate for tests with VolumeAttributesClass
+			if test.object.GetObjectKind().GroupVersionKind().Kind == "VolumeAttributesClass" {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
+			}
 
 			obj := test.object.DeepCopyObject()
 			attrs := admission.NewAttributesRecord(
