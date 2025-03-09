@@ -171,7 +171,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 			// Error out if the prioritizedList feature is not enabled and the request
 			// has subrequests. This is to avoid surprising behavior for users.
 			if !a.prioritizedListEnabled && hasSubRequests {
-				return nil, fmt.Errorf("claim %s, request %s: has subrequests, but the feature is disabled", klog.KObj(claim), request.Name)
+				return nil, fmt.Errorf("claim %s, request %s: has subrequests, but the DRAPrioritizedList feature is disabled", klog.KObj(claim), request.Name)
 			}
 
 			if hasSubRequests {
