@@ -545,6 +545,45 @@ func TestEnoughRequests(t *testing.T) {
 		},
 		{
 			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2"), hugePageResourceA: *resource.NewQuantity(5, resource.BinarySI)},
+				},
+			),
+			nodeInfo:                  framework.NewNodeInfo(),
+			name:                      "pod-level hugepages resource fit",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2"), hugePageResourceA: *resource.NewQuantity(5, resource.BinarySI)},
+				},
+			),
+			nodeInfo:                  framework.NewNodeInfo(),
+			name:                      "both pod-level and container-level hugepages resource fit",
+			wantInsufficientResources: []InsufficientResource{},
+		},
+		{
+			podLevelResourcesEnabled: true,
+			pod: newPodLevelResourcesPod(
+				newResourcePod(),
+				v1.ResourceRequirements{
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("3m"), v1.ResourceMemory: resource.MustParse("2"), hugePageResourceA: *resource.NewQuantity(10, resource.BinarySI)},
+				},
+			),
+			nodeInfo:   framework.NewNodeInfo(),
+			name:       "pod-level hugepages resource not fit",
+			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(hugePageResourceA)),
+			wantInsufficientResources: []InsufficientResource{
+				{ResourceName: hugePageResourceA, Reason: getErrReason(hugePageResourceA), Requested: 10, Used: 0, Capacity: 5},
+			},
+		},
+		{
+			podLevelResourcesEnabled: true,
 			pod: newResourceInitPod(newPodLevelResourcesPod(
 				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}),
 				v1.ResourceRequirements{
@@ -1547,8 +1586,25 @@ func TestIsFit(t *testing.T) {
 			pod: st.MakePod().Resources(
 				v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")}},
 			).Obj(),
-			node:     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			expected: true,
+			node:                     st.MakeNode().Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
+			podLevelResourcesEnabled: true,
+			expected:                 true,
+		},
+		"sufficient pod-level resource hugepages": {
+			pod: st.MakePod().Resources(
+				v1.ResourceRequirements{Requests: v1.ResourceList{hugePageResourceA: resource.MustParse("2Mi")}},
+			).Obj(),
+			node:                     st.MakeNode().Capacity(map[v1.ResourceName]string{hugePageResourceA: "2Mi"}).Obj(),
+			podLevelResourcesEnabled: true,
+			expected:                 true,
+		},
+		"insufficient pod-level resource hugepages": {
+			pod: st.MakePod().Resources(
+				v1.ResourceRequirements{Requests: v1.ResourceList{hugePageResourceA: resource.MustParse("4Mi")}},
+			).Obj(),
+			node:                     st.MakeNode().Capacity(map[v1.ResourceName]string{hugePageResourceA: "2Mi"}).Obj(),
+			podLevelResourcesEnabled: true,
+			expected:                 false,
 		},
 	}
 

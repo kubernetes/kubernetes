@@ -27,6 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/kubernetes/pkg/api/v1/service"
+	corev1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
@@ -199,6 +200,7 @@ func SetDefaults_Pod(obj *v1.Pod) {
 	// Pod Requests default values must be applied after container-level default values
 	// have been populated.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
+		defaultPodLimits(obj)
 		defaultPodRequests(obj)
 	}
 
@@ -456,7 +458,7 @@ func defaultPodRequests(obj *v1.Pod) {
 	// PodLevelResources feature) and pod-level requests are not set, the pod-level requests
 	// default to the effective requests of all the containers for that resource.
 	for key, aggrCtrLim := range aggrCtrReqs {
-		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) {
+		if _, exists := podReqs[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && !corev1helper.IsHugePageResourceName(key) {
 			podReqs[key] = aggrCtrLim.DeepCopy()
 		}
 	}
@@ -474,5 +476,46 @@ func defaultPodRequests(obj *v1.Pod) {
 	// contains entries after collecting container-level requests and pod-level limits.
 	if len(podReqs) > 0 {
 		obj.Spec.Resources.Requests = podReqs
+	}
+}
+
+// defaultPodLimits applies default values for pod-level limits, only when
+// container hugepage limits are set, but not at pod level, in following
+// scenario:
+// 1. When at least one container (regular, init or sidecar) has hugepage
+// limits set:
+// The pod-level limit becomes equal to the aggregated hugepages limit of all
+// the containers in the pod.
+func defaultPodLimits(obj *v1.Pod) {
+	// We only populate defaults when the pod-level resources are partly specified already.
+	if obj.Spec.Resources == nil {
+		return
+	}
+
+	if len(obj.Spec.Resources.Limits) == 0 && len(obj.Spec.Resources.Requests) == 0 {
+		return
+	}
+
+	var podLims v1.ResourceList
+	podLims = obj.Spec.Resources.Limits
+	if podLims == nil {
+		podLims = make(v1.ResourceList)
+	}
+
+	aggrCtrLims := resourcehelper.AggregateContainerLimits(obj, resourcehelper.PodResourcesOptions{})
+
+	// When containers specify limits for hugepages and pod-level limits are not
+	// set for that resource, the pod-level limit will default to the aggregated
+	// hugepages limit of all the containers.
+	for key, aggrCtrLim := range aggrCtrLims {
+		if _, exists := podLims[key]; !exists && resourcehelper.IsSupportedPodLevelResource(key) && corev1helper.IsHugePageResourceName(key) {
+			podLims[key] = aggrCtrLim.DeepCopy()
+		}
+	}
+
+	// Only set pod-level resource limits in the PodSpec if the requirements map
+	// contains entries after collecting container-level limits and pod-level limits for hugepages.
+	if len(podLims) > 0 {
+		obj.Spec.Resources.Limits = podLims
 	}
 }
