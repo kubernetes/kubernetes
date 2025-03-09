@@ -30,10 +30,11 @@ import (
 
 var _ = framework.SIGDescribe("instrumentation")("Kubelet Config", framework.WithSlow(), framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("kubelet-config-metrics-api-test")
-	ginkgo.Context("metrics api should exhibit expected behavior", func(ctx context.Context) {
+
+	ginkgo.Context("metrics api should exhibit expected behavior", func() {
+		ctx := context.Background()
 		oldCfg, err := getCurrentKubeletConfig(ctx)
 		framework.ExpectNoError(err)
-
 		ginkgo.AfterAll(func() {
 			updateKubeletConfig(ctx, f, oldCfg, true)
 		})
@@ -78,7 +79,7 @@ var _ = framework.SIGDescribe("instrumentation")("Kubelet Config", framework.Wit
 					}
 				}
 			}
-			gomega.Expect(found).To(gomega.BeTrueBecause("expected " + testMetric + " to be present"))
+			gomega.Expect(found).To(gomega.BeTrueBecause("expected metric to be present"))
 		})
 
 		ginkgo.It("when disabledMetrics is populated", func(ctx context.Context) {
@@ -102,7 +103,7 @@ var _ = framework.SIGDescribe("instrumentation")("Kubelet Config", framework.Wit
 					}
 				}
 			}
-			gomega.Expect(found).To(gomega.BeTrueBecause("expected " + testMetric + " to be present"))
+			gomega.Expect(found).To(gomega.BeTrueBecause("expected metrics to be present"))
 			framework.ExpectNoError(err)
 			updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -140,7 +141,7 @@ var _ = framework.SIGDescribe("instrumentation")("Kubelet Config", framework.Wit
 					}
 				}
 			}
-			gomega.Expect(found).To(gomega.BeTrueBecause("expected " + testMetric + " to be present"))
+			gomega.Expect(found).To(gomega.BeTrueBecause("expected metric to be present"))
 			updateKubeletConfig(ctx, f, newCfg, true)
 
 			ginkgo.By("expecting only a subset of " + testMetric + " label-sets to be present after kubelet config update")
@@ -155,7 +156,7 @@ var _ = framework.SIGDescribe("instrumentation")("Kubelet Config", framework.Wit
 					}
 				}
 			}
-			gomega.Expect(found).To(gomega.BeTrueBecause("expected " + testMetric + " to be present"))
+			gomega.Expect(found).To(gomega.BeTrueBecause("expected metric to be present"))
 		})
 
 		ginkgo.It("when allowListMappingManifest is populated", func(ctx context.Context) {
@@ -183,7 +184,7 @@ var _ = framework.SIGDescribe("instrumentation")("Kubelet Config", framework.Wit
 					}
 				}
 			}
-			gomega.Expect(found).To(gomega.BeTrueBecause("expected " + testMetric + " to be present"))
+			gomega.Expect(found).To(gomega.BeTrueBecause("expected metric to be present"))
 			updateKubeletConfig(ctx, f, newCfg, true)
 
 			ginkgo.By("expecting only a subset of " + testMetric + " label-sets to be present after kubelet config update")
@@ -198,7 +199,7 @@ var _ = framework.SIGDescribe("instrumentation")("Kubelet Config", framework.Wit
 					}
 				}
 			}
-			gomega.Expect(found).To(gomega.BeTrueBecause("expected " + testMetric + " to be present"))
+			gomega.Expect(found).To(gomega.BeTrueBecause("expected metric to be present"))
 			framework.ExpectNoError(os.Remove(manifestPath))
 		})
 	})
