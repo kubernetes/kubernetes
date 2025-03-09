@@ -299,7 +299,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			}
 			k := fmt.Sprintf("%d/%s", port.ContainerPort, port.Protocol)
 			if others, found := allPorts[k]; found {
-				// Someone else has this protcol+port, but it still might not be a conflict.
+				// Someone else has this protocol+port, but it still might not be a conflict.
 				for _, other := range others {
 					if port.HostIP == other.port.HostIP && port.HostPort == other.port.HostPort {
 						// Exactly-equal is obvious. Validation should already filter for this except when these are unspecified.

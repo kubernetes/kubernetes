@@ -473,7 +473,7 @@ func (r *RepairIPAddress) syncIPAddress(key string) error {
 		return nil
 	}
 
-	// not mananged by this controller
+	// not managed by this controller
 	if !managedByController(ipAddress) {
 		return nil
 	}
