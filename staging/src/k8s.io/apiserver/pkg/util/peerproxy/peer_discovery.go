@@ -35,7 +35,7 @@ import (
 func (h *peerProxyHandler) addPeerDiscoveryInfo(obj interface{}) {
 	serverIdentityLease, ok := obj.(*v1.Lease)
 	if !ok {
-		klog.ErrorS(fmt.Errorf("invalid lease object provided to addPeerDiscoveryInfo()"), "error adding peer served resources")
+		klog.ErrorS(fmt.Errorf("invalid lease object provided to addPeerDiscoveryInfo(), received type: %T", obj), "error adding peer served resources", )
 		return
 	}
 
