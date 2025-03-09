@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -57,7 +58,7 @@ const (
 	noSignerKey       = "no-signer"
 )
 
-var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjection, func() {
+var _ = SIGDescribe(feature.Alpha, framework.WithFeatureGate(features.ClusterTrustBundle), framework.WithFeatureGate(features.ClusterTrustBundleProjection), func() {
 	f := framework.NewDefaultFramework("projected-clustertrustbundle")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
