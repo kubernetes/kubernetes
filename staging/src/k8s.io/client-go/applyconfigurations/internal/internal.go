@@ -12507,11 +12507,29 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.DeviceAttribute
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeoutSeconds
+      type:
+        scalar: numeric
     - name: capacity
       type:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1alpha3.CELDeviceSelector
   map:
     fields:
@@ -12696,6 +12714,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeoutSeconds
+      type:
+        scalar: numeric
     - name: device
       type:
         scalar: string
@@ -12712,6 +12745,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1alpha3.DeviceSelector
   map:
     fields:
@@ -12969,11 +13005,29 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceAttribute
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeoutSeconds
+      type:
+        scalar: numeric
     - name: capacity
       type:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1beta1.CELDeviceSelector
   map:
     fields:
@@ -13164,6 +13218,21 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: adminAccess
       type:
         scalar: boolean
+    - name: bindingConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingFailureConditions
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: bindingTimeoutSeconds
+      type:
+        scalar: numeric
     - name: device
       type:
         scalar: string
@@ -13180,6 +13249,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: usageRestrictedToNode
+      type:
+        scalar: boolean
 - name: io.k8s.api.resource.v1beta1.DeviceSelector
   map:
     fields:
