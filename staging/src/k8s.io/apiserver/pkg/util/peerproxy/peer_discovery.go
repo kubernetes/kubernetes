@@ -62,7 +62,7 @@ func (h *peerProxyHandler) deletePeerDiscoveryInfo(obj interface{}) {
 func (h *peerProxyHandler) updatePeerDiscoveryInfo(oldObj interface{}, newObj interface{}) {
 	oldLease, ok := oldObj.(*v1.Lease)
 	if !ok {
-		klog.Error("invalid lease object provided to updatePeerServedResources()")
+		klog.Error("invalid lease object provided to updatePeerServedResources(), received type: %T", obj)
 		return
 	}
 
