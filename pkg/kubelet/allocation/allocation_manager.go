@@ -153,7 +153,7 @@ func (m *manager) SetPodAllocation(pod *v1.Pod) error {
 }
 
 func (m *manager) DeletePodAllocation(uid types.UID) {
-	if err := m.state.Delete(uid, ""); err != nil {
+	if err := m.state.DeletePod(uid); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
 		klog.V(3).ErrorS(err, "Failed to delete pod allocation", "podUID", uid)
 	}
