@@ -141,6 +141,10 @@ type VolumeError struct {
 	// information.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
+
+	// ResourceExhaust indicates that the maximum supported number of volumes that can be attached to the target node are already attached.
+	// +optional
+	ResourceExhaust *bool `json:"resourceExhaust,omitempty" protobuf:"varint,3,opt,name=resourceExhaust"`
 }
 
 // +genclient

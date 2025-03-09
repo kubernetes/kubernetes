@@ -13494,6 +13494,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsGroupPolicy
       type:
         scalar: string
+    - name: nodeAllocatableUpdatePeriodSeconds
+      type:
+        scalar: numeric
     - name: podInfoOnMount
       type:
         scalar: boolean
@@ -13714,6 +13717,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+    - name: resourceExhaust
+      type:
+        scalar: boolean
     - name: time
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
@@ -13840,6 +13846,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+    - name: resourceExhaust
+      type:
+        scalar: boolean
     - name: time
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
@@ -13869,6 +13878,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsGroupPolicy
       type:
         scalar: string
+    - name: nodeAllocatableUpdatePeriodSeconds
+      type:
+        scalar: numeric
     - name: podInfoOnMount
       type:
         scalar: boolean
@@ -14111,6 +14123,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+    - name: resourceExhaust
+      type:
+        scalar: boolean
     - name: time
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time

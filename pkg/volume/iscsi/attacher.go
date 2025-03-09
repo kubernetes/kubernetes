@@ -53,6 +53,8 @@ func (plugin *iscsiPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
+func (plugin *iscsiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {}
+
 func (plugin *iscsiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 	return plugin.NewAttacher()
 }

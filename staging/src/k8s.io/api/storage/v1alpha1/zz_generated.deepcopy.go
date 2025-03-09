@@ -308,6 +308,11 @@ func (in *VolumeAttributesClassList) DeepCopyObject() runtime.Object {
 func (in *VolumeError) DeepCopyInto(out *VolumeError) {
 	*out = *in
 	in.Time.DeepCopyInto(&out.Time)
+	if in.ResourceExhaust != nil {
+		in, out := &in.ResourceExhaust, &out.ResourceExhaust
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
