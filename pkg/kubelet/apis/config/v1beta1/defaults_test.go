@@ -22,6 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"k8s.io/utils/ptr"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/utils/ptr"
 )
 
 func TestSetDefaultsKubeletConfiguration(t *testing.T) {
@@ -83,7 +84,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumeStatsAggPeriod:                      metav1.Duration{Duration: time.Minute},
 				CgroupsPerQOS:                             ptr.To(true),
 				CgroupDriver:                              "cgroupfs",
-				CPUManagerPolicy:                          "none",
+				CPUManagerPolicy:                          v1beta1.NoneCPUManagerPolicy,
 				CPUManagerReconcilePeriod:                 metav1.Duration{Duration: 10 * time.Second},
 				MemoryManagerPolicy:                       v1beta1.NoneMemoryManagerPolicy,
 				TopologyManagerPolicy:                     v1beta1.NoneTopologyManagerPolicy,
@@ -310,7 +311,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumeStatsAggPeriod:                      metav1.Duration{Duration: time.Minute},
 				CgroupsPerQOS:                             ptr.To(false),
 				CgroupDriver:                              "cgroupfs",
-				CPUManagerPolicy:                          "none",
+				CPUManagerPolicy:                          v1beta1.NoneCPUManagerPolicy,
 				CPUManagerPolicyOptions:                   map[string]string{},
 				CPUManagerReconcilePeriod:                 metav1.Duration{Duration: 10 * time.Second},
 				MemoryManagerPolicy:                       v1beta1.NoneMemoryManagerPolicy,
@@ -732,7 +733,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumeStatsAggPeriod:                      metav1.Duration{Duration: time.Minute},
 				CgroupsPerQOS:                             ptr.To(true),
 				CgroupDriver:                              "cgroupfs",
-				CPUManagerPolicy:                          "none",
+				CPUManagerPolicy:                          v1beta1.NoneCPUManagerPolicy,
 				CPUManagerReconcilePeriod:                 metav1.Duration{Duration: 10 * time.Second},
 				MemoryManagerPolicy:                       v1beta1.NoneMemoryManagerPolicy,
 				TopologyManagerPolicy:                     v1beta1.NoneTopologyManagerPolicy,
@@ -828,7 +829,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumeStatsAggPeriod:                      metav1.Duration{Duration: time.Minute},
 				CgroupsPerQOS:                             ptr.To(true),
 				CgroupDriver:                              "cgroupfs",
-				CPUManagerPolicy:                          "none",
+				CPUManagerPolicy:                          v1beta1.NoneCPUManagerPolicy,
 				CPUManagerReconcilePeriod:                 metav1.Duration{Duration: 10 * time.Second},
 				MemoryManagerPolicy:                       v1beta1.NoneMemoryManagerPolicy,
 				TopologyManagerPolicy:                     v1beta1.NoneTopologyManagerPolicy,
@@ -924,7 +925,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumeStatsAggPeriod:                      metav1.Duration{Duration: time.Minute},
 				CgroupsPerQOS:                             ptr.To(true),
 				CgroupDriver:                              "cgroupfs",
-				CPUManagerPolicy:                          "none",
+				CPUManagerPolicy:                          v1beta1.NoneCPUManagerPolicy,
 				CPUManagerReconcilePeriod:                 metav1.Duration{Duration: 10 * time.Second},
 				MemoryManagerPolicy:                       v1beta1.NoneMemoryManagerPolicy,
 				TopologyManagerPolicy:                     v1beta1.NoneTopologyManagerPolicy,
@@ -1020,7 +1021,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumeStatsAggPeriod:                      metav1.Duration{Duration: time.Minute},
 				CgroupsPerQOS:                             ptr.To(true),
 				CgroupDriver:                              "cgroupfs",
-				CPUManagerPolicy:                          "none",
+				CPUManagerPolicy:                          v1beta1.NoneCPUManagerPolicy,
 				CPUManagerReconcilePeriod:                 metav1.Duration{Duration: 10 * time.Second},
 				MemoryManagerPolicy:                       v1beta1.NoneMemoryManagerPolicy,
 				TopologyManagerPolicy:                     v1beta1.NoneTopologyManagerPolicy,

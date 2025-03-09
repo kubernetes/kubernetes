@@ -24,14 +24,15 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/klog/v2"
+	"k8s.io/utils/cpuset"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/server/healthz"
 	internalapi "k8s.io/cri-api/pkg/apis"
-	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/utils/cpuset"
 )
 
 const (

@@ -26,6 +26,8 @@ import (
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
+	"k8s.io/utils/cpuset"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +42,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/cpuset"
 )
 
 var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUManager, func() {
@@ -82,7 +83,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 			newCfg := configureCPUManagerInKubelet(oldCfg,
 				&cpuManagerKubeletArguments{
-					policyName:              string(cpumanager.PolicyStatic),
+					policyName:              kubeletconfig.StaticCPUManagerPolicy,
 					reservedSystemCPUs:      cpuset.New(0),
 					enableCPUManagerOptions: true,
 					options:                 cpuPolicyOptions,

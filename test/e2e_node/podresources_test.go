@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/utils/cpuset"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,16 +35,15 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	apisgrpc "k8s.io/kubernetes/pkg/kubelet/apis/grpc"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/cpuset"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
+
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -868,7 +869,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 			ginkgo.Context("", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
-					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+					initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 					// Set the CPU Manager reconcile period to 1 second.
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
@@ -977,7 +978,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 			ginkgo.Context("", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
-					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+					initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 					// Set the CPU Manager reconcile period to 1 second.
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
@@ -1096,7 +1097,7 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 			ginkgo.Context("", func() {
 				tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 					// Set the CPU Manager policy to static.
-					initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+					initialConfig.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 					// Set the CPU Manager reconcile period to 1 second.
 					initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
