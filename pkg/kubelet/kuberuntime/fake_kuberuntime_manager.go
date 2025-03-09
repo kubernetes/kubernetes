@@ -23,6 +23,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/trace"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,6 +112,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		containerManager:       cm.NewFakeContainerManager(),
 		runtimeHelper:          runtimeHelper,
 		runtimeService:         runtimeService,
+		readinessManager:       proberesults.NewManager(),
 		imageService:           imageService,
 		keyring:                keyring,
 		seccompProfileRoot:     fakeSeccompProfileRoot,
