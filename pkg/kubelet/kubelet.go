@@ -1009,7 +1009,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
-	klet.usernsManager, err = userns.MakeUserNsManager(klet)
+	klet.usernsManager, err = userns.MakeUserNsManager(logger, klet)
 	if err != nil {
 		return nil, fmt.Errorf("create user namespace manager: %w", err)
 	}
@@ -2211,6 +2211,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		semconv.K8SPodNameKey.String(pod.Name),
 		semconv.K8SNamespaceNameKey.String(pod.Namespace),
 	))
+	logger := klog.FromContext(ctx)
 	defer otelSpan.End()
 	klog.V(4).InfoS("SyncTerminatedPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.V(4).InfoS("SyncTerminatedPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -2268,7 +2269,7 @@ func (kl *Kubelet) SyncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 		klog.V(4).InfoS("Pod termination removed cgroups", "pod", klog.KObj(pod), "podUID", pod.UID)
 	}
 
-	kl.usernsManager.Release(pod.UID)
+	kl.usernsManager.Release(logger, pod.UID)
 
 	// mark the final pod status
 	kl.statusManager.TerminatePod(pod)
