@@ -666,7 +666,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 	klet.allocationManager = allocation.NewManager(klet.getRootDir())
 
-	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
+	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(logger, klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
 	klet.runtimeService = kubeDeps.RemoteRuntimeService
 
@@ -991,7 +991,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		renewInterval,
 		string(klet.nodeName),
 		v1.NamespaceNodeLease,
-		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
+		util.SetNodeOwnerFunc(ctx, klet.heartbeatClient, string(klet.nodeName)))
 
 	// setup node shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{

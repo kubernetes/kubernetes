@@ -30,10 +30,10 @@ import (
 // PodStartupLatencyTracker records key moments for startup latency calculation,
 // e.g. image pulling or pod observed running on watch.
 type PodStartupLatencyTracker interface {
-	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
+	ObservedPodOnWatch(logger klog.Logger, pod *v1.Pod, when time.Time)
 	RecordImageStartedPulling(podUID types.UID)
 	RecordImageFinishedPulling(podUID types.UID)
-	RecordStatusUpdated(pod *v1.Pod)
+	RecordStatusUpdated(logger klog.Logger, pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
 
@@ -64,7 +64,7 @@ func NewPodStartupLatencyTracker() PodStartupLatencyTracker {
 	}
 }
 
-func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when time.Time) {
+func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(logger klog.Logger, pod *v1.Pod, when time.Time) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -101,7 +101,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 		imagePullingDuration := state.lastFinishedPulling.Sub(state.firstStartedPulling)
 		podStartSLOduration := (podStartingDuration - imagePullingDuration).Seconds()
 
-		klog.InfoS("Observed pod startup duration",
+		logger.Info("Observed pod startup duration",
 			"pod", klog.KObj(pod),
 			"podStartSLOduration", podStartSLOduration,
 			"podStartE2EDuration", podStartingDuration,
@@ -149,7 +149,7 @@ func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.
 	state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
 }
 
-func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
+func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(logger klog.Logger, pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -169,7 +169,7 @@ func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 	}
 
 	if hasPodStartedSLO(pod) {
-		klog.V(3).InfoS("Mark when the pod was running for the first time", "pod", klog.KObj(pod), "rv", pod.ResourceVersion)
+		logger.V(3).Info("Mark when the pod was running for the first time", "pod", klog.KObj(pod), "rv", pod.ResourceVersion)
 		state.observedRunningTime = p.clock.Now()
 	}
 }
