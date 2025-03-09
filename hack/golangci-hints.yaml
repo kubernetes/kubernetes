@@ -205,7 +205,6 @@ linters-settings: # please keep this alphabetized
       msg: should not be used because managedFields was removed
     - p: \.Add$
       pkg: ^k8s\.io/component-base/featuregate$
-      type: ^MutableFeatureGate$
       msg: should not use MutableFeatureGate.Add, use AddVersioned instead
     - p: ^gomega\.BeTrue$
       pkg: ^github.com/onsi/gomega$
