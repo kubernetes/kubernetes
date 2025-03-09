@@ -50,7 +50,7 @@ func (h *peerProxyHandler) deletePeerDiscoveryInfo(obj interface{}) {
 	defer h.peerAggDiscoveryCacheLock.Unlock()
 	serverIdentityLease, ok := obj.(*v1.Lease)
 	if !ok {
-		klog.ErrorS(fmt.Errorf("invalid lease object provided to addPeerServedResources()"), "error deleting peer served resources")
+		klog.ErrorS(fmt.Errorf("invalid lease object provided to addPeerServedResources(), received type: %T", obj), "error deleting peer served resources")
 		return
 	}
 
