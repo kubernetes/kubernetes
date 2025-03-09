@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/cloud-provider/fake"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func createNodeInternalIPAddress(address string) []v1.NodeAddress {
@@ -37,6 +38,7 @@ func createNodeInternalIPAddress(address string) []v1.NodeAddress {
 }
 
 func TestNodeAddressesDelay(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	syncPeriod := 100 * time.Millisecond
 	cloud := &fake.Cloud{
 		Addresses: createNodeInternalIPAddress("10.0.1.12"),
@@ -47,9 +49,9 @@ func TestNodeAddressesDelay(t *testing.T) {
 	defer close(stopCh)
 
 	manager := NewSyncManager(cloud, "defaultNode", syncPeriod).(*cloudResourceSyncManager)
-	go manager.Run(stopCh)
+	go manager.Run(tCtx, stopCh)
 
-	nodeAddresses, err := manager.NodeAddresses()
+	nodeAddresses, err := manager.NodeAddresses(tCtx)
 	if err != nil {
 		t.Errorf("Unexpected err: %q\n", err)
 	}
@@ -63,7 +65,7 @@ func TestNodeAddressesDelay(t *testing.T) {
 	// Wait until the IP address changes
 	maxRetry := 5
 	for i := 0; i < maxRetry; i++ {
-		nodeAddresses, err := manager.NodeAddresses()
+		nodeAddresses, err := manager.NodeAddresses(tCtx)
 		t.Logf("nodeAddresses: %#v, err: %v", nodeAddresses, err)
 		if err != nil {
 			t.Errorf("Unexpected err: %q\n", err)
@@ -82,6 +84,7 @@ func TestNodeAddressesDelay(t *testing.T) {
 }
 
 func TestNodeAddressesUsesLastSuccess(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	cloud := &fake.Cloud{}
 	manager := NewSyncManager(cloud, "defaultNode", 0).(*cloudResourceSyncManager)
 
@@ -134,8 +137,8 @@ func TestNodeAddressesUsesLastSuccess(t *testing.T) {
 				}()
 			}
 
-			manager.syncNodeAddresses()
-			nodeAddresses, err := manager.NodeAddresses()
+			manager.syncNodeAddresses(tCtx)
+			nodeAddresses, err := manager.NodeAddresses(tCtx)
 			if (err != nil) != test.wantErr {
 				t.Errorf("unexpected err: %v", err)
 			}
