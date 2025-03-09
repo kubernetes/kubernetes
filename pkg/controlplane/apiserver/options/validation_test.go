@@ -166,13 +166,13 @@ func TestValidateUnknownVersionInteroperabilityProxy(t *testing.T) {
 }
 
 func TestValidateUnknownVersionInteroperabilityProxyFeature(t *testing.T) {
-	const conflict = "UnknownVersionInteroperabilityProxy feature requires StorageVersionAPI feature flag to be enabled"
+	const conflict = "UnknownVersionInteroperabilityProxy feature requires APIServerIdentity feature flag to be enabled"
 	tests := []struct {
 		name            string
 		featuresEnabled []featuregate.Feature
 	}{
 		{
-			name:            "enabled: UnknownVersionInteroperabilityProxy, disabled: StorageVersionAPI",
+			name:            "enabled: UnknownVersionInteroperabilityProxy, disabled: APIServerIdentity",
 			featuresEnabled: []featuregate.Feature{features.UnknownVersionInteroperabilityProxy},
 		},
 	}
