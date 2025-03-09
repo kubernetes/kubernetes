@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,8 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	resourcealphainformers "k8s.io/client-go/informers/resource/v1alpha3"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/dynamic-resource-allocation/cel"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
@@ -277,7 +280,21 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	informerFactory := informers.NewSharedInformerFactory(tCtx.Client(), 0)
 	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
-	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), informerFactory)
+	resourceSliceTrackerOpts := resourceslicetracker.Options{
+		EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+		KubeClient:         tCtx.Client(),
+	}
+	var taintInformer resourcealphainformers.DeviceTaintInformer
+	if resourceSliceTrackerOpts.EnableDeviceTaints {
+		taintInformer = informerFactory.Resource().V1alpha3().DeviceTaints()
+	}
+	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx,
+		informerFactory.Resource().V1beta1().ResourceSlices(),
+		taintInformer,
+		informerFactory.Resource().V1beta1().DeviceClasses(),
+		resourceSliceTrackerOpts)
+	tCtx.ExpectNoError(err, "start resource slice tracker")
+	draManager := dynamicresources.NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), claimInformer, "ResourceClaim", "", nil), resourceSliceTracker, informerFactory)
 	informerFactory.Start(tCtx.Done())
 	defer func() {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
@@ -285,10 +302,11 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	}()
 	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
 	expectSyncedInformers := map[reflect.Type]bool{
-		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-		reflect.TypeOf(&v1.Node{}):                   true,
+		reflect.TypeOf(&resourceapi.DeviceClass{}):      true,
+		reflect.TypeOf(&resourceapi.ResourceClaim{}):    true,
+		reflect.TypeOf(&resourceapi.ResourceSlice{}):    true,
+		reflect.TypeOf(&resourcealphaapi.DeviceTaint{}): true,
+		reflect.TypeOf(&v1.Node{}):                      true,
 	}
 	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
 	celCache := cel.NewCache(10)
@@ -296,7 +314,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 	// The set of nodes is assumed to be fixed at this point.
 	nodes, err := nodeLister.List(labels.Everything())
 	tCtx.ExpectNoError(err, "list nodes")
-	slices, err := draManager.ResourceSlices().List()
+	slices, err := draManager.ResourceSlices().ListWithPatches()
 	tCtx.ExpectNoError(err, "list slices")
 
 	// Allocate one claim at a time, picking nodes randomly. Each

@@ -606,6 +606,9 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("pods/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("resourceslices").RuleOrDie(),
 		)
+		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaints").RuleOrDie())
+		}
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler
