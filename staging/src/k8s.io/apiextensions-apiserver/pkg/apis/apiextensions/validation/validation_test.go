@@ -10948,7 +10948,7 @@ func TestSchemaHasDefaults(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		// fuzz internal types
 		schema := &apiextensions.JSONSchemaProps{}
-		f.Fuzz(schema)
+		f.Fill(schema)
 
 		v1beta1Schema := &apiextensionsv1beta1.JSONSchemaProps{}
 		if err := apiextensionsv1beta1.Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(schema, v1beta1Schema, nil); err != nil {
@@ -11072,7 +11072,7 @@ func BenchmarkSchemaHas(b *testing.B) {
 	f := fuzzer.FuzzerFor(fuzzerFuncs, rand.NewSource(seed), codecs)
 	// fuzz internal types
 	schema := &apiextensions.JSONSchemaProps{}
-	f.NilChance(0).NumElements(10, 10).MaxDepth(10).Fuzz(schema)
+	f.NilChance(0).NumElements(10, 10).MaxDepth(10).Fill(schema)
 
 	b.ReportAllocs()
 	b.ResetTimer()

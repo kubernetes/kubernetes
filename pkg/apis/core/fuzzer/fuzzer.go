@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -37,45 +37,45 @@ import (
 // Funcs returns the fuzzer functions for the core group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(q *resource.Quantity, c fuzz.Continue) {
+		func(q *resource.Quantity, c randfill.Continue) {
 			*q = *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
 		},
-		func(j *core.ObjectReference, c fuzz.Continue) {
+		func(j *core.ObjectReference, c randfill.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
-			j.APIVersion = c.RandString()
-			j.Kind = c.RandString()
-			j.Namespace = c.RandString()
-			j.Name = c.RandString()
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.FieldPath = c.RandString()
+			j.APIVersion = c.String(0)
+			j.Kind = c.String(0)
+			j.Namespace = c.String(0)
+			j.Name = c.String(0)
+			j.ResourceVersion = strconv.FormatUint(c.Uint64(), 10)
+			j.FieldPath = c.String(0)
 		},
-		func(j *core.PodExecOptions, c fuzz.Continue) {
+		func(j *core.PodExecOptions, c randfill.Continue) {
 			j.Stdout = true
 			j.Stderr = true
 		},
-		func(j *core.PodAttachOptions, c fuzz.Continue) {
+		func(j *core.PodAttachOptions, c randfill.Continue) {
 			j.Stdout = true
 			j.Stderr = true
 		},
-		func(j *core.PodPortForwardOptions, c fuzz.Continue) {
-			if c.RandBool() {
+		func(j *core.PodPortForwardOptions, c randfill.Continue) {
+			if c.Bool() {
 				j.Ports = make([]int32, c.Intn(10))
 				for i := range j.Ports {
 					j.Ports[i] = c.Int31n(65535)
 				}
 			}
 		},
-		func(s *core.PodSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
+		func(s *core.PodSpec, c randfill.Continue) {
+			c.FillNoCustom(s)
 			// has a default value
 			ttl := int64(30)
-			if c.RandBool() {
+			if c.Bool() {
 				ttl = int64(c.Uint32())
 			}
 			s.TerminationGracePeriodSeconds = &ttl
 
-			c.Fuzz(s.SecurityContext)
+			c.Fill(s.SecurityContext)
 
 			if s.SecurityContext == nil {
 				s.SecurityContext = new(core.PodSecurityContext)
@@ -91,20 +91,20 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.EnableServiceLinks = &enableServiceLinks
 			}
 		},
-		func(s *core.PodStatus, c fuzz.Continue) {
-			c.Fuzz(&s)
+		func(s *core.PodStatus, c randfill.Continue) {
+			c.Fill(&s)
 			s.HostIPs = []core.HostIP{{IP: s.HostIP}}
 		},
-		func(j *core.PodPhase, c fuzz.Continue) {
+		func(j *core.PodPhase, c randfill.Continue) {
 			statuses := []core.PodPhase{core.PodPending, core.PodRunning, core.PodFailed, core.PodUnknown}
 			*j = statuses[c.Rand.Intn(len(statuses))]
 		},
-		func(j *core.Binding, c fuzz.Continue) {
-			c.Fuzz(&j.ObjectMeta)
-			j.Target.Name = c.RandString()
+		func(j *core.Binding, c randfill.Continue) {
+			c.Fill(&j.ObjectMeta)
+			j.Target.Name = c.String(0)
 		},
-		func(j *core.ReplicationController, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
+		func(j *core.ReplicationController, c randfill.Continue) {
+			c.FillNoCustom(j)
 
 			// match defaulting
 			if j.Spec.Template != nil {
@@ -116,21 +116,21 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
-		func(j *core.ReplicationControllerSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
+		func(j *core.ReplicationControllerSpec, c randfill.Continue) {
+			c.FillNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
 		},
-		func(j *core.List, c fuzz.Continue) {
-			c.FuzzNoCustom(j) // fuzz self without calling this function again
+		func(j *core.List, c randfill.Continue) {
+			c.FillNoCustom(j) // fuzz self without calling this function again
 			// TODO: uncomment when round trip starts from a versioned object
 			if false { //j.Items == nil {
 				j.Items = []runtime.Object{}
 			}
 		},
-		func(q *core.ResourceRequirements, c fuzz.Continue) {
+		func(q *core.ResourceRequirements, c randfill.Continue) {
 			randomQuantity := func() resource.Quantity {
 				var q resource.Quantity
-				c.Fuzz(&q)
+				c.Fill(&q)
 				// precalc the string for benchmarking purposes
 				_ = q.String()
 				return q
@@ -147,9 +147,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			q.Limits[core.ResourceStorage] = storageLimit.DeepCopy()
 			q.Requests[core.ResourceStorage] = storageLimit.DeepCopy()
 		},
-		func(q *core.LimitRangeItem, c fuzz.Continue) {
+		func(q *core.LimitRangeItem, c randfill.Continue) {
 			var cpuLimit resource.Quantity
-			c.Fuzz(&cpuLimit)
+			c.Fill(&cpuLimit)
 
 			q.Type = core.LimitTypeContainer
 			q.Default = make(core.ResourceList)
@@ -167,79 +167,79 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			q.MaxLimitRequestRatio = make(core.ResourceList)
 			q.MaxLimitRequestRatio[core.ResourceCPU] = resource.MustParse("10")
 		},
-		func(p *core.PullPolicy, c fuzz.Continue) {
+		func(p *core.PullPolicy, c randfill.Continue) {
 			policies := []core.PullPolicy{core.PullAlways, core.PullNever, core.PullIfNotPresent}
 			*p = policies[c.Rand.Intn(len(policies))]
 		},
-		func(rp *core.RestartPolicy, c fuzz.Continue) {
+		func(rp *core.RestartPolicy, c randfill.Continue) {
 			policies := []core.RestartPolicy{core.RestartPolicyAlways, core.RestartPolicyNever, core.RestartPolicyOnFailure}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
 		// core.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
 		// defaulted to a version otherwise roundtrip will fail
-		func(m *core.DownwardAPIVolumeFile, c fuzz.Continue) {
-			m.Path = c.RandString()
+		func(m *core.DownwardAPIVolumeFile, c randfill.Continue) {
+			m.Path = c.String(0)
 			versions := []string{"v1"}
 			m.FieldRef = &core.ObjectFieldSelector{}
 			m.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
-			m.FieldRef.FieldPath = c.RandString()
-			c.Fuzz(m.Mode)
+			m.FieldRef.FieldPath = c.String(0)
+			c.Fill(m.Mode)
 			if m.Mode != nil {
 				*m.Mode &= 0777
 			}
 		},
-		func(s *core.SecretVolumeSource, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
+		func(s *core.SecretVolumeSource, c randfill.Continue) {
+			c.FillNoCustom(s) // fuzz self without calling this function again
 
-			if c.RandBool() {
-				opt := c.RandBool()
+			if c.Bool() {
+				opt := c.Bool()
 				s.Optional = &opt
 			}
 			// DefaultMode should always be set, it has a default
 			// value and it is expected to be between 0 and 0777
 			var mode int32
-			c.Fuzz(&mode)
+			c.Fill(&mode)
 			mode &= 0777
 			s.DefaultMode = &mode
 		},
-		func(cm *core.ConfigMapVolumeSource, c fuzz.Continue) {
-			c.FuzzNoCustom(cm) // fuzz self without calling this function again
+		func(cm *core.ConfigMapVolumeSource, c randfill.Continue) {
+			c.FillNoCustom(cm) // fuzz self without calling this function again
 
-			if c.RandBool() {
-				opt := c.RandBool()
+			if c.Bool() {
+				opt := c.Bool()
 				cm.Optional = &opt
 			}
 			// DefaultMode should always be set, it has a default
 			// value and it is expected to be between 0 and 0777
 			var mode int32
-			c.Fuzz(&mode)
+			c.Fill(&mode)
 			mode &= 0777
 			cm.DefaultMode = &mode
 		},
-		func(d *core.DownwardAPIVolumeSource, c fuzz.Continue) {
-			c.FuzzNoCustom(d) // fuzz self without calling this function again
+		func(d *core.DownwardAPIVolumeSource, c randfill.Continue) {
+			c.FillNoCustom(d) // fuzz self without calling this function again
 
 			// DefaultMode should always be set, it has a default
 			// value and it is expected to be between 0 and 0777
 			var mode int32
-			c.Fuzz(&mode)
+			c.Fill(&mode)
 			mode &= 0777
 			d.DefaultMode = &mode
 		},
-		func(s *core.ProjectedVolumeSource, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
+		func(s *core.ProjectedVolumeSource, c randfill.Continue) {
+			c.FillNoCustom(s) // fuzz self without calling this function again
 
 			// DefaultMode should always be set, it has a default
 			// value and it is expected to be between 0 and 0777
 			var mode int32
-			c.Fuzz(&mode)
+			c.Fill(&mode)
 			mode &= 0777
 			s.DefaultMode = &mode
 		},
-		func(k *core.KeyToPath, c fuzz.Continue) {
-			c.FuzzNoCustom(k) // fuzz self without calling this function again
-			k.Key = c.RandString()
-			k.Path = c.RandString()
+		func(k *core.KeyToPath, c randfill.Continue) {
+			c.FillNoCustom(k) // fuzz self without calling this function again
+			k.Key = c.String(0)
+			k.Path = c.String(0)
 
 			// Mode is not mandatory, but if it is set, it should be
 			// a value between 0 and 0777
@@ -247,76 +247,76 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				*k.Mode &= 0777
 			}
 		},
-		func(vs *core.VolumeSource, c fuzz.Continue) {
+		func(vs *core.VolumeSource, c randfill.Continue) {
 			// Exactly one of the fields must be set.
 			v := reflect.ValueOf(vs).Elem()
-			i := int(c.RandUint64() % uint64(v.NumField()))
+			i := int(c.Uint64() % uint64(v.NumField()))
 			t := v.Field(i).Addr()
 			for v.Field(i).IsNil() {
-				c.Fuzz(t.Interface())
+				c.Fill(t.Interface())
 			}
 		},
-		func(i *core.ISCSIVolumeSource, c fuzz.Continue) {
-			i.ISCSIInterface = c.RandString()
+		func(i *core.ISCSIVolumeSource, c randfill.Continue) {
+			i.ISCSIInterface = c.String(0)
 			if i.ISCSIInterface == "" {
 				i.ISCSIInterface = "default"
 			}
 		},
-		func(i *core.ISCSIPersistentVolumeSource, c fuzz.Continue) {
-			i.ISCSIInterface = c.RandString()
+		func(i *core.ISCSIPersistentVolumeSource, c randfill.Continue) {
+			i.ISCSIInterface = c.String(0)
 			if i.ISCSIInterface == "" {
 				i.ISCSIInterface = "default"
 			}
 		},
-		func(i *core.PersistentVolumeClaimSpec, c fuzz.Continue) {
+		func(i *core.PersistentVolumeClaimSpec, c randfill.Continue) {
 			// Match defaulting in pkg/apis/core/v1/defaults.go.
-			volumeMode := core.PersistentVolumeMode(c.RandString())
+			volumeMode := core.PersistentVolumeMode(c.String(0))
 			if volumeMode == "" {
 				volumeMode = core.PersistentVolumeFilesystem
 			}
 			i.VolumeMode = &volumeMode
 		},
-		func(d *core.DNSPolicy, c fuzz.Continue) {
+		func(d *core.DNSPolicy, c randfill.Continue) {
 			policies := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault}
 			*d = policies[c.Rand.Intn(len(policies))]
 		},
-		func(p *core.Protocol, c fuzz.Continue) {
+		func(p *core.Protocol, c randfill.Continue) {
 			protocols := []core.Protocol{core.ProtocolTCP, core.ProtocolUDP, core.ProtocolSCTP}
 			*p = protocols[c.Rand.Intn(len(protocols))]
 		},
-		func(p *core.ServiceAffinity, c fuzz.Continue) {
+		func(p *core.ServiceAffinity, c randfill.Continue) {
 			types := []core.ServiceAffinity{core.ServiceAffinityClientIP, core.ServiceAffinityNone}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(p *core.ServiceType, c fuzz.Continue) {
+		func(p *core.ServiceType, c randfill.Continue) {
 			types := []core.ServiceType{core.ServiceTypeClusterIP, core.ServiceTypeNodePort, core.ServiceTypeLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(p *core.IPFamily, c fuzz.Continue) {
+		func(p *core.IPFamily, c randfill.Continue) {
 			types := []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
 			selected := types[c.Rand.Intn(len(types))]
 			*p = selected
 		},
-		func(p *core.ServiceExternalTrafficPolicy, c fuzz.Continue) {
+		func(p *core.ServiceExternalTrafficPolicy, c randfill.Continue) {
 			types := []core.ServiceExternalTrafficPolicy{core.ServiceExternalTrafficPolicyCluster, core.ServiceExternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(p *core.ServiceInternalTrafficPolicy, c fuzz.Continue) {
+		func(p *core.ServiceInternalTrafficPolicy, c randfill.Continue) {
 			types := []core.ServiceInternalTrafficPolicy{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
-		func(ct *core.Container, c fuzz.Continue) {
-			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
+		func(ct *core.Container, c randfill.Continue) {
+			c.FillNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 			ct.TerminationMessagePolicy = "File"
 		},
-		func(ep *core.EphemeralContainer, c fuzz.Continue) {
-			c.FuzzNoCustom(ep)                                                                   // fuzz self without calling this function again
+		func(ep *core.EphemeralContainer, c randfill.Continue) {
+			c.FillNoCustom(ep)                                                                   // fuzz self without calling this function again
 			ep.EphemeralContainerCommon.TerminationMessagePath = "/" + ep.TerminationMessagePath // Must be non-empty
 			ep.EphemeralContainerCommon.TerminationMessagePolicy = "File"
 		},
-		func(p *core.Probe, c fuzz.Continue) {
-			c.FuzzNoCustom(p)
+		func(p *core.Probe, c randfill.Continue) {
+			c.FillNoCustom(p)
 			// These fields have default values.
 			intFieldsWithDefaults := [...]string{"TimeoutSeconds", "PeriodSeconds", "SuccessThreshold", "FailureThreshold"}
 			v := reflect.ValueOf(p).Elem()
@@ -327,10 +327,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
-		func(ev *core.EnvVar, c fuzz.Continue) {
-			ev.Name = c.RandString()
-			if c.RandBool() {
-				ev.Value = c.RandString()
+		func(ev *core.EnvVar, c randfill.Continue) {
+			ev.Name = c.String(0)
+			if c.Bool() {
+				ev.Value = c.String(0)
 			} else {
 				ev.ValueFrom = &core.EnvVarSource{}
 				ev.ValueFrom.FieldRef = &core.ObjectFieldSelector{}
@@ -343,79 +343,79 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 
 				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))].String()
-				ev.ValueFrom.FieldRef.FieldPath = c.RandString()
+				ev.ValueFrom.FieldRef.FieldPath = c.String(0)
 			}
 		},
-		func(ev *core.EnvFromSource, c fuzz.Continue) {
-			if c.RandBool() {
+		func(ev *core.EnvFromSource, c randfill.Continue) {
+			if c.Bool() {
 				ev.Prefix = "p_"
 			}
-			if c.RandBool() {
-				c.Fuzz(&ev.ConfigMapRef)
+			if c.Bool() {
+				c.Fill(&ev.ConfigMapRef)
 			} else {
-				c.Fuzz(&ev.SecretRef)
+				c.Fill(&ev.SecretRef)
 			}
 		},
-		func(cm *core.ConfigMapEnvSource, c fuzz.Continue) {
-			c.FuzzNoCustom(cm) // fuzz self without calling this function again
-			if c.RandBool() {
-				opt := c.RandBool()
+		func(cm *core.ConfigMapEnvSource, c randfill.Continue) {
+			c.FillNoCustom(cm) // fuzz self without calling this function again
+			if c.Bool() {
+				opt := c.Bool()
 				cm.Optional = &opt
 			}
 		},
-		func(s *core.SecretEnvSource, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
+		func(s *core.SecretEnvSource, c randfill.Continue) {
+			c.FillNoCustom(s) // fuzz self without calling this function again
 		},
-		func(sc *core.SecurityContext, c fuzz.Continue) {
-			c.FuzzNoCustom(sc) // fuzz self without calling this function again
-			if c.RandBool() {
-				priv := c.RandBool()
+		func(sc *core.SecurityContext, c randfill.Continue) {
+			c.FillNoCustom(sc) // fuzz self without calling this function again
+			if c.Bool() {
+				priv := c.Bool()
 				sc.Privileged = &priv
 			}
 
-			if c.RandBool() {
+			if c.Bool() {
 				sc.Capabilities = &core.Capabilities{
 					Add:  make([]core.Capability, 0),
 					Drop: make([]core.Capability, 0),
 				}
-				c.Fuzz(&sc.Capabilities.Add)
-				c.Fuzz(&sc.Capabilities.Drop)
+				c.Fill(&sc.Capabilities.Add)
+				c.Fill(&sc.Capabilities.Drop)
 			}
 		},
-		func(s *core.Secret, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
+		func(s *core.Secret, c randfill.Continue) {
+			c.FillNoCustom(s) // fuzz self without calling this function again
 			s.Type = core.SecretTypeOpaque
 		},
-		func(r *core.RBDVolumeSource, c fuzz.Continue) {
-			r.RBDPool = c.RandString()
+		func(r *core.RBDVolumeSource, c randfill.Continue) {
+			r.RBDPool = c.String(0)
 			if r.RBDPool == "" {
 				r.RBDPool = "rbd"
 			}
-			r.RadosUser = c.RandString()
+			r.RadosUser = c.String(0)
 			if r.RadosUser == "" {
 				r.RadosUser = "admin"
 			}
-			r.Keyring = c.RandString()
+			r.Keyring = c.String(0)
 			if r.Keyring == "" {
 				r.Keyring = "/etc/ceph/keyring"
 			}
 		},
-		func(r *core.RBDPersistentVolumeSource, c fuzz.Continue) {
-			r.RBDPool = c.RandString()
+		func(r *core.RBDPersistentVolumeSource, c randfill.Continue) {
+			r.RBDPool = c.String(0)
 			if r.RBDPool == "" {
 				r.RBDPool = "rbd"
 			}
-			r.RadosUser = c.RandString()
+			r.RadosUser = c.String(0)
 			if r.RadosUser == "" {
 				r.RadosUser = "admin"
 			}
-			r.Keyring = c.RandString()
+			r.Keyring = c.String(0)
 			if r.Keyring == "" {
 				r.Keyring = "/etc/ceph/keyring"
 			}
 		},
-		func(obj *core.HostPathVolumeSource, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
+		func(obj *core.HostPathVolumeSource, c randfill.Continue) {
+			c.FillNoCustom(obj)
 			types := []core.HostPathType{core.HostPathUnset, core.HostPathDirectoryOrCreate, core.HostPathDirectory,
 				core.HostPathFileOrCreate, core.HostPathFile, core.HostPathSocket, core.HostPathCharDev, core.HostPathBlockDev}
 			typeVol := types[c.Rand.Intn(len(types))]
@@ -423,24 +423,24 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Type = &typeVol
 			}
 		},
-		func(pv *core.PersistentVolume, c fuzz.Continue) {
-			c.FuzzNoCustom(pv) // fuzz self without calling this function again
+		func(pv *core.PersistentVolume, c randfill.Continue) {
+			c.FillNoCustom(pv) // fuzz self without calling this function again
 			types := []core.PersistentVolumePhase{core.VolumeAvailable, core.VolumePending, core.VolumeBound, core.VolumeReleased, core.VolumeFailed}
 			pv.Status.Phase = types[c.Rand.Intn(len(types))]
-			pv.Status.Message = c.RandString()
+			pv.Status.Message = c.String(0)
 			reclamationPolicies := []core.PersistentVolumeReclaimPolicy{core.PersistentVolumeReclaimRecycle, core.PersistentVolumeReclaimRetain}
 			pv.Spec.PersistentVolumeReclaimPolicy = reclamationPolicies[c.Rand.Intn(len(reclamationPolicies))]
 			volumeModes := []core.PersistentVolumeMode{core.PersistentVolumeFilesystem, core.PersistentVolumeBlock}
 			pv.Spec.VolumeMode = &volumeModes[c.Rand.Intn(len(volumeModes))]
 		},
-		func(pvc *core.PersistentVolumeClaim, c fuzz.Continue) {
-			c.FuzzNoCustom(pvc) // fuzz self without calling this function again
+		func(pvc *core.PersistentVolumeClaim, c randfill.Continue) {
+			c.FillNoCustom(pvc) // fuzz self without calling this function again
 			types := []core.PersistentVolumeClaimPhase{core.ClaimBound, core.ClaimPending, core.ClaimLost}
 			pvc.Status.Phase = types[c.Rand.Intn(len(types))]
 			volumeModes := []core.PersistentVolumeMode{core.PersistentVolumeFilesystem, core.PersistentVolumeBlock}
 			pvc.Spec.VolumeMode = &volumeModes[c.Rand.Intn(len(volumeModes))]
 		},
-		func(obj *core.AzureDiskVolumeSource, c fuzz.Continue) {
+		func(obj *core.AzureDiskVolumeSource, c randfill.Continue) {
 			if obj.CachingMode == nil {
 				obj.CachingMode = new(core.AzureDataDiskCachingMode)
 				*obj.CachingMode = core.AzureDataDiskCachingReadWrite
@@ -458,31 +458,31 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				*obj.ReadOnly = false
 			}
 		},
-		func(sio *core.ScaleIOVolumeSource, c fuzz.Continue) {
-			sio.StorageMode = c.RandString()
+		func(sio *core.ScaleIOVolumeSource, c randfill.Continue) {
+			sio.StorageMode = c.String(0)
 			if sio.StorageMode == "" {
 				sio.StorageMode = "ThinProvisioned"
 			}
-			sio.FSType = c.RandString()
+			sio.FSType = c.String(0)
 			if sio.FSType == "" {
 				sio.FSType = "xfs"
 			}
 		},
-		func(sio *core.ScaleIOPersistentVolumeSource, c fuzz.Continue) {
-			sio.StorageMode = c.RandString()
+		func(sio *core.ScaleIOPersistentVolumeSource, c randfill.Continue) {
+			sio.StorageMode = c.String(0)
 			if sio.StorageMode == "" {
 				sio.StorageMode = "ThinProvisioned"
 			}
-			sio.FSType = c.RandString()
+			sio.FSType = c.String(0)
 			if sio.FSType == "" {
 				sio.FSType = "xfs"
 			}
 		},
-		func(s *core.NamespaceSpec, c fuzz.Continue) {
+		func(s *core.NamespaceSpec, c randfill.Continue) {
 			s.Finalizers = []core.FinalizerName{core.FinalizerKubernetes}
 		},
-		func(s *core.Namespace, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
+		func(s *core.Namespace, c randfill.Continue) {
+			c.FillNoCustom(s) // fuzz self without calling this function again
 			// Match name --> label defaulting
 			if len(s.Name) > 0 {
 				if s.Labels == nil {
@@ -491,20 +491,20 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				s.Labels["kubernetes.io/metadata.name"] = s.Name
 			}
 		},
-		func(s *core.NamespaceStatus, c fuzz.Continue) {
+		func(s *core.NamespaceStatus, c randfill.Continue) {
 			s.Phase = core.NamespaceActive
 		},
-		func(http *core.HTTPGetAction, c fuzz.Continue) {
-			c.FuzzNoCustom(http)            // fuzz self without calling this function again
+		func(http *core.HTTPGetAction, c randfill.Continue) {
+			c.FillNoCustom(http)            // fuzz self without calling this function again
 			http.Path = "/" + http.Path     // can't be blank
 			http.Scheme = "x" + http.Scheme // can't be blank
 		},
-		func(ss *core.ServiceSpec, c fuzz.Continue) {
-			c.FuzzNoCustom(ss) // fuzz self without calling this function again
+		func(ss *core.ServiceSpec, c randfill.Continue) {
+			c.FillNoCustom(ss) // fuzz self without calling this function again
 			if len(ss.Ports) == 0 {
 				// There must be at least 1 port.
 				ss.Ports = append(ss.Ports, core.ServicePort{})
-				c.Fuzz(&ss.Ports[0])
+				c.Fill(&ss.Ports[0])
 			}
 			for i := range ss.Ports {
 				switch ss.Ports[i].TargetPort.Type {
@@ -531,24 +531,24 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				ss.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
 			}
 		},
-		func(s *core.NodeStatus, c fuzz.Continue) {
-			c.FuzzNoCustom(s)
+		func(s *core.NodeStatus, c randfill.Continue) {
+			c.FillNoCustom(s)
 			s.Allocatable = s.Capacity
 		},
-		func(e *core.Event, c fuzz.Continue) {
-			c.FuzzNoCustom(e)
+		func(e *core.Event, c randfill.Continue) {
+			c.FillNoCustom(e)
 			e.EventTime = metav1.MicroTime{Time: time.Unix(1, 1000)}
 			if e.Series != nil {
 				e.Series.LastObservedTime = metav1.MicroTime{Time: time.Unix(3, 3000)}
 			}
 		},
-		func(j *core.GRPCAction, c fuzz.Continue) {
+		func(j *core.GRPCAction, c randfill.Continue) {
 			empty := ""
 			if j.Service == nil {
 				j.Service = &empty
 			}
 		},
-		func(j *core.LoadBalancerStatus, c fuzz.Continue) {
+		func(j *core.LoadBalancerStatus, c randfill.Continue) {
 			ipMode := core.LoadBalancerIPModeVIP
 			for i := range j.Ingress {
 				if j.Ingress[i].IPMode == nil {

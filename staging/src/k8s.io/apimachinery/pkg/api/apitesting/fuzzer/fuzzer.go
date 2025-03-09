@@ -21,19 +21,19 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kjson "k8s.io/apimachinery/pkg/util/json"
 )
 
-// FuzzerFuncs returns a list of func(*SomeType, c fuzz.Continue) functions.
+// FuzzerFuncs returns a list of func(*SomeType, c randfill.Continue) functions.
 type FuzzerFuncs func(codecs runtimeserializer.CodecFactory) []interface{}
 
 // FuzzerFor can randomly populate api objects that are destined for version.
-func FuzzerFor(funcs FuzzerFuncs, src rand.Source, codecs runtimeserializer.CodecFactory) *fuzz.Fuzzer {
-	f := fuzz.New().NilChance(.5).NumElements(0, 1)
+func FuzzerFor(funcs FuzzerFuncs, src rand.Source, codecs runtimeserializer.CodecFactory) *randfill.Filler {
+	f := randfill.New().NilChance(.5).NumElements(0, 1)
 	if src != nil {
 		f.RandSource(src)
 	}

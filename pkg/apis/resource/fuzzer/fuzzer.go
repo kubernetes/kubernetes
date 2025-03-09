@@ -17,10 +17,10 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"sigs.k8s.io/randfill"
 )
 
 // Funcs contains the fuzzer functions for the resource group.
@@ -29,8 +29,8 @@ import (
 // leads to errors during roundtrip tests.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(r *resource.DeviceRequest, c fuzz.Continue) {
-			c.FuzzNoCustom(r) // fuzz self without calling this function again
+		func(r *resource.DeviceRequest, c randfill.Continue) {
+			c.FillNoCustom(r) // fuzz self without calling this function again
 
 			if r.AllocationMode == "" {
 				r.AllocationMode = []resource.DeviceAllocationMode{
@@ -39,8 +39,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}[c.Int31n(2)]
 			}
 		},
-		func(r *resource.DeviceAllocationConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(r)
+		func(r *resource.DeviceAllocationConfiguration, c randfill.Continue) {
+			c.FillNoCustom(r)
 			if r.Source == "" {
 				r.Source = []resource.AllocationConfigSource{
 					resource.AllocationConfigSourceClass,
@@ -48,16 +48,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}[c.Int31n(2)]
 			}
 		},
-		func(r *resource.OpaqueDeviceConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(r)
+		func(r *resource.OpaqueDeviceConfiguration, c randfill.Continue) {
+			c.FillNoCustom(r)
 			// Match the fuzzer default content for runtime.Object.
 			//
 			// This is necessary because randomly generated content
 			// might be valid JSON which changes during re-encoding.
 			r.Parameters = runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
 		},
-		func(r *resource.AllocatedDeviceStatus, c fuzz.Continue) {
-			c.FuzzNoCustom(r)
+		func(r *resource.AllocatedDeviceStatus, c randfill.Continue) {
+			c.FillNoCustom(r)
 			// Match the fuzzer default content for runtime.Object.
 			//
 			// This is necessary because randomly generated content

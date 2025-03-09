@@ -17,7 +17,7 @@ limitations under the License.
 package outputtests
 
 import (
-	"github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/aliases"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/interfaces"
@@ -27,49 +27,49 @@ import (
 // JSON deepcopy does not work with it.
 // TODO: test also interface deepcopy
 var interfaceFuzzers = []interface{}{
-	func(s *aliases.AliasAliasInterface, c fuzz.Continue) {
-		if c.RandBool() {
+	func(s *aliases.AliasAliasInterface, c randfill.Continue) {
+		if c.Bool() {
 			*s = nil
 		} else {
 			*s = &aliasAliasInterfaceInstance{X: c.Int()}
 		}
 	},
-	func(s *aliases.AliasInterface, c fuzz.Continue) {
-		if c.RandBool() {
+	func(s *aliases.AliasInterface, c randfill.Continue) {
+		if c.Bool() {
 			*s = nil
 		} else {
 			*s = &aliasAliasInterfaceInstance{X: c.Int()}
 		}
 	},
-	func(s *aliases.Interface, c fuzz.Continue) {
-		if c.RandBool() {
+	func(s *aliases.Interface, c randfill.Continue) {
+		if c.Bool() {
 			*s = nil
 		} else {
 			*s = &aliasAliasInterfaceInstance{X: c.Int()}
 		}
 	},
-	func(s *aliases.AliasInterfaceMap, c fuzz.Continue) {
-		if c.RandBool() {
+	func(s *aliases.AliasInterfaceMap, c randfill.Continue) {
+		if c.Bool() {
 			*s = nil
 		} else {
 			*s = make(aliases.AliasInterfaceMap)
 			for i := 0; i < c.Intn(3); i++ {
-				if c.RandBool() {
-					(*s)[c.RandString()] = nil
+				if c.Bool() {
+					(*s)[c.String(0)] = nil
 				} else {
-					(*s)[c.RandString()] = &aliasAliasInterfaceInstance{X: c.Int()}
+					(*s)[c.String(0)] = &aliasAliasInterfaceInstance{X: c.Int()}
 				}
 			}
 		}
 
 	},
-	func(s *aliases.AliasInterfaceSlice, c fuzz.Continue) {
-		if c.RandBool() {
+	func(s *aliases.AliasInterfaceSlice, c randfill.Continue) {
+		if c.Bool() {
 			*s = nil
 		} else {
 			*s = make(aliases.AliasInterfaceSlice, 0)
 			for i := 0; i < c.Intn(3); i++ {
-				if c.RandBool() {
+				if c.Bool() {
 					*s = append(*s, nil)
 				} else {
 					*s = append(*s, &aliasAliasInterfaceInstance{X: c.Int()})
@@ -77,8 +77,8 @@ var interfaceFuzzers = []interface{}{
 			}
 		}
 	},
-	func(s *interfaces.Inner, c fuzz.Continue) {
-		if c.RandBool() {
+	func(s *interfaces.Inner, c randfill.Continue) {
+		if c.Bool() {
 			*s = nil
 		} else {
 			*s = &interfacesInnerInstance{X: c.Float64()}

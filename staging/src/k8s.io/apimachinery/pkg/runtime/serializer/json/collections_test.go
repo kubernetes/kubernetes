@@ -22,12 +22,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/randfill"
 )
 
 func TestCollectionsEncoding(t *testing.T) {
@@ -720,35 +720,35 @@ func (b *writeCountingBuffer) Reset() {
 }
 
 func TestFuzzCollectionsEncoding(t *testing.T) {
-	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c fuzz.Continue) {}
-	fuzzUnstructuredList := func(list *unstructured.UnstructuredList, c fuzz.Continue) {
+	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c randfill.Continue) {}
+	fuzzUnstructuredList := func(list *unstructured.UnstructuredList, c randfill.Continue) {
 		list.Object = map[string]interface{}{
-			"kind":         "List",
-			"apiVersion":   "v1",
-			c.RandString(): c.RandString(),
-			c.RandString(): c.RandUint64(),
-			c.RandString(): c.RandBool(),
+			"kind":       "List",
+			"apiVersion": "v1",
+			c.String(0):  c.String(0),
+			c.String(0):  c.Uint64(),
+			c.String(0):  c.Bool(),
 			"metadata": map[string]interface{}{
-				"resourceVersion":    fmt.Sprintf("%d", c.RandUint64()),
-				"continue":           c.RandString(),
-				"remainingItemCount": fmt.Sprintf("%d", c.RandUint64()),
-				c.RandString():       c.RandString(),
+				"resourceVersion":    fmt.Sprintf("%d", c.Uint64()),
+				"continue":           c.String(0),
+				"remainingItemCount": fmt.Sprintf("%d", c.Uint64()),
+				c.String(0):          c.String(0),
 			}}
-		c.Fuzz(&list.Items)
+		c.Fill(&list.Items)
 	}
-	fuzzMap := func(kvs map[string]interface{}, c fuzz.Continue) {
-		kvs[c.RandString()] = c.RandBool()
-		kvs[c.RandString()] = c.RandUint64()
-		kvs[c.RandString()] = c.RandString()
+	fuzzMap := func(kvs map[string]interface{}, c randfill.Continue) {
+		kvs[c.String(0)] = c.Bool()
+		kvs[c.String(0)] = c.Uint64()
+		kvs[c.String(0)] = c.String(0)
 	}
-	f := fuzz.New().Funcs(disableFuzzFieldsV1, fuzzUnstructuredList, fuzzMap)
+	f := randfill.New().Funcs(disableFuzzFieldsV1, fuzzUnstructuredList, fuzzMap)
 	streamingBuffer := &bytes.Buffer{}
 	normalSerializer := NewSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{StreamingCollectionsEncoding: false})
 	normalBuffer := &bytes.Buffer{}
 	t.Run("CarpList", func(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			list := &testapigroupv1.CarpList{}
-			f.Fuzz(list)
+			f.Fill(list)
 			streamingBuffer.Reset()
 			normalBuffer.Reset()
 			ok, err := streamEncodeCollections(list, streamingBuffer)
@@ -771,7 +771,7 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 	t.Run("UnstructuredList", func(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			list := &unstructured.UnstructuredList{}
-			f.Fuzz(list)
+			f.Fill(list)
 			streamingBuffer.Reset()
 			normalBuffer.Reset()
 			ok, err := streamEncodeCollections(list, streamingBuffer)

@@ -32,6 +32,21 @@ const (
 	AllowDuplicates ValidationOptions = iota
 )
 
+// extractItemsOptions is the options available when extracting items.
+type extractItemsOptions struct {
+	appendKeyFields bool
+}
+
+type ExtractItemsOption func(*extractItemsOptions)
+
+// WithAppendKeyFields configures ExtractItems to include key fields.
+// It is exported for use in configuring ExtractItems.
+func WithAppendKeyFields() ExtractItemsOption {
+	return func(opts *extractItemsOptions) {
+		opts.appendKeyFields = true
+	}
+}
+
 // AsTyped accepts a value and a type and returns a TypedValue. 'v' must have
 // type 'typeName' in the schema. An error is returned if the v doesn't conform
 // to the schema.
@@ -187,7 +202,37 @@ func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
 }
 
 // ExtractItems returns a value with only the provided list or map items extracted from the value.
-func (tv TypedValue) ExtractItems(items *fieldpath.Set) *TypedValue {
+func (tv TypedValue) ExtractItems(items *fieldpath.Set, opts ...ExtractItemsOption) *TypedValue {
+	options := &extractItemsOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	if options.appendKeyFields {
+		tvPathSet, err := tv.ToFieldSet()
+		if err == nil {
+			keyFieldPathSet := fieldpath.NewSet()
+			items.Iterate(func(path fieldpath.Path) {
+				if !tvPathSet.Has(path) {
+					return
+				}
+				for i, pe := range path {
+					if pe.Key == nil {
+						continue
+					}
+					for _, keyField := range *pe.Key {
+						keyName := keyField.Name
+						// Create a new slice with the same elements as path[:i+1], but set its capacity to len(path[:i+1]).
+						// This ensures that appending to keyFieldPath creates a new underlying array, avoiding accidental
+						// modification of the original slice (path).
+						keyFieldPath := append(path[:i+1:i+1], fieldpath.PathElement{FieldName: &keyName})
+						keyFieldPathSet.Insert(keyFieldPath)
+					}
+				}
+			})
+			items = items.Union(keyFieldPathSet)
+		}
+	}
+
 	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef, true)
 	return &tv
 }

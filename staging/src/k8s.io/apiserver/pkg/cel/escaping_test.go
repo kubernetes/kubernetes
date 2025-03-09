@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 // TestEscaping tests that property names are escaped as expected.
@@ -143,10 +143,10 @@ func TestUnescapeMalformed(t *testing.T) {
 }
 
 func TestEscapingFuzz(t *testing.T) {
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 	for i := 0; i < 1000; i++ {
 		var unescaped string
-		fuzzer.Fuzz(&unescaped)
+		fuzzer.Fill(&unescaped)
 		t.Run(fmt.Sprintf("%d - '%s'", i, unescaped), func(t *testing.T) {
 			if len(unescaped) == 0 {
 				return
