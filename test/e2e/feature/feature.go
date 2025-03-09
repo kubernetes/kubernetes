@@ -61,12 +61,6 @@ var (
 	ClusterSizeAutoscalingScaleUp = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterTrustBundle = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundle"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterTrustBundleProjection = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundleProjection"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterUpgrade"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
