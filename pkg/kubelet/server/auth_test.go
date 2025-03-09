@@ -125,6 +125,7 @@ func AuthzTestCases(fineGrained bool) []AuthzTestCase {
 		"/attach/{podNamespace}/{podID}/{uid}/{containerName}": {"proxy"},
 		"/checkpoint/{podNamespace}/{podID}/{containerName}":   {"checkpoint"},
 		"/configz": {"proxy"},
+		"/flagz":   {"configz"},
 		"/statusz": {"statusz"},
 		"/containerLogs/{podNamespace}/{podID}/{containerName}": {"proxy"},
 		"/debug/flags/v":                                     {"proxy"},
