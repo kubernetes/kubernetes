@@ -435,7 +435,7 @@ func (p *PodWrapper) NodeAffinityIn(key string, vals []string, t NodeSelectorTyp
 	return p
 }
 
-// NodeAffinityNotIn creates a HARD node affinity (with MatchExpressinos and the operator NotIn)
+// NodeAffinityNotIn creates a HARD node affinity (with MatchExpressions and the operator NotIn)
 // and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
