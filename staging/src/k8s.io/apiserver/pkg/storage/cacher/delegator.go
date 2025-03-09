@@ -139,7 +139,15 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 }
 
 func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	if shouldDelegateList(opts) {
+	_, _, err := storage.ValidateListOptions(c.cacher.resourcePrefix, c.cacher.versioner, opts)
+	if err != nil {
+		return err
+	}
+	shouldDelegate, err := c.shouldDelegateList(opts)
+	if err != nil {
+		return err
+	}
+	if shouldDelegate {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
@@ -173,6 +181,9 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	success := "true"
 	fallback := "false"
 	if err != nil {
+		if errors.IsResourceExpired(err) {
+			return c.storage.GetList(ctx, key, opts, listObj)
+		}
 		if consistentRead {
 			if storage.IsTooLargeResourceVersion(err) {
 				fallback = "true"
@@ -199,34 +210,58 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	return noLabelSelector && noFieldSelector && hasLimit
 }
 
-// NOTICE: Keep in sync with shouldListFromStorage function in
+// NOTICE: Keep *mostly* in sync with shouldListFromStorage function in
+// staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
 //
-//	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) bool {
+// The exceptions are blocks with `c.cacher.CanServeExact()` which depend on state of cacher which is not yet propagated to list_work_estimator.go.
+// This is acceptable state for Alpha stage of KEP-4988, as it will result in request cost being overestimated.
+// Resulting in lower performance for Alpha, but preventing API server overloading.
+func (c *CacheDelegator) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true
+		if opts.Recursive && c.cacher.CanServeExact() {
+			listRV, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion)
+			if err != nil {
+				return false, err
+			}
+			return !c.cacher.CanServeExactRV(listRV), nil
+		}
+		return true, nil
 	case metav1.ResourceVersionMatchNotOlderThan:
 	case "":
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true
+			if opts.Recursive && c.cacher.CanServeExact() {
+				listRV, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion)
+				if err != nil {
+					return false, err
+				}
+				return !c.cacher.CanServeExactRV(listRV), nil
+			}
+			return true, nil
 		}
 	default:
-		return true
+		return true, nil
 	}
 	// Continue
 	if len(opts.Predicate.Continue) > 0 {
-		return true
+		if opts.Recursive && c.cacher.CanServeExact() {
+			_, listRV, err := storage.DecodeContinue(opts.Predicate.Continue, c.cacher.resourcePrefix)
+			if err != nil {
+				return false, err
+			}
+			return !c.cacher.CanServeExactRV(uint64(listRV)), nil
+		}
+		return true, nil
 	}
 	// Consistent Read
 	if opts.ResourceVersion == "" {
 		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
 		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
+		return !consistentListFromCacheEnabled || !requestWatchProgressSupported, nil
 	}
-	return false
+	return false, nil
 }
 
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
