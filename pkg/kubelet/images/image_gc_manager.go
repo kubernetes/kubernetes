@@ -72,7 +72,7 @@ type ImageGCManager interface {
 	GarbageCollect(ctx context.Context, beganGC time.Time) error
 
 	// Start async garbage collection of images.
-	Start()
+	Start(ctx context.Context)
 
 	GetImageList() ([]container.Image, error)
 
@@ -206,12 +206,12 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 	return im, nil
 }
 
-func (im *realImageGCManager) Start() {
-	ctx := context.Background()
+func (im *realImageGCManager) Start(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	go wait.Until(func() {
 		_, err := im.detectImages(ctx, time.Now())
 		if err != nil {
-			klog.InfoS("Failed to monitor images", "err", err)
+			logger.Info("Failed to monitor images", "err", err)
 		}
 	}, 5*time.Minute, wait.NeverStop)
 
@@ -219,7 +219,7 @@ func (im *realImageGCManager) Start() {
 	go wait.Until(func() {
 		images, err := im.runtime.ListImages(ctx)
 		if err != nil {
-			klog.InfoS("Failed to update image list", "err", err)
+			logger.Info("Failed to update image list", "err", err)
 		} else {
 			im.imageCache.set(images)
 		}
@@ -233,6 +233,7 @@ func (im *realImageGCManager) GetImageList() ([]container.Image, error) {
 }
 
 func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.Time) (sets.Set[string], error) {
+	logger := klog.FromContext(ctx)
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
 	imagesInUse := sets.New[string]()
 
@@ -253,11 +254,11 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 			}
 
 			if !isRuntimeClassInImageCriAPIEnabled {
-				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef)
+				logger.V(5).Info("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef)
 				imagesInUse.Insert(container.ImageID)
 			} else {
 				imageKey := getImageTuple(container.ImageID, container.ImageRuntimeHandler)
-				klog.V(5).InfoS("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef, "imageKey", imageKey)
+				logger.V(5).Info("Container uses image", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "containerImage", container.Image, "imageID", container.ImageID, "imageRef", container.ImageRef, "imageKey", imageKey)
 				imagesInUse.Insert(imageKey)
 			}
 		}
@@ -271,17 +272,17 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 	for _, image := range images {
 		imageKey := image.ID
 		if !isRuntimeClassInImageCriAPIEnabled {
-			klog.V(5).InfoS("Adding image ID to currentImages", "imageID", imageKey)
+			logger.V(5).Info("Adding image ID to currentImages", "imageID", imageKey)
 		} else {
 			imageKey = getImageTuple(image.ID, image.Spec.RuntimeHandler)
-			klog.V(5).InfoS("Adding image ID with runtime class to currentImages", "imageKey", imageKey, "runtimeHandler", image.Spec.RuntimeHandler)
+			logger.V(5).Info("Adding image ID with runtime class to currentImages", "imageKey", imageKey, "runtimeHandler", image.Spec.RuntimeHandler)
 		}
 
 		currentImages.Insert(imageKey)
 
 		// New image, set it as detected now.
 		if _, ok := im.imageRecords[imageKey]; !ok {
-			klog.V(5).InfoS("Image ID is new", "imageID", imageKey, "runtimeHandler", image.Spec.RuntimeHandler)
+			logger.V(5).Info("Image ID is new", "imageID", imageKey, "runtimeHandler", image.Spec.RuntimeHandler)
 			im.imageRecords[imageKey] = &imageRecord{
 				firstDetected:                 detectTime,
 				runtimeHandlerUsedToPullImage: image.Spec.RuntimeHandler,
@@ -290,21 +291,21 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 
 		// Set last used time to now if the image is being used.
 		if isImageUsed(imageKey, imagesInUse) {
-			klog.V(5).InfoS("Setting Image ID lastUsed", "imageID", imageKey, "lastUsed", now)
+			logger.V(5).Info("Setting Image ID lastUsed", "imageID", imageKey, "lastUsed", now)
 			im.imageRecords[imageKey].lastUsed = now
 		}
 
-		klog.V(5).InfoS("Image ID has size", "imageID", imageKey, "size", image.Size)
+		logger.V(5).Info("Image ID has size", "imageID", imageKey, "size", image.Size)
 		im.imageRecords[imageKey].size = image.Size
 
-		klog.V(5).InfoS("Image ID is pinned", "imageID", imageKey, "pinned", image.Pinned)
+		logger.V(5).Info("Image ID is pinned", "imageID", imageKey, "pinned", image.Pinned)
 		im.imageRecords[imageKey].pinned = image.Pinned
 	}
 
 	// Remove old images from our records.
 	for image := range im.imageRecords {
 		if !currentImages.Has(image) {
-			klog.V(5).InfoS("Image ID is no longer present; removing from imageRecords", "imageID", image)
+			logger.V(5).Info("Image ID is no longer present; removing from imageRecords", "imageID", image)
 			delete(im.imageRecords, image)
 		}
 	}
@@ -314,6 +315,7 @@ func (im *realImageGCManager) detectImages(ctx context.Context, detectTime time.
 
 // handleImageVolumes ensures that image volumes are considered as images in use.
 func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUse sets.Set[string], container *container.Container, pod *container.Pod, images []container.Image) error {
+	logger := klog.FromContext(ctx)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 		return nil
 	}
@@ -326,7 +328,7 @@ func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUs
 	for _, mount := range status.Mounts {
 		for _, image := range images {
 			if mount.Image != nil && mount.Image.Image == image.ID {
-				klog.V(5).InfoS("Container uses image as mount", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "imageID", image.ID)
+				logger.V(5).Info("Container uses image as mount", "pod", klog.KRef(pod.Namespace, pod.Name), "containerName", container.Name, "imageID", image.ID)
 				imagesInUse.Insert(image.ID)
 			}
 		}
@@ -337,6 +339,7 @@ func (im *realImageGCManager) handleImageVolumes(ctx context.Context, imagesInUs
 
 func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.Time) error {
 	ctx, otelSpan := im.tracer.Start(ctx, "Images/GarbageCollect")
+	logger := klog.FromContext(ctx)
 	defer otelSpan.End()
 
 	freeTime := time.Now()
@@ -365,7 +368,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	}
 
 	if available > capacity {
-		klog.InfoS("Availability is larger than capacity", "available", available, "capacity", capacity)
+		logger.Info("Availability is larger than capacity", "available", available, "capacity", capacity)
 		available = capacity
 	}
 
@@ -380,7 +383,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	usagePercent := 100 - int(available*100/capacity)
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
-		klog.InfoS("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
+		logger.Info("Disk usage on image filesystem is over the high threshold, trying to free bytes down to the low threshold", "usage", usagePercent, "highThreshold", im.policy.HighThresholdPercent, "amountToFree", amountToFree, "lowThreshold", im.policy.LowThresholdPercent)
 		freed, err := im.freeSpace(ctx, amountToFree, freeTime, images)
 		if err != nil {
 			return err
@@ -407,9 +410,10 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 		return images, nil
 	}
 	var deletionErrors []error
+	logger := klog.FromContext(ctx)
 	remainingImages := make([]evictionInfo, 0)
 	for _, image := range images {
-		klog.V(5).InfoS("Evaluating image ID for possible garbage collection based on image age", "imageID", image.id)
+		logger.V(5).Info("Evaluating image ID for possible garbage collection based on image age", "imageID", image.id)
 		// Evaluate whether image is older than MaxAge.
 		if freeTime.Sub(image.lastUsed) > im.policy.MaxAge {
 			if err := im.freeImage(ctx, image, ImageGarbageCollectedTotalReasonAge); err != nil {
@@ -428,7 +432,8 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 }
 
 func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
-	klog.InfoS("Attempting to delete unused images")
+	logger := klog.FromContext(ctx)
+	logger.Info("Attempting to delete unused images")
 	freeTime := time.Now()
 	images, err := im.imagesInEvictionOrder(ctx, freeTime)
 	if err != nil {
@@ -447,19 +452,20 @@ func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 func (im *realImageGCManager) freeSpace(ctx context.Context, bytesToFree int64, freeTime time.Time, images []evictionInfo) (int64, error) {
 	// Delete unused images until we've freed up enough space.
 	var deletionErrors []error
+	logger := klog.FromContext(ctx)
 	spaceFreed := int64(0)
 	for _, image := range images {
-		klog.V(5).InfoS("Evaluating image ID for possible garbage collection based on disk usage", "imageID", image.id, "runtimeHandler", image.imageRecord.runtimeHandlerUsedToPullImage)
+		logger.V(5).Info("Evaluating image ID for possible garbage collection based on disk usage", "imageID", image.id, "runtimeHandler", image.imageRecord.runtimeHandlerUsedToPullImage)
 		// Images that are currently in used were given a newer lastUsed.
 		if image.lastUsed.Equal(freeTime) || image.lastUsed.After(freeTime) {
-			klog.V(5).InfoS("Image ID was used too recently, not eligible for garbage collection", "imageID", image.id, "lastUsed", image.lastUsed, "freeTime", freeTime)
+			logger.V(5).Info("Image ID was used too recently, not eligible for garbage collection", "imageID", image.id, "lastUsed", image.lastUsed, "freeTime", freeTime)
 			continue
 		}
 
 		// Avoid garbage collect the image if the image is not old enough.
 		// In such a case, the image may have just been pulled down, and will be used by a container right away.
 		if freeTime.Sub(image.firstDetected) < im.policy.MinAge {
-			klog.V(5).InfoS("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
+			logger.V(5).Info("Image ID's age is less than the policy's minAge, not eligible for garbage collection", "imageID", image.id, "age", freeTime.Sub(image.firstDetected), "minAge", im.policy.MinAge)
 			continue
 		}
 
@@ -484,7 +490,8 @@ func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo,
 	isRuntimeClassInImageCriAPIEnabled := utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClassInImageCriAPI)
 	// Remove image. Continue despite errors.
 	var err error
-	klog.InfoS("Removing image to free bytes", "imageID", image.id, "size", image.size, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
+	logger := klog.FromContext(ctx)
+	logger.Info("Removing image to free bytes", "imageID", image.id, "size", image.size, "runtimeHandler", image.runtimeHandlerUsedToPullImage)
 	err = im.runtime.RemoveImage(ctx, container.ImageSpec{Image: image.id, RuntimeHandler: image.runtimeHandlerUsedToPullImage})
 	if err != nil {
 		return err
@@ -510,17 +517,18 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
+	logger := klog.FromContext(ctx)
 
 	// Get all images in eviction order.
 	images := make([]evictionInfo, 0, len(im.imageRecords))
 	for image, record := range im.imageRecords {
 		if isImageUsed(image, imagesInUse) {
-			klog.V(5).InfoS("Image ID is being used", "imageID", image)
+			logger.V(5).Info("Image ID is being used", "imageID", image)
 			continue
 		}
 		// Check if image is pinned, prevent garbage collection
 		if record.pinned {
-			klog.V(5).InfoS("Image is pinned, skipping garbage collection", "imageID", image)
+			logger.V(5).Info("Image is pinned, skipping garbage collection", "imageID", image)
 			continue
 
 		}
