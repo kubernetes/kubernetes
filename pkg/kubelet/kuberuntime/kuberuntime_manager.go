@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -58,7 +59,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
@@ -156,6 +156,9 @@ type kubeGenericRuntimeManager struct {
 	// Manage RuntimeClass resources.
 	runtimeClassManager *runtimeclass.Manager
 
+	// Manager allocated & actuated resources.
+	allocationManager allocation.Manager
+
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
 
@@ -213,6 +216,7 @@ func NewKubeGenericRuntimeManager(
 	containerManager cm.ContainerManager,
 	logManager logs.ContainerLogManager,
 	runtimeClassManager *runtimeclass.Manager,
+	allocationManager allocation.Manager,
 	seccompDefault bool,
 	memorySwapBehavior string,
 	getNodeAllocatable func() v1.ResourceList,
@@ -242,6 +246,7 @@ func NewKubeGenericRuntimeManager(
 		internalLifecycle:      containerManager.InternalContainerLifecycle(),
 		logManager:             logManager,
 		runtimeClassManager:    runtimeClassManager,
+		allocationManager:      allocationManager,
 		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
 		seccompDefault:         seccompDefault,
 		memorySwapBehavior:     memorySwapBehavior,
@@ -550,6 +555,15 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.State == kubecontainer.ContainerStateExited && cStatus.ExitCode == 0
 }
 
+func containerResourcesFromRequirements(requirements *v1.ResourceRequirements) containerResources {
+	return containerResources{
+		memoryLimit:   requirements.Limits.Memory().Value(),
+		memoryRequest: requirements.Requests.Memory().Value(),
+		cpuLimit:      requirements.Limits.Cpu().MilliValue(),
+		cpuRequest:    requirements.Requests.Cpu().MilliValue(),
+	}
+}
+
 // computePodResizeAction determines the actions required (if any) to resize the given container.
 // Returns whether to keep (true) or restart (false) the container.
 // TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
@@ -573,47 +587,17 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containe
 		return true
 	}
 
-	if kubeContainerStatus.Resources == nil {
-		// Not enough information to actuate a resize.
-		klog.V(4).InfoS("Missing runtime resource information for container", "pod", klog.KObj(pod), "container", container.Name)
-		return true
+	actuatedResources, found := m.allocationManager.GetActuatedResources(pod.UID, container.Name)
+	if !found {
+		klog.ErrorS(nil, "Missing actuated resource record", "pod", klog.KObj(pod), "container", container.Name)
+		// Proceed with the zero-value actuated resources. For restart NotRequired, this may
+		// result in an extra call to UpdateContainerResources, but that call should be idempotent.
+		// For RestartContainer, this may trigger a container restart.
 	}
 
-	desiredResources := containerResources{
-		memoryLimit:   container.Resources.Limits.Memory().Value(),
-		memoryRequest: container.Resources.Requests.Memory().Value(),
-		cpuLimit:      container.Resources.Limits.Cpu().MilliValue(),
-		cpuRequest:    container.Resources.Requests.Cpu().MilliValue(),
-	}
+	desiredResources := containerResourcesFromRequirements(&container.Resources)
+	currentResources := containerResourcesFromRequirements(&actuatedResources)
 
-	currentResources := containerResources{
-		// memoryRequest isn't set by the runtime, so default it to the desired.
-		memoryRequest: desiredResources.memoryRequest,
-	}
-	if kubeContainerStatus.Resources.MemoryLimit != nil {
-		currentResources.memoryLimit = kubeContainerStatus.Resources.MemoryLimit.Value()
-	}
-	if kubeContainerStatus.Resources.CPULimit != nil {
-		currentResources.cpuLimit = kubeContainerStatus.Resources.CPULimit.MilliValue()
-	}
-	if kubeContainerStatus.Resources.CPURequest != nil {
-		currentResources.cpuRequest = kubeContainerStatus.Resources.CPURequest.MilliValue()
-	}
-	// Note: cgroup doesn't support memory request today, so we don't compare that. If canAdmitPod called  during
-	// handlePodResourcesResize finds 'fit', then desiredMemoryRequest == currentMemoryRequest.
-
-	// Special case for minimum CPU request
-	if desiredResources.cpuRequest <= cm.MinShares && currentResources.cpuRequest <= cm.MinShares {
-		// If both desired & current CPU requests are at or below MinShares,
-		// then consider these equal.
-		desiredResources.cpuRequest = currentResources.cpuRequest
-	}
-	// Special case for minimum CPU limit
-	if desiredResources.cpuLimit <= cm.MinMilliCPULimit && currentResources.cpuLimit <= cm.MinMilliCPULimit {
-		// If both desired & current CPU limit are at or below the minimum effective limit,
-		// then consider these equal.
-		desiredResources.cpuLimit = currentResources.cpuLimit
-	}
 	if currentResources == desiredResources {
 		// No resize required.
 		return true
@@ -755,6 +739,11 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 		}
 		return err
 	}
+
+	// Always update the pod status once. Even if there was a resize error, the resize may have been
+	// partially actuated.
+	defer m.runtimeHelper.SetPodWatchCondition(pod.UID, "doPodResizeAction", func(*kubecontainer.PodStatus) bool { return true })
+
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources {
 		currentPodMemoryConfig, err := pcm.GetPodCgroupConfig(pod, v1.ResourceMemory)
 		if err != nil {
@@ -846,35 +835,6 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 				"pod", format.Pod(pod), "resourceName", resourceName)
 			return err
 		}
-		resizeKey := fmt.Sprintf("%s:resize:%s", container.Name, resourceName)
-
-		// Watch (poll) the container for the expected resources update. Stop watching once the resources
-		// match the desired values.
-		resizeCondition := pleg.RunningContainerWatchCondition(container.Name, func(status *kubecontainer.Status) bool {
-			if status.Resources == nil {
-				return false
-			}
-			switch resourceName {
-			case v1.ResourceMemory:
-				actualLimit := nonNilQuantity(status.Resources.MemoryLimit)
-				return actualLimit.Equal(*container.Resources.Limits.Memory())
-			case v1.ResourceCPU:
-				actualLimit := nonNilQuantity(status.Resources.CPULimit)
-				actualRequest := nonNilQuantity(status.Resources.CPURequest)
-				desiredLimit := container.Resources.Limits.Cpu()
-				desiredRequest := container.Resources.Requests.Cpu()
-				// Consider limits equal if both are at or below the effective minimum limit.
-				equalLimits := actualLimit.Equal(*desiredLimit) || (actualLimit.MilliValue() <= cm.MinMilliCPULimit &&
-					desiredLimit.MilliValue() <= cm.MinMilliCPULimit)
-				// Consider requests equal if both are at or below MinShares.
-				equalRequests := actualRequest.Equal(*desiredRequest) || (actualRequest.MilliValue() <= cm.MinShares &&
-					desiredRequest.MilliValue() <= cm.MinShares)
-				return equalLimits && equalRequests
-			default:
-				return true // Shouldn't happen.
-			}
-		})
-		m.runtimeHelper.SetPodWatchCondition(pod.UID, resizeKey, resizeCondition)
 
 		// If UpdateContainerResources is error-free, it means desired values for 'resourceName' was accepted by runtime.
 		// So we update currentContainerResources for 'resourceName', which is our view of most recently configured resources.
@@ -889,15 +849,6 @@ func (m *kubeGenericRuntimeManager) updatePodContainerResources(pod *v1.Pod, res
 		}
 	}
 	return nil
-}
-
-// nonNilQuantity returns a non-nil quantity. If the input is non-nil, it is returned. Otherwise a
-// pointer to the zero value is returned.
-func nonNilQuantity(q *resource.Quantity) *resource.Quantity {
-	if q != nil {
-		return q
-	}
-	return &resource.Quantity{}
 }
 
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
