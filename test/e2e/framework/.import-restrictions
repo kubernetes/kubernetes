@@ -46,7 +46,6 @@ rules:
       "github.com/google/gnostic-models/openapiv3",
       "github.com/google/go-cmp/cmp",
       "github.com/google/go-cmp/cmp/cmpopts",
-      "github.com/google/gofuzz",
       "github.com/google/uuid",
       "github.com/imdario/mergo",
       "github.com/prometheus/client_golang/",

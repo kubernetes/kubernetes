@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/karrick/godirwalk"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/cgroups"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 

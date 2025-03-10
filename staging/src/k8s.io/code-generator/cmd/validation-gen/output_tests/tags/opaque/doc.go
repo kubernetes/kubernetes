@@ -124,7 +124,7 @@ type OtherStruct struct {
 type OtherString string
 
 // TODO: the validateFalse test fixture doesn't handle map and slice types, and
-// fixing it requires fixing gofuzz.  That is a tomorrow problem.  For now, the
+// fixing it requires fixing randfill.  That is a tomorrow problem.  For now, the
 // following types have been tested to generate correct code with
 // +k8s:opaqueType.
 

@@ -19,16 +19,11 @@ limitations under the License.
 
 package nftables
 
-//
-// NOTE: this needs to be tested in e2e since it uses nftables for everything.
-//
-
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"golang.org/x/time/rate"
 	"net"
 	"os"
 	"os/exec"
@@ -39,7 +34,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"golang.org/x/time/rate"
+
+	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -142,7 +139,7 @@ func NewDualStackProxier(
 	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
-// Proxier is an nftables based proxy
+// Proxier is an nftables-based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
@@ -179,7 +176,6 @@ type Proxier struct {
 	localDetector  proxyutil.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
-	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
@@ -211,9 +207,7 @@ type Proxier struct {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new nftables Proxier. Once a proxier is created, it will keep
-// nftables up to date in the background and will not terminate if a particular nftables
-// call fails.
+// NewProxier returns a new single-stack NFTables proxier.
 func NewProxier(ctx context.Context,
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,
@@ -264,7 +258,6 @@ func NewProxier(ctx context.Context,
 		localDetector:       localDetector,
 		hostname:            hostname,
 		nodeIP:              nodeIP,
-		recorder:            recorder,
 		serviceHealthServer: serviceHealthServer,
 		healthzServer:       healthzServer,
 		nodePortAddresses:   nodePortAddresses,

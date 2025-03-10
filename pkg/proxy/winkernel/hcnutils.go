@@ -21,6 +21,7 @@ package winkernel
 
 import (
 	"github.com/Microsoft/hnslib/hcn"
+
 	"k8s.io/klog/v2"
 )
 

@@ -27,7 +27,7 @@
       "github.com/golang/mock": "unmaintained, archive mode",
       "github.com/golang/protobuf": "replace with google.golang.org/protobuf",
       "github.com/golang/groupcache": "unmaintained",
-      "github.com/google/gofuzz": "unmaintained, archive mode",
+      "github.com/google/gofuzz": "unmaintained, use sigs.k8s.io/randfill",
       "github.com/google/s2a-go": "cloud dependency, unstable",
       "github.com/google/shlex": "unmaintained, archive mode",
       "github.com/googleapis/enterprise-certificate-proxy": "references cloud dependencies",
@@ -55,6 +55,7 @@
       "github.com/imdario/mergo": "see https://github.com/kubernetes/kubernetes/issues/107499",
       "github.com/influxdata/influxdb1-client": "db/datastore clients should not be required",
       "github.com/json-iterator/go": "refer to #105030",
+      "github.com/klauspost/compress": "unreviewable assembly code, `prometheus/client_golang` should use stdlib instead",
       "github.com/mailru/easyjson": "unmaintained",
       "github.com/miekg/dns": "no dns client/server should be required",
       "github.com/mindprince/gonvml": "depends on nvml.h that does not appear to permit modification, redistribution",
@@ -93,7 +94,6 @@
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/compute": [
-        "github.com/google/cadvisor",
         "google.golang.org/genproto"
       ],
       "cloud.google.com/go/firestore": [
@@ -107,7 +107,6 @@
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
         "github.com/json-iterator/go",
-        "github.com/prometheus/client_golang",
         "github.com/prometheus/common",
         "github.com/sirupsen/logrus",
         "github.com/stretchr/objx",
@@ -141,7 +140,9 @@
       ],
       "github.com/gogo/protobuf": [
         "github.com/containerd/containerd/api",
+        "github.com/containerd/errdefs/pkg",
         "github.com/containerd/ttrpc",
+        "github.com/containerd/typeurl/v2",
         "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "go.etcd.io/etcd/api/v3",
@@ -168,12 +169,9 @@
       "github.com/golang/protobuf": [
         "github.com/container-storage-interface/spec",
         "github.com/containerd/containerd/api",
-        "github.com/containerd/errdefs",
         "github.com/containerd/ttrpc",
-        "github.com/google/cadvisor",
         "github.com/grpc-ecosystem/go-grpc-middleware",
         "github.com/grpc-ecosystem/grpc-gateway",
-        "github.com/prometheus/client_golang",
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/pkg/v3",
@@ -185,17 +183,7 @@
         "sigs.k8s.io/apiserver-network-proxy/konnectivity-client"
       ],
       "github.com/google/gofuzz": [
-        "github.com/json-iterator/go",
-        "k8s.io/apiextensions-apiserver",
-        "k8s.io/apimachinery",
-        "k8s.io/apiserver",
-        "k8s.io/client-go",
-        "k8s.io/code-generator",
-        "k8s.io/kube-aggregator",
-        "k8s.io/kube-openapi",
-        "k8s.io/kubernetes",
-        "k8s.io/sample-apiserver",
-        "sigs.k8s.io/structured-merge-diff/v4"
+        "github.com/json-iterator/go"
       ],
       "github.com/google/shlex": [
         "sigs.k8s.io/kustomize/api",
@@ -220,6 +208,9 @@
         "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
         "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v4"
+      ],
+      "github.com/klauspost/compress": [
+        "github.com/prometheus/client_golang"
       ],
       "github.com/mailru/easyjson": [
         "github.com/go-openapi/jsonpointer",
@@ -261,11 +252,7 @@
       "golang.org/x/exp": [
         "github.com/antlr4-go/antlr/v4",
         "github.com/google/cel-go",
-        "github.com/opencontainers/runc",
         "k8s.io/mount-utils"
-      ],
-      "google.golang.org/appengine": [
-        "github.com/prometheus/client_golang"
       ],
       "google.golang.org/genproto": [
         "github.com/grpc-ecosystem/go-grpc-middleware",
@@ -287,7 +274,6 @@
       "github.com/davecgh/go-spew",
       "github.com/gogo/protobuf",
       "github.com/golang/protobuf",
-      "github.com/google/gofuzz",
       "github.com/google/shlex",
       "github.com/gregjones/httpcache",
       "github.com/grpc-ecosystem/go-grpc-prometheus",

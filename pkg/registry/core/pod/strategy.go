@@ -227,7 +227,36 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
 
+	preserveOldObservedGeneration(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
+// If a client request tries to clear `observedGeneration`, in the pod status or
+// conditions, we preserve the original value.
+func preserveOldObservedGeneration(newPod, oldPod *api.Pod) {
+	if newPod.Status.ObservedGeneration == 0 {
+		newPod.Status.ObservedGeneration = oldPod.Status.ObservedGeneration
+	}
+
+	// Remember observedGeneration values from old status conditions.
+	// This is a list per type because validation permits multiple conditions with the same type.
+	oldConditionGenerations := map[api.PodConditionType][]int64{}
+	for _, oldCondition := range oldPod.Status.Conditions {
+		oldConditionGenerations[oldCondition.Type] = append(oldConditionGenerations[oldCondition.Type], oldCondition.ObservedGeneration)
+	}
+
+	// For any conditions in the new status without observedGeneration set, preserve the old value.
+	for i, newCondition := range newPod.Status.Conditions {
+		oldGeneration := int64(0)
+		if oldGenerations, ok := oldConditionGenerations[newCondition.Type]; ok && len(oldGenerations) > 0 {
+			oldGeneration = oldGenerations[0]
+			oldConditionGenerations[newCondition.Type] = oldGenerations[1:]
+		}
+
+		if newCondition.ObservedGeneration == 0 {
+			newPod.Status.Conditions[i].ObservedGeneration = oldGeneration
+		}
+	}
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

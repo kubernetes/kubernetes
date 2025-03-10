@@ -1350,6 +1350,185 @@ func TestInterPodAffinityWithNamespaceSelector(t *testing.T) {
 	}
 }
 
+func TestTaintTolerationFilter(t *testing.T) {
+	pause := imageutils.GetPauseImageName()
+	tests := []struct {
+		name        string
+		nodes       []*v1.Node
+		incomingPod *v1.Pod
+		fit         bool
+	}{
+		{
+			name: "Pod tolerates node taint",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").
+					Taints([]v1.Taint{
+						{
+							Key:    "example.com/taint1",
+							Value:  "value1",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-1").
+				Tolerations([]v1.Toleration{
+					{
+						Key:    "example.com/taint1",
+						Value:  "value1",
+						Effect: v1.TaintEffectNoSchedule,
+					},
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+		{
+			name: "Pod does not tolerate node taint",
+			nodes: []*v1.Node{st.MakeNode().Name("node-2").
+				Taints([]v1.Taint{
+					{
+						Key:    "example.com/taint1",
+						Value:  "value1",
+						Effect: v1.TaintEffectNoSchedule,
+					},
+				}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-2").Container(pause).Obj(),
+			fit:         false,
+		},
+		{
+			name: "Pod tolerates some but not all node taints",
+			nodes: []*v1.Node{st.MakeNode().Name("node-3").Taints([]v1.Taint{
+				{
+					Key:    "example.com/taint1",
+					Value:  "value1",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "example.com/taint2",
+					Value:  "value2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-3").Tolerations([]v1.Toleration{
+				{
+					Key:    "example.com/taint1",
+					Value:  "value1",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			}).Container(pause).
+				Obj(),
+			fit: false,
+		},
+		{
+			name: "Pod tolerates all node taints",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-4").Taints([]v1.Taint{
+					{
+						Key:    "example.com/taint1",
+						Value:  "value1",
+						Effect: v1.TaintEffectNoSchedule,
+					},
+					{
+						Key:    "example.com/taint2",
+						Value:  "value2",
+						Effect: v1.TaintEffectNoSchedule,
+					},
+				}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-4").Tolerations([]v1.Toleration{
+				{
+					Key:    "example.com/taint1",
+					Value:  "value1",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "example.com/taint2",
+					Value:  "value2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			}).Container(pause).Obj(),
+			fit: true,
+		},
+		{
+			name: "Node has one taint, pod has multiple tolerations and tolerates all node taints",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-1").
+					Taints([]v1.Taint{
+						{
+							Key:    "example.com/taint1",
+							Value:  "value1",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-5").Tolerations([]v1.Toleration{
+				{
+					Key:    "example.com/taint1",
+					Value:  "value1",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "example.com/taint2",
+					Value:  "value2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			}).Container(pause).Obj(),
+			fit: true,
+		},
+		{
+			name: "Node has no taint, pod has one toleration",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-6").Obj(),
+			},
+			incomingPod: st.MakePod().Name("pod-6").Tolerations([]v1.Toleration{
+				{
+					Key:    "example.com/taint1",
+					Value:  "value1",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			}).Container(pause).Obj(),
+			fit: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "taint-toleration-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			for i := range tt.nodes {
+				if _, err := createNode(cs, tt.nodes[i]); err != nil {
+					t.Fatalf("Failed to create node: %v", err)
+				}
+			}
+
+			// set namespace to pods
+			tt.incomingPod.SetNamespace(ns)
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, []*v1.Pod{tt.incomingPod})
+
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(testCtx.Ctx, tt.incomingPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod during test: %v", err)
+			}
+
+			if tt.fit {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podScheduled(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be scheduled but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			} else {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be unschedulable but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			}
+		})
+	}
+}
+
 // TestPodTopologySpreadFilter verifies that EvenPodsSpread predicate functions well.
 func TestPodTopologySpreadFilter(t *testing.T) {
 	pause := imageutils.GetPauseImageName()

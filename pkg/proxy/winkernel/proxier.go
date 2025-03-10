@@ -31,6 +31,7 @@ import (
 
 	"github.com/Microsoft/hnslib"
 	"github.com/Microsoft/hnslib/hcn"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -622,8 +623,7 @@ func (network hnsNetworkInfo) findRemoteSubnetProviderAddress(ip string) string 
 
 type endPointsReferenceCountMap map[string]*uint16
 
-// Proxier is an hns based proxy for connections between a localhost:lport
-// and services that provide the actual backends.
+// Proxier is an HNS-based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
@@ -650,7 +650,6 @@ type Proxier struct {
 	// These are effectively const and do not need the mutex to be held.
 	hostname string
 	nodeIP   net.IP
-	recorder events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
@@ -701,7 +700,7 @@ type closeable interface {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new Proxier
+// NewProxier returns a new single-stack winkernel proxier.
 func NewProxier(
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,
@@ -713,11 +712,6 @@ func NewProxier(
 	healthzBindAddress string,
 	config config.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
-	if nodeIP == nil {
-		klog.InfoS("Invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
-	}
-
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
@@ -812,7 +806,6 @@ func NewProxier(
 		endpointsMap:          make(proxy.EndpointsMap),
 		hostname:              hostname,
 		nodeIP:                nodeIP,
-		recorder:              recorder,
 		serviceHealthServer:   serviceHealthServer,
 		healthzServer:         healthzServer,
 		hns:                   hns,

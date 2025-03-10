@@ -440,6 +440,7 @@ function codegen::validation() {
         k8s.io/apimachinery/pkg/runtime
         k8s.io/apimachinery/pkg/types
         k8s.io/apimachinery/pkg/util/intstr
+        time
     )
 
     kube::log::status "Generating validation code for ${#tag_pkgs[@]} targets"

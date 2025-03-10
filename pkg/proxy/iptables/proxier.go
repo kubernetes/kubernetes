@@ -19,10 +19,6 @@ limitations under the License.
 
 package iptables
 
-//
-// NOTE: this needs to be tested in e2e since it uses iptables for everything.
-//
-
 import (
 	"bytes"
 	"context"
@@ -54,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/util/nfacct"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilexec "k8s.io/utils/exec"
 )
 
 const (
@@ -101,7 +96,6 @@ func NewDualStackProxier(
 	ctx context.Context,
 	ipt [2]utiliptables.Interface,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -117,7 +111,7 @@ func NewDualStackProxier(
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit,
+		syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit,
 		localDetectors[v1.IPv4Protocol], hostname, nodeIPs[v1.IPv4Protocol],
 		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
@@ -125,7 +119,7 @@ func NewDualStackProxier(
 	}
 
 	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit,
+		syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit,
 		localDetectors[v1.IPv6Protocol], hostname, nodeIPs[v1.IPv6Protocol],
 		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
@@ -137,8 +131,7 @@ func NewDualStackProxier(
 	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
-// Proxier is an iptables based proxy for connections between a localhost:lport
-// and services that provide the actual backends.
+// Proxier is an iptables-based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
@@ -175,7 +168,6 @@ type Proxier struct {
 	localDetector  proxyutil.LocalTrafficDetector
 	hostname       string
 	nodeIP         net.IP
-	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
@@ -221,16 +213,11 @@ type Proxier struct {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new Proxier given an iptables Interface instance.
-// Because of the iptables logic, it is assumed that there is only a single Proxier active on a machine.
-// An error will be returned if iptables fails to update or acquire the initial lock.
-// Once a proxier is created, it will keep iptables up to date in the background and
-// will not terminate if a particular iptables call fails.
+// NewProxier returns a new single-stack IPTables proxier.
 func NewProxier(ctx context.Context,
 	ipFamily v1.IPFamily,
 	ipt utiliptables.Interface,
 	sysctl utilsysctl.Interface,
-	exec utilexec.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -300,7 +287,6 @@ func NewProxier(ctx context.Context,
 		localDetector:            localDetector,
 		hostname:                 hostname,
 		nodeIP:                   nodeIP,
-		recorder:                 recorder,
 		serviceHealthServer:      serviceHealthServer,
 		healthzServer:            healthzServer,
 		precomputedProbabilities: make([]string, 0, 1001),

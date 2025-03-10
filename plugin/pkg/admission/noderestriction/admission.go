@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -84,6 +85,8 @@ type Plugin struct {
 	pvGetter        corev1lister.PersistentVolumeLister
 	csiTranslator   csitrans.CSITranslator
 
+	authz authorizer.Authorizer
+
 	expansionRecoveryEnabled                       bool
 	dynamicResourceAllocationEnabled               bool
 	allowInsecureKubeletCertificateSigningRequests bool
@@ -94,6 +97,7 @@ var (
 	_ admission.Interface                                 = &Plugin{}
 	_ apiserveradmission.WantsExternalKubeInformerFactory = &Plugin{}
 	_ apiserveradmission.WantsFeatures                    = &Plugin{}
+	_ apiserveradmission.WantsAuthorizer                  = &Plugin{}
 )
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
@@ -137,8 +141,18 @@ func (p *Plugin) ValidateInitialization() error {
 		if p.pvGetter == nil {
 			return fmt.Errorf("%s requires a PV getter", PluginName)
 		}
+		if p.authz == nil {
+			return fmt.Errorf("%s requires an authorizer", PluginName)
+		}
 	}
 	return nil
+}
+
+// SetAuthorizer sets the authorizer.
+func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
+	if p.serviceAccountNodeAudienceRestriction {
+		p.authz = authz
+	}
 }
 
 var (
@@ -624,7 +638,7 @@ func (p *Plugin) admitServiceAccount(ctx context.Context, nodeName string, a adm
 	}
 
 	if p.serviceAccountNodeAudienceRestriction {
-		if err := p.validateNodeServiceAccountAudience(ctx, tr, pod); err != nil {
+		if err := p.validateNodeServiceAccountAudience(ctx, tr, pod, a); err != nil {
 			return admission.NewForbidden(a, err)
 		}
 	}
@@ -638,7 +652,7 @@ func (p *Plugin) admitServiceAccount(ctx context.Context, nodeName string, a adm
 	return nil
 }
 
-func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *authenticationapi.TokenRequest, pod *v1.Pod) error {
+func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *authenticationapi.TokenRequest, pod *v1.Pod, a admission.Attributes) error {
 	// ensure all items in tr.Spec.Audiences are present in a volume mount in the pod
 	requestedAudience := ""
 	switch len(tr.Spec.Audiences) {
@@ -654,10 +668,33 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 	if err != nil {
 		return fmt.Errorf("error validating audience %q: %w", requestedAudience, err)
 	}
-	if !foundAudiencesInPodSpec {
-		return fmt.Errorf("audience %q not found in pod spec volume", requestedAudience)
+	if foundAudiencesInPodSpec {
+		return nil
 	}
-	return nil
+
+	userInfo := a.GetUserInfo()
+	attrs := authorizer.AttributesRecord{
+		User:            userInfo, // this is the user info of the node requesting the token
+		Verb:            "request-serviceaccounts-token-audience",
+		Namespace:       a.GetNamespace(),
+		APIGroup:        "",
+		APIVersion:      "v1",
+		Resource:        requestedAudience, // this gives us the audience for which node is requesting a token for; wildcard will allow all audiences
+		Name:            a.GetName(),       // this gives us the service account name for which node is requesting a token for; if not set, default will allow all service accounts
+		ResourceRequest: true,
+	}
+
+	authorized, _, err := p.authz.Authorize(ctx, attrs)
+	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
+	// following the same pattern as withAuthorization (ref: https://github.com/kubernetes/kubernetes/blob/2b025e645975d6d51bf38c008f972c632cf49657/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authorization.go#L71-L91)
+	if authorized == authorizer.DecisionAllow {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("audience %q not found in pod spec volume, error authorizing %s to request tokens for this audience: %w", requestedAudience, userInfo.GetName(), err)
+	}
+
+	return fmt.Errorf("audience %q not found in pod spec volume, %s is not authorized to request tokens for this audience", requestedAudience, userInfo.GetName())
 }
 
 func (p *Plugin) podReferencesAudience(ctx context.Context, pod *v1.Pod, audience string) (bool, error) {
