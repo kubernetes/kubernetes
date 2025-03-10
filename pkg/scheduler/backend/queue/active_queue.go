@@ -113,14 +113,22 @@ func (uaq *unlockedActiveQueue) has(pInfo *framework.QueuedPodInfo) bool {
 	return uaq.queue.Has(pInfo)
 }
 
+// backoffQPopper defines method that is used to pop from the backoffQ when the activeQ is empty.
+type backoffQPopper interface {
+	// popBackoff pops the pInfo from the podBackoffQ.
+	popBackoff() (*framework.QueuedPodInfo, error)
+	// len returns length of the podBackoffQ queue.
+	lenBackoff() int
+}
+
 // activeQueue implements activeQueuer. All of the fields have to be protected using the lock.
 type activeQueue struct {
 	// lock synchronizes all operations related to activeQ.
 	// It protects activeQ, inFlightPods, inFlightEvents, schedulingCycle and closed fields.
 	// Caution: DO NOT take "SchedulingQueue.lock" after taking "lock".
 	// You should always take "SchedulingQueue.lock" first, otherwise the queue could end up in deadlock.
-	// "lock" should not be taken after taking "nLock".
-	// Correct locking order is: SchedulingQueue.lock > lock > nominator.nLock.
+	// "lock" should not be taken after taking "backoffQueue.lock" or "nominator.nLock".
+	// Correct locking order is: SchedulingQueue.lock > lock > backoffQueue.lock > nominator.nLock.
 	lock sync.RWMutex
 
 	// activeQ is heap structure that scheduler actively looks at to find pods to
@@ -132,6 +140,8 @@ type activeQueue struct {
 	unlockedQueue *unlockedActiveQueue
 
 	// cond is a condition that is notified when the pod is added to activeQ.
+	// When SchedulerPopFromBackoffQ feature is enabled,
+	// condition is also notified when the pod is added to backoffQ.
 	// It is used with lock.
 	cond sync.Cond
 
@@ -171,9 +181,13 @@ type activeQueue struct {
 	isSchedulingQueueHintEnabled bool
 
 	metricsRecorder metrics.MetricAsyncRecorder
+
+	// backoffQPopper is used to pop from backoffQ when activeQ is empty.
+	// It is non-nil only when SchedulerPopFromBackoffQ feature is enabled.
+	backoffQPopper backoffQPopper
 }
 
-func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder) *activeQueue {
+func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
 		queue:                        queue,
 		inFlightPods:                 make(map[types.UID]*list.Element),
@@ -181,6 +195,7 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 		isSchedulingQueueHintEnabled: isSchedulingQueueHintEnabled,
 		metricsRecorder:              metricRecorder,
 		unlockedQueue:                newUnlockedActiveQueue(queue),
+		backoffQPopper:               backoffQPopper,
 	}
 	aq.cond.L = &aq.lock
 
@@ -238,7 +253,13 @@ func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 }
 
 func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
+	var pInfo *framework.QueuedPodInfo
 	for aq.queue.Len() == 0 {
+		// backoffQPopper is non-nil only if SchedulerPopFromBackoffQ feature is enabled.
+		// In case of non-empty backoffQ, try popping from there.
+		if aq.backoffQPopper != nil && aq.backoffQPopper.lenBackoff() != 0 {
+			break
+		}
 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
 		// When Close() is called, the p.closed is set and the condition is broadcast,
 		// which causes this loop to continue and return from the Pop().
@@ -250,7 +271,15 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 	}
 	pInfo, err := aq.queue.Pop()
 	if err != nil {
-		return nil, err
+		if aq.backoffQPopper == nil {
+			return nil, err
+		}
+		// Try to pop from backoffQ when activeQ is empty.
+		pInfo, err = aq.backoffQPopper.popBackoff()
+		if err != nil {
+			return nil, err
+		}
+		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Inc()
 	}
 	pInfo.Attempts++
 	pInfo.BackoffExpiration = time.Time{}
