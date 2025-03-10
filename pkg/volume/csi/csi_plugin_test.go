@@ -1432,14 +1432,14 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 
 func TestGetNodeAllocatableUpdatePeriod(t *testing.T) {
 	tests := []struct {
-		name                                       string
-		driver                                     *storage.CSIDriver
-		expectedNodeAllocatableUpdatePeriodSeconds time.Duration
+		name     string
+		driver   *storage.CSIDriver
+		expected time.Duration
 	}{
 		{
-			name:   "nil driver",
-			driver: nil,
-			expectedNodeAllocatableUpdatePeriodSeconds: 0,
+			name:     "nil driver",
+			driver:   nil,
+			expected: 0,
 		},
 		{
 			name: "nil NodeAllocatableUpdatePeriodSeconds",
@@ -1448,7 +1448,7 @@ func TestGetNodeAllocatableUpdatePeriod(t *testing.T) {
 					NodeAllocatableUpdatePeriodSeconds: nil,
 				},
 			},
-			expectedNodeAllocatableUpdatePeriodSeconds: 0,
+			expected: 0,
 		},
 		{
 			name: "NodeAllocatableUpdatePeriodSeconds set to 60",
@@ -1457,15 +1457,15 @@ func TestGetNodeAllocatableUpdatePeriod(t *testing.T) {
 					NodeAllocatableUpdatePeriodSeconds: &[]int64{60}[0],
 				},
 			},
-			expectedNodeAllocatableUpdatePeriodSeconds: 60 * time.Second,
+			expected: 60 * time.Second,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := getNodeAllocatableUpdatePeriod(tc.driver)
-			if actual != tc.expectedNodeAllocatableUpdatePeriodSeconds {
-				t.Errorf("Expected %v, got %v", tc.expectedNodeAllocatableUpdatePeriodSeconds, actual)
+			if actual != tc.expected {
+				t.Errorf("Expected %v, got %v", tc.expected, actual)
 			}
 		})
 	}
