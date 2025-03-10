@@ -265,5 +265,9 @@ message VolumeError {
   // information.
   // +optional
   optional string message = 2;
+
+  // errorCode specifies the type of error encountered during Attach or Detach operation.
+  // +optional
+  optional string errorCode = 3;
 }
 
