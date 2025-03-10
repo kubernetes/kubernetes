@@ -186,9 +186,10 @@ func (d *Helper) GetPodsForDeletion(nodeName string) (*PodDeleteList, []error) {
 
 	podList := &corev1.PodList{}
 	initialOpts := &metav1.ListOptions{
-		LabelSelector: labelSelector.String(),
-		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String(),
-		Limit:         d.ChunkSize,
+		LabelSelector:   labelSelector.String(),
+		FieldSelector:   fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String(),
+		ResourceVersion: "0",
+		Limit:           d.ChunkSize,
 	}
 
 	err = resource.FollowContinue(initialOpts, func(options metav1.ListOptions) (runtime.Object, error) {
