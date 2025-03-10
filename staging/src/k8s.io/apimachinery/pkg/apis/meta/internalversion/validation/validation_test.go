@@ -63,6 +63,13 @@ func TestValidateListOptions(t *testing.T) {
 		},
 		expectErrors: []string{"resourceVersionMatch: Unsupported value: \"foo\": supported values: \"Exact\", \"NotOlderThan\", \"\""},
 	}, {
+		name: "invalid-resourceversionmatch",
+		opts: internalversion.ListOptions{
+			ResourceVersion: "1",
+			Continue:        "foo",
+		},
+		expectErrors: []string{"resourceVersion: Forbidden: specifying resource version is not allowed when using continue"},
+	}, {
 		name: "list-sendInitialEvents-forbidden",
 		opts: internalversion.ListOptions{
 			SendInitialEvents: boolPtrFn(true),
