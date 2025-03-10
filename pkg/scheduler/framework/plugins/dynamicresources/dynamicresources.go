@@ -917,19 +917,6 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 			}
 			claim.Status.Allocation = allocation
 
-			// if the claim has devices with binding conditions, we need to store them in the claim status
-			if pl.enableDeviceBindingConditions {
-				for _, device := range allocation.Devices.Results {
-					if len(device.BindingConditions) > 0 {
-						ad := resourceapi.AllocatedDeviceStatus{
-							Driver: device.Driver,
-							Device: device.Device,
-							Pool:   device.Pool,
-						}
-						claim.Status.Devices = append(claim.Status.Devices, ad)
-					}
-				}
-			}
 		}
 
 		// We can simply try to add the pod here without checking
