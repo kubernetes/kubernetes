@@ -46,8 +46,8 @@ type Manager interface {
 	// Returns the updated (or original) pod, and whether there was an allocation stored.
 	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
 
-	// SetPodAllocation checkpoints the resources allocated to a pod's containers.
-	SetPodAllocation(allocatedPod *v1.Pod) error
+	// SetAllocatedResources checkpoints the resources allocated to a pod's containers.
+	SetAllocatedResources(allocatedPod *v1.Pod) error
 
 	// SetActuatedResources records the actuated resources of the given container (or the entire
 	// pod, if actuatedContainer is nil).
@@ -56,8 +56,8 @@ type Manager interface {
 	// GetActuatedResources returns the stored actuated resources for the container, and whether they exist.
 	GetActuatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 
-	// DeletePod removes any stored state for the given pod UID.
-	DeletePod(uid types.UID)
+	// RemovePod removes any stored state for the given pod UID.
+	RemovePod(uid types.UID)
 
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
@@ -151,8 +151,8 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*
 	return pod, updated
 }
 
-// SetPodAllocation checkpoints the resources allocated to a pod's containers
-func (m *manager) SetPodAllocation(pod *v1.Pod) error {
+// SetAllocatedResources checkpoints the resources allocated to a pod's containers
+func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
 	return m.allocated.SetPodResourceAllocation(pod.UID, allocationFromPod(pod))
 }
 
@@ -175,7 +175,7 @@ func allocationFromPod(pod *v1.Pod) map[string]v1.ResourceRequirements {
 	return podAlloc
 }
 
-func (m *manager) DeletePod(uid types.UID) {
+func (m *manager) RemovePod(uid types.UID) {
 	if err := m.allocated.Delete(uid, ""); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
 		klog.V(3).ErrorS(err, "Failed to delete pod allocation", "podUID", uid)

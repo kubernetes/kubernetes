@@ -2568,7 +2568,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.existingPodAllocation != nil {
 				// when kubelet restarts, AllocatedResources has already existed before adding pod
-				err := kubelet.allocationManager.SetPodAllocation(tc.existingPodAllocation)
+				err := kubelet.allocationManager.SetAllocatedResources(tc.existingPodAllocation)
 				if err != nil {
 					t.Fatalf("failed to set pod allocation: %v", err)
 				}
@@ -2858,12 +2858,12 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				}
 
 				if !tt.newResourcesAllocated {
-					require.NoError(t, kubelet.allocationManager.SetPodAllocation(originalPod))
+					require.NoError(t, kubelet.allocationManager.SetAllocatedResources(originalPod))
 				} else {
-					require.NoError(t, kubelet.allocationManager.SetPodAllocation(newPod))
+					require.NoError(t, kubelet.allocationManager.SetAllocatedResources(newPod))
 				}
 				require.NoError(t, kubelet.allocationManager.SetActuatedResources(originalPod, nil))
-				t.Cleanup(func() { kubelet.allocationManager.DeletePod(originalPod.UID) })
+				t.Cleanup(func() { kubelet.allocationManager.RemovePod(originalPod.UID) })
 
 				podStatus := &kubecontainer.PodStatus{
 					ID:        originalPod.UID,
@@ -3882,7 +3882,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 					UID:  "12345",
 				},
 			}
-			t.Cleanup(func() { am.DeletePod(pod.UID) })
+			t.Cleanup(func() { am.RemovePod(pod.UID) })
 			podStatus := &kubecontainer.PodStatus{
 				ID:   pod.UID,
 				Name: pod.Name,
@@ -3923,7 +3923,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 					require.False(t, found)
 				}
 			}
-			require.NoError(t, am.SetPodAllocation(pod))
+			require.NoError(t, am.SetAllocatedResources(pod))
 
 			hasResizedResources := kl.isPodResizeInProgress(pod, podStatus)
 			require.Equal(t, test.expectHasResize, hasResizedResources, "hasResizedResources")

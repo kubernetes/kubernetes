@@ -2898,7 +2898,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			if test.setupFn != nil {
 				test.setupFn(pod)
 			}
-			t.Cleanup(func() { m.allocationManager.DeletePod(pod.UID) })
+			t.Cleanup(func() { m.allocationManager.RemovePod(pod.UID) })
 
 			for idx := range pod.Spec.Containers {
 				// compute hash

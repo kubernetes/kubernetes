@@ -2667,7 +2667,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					continue
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
-				if err := kl.allocationManager.SetPodAllocation(allocatedPod); err != nil {
+				if err := kl.allocationManager.SetAllocatedResources(allocatedPod); err != nil {
 					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
@@ -2723,7 +2723,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.RemovePod(pod)
-		kl.allocationManager.DeletePod(pod.UID)
+		kl.allocationManager.RemovePod(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2909,7 +2909,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 	fit, resizeStatus, resizeMsg := kl.canResizePod(pod)
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := kl.allocationManager.SetPodAllocation(pod); err != nil {
+		if err := kl.allocationManager.SetAllocatedResources(pod); err != nil {
 			return nil, err
 		}
 		for i, container := range pod.Spec.Containers {
