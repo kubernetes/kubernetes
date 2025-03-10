@@ -30,9 +30,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/cel/environment"
-	utilpointer "k8s.io/utils/pointer"
 
 	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
@@ -560,7 +560,7 @@ func TestValidateCustomResource(t *testing.T) {
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:          "object",
-						MaxProperties: utilpointer.Int64(2),
+						MaxProperties: ptr.To(int64(2)),
 					},
 				},
 			},
@@ -576,7 +576,7 @@ func TestValidateCustomResource(t *testing.T) {
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:     "array",
-						MaxItems: utilpointer.Int64(2),
+						MaxItems: ptr.To(int64(2)),
 					},
 				},
 			},
@@ -592,7 +592,7 @@ func TestValidateCustomResource(t *testing.T) {
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"fieldX": {
 						Type:      "string",
-						MaxLength: utilpointer.Int64(2),
+						MaxLength: ptr.To(int64(2)),
 					},
 				},
 			},
