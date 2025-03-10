@@ -1865,9 +1865,9 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 		t.Errorf("Expected %v in the backoffQ", hpp1.Name)
 	}
 
-	// Move clock by podInitialBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
+	// Move clock by podMaxBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
 	// and the pods will be moved into activeQ.
-	c.Step(q.backoffQ.podInitialBackoffDuration())
+	c.Step(q.backoffQ.podMaxBackoffDuration())
 	q.flushBackoffQCompleted(logger) // flush the completed backoffQ to move hpp1 to activeQ.
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
 	if q.activeQ.len() != 4 {
@@ -1969,9 +1969,9 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithOutQueueingHint(t *testi
 		t.Errorf("Expected %v in the backoffQ", hpp1.Name)
 	}
 
-	// Move clock by podInitialBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
+	// Move clock by podMaxBackoffDuration, so that pods in the unschedulablePods would pass the backing off,
 	// and the pods will be moved into activeQ.
-	c.Step(q.backoffQ.podInitialBackoffDuration())
+	c.Step(q.backoffQ.podMaxBackoffDuration())
 	q.flushBackoffQCompleted(logger) // flush the completed backoffQ to move hpp1 to activeQ.
 	q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
 	if q.activeQ.len() != 4 {
@@ -3647,7 +3647,7 @@ func TestBackOffFlow(t *testing.T) {
 			}
 
 			// Simulate routine that continuously flushes the backoff queue.
-			cl.Step(time.Millisecond)
+			cl.Step(backoffQOrderingWindowDuration)
 			q.flushBackoffQCompleted(logger)
 			// Still in backoff queue after an early flush.
 			if !q.backoffQ.has(podInfo) {
@@ -3677,20 +3677,20 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 		preEnqueueCheck PreEnqueueCheck
 		podInfos        []*framework.QueuedPodInfo
 		event           framework.ClusterEvent
-		want            []string
+		want            sets.Set[string]
 	}{
 		{
 			name:     "nil PreEnqueueCheck",
 			podInfos: podInfos,
 			event:    framework.EventUnschedulableTimeout,
-			want:     []string{"p0", "p1", "p2", "p3", "p4"},
+			want:     sets.New("p0", "p1", "p2", "p3", "p4"),
 		},
 		{
 			name:            "move Pods with priority greater than 2",
 			podInfos:        podInfos,
 			event:           framework.EventUnschedulableTimeout,
 			preEnqueueCheck: func(pod *v1.Pod) bool { return *pod.Spec.Priority >= 2 },
-			want:            []string{"p2", "p3", "p4"},
+			want:            sets.New("p2", "p3", "p4"),
 		},
 		{
 			name:     "move Pods with even priority and greater than 2",
@@ -3699,7 +3699,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			preEnqueueCheck: func(pod *v1.Pod) bool {
 				return *pod.Spec.Priority%2 == 0 && *pod.Spec.Priority >= 2
 			},
-			want: []string{"p2", "p4"},
+			want: sets.New("p2", "p4"),
 		},
 		{
 			name:     "move Pods with even and negative priority",
@@ -3745,10 +3745,10 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 				podInfo.Timestamp = podInfo.Timestamp.Add(time.Duration((i - len(tt.podInfos))) * time.Millisecond)
 			}
 			q.MoveAllToActiveOrBackoffQueue(logger, tt.event, nil, nil, tt.preEnqueueCheck)
-			var got []string
+			got := sets.New[string]()
 			c.Step(2 * q.backoffQ.podMaxBackoffDuration())
 			q.backoffQ.popEachBackoffCompleted(logger, func(pInfo *framework.QueuedPodInfo) {
-				got = append(got, pInfo.Pod.Name)
+				got.Insert(pInfo.Pod.Name)
 			})
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
