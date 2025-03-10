@@ -27,16 +27,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	admissionapi "k8s.io/pod-security-admission/api"
-
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -44,9 +44,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -270,7 +268,7 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 	newCfg.TopologyManagerScope = scope
 
 	// Set the CPU Manager policy to static.
-	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+	newCfg.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 	// Set the CPU Manager reconcile period to 1 second.
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}

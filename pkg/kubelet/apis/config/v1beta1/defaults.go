@@ -24,6 +24,8 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
+	"k8s.io/utils/ptr"
+
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -31,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -170,7 +171,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.CgroupDriver = "cgroupfs"
 	}
 	if obj.CPUManagerPolicy == "" {
-		obj.CPUManagerPolicy = "none"
+		obj.CPUManagerPolicy = kubeletconfigv1beta1.NoneCPUManagerPolicy
 	}
 	if obj.CPUManagerReconcilePeriod == zeroDuration {
 		// Keep the same as default NodeStatusUpdateFrequency
