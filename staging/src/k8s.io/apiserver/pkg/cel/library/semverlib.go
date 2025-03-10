@@ -48,8 +48,8 @@ import (
 //	semver('Three') // error
 //	semver('Mi') // error
 //	semver('v1.0.0', true) // Applies normalization to remove the leading "v". Returns a Semver of "1.0.0".
-//	semver('1.0') // Applies normalization to add the missing patch version. Returns a Semver of "1.0.0"
-//	semver('01.01.01') // Applies normalization to remove leading zeros. Returns a Semver of "1.1.1"
+//	semver('1.0', true) // Applies normalization to add the missing patch version. Returns a Semver of "1.0.0"
+//	semver('01.01.01', true) // Applies normalization to remove leading zeros. Returns a Semver of "1.1.1"
 //
 // isSemver
 //
@@ -66,9 +66,9 @@ import (
 //	isSemver('1.0.0') // returns true
 //	isSemver('hello') // returns false
 //  isSemver('v1.0')  // returns false (leading "v" is not allowed unless normalization is enabled)
-//	isSemver('v1.0') // Applies normalization to remove leading "v". returns true
-//	semver('1.0') // Applies normalization to add the missing patch version. Returns true
-//	semver('01.01.01') // Applies normalization to remove leading zeros. Returns true
+//	isSemver('v1.0', true) // Applies normalization to remove leading "v". returns true
+//	semver('1.0', true) // Applies normalization to add the missing patch version. Returns true
+//	semver('01.01.01', true) // Applies normalization to remove leading zeros. Returns true
 //
 // Conversion to Scalars:
 //

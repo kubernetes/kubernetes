@@ -298,8 +298,6 @@ func newCompiler() *compiler {
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
 
-				library.SemverLib(library.SemverVersion(0)),
-
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
 				// This is useful to simplify attribute lookups because the
@@ -310,6 +308,22 @@ func newCompiler() *compiler {
 			},
 			DeclTypes: []*apiservercel.DeclType{
 				deviceType,
+			},
+		},
+		{
+			IntroducedVersion: version.MajorMinor(1, 31),
+			// This library has added to base environment of Kubernetes
+			// in 1.33 at version 1. It will continue to be available for
+			// use in this environment, but does not need to be included
+			// directly since it becomes available indirectly via the base
+			// environment shared across Kubernetes.
+			// In Kubernetes 1.34, version 1 feature of this library will
+			// become available, and will be rollback safe to 1.33.
+			// TODO: In Kubernetes 1.34: Add compile tests that demonstrate that
+			// `isSemver("v1.0.0", true)` and `semver("v1.0.0", true)` are supported.
+			RemovedVersion: version.MajorMinor(1, 33),
+			EnvOptions: []cel.EnvOption{
+				library.SemverLib(library.SemverVersion(0)),
 			},
 		},
 	}
