@@ -39,6 +39,15 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}[c.Int31n(2)]
 			}
 		},
+		func(r *resource.DeviceSubRequest, c randfill.Continue) {
+			c.FillNoCustom(r) // fuzz self without calling this function again
+			if r.AllocationMode == "" {
+				r.AllocationMode = []resource.DeviceAllocationMode{
+					resource.DeviceAllocationModeAll,
+					resource.DeviceAllocationModeExactCount,
+				}[c.Int31n(2)]
+			}
+		},
 		func(r *resource.DeviceAllocationConfiguration, c randfill.Continue) {
 			c.FillNoCustom(r)
 			if r.Source == "" {
