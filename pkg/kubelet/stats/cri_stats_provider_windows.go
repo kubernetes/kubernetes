@@ -20,6 +20,7 @@ limitations under the License.
 package stats
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -53,9 +54,13 @@ func (s networkStats) GetHNSEndpointStats(endpointName string) (*hnslib.HNSEndpo
 func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.NetworkStats, error) {
 	networkStatsProvider := newNetworkStatsProvider(p)
 
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	endpoints, err := networkStatsProvider.HNSListEndpointRequest()
 	if err != nil {
-		klog.ErrorS(err, "Failed to fetch current HNS endpoints")
+		logger.Error(err, "Failed to fetch current HNS endpoints")
 		return nil, err
 	}
 
@@ -63,7 +68,7 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 	for _, endpoint := range endpoints {
 		endpointStats, err := networkStatsProvider.GetHNSEndpointStats(endpoint.Id)
 		if err != nil {
-			klog.V(2).InfoS("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
+			logger.V(2).Info("Failed to fetch statistics for endpoint, continue to get stats for other endpoints", "endpointId", endpoint.Id, "containers", endpoint.SharedContainers)
 			continue
 		}
 
@@ -120,6 +125,11 @@ func (p *criStatsProvider) makeWinContainerStats(
 		Rootfs:    &statsapi.FsStats{},
 		// UserDefinedMetrics is not supported by CRI.
 	}
+
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	if stats.Cpu != nil {
 		result.CPU.Time = metav1.NewTime(time.Unix(0, stats.Cpu.Timestamp))
 		if stats.Cpu.UsageCoreNanoSeconds != nil {
@@ -161,7 +171,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 	if fsID != nil {
 		imageFsInfo, found := fsIDtoInfo[*fsID]
 		if !found {
-			imageFsInfo, err = p.getFsInfo(fsID)
+			imageFsInfo, err = p.getFsInfo(ctx, fsID)
 			if err != nil {
 				return nil, fmt.Errorf("get filesystem info: %w", err)
 			}
@@ -181,7 +191,7 @@ func (p *criStatsProvider) makeWinContainerStats(
 	// officially support in-place upgrade anyway.
 	result.Logs, err = p.hostStatsProvider.getPodContainerLogStats(meta.GetNamespace(), meta.GetName(), types.UID(meta.GetUid()), container.GetMetadata().GetName(), rootFsInfo)
 	if err != nil {
-		klog.ErrorS(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
+		logger.Error(err, "Unable to fetch container log stats", "containerName", container.GetMetadata().GetName())
 	}
 	return result, nil
 }
