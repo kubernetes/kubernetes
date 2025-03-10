@@ -529,7 +529,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			}
 		})
 
-		ginkgo.It("custom-set generation on new pods should be overwritten to 1", func(ctx context.Context) {
+		ginkgo.It("custom-set generation on new pods and graceful delete", func(ctx context.Context) {
 			ginkgo.By("creating the pod")
 			name := "pod-generation-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -598,6 +598,10 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			gomega.Expect(pod.Generation).To(gomega.BeEquivalentTo(expectedPodGeneration))
 		})
 
+		// This is the same test as https://github.com/kubernetes/kubernetes/blob/aa08c90fca8d30038d3f05c0e8f127b540b40289/test/e2e/node/pod_admission.go#L35,
+		// except that this verifies the pod generation and observedGeneration, which is
+		// currently behind a feature gate. When we GA observedGeneration functionality,
+		// we can fold these tests together into one.
 		ginkgo.It("pod rejected by kubelet should have updated generation and observedGeneration", func(ctx context.Context) {
 			node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 			framework.ExpectNoError(err, "Failed to get a ready schedulable node")
@@ -631,6 +635,18 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
 			})
 
+			// Wait for the scheduler to update the pod status
+			err = e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace)
+			framework.ExpectNoError(err)
+
+			// Fetch the pod to verify that the scheduler has set the PodScheduled condition
+			// with observedGeneration.
+			pod, err = podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(len(pod.Status.Conditions)).To(gomega.BeEquivalentTo(1))
+			gomega.Expect(pod.Status.Conditions[0].Type).To(gomega.BeEquivalentTo(v1.PodScheduled))
+			gomega.Expect(pod.Status.Conditions[0].ObservedGeneration).To(gomega.BeEquivalentTo(1))
+
 			// Force assign the Pod to a node in order to get rejection status.
 			binding := &v1.Binding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -650,7 +666,7 @@ var _ = SIGDescribe("Pods Extended (pod generation)", feature.PodObservedGenerat
 			framework.ExpectNoError(err)
 
 			// Fetch the rejected Pod and verify the generation and observedGeneration.
-			gotPod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			gotPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(gotPod.Generation).To(gomega.BeEquivalentTo(1))
 			gomega.Expect(gotPod.Status.ObservedGeneration).To(gomega.BeEquivalentTo(1))

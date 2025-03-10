@@ -171,10 +171,11 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 			logger.V(2).Info("Preemptor pod rejected a waiting pod", "preemptor", klog.KObj(preemptor), "waitingPod", klog.KObj(victim), "node", c.Name())
 		} else {
 			condition := &v1.PodCondition{
-				Type:    v1.DisruptionTarget,
-				Status:  v1.ConditionTrue,
-				Reason:  v1.PodReasonPreemptionByScheduler,
-				Message: fmt.Sprintf("%s: preempting to accommodate a higher priority pod", preemptor.Spec.SchedulerName),
+				Type:               v1.DisruptionTarget,
+				ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(&victim.Status, victim.Generation, v1.DisruptionTarget),
+				Status:             v1.ConditionTrue,
+				Reason:             v1.PodReasonPreemptionByScheduler,
+				Message:            fmt.Sprintf("%s: preempting to accommodate a higher priority pod", preemptor.Spec.SchedulerName),
 			}
 			newStatus := victim.Status.DeepCopy()
 			updated := apipod.UpdatePodCondition(newStatus, condition)
