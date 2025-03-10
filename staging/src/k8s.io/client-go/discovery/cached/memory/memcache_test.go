@@ -588,7 +588,7 @@ func TestMemCacheGroupsAndMaybeResources(t *testing.T) {
 			}
 			output, err := json.Marshal(body)
 			if err != nil {
-				t.Errorf("unexpected error %v", err)
+				t.Fatalf("unexpected error %v", err)
 			}
 			// Content-type is "unaggregated" discovery format -- no resources returned.
 			w.Header().Set("Content-Type", discovery.AcceptV1)
@@ -1119,7 +1119,7 @@ func TestAggregatedMemCacheGroupsAndMaybeResources(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			if err != nil {
-				t.Errorf("unexpected error %v", err)
+				t.Fatalf("unexpected error %v", err)
 			}
 			// Content-type is "aggregated" discovery format.
 			w.Header().Set("Content-Type", discovery.AcceptV2)
@@ -1419,7 +1419,7 @@ func TestMemCacheAggregatedServerGroups(t *testing.T) {
 			}
 			output, err := json.Marshal(agg)
 			if err != nil {
-				t.Errorf("unexpected error %v", err)
+				t.Fatalf("unexpected error %v", err)
 			}
 			// Content-type is "aggregated" discovery format.
 			w.Header().Set("Content-Type", discovery.AcceptV2Beta1)

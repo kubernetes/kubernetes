@@ -202,10 +202,12 @@ func TestWithAuditConcurrency(t *testing.T) {
 			mutator, ok := handler.(MutationInterface)
 			if !ok {
 				t.Error("handler is not an interface of type MutationInterface")
+				return
 			}
 			auditMutator, ok := auditHandler.(MutationInterface)
 			if !ok {
 				t.Error("handler is not an interface of type MutationInterface")
+				return
 			}
 			assert.Equal(t, mutator.Admit(ctx, a, nil), auditMutator.Admit(ctx, a, nil), "WithAudit decorator should not effect the return value")
 		}()
