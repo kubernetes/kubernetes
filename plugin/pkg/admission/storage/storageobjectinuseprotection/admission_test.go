@@ -73,11 +73,12 @@ func TestAdmit(t *testing.T) {
 	vacWithFinalizer.Finalizers = []string{volumeutil.VACProtectionFinalizer}
 
 	tests := []struct {
-		name           string
-		resource       schema.GroupVersionResource
-		object         runtime.Object
-		expectedObject runtime.Object
-		namespace      string
+		name                 string
+		resource             schema.GroupVersionResource
+		object               runtime.Object
+		expectedObject       runtime.Object
+		namespace            string
+		enableVacFeatureGate bool
 	}{
 		{
 			"persistentvolumeclaims: create -> add finalizer",
@@ -85,6 +86,7 @@ func TestAdmit(t *testing.T) {
 			claim,
 			claimWithFinalizer,
 			claim.Namespace,
+			false,
 		},
 		{
 			"persistentvolumeclaims: finalizer already exists -> no new finalizer",
@@ -92,6 +94,7 @@ func TestAdmit(t *testing.T) {
 			claimWithFinalizer,
 			claimWithFinalizer,
 			claimWithFinalizer.Namespace,
+			false,
 		},
 		{
 			"persistentvolumes: create -> add finalizer",
@@ -99,6 +102,7 @@ func TestAdmit(t *testing.T) {
 			pv,
 			pvWithFinalizer,
 			pv.Namespace,
+			false,
 		},
 		{
 			"persistentvolumes: finalizer already exists -> no new finalizer",
@@ -106,20 +110,39 @@ func TestAdmit(t *testing.T) {
 			pvWithFinalizer,
 			pvWithFinalizer,
 			pvWithFinalizer.Namespace,
+			false,
 		},
 		{
-			"volumeattributesclasses: create -> add finalizer",
+			"volumeattributesclasses VacFeatureGate disabled: create -> no finalizer added",
+			storageapi.SchemeGroupVersion.WithResource("volumeattributesclasses"),
+			vac,
+			vac,
+			vac.Namespace,
+			false,
+		},
+		{
+			"volumeattributesclasses VacFeatureGate disabled: finalizer already exists -> no new finalizer",
+			storageapi.SchemeGroupVersion.WithResource("volumeattributesclasses"),
+			vacWithFinalizer,
+			vacWithFinalizer,
+			vac.Namespace,
+			false,
+		},
+		{
+			"volumeattributesclasses VacFeatureGate enabled: create -> add finalizer",
 			storageapi.SchemeGroupVersion.WithResource("volumeattributesclasses"),
 			vac,
 			vacWithFinalizer,
 			vac.Namespace,
+			true,
 		},
 		{
-			"volumeattributesclasses: finalizer already exists -> no new finalizer",
+			"volumeattributesclasses VacFeatureGate enabled: finalizer already exists -> no new finalizer",
 			storageapi.SchemeGroupVersion.WithResource("volumeattributesclasses"),
 			vacWithFinalizer,
 			vacWithFinalizer,
 			vac.Namespace,
+			true,
 		},
 	}
 
@@ -127,10 +150,7 @@ func TestAdmit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := newPlugin()
 
-			// Enable feature gate for tests with VolumeAttributesClass
-			if test.object.GetObjectKind().GroupVersionKind().Kind == "VolumeAttributesClass" {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, true)
-			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, test.enableVacFeatureGate)
 
 			obj := test.object.DeepCopyObject()
 			attrs := admission.NewAttributesRecord(
