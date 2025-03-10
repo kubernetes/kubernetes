@@ -132,6 +132,8 @@ type SchedulingQueue interface {
 	PendingPods() ([]*v1.Pod, string)
 	InFlightPods() []*v1.Pod
 	PodsInActiveQ() []*v1.Pod
+	PodsInBackoffQ() []*v1.Pod
+	UnschedulablePods() []*v1.Pod
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
@@ -1153,6 +1155,24 @@ func (p *PriorityQueue) PodsInActiveQ() []*v1.Pod {
 	return p.activeQ.list()
 }
 
+// PodsInBackoffQ returns all the Pods in the backoffQ.
+func (p *PriorityQueue) PodsInBackoffQ() []*v1.Pod {
+	var result []*v1.Pod
+	for _, pInfo := range p.backoffQ.list() {
+		result = append(result, pInfo.Pod)
+	}
+	return result
+}
+
+// UnschedulablePods returns all the pods in unschedulable state.
+func (p *PriorityQueue) UnschedulablePods() []*v1.Pod {
+	var result []*v1.Pod
+	for _, pInfo := range p.unschedulablePods.podInfoMap {
+		result = append(result, pInfo.Pod)
+	}
+	return result
+}
+
 var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
 
 // GetPod searches for a pod in the activeQ, backoffQ, and unschedulablePods.
@@ -1189,15 +1209,10 @@ func (p *PriorityQueue) GetPod(name, namespace string) (pInfo *framework.QueuedP
 func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	result := p.activeQ.list()
-	activeQLen := len(result)
-	for _, pInfo := range p.backoffQ.list() {
-		result = append(result, pInfo.Pod)
-	}
-	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		result = append(result, pInfo.Pod)
-	}
-	return result, fmt.Sprintf(pendingPodsSummary, activeQLen, p.backoffQ.len(), len(p.unschedulablePods.podInfoMap))
+	result := p.PodsInActiveQ()
+	result = append(result, p.PodsInBackoffQ()...)
+	result = append(result, p.UnschedulablePods()...)
+	return result, fmt.Sprintf(pendingPodsSummary, len(p.activeQ.list()), p.backoffQ.len(), len(p.unschedulablePods.podInfoMap))
 }
 
 // Note: this function assumes the caller locks both p.lock.RLock and p.activeQ.getLock().RLock.
