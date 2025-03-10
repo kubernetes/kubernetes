@@ -399,7 +399,6 @@ func (op *updateDeviceConditionsOp) requiredNamespaces() []string {
 }
 
 func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
-	// Wait for the pod to be created.
 	claimName := ""
 	retry := 0
 	for {
@@ -424,7 +423,14 @@ func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
 		if err != nil {
 			tCtx.Fatalf("get claim %s/%s: %v", op.Namespace, claimName, err)
 		}
-		if claim.Status.Devices != nil {
+		found := false
+		for _, dev := range claim.Status.Allocation.Devices.Results {
+			if dev.BindingConditions != nil {
+				found = true
+				break
+			}
+		}
+		if found {
 			break
 		}
 		retry++
@@ -436,15 +442,35 @@ func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
 	}
 
 	claim = claim.DeepCopy()
-	for i := range claim.Status.Devices {
-		claim.Status.Devices[i].Conditions = op.Conditions
-		for condIdx, cond := range claim.Status.Devices[i].Conditions {
-			cond.LastTransitionTime = metav1.Now()
-			cond.Reason = "Test"
-			cond.Message = "Test"
-			claim.Status.Devices[i].Conditions[condIdx] = cond
+	for _, dev := range claim.Status.Allocation.Devices.Results {
+		if dev.BindingConditions == nil && dev.BindingFailureConditions == nil {
+			continue
+		}
+		for _, cond := range op.Conditions {
+			ads := makeBindingConditions(dev.Driver, dev.Pool, dev.Device, cond.Type, cond.Status)
+			claim.Status.Devices = append(claim.Status.Devices, ads)
 		}
 	}
+
 	_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
-	tCtx.ExpectNoError(err, "update device conditions")
+	if err != nil {
+		tCtx.ExpectNoError(err, "update device conditions")
+	}
+}
+
+func makeBindingConditions(driver, pool, device, condition string, status metav1.ConditionStatus) resourceapi.AllocatedDeviceStatus {
+	return resourceapi.AllocatedDeviceStatus{
+		Driver: driver,
+		Pool:   pool,
+		Device: device,
+		Conditions: []metav1.Condition{
+			{
+				Type:               condition,
+				Status:             status,
+				LastTransitionTime: metav1.Now(),
+				Reason:             "Test",
+				Message:            "Test",
+			},
+		},
+	}
 }
