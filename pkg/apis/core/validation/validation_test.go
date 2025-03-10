@@ -16606,435 +16606,267 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 
 }
 
-func TestValidateReplicationControllerUpdate(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
-	validPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(),
-		},
-	}
-	readWriteVolumePodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(
-				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
-			),
-		},
-	}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	invalidPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: invalidSelector,
-			},
-			Spec: podtest.MakePodSpec(),
-		},
-	}
-	type rcUpdateTest struct {
-		old    core.ReplicationController
-		update core.ReplicationController
-	}
-	successCases := []rcUpdateTest{{
-		old: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		update: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 3,
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-	}, {
-		old: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &validPodTemplate.Template,
-			},
-		},
-		update: core.ReplicationController{
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-			Spec: core.ReplicationControllerSpec{
-				Replicas: 1,
-				Selector: validSelector,
-				Template: &readWriteVolumePodTemplate.Template,
-			},
-		},
-	},
-	}
-	for _, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerUpdate(&successCase.update, &successCase.old, PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
-	}
-	errorCases := map[string]rcUpdateTest{
-		"more than one read/write": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
-					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Template,
-				},
-			},
-		},
-		"invalid selector": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
-					Selector: invalidSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-		},
-		"invalid pod": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
-					Selector: validSelector,
-					Template: &invalidPodTemplate.Template,
-				},
-			},
-		},
-		"negative replicas": {
-			old: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-			update: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: -1,
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-		},
-	}
-	for testName, errorCase := range errorCases {
-		if errs := ValidateReplicationControllerUpdate(&errorCase.update, &errorCase.old, PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
-		}
-	}
-}
-
-func TestValidateReplicationController(t *testing.T) {
-	validSelector := map[string]string{"a": "b"}
-	validPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(),
-		},
-	}
-	readWriteVolumePodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(
-				podtest.SetVolumes(core.Volume{Name: "gcepd", VolumeSource: core.VolumeSource{GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}}),
-			),
-		},
-	}
-	hostnetPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector,
-			},
-			Spec: podtest.MakePodSpec(
-				podtest.SetSecurityContext(&core.PodSecurityContext{
-					HostNetwork: true,
-				}),
-				podtest.SetContainers(podtest.MakeContainer("abc", podtest.SetContainerPorts(
-					core.ContainerPort{
-						ContainerPort: 12345,
-						Protocol:      core.ProtocolTCP,
-					}))),
-			),
-		},
-	}
-	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
-	invalidPodTemplate := core.PodTemplate{
-		Template: core.PodTemplateSpec{
-			Spec: podtest.MakePodSpec(),
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: invalidSelector,
-			},
-		},
-	}
-	successCases := []core.ReplicationController{{
+// Helper function for RC tests.
+func mkValidReplicationController(tweaks ...func(rc *core.ReplicationController)) core.ReplicationController {
+	rc := core.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: core.ReplicationControllerSpec{
-			Selector: validSelector,
-			Template: &validPodTemplate.Template,
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-		Spec: core.ReplicationControllerSpec{
-			Selector: validSelector,
-			Template: &validPodTemplate.Template,
-		},
-	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-		Spec: core.ReplicationControllerSpec{
 			Replicas: 1,
-			Selector: validSelector,
-			Template: &readWriteVolumePodTemplate.Template,
+			Selector: map[string]string{"a": "b"},
+			Template: &core.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+				Spec: podtest.MakePodSpec(),
+			},
 		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&rc)
+	}
+	return rc
+}
+
+func TestValidateReplicationControllerUpdate(t *testing.T) {
+	successCases := []struct {
+		old    core.ReplicationController
+		update core.ReplicationController
+	}{{
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = 0
+		}),
 	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "hostnet", Namespace: metav1.NamespaceDefault},
-		Spec: core.ReplicationControllerSpec{
-			Replicas: 1,
-			Selector: validSelector,
-			Template: &hostnetPodTemplate.Template,
-		},
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = 3
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = 2
+			rc.Spec.Template.Spec = podtest.MakePodSpec(
+				podtest.SetVolumes(
+					core.Volume{
+						Name: "gcepd",
+						VolumeSource: core.VolumeSource{
+							GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{
+								PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false,
+							},
+						},
+					}))
+		}),
 	}}
-	for _, successCase := range successCases {
-		if errs := ValidateReplicationController(&successCase, PodValidationOptions{}); len(errs) != 0 {
+	for _, tc := range successCases {
+		tc.old.ObjectMeta.ResourceVersion = "1"
+		tc.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{}); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
 	errorCases := map[string]struct {
-		rc             core.ReplicationController
-		expectedOrigin []string
+		old          core.ReplicationController
+		update       core.ReplicationController
+		expectedErrs field.ErrorList
 	}{
-		"zero-length ID": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
+		"unmatched selector": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Selector["another"] = "value"
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.metadata.labels"), nil, "does not match template"),
 			},
 		},
-		"missing-namespace": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123"},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
+		"invalid selector": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				invalid := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
+				rc.Spec.Template.Labels = invalid
+				rc.Spec.Selector = invalid
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.labels"), nil, "").WithOrigin("labelKey"),
 			},
 		},
-		"empty selector": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Template: &validPodTemplate.Template,
-				},
+		"invalid pod": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.template"), ""),
 			},
 		},
-		"selector_doesnt_match": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Template: &validPodTemplate.Template,
-				},
-			},
-		},
-		"invalid manifest": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-				},
-			},
-		},
-		"read-write persistent disk with > 1 pod": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc"},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
-					Selector: validSelector,
-					Template: &readWriteVolumePodTemplate.Template,
-				},
-			},
-		},
-		"negative_replicas": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: -1,
-					Selector: validSelector,
-				},
-			},
-			expectedOrigin: []string{
-				"minimum",
-			},
-		},
-		"invalid_label": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-					Labels: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-		},
-		"invalid_label 2": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-					Labels: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: core.ReplicationControllerSpec{
-					Template: &invalidPodTemplate.Template,
-				},
-			},
-		},
-		"invalid_annotation": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-					Annotations: map[string]string{
-						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
-					},
-				},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &validPodTemplate.Template,
-				},
-			},
-		},
-		"invalid restart policy 1": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &core.PodTemplateSpec{
-						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyOnFailure)),
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: validSelector,
-						},
-					},
-				},
-			},
-		},
-		"invalid restart policy 2": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "abc-123",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: core.ReplicationControllerSpec{
-					Selector: validSelector,
-					Template: &core.PodTemplateSpec{
-						Spec: podtest.MakePodSpec(podtest.SetRestartPolicy(core.RestartPolicyNever)),
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: validSelector,
-						},
-					},
-				},
-			},
-		},
-		"template may not contain ephemeral containers": {
-			rc: core.ReplicationController{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
-				Spec: core.ReplicationControllerSpec{
-					Replicas: 1,
-					Selector: validSelector,
-					Template: &core.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: validSelector,
-						},
-						Spec: podtest.MakePodSpec(
-							podtest.SetEphemeralContainers(core.EphemeralContainer{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}),
-						),
-					},
-				},
+		"negative replicas": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Replicas = -1
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
 	}
-	for k, v := range errorCases {
-		errs := ValidateReplicationController(&v.rc, PodValidationOptions{})
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+	for k, tc := range errorCases {
+		t.Run(k, func(t *testing.T) {
+			tc.old.ObjectMeta.ResourceVersion = "1"
+			tc.update.ObjectMeta.ResourceVersion = "1"
+			errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{})
+			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
+	}
+}
+
+func TestValidateReplicationController(t *testing.T) {
+	successCases := []core.ReplicationController{
+		mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Name = "abc-123" }),
+		mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = 2
+			rc.Spec.Template.Spec = podtest.MakePodSpec(
+				podtest.SetVolumes(
+					core.Volume{
+						Name: "gcepd",
+						VolumeSource: core.VolumeSource{
+							GCEPersistentDisk: &core.GCEPersistentDiskVolumeSource{
+								PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false,
+							},
+						},
+					}))
+		}),
+		mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Template.Spec = podtest.MakePodSpec(
+				podtest.SetSecurityContext(&core.PodSecurityContext{HostNetwork: true}),
+				podtest.SetContainers(podtest.MakeContainer("abc",
+					podtest.SetContainerPorts(core.ContainerPort{
+						ContainerPort: 12345, Protocol: core.ProtocolTCP,
+					}))),
+			)
+		}),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 0 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 1 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 100 }),
+	}
+	for _, tc := range successCases {
+		if errs := ValidateReplicationController(&tc, PodValidationOptions{}); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
 		}
+	}
 
-		expectedOrigins := sets.NewString(v.expectedOrigin...)
-
-		for i := range errs {
-			field := errs[i].Field
-			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name" &&
-				field != "metadata.namespace" &&
-				field != "spec.selector" &&
-				field != "spec.template" &&
-				field != "GCEPersistentDisk.ReadOnly" &&
-				field != "spec.replicas" &&
-				field != "spec.template.labels" &&
-				field != "metadata.annotations" &&
-				field != "metadata.labels" &&
-				field != "status.replicas" {
-				t.Errorf("%s: missing prefix for: %v", k, errs[i])
-			}
-
-			if len(v.expectedOrigin) > 0 && errs[i].Origin != "" {
-				if !expectedOrigins.Has(errs[i].Origin) {
-					t.Errorf("%s: unexpected origin for: %v, expected one of %v", k, errs[i].Origin, v.expectedOrigin)
+	errorCases := map[string]struct {
+		input        core.ReplicationController
+		expectedErrs field.ErrorList
+	}{
+		"missing name": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Name = "" }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.name"), ""),
+			},
+		},
+		"missing namespace": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Namespace = "" }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("metadata.namespace"), ""),
+			},
+		},
+		"empty selector": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Selector = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.selector"), ""),
+			},
+		},
+		"selector doesnt match": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Selector = map[string]string{"foo": "bar"} }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.metadata.labels"), nil, "does not match template"),
+			},
+		},
+		"invalid manifest": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Template = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.template"), ""),
+			},
+		},
+		"negative replicas": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = -1 }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"invalid label": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Labels = map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
 				}
-				expectedOrigins.Delete(errs[i].Origin)
-			}
-		}
-		if len(expectedOrigins) > 0 {
-			t.Errorf("%s: missing errors with origin: %v", k, expectedOrigins.List())
-		}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.labels"), nil, "").WithOrigin("labelKey"),
+			},
+		},
+		"invalid label 2": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Labels = map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.template.metadata.labels"), nil, "does not match template"),
+				field.Invalid(field.NewPath("spec.template.labels"), nil, "").WithOrigin("labelKey"),
+			},
+		},
+		"invalid annotation": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Annotations = map[string]string{
+					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+				}
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("metadata.annotations"), nil, "name part must consist of"),
+			},
+		},
+		"invalid restart policy 1": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Spec.RestartPolicy = core.RestartPolicyOnFailure
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported[core.RestartPolicy](field.NewPath("spec.template.spec.restartPolicy"), nil, nil),
+			},
+		},
+		"invalid restart policy 2": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Spec.RestartPolicy = core.RestartPolicyNever
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported[core.RestartPolicy](field.NewPath("spec.template.spec.restartPolicy"), nil, nil),
+			},
+		},
+		"template may not contain ephemeral containers": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Template.Spec = podtest.MakePodSpec(
+					podtest.SetEphemeralContainers(
+						core.EphemeralContainer{
+							EphemeralContainerCommon: core.EphemeralContainerCommon{
+								Name:                     "debug",
+								Image:                    "image",
+								ImagePullPolicy:          "IfNotPresent",
+								TerminationMessagePolicy: "File",
+							},
+						}))
+			}),
+			expectedErrs: field.ErrorList{
+				field.Forbidden(field.NewPath("spec.template.spec.ephemeralContainers"), "not allowed in pod template"),
+			},
+		},
+	}
+	for k, tc := range errorCases {
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateReplicationController(&tc.input, PodValidationOptions{})
+			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher.Test(t, tc.expectedErrs, errs)
+		})
 	}
 }
 
