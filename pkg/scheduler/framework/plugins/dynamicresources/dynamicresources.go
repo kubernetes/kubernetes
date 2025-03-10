@@ -554,7 +554,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			continue
 		}
 
-		bound, err := isClaimBound(logger, claim, pod, node.Name)
+		bound, err := pl.isClaimBound(claim, pod, node.Name)
 		if err != nil || !bound {
 			unavailableClaims = append(unavailableClaims, index)
 		}
@@ -843,7 +843,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	// We need to wait for the device to be attached to the node.
 	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Duration(timeout)*time.Second, true,
 		func(ctx context.Context) (bool, error) {
-			return hasDeviceBindingStatus(ctx, logger, state, pl, pod, nodeName)
+			return pl.hasDeviceBindingStatus(ctx, state, pod, nodeName)
 		})
 	if err != nil {
 		return statusError(logger, err)
@@ -942,6 +942,67 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 	return claim, nil
 }
 
+// isClaimBound checks whether a given resource claim is successfully
+// bound to a device.
+func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim, pod *v1.Pod, nodeName string) (bool, error) {
+	for _, deviceRequest := range claim.Status.Allocation.Devices.Results {
+		if len(deviceRequest.BindingConditions) == 0 {
+			continue
+		}
+		deviceStatus := getAllocatedDeviceStatus(claim, &deviceRequest)
+		if deviceStatus == nil {
+			pl.fh.EventRecorder().Eventf(claim, nil, v1.EventTypeWarning, "FailedDeviceBinding", "Scheduling", "allocatedDeviceStatus is not updated.")
+			return false, nil
+		}
+		for _, cond := range deviceRequest.BindingFailureConditions {
+			if apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
+				pl.fh.EventRecorder().Eventf(claim, nil, v1.EventTypeWarning, "FailedDeviceBinding", "Scheduling", "device %v binding to node %v failed. pod: %v/%v. ", deviceStatus.Device, nodeName, pod.Namespace, pod.Name)
+				return false, fmt.Errorf("claim %s failed to bind", claim.Name)
+			}
+		}
+		for _, cond := range deviceRequest.BindingConditions {
+			if !apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
+				pl.fh.EventRecorder().Eventf(claim, nil, v1.EventTypeWarning, "FailedDeviceBinding", "Scheduling", "device binding conditions are not met.")
+				return false, nil
+			}
+		}
+	}
+	return true, nil
+}
+
+// hasDeviceBindingStatus checks the binding status of devices within the
+// given state claims.
+func (pl *DynamicResources) hasDeviceBindingStatus(ctx context.Context, state *stateData, pod *v1.Pod, nodeName string) (bool, error) {
+	for claimIndex, claim := range state.claims {
+		claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		state.claims[claimIndex] = claim
+		bound, err := pl.isClaimBound(claim, pod, nodeName)
+		if err != nil {
+			return false, err
+		}
+		if !bound {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// checkBindingConditions checks all claims in the given state.
+// It returns true if any device has non-empty binding conditions.
+func checkBindingConditions(state *stateData) bool {
+	for _, claim := range state.claims {
+		for _, device := range claim.Status.Allocation.Devices.Results {
+			if len(device.BindingConditions) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // statusUnschedulable ensures that there is a log message associated with the
 // line where the status originated.
 func statusUnschedulable(logger klog.Logger, reason string, kv ...interface{}) *framework.Status {
@@ -974,65 +1035,4 @@ func getAllocatedDeviceStatus(claim *resourceapi.ResourceClaim, deviceRequest *r
 		}
 	}
 	return nil
-}
-
-// isClaimBound checks whether a given resource claim is successfully
-// bound to a device.
-func isClaimBound(logger klog.Logger, claim *resourceapi.ResourceClaim, pod *v1.Pod, nodeName string) (bool, error) {
-	for _, deviceRequest := range claim.Status.Allocation.Devices.Results {
-		if len(deviceRequest.BindingConditions) == 0 {
-			continue
-		}
-		deviceStatus := getAllocatedDeviceStatus(claim, &deviceRequest)
-		if deviceStatus == nil {
-			return false, nil
-		}
-		for _, cond := range deviceRequest.BindingFailureConditions {
-			if apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
-				logger.V(5).Info("device binding failed", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim), "device", deviceStatus.Device, "condition", cond)
-				return false, fmt.Errorf("claim %s failed to bind", claim.Name)
-			}
-		}
-		for _, cond := range deviceRequest.BindingConditions {
-			if !apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
-				logger.V(5).Info("device binding condition not met", "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName}, "resourceclaim", klog.KObj(claim), "device", deviceStatus.Device, "condition", cond)
-				return false, nil
-			}
-		}
-	}
-	return true, nil
-}
-
-// hasDeviceBindingStatus checks the binding status of devices within the
-// given state claims.
-func hasDeviceBindingStatus(ctx context.Context, logger klog.Logger, state *stateData, pl *DynamicResources, pod *v1.Pod, nodeName string) (bool, error) {
-	for claimIndex, claim := range state.claims {
-		claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		state.claims[claimIndex] = claim
-		bound, err := isClaimBound(logger, claim, pod, nodeName)
-		if err != nil {
-			return false, err
-		}
-		if !bound {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// checkBindingConditions checks all claims in the given state.
-// It returns true if any device has non-empty binding conditions.
-func checkBindingConditions(state *stateData) bool {
-	for _, claim := range state.claims {
-		for _, device := range claim.Status.Allocation.Devices.Results {
-			if len(device.BindingConditions) > 0 {
-				return true
-			}
-		}
-	}
-
-	return false
 }
