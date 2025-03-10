@@ -41,12 +41,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
-
-	"k8s.io/client-go/informers"
-	"k8s.io/mount-utils"
-
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 
@@ -60,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -73,11 +70,11 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
-	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -131,13 +128,14 @@ import (
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	"k8s.io/utils/clock"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -2868,7 +2866,7 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
-			if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
+			if kl.containerManager.GetNodeConfig().CPUManagerPolicy == kubeletconfiginternal.StaticCPUManagerPolicy {
 				msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 				return false, v1.PodReasonInfeasible, msg
