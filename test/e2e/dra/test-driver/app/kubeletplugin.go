@@ -40,15 +40,13 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
-	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
 
 type ExamplePlugin struct {
 	stopCh     <-chan struct{}
 	logger     klog.Logger
 	kubeClient kubernetes.Interface
-	d          kubeletplugin.DRAPlugin
+	d          *kubeletplugin.Helper
 	fileOps    FileOperations
 
 	cdiDir      string
@@ -56,8 +54,11 @@ type ExamplePlugin struct {
 	nodeName    string
 	deviceNames sets.Set[string]
 
+	// The mutex is needed because there are other goroutines checking the state.
+	// Serializing in the gRPC server alone is not enough because writing would
+	// race with reading.
 	mutex     sync.Mutex
-	prepared  map[ClaimID][]Device // prepared claims -> result of nodePrepareResource
+	prepared  map[ClaimID][]kubeletplugin.Device // prepared claims -> result of nodePrepareResource
 	gRPCCalls []GRPCCall
 
 	blockPrepareResourcesMutex   sync.Mutex
@@ -89,7 +90,7 @@ type GRPCCall struct {
 // sufficient to make the ClaimID unique.
 type ClaimID struct {
 	Name string
-	UID  string
+	UID  types.UID
 }
 
 type Device struct {
@@ -99,10 +100,10 @@ type Device struct {
 	CDIDeviceID string
 }
 
-var _ drapb.DRAPluginServer = &ExamplePlugin{}
+var _ kubeletplugin.DRAPlugin = &ExamplePlugin{}
 
 // getJSONFilePath returns the absolute path where CDI file is/should be.
-func (ex *ExamplePlugin) getJSONFilePath(claimUID string, requestName string) string {
+func (ex *ExamplePlugin) getJSONFilePath(claimUID types.UID, requestName string) string {
 	baseRequestRef := resourceclaim.BaseRequestRef(requestName)
 	return filepath.Join(ex.cdiDir, fmt.Sprintf("%s-%s-%s.json", ex.driverName, claimUID, baseRequestRef))
 }
@@ -151,7 +152,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		cdiDir:      cdiDir,
 		driverName:  driverName,
 		nodeName:    nodeName,
-		prepared:    make(map[ClaimID][]Device),
+		prepared:    make(map[ClaimID][]kubeletplugin.Device),
 		deviceNames: sets.New[string](),
 	}
 
@@ -167,16 +168,9 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		kubeletplugin.KubeClient(kubeClient),
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
+		kubeletplugin.Serialize(false), // The example plugin does its own locking.
 	)
-	// Both APIs get provided, the legacy one via wrapping. The options
-	// determine which one(s) really get served (by default, both).
-	// The options are a bit redundant now because a single instance cannot
-	// implement both, but that might be different in the future.
-	nodeServers := []any{
-		drapb.DRAPluginServer(ex), // Casting is done only for clarity here, it's not needed.
-		drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: ex},
-	}
-	d, err := kubeletplugin.Start(ctx, nodeServers, opts...)
+	d, err := kubeletplugin.Start(ctx, ex, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}
@@ -300,34 +294,21 @@ func (ex *ExamplePlugin) getUnprepareResourcesFailure() error {
 // a deterministic name to simplify NodeUnprepareResource (no need to remember
 // or discover the name) and idempotency (when called again, the file simply
 // gets written again).
-func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drapb.Claim) ([]Device, error) {
+func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claim *resourceapi.ResourceClaim) ([]kubeletplugin.Device, error) {
 	logger := klog.FromContext(ctx)
-
-	// The plugin must retrieve the claim itself to get it in the version
-	// that it understands.
-	claim, err := ex.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
-	}
-	if claim.Status.Allocation == nil {
-		return nil, fmt.Errorf("claim %s/%s not allocated", claimReq.Namespace, claimReq.Name)
-	}
-	if claim.UID != types.UID(claimReq.UID) {
-		return nil, fmt.Errorf("claim %s/%s got replaced", claimReq.Namespace, claimReq.Name)
-	}
 
 	ex.mutex.Lock()
 	defer ex.mutex.Unlock()
 	ex.blockPrepareResourcesMutex.Lock()
 	defer ex.blockPrepareResourcesMutex.Unlock()
 
-	claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+	claimID := ClaimID{Name: claim.Name, UID: claim.UID}
 	if result, ok := ex.prepared[claimID]; ok {
 		// Idempotent call, nothing to do.
 		return result, nil
 	}
 
-	var devices []Device
+	var devices []kubeletplugin.Device
 	for _, result := range claim.Status.Allocation.Devices.Results {
 		// Only handle allocations for the current driver.
 		if ex.driverName != result.Driver {
@@ -356,7 +337,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 		claimReqName = regexp.MustCompile(`[^a-zA-Z0-9]`).ReplaceAllString(claimReqName, "_")
 		env[claimReqName] = "true"
 
-		deviceName := "claim-" + claimReq.UID + "-" + baseRequestName
+		deviceName := "claim-" + string(claim.UID) + "-" + baseRequestName
 		vendor := ex.driverName
 		class := "test"
 		cdiDeviceID := vendor + "/" + class + "=" + deviceName
@@ -391,7 +372,7 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 				},
 			},
 		}
-		filePath := ex.getJSONFilePath(claimReq.UID, baseRequestName)
+		filePath := ex.getJSONFilePath(claim.UID, baseRequestName)
 		buffer, err := json.Marshal(spec)
 		if err != nil {
 			return nil, fmt.Errorf("marshal spec: %w", err)
@@ -399,11 +380,11 @@ func (ex *ExamplePlugin) nodePrepareResource(ctx context.Context, claimReq *drap
 		if err := ex.fileOps.Create(filePath, buffer); err != nil {
 			return nil, fmt.Errorf("failed to write CDI file: %w", err)
 		}
-		device := Device{
-			PoolName:    result.Pool,
-			DeviceName:  result.Device,
-			RequestName: baseRequestName,
-			CDIDeviceID: cdiDeviceID,
+		device := kubeletplugin.Device{
+			PoolName:     result.Pool,
+			DeviceName:   result.Device,
+			Requests:     []string{result.Request}, // May also return baseRequestName here.
+			CDIDeviceIDs: []string{cdiDeviceID},
 		}
 		devices = append(devices, device)
 	}
@@ -434,48 +415,35 @@ func extractParameters(parameters runtime.RawExtension, env *map[string]string, 
 	return nil
 }
 
-func (ex *ExamplePlugin) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
-	resp := &drapb.NodePrepareResourcesResponse{
-		Claims: make(map[string]*drapb.NodePrepareResourceResponse),
-	}
-
+func (ex *ExamplePlugin) PrepareResourceClaims(ctx context.Context, claims []*resourceapi.ResourceClaim) (map[types.UID]kubeletplugin.PrepareResult, error) {
 	if failure := ex.getPrepareResourcesFailure(); failure != nil {
-		return resp, failure
+		return nil, failure
 	}
 
-	for _, claimReq := range req.Claims {
-		devices, err := ex.nodePrepareResource(ctx, claimReq)
+	result := make(map[types.UID]kubeletplugin.PrepareResult)
+	for _, claim := range claims {
+		devices, err := ex.nodePrepareResource(ctx, claim)
+		var claimResult kubeletplugin.PrepareResult
 		if err != nil {
-			resp.Claims[claimReq.UID] = &drapb.NodePrepareResourceResponse{
-				Error: err.Error(),
-			}
+			claimResult.Err = err
 		} else {
-			r := &drapb.NodePrepareResourceResponse{}
-			for _, device := range devices {
-				pbDevice := &drapb.Device{
-					PoolName:     device.PoolName,
-					DeviceName:   device.DeviceName,
-					RequestNames: []string{device.RequestName},
-					CDIDeviceIDs: []string{device.CDIDeviceID},
-				}
-				r.Devices = append(r.Devices, pbDevice)
-			}
-			resp.Claims[claimReq.UID] = r
+			claimResult.Devices = devices
 		}
+		result[claim.UID] = claimResult
 	}
-	return resp, nil
+	return result, nil
 }
 
 // NodeUnprepareResource removes the CDI file created by
 // NodePrepareResource. It's idempotent, therefore it is not an error when that
 // file is already gone.
-func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *drapb.Claim) error {
+func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimRef kubeletplugin.NamespacedObject) error {
 	ex.blockUnprepareResourcesMutex.Lock()
 	defer ex.blockUnprepareResourcesMutex.Unlock()
 
 	logger := klog.FromContext(ctx)
 
-	claimID := ClaimID{Name: claimReq.Name, UID: claimReq.UID}
+	claimID := ClaimID{Name: claimRef.Name, UID: claimRef.UID}
 	devices, ok := ex.prepared[claimID]
 	if !ok {
 		// Idempotent call, nothing to do.
@@ -483,11 +451,14 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *dr
 	}
 
 	for _, device := range devices {
-		filePath := ex.getJSONFilePath(claimReq.UID, device.RequestName)
-		if err := ex.fileOps.Remove(filePath); err != nil {
-			return fmt.Errorf("error removing CDI file: %w", err)
+		// In practice we only prepare one, but let's not assume that here.
+		for _, request := range device.Requests {
+			filePath := ex.getJSONFilePath(claimRef.UID, request)
+			if err := ex.fileOps.Remove(filePath); err != nil {
+				return fmt.Errorf("error removing CDI file: %w", err)
+			}
+			logger.V(3).Info("CDI file removed", "path", filePath)
 		}
-		logger.V(3).Info("CDI file removed", "path", filePath)
 	}
 
 	delete(ex.prepared, claimID)
@@ -495,26 +466,18 @@ func (ex *ExamplePlugin) nodeUnprepareResource(ctx context.Context, claimReq *dr
 	return nil
 }
 
-func (ex *ExamplePlugin) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
-	resp := &drapb.NodeUnprepareResourcesResponse{
-		Claims: make(map[string]*drapb.NodeUnprepareResourceResponse),
-	}
+func (ex *ExamplePlugin) UnprepareResourceClaims(ctx context.Context, claims []kubeletplugin.NamespacedObject) (map[types.UID]error, error) {
+	result := make(map[types.UID]error)
 
 	if failure := ex.getUnprepareResourcesFailure(); failure != nil {
-		return resp, failure
+		return nil, failure
 	}
 
-	for _, claimReq := range req.Claims {
-		err := ex.nodeUnprepareResource(ctx, claimReq)
-		if err != nil {
-			resp.Claims[claimReq.UID] = &drapb.NodeUnprepareResourceResponse{
-				Error: err.Error(),
-			}
-		} else {
-			resp.Claims[claimReq.UID] = &drapb.NodeUnprepareResourceResponse{}
-		}
+	for _, claimRef := range claims {
+		err := ex.nodeUnprepareResource(ctx, claimRef)
+		result[claimRef.UID] = err
 	}
-	return resp, nil
+	return result, nil
 }
 
 func (ex *ExamplePlugin) GetPreparedResources() []ClaimID {
