@@ -24,35 +24,36 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/utils/ptr"
 )
 
 var zeroIntSchema *spec.Schema = &spec.Schema{
 	SchemaProps: spec.SchemaProps{
 		Type:    spec.StringOrArray{"number"},
-		Minimum: ptr(float64(0)),
-		Maximum: ptr(float64(0)),
+		Minimum: ptr.To(float64(0)),
+		Maximum: ptr.To(float64(0)),
 	},
 }
 
 var smallIntSchema *spec.Schema = &spec.Schema{
 	SchemaProps: spec.SchemaProps{
 		Type:    spec.StringOrArray{"number"},
-		Maximum: ptr(float64(50)),
+		Maximum: ptr.To(float64(50)),
 	},
 }
 
 var mediumIntSchema *spec.Schema = &spec.Schema{
 	SchemaProps: spec.SchemaProps{
 		Type:    spec.StringOrArray{"number"},
-		Minimum: ptr(float64(50)),
-		Maximum: ptr(float64(10000)),
+		Minimum: ptr.To(float64(50)),
+		Maximum: ptr.To(float64(10000)),
 	},
 }
 
 var largeIntSchema *spec.Schema = &spec.Schema{
 	SchemaProps: spec.SchemaProps{
 		Type:    spec.StringOrArray{"number"},
-		Minimum: ptr(float64(10000)),
+		Minimum: ptr.To(float64(10000)),
 	},
 }
 
@@ -131,6 +132,3 @@ func TestObjectObjectFieldsRatcheting(t *testing.T) {
 		}}, validation.WithRatcheting(nil)).IsValid())
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
