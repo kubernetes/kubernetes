@@ -73,7 +73,6 @@ import (
 //
 //   - compareTo: Compares receiver to operand and returns 0 if they are equal, 1 if the receiver is greater, or -1 if the receiver is less than the operand
 //
-//
 //     <Semver>.isLessThan(<semver>) <bool>
 //     <Semver>.isGreaterThan(<semver>) <bool>
 //     <Semver>.compareTo(<semver>) <int>
@@ -83,7 +82,6 @@ import (
 // semver("1.2.3").compareTo(semver("1.2.3")) // returns 0
 // semver("1.2.3").compareTo(semver("2.0.0")) // returns -1
 // semver("1.2.3").compareTo(semver("0.1.2")) // returns 1
-
 func SemverLib() cel.EnvOption {
 	return cel.Lib(semverLib)
 }
