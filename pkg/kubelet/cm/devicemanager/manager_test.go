@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1411,6 +1412,148 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.True(initCont2Devices.IsSuperset(normalCont1Devices))
 	as.True(initCont2Devices.IsSuperset(normalCont2Devices))
 	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
+}
+
+func TestPodPartialDeviceAllocationFailed(t *testing.T) {
+	// This test case constructs a scenario where partial resource allocation fails
+	// The node has three healthy devices: dev1, dev2, dev3
+	// Pod1 first attempts to allocate all three devices:
+	// - dev1 and dev2 are successfully allocated and recorded
+	// - Allocation of dev3 fails due to m.callGetPreferredAllocationIfAvailable failure
+	// After the first failure, Pod2 attempts to allocate dev1 and dev2 again:
+	// - Fails initially due to dirty data
+	// - Succeeds after data cleanup/repair
+	resourceName := "domain1.com/resource3"
+	res1 := TestResource{
+		resourceName:     resourceName,
+		resourceQuantity: *resource.NewQuantity(int64(3), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2", "dev3"}},
+	}
+	res2 := TestResource{
+		resourceName:     resourceName,
+		resourceQuantity: *resource.NewQuantity(int64(2), resource.DecimalSI),
+		devs:             checkpoint.DevicesPerNUMA{0: []string{"dev1", "dev2"}},
+	}
+
+	testResources := make([]TestResource, 0)
+	testResources = append(testResources, res2, res1)
+	as := require.New(t)
+	tmpDir, err := os.MkdirTemp("", "checkpoint")
+	as.NoError(err)
+	defer func(path string) {
+		err := os.RemoveAll(path)
+		if err != nil {
+			t.Fatalf("Fail to remove tmpdir: %v", err)
+		}
+	}(tmpDir)
+
+	allDevices := ResourceDeviceInstances{
+		resourceName: map[string]pluginapi.Device{
+			"dev1": {
+				ID: "dev1",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 1,
+						},
+					},
+				},
+			},
+			"dev2": {
+				ID: "dev2",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 1,
+						},
+						{
+							ID: 2,
+						},
+					},
+				},
+			},
+			"dev3": {
+				ID: "dev3",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 2,
+						},
+					},
+				},
+			},
+		},
+	}
+	fakeAffinity, _ := bitmask.NewBitMask(2)
+	fakeHint := topologymanager.TopologyHint{
+		NUMANodeAffinity: fakeAffinity,
+		Preferred:        true,
+	}
+	testManager, err := getTestManager(tmpDir, func() []*v1.Pod { return []*v1.Pod{} }, testResources)
+	as.NoError(err)
+	testManager.topologyAffinityStore = topologymanager.NewFakeManagerWithHint(&fakeHint)
+	testManager.allDevices = allDevices
+	testManager.endpoints[resourceName] = endpointInfo{
+		e: &MockEndpoint{
+			allocateFunc: allocateStubFunc(),
+			getPreferredAllocationFunc: func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+				// inject a fault only when pod1 allocates dev3.
+				if size == 3 {
+					return nil, errors.New("fake error")
+				}
+				return nil, nil
+			}},
+		opts: &pluginapi.DevicePluginOptions{
+			GetPreferredAllocationAvailable: true,
+		},
+	}
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(resourceName): res1.resourceQuantity,
+						},
+					},
+				},
+			},
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: uuid.NewUUID(),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: string(uuid.NewUUID()),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceName(resourceName): res2.resourceQuantity,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	as.Error(err)
+	t.Logf("allocate failed for podid %s, error %s", pod1.UID, err)
+
+	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	as.NoError(err)
+	podUID := string(pod2.UID)
+	normalCont1 := pod2.Spec.Containers[0].Name
+	normalCont1Devices := testManager.podDevices.containerDevices(podUID, normalCont1, res1.resourceName)
+	as.Equal(2, normalCont1Devices.Len())
+	as.True(normalCont1Devices.Has("dev2"))
+	as.True(normalCont1Devices.Has("dev3"))
 }
 
 func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
