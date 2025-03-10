@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +26,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,10 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes/typed/core/v1"
 	dracel "k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/structured"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -910,5 +915,39 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 			return address, ""
 		},
 		fldPath.Child("ips"))...)
+	return allErrs
+}
+
+// AuthorizedForAdmin checks if the request is authorized to get admin access to devices
+// based on namespace label
+func AuthorizedForAdmin(ctx context.Context, deviceRequests []resource.DeviceRequest, namespaceName string, nsClient v1.NamespaceInterface) field.ErrorList {
+	var allErrs field.ErrorList
+	adminRequested := false
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess) {
+		// No need to validate unless feature gate is enabled
+		return allErrs
+	}
+
+	for i := range deviceRequests {
+		value := deviceRequests[i].AdminAccess
+		if value != nil && *value {
+			adminRequested = true
+			break
+		}
+	}
+	if !adminRequested {
+		// No need to validate unless admin access is requested
+		return allErrs
+	}
+	// Retrieve the namespace object from the store
+	ns, err := nsClient.Get(ctx, namespaceName, metav1.GetOptions{})
+	if err != nil {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "admin access to devices is not allowed when namespace object is not retrievable"))
+	}
+	if ns.Labels[resource.DRAAdminNamespaceLabel] != "true" {
+		return append(allErrs, field.Forbidden(field.NewPath(""), "admin access to devices is not allowed in namespace without Resource Admin Access label"))
+	}
+
 	return allErrs
 }
