@@ -639,7 +639,7 @@ func TestCSILimits(t *testing.T) {
 			}
 			csiTranslator := csitrans.New()
 			p := &CSILimits{
-				csiNodeLister:        getFakeCSINodeLister(csiNode),
+				csiManager:           NewCSIManager(getFakeCSINodeLister(csiNode)),
 				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
 				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
 				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
@@ -1246,4 +1246,69 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	nodeInfo.SetNode(node)
 	return nodeInfo, csiNode
+}
+
+func TestVolumeLimitScalingGate(t *testing.T) {
+	// Pod uses a PVC that resolves to the EBS CSI driver via PV
+	newPod := st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj()
+
+	cases := []struct {
+		name                     string
+		enableVolumeLimitScaling bool
+		limitSource              string
+		limit                    int32
+		wantStatus               *fwk.Status
+	}{
+		{
+			name:                     "gate enabled - fail when driver not installed",
+			enableVolumeLimitScaling: true,
+			limitSource:              "no-csi-driver",
+			limit:                    0,
+			wantStatus:               fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("%s CSI driver is not installed on the node", ebsCSIDriverName)),
+		},
+		{
+			name:                     "gate disabled - skip driver presence check",
+			enableVolumeLimitScaling: false,
+			limitSource:              "no-csi-driver",
+			limit:                    0,
+			wantStatus:               nil,
+		},
+		{
+			name:                     "gate enabled - driver installed within limit",
+			enableVolumeLimitScaling: true,
+			limitSource:              "csinode",
+			limit:                    2,
+			wantStatus:               nil,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			node, csiNode := getNodeWithPodAndVolumeLimits(tt.limitSource, []*v1.Pod{}, tt.limit, ebsCSIDriverName)
+
+			csiTranslator := csitrans.New()
+			p := &CSILimits{
+				csiManager:               NewCSIManager(getFakeCSINodeLister(csiNode)),
+				pvLister:                 getFakeCSIPVLister("csi", ebsCSIDriverName),
+				pvcLister:                getFakeCSIPVCLister("csi", scName, ebsCSIDriverName),
+				scLister:                 getFakeCSIStorageClassLister(scName, ebsCSIDriverName),
+				vaLister:                 getFakeVolumeAttachmentLister(0, ebsCSIDriverName),
+				enableVolumeLimitScaling: tt.enableVolumeLimitScaling,
+				randomVolumeIDPrefix:     rand.String(32),
+				translator:               csiTranslator,
+			}
+
+			_, ctx := ktesting.NewTestContext(t)
+			// Ensure PreFilter doesn't skip
+			_, preStatus := p.PreFilter(ctx, nil, newPod, nil)
+			if preStatus.Code() == fwk.Skip {
+				t.Fatalf("unexpected PreFilter Skip")
+			}
+			gotStatus := p.Filter(ctx, nil, newPod, node)
+
+			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
+				t.Errorf("Filter status does not match (-want, +got):\n%s", diff)
+			}
+		})
+	}
 }

@@ -984,13 +984,6 @@ const (
 	// Proxies client to an apiserver capable of serving the request in the event of version skew.
 	UnknownVersionInteroperabilityProxy featuregate.Feature = "UnknownVersionInteroperabilityProxy"
 
-	// owner: @gnufied
-	// kep: https://kep.k8s.io/5030
-	//
-	// Enables volume limit scaling for CSI drivers. This allows scheduler to
-	// co-ordinate better with cluster-autoscaler for storage limits.
-	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
-
 	// owner: @saschagrunert
 	//
 	// Enables user namespace support for Pod Security Standards. Enabling this
@@ -1013,6 +1006,13 @@ const (
 	//
 	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
 	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
+
+	// owner: @gnufied
+	// kep: https://kep.k8s.io/5030
+	//
+	// Enables volume limit scaling for CSI drivers. This allows scheduler to
+	// co-ordinate better with cluster-autoscaler for storage limits.
+	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
 
 	// owner: @ksubrmnn
 	//
@@ -1774,7 +1774,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	VolumeLimitScaling: {
-		{Version: version.MustParse("1.3"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	WinDSR: {

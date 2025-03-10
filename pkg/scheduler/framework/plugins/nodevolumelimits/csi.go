@@ -65,8 +65,8 @@ type CSILimits struct {
 
 	enableCSIMigrationPortworx bool
 	randomVolumeIDPrefix       string
-
-	translator InTreeToCSITranslator
+	enableVolumeLimitScaling   bool
+	translator                 InTreeToCSITranslator
 }
 
 var _ fwk.PreFilterPlugin = &CSILimits{}
@@ -282,6 +282,15 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 		return nil
 	}
 
+	if pl.enableVolumeLimitScaling {
+		for _, driverName := range newVolumes {
+			if !pl.checkCSIDriverOnNode(driverName, csiNode) {
+				driverNotInstalledMsg := fmt.Sprintf("%s CSI driver is not installed on the node", driverName)
+				return fwk.NewStatus(fwk.Unschedulable, driverNotInstalledMsg)
+			}
+		}
+	}
+
 	// If the node doesn't have volume limits, the predicate will always be true
 	nodeVolumeLimits := getVolumeLimits(csiNode)
 	if len(nodeVolumeLimits) == 0 {
@@ -336,6 +345,19 @@ func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, 
 	}
 
 	return nil
+}
+
+func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
+	if csiNode == nil {
+		return false
+	}
+
+	for _, driver := range csiNode.Spec.Drivers {
+		if driver.Name == pluginName {
+			return true
+		}
+	}
+	return false
 }
 
 // filterAttachableVolumes filters the attachable volumes from the pod and adds them to the result map.
@@ -561,6 +583,7 @@ func NewCSI(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.
 		scLister:                   scLister,
 		vaLister:                   vaLister,
 		enableCSIMigrationPortworx: fts.EnableCSIMigrationPortworx,
+		enableVolumeLimitScaling:   fts.EnableVolumeLimitScaling,
 		randomVolumeIDPrefix:       rand.String(32),
 		translator:                 csiTranslator,
 	}, nil
