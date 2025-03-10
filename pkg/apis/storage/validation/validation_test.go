@@ -1399,6 +1399,69 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 			t.Errorf("Expected failure for test: %+v", csiNode)
 		}
 	}
+
+	// Test with MutableCSINodeAllocatableCount feature gate enabled
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, true)
+	successCases = []storage.CSINode{{
+		// valid change trying to update allocatable with a different volume limit
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{{
+				Name:         "io.kubernetes.storage.csi.driver-1",
+				NodeID:       nodeID,
+				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+			}, {
+				Name:         "io.kubernetes.storage.csi.driver-2",
+				NodeID:       nodeID,
+				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(21)},
+			}},
+		},
+	}}
+
+	errorCases = []storage.CSINode{{
+		// invalid change node id
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{{
+				Name:         "io.kubernetes.storage.csi.driver-1",
+				NodeID:       "nodeB",
+				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+			}, {
+				Name:         "io.kubernetes.storage.csi.driver-2",
+				NodeID:       nodeID,
+				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+			}},
+		},
+	}, {
+		// invalid change topology keys
+		ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+		Spec: storage.CSINodeSpec{
+			Drivers: []storage.CSINodeDriver{{
+				Name:         "io.kubernetes.storage.csi.driver-1",
+				NodeID:       nodeID,
+				TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+			}, {
+				Name:         "io.kubernetes.storage.csi.driver-2",
+				NodeID:       nodeID,
+				TopologyKeys: []string{"company.com/zone2"},
+				Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32(20)},
+			}},
+		},
+	}}
+
+	for _, csiNode := range errorCases {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old, shorterIDValidationOption); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %+v", csiNode)
+		}
+	}
+
+	for _, csiNode := range successCases {
+		if errs := ValidateCSINodeUpdate(&csiNode, &old, shorterIDValidationOption); len(errs) != 0 {
+			t.Errorf("expected success with feature gate enabled: %+v", errs)
+		}
+	}
 }
 
 func TestCSIDriverValidation(t *testing.T) {

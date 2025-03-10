@@ -25,14 +25,15 @@ import (
 // CSIDriverSpecApplyConfiguration represents a declarative configuration of the CSIDriverSpec type for use
 // with apply.
 type CSIDriverSpecApplyConfiguration struct {
-	AttachRequired       *bool                                `json:"attachRequired,omitempty"`
-	PodInfoOnMount       *bool                                `json:"podInfoOnMount,omitempty"`
-	VolumeLifecycleModes []storagev1beta1.VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty"`
-	StorageCapacity      *bool                                `json:"storageCapacity,omitempty"`
-	FSGroupPolicy        *storagev1beta1.FSGroupPolicy        `json:"fsGroupPolicy,omitempty"`
-	TokenRequests        []TokenRequestApplyConfiguration     `json:"tokenRequests,omitempty"`
-	RequiresRepublish    *bool                                `json:"requiresRepublish,omitempty"`
-	SELinuxMount         *bool                                `json:"seLinuxMount,omitempty"`
+	AttachRequired                     *bool                                `json:"attachRequired,omitempty"`
+	PodInfoOnMount                     *bool                                `json:"podInfoOnMount,omitempty"`
+	VolumeLifecycleModes               []storagev1beta1.VolumeLifecycleMode `json:"volumeLifecycleModes,omitempty"`
+	StorageCapacity                    *bool                                `json:"storageCapacity,omitempty"`
+	FSGroupPolicy                      *storagev1beta1.FSGroupPolicy        `json:"fsGroupPolicy,omitempty"`
+	TokenRequests                      []TokenRequestApplyConfiguration     `json:"tokenRequests,omitempty"`
+	RequiresRepublish                  *bool                                `json:"requiresRepublish,omitempty"`
+	SELinuxMount                       *bool                                `json:"seLinuxMount,omitempty"`
+	NodeAllocatableUpdatePeriodSeconds *int64                               `json:"nodeAllocatableUpdatePeriodSeconds,omitempty"`
 }
 
 // CSIDriverSpecApplyConfiguration constructs a declarative configuration of the CSIDriverSpec type for use with
@@ -109,5 +110,13 @@ func (b *CSIDriverSpecApplyConfiguration) WithRequiresRepublish(value bool) *CSI
 // If called multiple times, the SELinuxMount field is set to the value of the last call.
 func (b *CSIDriverSpecApplyConfiguration) WithSELinuxMount(value bool) *CSIDriverSpecApplyConfiguration {
 	b.SELinuxMount = &value
+	return b
+}
+
+// WithNodeAllocatableUpdatePeriodSeconds sets the NodeAllocatableUpdatePeriodSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NodeAllocatableUpdatePeriodSeconds field is set to the value of the last call.
+func (b *CSIDriverSpecApplyConfiguration) WithNodeAllocatableUpdatePeriodSeconds(value int64) *CSIDriverSpecApplyConfiguration {
+	b.NodeAllocatableUpdatePeriodSeconds = &value
 	return b
 }

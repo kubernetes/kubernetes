@@ -50670,6 +50670,13 @@ func schema_k8sio_api_storage_v1_CSIDriverSpec(ref common.ReferenceCallback) com
 							Format:      "",
 						},
 					},
+					"nodeAllocatableUpdatePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of the CSINode allocatable capacity for this driver. When set, both periodic updates and updates triggered by capacity-related failures are enabled. If not set, no updates occur (neither periodic nor upon detecting capacity-related failures), and the Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.\n\nThis is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
 				},
 			},
 		},
@@ -51429,6 +51436,13 @@ func schema_k8sio_api_storage_v1_VolumeError(ref common.ReferenceCallback) commo
 							Format:      "",
 						},
 					},
+					"errorCode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "errorCode specifies the type of error encountered during Attach or Detach operation.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -51924,6 +51938,13 @@ func schema_k8sio_api_storage_v1alpha1_VolumeError(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"errorCode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "errorCode specifies the type of error encountered during Attach or Detach operation.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -52113,6 +52134,13 @@ func schema_k8sio_api_storage_v1beta1_CSIDriverSpec(ref common.ReferenceCallback
 							Description: "seLinuxMount specifies if the CSI driver supports \"-o context\" mount option.\n\nWhen \"true\", the CSI driver must ensure that all volumes provided by this CSI driver can be mounted separately with different `-o context` options. This is typical for storage backends that provide volumes as filesystems on block devices or as independent shared volumes. Kubernetes will call NodeStage / NodePublish with \"-o context=xyz\" mount option when mounting a ReadWriteOncePod volume used in Pod that has explicitly set SELinux context. In the future, it may be expanded to other volume AccessModes. In any case, Kubernetes will ensure that the volume is mounted only with a single SELinux context.\n\nWhen \"false\", Kubernetes won't pass any special SELinux mount options to the driver. This is typical for volumes that represent subdirectories of a bigger shared filesystem.\n\nDefault is \"false\".",
 							Type:        []string{"boolean"},
 							Format:      "",
+						},
+					},
+					"nodeAllocatableUpdatePeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of the CSINode allocatable capacity for this driver. When set, both periodic updates and updates triggered by capacity-related failures are enabled. If not set, no updates occur (neither periodic nor upon detecting capacity-related failures), and the Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.\n\nThis is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.",
+							Type:        []string{"integer"},
+							Format:      "int64",
 						},
 					},
 				},
@@ -52981,6 +53009,13 @@ func schema_k8sio_api_storage_v1beta1_VolumeError(ref common.ReferenceCallback) 
 					"message": {
 						SchemaProps: spec.SchemaProps{
 							Description: "message represents the error encountered during Attach or Detach operation. This string may be logged, so it should not contain sensitive information.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"errorCode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "errorCode specifies the type of error encountered during Attach or Detach operation.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
