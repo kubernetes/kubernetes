@@ -431,7 +431,7 @@ func TestWithRecover(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			flag.Set("v", "6")
+			_ = flag.Set("v", "6")
 			flag.Parse()
 			klog.SetOutput(&buf)
 			klog.LogToStderr(false)
