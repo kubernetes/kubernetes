@@ -106,6 +106,7 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		CPU:              rootStats.CPU,
 		Memory:           rootStats.Memory,
 		Swap:             rootStats.Swap,
+		IO:               rootStats.IO,
 		Network:          networkStats,
 		StartTime:        sp.systemBootTime,
 		Fs:               rootFsStats,
