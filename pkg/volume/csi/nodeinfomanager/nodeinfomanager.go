@@ -84,6 +84,9 @@ type Interface interface {
 	// to other methods in this interface.
 	InstallCSIDriver(driverName string, driverNodeID string, maxVolumeLimit int64, topology map[string]string) error
 
+	// UpdateCSIDriver updates CSIDrivers field in the CSINode object.
+	UpdateCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error
+
 	// Remove in the cluster node information from the CSI driver with the given name.
 	// Concurrent calls to UninstallCSIDriver() is allowed, but they should not be intertwined with calls
 	// to other methods in this interface.
@@ -127,6 +130,15 @@ func (nim *nodeInfoManager) InstallCSIDriver(driverName string, driverNodeID str
 		return fmt.Errorf("error updating CSINode object with CSI driver node info: %v", err)
 	}
 
+	return nil
+}
+
+// UpdateCSIDriver updates CSIDrivers field in the CSINode object.
+func (nim *nodeInfoManager) UpdateCSIDriver(driverName string, driverNodeID string, maxAttachLimit int64, topology map[string]string) error {
+	err := nim.updateCSINode(driverName, driverNodeID, maxAttachLimit, topology)
+	if err != nil {
+		return fmt.Errorf("error updating CSINode object with CSI driver node info: %w", err)
+	}
 	return nil
 }
 

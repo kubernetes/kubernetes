@@ -214,6 +214,18 @@ message CSIDriverSpec {
   // +featureGate=SELinuxMountReadWriteOncePod
   // +optional
   optional bool seLinuxMount = 8;
+
+  // NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
+  // the CSINode allocatable capacity for this driver. When set, both periodic updates and
+  // updates triggered by capacity-related failures are enabled. If not set, no updates
+  // occur (neither periodic nor upon detecting capacity-related failures), and the
+  // Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.
+  //
+  // This is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
+  //
+  // +featureGate=MutableCSINodeAllocatableCount
+  // +optional
+  optional int64 nodeAllocatableUpdatePeriodSeconds = 9;
 }
 
 // DEPRECATED - This group version of CSINode is deprecated by storage/v1/CSINode.
@@ -603,6 +615,10 @@ message VolumeError {
   // information.
   // +optional
   optional string message = 2;
+
+  // errorCode specifies the type of error encountered during Attach or Detach operation.
+  // +optional
+  optional string errorCode = 3;
 }
 
 // VolumeNodeResources is a set of resource limits for scheduling of volumes.

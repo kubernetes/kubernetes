@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -81,6 +82,8 @@ var _ volume.VolumePlugin = &csiPlugin{}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
+	csiPlugin              *csiPlugin
+	csiPluginUpdateChannel sync.Map
 }
 
 // TODO (verult) consider using a struct instead of global variables
@@ -156,7 +159,121 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		stopCh := make(chan struct{})
+		prevStopCh, loaded := h.csiPluginUpdateChannel.Swap(pluginName, stopCh)
+		if loaded {
+			close(prevStopCh.(chan struct{}))
+		}
+		go h.startPeriodicAllocatableUpdate(pluginName, stopCh)
+	}
+
 	return nil
+}
+
+func (h *RegistrationHandler) startPeriodicAllocatableUpdate(pluginName string, stopCh <-chan struct{}) {
+	driver, err := h.csiPlugin.getCSIDriver(pluginName)
+	if err != nil {
+		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
+		return
+	}
+
+	period := getNodeAllocatableUpdatePeriod(driver)
+	if period == 0 {
+		return
+	}
+
+	klog.InfoS("Starting CSINodeDriver.Allocatable periodic updates", "pluginName", pluginName, "period", period)
+
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := updateCSIDriver(pluginName); err != nil {
+				klog.ErrorS(err, "Failed to update CSIDriver", "pluginName", pluginName)
+			}
+		case <-stopCh:
+			klog.InfoS("Stopping CSINodeDriver.Allocatable periodic updates", "pluginName", pluginName)
+			return
+		}
+	}
+}
+
+func getNodeAllocatableUpdatePeriod(driver *storage.CSIDriver) time.Duration {
+	if driver == nil || driver.Spec.NodeAllocatableUpdatePeriodSeconds == nil {
+		return 0
+	}
+	return time.Duration(*driver.Spec.NodeAllocatableUpdatePeriodSeconds) * time.Second
+}
+
+func updateCSIDriver(pluginName string) error {
+	csi, err := newCsiDriverClient(csiDriverName(pluginName))
+	if err != nil {
+		return fmt.Errorf("failed to create CSI client for driver %q: %w", pluginName, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+
+	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get NodeGetInfo from driver %q: %w", pluginName, err)
+	}
+
+	if err := nim.UpdateCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology); err != nil {
+		return fmt.Errorf("failed to update driver %q: %w", pluginName, err)
+	}
+	return nil
+}
+
+func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {
+	if spec == nil || spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
+		klog.InfoS("Invalid volume spec for CSI")
+		return
+	}
+
+	pluginName := spec.PersistentVolume.Spec.CSI.Driver
+
+	driver, err := p.getCSIDriver(pluginName)
+	if err != nil {
+		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
+		return
+	}
+
+	period := getNodeAllocatableUpdatePeriod(driver)
+	if period == 0 {
+		return
+	}
+
+	volumeHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+	attachmentName := getAttachmentName(volumeHandle, pluginName, string(nodeName))
+	kubeClient := p.host.GetKubeClient()
+
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+
+	attachment, err := kubeClient.StorageV1().VolumeAttachments().Get(ctx, attachmentName, meta.GetOptions{})
+	if err != nil {
+		klog.ErrorS(err, "Failed to get volume attachment", "attachmentName", attachmentName)
+		return
+	}
+
+	if isResourceExhaustError(attachment) {
+		klog.V(4).InfoS("Detected ResourceExhausted error for volume", "pluginName", pluginName, "volumeHandle", volumeHandle)
+		if err := updateCSIDriver(pluginName); err != nil {
+			klog.ErrorS(err, "Failed to update CSIDriver", "pluginName", pluginName)
+		}
+	}
+}
+
+func isResourceExhaustError(attachment *storage.VolumeAttachment) bool {
+	if attachment == nil || attachment.Status.AttachError == nil {
+		return false
+	}
+	return attachment.Status.AttachError.ErrorCode != nil &&
+		*attachment.Status.AttachError.ErrorCode == storage.VolumeErrorCodeResourceExhausted
 }
 
 func (h *RegistrationHandler) validateVersions(callerName, pluginName string, endpoint string, versions []string) (*utilversion.Version, error) {
@@ -191,6 +308,11 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s", pluginName))
 	if err := unregisterDriver(pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
+	}
+
+	if stopCh, ok := h.csiPluginUpdateChannel.Load(pluginName); ok {
+		close(stopCh.(chan struct{}))
+		h.csiPluginUpdateChannel.Delete(pluginName)
 	}
 }
 
@@ -257,6 +379,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	// Initializing the label management channels
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
+	PluginHandler.csiPlugin = p
 
 	// This function prevents Kubelet from posting Ready status until CSINode
 	// is both installed and initialized

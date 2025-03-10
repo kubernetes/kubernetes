@@ -192,6 +192,30 @@ type VolumeAttachmentStatus struct {
 	DetachError *VolumeError
 }
 
+// VolumeErrorCode specifies the type of error encountered during a volume operation.
+type VolumeErrorCode string
+
+const (
+	// VolumeErrorCodeNotFound indicates that a volume or node does not exist.
+	// Maps to gRPC code 5 (NOT_FOUND).
+	VolumeErrorCodeNotFound VolumeErrorCode = "NotFound"
+
+	// VolumeErrorCodeAlreadyExists indicates that a volume has already been published
+	// at the node but is incompatible with the specified parameters.
+	// Maps to gRPC code 6 (ALREADY_EXISTS).
+	VolumeErrorCodeAlreadyExists VolumeErrorCode = "AlreadyExists"
+
+	// VolumeErrorCodeFailedPrecondition indicates that a volume has already been published
+	// at another node and does not have MULTI_NODE volume capability.
+	// Maps to gRPC code 9 (FAILED_PRECONDITION).
+	VolumeErrorCodeFailedPrecondition VolumeErrorCode = "FailedPrecondition"
+
+	// VolumeErrorCodeResourceExhausted indicates that the maximum supported number of
+	// volumes that can be attached to the specified node are already attached.
+	// Maps to gRPC code 8 (RESOURCE_EXHAUSTED).
+	VolumeErrorCodeResourceExhausted VolumeErrorCode = "ResourceExhausted"
+)
+
 // Captures an error encountered during a volume operation.
 type VolumeError struct {
 	// Time the error was encountered.
@@ -203,6 +227,10 @@ type VolumeError struct {
 	// information.
 	// +optional
 	Message string
+
+	// errorCode specifies the type of error encountered during Attach or Detach operation.
+	// +optional
+	ErrorCode *VolumeErrorCode
 }
 
 // VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
@@ -412,6 +440,18 @@ type CSIDriverSpec struct {
 	// +featureGate=SELinuxMountReadWriteOncePod
 	// +optional
 	SELinuxMount *bool
+
+	// NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
+	// the CSINode allocatable capacity for this driver. When set, both periodic updates and
+	// updates triggered by capacity-related failures are enabled. If not set, no updates
+	// occur (neither periodic nor upon detecting capacity-related failures), and the
+	// Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.
+	//
+	// This is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
+	//
+	// +featureGate=MutableCSINodeAllocatableCount
+	// +optional
+	NodeAllocatableUpdatePeriodSeconds *int64
 }
 
 // FSGroupPolicy specifies if a CSI Driver supports modifying
@@ -495,6 +535,8 @@ const (
 // there are no CSI Drivers available on the node, or the Kubelet version is low
 // enough that it doesn't create this object.
 // CSINode has an OwnerReference that points to the corresponding node object.
+// When the MutableCSINodeAllocatableCount feature gate is enabled, the Allocatable.Count
+// field in CSINodeDriver can be updated.
 type CSINode struct {
 	metav1.TypeMeta
 

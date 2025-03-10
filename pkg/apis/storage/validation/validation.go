@@ -304,17 +304,26 @@ func ValidateCSINode(csiNode *storage.CSINode, validationOpts CSINodeValidationO
 func ValidateCSINodeUpdate(new, old *storage.CSINode, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := ValidateCSINode(new, validationOpts)
 
-	// Validate modifying fields inside an existing CSINodeDriver entry is not allowed
+	// Validate modifying fields inside an existing CSINodeDriver entry
 	for _, oldDriver := range old.Spec.Drivers {
 		for _, newDriver := range new.Spec.Drivers {
 			if oldDriver.Name == newDriver.Name {
-				if !apiequality.Semantic.DeepEqual(oldDriver, newDriver) {
+				// If MutableCSINodeAllocatableCount feature gate is enabled, compare drivers without the Allocatable field
+				if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+					oldDriverCopy := oldDriver.DeepCopy()
+					newDriverCopy := newDriver.DeepCopy()
+					oldDriverCopy.Allocatable = nil // +k8s:verify-mutation:reason=clone
+					newDriverCopy.Allocatable = nil // +k8s:verify-mutation:reason=clone
+
+					if !apiequality.Semantic.DeepEqual(oldDriverCopy, newDriverCopy) {
+						allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
+					}
+				} else if !apiequality.Semantic.DeepEqual(oldDriver, newDriver) {
 					allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
 				}
 			}
 		}
 	}
-
 	return allErrs
 }
 
@@ -435,6 +444,16 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateTokenRequests(spec.TokenRequests, fldPath.Child("tokenRequests"))...)
 	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
 	allErrs = append(allErrs, validateSELinuxMount(spec.SELinuxMount, fldPath.Child("seLinuxMount"))...)
+	allErrs = append(allErrs, validateNodeAllocatableUpdatePeriodSeconds(spec.NodeAllocatableUpdatePeriodSeconds, fldPath.Child("nodeAllocatableUpdatePeriodSeconds"))...)
+	return allErrs
+}
+
+// validateNodeAllocatableUpdatePeriodSeconds tests if NodeAllocatableUpdatePeriodSeconds is valid for CSIDriver.
+func validateNodeAllocatableUpdatePeriodSeconds(period *int64, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if period != nil && *period < 10 {
+		allErrs = append(allErrs, field.Invalid(fldPath, *period, "must be greater than or equal to 10 seconds"))
+	}
 	return allErrs
 }
 
