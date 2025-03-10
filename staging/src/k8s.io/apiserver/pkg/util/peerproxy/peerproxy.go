@@ -17,14 +17,20 @@ limitations under the License.
 package peerproxy
 
 import (
+	"fmt"
 	"net/http"
-	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/reconcilers"
-	"k8s.io/apiserver/pkg/storageversion"
-	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/transport"
+
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	kubeinformers "k8s.io/client-go/informers"
 )
 
 // Interface defines how the Unknown Version Proxy filter interacts with the underlying system.
@@ -35,33 +41,45 @@ type Interface interface {
 }
 
 // New creates a new instance to implement unknown version proxy
+// This method is used for an alpha feature UnknownVersionInteroperabilityProxy
+// and is subject to future modifications.
 func NewPeerProxyHandler(informerFactory kubeinformers.SharedInformerFactory,
-	svm storageversion.Manager,
-	proxyTransport http.RoundTripper,
 	serverId string,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
-	serializer runtime.NegotiatedSerializer) *peerProxyHandler {
+	ser runtime.NegotiatedSerializer,
+	loopbackClientConfig *rest.Config,
+	proxyClientConfig *transport.Config) (*peerProxyHandler, error) {
 	h := &peerProxyHandler{
-		name:                  "PeerProxyHandler",
-		storageversionManager: svm,
-		proxyTransport:        proxyTransport,
-		svMap:                 sync.Map{},
-		serverId:              serverId,
-		reconciler:            reconciler,
-		serializer:            serializer,
+		name:                          "PeerProxyHandler",
+		serverId:                      serverId,
+		reconciler:                    reconciler,
+		serializer:                    ser,
+		loopbackClientConfig:          loopbackClientConfig,
+		proxyClientConfig:             proxyClientConfig,
+		localDiscoveryResponseCache:   make(map[schema.GroupVersion][]string),
+		peerAggDiscoveryResponseCache: make(map[string]*peerAggDiscoveryInfo),
 	}
-	svi := informerFactory.Internal().V1alpha1().StorageVersions()
-	h.storageversionInformer = svi.Informer()
 
-	svi.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	h.apiserverIdentityInformer = informerFactory.Coordination().V1().Leases().Informer()
+	h.apiserverIdentityLister = informerFactory.Coordination().V1().Leases().Lister()
+	discoveryScheme := runtime.NewScheme()
+	utilruntime.Must(apidiscoveryv2.AddToScheme(discoveryScheme))
+	h.discoverySerializer = serializer.NewCodecFactory(discoveryScheme)
+
+	_, err := h.apiserverIdentityInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			h.addSV(obj)
+			h.addPeerDiscoveryInfo(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			h.updateSV(oldObj, newObj)
+			h.updatePeerDiscoveryInfo(oldObj, newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			h.deleteSV(obj)
-		}})
-	return h
+			h.deletePeerDiscoveryInfo(obj)
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to add apiserver identity lease event handler: %w", err)
+	}
+	return h, nil
 }
