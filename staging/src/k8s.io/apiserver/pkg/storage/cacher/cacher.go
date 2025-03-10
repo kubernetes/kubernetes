@@ -730,6 +730,10 @@ type listResp struct {
 
 // GetList implements storage.Interface
 func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, listRV uint64) error {
+	// Match validation in etcd3
+	if len(opts.Predicate.Continue) > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+		return errors.NewBadRequest("specifying resource version is not allowed when using continue")
+	}
 	// For recursive lists, we need to make sure the key ended with "/" so that we only
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
 	// with prefix "/a" will return all three, while with prefix "/a/" will return only
@@ -1301,6 +1305,26 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 
 func (c *Cacher) Ready() bool {
 	_, ok := c.ready.check()
+	return ok
+}
+
+func (c *Cacher) CanServeExact() bool {
+	// Lock not needed. watchcache and snapshots are set once in constructors.
+	return c.watchCache.snapshots != nil
+}
+
+func (c *Cacher) CanServeExactRV(rv uint64) bool {
+	// Lock not needed. watchcache and snapshots are set once in constructors.
+	if c.watchCache.snapshots == nil {
+		return false
+	}
+	// Exact requests on future revision require consistentListFromCache
+	if c.watchCache.notFresh(rv) {
+		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+		return consistentListFromCacheEnabled && requestWatchProgressSupported
+	}
+	_, ok := c.watchCache.snapshots.GetLessOrEqual(rv)
 	return ok
 }
 
