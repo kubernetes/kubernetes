@@ -71,18 +71,6 @@ func TestPolicyOptionsAvailable(t *testing.T) {
 			expectedAvailable: false,
 		},
 		{
-			option:            FullPCPUsOnlyOption,
-			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
-			featureGateEnable: true,
-			expectedAvailable: true,
-		},
-		{
-			option:            FullPCPUsOnlyOption,
-			featureGate:       pkgfeatures.CPUManagerPolicyBetaOptions,
-			featureGateEnable: false,
-			expectedAvailable: false,
-		},
-		{
 			option:            AlignBySocketOption,
 			featureGate:       pkgfeatures.CPUManagerPolicyAlphaOptions,
 			featureGateEnable: true,
