@@ -1616,6 +1616,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
@@ -2015,6 +2018,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
@@ -2439,6 +2445,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
@@ -9125,6 +9134,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: paused
       type:
         scalar: boolean
+    - name: podReplacementPolicy
+      type:
+        scalar: string
     - name: progressDeadlineSeconds
       type:
         scalar: numeric
