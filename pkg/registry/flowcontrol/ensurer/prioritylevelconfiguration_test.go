@@ -24,7 +24,7 @@ import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	bootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-v134"
 	"k8s.io/client-go/kubernetes/fake"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1"
 	toolscache "k8s.io/client-go/tools/cache"
