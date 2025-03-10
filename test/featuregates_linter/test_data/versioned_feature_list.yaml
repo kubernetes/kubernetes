@@ -380,7 +380,7 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
-- name: DeclarativeValidationMismatchMetric
+- name: DeclarativeValidationTakeover
   versionedSpecs:
   - default: false
     lockToDefault: false
