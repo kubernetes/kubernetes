@@ -1067,6 +1067,20 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			expectPodIsInFlightAtFailureHandler: true,
 		},
 		{
+			name:                  "pod rejected on permit",
+			sendPod:               podWithID("foo", ""),
+			mockSchedulePodResult: okScheduleResult,
+			registerPluginFuncs: []tf.RegisterPluginFunc{
+				tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(framework.NewStatus(framework.Unschedulable, permitErr.Error()), time.Minute)),
+			},
+			expectErrorPod:                      podWithID("foo", testNode.Name),
+			expectAssumedPod:                    podWithID("foo", testNode.Name),
+			expectError:                         permitErr,
+			eventReason:                         "FailedScheduling",
+			expectedNumCallsToFailureHandler:    1,
+			expectPodIsInFlightAtFailureHandler: true,
+		},
+		{
 			name:                  "error on wait on permit",
 			sendPod:               podWithID("foo", ""),
 			mockSchedulePodResult: okScheduleResult,
@@ -1184,6 +1198,8 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				var gotBinding *v1.Binding
 				var gotCallsToFailureHandler int
 				var gotPodIsInFlightAtFailureHandler bool
+				var gotPodIsInFlightAtWaitOnPermit bool
+				var gotPodIsInFlightAtRunPreBindPlugins bool
 
 				cache := &fakecache.Cache{
 					ForgetFunc: func(pod *v1.Pod) {
@@ -1227,12 +1243,10 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				gotPodIsInFlightAtWaitOnPermit := false
 				fwk.waitOnPermitFn = func(_ context.Context, pod *v1.Pod) *framework.Status {
 					gotPodIsInFlightAtWaitOnPermit = podListContainsPod(fwk.queue.InFlightPods(), pod)
 					return item.mockWaitOnPermitResult
 				}
-				gotPodIsInFlightAtRunPreBindPlugins := false
 				fwk.runPreBindPluginsFn = func(_ context.Context, _ *framework.CycleState, pod *v1.Pod, _ string) *framework.Status {
 					gotPodIsInFlightAtRunPreBindPlugins = podListContainsPod(fwk.queue.InFlightPods(), pod)
 					return item.mockRunPreBindPluginsResult
