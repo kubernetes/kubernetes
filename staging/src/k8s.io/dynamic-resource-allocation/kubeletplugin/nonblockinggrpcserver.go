@@ -82,14 +82,18 @@ func startGRPCServer(valueCtx context.Context, grpcVerbosity int, unaryIntercept
 
 	// Run a gRPC server. It will close the listening socket when
 	// shutting down, so we don't need to do that.
+	// The per-context logger always gets initialized because
+	// there might be log output inside the method implementations.
 	var opts []grpc.ServerOption
-	finalUnaryInterceptors := []grpc.UnaryServerInterceptor{unaryContextInterceptor(valueCtx)}
-	finalStreamInterceptors := []grpc.StreamServerInterceptor{streamContextInterceptor(valueCtx)}
-	if grpcVerbosity >= 0 {
-		finalUnaryInterceptors = append(finalUnaryInterceptors, s.interceptor)
-		finalStreamInterceptors = append(finalStreamInterceptors, s.streamInterceptor)
+	finalUnaryInterceptors := []grpc.UnaryServerInterceptor{
+		unaryContextInterceptor(valueCtx),
+		s.interceptor,
 	}
 	finalUnaryInterceptors = append(finalUnaryInterceptors, unaryInterceptors...)
+	finalStreamInterceptors := []grpc.StreamServerInterceptor{
+		streamContextInterceptor(valueCtx),
+		s.streamInterceptor,
+	}
 	finalStreamInterceptors = append(finalStreamInterceptors, streamInterceptors...)
 	opts = append(opts, grpc.ChainUnaryInterceptor(finalUnaryInterceptors...))
 	opts = append(opts, grpc.ChainStreamInterceptor(finalStreamInterceptors...))
@@ -164,7 +168,6 @@ func (m mergeCtx) Value(i interface{}) interface{} {
 // sequentially increasing request ID and adds that logger to the context. It
 // also logs request and response.
 func (s *grpcServer) interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-
 	requestID := atomic.AddInt64(&requestID, 1)
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "requestID", requestID, "method", info.FullMethod)

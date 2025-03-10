@@ -430,7 +430,6 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
 			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
 			kubeletplugin.KubeletPluginSocketPath(draAddr),
-			kubeletplugin.NodeV1alpha4(d.NodeV1alpha4),
 			kubeletplugin.NodeV1beta1(d.NodeV1beta1),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
