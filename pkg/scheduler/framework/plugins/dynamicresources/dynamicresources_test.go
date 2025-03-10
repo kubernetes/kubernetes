@@ -222,14 +222,6 @@ var (
 		NodeSelector: st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj(),
 	}
 
-	allocatedDeviceStatusWithBindingConditions = []resourceapi.AllocatedDeviceStatus{
-		{
-			Driver: driver,
-			Pool:   nodeName,
-			Device: "instance-1",
-		},
-	}
-
 	boundClaim = st.FromResourceClaim(allocatedClaim).
 			Allocation(allocationResultWithBindingConditions).
 			AllocatedDeviceStatuses([]resourceapi.AllocatedDeviceStatus{
@@ -262,7 +254,6 @@ var (
 
 	allocatedClaimWithBindingConditions = st.FromResourceClaim(claim).
 						Allocation(allocationResultWithBindingConditions).
-						AllocatedDeviceStatuses(allocatedDeviceStatusWithBindingConditions).
 						Obj()
 )
 
@@ -1114,7 +1105,6 @@ func TestPlugin(t *testing.T) {
 								}
 								claim.Status.Allocation = allocatedClaim.Status.Allocation
 								claim.Status.Allocation.Devices = allocationResultWithBindingConditions.Devices
-								claim.Status.Devices = allocatedDeviceStatusWithBindingConditions
 							}
 							return claim
 						},
