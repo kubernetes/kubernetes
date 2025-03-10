@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 
@@ -40,6 +41,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
@@ -538,6 +540,14 @@ func (rdm *resourceDiscoveryManager) serveHTTP(resp http.ResponseWriter, req *ht
 		resp.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	if mediaType.Convert.GroupVersion() == apidiscoveryv2beta1.SchemeGroupVersion &&
+		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryRemoveBetaType) {
+		klog.Errorf("aggregated discovery version v2beta1 is removed. Please update to use v2")
+		resp.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	targetGV = mediaType.Convert.GroupVersion()
 
 	if len(etag) > 0 {
