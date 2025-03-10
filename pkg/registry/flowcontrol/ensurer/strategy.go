@@ -36,7 +36,7 @@ const (
 )
 
 // EnsureStrategy provides a maintenance strategy for APF configuration objects.
-// We have two types of strategy, corresponding to the two types of config objetcs:
+// We have two types of strategy, corresponding to the two types of config objects:
 //
 //   - mandatory: the mandatory configurationWrapper objects are about ensuring that the P&F
 //     system itself won't crash; we have to be sure there's 'catch-all' place for
