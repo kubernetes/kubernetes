@@ -1,0 +1,13 @@
+apiVersion: resource.k8s.io/v1alpha3
+kind: ResourceSlicePatch
+metadata:
+  generateName: test-patch-
+spec:
+  devices:
+    priority: {{ .Index }}
+    filter:
+      deviceClassName: test-class
+      pool: scheduler-perf-dra-{{ .Index }}
+    attributes:
+      dra.example.com/patched:
+        bool: true

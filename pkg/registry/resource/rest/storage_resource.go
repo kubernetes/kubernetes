@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	deviceclassstore "k8s.io/kubernetes/pkg/registry/resource/deviceclass/storage"
+	devicetaintstore "k8s.io/kubernetes/pkg/registry/resource/devicetaint/storage"
 	resourceclaimstore "k8s.io/kubernetes/pkg/registry/resource/resourceclaim/storage"
 	resourceclaimtemplatestore "k8s.io/kubernetes/pkg/registry/resource/resourceclaimtemplate/storage"
 	resourceslicestore "k8s.io/kubernetes/pkg/registry/resource/resourceslice/storage"
@@ -91,6 +92,14 @@ func (p RESTStorageProvider) v1alpha3Storage(apiResourceConfigSource serverstora
 			return nil, err
 		}
 		storage[resource] = resourceSliceStorage
+	}
+
+	if resource := "devicetaints"; apiResourceConfigSource.ResourceEnabled(resourcev1alpha3.SchemeGroupVersion.WithResource(resource)) {
+		deviceTaintStorage, err := devicetaintstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = deviceTaintStorage
 	}
 
 	return storage, nil

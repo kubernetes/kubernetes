@@ -90,7 +90,15 @@
           },
           "capacity": {
             "capacityKey": "0"
-          }
+          },
+          "taints": [
+            {
+              "key": "keyValue",
+              "value": "valueValue",
+              "effect": "effectValue",
+              "timeAdded": "2004-01-01T01:01:01Z"
+            }
+          ]
         }
       }
     ]
