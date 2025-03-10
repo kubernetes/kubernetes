@@ -126,6 +126,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				"AllAlpha": false,
 				"AllBeta":  true,
 			}
+			obj.UserNamespaces = &kubeletconfig.UserNamespaces{
+				IDsPerPod: ptr.To(kubeletconfigv1beta1.DefaultUserNamespacesIDsPerPod),
+			}
 		},
 	}
 }
