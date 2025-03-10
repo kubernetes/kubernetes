@@ -1282,7 +1282,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				if diff := cmp.Diff(item.expectErrorPod, gotPod); diff != "" {
 					t.Errorf("Unexpected error pod (-want,+got):\n%s", diff)
 				}
-				if (item.expectError == nil || gotError == nil) && item.expectError != gotError {
+				if (item.expectError == nil || gotError == nil) && !errors.Is(item.expectError, gotError) {
 					t.Errorf("Unexpected error. Wanted %v, got %v", item.expectError, gotError)
 				}
 				if item.expectError != nil && !strings.Contains(gotError.Error(), item.expectError.Error()) {
