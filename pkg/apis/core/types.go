@@ -2875,6 +2875,10 @@ type ContainerStatus struct {
 	// +featureGate=ResourceHealthStatus
 	// +optional
 	AllocatedResourcesStatus []ResourceStatus
+	// Lifecycle is used to show the container's effective stop signal in the Status
+	// +featureGate=ContainerStopSignals
+	// +optional
+	Lifecycle Lifecycle
 }
 
 type ResourceStatus struct {

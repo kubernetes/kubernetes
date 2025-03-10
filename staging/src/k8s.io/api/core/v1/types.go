@@ -3198,6 +3198,10 @@ type ContainerStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	AllocatedResourcesStatus []ResourceStatus `json:"allocatedResourcesStatus,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,14,rep,name=allocatedResourcesStatus"`
+	// Lifecycle is used to show the container's effective stop signal in the Status
+	// +featureGate=ContainerStopSignals
+	// +optional
+	Lifecycle Lifecycle `json:"lifecycle,omitempty" protobuf:"bytes,15,opt,name=lifecycle"`
 }
 
 // ResourceStatus represents the status of a single resource allocated to a Pod.
