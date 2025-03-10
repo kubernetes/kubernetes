@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/stats"
 	"k8s.io/klog/v2"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -58,7 +59,7 @@ type endpoint struct {
 // which handles requests for arbitrary services.
 //
 // The context is only used for additional values, cancellation is ignored.
-func startGRPCServer(valueCtx context.Context, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, endpoint endpoint, services ...registerService) (*grpcServer, error) {
+func startGRPCServer(valueCtx context.Context, grpcVerbosity int, unaryInterceptors []grpc.UnaryServerInterceptor, streamInterceptors []grpc.StreamServerInterceptor, grpcStatsHandlers []stats.Handler, endpoint endpoint, services ...registerService) (*grpcServer, error) {
 	logger := klog.FromContext(valueCtx)
 	s := &grpcServer{
 		endpoint:      endpoint,
@@ -93,6 +94,9 @@ func startGRPCServer(valueCtx context.Context, grpcVerbosity int, unaryIntercept
 	finalStreamInterceptors = append(finalStreamInterceptors, streamInterceptors...)
 	opts = append(opts, grpc.ChainUnaryInterceptor(finalUnaryInterceptors...))
 	opts = append(opts, grpc.ChainStreamInterceptor(finalStreamInterceptors...))
+	for _, handler := range grpcStatsHandlers {
+		opts = append(opts, grpc.StatsHandler(handler))
+	}
 	s.server = grpc.NewServer(opts...)
 	for _, service := range services {
 		service(s.server)
