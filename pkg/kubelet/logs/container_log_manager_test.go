@@ -370,10 +370,18 @@ func TestCompressLog(t *testing.T) {
 	testFile.Close()
 
 	testLog := testFile.Name()
+	testLogInfo, err := os.Stat(testLog)
+	assert.NoError(t, err)
 	c := &containerLogManager{osInterface: container.RealOS{}}
 	require.NoError(t, c.compressLog(testLog))
-	_, err = os.Stat(testLog + compressSuffix)
+	testLogCompressInfo, err := os.Stat(testLog + compressSuffix)
 	assert.NoError(t, err, "log should be compressed")
+	if testLogInfo.Mode() != testLogCompressInfo.Mode() {
+		t.Errorf("compressed and uncompressed test log file modes do not match")
+	}
+	if err := c.compressLog("test-unknown-log"); err == nil {
+		t.Errorf("compressing unknown log should return error")
+	}
 	_, err = os.Stat(testLog + tmpSuffix)
 	assert.Error(t, err, "temporary log should be renamed")
 	_, err = os.Stat(testLog)
