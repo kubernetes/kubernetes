@@ -1213,8 +1213,6 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 
 				fwk, err := NewFakeFramework(
 					ctx,
-					item.mockWaitOnPermitResult,
-					item.mockRunPreBindPluginsResult,
 					queue,
 					append(item.registerPluginFuncs,
 						tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1229,13 +1227,15 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				gotPodIsInFlightAtWaitOnPermit := false
 				fwk.waitOnPermitFn = func(_ context.Context, pod *v1.Pod) *framework.Status {
-					fwk.gotPodIsInFlightAtWaitOnPermit = podListContainsPod(fwk.queue.InFlightPods(), pod)
-					return fwk.waitOnPermitResult
+					gotPodIsInFlightAtWaitOnPermit = podListContainsPod(fwk.queue.InFlightPods(), pod)
+					return item.mockWaitOnPermitResult
 				}
+				gotPodIsInFlightAtRunPreBindPlugins := false
 				fwk.runPreBindPluginsFn = func(_ context.Context, _ *framework.CycleState, pod *v1.Pod, _ string) *framework.Status {
-					fwk.gotPodIsInFlightAtRunPreBindPlugins = podListContainsPod(fwk.queue.InFlightPods(), pod)
-					return fwk.runPreBindPluginsResult
+					gotPodIsInFlightAtRunPreBindPlugins = podListContainsPod(fwk.queue.InFlightPods(), pod)
+					return item.mockRunPreBindPluginsResult
 				}
 
 				sched := &Scheduler{
@@ -1299,13 +1299,13 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					t.Errorf("unexpected pod being in flight in FailureHandlerFn, expected %v but got %v.",
 						item.expectPodIsInFlightAtFailureHandler, gotPodIsInFlightAtFailureHandler)
 				}
-				if (item.expectPodIsInFlightAtWaitOnPermit && qHintEnabled) != fwk.gotPodIsInFlightAtWaitOnPermit {
+				if (item.expectPodIsInFlightAtWaitOnPermit && qHintEnabled) != gotPodIsInFlightAtWaitOnPermit {
 					t.Errorf("unexpected pod being in flight at start of WaiOnPermit, expected %v but got %v",
-						item.expectPodIsInFlightAtWaitOnPermit, fwk.gotPodIsInFlightAtWaitOnPermit)
+						item.expectPodIsInFlightAtWaitOnPermit, gotPodIsInFlightAtWaitOnPermit)
 				}
-				if (item.expectPodIsInFlightAtRunPreBindPlugins && qHintEnabled) != fwk.gotPodIsInFlightAtRunPreBindPlugins {
+				if (item.expectPodIsInFlightAtRunPreBindPlugins && qHintEnabled) != gotPodIsInFlightAtRunPreBindPlugins {
 					t.Errorf("unexpected pod being in flight at start of RunPreBindPlugins, expected %v but got %v",
-						item.expectPodIsInFlightAtRunPreBindPlugins, fwk.gotPodIsInFlightAtRunPreBindPlugins)
+						item.expectPodIsInFlightAtRunPreBindPlugins, gotPodIsInFlightAtRunPreBindPlugins)
 				}
 				// We have to use wait here
 				// because the Pod goes to the binding cycle in some test cases and the inflight pods might not be empty immediately at this point in such case.
@@ -1324,24 +1324,17 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 // simpler and more efficient testing of Scheduler's logic within the bindingCycle.
 type FakeFramework struct {
 	framework.Framework
-	waitOnPermitResult                  *framework.Status
-	runPreBindPluginsResult             *framework.Status
-	queue                               internalqueue.SchedulingQueue
-	gotPodIsInFlightAtWaitOnPermit      bool
-	gotPodIsInFlightAtRunPreBindPlugins bool
-	waitOnPermitFn                      func(context.Context, *v1.Pod) *framework.Status
-	runPreBindPluginsFn                 func(context.Context, *framework.CycleState, *v1.Pod, string) *framework.Status
+	queue               internalqueue.SchedulingQueue
+	waitOnPermitFn      func(context.Context, *v1.Pod) *framework.Status
+	runPreBindPluginsFn func(context.Context, *framework.CycleState, *v1.Pod, string) *framework.Status
 }
 
-func NewFakeFramework(ctx context.Context, waitOnPermitRes *framework.Status, runPreBindPluginsRes *framework.Status,
-	schedQueue internalqueue.SchedulingQueue, fns []tf.RegisterPluginFunc, profileName string,
-	opts ...frameworkruntime.Option) (*FakeFramework, error) {
+func NewFakeFramework(ctx context.Context, schedQueue internalqueue.SchedulingQueue, fns []tf.RegisterPluginFunc,
+	profileName string, opts ...frameworkruntime.Option) (*FakeFramework, error) {
 	fwk, err := tf.NewFramework(ctx, fns, profileName, opts...)
 	return &FakeFramework{
-			Framework:               fwk,
-			waitOnPermitResult:      waitOnPermitRes,
-			runPreBindPluginsResult: runPreBindPluginsRes,
-			queue:                   schedQueue},
+			Framework: fwk,
+			queue:     schedQueue},
 		err
 }
 
