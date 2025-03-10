@@ -129,6 +129,22 @@ if [ "${golangci_config}" ]; then
   GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
 fi
 
+# Verify that the given config is valid. "golangci-lint run" does not
+# do that, which makes it easy to miss mistakes while editing the configuration.
+if ! failures=$( ${GOBIN}/golangci-lint config verify --config="${golangci_config:-}" 2>&1 ); then
+  cat >&2 <<EOF
+
+Verification of the configuration failed. Command:
+
+   ${GOBIN}/golangci-lint config verify --config="${golangci_config:-}")
+
+Result:
+
+$failures
+EOF
+    exit 1
+fi
+
 if [ "${golangci_config}" ]; then
   # The relative path to _output/local/bin only works if that actually is the
   # GOBIN. If not, then we have to make a temporary copy of the config and
