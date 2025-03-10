@@ -24,6 +24,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -169,6 +171,10 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 
 // SetUp creates new directory and clones a git repo.
 func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.GitRepoVolumeDriver) {
+		return fmt.Errorf("git-repo volume plugin has been disabled; if necessary, it may be re-enabled by enabling the feature-gate `GitRepoVolumeDriver`")
+	}
+
 	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
