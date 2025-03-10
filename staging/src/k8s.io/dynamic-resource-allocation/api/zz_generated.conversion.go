@@ -24,8 +24,9 @@ package api
 import (
 	unsafe "unsafe"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1beta1 "k8s.io/api/resource/v1beta1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -123,6 +124,12 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1beta1.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[v1beta1.QualifiedName]v1beta1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[v1beta1.QualifiedName]v1beta1.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	if err := v1.Convert_bool_To_Pointer_bool(&in.UsageRestrictedToNode, &out.UsageRestrictedToNode, s); err != nil {
+		return err
+	}
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 
@@ -134,6 +141,12 @@ func Convert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1beta
 func autoConvert_v1beta1_BasicDevice_To_api_BasicDevice(in *v1beta1.BasicDevice, out *BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[QualifiedName]DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[QualifiedName]DeviceCapacity)(unsafe.Pointer(&in.Capacity))
+	if err := v1.Convert_Pointer_bool_To_bool(&in.UsageRestrictedToNode, &out.UsageRestrictedToNode, s); err != nil {
+		return err
+	}
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 
@@ -146,7 +159,15 @@ func autoConvert_api_Device_To_v1beta1_Device(in *Device, out *v1beta1.Device, s
 	if err := Convert_api_UniqueString_To_string(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Basic = (*v1beta1.BasicDevice)(unsafe.Pointer(in.Basic))
+	if in.Basic != nil {
+		in, out := &in.Basic, &out.Basic
+		*out = new(v1beta1.BasicDevice)
+		if err := Convert_api_BasicDevice_To_v1beta1_BasicDevice(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Basic = nil
+	}
 	return nil
 }
 
@@ -159,7 +180,15 @@ func autoConvert_v1beta1_Device_To_api_Device(in *v1beta1.Device, out *Device, s
 	if err := Convert_string_To_api_UniqueString(&in.Name, &out.Name, s); err != nil {
 		return err
 	}
-	out.Basic = (*BasicDevice)(unsafe.Pointer(in.Basic))
+	if in.Basic != nil {
+		in, out := &in.Basic, &out.Basic
+		*out = new(BasicDevice)
+		if err := Convert_v1beta1_BasicDevice_To_api_BasicDevice(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Basic = nil
+	}
 	return nil
 }
 
@@ -278,7 +307,7 @@ func autoConvert_api_ResourceSliceSpec_To_v1beta1_ResourceSliceSpec(in *Resource
 	if err := Convert_api_UniqueString_To_string(&in.NodeName, &out.NodeName, s); err != nil {
 		return err
 	}
-	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = in.AllNodes
 	if in.Devices != nil {
 		in, out := &in.Devices, &out.Devices
@@ -309,7 +338,7 @@ func autoConvert_v1beta1_ResourceSliceSpec_To_api_ResourceSliceSpec(in *v1beta1.
 	if err := Convert_string_To_api_UniqueString(&in.NodeName, &out.NodeName, s); err != nil {
 		return err
 	}
-	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = in.AllNodes
 	if in.Devices != nil {
 		in, out := &in.Devices, &out.Devices
