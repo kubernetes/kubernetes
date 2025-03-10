@@ -278,6 +278,9 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
+	if err == nil && ed.pod != nil {
+		err = volumeutil.MakeNestedMountpoints(ed.volName, dir, *ed.pod)
+	}
 
 	ownershipChanger := volume.NewVolumeOwnership(ed, dir, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(ed.plugin, nil))
 	_ = ownershipChanger.ChangePermissions()
