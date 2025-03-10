@@ -131,7 +131,7 @@ fi
 
 # Verify that the given config is valid. "golangci-lint run" does not
 # do that, which makes it easy to miss mistakes while editing the configuration.
-if ! failures=$( ${GOBIN}/golangci-lint config verify --config="${golangci_config:-}" 2>&1 ); then
+if ! failures=$( "${GOBIN}/golangci-lint" config verify --config="${golangci_config:-}" 2>&1 ); then
   cat >&2 <<EOF
 
 Verification of the configuration failed. Command:
