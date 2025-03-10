@@ -2916,7 +2916,7 @@ func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
 	// manually adding the just-created pod from fake clientset memory to informer cache because informer is not started.
 	// we are updating the pod status to succeeded which should update the job status to succeeded and remove the finalizer of the pod.
 	justCreatedPod := podList.(*v1.PodList).Items[0]
-	fmt.Printf("pod is %v\n", podList.(*v1.PodList).Items[0])
+	t.Logf("pod is %v\n", podList.(*v1.PodList).Items[0])
 	justCreatedPod.Status.Phase = v1.PodSucceeded
 	err = podIndexer.Add(&justCreatedPod)
 	if err != nil {
@@ -2948,7 +2948,7 @@ func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when fetching pods %v", err)
 	}
-	fmt.Printf("pod is %v\n", podList.(*v1.PodList).Items[0])
+	t.Logf("pod is %v\n", podList.(*v1.PodList).Items[0])
 	updatedPod := podList.(*v1.PodList).Items[0]
 	updatedPod.Status.Phase = v1.PodSucceeded
 	err = podIndexer.Add(&updatedPod)
@@ -2969,7 +2969,7 @@ func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
 	}
-	time.Sleep(time.Second)
+	time.Sleep(100 * time.Millisecond)
 
 	podList, err = clientSet.Tracker().List(
 		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
