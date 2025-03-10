@@ -47,6 +47,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	basecompatibility "k8s.io/component-base/compatibility"
+	baseversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
@@ -278,7 +279,7 @@ func TestServerRunWithSNI(t *testing.T) {
 			// launch server
 			config := setUp(t)
 			v := fakeVersion()
-			config.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString(v.String(), "", "")
+			config.EffectiveVersion = basecompatibility.NewEffectiveVersionFromString(fmt.Sprintf("%s.%s", v.Major, v.Minor), "", "")
 
 			config.EnableIndex = true
 			secureOptions := (&SecureServingOptions{
@@ -372,7 +373,7 @@ func TestServerRunWithSNI(t *testing.T) {
 				t.Fatalf("failed to connect with loopback client: %v", err)
 			}
 			if expected := &v; !reflect.DeepEqual(got, expected) {
-				t.Errorf("loopback client didn't get correct version info: expected=%v got=%v", expected, got)
+				t.Errorf("loopback client didn't get correct version info: expected=%#v got=%#v", *expected, *got)
 			}
 
 			select {
@@ -462,11 +463,14 @@ func certSignature(cert tls.Certificate) (string, error) {
 }
 
 func fakeVersion() version.Info {
-	return version.Info{
-		Major:      "42",
-		Minor:      "42",
-		GitVersion: "42.42",
-	}
+	baseVer := baseversion.Get()
+	baseVer.Major = "42"
+	baseVer.Minor = "42"
+	baseVer.EmulationMajor = "42"
+	baseVer.EmulationMinor = "42"
+	baseVer.MinCompatibilityMajor = "42"
+	baseVer.MinCompatibilityMinor = "41"
+	return baseVer
 }
 
 // generateSelfSignedCertKey creates a self-signed certificate and key for the given host.
