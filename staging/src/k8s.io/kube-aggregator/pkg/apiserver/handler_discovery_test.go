@@ -394,17 +394,17 @@ func TestV2Beta1Skew(t *testing.T) {
 		v2b := apidiscoveryv2beta1.APIGroupDiscoveryList{}
 		err := apidiscoveryv2scheme.Convertv2APIGroupDiscoveryListTov2beta1APIGroupDiscoveryList(&apiGroup, &v2b, nil)
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 		converted, err := json.Marshal(v2b)
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json;"+"g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
 		w.WriteHeader(200)
 		_, err = w.Write(converted)
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 	}))
 	testCtx, cancel := context.WithCancel(context.Background())

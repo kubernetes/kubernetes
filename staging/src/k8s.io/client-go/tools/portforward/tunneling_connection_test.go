@@ -52,16 +52,16 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 		}
 		conn, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 		defer conn.Close() //nolint:errcheck
 		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
-			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
+			t.Fatalf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
 		}
 		tunnelingConn := NewTunnelingConnection("server", conn)
 		spdyConn, err := spdy.NewServerConnection(tunnelingConn, justQueueStream(streamChan))
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 		defer spdyConn.Close() //nolint:errcheck
 		<-stopServerChan
@@ -85,10 +85,12 @@ func TestTunnelingConnection_ReadWriteClose(t *testing.T) {
 		clientStream, err := spdyClient.CreateStream(http.Header{})
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 		_, err = io.Copy(clientStream, strings.NewReader(expected))
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 		clientStream.Close() //nolint:errcheck
 	}()
@@ -113,7 +115,7 @@ func TestTunnelingConnection_LocalRemoteAddress(t *testing.T) {
 		}
 		conn, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 		defer conn.Close() //nolint:errcheck
 		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
@@ -149,11 +151,11 @@ func TestTunnelingConnection_ReadWriteDeadlines(t *testing.T) {
 		}
 		conn, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 		defer conn.Close() //nolint:errcheck
 		if conn.Subprotocol() != constants.WebsocketsSPDYTunnelingPortForwardV1 {
-			t.Errorf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
+			t.Fatalf("Not acceptable agreement Subprotocol: %v", conn.Subprotocol())
 		}
 		<-stopServerChan
 	}))

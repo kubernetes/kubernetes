@@ -114,16 +114,16 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 				if testCase.status != nil {
 					statusBytes, err := runtime.Encode(encoder, testCase.status)
 					if err != nil {
-						t.Errorf("unexpected error %v", err)
+						t.Fatalf("unexpected error %v", err)
 					}
 					_, err = w.Write(statusBytes)
 					if err != nil {
-						t.Errorf("unexpected error %v", err)
+						t.Fatalf("unexpected error %v", err)
 					}
 				} else if len(testCase.body) > 0 {
 					_, err := w.Write([]byte(testCase.body))
 					if err != nil {
-						t.Errorf("unexpected error %v", err)
+						t.Fatalf("unexpected error %v", err)
 					}
 				}
 			}))

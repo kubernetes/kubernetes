@@ -123,7 +123,7 @@ func fakeServer(t *testing.T, requestReceived chan struct{}, testName string, ex
 
 		opts, err := remotecommand.NewOptions(req)
 		if err != nil {
-			t.Errorf("unexpected error %v", err)
+			t.Fatalf("unexpected error %v", err)
 		}
 		if exec {
 			cmd := req.URL.Query()[api.ExecCommandParam]
