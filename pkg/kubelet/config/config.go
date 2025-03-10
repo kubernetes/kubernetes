@@ -52,7 +52,7 @@ const (
 )
 
 type podStartupSLIObserver interface {
-	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
+	ObservedPodOnWatch(logger klog.Logger, pod *v1.Pod, when time.Time)
 }
 
 // PodConfig is a configuration mux that merges many sources of pod configuration into a single
@@ -157,12 +157,12 @@ func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificatio
 // Merge normalizes a set of incoming changes from different sources into a map of all Pods
 // and ensures that redundant changes are filtered out, and then pushes zero or more minimal
 // updates onto the update channel.  Ensures that updates are delivered in order.
-func (s *podStorage) Merge(source string, change interface{}) error {
+func (s *podStorage) Merge(logger klog.Logger, source string, change interface{}) error {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
 	seenBefore := s.sourcesSeen.Has(source)
-	adds, updates, deletes, removes, reconciles := s.merge(source, change)
+	adds, updates, deletes, removes, reconciles := s.merge(logger, source, change)
 	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
@@ -216,7 +216,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
+func (s *podStorage) merge(logger klog.Logger, source string, change interface{}) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
@@ -244,7 +244,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
 			// ignore static pods
 			if !kubetypes.IsStaticPod(ref) {
-				s.startupSLIObserver.ObservedPodOnWatch(ref, time.Now())
+				s.startupSLIObserver.ObservedPodOnWatch(logger, ref, time.Now())
 			}
 			if existing, found := oldPods[ref.UID]; found {
 				pods[ref.UID] = existing

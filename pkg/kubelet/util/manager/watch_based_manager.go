@@ -17,6 +17,7 @@ limitations under the License.
 package manager
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -343,7 +344,8 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		if c.isImmutable(object) {
 			item.setImmutable()
 			if item.stop() {
-				klog.V(4).InfoS("Stopped watching for changes - object is immutable", "obj", klog.KRef(namespace, name))
+				// TODO: it needs to be replaced by a proper context in the future
+				klog.FromContext(context.TODO()).V(4).Info("Stopped watching for changes - object is immutable", "obj", klog.KRef(namespace, name))
 			}
 		}
 		return object, nil
@@ -352,12 +354,15 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 }
 
 func (c *objectCache) startRecycleIdleWatch() {
+	// TODO: it needs to be replaced by a proper context in the future
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
 	for key, item := range c.items {
 		if item.stopIfIdle(c.clock.Now(), c.maxIdleTime) {
-			klog.V(4).InfoS("Not acquired for long time, Stopped watching for changes", "objectKey", key, "maxIdleTime", c.maxIdleTime)
+			logger.V(4).Info("Not acquired for long time, Stopped watching for changes", "objectKey", key, "maxIdleTime", c.maxIdleTime)
 		}
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package emptydir
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -248,6 +249,8 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// storage medium is the default, then the volume is ready.  If the
 	// medium is memory, and a mountpoint is present, then the volume is
 	// ready.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 	readyDir := ed.getMetaDir()
 	if volumeutil.IsReady(readyDir) {
 		if ed.medium == v1.StorageMediumMemory && !notMnt {
@@ -272,7 +275,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	case ed.medium == v1.StorageMediumDefault:
 		err = ed.setupDir(dir)
 	case ed.medium == v1.StorageMediumMemory:
-		err = ed.setupTmpfs(dir)
+		err = ed.setupTmpfs(logger, dir)
 	case v1helper.IsHugePageMedium(ed.medium):
 		err = ed.setupHugepages(dir)
 	default:
@@ -320,7 +323,7 @@ func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) erro
 }
 
 // setupTmpfs creates a tmpfs mount at the specified directory.
-func (ed *emptyDir) setupTmpfs(dir string) error {
+func (ed *emptyDir) setupTmpfs(logger klog.Logger, dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
@@ -338,7 +341,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(emptyDirPluginName)))
+	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(logger, ed.mounter, ed.plugin.host.GetPluginDir(emptyDirPluginName)))
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
