@@ -19,7 +19,6 @@ package yaml
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -105,7 +104,7 @@ stuff: 1
 	}
 	b = make([]byte, 15)
 	n, err = r.Read(b)
-	if err != io.EOF || n != 0 {
+	if err != io.EOF || n != 0 { //nolint:errorlint
 		t.Fatalf("expected EOF: %d / %v", n, err)
 	}
 }
@@ -205,7 +204,7 @@ stuff: 1
 		t.Fatalf("unexpected object: %#v", obj)
 	}
 	obj = generic{}
-	if err := s.Decode(&obj); err != io.EOF {
+	if err := s.Decode(&obj); err != io.EOF { //nolint:errorlint
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -319,6 +318,11 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 			{"foo": "bar"},
 			{"baz": "biz"},
 		}},
+		// Spaces for indent, tabs are not allowed in YAML.
+		{"foo:\n  field: bar\n---\nbaz:\n  field: biz", 100, false, false, []generic{
+			{"foo": map[string]any{"field": "bar"}},
+			{"baz": map[string]any{"field": "biz"}},
+		}},
 		{"foo: bar\n---\n", 100, false, false, []generic{
 			{"foo": "bar"},
 		}},
@@ -334,6 +338,38 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		{"foo: bar\n", 100, false, false, []generic{
 			{"foo": "bar"},
 		}},
+		// First document is JSON, second is YAML
+		{"{\"foo\": \"bar\"}\n---\n{baz: biz}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		// First document is JSON, second is YAML, longer than the buffer
+		{"{\"foo\": \"bar\"}\n---\n{baz: biz0123456780123456780123456780123456780123456789}", 20, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz0123456780123456780123456780123456780123456789"},
+		}},
+		// First document is JSON, then whitespace, then YAML
+		{"{\"foo\": \"bar\"}    \n---\n{baz: biz}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		// First document is YAML, second is JSON
+		{"{foo: bar}\n---\n{\"baz\": \"biz\"}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		// First document is JSON, second is YAML, using spaces
+		{"{\n  \"foo\": \"bar\"\n}\n---\n{\n  baz: biz\n}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		// First document is JSON, second is YAML, using tabs
+		{"{\n\t\"foo\": \"bar\"\n}\n---\n{\n\tbaz: biz\n}", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"baz": "biz"},
+		}},
+		// First 2 documents are JSON, third is YAML (stream is JSON)
+		{"{\"foo\": \"bar\"}\n{\"baz\": \"biz\"}\n---\n{qux: zrb}", 100, true, true, nil},
 	}
 	for i, testCase := range testCases {
 		decoder := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(testCase.input)), testCase.buffer)
@@ -348,7 +384,7 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 			}
 			objs = append(objs, out)
 		}
-		if err != io.EOF {
+		if err != io.EOF { //nolint:errorlint
 			switch {
 			case testCase.err && err == nil:
 				t.Errorf("%d: unexpected non-error", i)
@@ -360,12 +396,12 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 				continue
 			}
 		}
-		switch decoder.decoder.(type) {
-		case *YAMLToJSONDecoder:
+		switch {
+		case decoder.yaml != nil:
 			if testCase.isJSON {
 				t.Errorf("%d: expected JSON decoder, got YAML", i)
 			}
-		case *json.Decoder:
+		case decoder.json != nil:
 			if !testCase.isJSON {
 				t.Errorf("%d: expected YAML decoder, got JSON", i)
 			}
@@ -419,7 +455,7 @@ func testReadLines(t *testing.T, lineLengths []int) {
 	var readLines [][]byte
 	for range lines {
 		bytes, err := lineReader.Read()
-		if err != nil && err != io.EOF {
+		if err != nil && err != io.EOF { //nolint:errorlint
 			t.Fatalf("failed to read lines: %v", err)
 		}
 		readLines = append(readLines, bytes)
