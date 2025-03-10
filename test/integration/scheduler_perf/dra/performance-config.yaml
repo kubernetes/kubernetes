@@ -508,7 +508,8 @@
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
 
-#
+# BindingSuccess tests DRADeviceBindingConditions.
+# This case check the binding success flow
 - name: BindingSuccess
   featureGates:
     DynamicResourceAllocation: true
@@ -543,5 +544,5 @@
           status: "True"
   workloads:
     - name: fast
-      labels: [integration-test, short, binding]
+      labels: [integration-test, short]
       params: {}
