@@ -176,6 +176,10 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 }
 
 func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	_, _, err := storage.ValidateListOptions(c.cacher.resourcePrefix, c.cacher.versioner, opts)
+	if err != nil {
+		return err
+	}
 	shouldDelegate, consistentRead := shouldDelegateList(opts)
 	if shouldDelegate {
 		return c.storage.GetList(ctx, key, opts, listObj)
