@@ -123,6 +123,10 @@ type Controller struct {
 	// Store with information to compute the expotential backoff delay for pod
 	// recreation in case of pod failures.
 	podBackoffStore *backoffStore
+
+	// finishedJobStore contains the job ids for which the job status is finished
+	// but the corresponding event is not yet received.
+	finishedJobStore sync.Map
 }
 
 type syncJobCtx struct {
@@ -184,6 +188,7 @@ func newControllerWithClock(ctx context.Context, podInformer coreinformers.PodIn
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 		clock:                 clock,
 		podBackoffStore:       newBackoffStore(),
+		finishedJobStore:      sync.Map{},
 	}
 
 	if _, err := jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -536,6 +541,7 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 			return
 		}
 	}
+	jm.finishedJobStore.Delete(jobObj.UID)
 	jm.enqueueLabelSelector(jobObj)
 }
 
@@ -841,6 +847,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			// re-syncing here as the record has to be removed for finished/deleted jobs
 			return fmt.Errorf("error removing backoff record %w", err)
 		}
+		jm.finishedJobStore.Delete(job.UID)
+		return nil
+	}
+	if _, ok := jm.finishedJobStore.Load(job.UID); ok {
+		logger.V(2).Info("Skip syncing the job as its marked completed but the completed update event is not yet received", "uid", job.UID, "key", key)
 		return nil
 	}
 
@@ -1304,6 +1315,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		}
 		if jobFinished {
 			jm.recordJobFinished(jobCtx.job, jobCtx.finishedCondition)
+			jm.finishedJobStore.Store(jobCtx.job.UID, struct{}{})
 		}
 		recordJobPodFinished(logger, jobCtx.job, oldCounters)
 	}
