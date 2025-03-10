@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This script checks that all generated golangci-lint configurations
-# are up-to-date.
+# are up-to-date and the config hack/golangci.yaml is valid.
 
 set -o errexit
 set -o nounset
@@ -24,4 +24,9 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/verify-generated.sh"
 
+golangci=("${GOBIN}/golangci-lint")
+golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
+
 kube::verify::generated "" "Please run 'hack/update-golangci-lint-config.sh'" hack/update-golangci-lint-config.sh
+
+"${golangci[@]}" config verify --config="${golangci_config}"

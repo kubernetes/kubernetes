@@ -271,7 +271,7 @@ linters-settings: # please keep this alphabetized
       msg: should not be used because managedFields was removed
     - p: \.Add$
       pkg: ^k8s\.io/component-base/featuregate$
-      msg: should not use MutableFeatureGate.Add, use AddVersioned instead
+      msg: should not use Add, use AddVersioned instead
   gocritic:
     enabled-checks:
       - equalFold

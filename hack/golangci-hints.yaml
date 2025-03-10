@@ -205,7 +205,7 @@ linters-settings: # please keep this alphabetized
       msg: should not be used because managedFields was removed
     - p: \.Add$
       pkg: ^k8s\.io/component-base/featuregate$
-      msg: should not use MutableFeatureGate.Add, use AddVersioned instead
+      msg: should not use Add, use AddVersioned instead
     - p: ^gomega\.BeTrue$
       pkg: ^github.com/onsi/gomega$
       msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
