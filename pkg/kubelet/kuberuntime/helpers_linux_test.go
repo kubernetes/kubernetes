@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -493,4 +494,52 @@ func TestQuotaToMilliCPU(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSubtractOverheadFromResourceConfig(t *testing.T) {
+	podCPUMilli := resource.MustParse("200m")
+	podMemory := resource.MustParse("256Mi")
+	podOverheadCPUMilli := resource.MustParse("100m")
+	podOverheadMemory := resource.MustParse("64Mi")
+
+	resCfg := &cm.ResourceConfig{
+		Memory:    int64Ptr(335544320),
+		CPUShares: uint64Ptr(306),
+		CPUPeriod: uint64Ptr(100000),
+		CPUQuota:  int64Ptr(30000),
+	}
+
+	expectedResCfg := &cm.ResourceConfig{
+		Memory:    int64Ptr(268435456),
+		CPUShares: uint64Ptr(203),
+		CPUPeriod: uint64Ptr(100000),
+		CPUQuota:  int64Ptr(20000),
+	}
+
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "foo",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: podCPUMilli,
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    podCPUMilli,
+							v1.ResourceMemory: podMemory,
+						},
+					},
+				},
+			},
+			Overhead: v1.ResourceList{
+				v1.ResourceCPU:    podOverheadCPUMilli,
+				v1.ResourceMemory: podOverheadMemory,
+			},
+		},
+	}
+
+	got := subtractOverheadFromResourceConfig(resCfg, pod)
+
+	assert.Equal(t, expectedResCfg, got)
 }

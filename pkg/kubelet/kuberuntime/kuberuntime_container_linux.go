@@ -248,6 +248,17 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 	}
 }
 
+// generateUpdatePodSandboxResourcesRequest generates platform specific (linux) podsandox resources config for runtime
+func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
+
+	podResourcesWithoutOverhead := subtractOverheadFromResourceConfig(podResources, pod)
+	return &runtimeapi.UpdatePodSandboxResourcesRequest{
+		PodSandboxId: sandboxID,
+		Overhead:     m.convertOverheadToLinuxResources(pod),
+		Resources:    convertResourceConfigToLinuxContainerResources(podResourcesWithoutOverhead),
+	}
+}
+
 // calculateLinuxResources will create the linuxContainerResources type based on the provided CPU and memory resource requests, limits
 func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit, memoryLimit *resource.Quantity, disableCPUQuota bool) *runtimeapi.LinuxContainerResources {
 	resources := runtimeapi.LinuxContainerResources{}
