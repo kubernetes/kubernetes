@@ -48,7 +48,7 @@ issues:
     # Adding unversioned feature gates is allowed in tests
     - linters:
         - forbidigo
-      text: should not use MutableFeatureGate.Add, use AddVersioned instead
+      text: should not use Add, use AddVersioned instead
       path: _test.go$
 
     # The Kubernetes naming convention for conversion functions uses underscores
