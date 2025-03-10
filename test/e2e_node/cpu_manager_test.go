@@ -19,7 +19,9 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -1050,6 +1052,134 @@ func runCPUManagerTests(f *framework.Framework) {
 		waitForContainerRemoval(ctx, pod.Spec.Containers[0].Name, pod.Name, pod.Namespace)
 	})
 
+	ginkgo.It("should assign packed CPUs with distribute-cpus-across-numa disabled and pcpu-only policy options enabled", func(ctx context.Context) {
+		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+		smtLevel := getSMTLevel()
+
+		// strict SMT alignment is trivially verified and granted on non-SMT systems
+		if smtLevel < 2 {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
+		}
+
+		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
+		if cpuAlloc < int64(smtLevel*2) {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
+		}
+
+		framework.Logf("SMT level %d", smtLevel)
+
+		// hostcheck skips test if numaNode < 2
+		numaNodeNum, _, _ := hostCheck()
+
+		cpuPolicyOptions := map[string]string{
+			cpumanager.FullPCPUsOnlyOption:            "true",
+			cpumanager.DistributeCPUsAcrossNUMAOption: "false",
+		}
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      cpuset.New(0),
+				enableCPUManagerOptions: true,
+				options:                 cpuPolicyOptions,
+			},
+		)
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ctnAttrs := []ctnAttribute{
+			{
+				ctnName:    "test-gu-container-distribute-across-numa-disabled",
+				cpuRequest: fmt.Sprintf("%d", 2*numaNodeNum),
+				cpuLimit:   fmt.Sprintf("%d", 2*numaNodeNum),
+			},
+		}
+		pod := makeCPUManagerPod("test-pod-distribute-across-numa-disabled", ctnAttrs)
+		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+		for _, cnt := range pod.Spec.Containers {
+			ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+			framework.Logf("got pod logs: %v", logs)
+			cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+			framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+			validateSMTAlignment(cpus, smtLevel, pod, &cnt)
+			validateCPUsPacked(cpus, numaNodeNum, smtLevel, pod, &cnt)
+		}
+		deletePodSyncByName(ctx, f, pod.Name)
+		// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+		// this is in turn needed because we will have an unavoidable (in the current framework) race with th
+		// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+		waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
+	})
+
+	ginkgo.It("should assign CPUs distributed across NUMA with distribute-cpus-across-numa and pcpu-only policy options enabled", func(ctx context.Context) {
+		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+		smtLevel := getSMTLevel()
+
+		// strict SMT alignment is trivially verified and granted on non-SMT systems
+		if smtLevel < 2 {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
+		}
+
+		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
+		if cpuAlloc < int64(smtLevel*2) {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
+		}
+
+		framework.Logf("SMT level %d", smtLevel)
+
+		// hostcheck skips test if numaNode < 2
+		numaNodeNum, _, _ := hostCheck()
+
+		cpuPolicyOptions := map[string]string{
+			cpumanager.FullPCPUsOnlyOption:            "true",
+			cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+		}
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      cpuset.New(0),
+				enableCPUManagerOptions: true,
+				options:                 cpuPolicyOptions,
+			},
+		)
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ctnAttrs := []ctnAttribute{
+			{
+				ctnName:    "test-gu-container-distribute-across-numa",
+				cpuRequest: fmt.Sprintf("%d", 2*numaNodeNum),
+				cpuLimit:   fmt.Sprintf("%d", 2*numaNodeNum),
+			},
+		}
+		pod := makeCPUManagerPod("test-pod-distribute-across-numa", ctnAttrs)
+		pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+		for _, cnt := range pod.Spec.Containers {
+			ginkgo.By(fmt.Sprintf("validating the container %s on Gu pod %s", cnt.Name, pod.Name))
+
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
+			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
+
+			framework.Logf("got pod logs: %v", logs)
+			cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+			framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+			validateSMTAlignment(cpus, smtLevel, pod, &cnt)
+			validateCPUDistributionAcrossNUMA(cpus, numaNodeNum, smtLevel, pod, &cnt)
+		}
+		deletePodSyncByName(ctx, f, pod.Name)
+		// we need to wait for all containers to really be gone so cpumanager reconcile loop will not rewrite the cpu_manager_state.
+		// this is in turn needed because we will have an unavoidable (in the current framework) race with th
+		// reconcile loop which will make our attempt to delete the state file and to restore the old config go haywire
+		waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
+	})
+
 	ginkgo.AfterEach(func(ctx context.Context) {
 		updateKubeletConfig(ctx, f, oldCfg, true)
 	})
@@ -1154,6 +1284,94 @@ func validateSMTAlignment(cpus cpuset.CPUSet, smtLevel int, pod *v1.Pod, cnt *v1
 func isSMTAlignmentError(pod *v1.Pod) bool {
 	re := regexp.MustCompile(`SMT.*Alignment.*Error`)
 	return re.MatchString(pod.Status.Reason)
+}
+
+// getNumaNodeCPUs retrieves CPUs for each NUMA node.
+func getNumaNodeCPUs() (map[int][]int, error) {
+	numaNodes := make(map[int][]int)
+	nodePaths, err := filepath.Glob("/sys/devices/system/node/node*/cpulist")
+	if err != nil {
+		return nil, err
+	}
+
+	for _, nodePath := range nodePaths {
+		data, err := os.ReadFile(nodePath)
+		framework.ExpectNoError(err, "Error obtaning CPU information from the node")
+		cpuSet := strings.TrimSpace(string(data))
+		cpus, err := cpuset.Parse(cpuSet)
+		framework.ExpectNoError(err, "Error parsing CPUset")
+		// cpus := parseCpuset(cpuSet)
+
+		// Extract node ID from path (e.g., "node0" -> 0)
+		base := filepath.Base(filepath.Dir(nodePath))
+		nodeID, err := strconv.Atoi(strings.TrimPrefix(base, "node"))
+		if err != nil {
+			continue
+		}
+		numaNodes[nodeID] = append(numaNodes[nodeID], cpus.UnsortedList()...)
+	}
+
+	return numaNodes, nil
+}
+
+func validateCPUDistributionAcrossNUMA(allocatedCPUs cpuset.CPUSet, numaNodeNum int, smtLevel int, pod *v1.Pod, cnt *v1.Container) {
+	framework.Logf("validating cpus: %v", allocatedCPUs)
+
+	numaCPUs, err := getNumaNodeCPUs()
+	framework.ExpectNoError(err, "Error retrieving NUMA nodes for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+	distribution := make(map[int]int)
+	for node, cpus := range numaCPUs {
+		count := 0
+		for _, cpu := range cpus {
+			if allocatedCPUs.Contains(cpu) {
+				count++
+			}
+		}
+		if count > 0 {
+			distribution[node] = count
+		}
+	}
+
+	expectedCPUSpread := allocatedCPUs.Size() / numaNodeNum
+	framework.Logf("CPU distribution across NUMA nodes:")
+	for NUMANode, count := range distribution {
+		framework.Logf("NUMA Node %d: %d CPUs\n", NUMANode, count)
+		if count != expectedCPUSpread {
+			framework.Failf("pod %q cnt %q received cpuset not distributed equally across NUMA %v, expected %v got: %v", pod.Name, cnt.Name, NUMANode, expectedCPUSpread, count)
+		}
+	}
+
+}
+
+func validateCPUsPacked(allocatedCPUs cpuset.CPUSet, numaNodeNum int, smtLevel int, pod *v1.Pod, cnt *v1.Container) {
+	framework.Logf("validating cpus: %v", allocatedCPUs)
+
+	numaCPUs, err := getNumaNodeCPUs()
+	framework.ExpectNoError(err, "Error retrieving NUMA nodes for [%s] of pod [%s]", cnt.Name, pod.Name)
+
+	distribution := make(map[int]int)
+	for node, cpus := range numaCPUs {
+		count := 0
+		for _, cpu := range cpus {
+			if allocatedCPUs.Contains(cpu) {
+				count++
+			}
+		}
+		if count > 0 {
+			distribution[node] = count
+		}
+	}
+
+	expectedCPUSpread := allocatedCPUs.Size() / numaNodeNum
+	framework.Logf("CPU distribution across NUMA nodes:")
+	for NUMANode, count := range distribution {
+		framework.Logf("NUMA Node %d: %d CPUs\n", NUMANode, count)
+		if count == expectedCPUSpread {
+			framework.Failf("pod %q cnt %q received cpuset that are not packed as expected %v, expected %v got: %v", pod.Name, cnt.Name, NUMANode, expectedCPUSpread, count)
+		}
+	}
+
 }
 
 // Serial because the test updates kubelet configuration.
