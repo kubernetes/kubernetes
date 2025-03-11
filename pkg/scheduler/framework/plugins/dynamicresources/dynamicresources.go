@@ -846,6 +846,9 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 			return pl.hasDeviceBindingStatus(ctx, state, pod, nodeName)
 		})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			pl.fh.EventRecorder().Eventf(pod, pod, v1.EventTypeWarning, "BindingConditionsFailed", "Scheduling", "waiting for binding conditions timed out, error: %s", err)
+		}
 		return statusError(logger, err)
 	}
 
@@ -951,18 +954,18 @@ func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim, pod *
 		}
 		deviceStatus := getAllocatedDeviceStatus(claim, &deviceRequest)
 		if deviceStatus == nil {
-			pl.fh.EventRecorder().Eventf(claim, nil, v1.EventTypeWarning, "FailedDeviceBinding", "Scheduling", "allocatedDeviceStatus is not updated.")
+			pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for driver to report status for device %s/%s/%s on node %s.", deviceRequest.Driver, deviceRequest.Pool, deviceRequest.Device, nodeName)
 			return false, nil
 		}
 		for _, cond := range deviceRequest.BindingFailureConditions {
 			if apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
-				pl.fh.EventRecorder().Eventf(claim, nil, v1.EventTypeWarning, "FailedDeviceBinding", "Scheduling", "device %v binding to node %v failed. pod: %v/%v. ", deviceStatus.Device, nodeName, pod.Namespace, pod.Name)
+				pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeWarning, "BindingConditionsFailed", "Scheduling", "binding failed for device %s/%s/%s on node %s", deviceRequest.Driver, deviceRequest.Pool, deviceRequest.Device, nodeName)
 				return false, fmt.Errorf("claim %s failed to bind", claim.Name)
 			}
 		}
 		for _, cond := range deviceRequest.BindingConditions {
 			if !apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
-				pl.fh.EventRecorder().Eventf(claim, nil, v1.EventTypeWarning, "FailedDeviceBinding", "Scheduling", "device binding conditions are not met.")
+				pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for binding conditions for device %s/%s/%s on node %s.", deviceRequest.Driver, deviceRequest.Pool, deviceRequest.Device, nodeName)
 				return false, nil
 			}
 		}
