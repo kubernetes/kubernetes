@@ -6781,7 +6781,8 @@ func ValidateLimitRange(limitRange *core.LimitRange) field.ErrorList {
 			min[string(k)] = q
 		}
 
-		if limit.Type == core.LimitTypePod {
+		// We allow default and defaultRequest when Pod Level Resources are enabled
+		if limit.Type == core.LimitTypePod && !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) {
 			if len(limit.Default) > 0 {
 				allErrs = append(allErrs, field.Forbidden(idxPath.Child("default"), "may not be specified when `type` is 'Pod'"))
 			}
