@@ -45,6 +45,7 @@ type FakeContainerManager struct {
 	PodContainerManager                 *FakePodContainerManager
 	shouldResetExtendedResourceCapacity bool
 	nodeConfig                          NodeConfig
+	memoryManager                       memorymanager.Manager
 }
 
 var _ ContainerManager = &FakeContainerManager{}
@@ -52,6 +53,7 @@ var _ ContainerManager = &FakeContainerManager{}
 func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
+		memoryManager:       memorymanager.NewFakeManager(context.TODO()),
 	}
 }
 
@@ -179,7 +181,7 @@ func (cm *FakeContainerManager) InternalContainerLifecycle() InternalContainerLi
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "InternalContainerLifecycle")
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), cm.memoryManager, topologymanager.NewFakeManager()}
 }
 
 func (cm *FakeContainerManager) GetPodCgroupRoot() string {

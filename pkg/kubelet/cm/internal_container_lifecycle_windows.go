@@ -20,6 +20,7 @@ limitations under the License.
 package cm
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -47,7 +48,7 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(pod *v1.Pod, contain
 
 	var numaNodes sets.Set[int]
 	if i.memoryManager != nil {
-		numaNodes = i.memoryManager.GetMemoryNUMANodes(pod, container)
+		numaNodes = i.memoryManager.GetMemoryNUMANodes(context.TODO(), pod, container)
 	}
 
 	// Gather all CPUs associated with the selected NUMA nodes
