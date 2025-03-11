@@ -200,6 +200,10 @@ type deferredResponseWriter struct {
 	hasWritten  bool
 	hw          http.ResponseWriter
 	w           io.Writer
+	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
+	totalBytes int
+	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
+	lastWriteErr error
 
 	ctx context.Context
 }
@@ -242,26 +246,11 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 }
 
 func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
-	ctx := w.ctx
-	span := tracing.SpanFromContext(ctx)
-	// This Step usually wraps in-memory object serialization.
-	span.AddEvent("About to start writing response", attribute.Int("size", len(p)))
-
-	firstWrite := !w.hasWritten
 	defer func() {
-		if err != nil {
-			span.AddEvent("Write call failed",
-				attribute.String("writer", fmt.Sprintf("%T", w.w)),
-				attribute.Int("size", len(p)),
-				attribute.Bool("firstWrite", firstWrite),
-				attribute.String("err", err.Error()))
-		} else {
-			span.AddEvent("Write call succeeded",
-				attribute.String("writer", fmt.Sprintf("%T", w.w)),
-				attribute.Int("size", len(p)),
-				attribute.Bool("firstWrite", firstWrite))
-		}
+		w.totalBytes += n
+		w.lastWriteErr = err
 	}()
+
 	if w.hasWritten {
 		return w.w.Write(p)
 	}
@@ -282,12 +271,35 @@ func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
 		w.w = hw
 	}
 
+	span := tracing.SpanFromContext(w.ctx)
+	span.AddEvent("About to start writing response",
+		attribute.String("writer", fmt.Sprintf("%T", w.w)),
+		attribute.Int("size", len(p)),
+	)
+
 	header.Set("Content-Type", w.mediaType)
 	hw.WriteHeader(w.statusCode)
 	return w.w.Write(p)
 }
 
 func (w *deferredResponseWriter) Close() (err error) {
+	defer func() {
+		if !w.hasWritten {
+			return
+		}
+
+		span := tracing.SpanFromContext(w.ctx)
+
+		if w.lastWriteErr != nil {
+			span.AddEvent("Write call failed",
+				attribute.Int("size", w.totalBytes),
+				attribute.String("err", w.lastWriteErr.Error()))
+		} else {
+			span.AddEvent("Write call succeeded",
+				attribute.Int("size", w.totalBytes))
+		}
+	}()
+
 	if !w.hasWritten {
 		if !w.hasBuffered {
 			return nil
