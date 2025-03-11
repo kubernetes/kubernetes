@@ -23,7 +23,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -40,6 +39,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/cache"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -65,6 +65,7 @@ const (
 type csiPlugin struct {
 	host                      volume.VolumeHost
 	csiDriverLister           storagelisters.CSIDriverLister
+	csiDriverInformer         cache.SharedIndexInformer
 	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 	volumeAttachmentLister    storagelisters.VolumeAttachmentLister
 }
@@ -82,8 +83,7 @@ var _ volume.VolumePlugin = &csiPlugin{}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
-	csiPlugin              *csiPlugin
-	csiPluginUpdateChannel sync.Map
+	csiPlugin *csiPlugin
 }
 
 // TODO (verult) consider using a struct instead of global variables
@@ -159,46 +159,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
-		stopCh := make(chan struct{})
-		prevStopCh, loaded := h.csiPluginUpdateChannel.Swap(pluginName, stopCh)
-		if loaded {
-			close(prevStopCh.(chan struct{}))
-		}
-		go h.startPeriodicAllocatableUpdate(pluginName, stopCh)
-	}
-
 	return nil
-}
-
-func (h *RegistrationHandler) startPeriodicAllocatableUpdate(pluginName string, stopCh <-chan struct{}) {
-	driver, err := h.csiPlugin.getCSIDriver(pluginName)
-	if err != nil {
-		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
-		return
-	}
-
-	period := getNodeAllocatableUpdatePeriod(driver)
-	if period == 0 {
-		return
-	}
-
-	klog.InfoS("Starting CSINodeDriver.Allocatable periodic updates", "pluginName", pluginName, "period", period)
-
-	ticker := time.NewTicker(period)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			if err := updateCSIDriver(pluginName); err != nil {
-				klog.ErrorS(err, "Failed to update CSIDriver", "pluginName", pluginName)
-			}
-		case <-stopCh:
-			klog.InfoS("Stopping CSINodeDriver.Allocatable periodic updates", "pluginName", pluginName)
-			return
-		}
-	}
 }
 
 func getNodeAllocatableUpdatePeriod(driver *storage.CSIDriver) time.Duration {
@@ -309,11 +270,6 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	if err := unregisterDriver(pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
 	}
-
-	if stopCh, ok := h.csiPluginUpdateChannel.Load(pluginName); ok {
-		close(stopCh.(chan struct{}))
-		h.csiPluginUpdateChannel.Delete(pluginName)
-	}
 }
 
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
@@ -350,6 +306,13 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			}
 			// We don't run the volumeAttachmentLister in the kubelet context
 			p.volumeAttachmentLister = nil
+
+			informerFactory := kletHost.GetInformerFactory()
+			if informerFactory == nil {
+				klog.Error(log("InformerFactory not found on KubeletVolumeHost"))
+			} else {
+				p.csiDriverInformer = informerFactory.Storage().V1().CSIDrivers().Informer()
+			}
 		}
 	}
 
@@ -387,6 +350,16 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		return errors.New(log("failed to initialize CSINode: %v", err))
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		if p.csiDriverLister != nil && p.csiDriverInformer != nil {
+			csiNodeUpdater, err := NewCSINodeUpdater(p.csiDriverLister, p.csiDriverInformer)
+			if err != nil {
+				klog.ErrorS(err, "Failed to create CSINodeUpdater")
+			} else {
+				go csiNodeUpdater.Run()
+			}
+		}
+	}
 	return nil
 }
 
