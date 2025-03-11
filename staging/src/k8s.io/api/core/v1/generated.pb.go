@@ -9888,6 +9888,16 @@ func (m *ContainerStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	{
+		size, err := m.Lifecycle.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x7a
 	if len(m.AllocatedResourcesStatus) > 0 {
 		for iNdEx := len(m.AllocatedResourcesStatus) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -12259,6 +12269,13 @@ func (m *Lifecycle) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.StopSignal != nil {
+		i -= len(*m.StopSignal)
+		copy(dAtA[i:], *m.StopSignal)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.StopSignal)))
+		i--
+		dAtA[i] = 0x1a
+	}
 	if m.PreStop != nil {
 		{
 			size, err := m.PreStop.MarshalToSizedBuffer(dAtA[:i])
@@ -22551,6 +22568,8 @@ func (m *ContainerStatus) Size() (n int) {
 			n += 1 + l + sovGenerated(uint64(l))
 		}
 	}
+	l = m.Lifecycle.Size()
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -23389,6 +23408,10 @@ func (m *Lifecycle) Size() (n int) {
 	}
 	if m.PreStop != nil {
 		l = m.PreStop.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.StopSignal != nil {
+		l = len(*m.StopSignal)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -27468,6 +27491,7 @@ func (this *ContainerStatus) String() string {
 		`VolumeMounts:` + repeatedStringForVolumeMounts + `,`,
 		`User:` + strings.Replace(this.User.String(), "ContainerUser", "ContainerUser", 1) + `,`,
 		`AllocatedResourcesStatus:` + repeatedStringForAllocatedResourcesStatus + `,`,
+		`Lifecycle:` + strings.Replace(strings.Replace(this.Lifecycle.String(), "Lifecycle", "Lifecycle", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -28091,6 +28115,7 @@ func (this *Lifecycle) String() string {
 	s := strings.Join([]string{`&Lifecycle{`,
 		`PostStart:` + strings.Replace(this.PostStart.String(), "LifecycleHandler", "LifecycleHandler", 1) + `,`,
 		`PreStop:` + strings.Replace(this.PreStop.String(), "LifecycleHandler", "LifecycleHandler", 1) + `,`,
+		`StopSignal:` + valueToStringGenerated(this.StopSignal) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -37918,6 +37943,39 @@ func (m *ContainerStatus) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 15:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Lifecycle", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Lifecycle.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -45068,6 +45126,39 @@ func (m *Lifecycle) Unmarshal(dAtA []byte) error {
 			if err := m.PreStop.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StopSignal", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := Signal(dAtA[iNdEx:postIndex])
+			m.StopSignal = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

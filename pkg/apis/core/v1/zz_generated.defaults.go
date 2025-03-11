@@ -511,6 +511,16 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.Lifecycle.PostStart != nil {
+			if a.Lifecycle.PostStart.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if a.Lifecycle.PreStop != nil {
+			if a.Lifecycle.PreStop.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+			}
+		}
 	}
 	for i := range in.Status.ContainerStatuses {
 		a := &in.Status.ContainerStatuses[i]
@@ -519,6 +529,16 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.Lifecycle.PostStart != nil {
+			if a.Lifecycle.PostStart.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if a.Lifecycle.PreStop != nil {
+			if a.Lifecycle.PreStop.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+			}
+		}
 	}
 	for i := range in.Status.EphemeralContainerStatuses {
 		a := &in.Status.EphemeralContainerStatuses[i]
@@ -526,6 +546,16 @@ func SetObjectDefaults_Pod(in *corev1.Pod) {
 		if a.Resources != nil {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
+		}
+		if a.Lifecycle.PostStart != nil {
+			if a.Lifecycle.PostStart.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if a.Lifecycle.PreStop != nil {
+			if a.Lifecycle.PreStop.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+			}
 		}
 	}
 }
@@ -549,6 +579,16 @@ func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.Lifecycle.PostStart != nil {
+			if a.Lifecycle.PostStart.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if a.Lifecycle.PreStop != nil {
+			if a.Lifecycle.PreStop.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+			}
+		}
 	}
 	for i := range in.Status.ContainerStatuses {
 		a := &in.Status.ContainerStatuses[i]
@@ -557,6 +597,16 @@ func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
 		}
+		if a.Lifecycle.PostStart != nil {
+			if a.Lifecycle.PostStart.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if a.Lifecycle.PreStop != nil {
+			if a.Lifecycle.PreStop.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+			}
+		}
 	}
 	for i := range in.Status.EphemeralContainerStatuses {
 		a := &in.Status.EphemeralContainerStatuses[i]
@@ -564,6 +614,16 @@ func SetObjectDefaults_PodStatusResult(in *corev1.PodStatusResult) {
 		if a.Resources != nil {
 			SetDefaults_ResourceList(&a.Resources.Limits)
 			SetDefaults_ResourceList(&a.Resources.Requests)
+		}
+		if a.Lifecycle.PostStart != nil {
+			if a.Lifecycle.PostStart.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if a.Lifecycle.PreStop != nil {
+			if a.Lifecycle.PreStop.HTTPGet != nil {
+				SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
+			}
 		}
 	}
 }
