@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"path"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -34,6 +35,13 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+)
+
+const (
+	// KubeletPluginsDir is the default directory for [PluginDataDirectoryPath].
+	KubeletPluginsDir = "/var/lib/kubelet/plugins"
+	// KubeletRegistryDir is the default for [RegistrarDirectoryPath]
+	KubeletRegistryDir = "/var/lib/kubelet/plugins_registry"
 )
 
 // DRAPlugin is the interface that needs to be implemented by a DRA driver to
@@ -165,63 +173,77 @@ func GRPCVerbosity(level int) Option {
 	}
 }
 
-// RegistrarSocketPath sets the file path for a Unix domain socket.
-// If RegistrarListener is not used, then Start will remove
-// a file at that path, should one exist, and creates a socket
-// itself. Otherwise it uses the provided listener and only
-// removes the socket at the specified path during shutdown.
+// RegistrarDirectoryPath sets the path to the directory where the kubelet
+// expects to find registration sockets of plugins. Typically this is
+// /var/lib/kubelet/plugins_registry with /var/lib/kubelet being the kubelet's
+// data directory.
 //
-// At least one of these two options is required.
-func RegistrarSocketPath(path string) Option {
+// This is also the default. Some Kubernetes clusters may use a different data directory.
+// This path must be the same inside and outside of the driver's container.
+// The directory must exist.
+func RegistrarDirectoryPath(path string) Option {
 	return func(o *options) error {
-		o.pluginRegistrationEndpoint.path = path
+		o.pluginRegistrationEndpoint.dir = path
 		return nil
 	}
 }
 
-// RegistrarListener sets an already created listener for the plugin
-// registration API. Can be combined with RegistrarSocketPath.
+// RegistrarSocketFilename sets the name of the socket inside the directory where
+// the kubelet watches for registration sockets (see RegistrarDirectoryPath).
 //
-// At least one of these two options is required.
-func RegistrarListener(listener net.Listener) Option {
+// Usually DRA drivers should not need this option. It is provided to
+// support updates from an installation which used an older release of
+// of the helper code.
+//
+// The default is <driver name>-reg.sock. When rolling updates are enabled (not supported yet),
+// it is <driver name>-<uid>-reg.sock.
+func RegistrarSocketFilename(name string) Option {
 	return func(o *options) error {
-		o.pluginRegistrationEndpoint.listener = listener
+		o.pluginRegistrationEndpoint.file = name
 		return nil
 	}
 }
 
-// PluginSocketPath sets the file path for a Unix domain socket.
-// If PluginListener is not used, then Start will remove
-// a file at that path, should one exist, and creates a socket
-// itself. Otherwise it uses the provided listener and only
-// removes the socket at the specified path during shutdown.
+// RegistrarListener configures how to create the registrar socket.
+// The default is to remove the file if it exists and to then
+// create a socket.
 //
-// At least one of these two options is required.
-func PluginSocketPath(path string) Option {
+// This is used in Kubernetes for end-to-end testing. The default should
+// be fine for DRA drivers.
+func RegistrarListener(listen func(ctx context.Context, path string) (net.Listener, error)) Option {
 	return func(o *options) error {
-		o.draEndpoint.path = path
+		o.pluginRegistrationEndpoint.listenFunc = listen
 		return nil
 	}
 }
 
-// PluginListener sets an already created listener for the dynamic resource
-// allocation plugin API. Can be combined with PluginSocketPath.
+// PluginDataDirectoryPath sets the path where the DRA driver creates the
+// "dra.sock" socket that the kubelet connects to for the DRA-specific gRPC calls.
+// It is also used to coordinate between different Pods when using rolling
+// updates. It must not be shared with other kubelet plugins.
 //
-// At least one of these two options is required.
-func PluginListener(listener net.Listener) Option {
+// The default is /var/lib/kubelet/plugins/<driver name>. This directory
+// does not need to be inside the kubelet data directory, as long as
+// the kubelet can access it.
+//
+// This path must be the same inside and outside of the driver's container.
+// The directory must exist.
+func PluginDataDirectoryPath(path string) Option {
 	return func(o *options) error {
-		o.draEndpoint.listener = listener
+		o.pluginDataDirectoryPath = path
 		return nil
 	}
 }
 
-// KubeletPluginSocketPath defines how kubelet will connect to the dynamic
-// resource allocation plugin. This corresponds to PluginSocketPath, except
-// that PluginSocketPath defines the path in the filesystem of the caller and
-// KubeletPluginSocketPath in the filesystem of kubelet.
-func KubeletPluginSocketPath(path string) Option {
+// PluginListener configures how to create the registrar socket.
+// The default is to remove the file if it exists and to then
+// create a socket.
+//
+// This is used in Kubernetes for end-to-end testing. The default should
+// be fine for DRA drivers.
+func PluginListener(listen func(ctx context.Context, path string) (net.Listener, error)) Option {
 	return func(o *options) error {
-		o.draAddress = path
+		o.draEndpointListen = listen
 		return nil
 	}
 }
@@ -306,9 +328,9 @@ type options struct {
 	driverName                 string
 	nodeName                   string
 	nodeUID                    types.UID
-	draEndpoint                endpoint
-	draAddress                 string
 	pluginRegistrationEndpoint endpoint
+	pluginDataDirectoryPath    string
+	draEndpointListen          func(ctx context.Context, path string) (net.Listener, error)
 	unaryInterceptors          []grpc.UnaryServerInterceptor
 	streamInterceptors         []grpc.StreamServerInterceptor
 	kubeClient                 kubernetes.Interface
@@ -349,7 +371,7 @@ type Helper struct {
 // a name to all log entries.
 //
 // If the plugin will be used to publish resources, [KubeClient] and [NodeName]
-// options are mandatory.
+// options are mandatory. Otherwise only [DriverName] is mandatory.
 func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helper, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
@@ -357,6 +379,9 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		grpcVerbosity: 6, // Logs requests and responses, which can be large.
 		serialize:     true,
 		nodeV1beta1:   true,
+		pluginRegistrationEndpoint: endpoint{
+			dir: KubeletRegistryDir,
+		},
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -367,17 +392,12 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.driverName == "" {
 		return nil, errors.New("driver name must be set")
 	}
-	if o.draAddress == "" {
-		return nil, errors.New("DRA address must be set")
+	if o.pluginRegistrationEndpoint.file == "" {
+		o.pluginRegistrationEndpoint.file = o.driverName + "-reg.sock"
 	}
-	var emptyEndpoint endpoint
-	if o.draEndpoint == emptyEndpoint {
-		return nil, errors.New("a Unix domain socket path and/or listener must be set for the kubelet plugin")
+	if o.pluginDataDirectoryPath == "" {
+		o.pluginDataDirectoryPath = path.Join(KubeletPluginsDir, o.driverName)
 	}
-	if o.pluginRegistrationEndpoint == emptyEndpoint {
-		return nil, errors.New("a Unix domain socket path and/or listener must be set for the registrar")
-	}
-
 	d := &Helper{
 		driverName: o.driverName,
 		nodeName:   o.nodeName,
@@ -412,7 +432,12 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 
 	// Run the node plugin gRPC server first to ensure that it is ready.
 	var supportedServices []string
-	pluginServer, err := startGRPCServer(klog.NewContext(ctx, klog.LoggerWithName(logger, "dra")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.draEndpoint, func(grpcServer *grpc.Server) {
+	draEndpoint := endpoint{
+		dir:        o.pluginDataDirectoryPath,
+		file:       "dra.sock", // "dra" is hard-coded.
+		listenFunc: o.draEndpointListen,
+	}
+	pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
 		if o.nodeV1beta1 {
 			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
 			drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
@@ -428,7 +453,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.NewContext(ctx, klog.LoggerWithName(logger, "registrar")), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, o.draAddress, o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}
@@ -510,6 +535,11 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 		// our background context, not the one passed into this
 		// function, and thus is connected to the lifecycle of the
 		// plugin.
+		//
+		// TODO: don't delete ResourceSlices, not even on a clean shutdown.
+		// We either support rolling updates and want to hand over seamlessly
+		// or don't and then perhaps restart the pod quickly enough that
+		// the kubelet hasn't deleted ResourceSlices yet.
 		controllerCtx := d.backgroundCtx
 		controllerLogger := klog.FromContext(controllerCtx)
 		controllerLogger = klog.LoggerWithName(controllerLogger, "ResourceSlice controller")

@@ -61,10 +61,10 @@ RUNTIME_CONFIG="resource.k8s.io/v1alpha3" FEATURE_GATES=DynamicResourceAllocatio
 In another:
 ```
 sudo mkdir -p /var/run/cdi
-sudo mkdir -p /var/lib/kubelet/plugins
+sudo mkdir -p /var/lib/kubelet/plugins/test-driver.cdi.k8s.io
 sudo mkdir -p /var/lib/kubelet/plugins_registry
 sudo chmod a+rx /var/lib/kubelet /var/lib/kubelet/plugins
-sudo chmod a+rwx /var/run/cdi /var/lib/kubelet/plugins_registry
+sudo chmod a+rwx /var/run/cdi /var/lib/kubelet/plugins_registry /var/lib/kubelet/plugins/test-driver.cdi.k8s.io
 KUBECONFIG=/var/run/kubernetes/admin.kubeconfig go run ./test/e2e/dra/test-driver -v=5 kubelet-plugin --node-name=127.0.0.1
 ```
 
