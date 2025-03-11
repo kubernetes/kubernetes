@@ -97,10 +97,12 @@ func (requirednessTagValidator) doRequired(context Context) (Validations, error)
 	case types.Pointer:
 		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredPointerValidator)}}, nil
 	case types.Struct:
-		// The +required tag on a non-pointer struct is only for documentation.
-		// We don't perform validation here and defer the validation to
-		// the struct's fields.
-		return Validations{Comments: []string{"required non-pointer structs are purely documentation"}}, nil
+		// The +k8s:required tag on a non-pointer struct is not supported.
+		// If you encounter this error and believe you have a valid use case
+		// for forbiddening a non-pointer struct, please let us know! We need
+		// to understand your scenario to determine if we need to adjust
+		// this behavior or provide alternative validation mechanisms.
+		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", requiredTagName)
 	}
 	return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredValueValidator)}}, nil
 }
@@ -125,11 +127,12 @@ func (requirednessTagValidator) doOptional(context Context) (Validations, error)
 	case types.Pointer:
 		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalPointerValidator)}}, nil
 	case types.Struct:
-		// Specifying that a non-pointer struct is optional doesn't actually
-		// make sense technically almost ever, and is better described as a
-		// union inside the struct. It does, however, make sense as
-		// documentation.
-		return Validations{Comments: []string{"optional non-pointer structs are purely documentation"}}, nil
+		// The +k8s:optional tag on a non-pointer struct is not supported.
+		// If you encounter this error and believe you have a valid use case
+		// for forbiddening a non-pointer struct, please let us know! We need
+		// to understand your scenario to determine if we need to adjust
+		// this behavior or provide alternative validation mechanisms.
+		return Validations{}, fmt.Errorf("non-pointer structs cannot use the %q tag", optionalTagName)
 	}
 	return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalValueValidator)}}, nil
 }
@@ -174,7 +177,7 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 			},
 		}, nil
 	case types.Struct:
-		// The +forbidden tag on a non-pointer struct is not supported.
+		// The +k8s:forbidden tag on a non-pointer struct is not supported.
 		// If you encounter this error and believe you have a valid use case
 		// for forbiddening a non-pointer struct, please let us know! We need
 		// to understand your scenario to determine if we need to adjust

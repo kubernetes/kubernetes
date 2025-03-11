@@ -33,17 +33,9 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListField[*]"
 	ListField []string `json:"listField"`
 
-	// +k8s:validateFalse="field Struct.ListPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrField[*]"
-	ListPtrField []*string `json:"listPtrField"`
-
 	// +k8s:validateFalse="field Struct.ListTypedefField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefField[*]"
 	ListTypedefField []StringType `json:"listTypedefField"`
-
-	// +k8s:validateFalse="field Struct.ListTypedefPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefPtrField[*]"
-	ListTypedefPtrField []*StringType `json:"listTypedefPtrField"`
 
 	UnvalidatedListField []string `json:"UnvalidatedListField"`
 }

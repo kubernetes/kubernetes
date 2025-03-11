@@ -15,28 +15,16 @@
         "field Struct.MapField[*]",
         "type MapType[*]"
       ],
-      "mapPtrField": [
-        "field Struct.MapPtrField",
-        "type MapPtrType"
-      ],
-      "mapPtrField[V噘¢\u003eóǲ岋笨Gń條ģ]": [
-        "field Struct.MapPtrField[*]",
-        "type MapPtrType[*]"
-      ],
-      "mapPtrField[讻IeYF墄[C]": [
-        "field Struct.MapPtrField[*]",
-        "type MapPtrType[*]"
-      ],
       "mapTypedefField": [
         "field Struct.MapTypedefField",
         "type MapTypedefType"
       ],
-      "mapTypedefField[\u003eƯ]ɹȽ東潇澍]": [
+      "mapTypedefField[V噘¢\u003eóǲ岋笨Gń條ģ]": [
         "field Struct.MapTypedefField[*]",
         "type MapTypedefType[*]",
         "type StringType"
       ],
-      "mapTypedefField[闌剾溏]": [
+      "mapTypedefField[þƿ髈儱Ŀ蒫÷K鬣壈]": [
         "field Struct.MapTypedefField[*]",
         "type MapTypedefType[*]",
         "type StringType"

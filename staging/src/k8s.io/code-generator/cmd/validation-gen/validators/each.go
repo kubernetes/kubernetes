@@ -214,10 +214,8 @@ func (eachValTagValidator) ValidScopes() sets.Set[Scope] {
 func (eachValTagValidator) LateTagValidator() {}
 
 var (
-	validateEachSliceVal        = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
-	validateEachSliceValNilable = types.Name{Package: libValidationPkg, Name: "EachSliceValNilable"}
-	validateEachMapVal          = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
-	validateEachMapValNilable   = types.Name{Package: libValidationPkg, Name: "EachMapValNilable"}
+	validateEachSliceVal = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
+	validateEachMapVal   = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
@@ -284,16 +282,6 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		listMap = lm
 	}
 	for _, vfn := range validations.Functions {
-		// Which function we call depends on whether the value-type is
-		// already nilable or not.
-		var validateEach types.Name
-
-		if isNilableType(t.Elem) {
-			validateEach = validateEachSliceValNilable
-		} else {
-			validateEach = validateEachSliceVal
-		}
-
 		var cmpArg any = Literal("nil")
 		if listMap != nil {
 			cmpFn := FunctionLiteral{
@@ -311,7 +299,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 			cmpFn.Body = buf.String()
 			cmpArg = cmpFn
 		}
-		f := Function(eachValTagName, vfn.Flags(), validateEach, cmpArg, WrapperFunction{vfn, t.Elem})
+		f := Function(eachValTagName, vfn.Flags(), validateEachSliceVal, cmpArg, WrapperFunction{vfn, t.Elem})
 		result.Functions = append(result.Functions, f)
 	}
 
@@ -323,17 +311,7 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	result.OpaqueValType = validations.OpaqueType
 
 	for _, vfn := range validations.Functions {
-		// Which function we call depends on whether the value-type is
-		// already nilable or not.
-		var validateEach types.Name
-
-		if isNilableType(t.Elem) {
-			validateEach = validateEachMapValNilable
-		} else {
-			validateEach = validateEachMapVal
-		}
-
-		f := Function(eachValTagName, vfn.Flags(), validateEach, WrapperFunction{vfn, t.Elem})
+		f := Function(eachValTagName, vfn.Flags(), validateEachMapVal, WrapperFunction{vfn, t.Elem})
 		result.Functions = append(result.Functions, f)
 	}
 
