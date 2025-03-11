@@ -241,7 +241,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.4"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{list.GcRegistry, "pause", "3.10"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.10.1"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
 	configs[Redis] = Config{list.PromoterE2eRegistry, "redis", "5.0.5-3"}
 	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.2"}
