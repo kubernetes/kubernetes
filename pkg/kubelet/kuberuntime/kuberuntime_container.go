@@ -256,6 +256,12 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
+	// When creating a container, mark the resources as actuated.
+	if err := m.allocationManager.SetActuatedResources(pod, container); err != nil {
+		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", err)
+		return err.Error(), ErrCreateContainerConfig
+	}
+
 	err = m.internalLifecycle.PreCreateContainer(pod, container, containerConfig)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
@@ -399,8 +405,8 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, contai
 	}
 	ctx := context.Background()
 	err := m.runtimeService.UpdateContainerResources(ctx, containerID.ID, containerResources)
-	if err != nil {
-		klog.ErrorS(err, "UpdateContainerResources failed", "container", containerID.String())
+	if err == nil {
+		err = m.allocationManager.SetActuatedResources(pod, container)
 	}
 	return err
 }
