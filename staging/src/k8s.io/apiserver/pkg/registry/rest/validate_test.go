@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	fieldtesting "k8s.io/apimachinery/pkg/util/validation/field/testing"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -154,7 +153,7 @@ func TestValidateDeclaratively(t *testing.T) {
 			} else {
 				results = ValidateUpdateDeclaratively(ctx, tc.options, scheme, tc.object, tc.oldObject)
 			}
-			matcher := fieldtesting.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, tc.expected, results)
 		})
 	}

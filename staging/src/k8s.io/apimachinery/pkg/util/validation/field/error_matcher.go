@@ -14,19 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package field
 
 import (
 	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
-	"testing"
-
-	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// ErrorMatcher is a helper for comparing field.Error objects.
+// ErrorMatcher is a helper for comparing Error objects.
 type ErrorMatcher struct {
 	// TODO(thockin): consider whether type is ever NOT required, maybe just
 	// assume it.
@@ -42,9 +39,9 @@ type ErrorMatcher struct {
 	requireOriginWhenInvalid bool
 }
 
-// Matches returns true if the two field.Error objects match according to the
+// Matches returns true if the two Error objects match according to the
 // configured criteria.
-func (m ErrorMatcher) Matches(want, got *field.Error) bool {
+func (m ErrorMatcher) Matches(want, got *Error) bool {
 	if m.matchType && want.Type != got.Type {
 		return false
 	}
@@ -58,7 +55,7 @@ func (m ErrorMatcher) Matches(want, got *field.Error) bool {
 		if want.Origin != got.Origin {
 			return false
 		}
-		if m.requireOriginWhenInvalid && want.Type == field.ErrorTypeInvalid {
+		if m.requireOriginWhenInvalid && want.Type == ErrorTypeInvalid {
 			if want.Origin == "" || got.Origin == "" {
 				return false
 			}
@@ -72,7 +69,7 @@ func (m ErrorMatcher) Matches(want, got *field.Error) bool {
 
 // Render returns a string representation of the specified Error object,
 // according to the criteria configured in the ErrorMatcher.
-func (m ErrorMatcher) Render(e *field.Error) string {
+func (m ErrorMatcher) Render(e *Error) string {
 	buf := strings.Builder{}
 
 	comma := func() {
@@ -93,7 +90,7 @@ func (m ErrorMatcher) Render(e *field.Error) string {
 		comma()
 		buf.WriteString(fmt.Sprintf("Value=%v", e.BadValue))
 	}
-	if m.matchOrigin || m.requireOriginWhenInvalid && e.Type == field.ErrorTypeInvalid {
+	if m.matchOrigin || m.requireOriginWhenInvalid && e.Type == ErrorTypeInvalid {
 		comma()
 		buf.WriteString(fmt.Sprintf("Origin=%q", e.Origin))
 	}
@@ -170,17 +167,25 @@ func (m ErrorMatcher) ByDetailRegexp() ErrorMatcher {
 	return m
 }
 
+// TestIntf lets users pass a testing.T while not coupling this package to Go's
+// testing package.
+type TestIntf interface {
+	Helper()
+	Errorf(format string, args ...any)
+	Logf(format string, args ...any)
+}
+
 // Test compares two ErrorLists by the criteria configured in this matcher, and
 // fails the test if they don't match. If a given "want" error matches multiple
 // "got" errors, they will all be consumed. This might be OK (e.g. if there are
 // multiple errors on the same field from the same origin) or it might be an
 // insufficiently specific matcher, so these will be logged.
-func (m ErrorMatcher) Test(tb testing.TB, want, got field.ErrorList) {
+func (m ErrorMatcher) Test(tb TestIntf, want, got ErrorList) {
 	tb.Helper()
 
 	remaining := got
 	for _, w := range want {
-		tmp := make(field.ErrorList, 0, len(remaining))
+		tmp := make(ErrorList, 0, len(remaining))
 		n := 0
 		for _, g := range remaining {
 			if m.Matches(w, g) {
