@@ -634,9 +634,9 @@
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
 
-# BindingSuccess tests DRADeviceBindingConditions.
-# This case check the binding success flow
-- name: BindingSuccess
+# DRABindingConditionsDeviceAttached validates DRA device binding condition handling mechanisms.
+# - Success scenario: DeviceAttached=True → Pod should schedule
+- name: DRABindingConditionsDeviceAttached
   featureGates:
     DynamicResourceAllocation: true
     DRADeviceBindingConditions: true
@@ -653,22 +653,59 @@
       templatePath: templates/deviceclass.yaml
     - opcode: createAny
       namespace: test
-      count: 1
       templatePath: templates/resourceclaimtemplate.yaml
     - opcode: createPods
       namespace: test
       count: 1
       podTemplatePath: templates/pod-with-claim-template.yaml
-      collectMetrics: true
       steadyState: true
+      collectMetrics: true
     - opcode: updateDeviceConditions
       namespace: test
-      claimName: "test-claim-0"
-      PodName: "test-dra-0"
       conditions:
         - type: "DeviceAttached"
           status: "True"
+    - opcode: checkPodScheduled
+      namespace: test
+      expectedScheduled: true
   workloads:
     - name: fast
       labels: [integration-test, short]
-      params: {}
+
+# DRABindingConditionsAttachmentFailed validates DRA device binding condition handling mechanisms.
+# - Failure scenario: AttachmentFailed=True → Pod should NOT schedule
+- name: DRABindingConditionsAttachmentFailed
+  featureGates:
+    DynamicResourceAllocation: true
+    DRADeviceBindingConditions: true
+    DRAResourceClaimDeviceStatus: true
+  workloadTemplate:
+    - opcode: createNodes
+      count: 1
+      nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    - opcode: createResourceDriver
+      driverName: test-driver.cdi.k8s.io
+      nodes: scheduler-perf-dra-*
+      maxClaimsPerNode: 1
+    - opcode: createAny
+      templatePath: templates/deviceclass.yaml
+    - opcode: createAny
+      namespace: test
+      templatePath: templates/resourceclaimtemplate.yaml
+    - opcode: createPods
+      namespace: test
+      count: 1
+      podTemplatePath: templates/pod-with-claim-template.yaml
+      steadyState: true
+      collectMetrics: true
+    - opcode: updateDeviceConditions
+      namespace: test
+      conditions:
+        - type: "AttachmentFailed"
+          status: "True"
+    - opcode: checkPodScheduled
+      namespace: test
+      expectedScheduled: false
+  workloads:
+    - name: fast
+      labels: [integration-test, short]

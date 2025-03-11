@@ -374,14 +374,12 @@ claims:
 type updateDeviceConditionsOp struct {
 	Opcode     operationCode
 	Namespace  string
-	ClaimName  string
-	PodName    string
 	Conditions []metav1.Condition
 }
 
 func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
-	if op.Namespace == "" || op.ClaimName == "" || len(op.Conditions) == 0 {
-		return fmt.Errorf("namespace, claimName, and conditions must be set")
+	if op.Namespace == "" || len(op.Conditions) == 0 {
+		return fmt.Errorf("namespace and conditions must be set")
 	}
 	return nil
 }
@@ -472,5 +470,99 @@ func makeBindingConditions(driver, pool, device, condition string, status metav1
 				Message:            "Test",
 			},
 		},
+	}
+}
+
+type checkPodScheduledOp struct {
+	Opcode            operationCode
+	Namespace         string
+	ExpectedScheduled bool
+}
+
+func (op *checkPodScheduledOp) isValid(allowParameterization bool) error {
+	if op.Namespace == "" {
+		return fmt.Errorf("namespace must be set")
+	}
+	return nil
+}
+
+func (op *checkPodScheduledOp) collectsMetrics() bool {
+	return false
+}
+
+func (op *checkPodScheduledOp) patchParams(w *workload) (realOp, error) {
+	return op, op.isValid(false)
+}
+
+func (op *checkPodScheduledOp) requiredNamespaces() []string {
+	if op.Namespace != "" {
+		return []string{op.Namespace}
+	}
+	return nil
+}
+
+func (op *checkPodScheduledOp) run(tCtx ktesting.TContext) {
+	podName := ""
+	retry := 0
+	for {
+		pods, err := tCtx.Client().CoreV1().Pods(op.Namespace).List(tCtx, metav1.ListOptions{})
+		if retry > 40 {
+			tCtx.Fatalf("no pods found in namespace %s", op.Namespace)
+			break
+		}
+		if err != nil || len(pods.Items) == 0 {
+			retry++
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		podName = pods.Items[0].GetName()
+		break
+	}
+
+	validate := func(pod v1.Pod) bool {
+		isScheduled := pod.Spec.NodeName != ""
+		return (op.ExpectedScheduled && isScheduled) || (!op.ExpectedScheduled && !isScheduled)
+	}
+
+	lastViolation := ""
+	for i := 0; i < 30; i++ {
+		allValid := true
+		currentViolation := ""
+
+		pod, err := tCtx.Client().CoreV1().Pods(op.Namespace).Get(
+			tCtx,
+			podName,
+			metav1.GetOptions{},
+		)
+		if err != nil {
+			tCtx.Logf("Failed to refresh pod %s: %v", podName, err)
+			continue
+		}
+
+		if !validate(*pod) {
+			allValid = false
+			currentViolation = fmt.Sprintf("Pod %s: ExpectedScheduled=%v, ActualScheduled=%v (Node=%s)",
+				pod.Name, op.ExpectedScheduled, pod.Spec.NodeName != "", pod.Spec.NodeName)
+		}
+
+		switch {
+		case allValid && op.ExpectedScheduled:
+			tCtx.Logf("Pod scheduled successfully")
+			return
+		case allValid && !op.ExpectedScheduled:
+			if i >= 5 {
+				tCtx.Logf("Pod remain unscheduled for %d seconds", i+1)
+				return
+			}
+		case !allValid:
+			lastViolation = currentViolation
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if op.ExpectedScheduled {
+		tCtx.Fatalf("Timeout waiting for pods to be scheduled. Last violation: %s", lastViolation)
+	} else {
+		tCtx.Fatalf("Pods were unexpectedly scheduled. Last violation: %s", lastViolation)
 	}
 }
