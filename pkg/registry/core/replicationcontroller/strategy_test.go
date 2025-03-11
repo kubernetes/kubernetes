@@ -219,7 +219,7 @@ func mkValidReplicationController(tweaks ...func(rc *api.ReplicationController))
 	rc := api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: ptr.To[int32](1),
 			Selector: map[string]string{"a": "b"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -242,9 +242,9 @@ func TestValidateForDeclarative(t *testing.T) {
 	})
 	successCases := []api.ReplicationController{
 		mkValidReplicationController(func(rc *api.ReplicationController) {}),
-		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = 0 }),
-		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = 1 }),
-		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = 100 }),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](0) }),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](1) }),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](100) }),
 		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = 0 }),
 		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = 1 }),
 		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = 100 }),
@@ -268,7 +268,7 @@ func TestValidateForDeclarative(t *testing.T) {
 		expectedErrs field.ErrorList
 	}{
 		"negative replicas": {
-			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = -1 }),
+			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
@@ -277,6 +277,12 @@ func TestValidateForDeclarative(t *testing.T) {
 			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = -1 }),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"nil replicas": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
 	}
@@ -323,12 +329,12 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 	}{{
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *api.ReplicationController) {
-			rc.Spec.Replicas = 0
+			rc.Spec.Replicas = ptr.To[int32](0)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *api.ReplicationController) {
-			rc.Spec.Replicas = 3
+			rc.Spec.Replicas = ptr.To[int32](3)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
@@ -365,12 +371,22 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 		"negative replicas": {
 			old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
 			update: mkValidReplicationController(func(rc *api.ReplicationController) {
-				rc.Spec.Replicas = -1
+				rc.Spec.Replicas = ptr.To[int32](-1)
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
+		"nil replicas": {
+			old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+
 		"negative minReadySeconds": {
 			old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
 			update: mkValidReplicationController(func(rc *api.ReplicationController) {
