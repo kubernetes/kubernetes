@@ -18,6 +18,7 @@ package field
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -208,6 +209,95 @@ func TestErrorListOrigin(t *testing.T) {
 	for i, err := range list {
 		if err.Origin != "origin1" {
 			t.Errorf("Error %d: Expected original list Origin to be 'origin2', got '%s'", i, err.Origin)
+		}
+	}
+}
+
+func TestErrorMarkDeclarative(t *testing.T) {
+	// Test for single Error
+	err := Invalid(NewPath("field"), "value", "detail")
+	if err.CoveredByDeclarative {
+		t.Errorf("New error should not be declarative by default")
+	}
+
+	// Mark as declarative
+	err.MarkCoveredByDeclarative() //nolint:errcheck // The "error" here is not an unexpected error from the function.
+	if !err.CoveredByDeclarative {
+		t.Errorf("Error should be declarative after marking")
+	}
+}
+
+func TestErrorListMarkDeclarative(t *testing.T) {
+	// Test for ErrorList
+	list := ErrorList{
+		Invalid(NewPath("field1"), "value1", "detail1"),
+		Invalid(NewPath("field2"), "value2", "detail2"),
+	}
+
+	// Verify none are declarative by default
+	for i, err := range list {
+		if err.CoveredByDeclarative {
+			t.Errorf("Error %d should not be declarative by default", i)
+		}
+	}
+
+	// Mark list as declarative
+	list.MarkCoveredByDeclarative()
+
+	// Verify all errors in the list are now declarative
+	for i, err := range list {
+		if !err.CoveredByDeclarative {
+			t.Errorf("Error %d should be declarative after marking the list", i)
+		}
+	}
+}
+
+func TestErrorListExtractCoveredByDeclarative(t *testing.T) {
+	testCases := []struct {
+		list         ErrorList
+		expectedList ErrorList
+	}{
+		{
+			ErrorList{},
+			ErrorList{},
+		},
+		{
+			ErrorList{Invalid(NewPath("field1"), nil, "")},
+			ErrorList{},
+		},
+		{
+			ErrorList{Invalid(NewPath("field1"), nil, "").MarkCoveredByDeclarative(), Required(NewPath("field2"), "detail2")},
+			ErrorList{Invalid(NewPath("field1"), nil, "").MarkCoveredByDeclarative()},
+		},
+	}
+
+	for _, tc := range testCases {
+		got := tc.list.ExtractCoveredByDeclarative()
+		if !reflect.DeepEqual(got, tc.expectedList) {
+			t.Errorf("For list %v, expected %v, got %v", tc.list, tc.expectedList, got)
+		}
+	}
+}
+
+func TestErrorListRemoveCoveredByDeclarative(t *testing.T) {
+	testCases := []struct {
+		list         ErrorList
+		expectedList ErrorList
+	}{
+		{
+			ErrorList{},
+			ErrorList{},
+		},
+		{
+			ErrorList{Invalid(NewPath("field1"), nil, "").MarkCoveredByDeclarative(), Required(NewPath("field2"), "detail2")},
+			ErrorList{Required(NewPath("field2"), "detail2")},
+		},
+	}
+
+	for _, tc := range testCases {
+		got := tc.list.RemoveCoveredByDeclarative()
+		if !reflect.DeepEqual(got, tc.expectedList) {
+			t.Errorf("For list %v, expected %v, got %v", tc.list, tc.expectedList, got)
 		}
 	}
 }
