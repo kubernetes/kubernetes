@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -135,12 +136,13 @@ type testStaticPolicy struct {
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
+	tCtx := ktesting.Init(t)
 	manager := topologymanager.NewFakeManager()
 	if hint != nil {
 		manager = topologymanager.NewFakeManagerWithHint(hint)
 	}
 
-	p, err := NewPolicyStatic(testCase.machineInfo, testCase.systemReserved, manager)
+	p, err := NewPolicyStatic(tCtx, testCase.machineInfo, testCase.systemReserved, manager)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -213,6 +215,7 @@ func TestStaticPolicyName(t *testing.T) {
 }
 
 func TestStaticPolicyStart(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should fail, if machine state is empty, but it has memory assignments",
@@ -1153,7 +1156,7 @@ func TestStaticPolicyStart(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.Start(s)
+			err = p.Start(tCtx, s)
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Fatalf("The actual error: %v is different from the expected one: %v", err, testCase.expectedError)
 			}
@@ -1168,7 +1171,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			}
 
 			machineState := s.GetMachineState()
-			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
 				t.Fatalf("The actual machine state: %v is different from the expected one: %v", machineState, testCase.expectedMachineState)
 			}
 		})
@@ -1176,6 +1179,7 @@ func TestStaticPolicyStart(t *testing.T) {
 }
 
 func TestStaticPolicyAllocate(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description:         "should do nothing for non-guaranteed pods",
@@ -2014,7 +2018,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			err = p.Allocate(tCtx, s, testCase.pod, &testCase.pod.Spec.Containers[0])
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 			}
@@ -2029,7 +2033,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 			}
 
 			machineState := s.GetMachineState()
-			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
 				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
 			}
 		})
@@ -2037,6 +2041,7 @@ func TestStaticPolicyAllocate(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should re-use init containers memory, init containers requests 1Gi and 2Gi, apps containers 3Gi and 4Gi",
@@ -2738,14 +2743,14 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(tCtx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(tCtx, s, testCase.pod, &testCase.pod.Spec.Containers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -2757,7 +2762,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 			}
 
 			machineState := s.GetMachineState()
-			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
 				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
 			}
 		})
@@ -2765,6 +2770,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 }
 
 func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should do nothing once containers already exist under the state file",
@@ -3071,7 +3077,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.InitContainers {
-				err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
+				err = p.Allocate(tCtx, s, testCase.pod, &testCase.pod.Spec.InitContainers[i])
 				if !reflect.DeepEqual(err, testCase.expectedError) {
 					t.Fatalf("The actual error %v is different from the expected one %v", err, testCase.expectedError)
 				}
@@ -3082,7 +3088,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			for i := range testCase.pod.Spec.Containers {
-				err = p.Allocate(s, testCase.pod, &testCase.pod.Spec.Containers[i])
+				err = p.Allocate(tCtx, s, testCase.pod, &testCase.pod.Spec.Containers[i])
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -3094,7 +3100,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 			}
 
 			machineState := s.GetMachineState()
-			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
 				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
 			}
 		})
@@ -3102,6 +3108,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 }
 
 func TestStaticPolicyRemoveContainer(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
 	testCases := []testStaticPolicy{
 		{
 			description:         "should do nothing when the container does not exist under the state",
@@ -3344,14 +3351,14 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			p.RemoveContainer(s, "pod1", "container1")
+			p.RemoveContainer(tCtx, s, "pod1", "container1")
 			assignments := s.GetMemoryAssignments()
 			if !areContainerMemoryAssignmentsEqual(t, assignments, testCase.expectedAssignments) {
 				t.Fatalf("Actual assignments %v are different from the expected %v", assignments, testCase.expectedAssignments)
 			}
 
 			machineState := s.GetMachineState()
-			if !areMachineStatesEqual(machineState, testCase.expectedMachineState) {
+			if !areMachineStatesEqual(logger, machineState, testCase.expectedMachineState) {
 				t.Fatalf("The actual machine state %v is different from the expected %v", machineState, testCase.expectedMachineState)
 			}
 		})
@@ -3359,6 +3366,7 @@ func TestStaticPolicyRemoveContainer(t *testing.T) {
 }
 
 func TestStaticPolicyGetTopologyHints(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	testCases := []testStaticPolicy{
 		{
 			description: "should not provide topology hints for non-guaranteed pods",
@@ -3735,7 +3743,7 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetTopologyHints(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			topologyHints := p.GetTopologyHints(tCtx, s, testCase.pod, &testCase.pod.Spec.Containers[0])
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}
