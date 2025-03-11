@@ -706,7 +706,7 @@ func (f *frameworkImpl) QueueSortFunc() framework.LessFunc {
 // When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 // and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
 // If a non-success status is returned, then the scheduling cycle is aborted.
-func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (_ *framework.PreFilterResult, status *framework.Status, _ sets.Set[string]) {
+func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (_ *framework.PreFilterResult, status *framework.Status, _ sets.Set[string]) {
 	startTime := time.Now()
 	skipPlugins := sets.New[string]()
 	defer func() {
@@ -727,7 +727,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
+		r, s := f.runPreFilterPlugin(ctx, pl, state, pod, nodes)
 		if s.IsSkip() {
 			skipPlugins.Insert(pl.Name())
 			continue
@@ -765,12 +765,12 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 	return result, returnStatus, pluginsWithNodes
 }
 
-func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	if !state.ShouldRecordPluginMetrics() {
-		return pl.PreFilter(ctx, state, pod)
+		return pl.PreFilter(ctx, state, pod, nodes)
 	}
 	startTime := time.Now()
-	result, status := pl.PreFilter(ctx, state, pod)
+	result, status := pl.PreFilter(ctx, state, pod, nodes)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PreFilter, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return result, status
 }

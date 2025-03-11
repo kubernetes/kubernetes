@@ -162,7 +162,7 @@ func needsRestrictionsCheck(v v1.Volume) bool {
 }
 
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
-func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	needsCheck := false
 	for i := range pod.Spec.Volumes {
 		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
