@@ -404,7 +404,6 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldPod := old.(*api.Pod)
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
-	podutil.MarkPodProposedForResize(oldPod, newPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 	updatePodGeneration(newPod, oldPod)
 }

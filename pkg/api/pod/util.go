@@ -19,7 +19,6 @@ package pod
 import (
 	"strings"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1300,43 +1299,6 @@ func hasInvalidLabelValueInRequiredNodeAffinity(spec *api.PodSpec) bool {
 		return false
 	}
 	return helper.HasInvalidLabelValueInNodeSelectorTerms(spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms)
-}
-
-func MarkPodProposedForResize(oldPod, newPod *api.Pod) {
-	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) {
-		// Update is invalid: ignore changes and let validation handle it
-		return
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && len(newPod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
-		return
-	}
-
-	for i, c := range newPod.Spec.Containers {
-		if c.Name != oldPod.Spec.Containers[i].Name {
-			return // Update is invalid (container mismatch): let validation handle it.
-		}
-		if apiequality.Semantic.DeepEqual(oldPod.Spec.Containers[i].Resources, c.Resources) {
-			continue
-		}
-		newPod.Status.Resize = api.PodResizeStatusProposed
-		return
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for i, c := range newPod.Spec.InitContainers {
-			if IsRestartableInitContainer(&c) {
-				if c.Name != oldPod.Spec.InitContainers[i].Name {
-					return // Update is invalid (container mismatch): let validation handle it.
-				}
-				if apiequality.Semantic.DeepEqual(oldPod.Spec.InitContainers[i].Resources, c.Resources) {
-					continue
-				}
-				newPod.Status.Resize = api.PodResizeStatusProposed
-				return
-			}
-		}
-	}
 }
 
 // KEP: https://kep.k8s.io/4639
