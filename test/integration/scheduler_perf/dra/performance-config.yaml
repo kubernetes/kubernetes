@@ -634,59 +634,22 @@
       measureClaims: 500 # must be measurePods / 5
       maxClaimsPerNode: 2
 
-# DRABindingConditionsDeviceAttached validates DRA device binding condition handling mechanisms.
+# DRABindingConditionsTest validates DRA device binding condition handling mechanisms.
 # - Success scenario: DeviceAttached=True → Pod should schedule
-- name: DRABindingConditionsDeviceAttached
-  featureGates:
-    DynamicResourceAllocation: true
-    DRADeviceBindingConditions: true
-    DRAResourceClaimDeviceStatus: true
-  workloadTemplate:
-    - opcode: createNodes
-      count: 1
-      nodeTemplatePath: templates/node-with-dra-test-driver.yaml
-    - opcode: createResourceDriver
-      driverName: test-driver.cdi.k8s.io
-      nodes: scheduler-perf-dra-*
-      maxClaimsPerNode: 1
-    - opcode: createAny
-      templatePath: templates/deviceclass.yaml
-    - opcode: createAny
-      namespace: test
-      templatePath: templates/resourceclaimtemplate.yaml
-    - opcode: createPods
-      namespace: test
-      count: 1
-      podTemplatePath: templates/pod-with-claim-template.yaml
-      steadyState: true
-      collectMetrics: true
-    - opcode: updateDeviceConditions
-      namespace: test
-      conditions:
-        - type: "DeviceAttached"
-          status: "True"
-    - opcode: checkPodScheduled
-      namespace: test
-      expectedScheduled: true
-  workloads:
-    - name: fast
-      labels: [integration-test, short]
-
-# DRABindingConditionsAttachmentFailed validates DRA device binding condition handling mechanisms.
 # - Failure scenario: AttachmentFailed=True → Pod should NOT schedule
-- name: DRABindingConditionsAttachmentFailed
+- name: DRABindingConditionsTest
   featureGates:
     DynamicResourceAllocation: true
     DRADeviceBindingConditions: true
     DRAResourceClaimDeviceStatus: true
   workloadTemplate:
     - opcode: createNodes
-      count: 1
       nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+      countParam: $nodesWithDRA
     - opcode: createResourceDriver
       driverName: test-driver.cdi.k8s.io
       nodes: scheduler-perf-dra-*
-      maxClaimsPerNode: 1
+      maxClaimsPerNodeParam: $maxClaimsPerNode
     - opcode: createAny
       templatePath: templates/deviceclass.yaml
     - opcode: createAny
@@ -694,18 +657,51 @@
       templatePath: templates/resourceclaimtemplate.yaml
     - opcode: createPods
       namespace: test
-      count: 1
       podTemplatePath: templates/pod-with-claim-template.yaml
+      countParam: $measurePods
       steadyState: true
       collectMetrics: true
     - opcode: updateDeviceConditions
       namespace: test
-      conditions:
-        - type: "AttachmentFailed"
-          status: "True"
+      ConditionTypeParam: $conditionType
+      ConditionStatusParam: $conditionStatus
     - opcode: checkPodScheduled
       namespace: test
-      expectedScheduled: false
+      ScheduledParam: $scheduled
   workloads:
-    - name: fast
+    - name: fast_AttachmentSuccess
       labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 1
+        maxClaimsPerNode: 1
+        conditionType: DeviceAttached
+        conditionStatus: "True"
+        scheduled: true
+    - name: fast_AttachmentFailed
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 1
+        maxClaimsPerNode: 1
+        conditionType: AttachmentFailed
+        conditionStatus: "True"
+        scheduled: false
+    - name: multiple_pods_AttachmentSuccess
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 5
+        maxClaimsPerNode: 10
+        conditionType: DeviceAttached
+        conditionStatus: "True"
+        scheduled: true
+    - name: multiple_pods_AttachmentFailed
+      labels: [integration-test, short]
+      params:
+        nodesWithDRA: 1
+        measurePods: 5
+        maxClaimsPerNode: 10
+        conditionType: AttachmentFailed
+        conditionStatus: "True"
+        scheduled: false
