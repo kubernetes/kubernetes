@@ -818,7 +818,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			return nil, fmt.Errorf("the server could not properly serve the list kind")
 		}
 
-		storages[v.Name] = customresource.NewStorage(
+		storages[v.Name], err = customresource.NewStorage(
 			resource.GroupResource(),
 			singularResource.GroupResource(),
 			kind,
@@ -847,6 +847,9 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			table,
 			replicasPathInCustomResource,
 		)
+		if err != nil {
+			return nil, err
+		}
 
 		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
 
