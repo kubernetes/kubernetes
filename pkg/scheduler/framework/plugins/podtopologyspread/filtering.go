@@ -136,8 +136,8 @@ func (p *criticalPaths) update(tpVal string, num int) {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	s, err := pl.calPreFilterState(ctx, pod)
+func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+	s, err := pl.calPreFilterState(ctx, pod, nodes)
 	if err != nil {
 		return nil, framework.AsStatus(err)
 	} else if s != nil && len(s.Constraints) == 0 {
@@ -231,18 +231,13 @@ type topologyCount struct {
 }
 
 // calPreFilterState computes preFilterState describing how pods are spread on topologies.
-func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod) (*preFilterState, error) {
+func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod, allNodes []*framework.NodeInfo) (*preFilterState, error) {
 	constraints, err := pl.getConstraints(pod)
 	if err != nil {
 		return nil, fmt.Errorf("get constraints from pod: %w", err)
 	}
 	if len(constraints) == 0 {
 		return &preFilterState{}, nil
-	}
-
-	allNodes, err := pl.sharedLister.NodeInfos().List()
-	if err != nil {
-		return nil, fmt.Errorf("listing NodeInfos: %w", err)
 	}
 
 	s := preFilterState{

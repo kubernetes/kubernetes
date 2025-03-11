@@ -152,7 +152,7 @@ func TestNodePorts(t *testing.T) {
 				t.Fatalf("creating plugin: %v", err)
 			}
 			cycleState := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("preFilter status does not match (-want,+got): %s", diff)
 			}
