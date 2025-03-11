@@ -105,17 +105,13 @@ func (h *peerProxyHandler) updatePeerDiscoveryInfo(oldObj interface{}, newObj in
 }
 
 func (h *peerProxyHandler) addPeerDiscoveryInfoToCache(serverIdentityLease *v1.Lease) error {
-	if serverIdentityLease == nil {
-		return fmt.Errorf("error adding peer discovery to cache, received nil lease")
+	if serverIdentityLease == nil || serverIdentityLease.Spec.HolderIdentity == nil {
+		return fmt.Errorf("error adding peer discovery to cache, received nil lease or missing holderIdentity, lease obj: %v", serverIdentityLease)
 	}
 
 	// Don't record our own discovery info.
 	if serverIdentityLease.Name == h.serverId {
 		return nil
-	}
-
-	if serverIdentityLease.Spec.HolderIdentity == nil {
-		return fmt.Errorf("error adding peer discovery to cache, received nil holderIdentity in lease: %v", serverIdentityLease)
 	}
 
 	var discoveryDoc *peerAggDiscoveryInfo
