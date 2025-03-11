@@ -437,7 +437,7 @@ func TestRejectPodAdmissionBasedOnOSField(t *testing.T) {
 }
 
 func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
-	nodeSupportedTheFeature := &v1.Node{
+	nodeWithFeature := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
 		Status: v1.NodeStatus{
 			Features: &v1.NodeFeatures{
@@ -445,11 +445,11 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 			},
 		},
 	}
-	nodeNotSupportedTheFeature := &v1.Node{
+	nodeWithoutFeature := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
 	}
-	podNotUsedTheFeature := &v1.Pod{}
-	podUsedTheFeature := &v1.Pod{Spec: v1.PodSpec{
+	podNotUsingFeature := &v1.Pod{}
+	podUsingFeature := &v1.Pod{Spec: v1.PodSpec{
 		SecurityContext: &v1.PodSecurityContext{
 			SupplementalGroupsPolicy: ptr.To(v1.SupplementalGroupsPolicyStrict),
 		},
@@ -465,29 +465,29 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 		{
 			name:             "feature=Beta, node=feature not supported, pod=in use: it should REJECT",
 			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeNotSupportedTheFeature,
-			pod:              podUsedTheFeature,
+			node:             nodeWithoutFeature,
+			pod:              podUsingFeature,
 			expectRejection:  true,
 		},
 		{
 			name:             "feature=Beta, node=feature supported, pod=in use: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeSupportedTheFeature,
-			pod:              podUsedTheFeature,
+			node:             nodeWithFeature,
+			pod:              podUsingFeature,
 			expectRejection:  false,
 		},
 		{
 			name:             "feature=Beta, node=feature not supported, pod=not in use: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeNotSupportedTheFeature,
-			pod:              podNotUsedTheFeature,
+			node:             nodeWithoutFeature,
+			pod:              podNotUsingFeature,
 			expectRejection:  false,
 		},
 		{
 			name:             "feature=Beta, node=feature supported, pod=not in use: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.33"),
-			node:             nodeSupportedTheFeature,
-			pod:              podNotUsedTheFeature,
+			node:             nodeWithFeature,
+			pod:              podNotUsingFeature,
 			expectRejection:  false,
 		},
 		// The feature is Alpha(v1.31, v1.32) in emulated version
@@ -495,29 +495,29 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 		{
 			name:             "feature=Alpha, node=feature not supported, pod=feature used: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeNotSupportedTheFeature,
-			pod:              podUsedTheFeature,
+			node:             nodeWithoutFeature,
+			pod:              podUsingFeature,
 			expectRejection:  false,
 		},
 		{
 			name:             "feature=Alpha, node=feature not supported, pod=feature not used: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeNotSupportedTheFeature,
-			pod:              podNotUsedTheFeature,
+			node:             nodeWithoutFeature,
+			pod:              podNotUsingFeature,
 			expectRejection:  false,
 		},
 		{
 			name:             "feature=Alpha, node=feature supported, pod=feature used: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeSupportedTheFeature,
-			pod:              podUsedTheFeature,
+			node:             nodeWithFeature,
+			pod:              podUsingFeature,
 			expectRejection:  false,
 		},
 		{
 			name:             "feature=Alpha, node=feature supported, pod=feature not used: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.32"),
-			node:             nodeSupportedTheFeature,
-			pod:              podNotUsedTheFeature,
+			node:             nodeWithFeature,
+			pod:              podNotUsingFeature,
 			expectRejection:  false,
 		},
 		// The feature is not yet released (< v1.31) in emulated version (this can happen when only kubelet downgraded).
@@ -525,15 +525,15 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 		{
 			name:             "feature=NotReleased, node=feature not supported, pod=feature used: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.30"),
-			node:             nodeNotSupportedTheFeature,
-			pod:              podUsedTheFeature,
+			node:             nodeWithoutFeature,
+			pod:              podUsingFeature,
 			expectRejection:  false,
 		},
 		{
 			name:             "feature=NotReleased, node=feature not supported, pod=feature not used: it should ADMIT",
 			emulationVersion: utilversion.MustParse("1.30"),
-			node:             nodeNotSupportedTheFeature,
-			pod:              podNotUsedTheFeature,
+			node:             nodeWithoutFeature,
+			pod:              podNotUsingFeature,
 			expectRejection:  false,
 		},
 	}
