@@ -845,14 +845,12 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
-	if c.FeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-		manager := c.AggregatedDiscoveryGroupManager
-		if manager == nil {
-			manager = discoveryendpoint.NewResourceManager("apis")
-		}
-		s.AggregatedDiscoveryGroupManager = manager
-		s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
+	manager := c.AggregatedDiscoveryGroupManager
+	if manager == nil {
+		manager = discoveryendpoint.NewResourceManager("apis")
 	}
+	s.AggregatedDiscoveryGroupManager = manager
+	s.AggregatedLegacyDiscoveryGroupManager = discoveryendpoint.NewResourceManager("api")
 	for {
 		if c.JSONPatchMaxCopyBytes <= 0 {
 			break
@@ -1111,12 +1109,8 @@ func installAPI(name string, s *GenericAPIServer, c *Config) {
 	routes.Version{Version: c.EffectiveVersion.BinaryVersion().Info()}.Install(s.Handler.GoRestfulContainer)
 
 	if c.EnableDiscovery {
-		if c.FeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-			wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
-			s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
-		} else {
-			s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
-		}
+		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(s.DiscoveryGroupManager, s.AggregatedDiscoveryGroupManager)
+		s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/apis", metav1.APIGroupList{}))
 	}
 	if c.FlowControl != nil {
 		c.FlowControl.Install(s.Handler.NonGoRestfulMux)

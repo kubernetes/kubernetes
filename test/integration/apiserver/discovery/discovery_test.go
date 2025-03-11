@@ -39,13 +39,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	kubernetes "k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregator "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	aggregatorclientsetscheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
@@ -185,8 +182,6 @@ func setup(t *testing.T) (context.Context, testClientSet, context.CancelFunc) {
 }
 
 func TestReadinessAggregatedAPIServiceDiscovery(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	// Keep any goroutines spawned from running past the execution of this test
 	ctx, client, cleanup := setup(t)
 	defer cleanup()
@@ -284,8 +279,6 @@ func unregisterAPIService(ctx context.Context, client aggregator.Interface, gv m
 }
 
 func TestAggregatedAPIServiceDiscovery(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	// Keep any goroutines spawned from running past the execution of this test
 	ctx, client, cleanup := setup(t)
 	defer cleanup()
@@ -386,8 +379,6 @@ func runTestCases(t *testing.T, cases []testCase) {
 
 // Declarative tests targeting CRD integration
 func TestCRD(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	runTestCases(t, []testCase{
 		{
 			// Show that when a CRD is added it gets included on the discovery doc
@@ -626,8 +617,6 @@ func TestCRD(t *testing.T) {
 }
 
 func TestFreshness(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	requireStaleGVs := func(gvs ...metav1.GroupVersion) inlineAction {
 		return inlineAction(func(ctx context.Context, client testClient) error {
 			document, err := FetchV2Discovery(ctx, client)
@@ -716,8 +705,6 @@ func TestFreshness(t *testing.T) {
 // Shows a group for which multiple APIServices specify a GroupPriorityMinimum,
 // it is sorted the same in both versions of discovery
 func TestGroupPriority(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryEndpoint, true)
-
 	makeApiServiceSpec := func(gv metav1.GroupVersion, groupPriorityMin, versionPriority int) apiregistrationv1.APIServiceSpec {
 		return apiregistrationv1.APIServiceSpec{
 			Group:                 gv.Group,

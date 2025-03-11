@@ -785,28 +785,26 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 		resourceInfos = append(resourceInfos, r...)
 
-		if s.FeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
-			// Aggregated discovery only aggregates resources under /apis
-			if apiPrefix == APIGroupPrefix {
-				s.AggregatedDiscoveryGroupManager.AddGroupVersion(
-					groupVersion.Group,
-					apidiscoveryv2.APIVersionDiscovery{
-						Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
-						Version:   groupVersion.Version,
-						Resources: discoveryAPIResources,
-					},
-				)
-			} else {
-				// There is only one group version for legacy resources, priority can be defaulted to 0.
-				s.AggregatedLegacyDiscoveryGroupManager.AddGroupVersion(
-					groupVersion.Group,
-					apidiscoveryv2.APIVersionDiscovery{
-						Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
-						Version:   groupVersion.Version,
-						Resources: discoveryAPIResources,
-					},
-				)
-			}
+		// Aggregated discovery only aggregates resources under /apis
+		if apiPrefix == APIGroupPrefix {
+			s.AggregatedDiscoveryGroupManager.AddGroupVersion(
+				groupVersion.Group,
+				apidiscoveryv2.APIVersionDiscovery{
+					Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+					Version:   groupVersion.Version,
+					Resources: discoveryAPIResources,
+				},
+			)
+		} else {
+			// There is only one group version for legacy resources, priority can be defaulted to 0.
+			s.AggregatedLegacyDiscoveryGroupManager.AddGroupVersion(
+				groupVersion.Group,
+				apidiscoveryv2.APIVersionDiscovery{
+					Freshness: apidiscoveryv2.DiscoveryFreshnessCurrent,
+					Version:   groupVersion.Version,
+					Resources: discoveryAPIResources,
+				},
+			)
 		}
 
 	}
@@ -844,12 +842,8 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	// Install the version handler.
 	// Add a handler at /<apiPrefix> to enumerate the supported api versions.
 	legacyRootAPIHandler := discovery.NewLegacyRootAPIHandler(s.discoveryAddresses, s.Serializer, apiPrefix)
-	if s.FeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
-		wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(legacyRootAPIHandler, s.AggregatedLegacyDiscoveryGroupManager)
-		s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/api", metav1.APIVersions{}))
-	} else {
-		s.Handler.GoRestfulContainer.Add(legacyRootAPIHandler.WebService())
-	}
+	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(legacyRootAPIHandler, s.AggregatedLegacyDiscoveryGroupManager)
+	s.Handler.GoRestfulContainer.Add(wrapped.GenerateWebService("/api", metav1.APIVersions{}))
 	s.registerStorageReadinessCheck("", apiGroupInfo)
 
 	return nil
