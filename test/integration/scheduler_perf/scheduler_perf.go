@@ -96,6 +96,7 @@ const (
 	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
 	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
 	updateDeviceConditionsOpcode operationCode = "updateDeviceConditions"
+	checkPodScheduledOpcode      operationCode = "checkPodScheduled"
 )
 
 const (
@@ -500,7 +501,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
 		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
 		updateDeviceConditionsOpcode: &updateDeviceConditionsOp{},
-
+		checkPodScheduledOpcode:      &checkPodScheduledOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	// First determine the opcode using lenient decoding (= ignore extra fields).
