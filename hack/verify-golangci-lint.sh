@@ -134,7 +134,7 @@ fi
 if ! failures=$( "${GOBIN}/golangci-lint" config verify --config="${golangci_config:-}" 2>&1 ); then
   cat >&2 <<EOF
 
-Verification of the configuration failed. Command:
+Verification of the golangci-lint configuration failed. Command:
 
    ${GOBIN}/golangci-lint config verify --config="${golangci_config:-}")
 
