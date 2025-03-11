@@ -23,6 +23,8 @@ import (
 
 	"sigs.k8s.io/randfill"
 
+	utilpointer "k8s.io/utils/pointer"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -119,6 +121,12 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(j *core.ReplicationControllerSpec, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again
 			//j.TemplateRef = nil // this is required for round trip
+
+			// match defaulting
+			if j.Replicas == nil {
+				replicas := int32(0)
+				j.Replicas = &replicas
+			}
 		},
 		func(j *core.List, c randfill.Continue) {
 			c.FillNoCustom(j) // fuzz self without calling this function again
