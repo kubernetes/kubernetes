@@ -113,6 +113,18 @@ message BasicDevice {
   //
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
+
+  // If specified, the device's taints.
+  //
+  // The maximum number of taints is 8.
+  //
+  // This is an alpha field and requires enabling the DRADeviceTaints
+  // feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceTaints
+  repeated DeviceTaintAtom taints = 3;
 }
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
@@ -520,6 +532,32 @@ message DeviceRequest {
   // +listType=atomic
   // +featureGate=DRAPrioritizedList
   repeated DeviceSubRequest firstAvailable = 7;
+
+  // If specified, the request's tolerations.
+  //
+  // Tolerations for NoSchedule are required to allocate a
+  // device which has a taint with that effect. The same applies
+  // to NoExecute.
+  //
+  // In addition, should any of the allocated devices get tainted
+  // with NoExecute after allocation and that effect is not tolerated,
+  // then all pods consuming the ResourceClaim get deleted to evict
+  // them. The scheduler will not let new pods reserve the claim while
+  // it has these tainted devices. Once all pods are evicted, the
+  // claim will get deallocated.
+  //
+  // The maximum number of tolerations is 16.
+  //
+  // This field can only be set when deviceClassName is set and no subrequests
+  // are specified in the firstAvailable list.
+  //
+  // This is an alpha field and requires enabling the DRADeviceTaints
+  // feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceTaints
+  repeated DeviceToleration tolerations = 8;
 }
 
 // DeviceRequestAllocationResult contains the allocation result for one request.
@@ -571,6 +609,19 @@ message DeviceRequestAllocationResult {
   // +optional
   // +featureGate=DRAAdminAccess
   optional bool adminAccess = 5;
+
+  // A copy of all tolerations specified in the request at the time
+  // when the device got allocated.
+  //
+  // The maximum number of tolerations is 16.
+  //
+  // This is an alpha field and requires enabling the DRADeviceTaints
+  // feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceTaints
+  repeated DeviceToleration tolerations = 6;
 }
 
 // DeviceSelector must have exactly one field set.
@@ -652,6 +703,185 @@ message DeviceSubRequest {
   // +optional
   // +oneOf=AllocationMode
   optional int64 count = 5;
+
+  // If specified, the request's tolerations.
+  //
+  // Tolerations for NoSchedule are required to allocate a
+  // device which has a taint with that effect. The same applies
+  // to NoExecute.
+  //
+  // In addition, should any of the allocated devices get tainted
+  // with NoExecute after allocation and that effect is not tolerated,
+  // then all pods consuming the ResourceClaim get deleted to evict
+  // them. The scheduler will not let new pods reserve the claim while
+  // it has these tainted devices. Once all pods are evicted, the
+  // claim will get deallocated.
+  //
+  // The maximum number of tolerations is 16.
+  //
+  // This is an alpha field and requires enabling the DRADeviceTaints
+  // feature gate.
+  //
+  // +optional
+  // +listType=atomic
+  // +featureGate=DRADeviceTaints
+  repeated DeviceToleration tolerations = 7;
+}
+
+// DeviceTaint adds one taint to all devices which match the filter.
+// This has the same effect as if the taint was specified directly
+// in the ResourceSlice by the DRA driver.
+message DeviceTaint {
+  // Standard object metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec specifies the filter and one taint.
+  //
+  // Changing the spec automatically increments the metadata.generation number.
+  optional DeviceTaintSpec spec = 2;
+}
+
+// The device this taint is attached to has the "effect" on
+// any claim which does not tolerate the taint and, through the claim,
+// to pods using the claim.
+message DeviceTaintAtom {
+  // The taint key to be applied to a device.
+  // Must be a label name.
+  //
+  // +required
+  optional string key = 1;
+
+  // The taint value corresponding to the taint key.
+  // Must be a label value.
+  //
+  // +optional
+  optional string value = 2;
+
+  // The effect of the taint on claims that do not tolerate the taint
+  // and through such claims on the pods using them.
+  // Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+  // nodes is not valid here.
+  //
+  // +required
+  optional string effect = 3;
+
+  // TimeAdded represents the time at which the taint was added.
+  // For NoExecute taints, the current time is set automatically
+  // when adding such a taint. There is no default for other taints.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
+}
+
+// DeviceTaintFilter defines which device(s) a [DevicePatch] applies to.
+message DeviceTaintFilter {
+  // If DeviceClassName is set, the selectors defined there must be
+  // satisfied by a device to be patched. This field corresponds
+  // to class.metadata.name.
+  //
+  // +optional
+  optional string deviceClassName = 1;
+
+  // If driver is set, only devices from that driver are patched.
+  // This fields corresponds to slice.spec.driver.
+  //
+  // +optional
+  optional string driver = 2;
+
+  // If pool is set, only devices in that pool are patched.
+  //
+  // Also setting the driver name may be useful to avoid
+  // ambiguity when different drivers use the same pool name,
+  // but this is not required because selecting pools from
+  // different drivers may also be useful, for example when
+  // drivers with node-local devices use the node name as
+  // their pool name.
+  //
+  // +optional
+  optional string pool = 3;
+
+  // If device is set, only devices with that name are patched.
+  // This field corresponds to slice.spec.devices[].name.
+  //
+  // Setting also driver and pool may be required to avoid ambiguity,
+  // but is not required.
+  //
+  // +optional
+  optional string device = 4;
+
+  // Selectors define criteria which must be satisfied by a
+  // device to be patched. All selectors must be satisfied.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceSelector selectors = 5;
+}
+
+// DeviceTaintList is a collection of DeviceTaints.
+message DeviceTaintList {
+  // Standard list metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of DeviceTaints.
+  repeated DeviceTaint items = 2;
+}
+
+// DeviceTaintSpec specifies the filter and one taint.
+message DeviceTaintSpec {
+  // Filter defines which device(s) the patch is applied to.
+  // All filter criteria must be satified for a device to
+  // match. Without a filter or with an empty filter all
+  // devices match.
+  //
+  // +optional
+  optional DeviceTaintFilter filter = 1;
+
+  // The taint that gets applied to matching devices.
+  //
+  // +required
+  optional DeviceTaintAtom taint = 2;
+}
+
+// The ResourceClaim this DeviceToleration is attached to tolerate any taint that matches
+// the triple <key,value,effect> using the matching operator <operator>.
+message DeviceToleration {
+  // Key is the taint key that the toleration applies to. Empty means match all taint keys.
+  // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+  // Must be a label name.
+  //
+  // +optional
+  optional string key = 1;
+
+  // Operator represents a key's relationship to the value.
+  // Valid operators are Exists and Equal. Defaults to Equal.
+  // Exists is equivalent to wildcard for value, so that a ResourceClaim can
+  // tolerate all taints of a particular category.
+  //
+  // +optional
+  optional string operator = 2;
+
+  // Value is the taint value the toleration matches to.
+  // If the operator is Exists, the value should be empty, otherwise just a regular string.
+  // Must be a label value.
+  //
+  // +optional
+  optional string value = 3;
+
+  // Effect indicates the taint effect to match. Empty means match all taint effects.
+  // When specified, allowed values are NoSchedule and NoExecute.
+  //
+  // +optional
+  optional string effect = 4;
+
+  // TolerationSeconds represents the period of time the toleration (which must be
+  // of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+  // it is not set, which means tolerate the taint forever (do not evict). Zero and
+  // negative values will be treated as 0 (evict immediately) by the system.
+  //
+  // +optional
+  optional int64 tolerationSeconds = 5;
 }
 
 // NetworkDeviceData provides network-related details for the allocated device.

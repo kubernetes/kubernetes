@@ -1864,6 +1864,26 @@
               ]
             },
             {
+              "resource": "devicetaints",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceTaint",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "devicetaint",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "resourceclaims",
               "responseKind": {
                 "group": "",

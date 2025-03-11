@@ -21,6 +21,23 @@
       ]
     },
     {
+      "kind": "DeviceTaint",
+      "name": "devicetaints",
+      "namespaced": false,
+      "singularName": "devicetaint",
+      "storageVersionHash": "0N/vky9sxE8=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
       "kind": "ResourceClaim",
       "name": "resourceclaims",
       "namespaced": true,

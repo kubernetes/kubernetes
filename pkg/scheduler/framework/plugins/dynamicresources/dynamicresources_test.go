@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -95,7 +96,7 @@ var (
 
 	// Node with "instance-1" device and no device attributes.
 	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
-	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
+	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 
 	// Node with same device, but now with a "healthy" boolean attribute.
 	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node
@@ -1189,7 +1190,18 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	tc.client.PrependReactor("*", "*", reactor)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1beta1().ResourceClaims().Informer(), "resource claim", "", nil), tc.informerFactory)
+	resourceSliceTrackerOpts := resourceslicetracker.Options{
+		EnableDeviceTaints: true,
+		KubeClient:         tc.client,
+	}
+	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx,
+		tc.informerFactory.Resource().V1beta1().ResourceSlices(),
+		tc.informerFactory.Resource().V1alpha3().DeviceTaints(),
+		tc.informerFactory.Resource().V1beta1().DeviceClasses(),
+		resourceSliceTrackerOpts,
+	)
+	require.NoError(t, err, "couldn't start resource slice tracker")
+	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1beta1().ResourceClaims().Informer(), "resource claim", "", nil), resourceSliceTracker, tc.informerFactory)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),

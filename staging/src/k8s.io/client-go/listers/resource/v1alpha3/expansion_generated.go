@@ -22,6 +22,10 @@ package v1alpha3
 // DeviceClassLister.
 type DeviceClassListerExpansion interface{}
 
+// DeviceTaintListerExpansion allows custom methods to be added to
+// DeviceTaintLister.
+type DeviceTaintListerExpansion interface{}
+
 // ResourceClaimListerExpansion allows custom methods to be added to
 // ResourceClaimLister.
 type ResourceClaimListerExpansion interface{}

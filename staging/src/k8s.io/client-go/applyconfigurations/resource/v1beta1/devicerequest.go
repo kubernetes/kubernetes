@@ -32,6 +32,7 @@ type DeviceRequestApplyConfiguration struct {
 	Count           *int64                                `json:"count,omitempty"`
 	AdminAccess     *bool                                 `json:"adminAccess,omitempty"`
 	FirstAvailable  []DeviceSubRequestApplyConfiguration  `json:"firstAvailable,omitempty"`
+	Tolerations     []DeviceTolerationApplyConfiguration  `json:"tolerations,omitempty"`
 }
 
 // DeviceRequestApplyConfiguration constructs a declarative configuration of the DeviceRequest type for use with
@@ -102,6 +103,19 @@ func (b *DeviceRequestApplyConfiguration) WithFirstAvailable(values ...*DeviceSu
 			panic("nil value passed to WithFirstAvailable")
 		}
 		b.FirstAvailable = append(b.FirstAvailable, *values[i])
+	}
+	return b
+}
+
+// WithTolerations adds the given value to the Tolerations field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Tolerations field.
+func (b *DeviceRequestApplyConfiguration) WithTolerations(values ...*DeviceTolerationApplyConfiguration) *DeviceRequestApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithTolerations")
+		}
+		b.Tolerations = append(b.Tolerations, *values[i])
 	}
 	return b
 }

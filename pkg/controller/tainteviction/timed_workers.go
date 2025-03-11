@@ -28,18 +28,23 @@ import (
 
 // WorkArgs keeps arguments that will be passed to the function executed by the worker.
 type WorkArgs struct {
-	NamespacedName types.NamespacedName
+	// Object is the work item. The UID is only set if it was set when adding the work item.
+	Object NamespacedObject
 }
 
-// KeyFromWorkArgs creates a key for the given `WorkArgs`
+// KeyFromWorkArgs creates a key for the given `WorkArgs`.
+//
+// The key is the same as the NamespacedName of the object in the work item,
+// i.e. the UID is ignored. There cannot be two different
+// work items with the same NamespacedName and different UIDs.
 func (w *WorkArgs) KeyFromWorkArgs() string {
-	return w.NamespacedName.String()
+	return w.Object.NamespacedName.String()
 }
 
-// NewWorkArgs is a helper function to create new `WorkArgs`
+// NewWorkArgs is a helper function to create new `WorkArgs` without a UID.
 func NewWorkArgs(name, namespace string) *WorkArgs {
 	return &WorkArgs{
-		NamespacedName: types.NamespacedName{Namespace: namespace, Name: name},
+		Object: NamespacedObject{NamespacedName: types.NamespacedName{Namespace: namespace, Name: name}},
 	}
 }
 
@@ -102,31 +107,59 @@ func CreateWorkerQueue(f func(ctx context.Context, fireAt time.Time, args *WorkA
 
 func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
+		logger := klog.FromContext(ctx)
+		logger.V(4).Info("Firing worker", "item", key, "firedTime", fireAt)
 		err := q.workFunc(ctx, fireAt, args)
 		q.Lock()
 		defer q.Unlock()
+		logger.V(4).Info("Worker finished, removing", "item", key, "err", err)
 		delete(q.workers, key)
 		return err
 	}
 }
 
 // AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
+// If replace is false, an existing work item will not get replaced, otherwise it
+// gets canceled and the new one is added instead.
 func (q *TimedWorkerQueue) AddWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
 
 	q.Lock()
 	defer q.Unlock()
 	if _, exists := q.workers[key]; exists {
-		logger.Info("Trying to add already existing work, skipping", "args", args)
+		logger.V(4).Info("Trying to add already existing work, skipping", "item", key, "createTime", createdAt, "firedTime", fireAt)
 		return
 	}
+	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
+	worker := createWorker(ctx, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
+	q.workers[key] = worker
+}
+
+// UpdateWork adds or replaces a work item such that it will be executed not earlier than `fireAt`.
+// This is a cheap no-op when the old and new fireAt are the same.
+func (q *TimedWorkerQueue) UpdateWork(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time) {
+	key := args.KeyFromWorkArgs()
+	logger := klog.FromContext(ctx)
+
+	q.Lock()
+	defer q.Unlock()
+	if worker, exists := q.workers[key]; exists {
+		if worker.FireAt.Compare(fireAt) == 0 {
+			logger.V(4).Info("Keeping existing work, same time", "item", key, "createTime", worker.CreatedAt, "firedTime", worker.FireAt)
+			return
+		}
+		logger.V(4).Info("Replacing existing work", "item", key, "createTime", worker.CreatedAt, "firedTime", worker.FireAt)
+		worker.Cancel()
+	}
+	logger.V(4).Info("Adding TimedWorkerQueue item and to be fired at firedTime", "item", key, "createTime", createdAt, "firedTime", fireAt)
 	worker := createWorker(ctx, args, createdAt, fireAt, q.getWrappedWorkerFunc(key), q.clock)
 	q.workers[key] = worker
 }
 
 // CancelWork removes scheduled function execution from the queue. Returns true if work was cancelled.
+// The key must be the same as the one returned by WorkArgs.KeyFromWorkArgs, i.e.
+// the result of NamespacedName.String.
 func (q *TimedWorkerQueue) CancelWork(logger klog.Logger, key string) bool {
 	q.Lock()
 	defer q.Unlock()
