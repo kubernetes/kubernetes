@@ -936,7 +936,9 @@ func TestPlugin(t *testing.T) {
 
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
 			t.Run("prefilter", func(t *testing.T) {
-				assert.Equal(t, tc.want.preFilterResult, result)
+				if diff := cmp.Diff(tc.want.preFilterResult, result); diff != "" {
+					t.Errorf("Mismatch in Prefilter (- expected, + actual):\n%s", diff)
+				}
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
@@ -1027,7 +1029,9 @@ func TestPlugin(t *testing.T) {
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postfilter)
 				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
 				t.Run("postfilter", func(t *testing.T) {
-					assert.Equal(t, tc.want.postFilterResult, result)
+					if diff := cmp.Diff(tc.want.postFilterResult, result); diff != "" {
+						t.Errorf("Mismatch in Postfilter (- expected, + actual):\n%s", diff)
+					}
 					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
@@ -1049,9 +1053,18 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	t.Helper()
 	if actualErr := status.AsError(); actualErr != nil {
 		// Compare only the error strings.
-		assert.ErrorContains(t, actualErr, expected.status.AsError().Error())
+		expectedErr := expected.status.AsError()
+		if expectedErr != nil {
+			if diff := cmp.Diff(expectedErr.Error(), actualErr.Error()); diff != "" {
+				t.Errorf("Mismatch in error strings (- expected, + actual):\n%s", diff)
+			}
+		} else {
+			t.Errorf("Expected no error, but got: %v", actualErr)
+		}
 	} else {
-		assert.Equal(t, expected.status, status)
+		if diff := cmp.Diff(expected.status, status); diff != "" {
+			t.Errorf("Mismatch in status (- expected, + actual):\n%s", diff)
+		}
 	}
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)

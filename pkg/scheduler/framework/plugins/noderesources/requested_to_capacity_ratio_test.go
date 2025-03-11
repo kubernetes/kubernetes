@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -214,7 +213,13 @@ func TestBrokenLinearFunction(t *testing.T) {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			function := helper.BuildBrokenLinearFunction(test.points)
 			for _, assertion := range test.assertions {
-				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%d", test.points, assertion.p)
+				actual := function(assertion.p)
+				delta := 0.1
+				expectedAsFloat := float64(assertion.expected)
+				actualAsFloat := float64(actual)
+				if (expectedAsFloat-actualAsFloat) > delta || (actualAsFloat-expectedAsFloat) > delta {
+					t.Errorf("Mismatch in values with delta threshold (%.2f): expected %.2f, actual %.2f", delta, expectedAsFloat, actualAsFloat)
+				}
 			}
 		})
 	}
