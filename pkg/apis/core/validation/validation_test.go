@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	fldtest "k8s.io/apimachinery/pkg/util/validation/field/testing"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -16714,7 +16713,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			tc.old.ObjectMeta.ResourceVersion = "1"
 			tc.update.ObjectMeta.ResourceVersion = "1"
 			errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{})
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 			matcher.Test(t, tc.expectedErrs, errs)
 		})
 	}
@@ -16864,7 +16863,7 @@ func TestValidateReplicationController(t *testing.T) {
 	for k, tc := range errorCases {
 		t.Run(k, func(t *testing.T) {
 			errs := ValidateReplicationController(&tc.input, PodValidationOptions{})
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 			matcher.Test(t, tc.expectedErrs, errs)
 		})
 	}
@@ -20770,7 +20769,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			errs := ValidateEndpointsCreate(&v.endpoints)
 			// TODO: set .RequireOriginWhenInvalid() once metadata is done
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, v.expectedErrs, errs)
 		})
 	}
@@ -22767,7 +22766,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath, tc.opts)
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
 			matcher.Test(t, tc.wantFieldErrors, errs)
 		})
 	}
