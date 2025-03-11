@@ -1123,7 +1123,10 @@ func printReplicationController(obj *api.ReplicationController, options printers
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredReplicas := *obj.Spec.Replicas
+	var desiredReplicas int32 = 1
+	if obj.Spec.Replicas != nil {
+		desiredReplicas = *obj.Spec.Replicas
+	}
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 
