@@ -19066,7 +19066,7 @@ func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 
 	for _, testCase := range testCases {
 		limitRange := &core.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: testCase.name, Namespace: "foo"}, Spec: testCase.spec}
-		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
+		if errs := ValidateLimitRange(limitRange, false); len(errs) != 0 {
 			t.Errorf("Case %v, unexpected error: %v", testCase.name, errs)
 		}
 	}
@@ -19323,7 +19323,6 @@ func TestValidateLimitRange(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {

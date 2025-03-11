@@ -198,11 +198,11 @@ func TestDefaultContainerResourceRequirements(t *testing.T) {
 		Limits:   getComputeResourceList("75m", "10Mi"),
 	}
 
-	actual := defaultContainerResourceRequirements(&limitRange)
-	if !apiequality.Semantic.DeepEqual(expected, actual) {
-		t.Errorf("actual.Limits != expected.Limits; %v != %v", actual.Limits, expected.Limits)
-		t.Errorf("actual.Requests != expected.Requests; %v != %v", actual.Requests, expected.Requests)
-		t.Errorf("expected != actual; %v != %v", expected, actual)
+	actual := defaultResourceRequirements(&limitRange, false)
+	if !apiequality.Semantic.DeepEqual(expected, actual.container) {
+		t.Errorf("actual.Limits != expected.Limits; %v != %v", actual.container.Limits, expected.Limits)
+		t.Errorf("actual.Requests != expected.Requests; %v != %v", actual.container.Requests, expected.Requests)
+		t.Errorf("expected != actual; %v != %v", expected, actual.container)
 	}
 }
 
@@ -228,8 +228,8 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	// pod with no resources enumerated should get each resource from default request
 	expected := getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("", ""))
 	pod := validPod("empty-resources", 1, expected)
-	defaultRequirements := defaultContainerResourceRequirements(&limitRange)
-	mergePodResourceRequirements(&pod, &defaultRequirements)
+	defaultRequirements := defaultResourceRequirements(&limitRange, false)
+	mergePodResourceRequirements(&pod, defaultRequirements, false)
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
@@ -243,12 +243,12 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	pod = validPodInit(validPod("limit-memory", 1, input), input)
 	expected = api.ResourceRequirements{
 		Requests: api.ResourceList{
-			api.ResourceCPU:    defaultRequirements.Requests[api.ResourceCPU],
+			api.ResourceCPU:    defaultRequirements.container.Requests[api.ResourceCPU],
 			api.ResourceMemory: resource.MustParse("512Mi"),
 		},
-		Limits: defaultRequirements.Limits,
+		Limits: defaultRequirements.container.Limits,
 	}
-	mergePodResourceRequirements(&pod, &defaultRequirements)
+	mergePodResourceRequirements(&pod, defaultRequirements, false)
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
@@ -268,7 +268,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	initInputs := []api.ResourceRequirements{getResourceRequirements(getComputeResourceList("200m", "1G"), getComputeResourceList("400m", "2G"))}
 	pod = validPodInit(validPod("limit-memory", 1, input), initInputs...)
 	expected = input
-	mergePodResourceRequirements(&pod, &defaultRequirements)
+	mergePodResourceRequirements(&pod, defaultRequirements, false)
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
