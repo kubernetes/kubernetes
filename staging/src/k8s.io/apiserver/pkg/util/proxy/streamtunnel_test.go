@@ -59,11 +59,13 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 		upgrader := spdy.NewResponseUpgrader()
 		conn := upgrader.UpgradeResponse(w, req, justQueueStream(streamChan))
 		if conn == nil {
 			t.Error("connect is unexpected nil")
+			return
 		}
 		defer conn.Close() //nolint:errcheck
 		<-stopServerChan
@@ -103,10 +105,12 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 		clientStream, err := spdyClient.CreateStream(http.Header{})
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 		_, err = io.Copy(clientStream, bytes.NewReader(randomData))
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 		clientStream.Close() //nolint:errcheck
 	}()
@@ -179,6 +183,7 @@ func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
 		if err == nil {
 			t.Errorf("handshake should have returned an error %v", err)
+			return
 		}
 		assert.ErrorContains(t, err, "unable to negotiate protocol")
 		w.WriteHeader(http.StatusForbidden)
@@ -235,6 +240,7 @@ func TestTunnelingHandler_UpstreamSPDYServerErrorPropagated(t *testing.T) {
 			_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
 			if err != nil {
 				t.Errorf("handshake should have succeeded %v", err)
+				return
 			}
 			// Returned status code should be incremented in metrics.
 			w.WriteHeader(statusCode)
