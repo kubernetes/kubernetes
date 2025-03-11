@@ -196,7 +196,7 @@ func (h *peerProxyHandler) aggregateDiscovery(path string, hostport string) (*ap
 	apiServerUser := &user.DefaultInfo{
 		Name:   user.APIServerUser,
 		UID:    user.APIServerUser,
-		Groups: []string{user.SystemPrivilegedGroup},
+		Groups: []string{user.AllAuthenticated},
 	}
 
 	ctx := apirequest.WithUser(req.Context(), apiServerUser)
