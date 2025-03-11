@@ -40,9 +40,8 @@ type csiNodeUpdater struct {
 	// Map of driver names to stop channels for update goroutines
 	driverUpdaters sync.Map
 
-	// Tracks whether the updater has been started
-	started bool
-	startMu sync.Mutex
+	// Ensures the updater is only started once
+	once sync.Once
 }
 
 // NewCSINodeUpdater creates a new csiNodeUpdater
@@ -63,25 +62,19 @@ func NewCSINodeUpdater(
 
 // Run starts the CSINodeUpdater
 func (u *csiNodeUpdater) Run() {
-	u.startMu.Lock()
-	defer u.startMu.Unlock()
+	u.once.Do(func() {
+		_, err := u.driverInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    u.onDriverAdd,
+			UpdateFunc: u.onDriverUpdate,
+			DeleteFunc: u.onDriverDelete,
+		})
+		if err != nil {
+			klog.ErrorS(err, "Failed to add event handler for CSI driver informer")
+			return
+		}
 
-	if u.started {
-		return
-	}
-
-	_, err := u.driverInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    u.onDriverAdd,
-		UpdateFunc: u.onDriverUpdate,
-		DeleteFunc: u.onDriverDelete,
+		klog.InfoS("CSINodeUpdater initialized successfully")
 	})
-	if err != nil {
-		klog.ErrorS(err, "Failed to add event handler for CSI driver informer")
-		return
-	}
-
-	klog.InfoS("CSINodeUpdater initialized successfully")
-	u.started = true
 }
 
 // onDriverAdd handles the addition of a new CSIDriver object
