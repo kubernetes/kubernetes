@@ -1174,6 +1174,9 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			}
 		}
 
+		for _, comment := range v.Comments() {
+			sw.Do("// $.$\n", comment)
+		}
 		if isShortCircuit {
 			sw.Do("if e := ", nil)
 			emitCall()
@@ -1214,10 +1217,14 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 		return cmp.Compare(a.Var().Name, b.Var().Name)
 	})
 	for _, variable := range variables {
-		supportInitFn, supportInitArgs := variable.Init().SignatureAndArgs()
+		fn := variable.Init()
+		supportInitFn, supportInitArgs := fn.SignatureAndArgs()
 		targs := generator.Args{
 			"varName": c.Universe.Type(types.Name(variable.Var())),
 			"initFn":  c.Universe.Type(supportInitFn),
+		}
+		for _, comment := range fn.Comments() {
+			sw.Do("// $.$\n", comment)
 		}
 		sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
 		typeArgs := variable.Init().TypeArgs()
@@ -1276,6 +1283,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// just use it directly.
 			targs := generator.Args{
 				"funcName": c.Universe.Type(fn),
+			}
+			for _, comment := range v.Function.Comments() {
+				sw.Do("// $.$\n", comment)
 			}
 			sw.Do("$.funcName|raw$", targs)
 		} else {
