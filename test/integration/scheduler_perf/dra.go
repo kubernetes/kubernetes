@@ -372,19 +372,47 @@ claims:
 }
 
 type updateDeviceConditionsOp struct {
-	Opcode     operationCode
-	Namespace  string
-	Conditions []metav1.Condition
+	Opcode               operationCode
+	Namespace            string
+	ConditionTypeParam   string
+	ConditionStatusParam string
+	Conditions           []metav1.Condition
 }
 
 func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
-	if op.Namespace == "" || len(op.Conditions) == 0 {
+	if op.Namespace == "" || op.ConditionTypeParam == "" {
 		return fmt.Errorf("namespace and conditions must be set")
 	}
 	return nil
 }
 
 func (op *updateDeviceConditionsOp) patchParams(w *workload) (realOp, error) {
+	op.Conditions = make([]metav1.Condition, 1)
+
+	var err error
+	if op.ConditionTypeParam != "" {
+		op.Conditions[0].Type, err = getParam[string](w.Params, op.ConditionTypeParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if op.ConditionStatusParam != "" {
+		status, err := getParam[string](w.Params, op.ConditionStatusParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		switch status {
+		case "True":
+			op.Conditions[0].Status = metav1.ConditionTrue
+		case "False":
+			op.Conditions[0].Status = metav1.ConditionFalse
+		case "Unknown":
+			op.Conditions[0].Status = metav1.ConditionUnknown
+		default:
+			return nil, fmt.Errorf("invalid condition status %q", status)
+		}
+	}
+
 	return op, op.isValid(false)
 }
 
@@ -397,62 +425,72 @@ func (op *updateDeviceConditionsOp) requiredNamespaces() []string {
 }
 
 func (op *updateDeviceConditionsOp) run(tCtx ktesting.TContext) {
-	claimName := ""
+	var claimList *resourceapi.ResourceClaimList
+	var err error
 	retry := 0
 	for {
-		claimList, err := tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
+		claimList, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).List(tCtx, metav1.ListOptions{})
 		if retry > 40 {
 			tCtx.Fatalf("no claims found in namespace %s", op.Namespace)
-			break
 		}
 		if err != nil || len(claimList.Items) == 0 {
 			retry++
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		claimName = claimList.Items[0].GetName()
 		break
 	}
 
-	var claim *resourceapi.ResourceClaim
-	var err error
-	for {
-		claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Get(tCtx, claimName, metav1.GetOptions{})
-		if err != nil {
-			tCtx.Fatalf("get claim %s/%s: %v", op.Namespace, claimName, err)
-		}
-		found := false
-		for _, dev := range claim.Status.Allocation.Devices.Results {
-			if dev.BindingConditions != nil {
-				found = true
+	for _, item := range claimList.Items {
+		claimName := item.GetName()
+		retryClaim := 0
+		var claim *resourceapi.ResourceClaim
+
+		for {
+			claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).Get(tCtx, claimName, metav1.GetOptions{})
+			if err != nil {
+				tCtx.Fatalf("get claim %s/%s: %v", op.Namespace, claimName, err)
+			}
+
+			foundDevice := false
+			for _, dev := range claim.Status.Allocation.Devices.Results {
+				if dev.BindingConditions != nil {
+					foundDevice = true
+					break
+				}
+			}
+			if foundDevice {
 				break
 			}
-		}
-		if found {
-			break
-		}
-		retry++
-		if retry > 40 {
-			tCtx.Fatalf("no devices found in claim %s/%s", op.Namespace, claimName)
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
 
-	claim = claim.DeepCopy()
-	for _, dev := range claim.Status.Allocation.Devices.Results {
-		if dev.BindingConditions == nil && dev.BindingFailureConditions == nil {
-			continue
+			retryClaim++
+			if retryClaim > 40 {
+				tCtx.Fatalf("no devices found in claim %s/%s", op.Namespace, claimName)
+			}
+			time.Sleep(1 * time.Second)
 		}
-		for _, cond := range op.Conditions {
-			ads := makeBindingConditions(dev.Driver, dev.Pool, dev.Device, cond.Type, cond.Status)
-			claim.Status.Devices = append(claim.Status.Devices, ads)
-		}
-	}
 
-	_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
-	if err != nil {
-		tCtx.ExpectNoError(err, "update device conditions")
+		updatedClaim := claim.DeepCopy()
+		for _, dev := range claim.Status.Allocation.Devices.Results {
+			if dev.BindingConditions == nil && dev.BindingFailureConditions == nil {
+				continue
+			}
+			for _, cond := range op.Conditions {
+				ads := makeBindingConditions(
+					dev.Driver,
+					dev.Pool,
+					dev.Device,
+					cond.Type,
+					cond.Status,
+				)
+				updatedClaim.Status.Devices = append(updatedClaim.Status.Devices, ads)
+			}
+		}
+
+		_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(op.Namespace).UpdateStatus(tCtx, updatedClaim, metav1.UpdateOptions{})
+		if err != nil {
+			tCtx.Fatalf("update device conditions for claim %s/%s failed: %v", op.Namespace, claimName, err)
+		}
 	}
 }
 
@@ -476,6 +514,7 @@ func makeBindingConditions(driver, pool, device, condition string, status metav1
 type checkPodScheduledOp struct {
 	Opcode            operationCode
 	Namespace         string
+	ScheduledParam    string
 	ExpectedScheduled bool
 }
 
@@ -491,6 +530,13 @@ func (op *checkPodScheduledOp) collectsMetrics() bool {
 }
 
 func (op *checkPodScheduledOp) patchParams(w *workload) (realOp, error) {
+	if op.ScheduledParam != "" {
+		var err error
+		op.ExpectedScheduled, err = getParam[bool](w.Params, op.ScheduledParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
 	return op, op.isValid(false)
 }
 
@@ -502,62 +548,57 @@ func (op *checkPodScheduledOp) requiredNamespaces() []string {
 }
 
 func (op *checkPodScheduledOp) run(tCtx ktesting.TContext) {
-	podName := ""
-	retry := 0
-	for {
-		pods, err := tCtx.Client().CoreV1().Pods(op.Namespace).List(tCtx, metav1.ListOptions{})
-		if retry > 40 {
-			tCtx.Fatalf("no pods found in namespace %s", op.Namespace)
-			break
-		}
-		if err != nil || len(pods.Items) == 0 {
-			retry++
-			time.Sleep(1 * time.Second)
-			continue
-		}
-		podName = pods.Items[0].GetName()
-		break
-	}
+	pods, err := tCtx.Client().CoreV1().Pods(op.Namespace).List(tCtx, metav1.ListOptions{})
+	tCtx.ExpectNoError(err, "list pods")
 
 	validate := func(pod v1.Pod) bool {
 		isScheduled := pod.Spec.NodeName != ""
 		return (op.ExpectedScheduled && isScheduled) || (!op.ExpectedScheduled && !isScheduled)
 	}
 
+	const (
+		retryInterval = 1 * time.Second
+		maxRetries    = 30
+	)
+
 	lastViolation := ""
-	for i := 0; i < 30; i++ {
+	for i := 0; i < maxRetries; i++ {
 		allValid := true
 		currentViolation := ""
 
-		pod, err := tCtx.Client().CoreV1().Pods(op.Namespace).Get(
-			tCtx,
-			podName,
-			metav1.GetOptions{},
-		)
-		if err != nil {
-			tCtx.Logf("Failed to refresh pod %s: %v", podName, err)
-			continue
-		}
+		for _, item := range pods.Items {
+			podName := item.GetName()
+			pod, err := tCtx.Client().CoreV1().Pods(op.Namespace).Get(
+				tCtx,
+				podName,
+				metav1.GetOptions{},
+			)
+			if err != nil {
+				tCtx.Logf("Failed to refresh pod %s: %v", podName, err)
+				continue
+			}
 
-		if !validate(*pod) {
-			allValid = false
-			currentViolation = fmt.Sprintf("Pod %s: ExpectedScheduled=%v, ActualScheduled=%v (Node=%s)",
-				pod.Name, op.ExpectedScheduled, pod.Spec.NodeName != "", pod.Spec.NodeName)
+			if !validate(*pod) {
+				allValid = false
+				currentViolation = fmt.Sprintf("Pod %s: ExpectedScheduled=%v, ActualScheduled=%v (Node=%s)",
+					pod.Name, op.ExpectedScheduled, pod.Spec.NodeName != "", pod.Spec.NodeName)
+				break
+			}
 		}
 
 		switch {
 		case allValid && op.ExpectedScheduled:
-			tCtx.Logf("Pod scheduled successfully")
+			tCtx.Logf("All pods scheduled successfully")
 			return
 		case allValid && !op.ExpectedScheduled:
 			if i >= 5 {
-				tCtx.Logf("Pod remain unscheduled for %d seconds", i+1)
+				tCtx.Logf("All pods remain unscheduled for %d seconds", i+1)
 				return
 			}
 		case !allValid:
 			lastViolation = currentViolation
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(retryInterval)
 	}
 
 	if op.ExpectedScheduled {
