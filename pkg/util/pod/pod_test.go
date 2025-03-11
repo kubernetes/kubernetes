@@ -84,7 +84,7 @@ func TestPatchPodStatus(t *testing.T) {
 				return input
 			},
 			false,
-			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"initContainerStatuses":[{"image":"","imageID":"","lastState":{},"name":"init-container","ready":true,"restartCount":0,"state":{}}]}}`)),
+			[]byte(fmt.Sprintf(`{"metadata":{"uid":"myuid"},"status":{"initContainerStatuses":[{"image":"","imageID":"","lastState":{},"lifecycle":{},"name":"init-container","ready":true,"restartCount":0,"state":{}}]}}`)),
 		},
 	}
 	for _, tc := range testCases {
