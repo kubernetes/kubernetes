@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/utils/ptr"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	"k8s.io/utils/ptr"
 )
 
 const (
@@ -86,6 +87,7 @@ func validNewController() *api.ReplicationController {
 				},
 				Spec: podtest.MakePodSpec(),
 			},
+			Replicas: ptr.To[int32](1),
 		},
 	}
 }

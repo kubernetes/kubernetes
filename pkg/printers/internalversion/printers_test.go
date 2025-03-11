@@ -26,6 +26,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"k8s.io/utils/ptr"
+
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +54,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/utils/ptr"
 )
 
 var containerRestartPolicyAlways = api.ContainerRestartPolicyAlways
@@ -4559,18 +4560,21 @@ func TestPrintCertificateSigningRequest(t *testing.T) {
 
 func TestPrintReplicationController(t *testing.T) {
 	tests := []struct {
+		name     string
 		rc       api.ReplicationController
 		options  printers.GenerateOptions
 		expected []metav1.TableRow
 	}{
 		// Basic print replication controller without replicas or status.
 		{
+			name: "basic",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rc1",
 					Namespace: "test-namespace",
 				},
 				Spec: api.ReplicationControllerSpec{
+					Replicas: ptr.To[int32](0),
 					Selector: map[string]string{"a": "b"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
@@ -4597,6 +4601,7 @@ func TestPrintReplicationController(t *testing.T) {
 		},
 		// Basic print replication controller with replicas; does not print containers or labels
 		{
+			name: "basic with replicas",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "rc1",
@@ -4634,6 +4639,7 @@ func TestPrintReplicationController(t *testing.T) {
 		},
 		// Generate options: Wide; print containers and labels.
 		{
+			name: "wide",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "rc1",
@@ -4670,11 +4676,15 @@ func TestPrintReplicationController(t *testing.T) {
 		},
 		{
 			// make sure Bookmark event will not lead a panic
+			name: "no panic",
 			rc: api.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						metav1.InitialEventsAnnotationKey: "true",
 					},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: ptr.To[int32](0),
 				},
 			},
 			options: printers.GenerateOptions{Wide: true},
