@@ -207,6 +207,15 @@ func (d *dummyStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, e
 	return 100, nil
 }
 
+type dummyCacher struct {
+	dummyStorage
+	ready bool
+}
+
+func (d *dummyCacher) Ready() bool {
+	return d.ready
+}
+
 func TestGetListCacheBypass(t *testing.T) {
 	type opts struct {
 		ResourceVersion      string
@@ -326,6 +335,7 @@ func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectByp
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 	result := &example.PodList{}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if err := cacher.ready.wait(context.Background()); err != nil {
@@ -450,6 +460,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 			}
 			defer cacher.Stop()
 			delegator := NewCacheDelegator(cacher, backingStorage)
+			defer delegator.Stop()
 			if err := cacher.ready.wait(context.Background()); err != nil {
 				t.Fatalf("unexpected error waiting for the cache to be ready")
 			}
@@ -533,6 +544,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	pred := storage.SelectionPredicate{
 		Limit: 500,
@@ -572,6 +584,7 @@ func TestGetCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	result := &example.Pod{}
 
@@ -608,6 +621,7 @@ func TestWatchCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if err := cacher.ready.wait(context.Background()); err != nil {
@@ -645,6 +659,7 @@ func TestTooManyRequestsNotReturned(t *testing.T) {
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	opts := storage.ListOptions{
 		ResourceVersion: "0",
@@ -890,6 +905,7 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if err := cacher.ready.wait(context.Background()); err != nil {
@@ -2326,6 +2342,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 				}
 				defer cacher.Stop()
 				delegator := NewCacheDelegator(cacher, store)
+				defer delegator.Stop()
 
 				// prepare result and pred
 				parsedField, err := fields.ParseSelector("spec.nodeName=node-0")
@@ -3207,6 +3224,7 @@ func TestRetryAfterForUnreadyCache(t *testing.T) {
 	}
 	result := &example.PodList{}
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 	err = delegator.GetList(context.TODO(), "/pods/ns", opts, result)
 
 	if !apierrors.IsTooManyRequests(err) {

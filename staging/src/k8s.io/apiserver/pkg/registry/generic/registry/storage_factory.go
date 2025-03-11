@@ -71,15 +71,17 @@ func StorageWithCacher() generic.StorageDecorator {
 		if err != nil {
 			return nil, func() {}, err
 		}
+		delegator := cacherstorage.NewCacheDelegator(cacher, s)
 		var once sync.Once
 		destroyFunc := func() {
 			once.Do(func() {
+				delegator.Stop()
 				cacher.Stop()
 				d()
 			})
 		}
 
-		return cacherstorage.NewCacheDelegator(cacher, s), destroyFunc, nil
+		return delegator, destroyFunc, nil
 	}
 }
 
