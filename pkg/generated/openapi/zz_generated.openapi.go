@@ -21804,8 +21804,9 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 					},
 					"lifecycle": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/api/core/v1.Lifecycle"),
+							Description: "Lifecycle is used to show the container's effective stop signal in the Status",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/api/core/v1.Lifecycle"),
 						},
 					},
 				},

@@ -1104,6 +1104,9 @@ message ContainerStatus {
   // +listMapKey=name
   repeated ResourceStatus allocatedResourcesStatus = 14;
 
+  // Lifecycle is used to show the container's effective stop signal in the Status
+  // +featureGate=ContainerStopSignals
+  // +optional
   optional Lifecycle lifecycle = 15;
 }
 
