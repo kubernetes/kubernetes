@@ -49,3 +49,23 @@ func isNilableType(t *types.Type) bool {
 	}
 	return false
 }
+
+func realType(t *types.Type) *types.Type {
+	for {
+		if t.Kind == types.Alias {
+			t = t.Underlying
+		} else if t.Kind == types.Pointer {
+			t = t.Elem
+		} else {
+			break
+		}
+	}
+	return t
+}
+
+func rootTypeString(src, dst *types.Type) string {
+	if src == dst {
+		return src.String()
+	}
+	return src.String() + " -> " + dst.String()
+}
