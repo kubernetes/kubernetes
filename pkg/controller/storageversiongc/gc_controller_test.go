@@ -53,7 +53,7 @@ func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.StringPtr(holderIdentity),
+			HolderIdentity: utilpointer.String(holderIdentity),
 		},
 	}
 }

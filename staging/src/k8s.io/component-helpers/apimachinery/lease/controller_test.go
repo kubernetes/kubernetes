@@ -72,7 +72,7 @@ func TestNewNodeLease(t *testing.T) {
 					Namespace: corev1.NamespaceNodeLease,
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
+					HolderIdentity:       pointer.String(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
@@ -102,7 +102,7 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
+					HolderIdentity:       pointer.String(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
@@ -122,7 +122,7 @@ func TestNewNodeLease(t *testing.T) {
 					Namespace: corev1.NamespaceNodeLease,
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
+					HolderIdentity:       pointer.String(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-10 * time.Second)},
 				},
@@ -141,7 +141,7 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
+					HolderIdentity:       pointer.String(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
@@ -169,7 +169,7 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
+					HolderIdentity:       pointer.String(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-10 * time.Second)},
 				},
@@ -188,7 +188,7 @@ func TestNewNodeLease(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr(node.Name),
+					HolderIdentity:       pointer.String(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},

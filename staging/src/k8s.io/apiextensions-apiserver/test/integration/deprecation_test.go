@@ -45,7 +45,7 @@ var deprecationFixture = &apiextensionsv1.CustomResourceDefinition{
 				Name:               "v1alpha2",
 				Served:             true,
 				Deprecated:         true,
-				DeprecationWarning: pointer.StringPtr("custom deprecation warning"),
+				DeprecationWarning: pointer.String("custom deprecation warning"),
 				Schema:             &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{Type: "object"}},
 			},
 			{

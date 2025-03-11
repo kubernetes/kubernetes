@@ -221,7 +221,7 @@ func (c *controller) newLease(base *coordinationv1.Lease) (*coordinationv1.Lease
 				Namespace: c.leaseNamespace,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr(c.holderIdentity),
+				HolderIdentity:       pointer.String(c.holderIdentity),
 				LeaseDurationSeconds: pointer.Int32Ptr(c.leaseDurationSeconds),
 			},
 		}
