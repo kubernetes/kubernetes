@@ -50,29 +50,32 @@ spec:
           image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
           args:
             - "--v=5"
-            - "--endpoint=/plugins_registry/dra-test-driver-reg.sock"
+            - "--endpoint=/var/lib/kubelet/plugins_registry/test-driver.dra.k8s.io-reg.sock"
             - "--proxy-endpoint=tcp://:9000"
           volumeMounts:
-            - mountPath: /plugins_registry
+            - mountPath: /var/lib/kubelet/plugins_registry
               name: registration-dir
 
         - name: plugin
           image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
           args:
             - "--v=5"
-            - "--endpoint=/dra/dra-test-driver.sock"
+            - "--endpoint=/var/lib/kubelet/plugins/test-driver.dra.k8s.io/dra.sock"
             - "--proxy-endpoint=tcp://:9001"
           securityContext:
             privileged: true
           volumeMounts:
-            - mountPath: /dra
+            - mountPath: /var/lib/kubelet/plugins/test-driver.dra.k8s.io
               name: socket-dir
             - mountPath: /cdi
               name: cdi-dir
 
       volumes:
         - hostPath:
-            path: /var/lib/kubelet/plugins
+            # There's no way to remove this. Conceptually, it may have to
+            # survive Pod restarts and there's no way to tell the kubelet
+            # that this isn't the case for this Pod.
+            path: /var/lib/kubelet/plugins/test-driver.dra.k8s.io
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:

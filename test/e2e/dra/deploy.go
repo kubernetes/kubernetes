@@ -326,8 +326,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
-	draAddr := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name+".sock")
 	numNodes := int32(len(nodes.NodeNames))
+	pluginDataDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name)
+	registrarDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
+	registrarSocketFilename := d.Name + "-reg.sock"
 	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
@@ -353,10 +355,12 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 					},
 				},
 			}
-			item.Spec.Template.Spec.Volumes[0].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins")
-			item.Spec.Template.Spec.Volumes[2].HostPath.Path = path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
-			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint=/plugins_registry/"+d.Name+"-reg.sock")
-			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint=/dra/"+d.Name+".sock")
+			item.Spec.Template.Spec.Volumes[0].HostPath.Path = pluginDataDirectoryPath
+			item.Spec.Template.Spec.Volumes[2].HostPath.Path = registrarDirectoryPath
+			item.Spec.Template.Spec.Containers[0].Args = append(item.Spec.Template.Spec.Containers[0].Args, "--endpoint="+path.Join(registrarDirectoryPath, registrarSocketFilename))
+			item.Spec.Template.Spec.Containers[0].VolumeMounts[0].MountPath = registrarDirectoryPath
+			item.Spec.Template.Spec.Containers[1].Args = append(item.Spec.Template.Spec.Containers[1].Args, "--endpoint="+path.Join(pluginDataDirectoryPath, "dra.sock"))
+			item.Spec.Template.Spec.Containers[1].VolumeMounts[0].MountPath = pluginDataDirectoryPath
 		}
 		return nil
 	}, manifests...)
@@ -427,10 +431,16 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			kubeletplugin.GRPCStreamInterceptor(func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
 				return d.streamInterceptor(nodename, srv, ss, info, handler)
 			}),
-			kubeletplugin.PluginListener(listen(ctx, d.f, pod.Name, "plugin", 9001)),
-			kubeletplugin.RegistrarListener(listen(ctx, d.f, pod.Name, "registrar", 9000)),
-			kubeletplugin.KubeletPluginSocketPath(draAddr),
-			kubeletplugin.NodeV1beta1(d.NodeV1beta1),
+
+			// TODO: start socat on-demand in listen. Then we can properly test
+			// the socket path handling in kubeletplugin and do rolling updates.
+
+			kubeletplugin.PluginDataDirectoryPath(pluginDataDirectoryPath),
+			kubeletplugin.PluginListener(listen(d.f, pod.Name, "plugin", 9001)),
+
+			kubeletplugin.RegistrarDirectoryPath(registrarDirectoryPath),
+			kubeletplugin.RegistrarSocketFilename(registrarSocketFilename),
+			kubeletplugin.RegistrarListener(listen(d.f, pod.Name, "registrar", 9000)),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
 		d.cleanup = append(d.cleanup, func() {
@@ -552,16 +562,20 @@ func (d *Driver) podIO(pod *v1.Pod) proxy.PodDirIO {
 	}
 }
 
-func listen(ctx context.Context, f *framework.Framework, podName, containerName string, port int) net.Listener {
-	addr := proxy.Addr{
-		Namespace:     f.Namespace.Name,
-		PodName:       podName,
-		ContainerName: containerName,
-		Port:          port,
+func listen(f *framework.Framework, podName, containerName string, port int) func(ctx context.Context, path string) (net.Listener, error) {
+	return func(ctx context.Context, path string) (net.Listener, error) {
+		addr := proxy.Addr{
+			Namespace:     f.Namespace.Name,
+			PodName:       podName,
+			ContainerName: containerName,
+			Port:          port,
+		}
+		listener, err := proxy.Listen(ctx, f.ClientSet, f.ClientConfig(), addr)
+		if err != nil {
+			return nil, fmt.Errorf("listen for connections from %+v: %w", addr, err)
+		}
+		return listener, nil
 	}
-	listener, err := proxy.Listen(ctx, f.ClientSet, f.ClientConfig(), addr)
-	framework.ExpectNoError(err, "listen for connections from %+v", addr)
-	return listener
 }
 
 func (d *Driver) TearDown() {
