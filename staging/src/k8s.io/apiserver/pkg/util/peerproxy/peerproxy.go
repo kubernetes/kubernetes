@@ -19,6 +19,7 @@ package peerproxy
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -57,6 +58,7 @@ func NewPeerProxyHandler(informerFactory kubeinformers.SharedInformerFactory,
 		loopbackClientConfig:          loopbackClientConfig,
 		proxyClientConfig:             proxyClientConfig,
 		localDiscoveryResponseCache:   make(map[schema.GroupVersion][]string),
+		localDiscoveryCacheTicker:     time.NewTicker(30 * time.Minute),
 		peerAggDiscoveryResponseCache: make(map[string]*peerAggDiscoveryInfo),
 	}
 

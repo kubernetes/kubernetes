@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -73,10 +74,10 @@ type peerProxyHandler struct {
 	proxyClientConfig           *transport.Config
 	finishedSync                atomic.Bool
 	localDiscoveryResponseCache map[schema.GroupVersion][]string
+	localDiscoveryCacheTicker   *time.Ticker
 	// peerAggDiscoveryResponseCache is a map for each peer API server's ID to
 	// its aggregated discovery information
 	peerAggDiscoveryResponseCache map[string]*peerAggDiscoveryInfo
-	discoveryResponseCacheLock    sync.RWMutex
 	peerAggDiscoveryCacheLock     sync.RWMutex
 }
 
@@ -95,9 +96,7 @@ func (h *peerProxyHandler) WaitForCacheSync(stopCh <-chan struct{}) error {
 	if !ok {
 		return fmt.Errorf("error while waiting for initial cache sync")
 	}
-	if err := h.populateLocalDiscoveryCache(); err != nil {
-		return fmt.Errorf("failed to populate discovery cache: %w", err)
-	}
+	h.startLocalDiscoveryCacheInvalidation(stopCh)
 	h.finishedSync.Store(true)
 	return nil
 }
@@ -167,8 +166,30 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 	})
 }
 
+func (h *peerProxyHandler) startLocalDiscoveryCacheInvalidation(stopCh <-chan struct{}) {
+	go func() {
+		klog.Info("localDiscoveryCacheInvalidation goroutine started")
+		for {
+			select {
+			case <-h.localDiscoveryCacheTicker.C:
+				klog.V(4).Infof("Invalidating local discovery cache")
+				if err := h.populateLocalDiscoveryCache(); err != nil {
+					klog.Errorf("Failed to repopulate local discovery cache: %v", err)
+				}
+			case <-stopCh:
+				klog.Info("localDiscoveryCacheInvalidation goroutine received stop signal")
+				if h.localDiscoveryCacheTicker != nil {
+					h.localDiscoveryCacheTicker.Stop()
+					klog.Info("localDiscoveryCacheTicker stopped")
+				}
+				klog.Info("localDiscoveryCacheInvalidation goroutine exiting")
+				return
+			}
+		}
+	}()
+}
+
 func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
-	clear(h.localDiscoveryResponseCache)
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(h.loopbackClientConfig)
 	if err != nil {
 		return fmt.Errorf("error creating discovery client: %w", err)
@@ -179,24 +200,22 @@ func (h *peerProxyHandler) populateLocalDiscoveryCache() error {
 		return fmt.Errorf("error getting API group resources from discovery: %w", err)
 	}
 
-	h.discoveryResponseCacheLock.Lock()
-	defer h.discoveryResponseCacheLock.Unlock()
+	freshLocalDiscoveryResponse := map[schema.GroupVersion][]string{}
 	for gv, resources := range resourcesByGV {
 		if gv.Group == "" {
 			gv.Group = "core"
 		}
-		h.localDiscoveryResponseCache[gv] = []string{}
+		freshLocalDiscoveryResponse[gv] = []string{}
 		for _, resource := range resources.APIResources {
-			h.localDiscoveryResponseCache[gv] = append(h.localDiscoveryResponseCache[gv], resource.Name)
+			freshLocalDiscoveryResponse[gv] = append(freshLocalDiscoveryResponse[gv], resource.Name)
 		}
 	}
 
+	h.localDiscoveryResponseCache = freshLocalDiscoveryResponse
 	return nil
 }
 
 func (h *peerProxyHandler) shouldServeLocally(gvr schema.GroupVersionResource) bool {
-	h.discoveryResponseCacheLock.RLock()
-	defer h.discoveryResponseCacheLock.RUnlock()
 	resources, ok := h.localDiscoveryResponseCache[gvr.GroupVersion()]
 	if !ok {
 		klog.V(4).Infof("resource not found for %v in local discovery cache\n", gvr.GroupVersion())

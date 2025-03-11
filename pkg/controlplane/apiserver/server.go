@@ -212,7 +212,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 				return nil
 			})
 		if c.Extra.PeerProxy != nil {
-			s.GenericAPIServer.AddPostStartHookOrDie("unknown-version-proxy-filter", func(context genericapiserver.PostStartHookContext) error {
+			s.GenericAPIServer.AddPostStartHookOrDie("mixed-version-proxy-handler", func(context genericapiserver.PostStartHookContext) error {
 				err := c.Extra.PeerProxy.WaitForCacheSync(context.Done())
 				return err
 			})
