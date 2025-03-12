@@ -3357,6 +3357,7 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"device-binding-conditions": {
+<<<<<<< HEAD
 			features: Features{
 				DeviceBinding: false,
 			},
@@ -3365,6 +3366,13 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices:  objects(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
 			node:    node(node1, region1),
+=======
+			deviceBinding:    true,
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
+			classes:          objects(class(classA, driverA)),
+			slices:           objects(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
+			node:             node(node1, region1),
+>>>>>>> ef540be65a0 (Update unit test)
 
 			expectResults: []any{
 				resourceapi.AllocationResult{
@@ -3383,7 +3391,7 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
-			slices:           objects(sliceWithOneDeviceAndRestrictedUsage(slice1, localNodeSelector(node1), pool1, driverA)),
+			slices:           objects(sliceWithOneDeviceAndRestrictedUsage(slice1, nodeLabelSelector(planetKey, planetValueEarth), pool1, driverA)),
 			node:             node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
