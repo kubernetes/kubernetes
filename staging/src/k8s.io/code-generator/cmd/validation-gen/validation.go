@@ -494,7 +494,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 			if elemNode := underlying.node.elem.node; elemNode == nil {
 				if !thisNode.typeValidations.OpaqueValType {
 					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						fldPath, underlying.node.elem.childType)
 				}
@@ -525,7 +525,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 			if keyNode := underlying.node.key.node; keyNode == nil {
 				if !thisNode.typeValidations.OpaqueKeyType {
 					return nil, fmt.Errorf("%v: key type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
 						fldPath, underlying.node.elem.childType)
 				}
@@ -555,7 +555,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 			if elemNode := underlying.node.elem.node; elemNode == nil {
 				if !thisNode.typeValidations.OpaqueValType {
 					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						fldPath, underlying.node.elem.childType)
 				}
@@ -654,7 +654,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			if child.node == nil { // a non-included type
 				if !child.fieldValidations.OpaqueType {
 					return fmt.Errorf("%v: type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:opaqueType to the field to skip validation",
 						childPath, childType.String())
 				}
@@ -678,7 +678,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			if elemNode := child.node.elem.node; elemNode == nil {
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						childPath, childType.Elem.String())
 				}
@@ -709,7 +709,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			if keyNode := child.node.key.node; keyNode == nil {
 				if !child.fieldValidations.OpaqueKeyType {
 					return fmt.Errorf("%v: key type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
 						childPath, childType.Key.String())
 				}
@@ -739,7 +739,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			if elemNode := child.node.elem.node; elemNode == nil {
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						childPath, childType.Elem.String())
 				}
