@@ -27,63 +27,73 @@ import (
 
 type stateMemory struct {
 	sync.RWMutex
-	podAllocation PodResourceAllocation
+	podResources PodResourceInfoMap
 }
 
 var _ State = &stateMemory{}
 
-// NewStateMemory creates new State to track resources allocated to pods
-func NewStateMemory(alloc PodResourceAllocation) State {
-	if alloc == nil {
-		alloc = PodResourceAllocation{}
+// NewStateMemory creates new State to track resources resourcesated to pods
+func NewStateMemory(resources PodResourceInfoMap) State {
+	if resources == nil {
+		resources = PodResourceInfoMap{}
 	}
-	klog.V(2).InfoS("Initialized new in-memory state store for pod resource allocation tracking")
+	klog.V(2).InfoS("Initialized new in-memory state store for pod resource information tracking")
 	return &stateMemory{
-		podAllocation: alloc,
+		podResources: resources,
 	}
 }
 
-func (s *stateMemory) GetContainerResourceAllocation(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
+func (s *stateMemory) GetContainerResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
-	alloc, ok := s.podAllocation[podUID][containerName]
-	return *alloc.DeepCopy(), ok
+	resourceInfo, ok := s.podResources[podUID]
+	if !ok {
+		return v1.ResourceRequirements{}, ok
+	}
+
+	resources, ok := resourceInfo.ContainerResources[containerName]
+	if !ok {
+		return v1.ResourceRequirements{}, ok
+	}
+	return *resources.DeepCopy(), ok
 }
 
-func (s *stateMemory) GetPodResourceAllocation() PodResourceAllocation {
+func (s *stateMemory) GetPodResourceInfoMap() PodResourceInfoMap {
 	s.RLock()
 	defer s.RUnlock()
-	return s.podAllocation.Clone()
+	return s.podResources.Clone()
 }
 
-func (s *stateMemory) SetContainerResourceAllocation(podUID types.UID, containerName string, alloc v1.ResourceRequirements) error {
+func (s *stateMemory) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
 	s.Lock()
 	defer s.Unlock()
 
-	if _, ok := s.podAllocation[podUID]; !ok {
-		s.podAllocation[podUID] = make(map[string]v1.ResourceRequirements)
+	if _, ok := s.podResources[podUID]; !ok {
+		s.podResources[podUID] = PodResourceInfo{
+			ContainerResources: make(map[string]v1.ResourceRequirements),
+		}
 	}
 
-	s.podAllocation[podUID][containerName] = alloc
-	klog.V(3).InfoS("Updated container resource allocation", "podUID", podUID, "containerName", containerName, "alloc", alloc)
+	s.podResources[podUID].ContainerResources[containerName] = resources
+	klog.V(3).InfoS("Updated container resource information", "podUID", podUID, "containerName", containerName, "resources", resources)
 	return nil
 }
 
-func (s *stateMemory) SetPodResourceAllocation(podUID types.UID, alloc map[string]v1.ResourceRequirements) error {
+func (s *stateMemory) SetPodResourceInfo(podUID types.UID, resourceInfo PodResourceInfo) error {
 	s.Lock()
 	defer s.Unlock()
 
-	s.podAllocation[podUID] = alloc
-	klog.V(3).InfoS("Updated pod resource allocation", "podUID", podUID, "allocation", alloc)
+	s.podResources[podUID] = resourceInfo
+	klog.V(3).InfoS("Updated pod resource information", "podUID", podUID, "information", resourceInfo)
 	return nil
 }
 
 func (s *stateMemory) RemovePod(podUID types.UID) error {
 	s.Lock()
 	defer s.Unlock()
-	delete(s.podAllocation, podUID)
-	klog.V(3).InfoS("Deleted pod resource allocation", "podUID", podUID)
+	delete(s.podResources, podUID)
+	klog.V(3).InfoS("Deleted pod resource information", "podUID", podUID)
 	return nil
 }
 
@@ -91,9 +101,9 @@ func (s *stateMemory) RemoveOrphanedPods(remainingPods sets.Set[types.UID]) {
 	s.Lock()
 	defer s.Unlock()
 
-	for podUID := range s.podAllocation {
+	for podUID := range s.podResources {
 		if _, ok := remainingPods[types.UID(podUID)]; !ok {
-			delete(s.podAllocation, podUID)
+			delete(s.podResources, podUID)
 		}
 	}
 }
