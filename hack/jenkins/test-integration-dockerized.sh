@@ -19,27 +19,11 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Runs test-integration,
-# producing JUnit-style XML test
-# reports in ${WORKSPACE}/artifacts. This script is intended to be run from
-# kubekins-test container with a kubernetes repo mapped in. See
-# k8s.io/test-infra/scenarios/kubernetes_verify.py
+# Runs test-integration
+# This script is intended to be run from prow.k8s.io
+set -x;
 
-export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
+# TODO: make test-integration should handle this automatically
+source ./hack/install-etcd.sh
 
-# Install tools we need
-go -C "./hack/tools" install gotest.tools/gotestsum
-
-# Disable coverage report
-export KUBE_COVER="n"
-# Set artifacts directory
-export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
-# Save the verbose stdout as well.
-export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
-export LOG_LEVEL=4
-
-cd "${GOPATH}/src/k8s.io/kubernetes"
-
-./hack/install-etcd.sh
-
-make test-integration
+make test-integration KUBE_KEEP_VERBOSE_TEST_OUTPUT=y LOG_LEVEL=4
