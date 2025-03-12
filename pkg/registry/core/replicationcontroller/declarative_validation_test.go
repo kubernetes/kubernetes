@@ -40,10 +40,34 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 		input        api.ReplicationController
 		expectedErrs field.ErrorList
 	}{
+		// baseline
 		"empty resource": {
 			input: mkValidReplicationController(),
 		},
-		// TODO: Add test cases
+		// spec.replicas
+		"nil replicas": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+		"0 replicas": {
+			input: mkValidReplicationController(setSpecReplicas(0)),
+		},
+		"1 replicas": {
+			input: mkValidReplicationController(setSpecReplicas(1)),
+		},
+		"positive replicas": {
+			input: mkValidReplicationController(setSpecReplicas(100)),
+		},
+		"negative replicas": {
+			input: mkValidReplicationController(setSpecReplicas(-1)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -90,7 +114,40 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 		update       api.ReplicationController
 		expectedErrs field.ErrorList
 	}{
-		// TODO: Add test cases
+		// baseline
+		"baseline": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(),
+		},
+		// spec.replicas
+		"nil replicas": {
+			old: mkValidReplicationController(),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+		"0 replicas": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecReplicas(0)),
+		},
+		"1 replicas": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecReplicas(1)),
+		},
+		"positive replicas": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecReplicas(100)),
+		},
+		"negative replicas": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecReplicas(-1)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -163,4 +220,10 @@ func mkValidReplicationController(tweaks ...func(rc *api.ReplicationController))
 		tweak(&rc)
 	}
 	return rc
+}
+
+func setSpecReplicas(val int32) func(rc *api.ReplicationController) {
+	return func(rc *api.ReplicationController) {
+		rc.Spec.Replicas = ptr.To(val)
+	}
 }
