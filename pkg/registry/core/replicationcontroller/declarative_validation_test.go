@@ -68,6 +68,22 @@ func TestDeclarativeValidateForDeclarative(t *testing.T) {
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
+		// spec.minReadySeconds
+		"0 minReadySeconds": {
+			input: mkValidReplicationController(setSpecMinReadySeconds(0)),
+		},
+		"1 minReadySeconds": {
+			input: mkValidReplicationController(setSpecMinReadySeconds(1)),
+		},
+		"positive minReadySeconds": {
+			input: mkValidReplicationController(setSpecMinReadySeconds(100)),
+		},
+		"negative minReadySeconds": {
+			input: mkValidReplicationController(setSpecMinReadySeconds(-1)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -148,6 +164,26 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
 			},
 		},
+		// spec.minReadySeconds
+		"0 minReadySeconds": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecMinReadySeconds(0)),
+		},
+		"1 minReadySeconds": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecMinReadySeconds(1)),
+		},
+		"positive minReadySeconds": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecMinReadySeconds(3)),
+		},
+		"negative minReadySeconds": {
+			old:    mkValidReplicationController(),
+			update: mkValidReplicationController(setSpecMinReadySeconds(-1)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -225,5 +261,11 @@ func mkValidReplicationController(tweaks ...func(rc *api.ReplicationController))
 func setSpecReplicas(val int32) func(rc *api.ReplicationController) {
 	return func(rc *api.ReplicationController) {
 		rc.Spec.Replicas = ptr.To(val)
+	}
+}
+
+func setSpecMinReadySeconds(val int32) func(rc *api.ReplicationController) {
+	return func(rc *api.ReplicationController) {
+		rc.Spec.MinReadySeconds = val
 	}
 }
