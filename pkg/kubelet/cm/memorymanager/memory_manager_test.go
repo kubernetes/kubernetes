@@ -96,7 +96,7 @@ func (p *mockPolicy) Name() string {
 	return string(policyTypeMock)
 }
 
-func (p *mockPolicy) Start(_ context.Context, s state.State) error {
+func (p *mockPolicy) Start(context.Context, state.State) error {
 	return p.err
 }
 
