@@ -992,6 +992,9 @@ func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec
 	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToJSON) {
 		opts = append(opts, serializer.WithStreamingCollectionEncodingToJSON())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToProtobuf) {
+		opts = append(opts, serializer.WithStreamingCollectionEncodingToProtobuf())
+	}
 	if len(opts) != 0 {
 		codecs = serializer.NewCodecFactory(scheme, opts...)
 	}
