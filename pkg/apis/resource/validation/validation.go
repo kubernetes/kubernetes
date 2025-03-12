@@ -46,6 +46,8 @@ var (
 	validateDeviceName      = corevalidation.ValidateDNS1123Label
 	validateDeviceClassName = corevalidation.ValidateDNS1123Subdomain
 	validateRequestName     = corevalidation.ValidateDNS1123Label
+
+	attributeAndCapacityMaxKeyLength = resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength
 )
 
 func validatePoolName(name string, fldPath *field.Path) field.ErrorList {
@@ -575,7 +577,7 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.NodeName, oldSpec.NodeName, fldPath.Child("nodeName"))...)
 	}
 
-	setFields := make([]string, 0, 3)
+	setFields := make([]string, 0, 4)
 	if spec.NodeName != "" {
 		setFields = append(setFields, "`nodeName`")
 		allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
@@ -592,21 +594,59 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	if spec.AllNodes {
 		setFields = append(setFields, "`allNodes`")
 	}
+	if spec.PerDeviceNodeSelection {
+		setFields = append(setFields, "`perDeviceNodeSelection`")
+	}
 	switch len(setFields) {
 	case 0:
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required"))
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required"))
 	case 1:
 	default:
 		allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")),
-			"exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required, but multiple fields are set"))
+			"exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"))
 	}
 
-	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices, validateDevice,
+	capacityPoolNames := gatherCapacityPoolNames(spec.CapacityPools)
+	allErrs = append(allErrs, validateSet(spec.Devices, resource.ResourceSliceMaxDevices,
+		func(device resource.Device, fldPath *field.Path) field.ErrorList {
+			return validateDevice(device, fldPath, capacityPoolNames, spec.PerDeviceNodeSelection)
+		},
 		func(device resource.Device) (string, string) {
 			return device.Name, "name"
 		}, fldPath.Child("devices"))...)
 
+	allErrs = append(allErrs, validateSet(spec.CapacityPools, resource.ResourceSliceMaxCapacityPools,
+		func(capacityPool resource.CapacityPool, fldPath *field.Path) field.ErrorList {
+			return validateCapacityPool(capacityPool, fldPath)
+		},
+		func(capacityPool resource.CapacityPool) (string, string) {
+			return capacityPool.Name, "name"
+		}, fldPath.Child("capacityPools"))...)
+
 	return allErrs
+}
+
+func validateCapacityPool(capacityPool resource.CapacityPool, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if capacityPool.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
+	} else {
+		allErrs = append(allErrs, validatePoolName(capacityPool.Name, fldPath.Child("name"))...)
+	}
+	if capacityPool.Capacity == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("capacity"), ""))
+	}
+	allErrs = append(allErrs, validateMap(capacityPool.Capacity, resource.ResourceSliceMaxAttributesAndCapacities, attributeAndCapacityMaxKeyLength,
+		validateQualifiedName, validateDeviceCapacity, fldPath)...)
+	return allErrs
+}
+
+func gatherCapacityPoolNames(capacityPools []resource.CapacityPool) sets.Set[string] {
+	capacityPoolNames := sets.New[string]()
+	for _, capacityPool := range capacityPools {
+		capacityPoolNames.Insert(capacityPool.Name)
+	}
+	return capacityPoolNames
 }
 
 func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field.ErrorList {
@@ -621,27 +661,77 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateDevice(device resource.Device, fldPath *field.Path) field.ErrorList {
+func validateDevice(device resource.Device, fldPath *field.Path, capacityPoolNames sets.Set[string], perDeviceNodeSelection bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
 	if device.Basic == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("basic"), ""))
 	} else {
-		allErrs = append(allErrs, validateBasicDevice(*device.Basic, fldPath.Child("basic"))...)
+		allErrs = append(allErrs, validateBasicDevice(*device.Basic, fldPath.Child("basic"), capacityPoolNames, perDeviceNodeSelection)...)
 	}
 	return allErrs
 }
 
-func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path) field.ErrorList {
+func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path, capacityPoolNames sets.Set[string], perDeviceNodeSelection bool) field.ErrorList {
 	var allErrs field.ErrorList
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
-	maxKeyLen := resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength
-	allErrs = append(allErrs, validateMap(device.Attributes, -1, maxKeyLen, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
-	allErrs = append(allErrs, validateMap(device.Capacity, -1, maxKeyLen, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
+	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
+	allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
 	if combinedLen, max := len(device.Attributes)+len(device.Capacity), resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice; combinedLen > max {
 		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
 	}
+
+	allErrs = append(allErrs, validateSet(device.ConsumesCapacity, resource.ResourceSliceMaxDeviceCapacityConsumptions,
+		func(deviceCapacityConsumption resource.DeviceCapacityConsumption, fldPath *field.Path) field.ErrorList {
+			return validateDeviceCapacityConsumption(deviceCapacityConsumption, fldPath, capacityPoolNames)
+		},
+		func(deviceCapacityConsumption resource.DeviceCapacityConsumption) (string, string) {
+			return deviceCapacityConsumption.CapacityPool, "capacityPool"
+		}, fldPath.Child("consumesCapacity"))...)
+
+	if perDeviceNodeSelection {
+		setFields := make([]string, 0, 3)
+		if device.NodeName != "" {
+			setFields = append(setFields, "`nodeName`")
+			allErrs = append(allErrs, validateNodeName(device.NodeName, fldPath.Child("nodeName"))...)
+		}
+		if device.NodeSelector != nil {
+			setFields = append(setFields, "`nodeSelector`")
+			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(device.NodeSelector, false, fldPath.Child("nodeSelector"))...)
+		}
+		if device.AllNodes {
+			setFields = append(setFields, "`allNodes`")
+		}
+		switch len(setFields) {
+		case 0:
+			allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"))
+		case 1:
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"))
+		}
+	} else if device.NodeName != "" || device.NodeSelector != nil || device.AllNodes {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set in the ResourceSlice spec"))
+	}
+
+	return allErrs
+}
+
+func validateDeviceCapacityConsumption(deviceCapacityConsumption resource.DeviceCapacityConsumption, fldPath *field.Path, capacityPoolNames sets.Set[string]) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if len(deviceCapacityConsumption.CapacityPool) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("capacityPool"), ""))
+	} else if !capacityPoolNames.Has(deviceCapacityConsumption.CapacityPool) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("capacityPool"), deviceCapacityConsumption.CapacityPool, "must reference a capacity pool defined in the ResourceSlice"))
+	}
+	if deviceCapacityConsumption.Capacity == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("capacity"), ""))
+	} else {
+		allErrs = append(allErrs, validateMap(deviceCapacityConsumption.Capacity, resource.ResourceSliceMaxAttributesAndCapacities, attributeAndCapacityMaxKeyLength,
+			validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
+	}
+
 	return allErrs
 }
 

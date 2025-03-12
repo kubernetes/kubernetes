@@ -273,7 +273,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-node-selection": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `nodeSelector`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required, but multiple fields are set")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `nodeSelector`}", "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.NodeName = "worker"
@@ -284,7 +284,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-node-selection-all-nodes": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required, but multiple fields are set")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.NodeName = "worker"
@@ -293,7 +293,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"empty-node-selection": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required")},
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec"), "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.NodeName = ""
@@ -447,6 +447,147 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"bad-PerDeviceNodeSelection": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "{`nodeName`, `perDeviceNodeSelection`}", "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.NodeName = "worker"
+				slice.Spec.PerDeviceNodeSelection = true
+				return slice
+			}(),
+		},
+		"bad-node-selector-in-basicdevice": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PerDeviceNodeSelection = true
+				slice.Spec.NodeName = ""
+				slice.Spec.Devices[0].Basic.NodeName = "worker"
+				slice.Spec.Devices[0].Basic.AllNodes = true
+				return slice
+			}(),
+		},
+		"bad-name-capacity-pools": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "capacityPools").Index(0).Child("name"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				field.Required(field.NewPath("spec", "capacityPools").Index(0).Child("capacity"), ""),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = []resourceapi.CapacityPool{
+					{
+						Name: badName,
+					},
+				}
+				return slice
+			}(),
+		},
+		"missing-name-capacity-pools": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "capacityPools").Index(0).Child("name"), ""),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = []resourceapi.CapacityPool{
+					{
+						Capacity: testCapacity(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"duplicate-capacity-pools": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "capacityPools").Index(1).Child("name"), goodName),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = []resourceapi.CapacityPool{
+					{
+						Name:     goodName,
+						Capacity: testCapacity(),
+					},
+					{
+						Name:     goodName,
+						Capacity: testCapacity(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"too-large-capacity-pools": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "capacityPools"), resourceapi.ResourceSliceMaxCapacityPools+1, resourceapi.ResourceSliceMaxCapacityPools),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = createCapacityPools(resourceapi.ResourceSliceMaxCapacityPools + 1)
+				return slice
+			}(),
+		},
+		"missing-value-consumes-capacity": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCapacity").Index(0).Child("capacityPool"), ""),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = createCapacityPools(1)
+				slice.Spec.Devices[0].Basic.ConsumesCapacity = []resourceapi.DeviceCapacityConsumption{
+					{
+						Capacity: testCapacity(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"missing-capacity-consumes-capacity": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCapacity").Index(0).Child("capacity"), ""),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = createCapacityPools(1)
+				slice.Spec.Devices[0].Basic.ConsumesCapacity = []resourceapi.DeviceCapacityConsumption{
+					{
+						CapacityPool: "capacitypools-0",
+					},
+				}
+				return slice
+			}(),
+		},
+		"wrong-ref-consumes-capacity": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCapacity").Index(0).Child("capacityPool"), "fake", "must reference a capacity pool defined in the ResourceSlice"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = createCapacityPools(1)
+				slice.Spec.Devices[0].Basic.ConsumesCapacity = []resourceapi.DeviceCapacityConsumption{
+					{
+						Capacity:     testCapacity(),
+						CapacityPool: "fake",
+					},
+				}
+				return slice
+			}(),
+		},
+		"too-large-consumes-capacity": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCapacity"), resourceapi.ResourceSliceMaxDeviceCapacityConsumptions+1, resourceapi.ResourceSliceMaxCapacityPools),
+				field.TooMany(field.NewPath("spec", "capacityPools"), resourceapi.ResourceSliceMaxDeviceCapacityConsumptions+1, resourceapi.ResourceSliceMaxCapacityPools),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.CapacityPools = createCapacityPools(resourceapi.ResourceSliceMaxDeviceCapacityConsumptions + 1)
+				slice.Spec.Devices[0].Basic.ConsumesCapacity = createConsumesCapacity(resourceapi.ResourceSliceMaxDeviceCapacityConsumptions + 1)
+				return slice
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -540,4 +681,26 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}
+}
+
+func createCapacityPools(count int) []resourceapi.CapacityPool {
+	capacityPools := make([]resourceapi.CapacityPool, count)
+	for i := 0; i < count; i++ {
+		capacityPools[i] = resourceapi.CapacityPool{
+			Name:     fmt.Sprintf("capacitypools-%d", i),
+			Capacity: testCapacity(),
+		}
+	}
+	return capacityPools
+}
+
+func createConsumesCapacity(count int) []resourceapi.DeviceCapacityConsumption {
+	consumeCapacity := make([]resourceapi.DeviceCapacityConsumption, count)
+	for i := 0; i < count; i++ {
+		consumeCapacity[i] = resourceapi.DeviceCapacityConsumption{
+			CapacityPool: fmt.Sprintf("capacitypools-%d", i),
+			Capacity:     testCapacity(),
+		}
+	}
+	return consumeCapacity
 }

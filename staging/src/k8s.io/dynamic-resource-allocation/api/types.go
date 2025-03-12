@@ -29,12 +29,19 @@ type ResourceSlice struct {
 }
 
 type ResourceSliceSpec struct {
-	Driver       UniqueString
-	Pool         ResourcePool
-	NodeName     UniqueString
-	NodeSelector *v1.NodeSelector
-	AllNodes     bool
-	Devices      []Device
+	Driver                 UniqueString
+	Pool                   ResourcePool
+	NodeName               UniqueString
+	NodeSelector           *v1.NodeSelector
+	AllNodes               bool
+	Devices                []Device
+	PerDeviceNodeSelection bool
+	CapacityPools          []CapacityPool
+}
+
+type CapacityPool struct {
+	Name     UniqueString
+	Capacity map[QualifiedName]DeviceCapacity
 }
 
 type ResourcePool struct {
@@ -48,8 +55,17 @@ type Device struct {
 }
 
 type BasicDevice struct {
-	Attributes map[QualifiedName]DeviceAttribute
-	Capacity   map[QualifiedName]DeviceCapacity
+	Attributes       map[QualifiedName]DeviceAttribute
+	Capacity         map[QualifiedName]DeviceCapacity
+	ConsumesCapacity []DeviceCapacityConsumption
+	NodeName         UniqueString
+	NodeSelector     *v1.NodeSelector
+	AllNodes         bool
+}
+
+type DeviceCapacityConsumption struct {
+	CapacityPool UniqueString
+	Capacity     map[QualifiedName]DeviceCapacity
 }
 
 type QualifiedName string
