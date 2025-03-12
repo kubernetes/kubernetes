@@ -135,7 +135,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 	return
 }
 
-// canUseTopology returns true if all of the following is true:
+// canUseTopology returns true if all of the following are true:
 //   - The node's labels include "topology.kubernetes.io/zone".
 //   - All of the endpoints for this Service have a topology hint.
 //   - At least one endpoint for this Service is hinted for this node's zone.
