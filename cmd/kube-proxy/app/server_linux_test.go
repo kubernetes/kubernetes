@@ -703,7 +703,7 @@ func TestProxyServer_platformSetup(t *testing.T) {
 			s := &ProxyServer{
 				Config:   tt.config,
 				Client:   client,
-				Hostname: "nodename",
+				NodeName: "nodename",
 				NodeIPs: map[v1.IPFamily]net.IP{
 					v1.IPv4Protocol: netutils.ParseIPSloppy("127.0.0.1"),
 					v1.IPv6Protocol: net.IPv6zero,

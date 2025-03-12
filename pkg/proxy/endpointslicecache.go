@@ -43,7 +43,7 @@ type EndpointSliceCache struct {
 	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
 
 	makeEndpointInfo makeEndpointFunc
-	hostname         string
+	nodeName         string
 }
 
 // endpointSliceTracker keeps track of EndpointSlices as they have been applied
@@ -65,13 +65,13 @@ type endpointSliceData struct {
 }
 
 // NewEndpointSliceCache initializes an EndpointSliceCache.
-func NewEndpointSliceCache(hostname string, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
+func NewEndpointSliceCache(nodeName string, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
 		makeEndpointInfo = standardEndpointInfo
 	}
 	return &EndpointSliceCache{
 		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
-		hostname:            hostname,
+		nodeName:            nodeName,
 		makeEndpointInfo:    makeEndpointInfo,
 	}
 }
@@ -233,8 +233,8 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 	return endpointSet
 }
 
-func (cache *EndpointSliceCache) isLocal(hostname string) bool {
-	return len(cache.hostname) > 0 && hostname == cache.hostname
+func (cache *EndpointSliceCache) isLocal(nodeName string) bool {
+	return len(cache.nodeName) > 0 && nodeName == cache.nodeName
 }
 
 // esDataChanged returns true if the esData parameter should be set as a new

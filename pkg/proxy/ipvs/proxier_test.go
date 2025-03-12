@@ -63,7 +63,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-const testHostname = "test-hostname"
+const testNodeName = "test-node"
 
 // fakeIpvs implements utilipvs.Interface
 type fakeIpvs struct {
@@ -143,14 +143,14 @@ func NewFakeProxier(ctx context.Context, ipt utiliptables.Interface, ipvs utilip
 		svcPortMap:            make(proxy.ServicePortMap),
 		serviceChanges:        proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
 		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointsChangeTracker(ipFamily, testHostname, nil, nil),
+		endpointsChanges:      proxy.NewEndpointsChangeTracker(ipFamily, testNodeName, nil, nil),
 		excludeCIDRs:          excludeCIDRs,
 		iptables:              ipt,
 		ipvs:                  ipvs,
 		ipset:                 ipset,
 		conntrack:             conntrack.NewFake(),
 		localDetector:         proxyutil.NewNoOpLocalDetector(),
-		hostname:              testHostname,
+		nodeName:              testNodeName,
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         defaultScheduler,
 		iptablesData:          bytes.NewBuffer(nil),
@@ -847,10 +847,10 @@ func TestNodePortIPv4(t *testing.T) {
 					eps.AddressType = discovery.AddressTypeIPv4
 					eps.Endpoints = []discovery.Endpoint{{
 						Addresses: []string{"10.180.0.1"},
-						NodeName:  ptr.To(testHostname),
+						NodeName:  ptr.To(testNodeName),
 					}, {
 						Addresses: []string{"10.180.1.1"},
-						NodeName:  ptr.To("otherHost"),
+						NodeName:  ptr.To("other-node"),
 					}}
 					eps.Ports = []discovery.EndpointPort{{
 						Name:     ptr.To("p80"),
@@ -1864,18 +1864,18 @@ func TestOnlyLocalExternalIPs(t *testing.T) {
 	)
 	epIP := "10.180.0.1"
 	epIP1 := "10.180.1.1"
-	thisHostname := testHostname
-	otherHostname := "other-hostname"
+	thisNodeName := testNodeName
+	otherNodeName := "other-node"
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
-				NodeName:  ptr.To(thisHostname),
+				NodeName:  ptr.To(thisNodeName),
 			},
 				{
 					Addresses: []string{epIP1},
-					NodeName:  ptr.To(otherHostname),
+					NodeName:  ptr.To(otherNodeName),
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2035,10 +2035,10 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIP},
-				NodeName:  ptr.To(testHostname),
+				NodeName:  ptr.To(testNodeName),
 			}, {
 				Addresses: []string{epIP1},
-				NodeName:  ptr.To("other-hostname"),
+				NodeName:  ptr.To("other-node"),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2386,11 +2386,11 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 			eps.Endpoints = []discovery.Endpoint{
 				{ // **local** endpoint address, should be added as RS
 					Addresses: []string{epIP},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				},
 				{ // **remote** endpoint address, should not be added as RS
 					Addresses: []string{epIP1},
-					NodeName:  ptr.To("other-hostname"),
+					NodeName:  ptr.To("other-node"),
 				}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -2787,7 +2787,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				eps.AddressType = discovery.AddressTypeIPv4
 				eps.Endpoints = []discovery.Endpoint{{
 					Addresses: []string{"1.1.1.1"},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -2835,7 +2835,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 					Addresses: []string{"1.1.1.1"},
 				}, {
 					Addresses: []string{"1.1.1.2"},
-					NodeName:  ptr.To(testHostname),
+					NodeName:  ptr.To(testNodeName),
 				}}
 				eps.Ports = []discovery.EndpointPort{{
 					Name:     ptr.To("p11"),
@@ -2856,7 +2856,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p12"),
@@ -2872,7 +2872,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"1.1.1.1"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -2905,7 +2905,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.1"},
 		}, {
 			Addresses: []string{"1.1.1.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p11"),
@@ -2923,7 +2923,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"1.1.1.3"},
 		}, {
 			Addresses: []string{"1.1.1.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p13"),
@@ -2941,7 +2941,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 			Addresses: []string{"2.2.2.1"},
 		}, {
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p21"),
@@ -2962,10 +2962,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.2"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"2.2.2.22"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p22"),
@@ -2977,7 +2977,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"2.2.2.3"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p23"),
@@ -2989,10 +2989,10 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"4.4.4.5"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3004,7 +3004,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.6"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p45"),
@@ -3055,7 +3055,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		eps.AddressType = discovery.AddressTypeIPv4
 		eps.Endpoints = []discovery.Endpoint{{
 			Addresses: []string{"4.4.4.4"},
-			NodeName:  ptr.To(testHostname),
+			NodeName:  ptr.To(testNodeName),
 		}}
 		eps.Ports = []discovery.EndpointPort{{
 			Name:     ptr.To("p44"),
@@ -3454,7 +3454,6 @@ func Test_updateEndpointsMap(t *testing.T) {
 			ipvs := ipvstest.NewFake()
 			ipset := ipsettest.NewFake(testIPSetVersion)
 			fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-			fp.hostname = testHostname
 
 			// First check that after adding all previous versions of endpoints,
 			// the fp.oldEndpoints is as we expect.
@@ -4252,7 +4251,7 @@ func TestEndpointSliceE2E(t *testing.T) {
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
@@ -4393,18 +4392,18 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"10.0.1.1"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}, {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
 		}, { // not ready endpoints should be ignored
 			Addresses:  []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{Ready: ptr.To(false)},
-			NodeName:   ptr.To(testHostname),
+			NodeName:   ptr.To(testNodeName),
 		}},
 	}
 
@@ -4435,7 +4434,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(false),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.0.1.2"},
 			Conditions: discovery.EndpointConditions{
@@ -4443,7 +4442,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, {
 			Addresses: []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{
@@ -4451,7 +4450,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(true),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}, { // not ready endpoints should be ignored
 			Addresses: []string{"10.0.1.4"},
 			Conditions: discovery.EndpointConditions{
@@ -4459,7 +4458,7 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 				Serving:     ptr.To(false),
 				Terminating: ptr.To(true),
 			},
-			NodeName: ptr.To(testHostname),
+			NodeName: ptr.To(testNodeName),
 		}},
 	}
 
@@ -4530,7 +4529,7 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 	type endpoint struct {
 		ip       string
-		hostname string
+		nodeName string
 	}
 
 	testCases := []struct {
@@ -4546,9 +4545,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is cluster with non-zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      true,
 			expectLocalEntries:       true,
@@ -4563,9 +4562,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is cluster with zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyCluster),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      false,
 			expectLocalEntries:       false,
@@ -4580,9 +4579,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local with non-zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      true,
 			expectLocalEntries:       true,
@@ -4595,9 +4594,9 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			name:                  "internalTrafficPolicy is local with zero local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectVirtualServer:      false,
 			expectLocalEntries:       false,
@@ -4652,7 +4651,7 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 			endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 				Addresses:  []string{ep.ip},
 				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-				NodeName:   ptr.To(ep.hostname),
+				NodeName:   ptr.To(ep.nodeName),
 			})
 		}
 
@@ -4758,7 +4757,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -4767,7 +4766,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -4776,7 +4775,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -4785,7 +4784,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -4794,7 +4793,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -4931,7 +4930,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -4940,7 +4939,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -4949,7 +4948,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -4958,7 +4957,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -4967,7 +4966,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -5103,7 +5102,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -5112,7 +5111,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -5121,7 +5120,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -5130,7 +5129,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -5139,7 +5138,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -5275,7 +5274,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.2"},
@@ -5284,7 +5283,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.3"},
@@ -5293,7 +5292,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(false),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To(testHostname),
+				NodeName: ptr.To(testNodeName),
 			},
 			{
 				Addresses: []string{"10.0.1.4"},
@@ -5302,7 +5301,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(true),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 			{
 				Addresses: []string{"10.0.1.5"},
@@ -5311,7 +5310,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 					Serving:     ptr.To(true),
 					Terminating: ptr.To(false),
 				},
-				NodeName: ptr.To("another-host"),
+				NodeName: ptr.To("another-node"),
 			},
 		},
 	}
@@ -5480,7 +5479,7 @@ func TestIpIsValidForSet(t *testing.T) {
 func TestNoEndpointsMetric(t *testing.T) {
 	type endpoint struct {
 		ip       string
-		hostname string
+		nodeName string
 	}
 
 	metrics.RegisterMetrics(kubeproxyconfig.ProxyModeIPVS)
@@ -5497,18 +5496,18 @@ func TestNoEndpointsMetric(t *testing.T) {
 			name:                  "internalTrafficPolicy is set and there are local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
 			name:                  "externalTrafficPolicy is set and there are local endpoints",
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
@@ -5516,18 +5515,18 @@ func TestNoEndpointsMetric(t *testing.T) {
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", testHostname},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", testNodeName},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 		},
 		{
 			name:                  "internalTrafficPolicy is set and there are no local endpoints",
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 		},
@@ -5535,9 +5534,9 @@ func TestNoEndpointsMetric(t *testing.T) {
 			name:                  "externalTrafficPolicy is set and there are no local endpoints",
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
 		},
@@ -5546,9 +5545,9 @@ func TestNoEndpointsMetric(t *testing.T) {
 			internalTrafficPolicy: ptr.To(v1.ServiceInternalTrafficPolicyLocal),
 			externalTrafficPolicy: v1.ServiceExternalTrafficPolicyLocal,
 			endpoints: []endpoint{
-				{"10.0.1.1", "host0"},
-				{"10.0.1.2", "host1"},
-				{"10.0.1.3", "host2"},
+				{"10.0.1.1", "node0"},
+				{"10.0.1.2", "node1"},
+				{"10.0.1.3", "node2"},
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
@@ -5613,7 +5612,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
 				Addresses:  []string{ep.ip},
 				Conditions: discovery.EndpointConditions{Ready: ptr.To(true)},
-				NodeName:   ptr.To(ep.hostname),
+				NodeName:   ptr.To(ep.nodeName),
 			})
 		}
 

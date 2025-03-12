@@ -652,7 +652,7 @@ type Proxier struct {
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	// These are effectively const and do not need the mutex to be held.
-	hostname string
+	nodeName string
 	nodeIP   net.IP
 
 	serviceHealthServer healthcheck.ServiceHealthServer
@@ -709,7 +709,7 @@ func NewProxier(
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	hostname string,
+	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
@@ -718,7 +718,7 @@ func NewProxier(
 ) (*Proxier, error) {
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer)
 
 	var healthzPort int
 	if len(healthzBindAddress) > 0 {
@@ -729,7 +729,7 @@ func NewProxier(
 	hcnImpl := newHcnImpl()
 	proxier, err := newProxierInternal(
 		ipFamily,
-		hostname,
+		nodeName,
 		nodeIP,
 		serviceHealthServer,
 		healthzServer,
@@ -752,7 +752,7 @@ func NewProxier(
 // allow internal testing of proxier
 func newProxierInternal(
 	ipFamily v1.IPFamily,
-	hostname string,
+	nodeName string,
 	nodeIP net.IP,
 	serviceHealthServer healthcheck.ServiceHealthServer,
 	healthzServer *healthcheck.ProxyHealthServer,
@@ -837,7 +837,7 @@ func newProxierInternal(
 		endPointsRefCount:     make(endPointsReferenceCountMap),
 		svcPortMap:            make(proxy.ServicePortMap),
 		endpointsMap:          make(proxy.EndpointsMap),
-		hostname:              hostname,
+		nodeName:              nodeName,
 		nodeIP:                nodeIP,
 		serviceHealthServer:   serviceHealthServer,
 		healthzServer:         healthzServer,
@@ -856,7 +856,7 @@ func newProxierInternal(
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(ipFamily, proxier.newServiceInfo, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointsChangeTracker(ipFamily, hostname, proxier.newEndpointInfo, proxier.endpointsMapChange)
+	endPointChangeTracker := proxy.NewEndpointsChangeTracker(ipFamily, nodeName, proxier.newEndpointInfo, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
@@ -866,7 +866,7 @@ func newProxierInternal(
 func NewDualStackProxier(
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
-	hostname string,
+	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
@@ -876,18 +876,18 @@ func NewDualStackProxier(
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, syncPeriod, minSyncPeriod,
-		hostname, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
+		nodeName, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
 		healthzBindAddress, config)
 
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv4Protocol])
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv4Protocol])
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, syncPeriod, minSyncPeriod,
-		hostname, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
+		nodeName, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
 		healthzBindAddress, config)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, nodeIP:%v", err, hostname, nodeIPs[v1.IPv6Protocol])
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv6Protocol])
 	}
 
 	// Return a meta-proxier that dispatch calls between the two

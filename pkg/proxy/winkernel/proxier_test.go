@@ -45,7 +45,7 @@ import (
 )
 
 const (
-	testHostName      = "test-hostname"
+	testNodeName      = "test-node"
 	testNetwork       = "TestNetwork"
 	ipAddress         = "10.0.0.1"
 	prefixLen         = 24
@@ -87,7 +87,7 @@ func newHnsNetwork(networkInfo *hnsNetworkInfo) *hcn.HostComputeNetwork {
 	return network
 }
 
-func NewFakeProxier(t *testing.T, hostname string, nodeIP net.IP, networkType string, enableDSR bool) *Proxier {
+func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType string, enableDSR bool) *Proxier {
 	sourceVip := "192.168.1.2"
 
 	// enable `WinDSR` feature gate
@@ -104,7 +104,7 @@ func NewFakeProxier(t *testing.T, hostname string, nodeIP net.IP, networkType st
 
 	proxier, _ := newProxierInternal(
 		v1.IPv4Protocol,
-		hostname,
+		nodeName,
 		nodeIP,
 		healthcheck.NewFakeServiceHealthServer(),
 		nil,
@@ -139,7 +139,7 @@ func getHcnMock(networkType string) *fakehcn.HcnMock {
 }
 
 func TestCreateServiceVip(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -192,7 +192,7 @@ func TestCreateServiceVip(t *testing.T) {
 }
 
 func TestCreateRemoteEndpointOverlay(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -256,7 +256,7 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 }
 
 func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", false)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -413,7 +413,7 @@ func TestDsrNotAppliedToClusterTrafficPolicy(t *testing.T) {
 }
 
 func TestSharedRemoteEndpointDelete(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -554,7 +554,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	}
 }
 func TestSharedRemoteEndpointUpdate(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge", true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -728,7 +728,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 }
 
 func TestCreateLoadBalancerWithoutDSR(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 	if proxier == nil {
 		t.Error()
 	}
@@ -797,7 +797,7 @@ func TestCreateLoadBalancerWithoutDSR(t *testing.T) {
 }
 
 func TestCreateLoadBalancerWithDSR(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -866,7 +866,7 @@ func TestCreateLoadBalancerWithDSR(t *testing.T) {
 }
 
 func TestUpdateLoadBalancerWhenSupported(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1007,7 +1007,7 @@ func TestUpdateLoadBalancerWhenSupported(t *testing.T) {
 }
 
 func TestUpdateLoadBalancerWhenUnsupported(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1149,7 +1149,7 @@ func TestUpdateLoadBalancerWhenUnsupported(t *testing.T) {
 }
 
 func TestCreateDsrLoadBalancer(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1185,7 +1185,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			eps.AddressType = discovery.AddressTypeIPv4
 			eps.Endpoints = []discovery.Endpoint{{
 				Addresses: []string{epIpAddressRemote},
-				NodeName:  ptr.To("testhost"),
+				NodeName:  ptr.To(testNodeName),
 			}}
 			eps.Ports = []discovery.EndpointPort{{
 				Name:     ptr.To(svcPortName.Port),
@@ -1227,7 +1227,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 // syncproxyrules only creates ClusterIP Loadbalancer and no NodePort, External IP or IngressIP
 // loadbalancers will be created.
 func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, false)
 
 	if proxier == nil {
 		t.Error()
@@ -1307,7 +1307,7 @@ func TestClusterIPLBInCreateDsrLoadBalancer(t *testing.T) {
 }
 
 func TestEndpointSlice(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1387,7 +1387,7 @@ func TestNoopEndpointSlice(t *testing.T) {
 }
 
 func TestFindRemoteSubnetProviderAddress(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error()
 	}
@@ -1413,7 +1413,7 @@ func TestFindRemoteSubnetProviderAddress(t *testing.T) {
 }
 
 func TestWinDSRWithOverlayEnabled(t *testing.T) {
-	proxier := NewFakeProxier(t, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, true)
 	if proxier == nil {
 		t.Error("Failed to create proxier")
 	}
@@ -1499,7 +1499,7 @@ func TestDSRFeatureGateValidation(t *testing.T) {
 
 			_, err := newProxierInternal(
 				v1.IPv4Protocol,                       // ipFamily
-				testHostName,                          // hostname
+				testNodeName,                          // nodeName
 				netutils.ParseIPSloppy("192.168.1.1"), // nodeIP
 				nil,                                   // serviceHealthServer (not needed in this unit test)
 				nil,                                   // healthzServer (not needed in this unit test)
