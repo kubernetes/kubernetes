@@ -46,7 +46,7 @@ func NewCheckpointState(logger klog.Logger, stateDir, checkpointName, policyName
 	}
 	stateCheckpoint := &stateCheckpoint{
 		logger:            logger,
-		cache:             NewMemoryState(),
+		cache:             NewMemoryState(logger),
 		policyName:        policyName,
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,

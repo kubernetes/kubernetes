@@ -897,7 +897,7 @@ func TestRemoveStaleState(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
 				policy:       returnPolicyByName(tCtx, testCase),
-				state:        state.NewMemoryState(),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: nil,
@@ -1390,7 +1390,7 @@ func TestAddContainer(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
 				policy:       returnPolicyByName(tCtx, testCase),
-				state:        state.NewMemoryState(),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: testCase.updateError,
@@ -1867,7 +1867,7 @@ func TestRemoveContainer(t *testing.T) {
 			iniContainerMap.Add("fakePod1", "fakeContainer2", "fakeID2")
 			mgr := &manager{
 				policy:       returnPolicyByName(tCtx, testCase),
-				state:        state.NewMemoryState(),
+				state:        state.NewMemoryState(logger),
 				containerMap: iniContainerMap,
 				containerRuntime: mockRuntimeService{
 					err: testCase.expectedError,
@@ -2029,7 +2029,7 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestGetTopologyHints(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	testCases := []testMemoryManager{
 		{
 			description: "Successful hint generation",
@@ -2151,7 +2151,7 @@ func TestGetTopologyHints(t *testing.T) {
 		t.Run(testCase.description, func(t *testing.T) {
 			mgr := &manager{
 				policy:       returnPolicyByName(tCtx, testCase),
-				state:        state.NewMemoryState(),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: nil,
@@ -2329,7 +2329,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 			logger.Info("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
 			mgr := &manager{
 				policy:       returnPolicyByName(tCtx, testCase),
-				state:        state.NewMemoryState(),
+				state:        state.NewMemoryState(logger),
 				containerMap: containermap.NewContainerMap(),
 				containerRuntime: mockRuntimeService{
 					err: nil,
