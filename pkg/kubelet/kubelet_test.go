@@ -2453,17 +2453,19 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	emptyPodSpec.Containers[0].Resources.Requests = v1.ResourceList{}
 
 	tests := []struct {
-		name                          string
-		pod                           *v1.Pod
-		existingPodAllocation         *v1.Pod
-		expectedPodResourceAllocation state.PodResourceAllocation
+		name                       string
+		pod                        *v1.Pod
+		existingPodAllocation      *v1.Pod
+		expectedPodResourceInfoMap state.PodResourceInfoMap
 	}{
 		{
 			name: "Having both memory and cpu, resource allocation not exists",
 			pod:  podWithUIDNameNsSpec("1", "pod1", "foo", *cpu500mMem500MPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"1": map[string]v1.ResourceRequirements{
-					cpu500mMem500MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"1": {
+					ContainerResources: map[string]v1.ResourceRequirements{
+						cpu500mMem500MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2471,9 +2473,11 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			name:                  "Having both memory and cpu, resource allocation exists",
 			pod:                   podWithUIDNameNsSpec("2", "pod2", "foo", *cpu500mMem500MPodSpec),
 			existingPodAllocation: podWithUIDNameNsSpec("2", "pod2", "foo", *cpu500mMem500MPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"2": map[string]v1.ResourceRequirements{
-					cpu500mMem500MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"2": {
+					ContainerResources: map[string]v1.ResourceRequirements{
+						cpu500mMem500MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2481,18 +2485,22 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			name:                  "Having both memory and cpu, resource allocation exists (with different value)",
 			pod:                   podWithUIDNameNsSpec("3", "pod3", "foo", *cpu500mMem500MPodSpec),
 			existingPodAllocation: podWithUIDNameNsSpec("3", "pod3", "foo", *cpu800mMem800MPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"3": map[string]v1.ResourceRequirements{
-					cpu800mMem800MPodSpec.Containers[0].Name: cpu800mMem800MPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						cpu800mMem800MPodSpec.Containers[0].Name: cpu800mMem800MPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
 		{
 			name: "Only has cpu, resource allocation not exists",
 			pod:  podWithUIDNameNsSpec("4", "pod5", "foo", *cpu500mPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"4": map[string]v1.ResourceRequirements{
-					cpu500mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						cpu500mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2500,9 +2508,11 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			name:                  "Only has cpu, resource allocation exists",
 			pod:                   podWithUIDNameNsSpec("5", "pod5", "foo", *cpu500mPodSpec),
 			existingPodAllocation: podWithUIDNameNsSpec("5", "pod5", "foo", *cpu500mPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"5": map[string]v1.ResourceRequirements{
-					cpu500mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						cpu500mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2510,18 +2520,22 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			name:                  "Only has cpu, resource allocation exists (with different value)",
 			pod:                   podWithUIDNameNsSpec("6", "pod6", "foo", *cpu500mPodSpec),
 			existingPodAllocation: podWithUIDNameNsSpec("6", "pod6", "foo", *cpu800mPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"6": map[string]v1.ResourceRequirements{
-					cpu800mPodSpec.Containers[0].Name: cpu800mPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						cpu800mPodSpec.Containers[0].Name: cpu800mPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
 		{
 			name: "Only has memory, resource allocation not exists",
 			pod:  podWithUIDNameNsSpec("7", "pod7", "foo", *mem500MPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"7": map[string]v1.ResourceRequirements{
-					mem500MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						mem500MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2529,9 +2543,11 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			name:                  "Only has memory, resource allocation exists",
 			pod:                   podWithUIDNameNsSpec("8", "pod8", "foo", *mem500MPodSpec),
 			existingPodAllocation: podWithUIDNameNsSpec("8", "pod8", "foo", *mem500MPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"8": map[string]v1.ResourceRequirements{
-					mem500MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						mem500MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2539,18 +2555,22 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			name:                  "Only has memory, resource allocation exists (with different value)",
 			pod:                   podWithUIDNameNsSpec("9", "pod9", "foo", *mem500MPodSpec),
 			existingPodAllocation: podWithUIDNameNsSpec("9", "pod9", "foo", *mem800MPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"9": map[string]v1.ResourceRequirements{
-					mem800MPodSpec.Containers[0].Name: mem800MPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						mem800MPodSpec.Containers[0].Name: mem800MPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
 		{
 			name: "No CPU and memory, resource allocation not exists",
 			pod:  podWithUIDNameNsSpec("10", "pod10", "foo", *emptyPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"10": map[string]v1.ResourceRequirements{
-					emptyPodSpec.Containers[0].Name: emptyPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						emptyPodSpec.Containers[0].Name: emptyPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2558,9 +2578,11 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			name:                  "No CPU and memory, resource allocation exists",
 			pod:                   podWithUIDNameNsSpec("11", "pod11", "foo", *emptyPodSpec),
 			existingPodAllocation: podWithUIDNameNsSpec("11", "pod11", "foo", *emptyPodSpec),
-			expectedPodResourceAllocation: state.PodResourceAllocation{
-				"11": map[string]v1.ResourceRequirements{
-					emptyPodSpec.Containers[0].Name: emptyPodSpec.Containers[0].Resources,
+			expectedPodResourceInfoMap: state.PodResourceInfoMap{
+				"3": state.PodResourceInfo{
+					ContainerResources: map[string]v1.ResourceRequirements{
+						emptyPodSpec.Containers[0].Name: emptyPodSpec.Containers[0].Resources,
+					},
 				},
 			},
 		},
@@ -2580,7 +2602,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			if !found {
 				t.Fatalf("resource allocation should exist: (pod: %#v, container: %s)", tc.pod, tc.pod.Spec.Containers[0].Name)
 			}
-			assert.Equal(t, tc.expectedPodResourceAllocation[tc.pod.UID][tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
+			assert.Equal(t, tc.expectedPodResourceInfoMap[tc.pod.UID].ContainerResources[tc.pod.Spec.Containers[0].Name], allocatedResources, tc.name)
 		})
 	}
 }
