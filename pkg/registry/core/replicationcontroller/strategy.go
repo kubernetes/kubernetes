@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
@@ -44,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -175,9 +176,7 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	newRc := obj.(*api.ReplicationController)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(newRc.Spec.Template, oldRc.Spec.Template)
-	validationErrorList := corevalidation.ValidateReplicationController(newRc, opts)
-	updateErrorList := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
-	errs := append(validationErrorList, updateErrorList...)
+	errs := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
 
 	for key, value := range helper.NonConvertibleFields(oldRc.Annotations) {
 		parts := strings.Split(key, "/")
@@ -202,10 +201,7 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
 		// Run both validations with panic recovery
-		declarativeErrs := rest.ValidateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, obj, takeover)
-		declarativeErrs = append(
-			declarativeErrs,
-			rest.ValidateUpdateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, obj, old, takeover)...)
+		declarativeErrs := rest.ValidateUpdateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, obj, old, takeover)
 
 		// Only apply declarative errors if takeover is enabled
 		if takeover {

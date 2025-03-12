@@ -31,6 +31,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/go-cmp/cmp" //nolint:depguard
+
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
@@ -6221,8 +6223,10 @@ func ValidateReplicationController(controller *core.ReplicationController, opts 
 
 // ValidateReplicationControllerUpdate tests if required fields in the replication controller are set.
 func ValidateReplicationControllerUpdate(controller, oldController *core.ReplicationController, opts PodValidationOptions) field.ErrorList {
-	allErrs := ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))
+	allErrs := ValidateObjectMeta(&controller.ObjectMeta, true, ValidateReplicationControllerName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&controller.ObjectMeta, &oldController.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidateReplicationControllerSpec(&controller.Spec, &oldController.Spec, field.NewPath("spec"), opts)...)
+
 	return allErrs
 }
 
@@ -6300,6 +6304,13 @@ func ValidateReplicationControllerSpec(spec, oldSpec *core.ReplicationController
 	if spec.Replicas == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("replicas"), "").MarkCoveredByDeclarative())
 	} else {
+		// handwritten ratcheting validation
+		if oldSpec == nil || oldSpec.Replicas == nil || *spec.Replicas != *oldSpec.Replicas {
+			if *spec.Replicas < 1 {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("replicas"), *spec.Replicas, content.MinError(1)).WithOrigin("tightenedMinimum"))
+			}
+		}
+
 		allErrs = append(allErrs, ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas")).MarkCoveredByDeclarative()...)
 	}
 	allErrs = append(allErrs, ValidatePodTemplateSpecForRC(spec.Template, spec.Selector, fldPath.Child("template"), opts)...)
