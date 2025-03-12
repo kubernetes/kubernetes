@@ -554,7 +554,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			continue
 		}
 
-		bound, err := pl.isClaimBound(claim, pod, node.Name)
+		bound, err := pl.isClaimBound(claim)
 		if err != nil || !bound {
 			unavailableClaims = append(unavailableClaims, index)
 		}
@@ -836,8 +836,11 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 			}
 		}
 	}
-	if timeout > timeoutMax || timeout <= 0 {
+	if timeout <= 0 {
 		timeout = timeoutDefault
+	}
+	if timeout > timeoutMax {
+		timeout = timeoutMax
 	}
 
 	// We need to wait for the device to be attached to the node.
@@ -846,9 +849,6 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 			return pl.hasDeviceBindingStatus(ctx, state, pod, nodeName)
 		})
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			pl.fh.EventRecorder().Eventf(pod, pod, v1.EventTypeWarning, "BindingConditionsFailed", "Scheduling", "waiting for binding conditions timed out, error: %s", err)
-		}
 		return statusError(logger, err)
 	}
 
@@ -947,25 +947,22 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 
 // isClaimBound checks whether a given resource claim is successfully
 // bound to a device.
-func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim, pod *v1.Pod, nodeName string) (bool, error) {
+func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim) (bool, error) {
 	for _, deviceRequest := range claim.Status.Allocation.Devices.Results {
 		if len(deviceRequest.BindingConditions) == 0 {
 			continue
 		}
 		deviceStatus := getAllocatedDeviceStatus(claim, &deviceRequest)
 		if deviceStatus == nil {
-			pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for driver to report status for device %s/%s/%s on node %s.", deviceRequest.Driver, deviceRequest.Pool, deviceRequest.Device, nodeName)
 			return false, nil
 		}
 		for _, cond := range deviceRequest.BindingFailureConditions {
 			if apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
-				pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeWarning, "BindingConditionsFailed", "Scheduling", "binding failed for device %s/%s/%s on node %s", deviceRequest.Driver, deviceRequest.Pool, deviceRequest.Device, nodeName)
 				return false, fmt.Errorf("claim %s failed to bind", claim.Name)
 			}
 		}
 		for _, cond := range deviceRequest.BindingConditions {
 			if !apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
-				pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for binding conditions for device %s/%s/%s on node %s.", deviceRequest.Driver, deviceRequest.Pool, deviceRequest.Device, nodeName)
 				return false, nil
 			}
 		}
@@ -982,11 +979,12 @@ func (pl *DynamicResources) hasDeviceBindingStatus(ctx context.Context, state *s
 			return false, err
 		}
 		state.claims[claimIndex] = claim
-		bound, err := pl.isClaimBound(claim, pod, nodeName)
+		bound, err := pl.isClaimBound(claim)
 		if err != nil {
 			return false, err
 		}
 		if !bound {
+			pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for binding conditions for device on node %s.", nodeName)
 			return false, nil
 		}
 	}

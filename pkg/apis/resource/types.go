@@ -1337,6 +1337,8 @@ type DeviceRequestAllocationResult struct {
 	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
 	//
 	// The default timeout if not set is 600 seconds.
+	// The maximum timeout is 1200 seconds.
+	// Any configured timeout exceeding this value will be capped at 1200 seconds
 	//
 	// +optional
 	BindingTimeoutSeconds *int64
