@@ -1144,12 +1144,20 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: SELinuxMount
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.30"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: SELinuxMountReadWriteOncePod
   versionedSpecs:
   - default: false

@@ -3844,8 +3844,12 @@ func TestDropSELinuxChangePolicy(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 
-			for _, gate := range tc.gates {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)
+			// Set feature gates for the test. *Disable* those that are not in tc.gates.
+			allGates := []featuregate.Feature{features.SELinuxChangePolicy, features.SELinuxMount}
+			enabledGates := sets.New(tc.gates...)
+			for _, gate := range allGates {
+				enable := enabledGates.Has(gate)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, enable)
 			}
 
 			oldPod := tc.oldPod.DeepCopy()
