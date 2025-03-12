@@ -426,7 +426,7 @@ func (c CompletedConfig) StorageProviders(discovery clientdiscovery.DiscoveryInt
 		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: discovery},
 		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
-		resourcerest.RESTStorageProvider{},
+		resourcerest.RESTStorageProvider{LoopbackClientConfig: c.ControlPlane.Generic.LoopbackClientConfig},
 	}, nil
 }
 
