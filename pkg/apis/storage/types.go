@@ -449,6 +449,8 @@ type CSIDriverSpec struct {
 	//
 	// This is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
 	//
+	// This field is mutable.
+	//
 	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
 	NodeAllocatableUpdatePeriodSeconds *int64
