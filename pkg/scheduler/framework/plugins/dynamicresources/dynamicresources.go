@@ -454,7 +454,12 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 		if err != nil {
 			return nil, statusError(logger, err)
 		}
-		allocator, err := structured.NewAllocator(ctx, pl.enableAdminAccess, pl.enablePrioritizedList, pl.enableDeviceTaints, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
+		features := structured.Features{
+			AdminAccess:     pl.enableAdminAccess,
+			PrioritizedList: pl.enablePrioritizedList,
+			DeviceTaints:    pl.enableDeviceTaints,
+		}
+		allocator, err := structured.NewAllocator(ctx, features, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
 			return nil, statusError(logger, err)
 		}

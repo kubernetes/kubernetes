@@ -33,7 +33,7 @@ import (
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, partitionableDevicesEnabled bool) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
 	nodeName := ""
 	if node != nil {
@@ -44,12 +44,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 		switch {
 		case slice.Spec.NodeName != "":
 			if slice.Spec.NodeName == nodeName {
-				if err := addSlice(pools, slice); err != nil {
+				if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
 					return nil, fmt.Errorf("add node slice %s: %w", slice.Name, err)
 				}
 			}
 		case slice.Spec.AllNodes:
-			if err := addSlice(pools, slice); err != nil {
+			if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
 				return nil, fmt.Errorf("add cluster slice %s: %w", slice.Name, err)
 			}
 		case slice.Spec.NodeSelector != nil:
@@ -59,9 +59,16 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				return nil, fmt.Errorf("node selector in resource slice %s: %w", slice.Name, err)
 			}
 			if selector.Match(node) {
-				if err := addSlice(pools, slice); err != nil {
+				if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
 					return nil, fmt.Errorf("add matching slice %s: %w", slice.Name, err)
 				}
+			}
+		case slice.Spec.PerDeviceNodeSelection:
+			// We add the slice here regardless of whether the partitionable devices feature is
+			// enabled. If we don't, the full slice will be considered incomplete. So we filter
+			// out devices that have fields from the partitionable devices feature set later.
+			if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
+				return nil, fmt.Errorf("add cluster slice %s: %w", slice.Name, err)
 			}
 		default:
 			// Nothing known was set. This must be some future, unknown extension,
@@ -87,9 +94,16 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	return result, nil
 }
 
-func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
+func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice, node *v1.Node, partitionableDevicesEnabled bool) error {
 	var slice draapi.ResourceSlice
-	if err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
+	sliceScope := draapi.SliceScope{
+		SliceContext: draapi.SliceContext{
+			Slice:                       s,
+			Node:                        node,
+			PartitionableDevicesEnabled: partitionableDevicesEnabled,
+		},
+	}
+	if err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(s, &slice, sliceScope); err != nil {
 		return fmt.Errorf("convert ResourceSlice: %w", err)
 	}
 
