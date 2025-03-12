@@ -73,7 +73,7 @@ var (
 	}
 )
 
-// GetServiceAccountFunc is a function type that returns a service account token for the given namespace and name.
+// GetServiceAccountFunc is a function type that returns a service account for the given namespace and name.
 type GetServiceAccountFunc func(namespace, name string) (*v1.ServiceAccount, error)
 
 // getServiceAccountTokenFunc is a function type that returns a service account token for the given namespace and name.
