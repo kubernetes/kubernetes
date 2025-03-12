@@ -242,7 +242,6 @@ func TestValidateForDeclarative(t *testing.T) {
 	})
 	successCases := []api.ReplicationController{
 		mkValidReplicationController(func(rc *api.ReplicationController) {}),
-		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](0) }),
 		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](1) }),
 		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](100) }),
 		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = 0 }),
@@ -271,6 +270,7 @@ func TestValidateForDeclarative(t *testing.T) {
 			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("tightenedMinimum"),
 			},
 		},
 		"negative minReadySeconds": {
@@ -329,12 +329,20 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 	}{{
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *api.ReplicationController) {
-			rc.Spec.Replicas = ptr.To[int32](0)
+			rc.Spec.Replicas = ptr.To[int32](1)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *api.ReplicationController) {
 			rc.Spec.Replicas = ptr.To[int32](3)
+		}),
+	}, {
+		// ratcheting allows 0 if the previous value was 0
+		old: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](0)
+		}),
+		update: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](0)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
@@ -375,6 +383,18 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("tightenedMinimum"),
+			},
+		},
+		"ratcheted": { // ratcheting does not allow 0 if the previous value was not 0
+			old: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = ptr.To[int32](1)
+			}),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = ptr.To[int32](0)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("tightenedMinimum"),
 			},
 		},
 		"nil replicas": {
