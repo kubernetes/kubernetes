@@ -194,20 +194,20 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 
 	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, memoryManagerStateFileName, m.policy.Name())
 	if err != nil {
-		klog.ErrorS(err, "Could not initialize checkpoint manager, please drain node and remove policy state file")
+		logger.Error(err, "Could not initialize checkpoint manager, please drain node and remove policy state file")
 		return err
 	}
 	m.state = stateImpl
 
 	err = m.policy.Start(ctx, m.state)
 	if err != nil {
-		klog.ErrorS(err, "Policy start error")
+		logger.Error(err, "Policy start error")
 		return err
 	}
 
 	m.allocatableMemory = m.policy.GetAllocatableMemory(ctx, m.state)
 
-	klog.V(4).InfoS("memorymanager started", "policy", m.policy.Name())
+	logger.V(4).Info("memorymanager started", "policy", m.policy.Name())
 	return nil
 }
 
@@ -323,6 +323,8 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 
 // TODO: move the method to the upper level, to re-use it under the CPU and memory managers
 func (m *manager) removeStaleState() {
+	logger := klog.TODO()
+
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
 	// the actual active pods list.
@@ -355,7 +357,7 @@ func (m *manager) removeStaleState() {
 	for podUID := range assignments {
 		for containerName := range assignments[podUID] {
 			if _, ok := activeContainers[podUID][containerName]; !ok {
-				klog.V(2).InfoS("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
+				logger.V(2).Info("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
 				m.policyRemoveContainerByRef(podUID, containerName)
 			}
 		}
@@ -363,7 +365,7 @@ func (m *manager) removeStaleState() {
 
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		if _, ok := activeContainers[podUID][containerName]; !ok {
-			klog.V(2).InfoS("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
+			logger.V(2).Info("RemoveStaleState removing state", "podUID", podUID, "containerName", containerName)
 			m.policyRemoveContainerByRef(podUID, containerName)
 		}
 	})
