@@ -4548,13 +4548,11 @@ const (
 
 // These are valid values for the TrafficDistribution field of a Service.
 const (
-	// Indicates a preference for routing traffic to endpoints that are
-	// topologically proximate to the client. The interpretation of "topologically
-	// proximate" may vary across implementations and could encompass endpoints
-	// within the same node, rack, zone, or even region. Setting this value gives
-	// implementations permission to make different tradeoffs, e.g. optimizing for
-	// proximity rather than equal distribution of load. Users should not set this
-	// value if such tradeoffs are not acceptable.
+	// Indicates a preference for routing traffic to endpoints that are in the
+	// same zone as the client. Setting this value gives implementations
+	// permission to make different tradeoffs, e.g. optimizing for proximity
+	// rather than equal distribution of load. Users should not set this value
+	// if such tradeoffs are not acceptable.
 	ServiceTrafficDistributionPreferClose = "PreferClose"
 )
 
@@ -4822,12 +4820,12 @@ type ServiceSpec struct {
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicy
 
-	// TrafficDistribution offers a way to express preferences for how traffic is
-	// distributed to Service endpoints. Implementations can use this field as a
-	// hint, but are not required to guarantee strict adherence. If the field is
-	// not set, the implementation will apply its default routing strategy. If set
-	// to "PreferClose", implementations should prioritize endpoints that are
-	// topologically close (e.g., same zone).
+	// TrafficDistribution offers a way to express preferences for how traffic
+	// is distributed to Service endpoints. Implementations can use this field
+	// as a hint, but are not required to guarantee strict adherence. If the
+	// field is not set, the implementation will apply its default routing
+	// strategy. If set to "PreferClose", implementations should prioritize
+	// endpoints that are in the same zone.
 	// +optional
 	TrafficDistribution *string
 }
