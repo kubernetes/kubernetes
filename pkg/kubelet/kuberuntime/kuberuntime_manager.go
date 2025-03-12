@@ -224,7 +224,7 @@ func NewKubeGenericRuntimeManager(
 	podPullingTimeRecorder images.ImagePodPullingTimeRecorder,
 	tracerProvider trace.TracerProvider,
 	tokenManager *token.Manager,
-	getServiceAccount func(string, string) (*v1.ServiceAccount, error),
+	getServiceAccount plugin.GetServiceAccountFunc,
 ) (KubeGenericRuntime, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
