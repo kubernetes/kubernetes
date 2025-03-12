@@ -586,7 +586,6 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	result = result.Union(remainingCPUs)
 
 	// Remove allocated CPUs from the shared CPUSet.
-	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
 	if reusableCPUsForResize != nil {
 		if reusableCPUsForResize.Size() < result.Size() {
 			// Scale up or creation has been performed
