@@ -592,7 +592,6 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	result.Aligned = p.topology.CheckAlignment(result.CPUs)
 
 	// Remove allocated CPUs from the shared CPUSet.
-	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result.CPUs))
 	if reusableCPUsForResize != nil {
 		if reusableCPUsForResize.Size() < result.CPUs.Size() {
 			// Scale up or creation has been performed

@@ -1388,7 +1388,7 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 					Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 			}
 
-			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, isRollback bool) {
+			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string) {
 				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
 				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
@@ -1398,7 +1398,7 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 				e2epod.VerifyPodResources(patchedPod, expectedContainers)
 
 				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod)
+				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
 				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
 
 				// Check cgroup values only for containerd versions before 1.6.9
@@ -1425,12 +1425,12 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 				}
 			}
 
-			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize", false)
+			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize")
 
 			rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
 			framework.ExpectNoError(err)
 			// Resize has been actuated, test rollback
-			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback", true)
+			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback")
 
 			ginkgo.By("deleting pod")
 			deletePodSyncByName(ctx, f, newPod.Name)
@@ -2127,7 +2127,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 					Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 			}
 
-			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, isRollback bool) {
+			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string) {
 				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
 				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
@@ -2137,7 +2137,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 				e2epod.VerifyPodResources(patchedPod, expectedContainers)
 
 				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod)
+				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
 				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
 
 				// Check cgroup values only for containerd versions before 1.6.9
@@ -2165,13 +2165,13 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			}
 
 			ginkgo.By("First patch")
-			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize", false)
+			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize")
 
 			rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
 			framework.ExpectNoError(err)
 			// Resize has been actuated, test rollback
 			ginkgo.By("Second patch for rollback")
-			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback", true)
+			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback")
 
 			ginkgo.By("deleting pod")
 			deletePodSyncByName(ctx, f, newPod.Name)
@@ -2371,7 +2371,7 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 			newPod1 := createAndVerify("testpod1", podClient, tc.testPod1.containers)
 			newPod2 := createAndVerify("testpod2", podClient, tc.testPod2.containers)
 
-			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, isRollback bool, newPod *v1.Pod) {
+			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, newPod *v1.Pod) {
 				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
 				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
@@ -2381,7 +2381,7 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				e2epod.VerifyPodResources(patchedPod, expectedContainers)
 
 				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod)
+				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
 				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
 
 				// Check cgroup values only for containerd versions before 1.6.9
@@ -2408,16 +2408,16 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				}
 			}
 
-			patchAndVerify(tc.testPod1.patchString, tc.testPod1.expected, tc.testPod1.containers, "resize", false, newPod1)
-			patchAndVerify(tc.testPod2.patchString, tc.testPod2.expected, tc.testPod2.containers, "resize", false, newPod2)
+			patchAndVerify(tc.testPod1.patchString, tc.testPod1.expected, tc.testPod1.containers, "resize", newPod1)
+			patchAndVerify(tc.testPod2.patchString, tc.testPod2.expected, tc.testPod2.containers, "resize", newPod2)
 
 			rbPatchStr1, err1 := e2epod.ResizeContainerPatch(tc.testPod1.containers)
 			framework.ExpectNoError(err1)
 			rbPatchStr2, err2 := e2epod.ResizeContainerPatch(tc.testPod2.containers)
 			framework.ExpectNoError(err2)
 			// Resize has been actuated, test rollback
-			patchAndVerify(rbPatchStr1, tc.testPod1.containers, tc.testPod1.expected, "rollback", true, newPod1)
-			patchAndVerify(rbPatchStr2, tc.testPod2.containers, tc.testPod2.expected, "rollback", true, newPod2)
+			patchAndVerify(rbPatchStr1, tc.testPod1.containers, tc.testPod1.expected, "rollback", newPod1)
+			patchAndVerify(rbPatchStr2, tc.testPod2.containers, tc.testPod2.expected, "rollback", newPod2)
 
 			ginkgo.By("deleting pod")
 			deletePodSyncByName(ctx, f, newPod1.Name)
