@@ -5110,6 +5110,7 @@ type ReplicationControllerSpec struct {
 	// +k8s:optional
 	// +default=1
 	// +k8s:minimum=0
+	// +k8s:tightenedMinimum=1
 	Replicas *int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 
 	// Minimum number of seconds for which a newly created pod should be ready

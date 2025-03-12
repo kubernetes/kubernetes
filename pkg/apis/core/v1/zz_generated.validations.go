@@ -95,6 +95,7 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 				return // do not proceed
 			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			errs = append(errs, validate.TightenedMinimum(ctx, op, fldPath, obj, oldObj, 1)...)
 			return
 		}(fldPath.Child("replicas"), obj.Replicas, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return oldObj.Replicas }))...)
 
