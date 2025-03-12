@@ -18,9 +18,11 @@ package cache
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -113,11 +115,16 @@ func TestGenericListerListMethod(t *testing.T) {
 	target := NewGenericLister(indexer, schema.GroupResource{Group: "group", Resource: "resource"})
 
 	expectedOutput := []runtime.Object{
+		newUnstructured("group/version", "TheKind", "ns-bar", "name-bar"),
 		newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 		newUnstructured("group/version", "TheKind", "ns-foo", "name-foo1"),
-		newUnstructured("group/version", "TheKind", "ns-bar", "name-bar"),
 	}
 	actualOutput, err := target.List(labels.Everything())
+
+	// Lister result is unsorted. Sort before comparing result with expected.
+	sort.Slice(actualOutput, func(i, j int) bool {
+		return actualOutput[i].(*unstructured.Unstructured).GetName() < actualOutput[j].(*unstructured.Unstructured).GetName()
+	})
 
 	if err != nil {
 		t.Fatal(err)
