@@ -31,6 +31,7 @@ import (
 func TestVersionedValidationByFuzzing(t *testing.T) {
 	typesWithDeclarativeValidation := []schema.GroupVersion{
 		// Registered group versions for versioned validation fuzz testing:
+		{Group: "", Version: "v1"},
 	}
 
 	for _, gv := range typesWithDeclarativeValidation {
