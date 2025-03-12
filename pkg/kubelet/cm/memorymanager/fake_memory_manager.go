@@ -19,7 +19,6 @@ package memorymanager
 import (
 	"context"
 
-	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -31,7 +30,7 @@ import (
 )
 
 type fakeManager struct {
-	logger logr.Logger
+	logger klog.Logger
 	state  state.State
 }
 
