@@ -131,6 +131,18 @@ var (
 	//   is enabled such that passing CDI device IDs through CRI fields is supported
 	DRAPrioritizedList = framework.WithFeature(framework.ValidFeatures.Add("DRAPrioritizedList"))
 
+	// owning-sig: sig-scheduling
+	// kep: https://kep.k8s.io/4815
+	// test-infra jobs:
+	// - "ci-kind-dra-all" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
+	//
+	// This label is used for tests which need:
+	// - the DynamicResourceAllocation *and* DRAPartitionableDevices feature gates
+	// - the resource.k8s.io API group
+	// - a container runtime where support for CDI (https://github.com/cncf-tags/container-device-interface)
+	//   is enabled such that passing CDI device IDs through CRI fields is supported
+	DRAPartitionableDevices = framework.WithFeature(framework.ValidFeatures.Add("DRAPartitionableDevices"))
+
 	// owning-sig: sig-node
 	// kep: https://kep.k8s.io/4381
 	// test-infra jobs:

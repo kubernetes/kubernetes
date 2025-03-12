@@ -53,6 +53,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -413,12 +414,43 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 				return d.removeFile(&pod, name)
 			},
 		}
-		if i < len(devicesPerNode) {
-			fileOps.Devices = devicesPerNode[i]
-			fileOps.NumDevices = -1
-		} else {
-			fileOps.NumDevices = numDevices
+
+		if numDevices >= 0 {
+			devices := make([]resourceapi.Device, numDevices)
+			for i := 0; i < numDevices; i++ {
+				devices[i] = resourceapi.Device{
+					Name:  fmt.Sprintf("device-%02d", i),
+					Basic: &resourceapi.BasicDevice{},
+				}
+			}
+			fileOps.DriverResources = &resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{
+					nodename: {
+						Slices: []resourceslice.Slice{{
+							Devices: devices,
+						}},
+					},
+				},
+			}
+		} else if len(devicesPerNode[i]) > 0 {
+			devices := make([]resourceapi.Device, len(devicesPerNode[i]))
+			for deviceName, attributes := range devicesPerNode[i] {
+				devices[i] = resourceapi.Device{
+					Name:  deviceName,
+					Basic: &resourceapi.BasicDevice{Attributes: attributes},
+				}
+			}
+			fileOps.DriverResources = &resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{
+					nodename: {
+						Slices: []resourceslice.Slice{{
+							Devices: devices,
+						}},
+					},
+				},
+			}
 		}
+
 		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {

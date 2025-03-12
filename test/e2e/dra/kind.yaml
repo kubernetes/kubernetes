@@ -14,7 +14,7 @@ nodes:
     scheduler:
         extraArgs:
           v: "5"
-          vmodule: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
+          vmodule: "allocator=8,dynamicresources=8" # structured/allocator.go, DRA scheduler plugin
     controllerManager:
         extraArgs:
           v: "5"
@@ -53,3 +53,7 @@ nodes:
 #    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
   DynamicResourceAllocation: true
+  DRAAdminAccess: true
+  DRAPrioritizedList: true
+  DRAResourceClaimDeviceStatus: true
+  DRAPartitionableDevices: true

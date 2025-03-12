@@ -29,6 +29,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
@@ -1287,6 +1288,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		expectedEnv = append(expectedEnv, expected...)
 
 		ginkgo.It("supports simple ResourceClaim", func(ctx context.Context) {
+			time.Sleep(10 * time.Second)
+			logResourceSlices(ctx, f)
 			pod, template := b.podInlineWithV1beta2()
 			b.create(ctx, pod, template)
 			b.testPod(ctx, f, pod, expectedEnv...)
@@ -1354,6 +1357,24 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	}
 
+	partitionableDevicesTests := func() {
+		nodes := NewNodes(f, 1, 1)
+
+		driver := NewDriver(f, nodes, perNode(-1, nodes), []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+			{
+				"device-1-1": {},
+			},
+		}...)
+		_ = driver
+		// b := newBuilder(f, driver)
+		// _ = b
+
+		f.It("foo", feature.DRAPartitionableDevices, func(ctx context.Context) {
+			time.Sleep(10 * time.Second)
+			logResourceSlices(ctx, f)
+		})
+	}
+
 	ginkgo.Context("on single node", func() {
 		singleNodeTests()
 	})
@@ -1368,6 +1389,10 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	ginkgo.Context("with v1beta2 API", func() {
 		v1beta2Tests()
+	})
+
+	ginkgo.Context("with partitionable devices", func() {
+		partitionableDevicesTests()
 	})
 
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123699): move most of the test below into `testDriver` so that they get
@@ -2297,4 +2322,10 @@ func (b *builder) listTestPods(ctx context.Context) ([]v1.Pod, error) {
 		testPods = append(testPods, pod)
 	}
 	return testPods, nil
+}
+
+func logResourceSlices(ctx context.Context, f *framework.Framework) {
+	rsList, err := f.ClientSet.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	framework.Logf("resourceSlices:\n%s", format.Object(rsList, 1))
 }
