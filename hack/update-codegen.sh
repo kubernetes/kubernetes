@@ -434,7 +434,7 @@ function codegen::validation() {
     # main API types. Validations defined on types in these packages will be
     # used, but not regenerated, unless they are also listed as a "regular"
     # input on the command-line.
-    local extra_pkgs=(
+    local readonly_pkgs=(
         k8s.io/apimachinery/pkg/apis/meta/v1
         k8s.io/apimachinery/pkg/api/resource
         k8s.io/apimachinery/pkg/runtime
@@ -457,7 +457,7 @@ function codegen::validation() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        $(printf -- " --extra-pkg %s" "${extra_pkgs[@]}") \
+        $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
 

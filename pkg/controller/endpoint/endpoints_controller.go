@@ -67,18 +67,18 @@ const (
 	// maxCapacity
 	truncated = "truncated"
 
-	// labelManagedBy is a label for recognizing Endpoints managed by this controller.
-	labelManagedBy = "endpoints.kubernetes.io/managed-by"
+	// LabelManagedBy is a label for recognizing Endpoints managed by this controller.
+	LabelManagedBy = "endpoints.kubernetes.io/managed-by"
 
-	// controllerName is the name of this controller
-	controllerName = "endpoint-controller"
+	// ControllerName is the name of this controller
+	ControllerName = "endpoint-controller"
 )
 
 // NewEndpointController returns a new *Controller.
 func NewEndpointController(ctx context.Context, podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *Controller {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: controllerName})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: ControllerName})
 
 	e := &Controller{
 		client: client,
@@ -503,7 +503,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	} else {
 		newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
 	}
-	newEndpoints.Labels[labelManagedBy] = controllerName
+	newEndpoints.Labels[LabelManagedBy] = ControllerName
 
 	logger.V(4).Info("Update endpoints", "service", klog.KObj(service), "readyEndpoints", totalReadyEps, "notreadyEndpoints", totalNotReadyEps)
 	var updatedEndpoints *v1.Endpoints
@@ -720,16 +720,16 @@ func endpointSubsetsEqualIgnoreResourceVersion(subsets1, subsets2 []v1.EndpointS
 // labelsCorrectForEndpoints tests that epLabels is correctly derived from svcLabels
 // (ignoring the v1.IsHeadlessService label).
 func labelsCorrectForEndpoints(epLabels, svcLabels map[string]string) bool {
-	if epLabels[labelManagedBy] != controllerName {
+	if epLabels[LabelManagedBy] != ControllerName {
 		return false
 	}
 
-	// Every label in epLabels except v1.IsHeadlessService and labelManagedBy should
+	// Every label in epLabels except v1.IsHeadlessService and LabelManagedBy should
 	// correspond to a label in svcLabels, and svcLabels should not have any other
 	// labels that aren't in epLabels.
 	skipped := 0
 	for k, v := range epLabels {
-		if k == v1.IsHeadlessService || k == labelManagedBy {
+		if k == v1.IsHeadlessService || k == LabelManagedBy {
 			skipped++
 		} else if sv, exists := svcLabels[k]; !exists || sv != v {
 			return false

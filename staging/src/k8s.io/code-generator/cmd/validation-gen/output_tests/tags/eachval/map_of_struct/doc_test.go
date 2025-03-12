@@ -29,13 +29,10 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		MapField:        map[string]OtherStruct{"a": {}, "b": {}},
-		MapPtrField:     map[string]*OtherStruct{"a": {}, "b": {}},
 		MapTypedefField: map[string]OtherTypedefStruct{"a": {}, "b": {}},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"mapField[a]":        {"field Struct.MapField[*]"},
 		"mapField[b]":        {"field Struct.MapField[*]"},
-		"mapPtrField[a]":     {"field Struct.MapPtrField[*]"},
-		"mapPtrField[b]":     {"field Struct.MapPtrField[*]"},
 		"mapTypedefField[a]": {"field Struct.MapTypedefField[*]"},
 		"mapTypedefField[b]": {"field Struct.MapTypedefField[*]"},
 	})

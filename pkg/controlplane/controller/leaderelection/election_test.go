@@ -404,6 +404,22 @@ func TestCompare(t *testing.T) {
 			},
 			expectedResult: 1,
 		},
+		{
+			name: "lhs less than rhs, lexographical order check",
+			lhs: &v1alpha2.LeaseCandidate{
+				Spec: v1alpha2.LeaseCandidateSpec{
+					EmulationVersion: "1.2.0",
+					BinaryVersion:    "1.20.0",
+				},
+			},
+			rhs: &v1alpha2.LeaseCandidate{
+				Spec: v1alpha2.LeaseCandidateSpec{
+					EmulationVersion: "1.19.0",
+					BinaryVersion:    "1.20.0",
+				},
+			},
+			expectedResult: -1,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

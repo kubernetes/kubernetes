@@ -46,16 +46,6 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-func Validate_ListPtrType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ListPtrType) (errs field.ErrorList) {
-	// type ListPtrType
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ListPtrType")...)
-	errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ListPtrType[*]")
-	})...)
-
-	return errs
-}
-
 func Validate_ListType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj ListType) (errs field.ErrorList) {
 	// type ListType
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ListType")...)
@@ -100,17 +90,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			errs = append(errs, Validate_ListType(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *Struct) ListType { return oldObj.ListField }))...)
-
-	// field Struct.ListPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj ListPtrType) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField")...)
-			errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListPtrField[*]")
-			})...)
-			errs = append(errs, Validate_ListPtrType(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("listPtrField"), obj.ListPtrField, safe.Field(oldObj, func(oldObj *Struct) ListPtrType { return oldObj.ListPtrField }))...)
 
 	// field Struct.ListTypedefField
 	errs = append(errs,

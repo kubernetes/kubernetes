@@ -18,8 +18,6 @@ package typedeftomap
 
 import (
 	"testing"
-
-	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -33,14 +31,11 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		MapField:        MapType{"a": "A", "b": "B"},
-		MapPtrField:     MapPtrType{"a": ptr.To("A"), "b": ptr.To("B")},
 		MapTypedefField: MapTypedefType{"a": StringType("A"), "b": StringType("B")},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"":                   {"type Struct"},
 		"mapField[a]":        {"type MapType[*]", "field Struct.MapField[*]"},
 		"mapField[b]":        {"type MapType[*]", "field Struct.MapField[*]"},
-		"mapPtrField[a]":     {"type MapPtrType[*]", "field Struct.MapPtrField[*]"},
-		"mapPtrField[b]":     {"type MapPtrType[*]", "field Struct.MapPtrField[*]"},
 		"mapTypedefField[a]": {"type MapTypedefType[*]", "field Struct.MapTypedefField[*]", "type StringType"},
 		"mapTypedefField[b]": {"type MapTypedefType[*]", "field Struct.MapTypedefField[*]", "type StringType"},
 	})

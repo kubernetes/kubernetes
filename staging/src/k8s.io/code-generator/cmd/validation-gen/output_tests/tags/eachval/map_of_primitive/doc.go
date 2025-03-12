@@ -30,9 +30,6 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapField[*]"
 	MapField map[string]string `json:"mapField"`
 
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapPtrField[*]"
-	MapPtrField map[string]*string `json:"mapPtrField"`
-
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapTypedefField[*]"
 	MapTypedefField map[string]StringType `json:"mapTypedefField"`
 }

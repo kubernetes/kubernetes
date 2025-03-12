@@ -49,13 +49,7 @@ type Struct struct {
 	SliceField []string `json:"sliceField"`
 
 	// +k8s:immutable
-	SlicePtrField []*string `json:"slicePtrField"`
-
-	// +k8s:immutable
 	MapField map[string]string `json:"mapField"`
-
-	// +k8s:immutable
-	MapPtrField map[string]*string `json:"mapPtrField"`
 
 	ImmutableField ImmutableType `json:"immutableField"`
 

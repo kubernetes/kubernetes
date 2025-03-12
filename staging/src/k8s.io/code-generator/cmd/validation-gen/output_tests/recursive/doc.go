@@ -48,10 +48,6 @@ type T2 struct {
 	PT2 *T2 `json:"pt2"`
 }
 
-// +k8s:validateFalse="type E1"
-// +k8s:eachVal=+k8s:validateFalse="type E1 values"
-type E1 []E1
-
 // NOTE: no validations.
 type T3 struct {
 	// NOTE: no validations.

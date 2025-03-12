@@ -150,20 +150,27 @@ const (
 	// Enable usage of Provision of PVCs from snapshots in other namespaces
 	CrossNamespaceVolumeDataSource featuregate.Feature = "CrossNamespaceVolumeDataSource"
 
-	// owner: @thockin
-	// kep: http://kep.k8s.io/5073:
+	// owner: @jpbetz @aaron-prindle @yongruilin
+	// kep: http://kep.k8s.io/5073
 	// beta: v1.33
 	//
-	// Enable declarative validation of APIs, where declared.
+	// Enables running declarative validation of APIs, where declared. When enabled, APIs with
+	// declarative validation rules will validate objects using the generated
+	// declarative validation code and compare the results to the regular imperative validation.
+	// See DeclarativeValidationTakeover for more.
 	DeclarativeValidation featuregate.Feature = "DeclarativeValidation"
 
-	// owner: @thockin
-	// kep: http://kep.k8s.io/5073:
+	// owner: @jpbetz @aaron-prindle @yongruilin
+	// kep: http://kep.k8s.io/5073
 	// beta: v1.33
 	//
-	// Enable declarative_validation_mismatch metric which outputs # of mismatch occurrences between
-	// hand-written and declarative validation rules.
-	DeclarativeValidationMismatchMetric featuregate.Feature = "DeclarativeValidationMismatchMetric"
+	// When enabled, declarative validation errors are returned directly to the caller,
+	// replacing hand-written validation errors for rules that have declarative implementations.
+	// When disabled, hand-written validation errors are always returned, effectively putting
+	// declarative validation in a "shadow mode" that monitors but does not affect API responses.
+	// Note: Although declarative validation aims for functional equivalence with hand-written validation,
+	// the exact number, format, and content of error messages may differ between the two approaches.
+	DeclarativeValidationTakeover featuregate.Feature = "DeclarativeValidationTakeover"
 
 	// owner: @atiratree
 	// kep: http://kep.k8s.io/3973
@@ -369,6 +376,13 @@ const (
 	// of images (read-only layers) and/or containers (writeable layers) deployed on
 	// separate filesystems.
 	KubeletSeparateDiskGC featuregate.Feature = "KubeletSeparateDiskGC"
+
+	// owner: @aramase
+	// kep: http://kep.k8s.io/4412
+	//
+	// Enable kubelet to send the service account token bound to the pod for which the image
+	// is being pulled to the credential provider plugin.
+	KubeletServiceAccountTokenForCredentialProviders featuregate.Feature = "KubeletServiceAccountTokenForCredentialProviders"
 
 	// owner: @sallyom
 	// kep: https://kep.k8s.io/2832
@@ -694,8 +708,18 @@ const (
 	StorageVersionMigrator featuregate.Feature = "StorageVersionMigrator"
 
 	// owner: @serathius
-	// Allow API server to encode collections item by item, instead of all at once.
+	// Allow API server JSON encoder to encode collections item by item, instead of all at once.
 	StreamingCollectionEncodingToJSON featuregate.Feature = "StreamingCollectionEncodingToJSON"
+
+	// owner: serathius
+	// Allow API server Protobuf encoder to encode collections item by item, instead of all at once.
+	StreamingCollectionEncodingToProtobuf featuregate.Feature = "StreamingCollectionEncodingToProtobuf"
+
+	// owner: @danwinship
+	// kep: https://kep.k8s.io/4858
+	//
+	// Requires stricter validation of IP addresses and CIDR values in API objects.
+	StrictIPCIDRValidation featuregate.Feature = "StrictIPCIDRValidation"
 
 	// owner: @robscott
 	// kep: https://kep.k8s.io/2433

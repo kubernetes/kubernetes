@@ -244,7 +244,7 @@ func (r *rangeAllocator) processNextNodeWorkItem(ctx context.Context) bool {
 		// Finally, if no error occurs we Forget this item so it does not
 		// get queue again until another change happens.
 		r.queue.Forget(obj)
-		logger.Info("Successfully synced", "key", key)
+		logger.V(4).Info("Successfully synced", "key", key)
 		return nil
 	}(klog.FromContext(ctx), obj)
 

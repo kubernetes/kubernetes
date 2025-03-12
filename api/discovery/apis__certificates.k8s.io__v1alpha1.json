@@ -8,7 +8,7 @@
       "name": "clustertrustbundles",
       "namespaced": false,
       "singularName": "clustertrustbundle",
-      "storageVersionHash": "XGGGW2kGm+w=",
+      "storageVersionHash": "v5yhuVertL4=",
       "verbs": [
         "create",
         "delete",

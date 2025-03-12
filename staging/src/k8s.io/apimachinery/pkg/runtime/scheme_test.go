@@ -35,7 +35,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	fieldtesting "k8s.io/apimachinery/pkg/util/validation/field/testing"
 )
 
 type testConversions struct {
@@ -1089,7 +1088,7 @@ func TestRegisterValidate(t *testing.T) {
 			} else {
 				results = s.ValidateUpdate(ctx, tc.options, tc.object, tc.oldObject, tc.subresource...)
 			}
-			matcher := fieldtesting.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, tc.expected, results)
 		})
 	}
