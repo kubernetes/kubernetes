@@ -183,7 +183,7 @@ func NewManager(ctx context.Context, policyName string, machineInfo *cadvisorapi
 
 // Start starts the memory manager under the kubelet and calls policy start
 func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	ctx := context.Background()
+	ctx := context.TODO()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting memorymanager", "policy", m.policy.Name())
 	m.sourcesReady = sourcesReady
@@ -241,7 +241,7 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 
 // GetMemoryNUMANodes provides NUMA nodes that used to allocate the container memory
 func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int] {
-	logger := klog.LoggerWithValues(klog.Background(), "pod", klog.KObj(pod), "containerName", container.Name)
+	logger := klog.LoggerWithValues(klog.TODO(), "pod", klog.KObj(pod), "containerName", container.Name)
 
 	// Get NUMA node affinity of blocks assigned to the container during Allocate()
 	numaNodes := sets.New[int]()
@@ -264,7 +264,7 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 // Allocate is called to pre-allocate memory resources during Pod admission.
 func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// Garbage collect any stranded resources before allocation
-	ctx := context.Background()
+	ctx := context.TODO()
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod), "containerName", container.Name)
 
 	m.removeStaleState()
@@ -282,8 +282,7 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 
 // RemoveContainer removes the container from the state
 func (m *manager) RemoveContainer(containerID string) error {
-	ctx := context.Background()
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "containerID", containerID)
+	logger := klog.LoggerWithValues(klog.TODO(), "containerID", containerID)
 
 	m.Lock()
 	defer m.Unlock()
@@ -310,7 +309,7 @@ func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(context.Background(), m.state, pod)
+	return m.policy.GetPodTopologyHints(context.TODO(), m.state, pod)
 }
 
 // GetTopologyHints returns the topology hints for the topology manager
@@ -318,7 +317,7 @@ func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[str
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(context.Background(), m.state, pod, container)
+	return m.policy.GetTopologyHints(context.TODO(), m.state, pod, container)
 }
 
 // TODO: move the method to the upper level, to re-use it under the CPU and memory managers
@@ -372,7 +371,7 @@ func (m *manager) removeStaleState() {
 }
 
 func (m *manager) policyRemoveContainerByRef(podUID string, containerName string) {
-	m.policy.RemoveContainer(context.Background(), m.state, podUID, containerName)
+	m.policy.RemoveContainer(context.TODO(), m.state, podUID, containerName)
 	m.containerMap.RemoveByContainerRef(podUID, containerName)
 }
 

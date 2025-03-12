@@ -52,7 +52,7 @@ var _ ContainerManager = &FakeContainerManager{}
 func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
-		memoryManager:       memorymanager.NewFakeManager(context.Background()),
+		memoryManager:       memorymanager.NewFakeManager(context.TODO()),
 	}
 }
 
