@@ -151,8 +151,7 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 			go cletest.createAndRunFakeController("baz1", "default", "baz", "1.20.0", "1.20.0", tc.preferredStrategy)
 			go cletest.createAndRunFakeController("baz2", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
 			go cletest.createAndRunFakeController("baz3", "default", "baz", "1.19.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz4", "default", "baz", "1.2.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz5", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController("baz4", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
 			cletest.pollForLease(ctx, "baz", "default", tc.expectedHolderIdentity)
 		})
 	}
