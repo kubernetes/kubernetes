@@ -5,6 +5,7 @@
 
 approvers:
   - sig-api-machinery-api-approvers
+  - jpbetz
 reviewers:
   - sig-api-machinery-api-reviewers
   - siyuanfoundation
