@@ -94,6 +94,6 @@ func NewFakeManager(ctx context.Context) Manager {
 	logger := klog.LoggerWithName(klog.FromContext(ctx), "memory-mgr.fake")
 	return &fakeManager{
 		logger: logger,
-		state:  state.NewMemoryState(),
+		state:  state.NewMemoryState(logger),
 	}
 }
