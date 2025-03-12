@@ -340,9 +340,11 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 		// ratcheting allows 0 if the previous value was 0
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {
 			rc.Spec.Replicas = ptr.To[int32](0)
+			rc.Spec.MinReadySeconds = 1
 		}),
 		update: mkValidReplicationController(func(rc *api.ReplicationController) {
 			rc.Spec.Replicas = ptr.To[int32](0)
+			rc.Spec.MinReadySeconds = 2
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
