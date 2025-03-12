@@ -45,7 +45,6 @@ func checkExpectedEndpoints(expected sets.Set[string], actual []Endpoint) error 
 func TestCategorizeEndpoints(t *testing.T) {
 	testCases := []struct {
 		name        string
-		pteEnabled  bool
 		nodeLabels  map[string]string
 		serviceInfo ServicePort
 		endpoints   []Endpoint
@@ -240,7 +239,6 @@ func TestCategorizeEndpoints(t *testing.T) {
 		localEndpoints:   nil,
 	}, {
 		name:        "Cluster traffic policy, all endpoints are terminating",
-		pteEnabled:  true,
 		serviceInfo: &BaseServicePortInfo{},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.0.0.0:80", ready: false, serving: true, terminating: true, isLocal: true},
@@ -290,7 +288,6 @@ func TestCategorizeEndpoints(t *testing.T) {
 		allEndpoints:     sets.New[string]("10.0.0.0:80", "10.0.0.1:80"),
 	}, {
 		name:        "iTP: Local, eTP: Local, all endpoints remote and terminating",
-		pteEnabled:  true,
 		serviceInfo: &BaseServicePortInfo{internalPolicyLocal: true, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.0.0.0:80", ready: false, serving: true, terminating: true, isLocal: false},
@@ -302,7 +299,6 @@ func TestCategorizeEndpoints(t *testing.T) {
 		onlyRemoteEndpoints: true,
 	}, {
 		name:        "iTP: Cluster, eTP: Local, with terminating endpoints",
-		pteEnabled:  true,
 		serviceInfo: &BaseServicePortInfo{internalPolicyLocal: false, externalPolicyLocal: true, nodePort: 8080},
 		endpoints: []Endpoint{
 			&BaseEndpointInfo{endpoint: "10.0.0.0:80", ready: true, isLocal: false},

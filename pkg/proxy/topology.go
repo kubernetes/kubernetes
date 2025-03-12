@@ -26,8 +26,8 @@ import (
 //   - The service's usable Cluster-traffic-policy endpoints (taking topology into account, if
 //     relevant). This will be nil if the service does not ever use Cluster traffic policy.
 //
-//   - The service's usable Local-traffic-policy endpoints (including terminating endpoints, if
-//     relevant). This will be nil if the service does not ever use Local traffic policy.
+//   - The service's usable Local-traffic-policy endpoints. This will be nil if the
+//     service does not ever use Local traffic policy.
 //
 //   - The combined list of all endpoints reachable from this node (which is the union of the
 //     previous two lists, but in the case where it is identical to one or the other, we avoid
@@ -35,6 +35,10 @@ import (
 //
 //   - An indication of whether the service has any endpoints reachable from anywhere in the
 //     cluster. (This may be true even if allReachableEndpoints is empty.)
+//
+// "Usable endpoints" means Ready endpoints by default, but will fall back to
+// Serving-Terminating endpoints (independently for Cluster and Local) if no Ready
+// endpoints are available.
 func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
 	var useTopology, useServingTerminatingEndpoints bool
 
@@ -50,9 +54,10 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 			return true
 		})
 
-		// if there are 0 cluster-wide endpoints, we can try to fallback to any terminating endpoints that are ready.
-		// When falling back to terminating endpoints, we do NOT consider topology aware routing since this is a best
-		// effort attempt to avoid dropping connections.
+		// If we didn't get any endpoints, try again using terminating endpoints.
+		// (Note that we would already have chosen to ignore topology if there
+		// were no ready endpoints for the given topology, so the problem at this
+		// point must be that there are no ready endpoints anywhere.)
 		if len(clusterEndpoints) == 0 {
 			clusterEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
 				if ep.IsServing() && ep.IsTerminating() {
