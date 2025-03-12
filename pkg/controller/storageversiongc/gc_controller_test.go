@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func setupController(ctx context.Context, clientset kubernetes.Interface) {
@@ -53,7 +54,7 @@ func newKubeApiserverLease(name, holderIdentity string) *coordinationv1.Lease {
 			},
 		},
 		Spec: coordinationv1.LeaseSpec{
-			HolderIdentity: utilpointer.String(holderIdentity),
+			HolderIdentity: ptr.To(holderIdentity),
 		},
 	}
 }
