@@ -16795,7 +16795,7 @@
           "type": "string"
         },
         "nodeAllocatableUpdatePeriodSeconds": {
-          "description": "NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of the CSINode allocatable capacity for this driver. When set, both periodic updates and updates triggered by capacity-related failures are enabled. If not set, no updates occur (neither periodic nor upon detecting capacity-related failures), and the Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.\n\nThis is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.",
+          "description": "NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of the CSINode allocatable capacity for this driver. When set, both periodic updates and updates triggered by capacity-related failures are enabled. If not set, no updates occur (neither periodic nor upon detecting capacity-related failures), and the Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.\n\nThis is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.\n\nThis field is mutable.",
           "format": "int64",
           "type": "integer"
         },
