@@ -240,6 +240,11 @@ func (e requiredAnnotationNotFoundError) Error() string {
 	return fmt.Sprintf("required annotation %s not found", string(e))
 }
 
+func isRequiredAnnotationNotFoundError(err error) bool {
+	var requiredAnnotationNotFoundErr requiredAnnotationNotFoundError
+	return errors.As(err, &requiredAnnotationNotFoundErr)
+}
+
 // getServiceAccountData returns the service account UID and required annotations for the service account.
 // If the service account does not exist, an error is returned.
 // saAnnotations is a map of annotation keys and values that the plugin requires to generate credentials
@@ -370,8 +375,7 @@ func (p *pluginProvider) provide(image, podNamespace, podName string, podUID typ
 		// to pull images for pods without service accounts (e.g., static pods).
 		if len(serviceAccountName) > 0 {
 			if serviceAccountUID, saAnnotations, err = p.serviceAccountProvider.getServiceAccountData(podNamespace, serviceAccountName); err != nil {
-				var requiredAnnotationNotFoundErr requiredAnnotationNotFoundError
-				if errors.As(err, &requiredAnnotationNotFoundErr) {
+				if isRequiredAnnotationNotFoundError(err) {
 					// The required annotation could be a mechanism for individual workloads to opt in to using service account tokens
 					// for image pull. If any of the required annotation is missing, we will not invoke the plugin. We will log the error
 					// at higher verbosity level as it could be noisy.
