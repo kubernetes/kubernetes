@@ -539,9 +539,11 @@
       namespace: test
       ConditionTypeParam: $conditionType
       ConditionStatusParam: $conditionStatus
+      durationParam: $updateDuration
     - opcode: checkPodScheduled
       namespace: test
       ScheduledParam: $scheduled
+      durationParam: $checkDuration
   workloads:
     - name: fast_AttachmentSuccess
       labels: [integration-test, short]
@@ -552,6 +554,8 @@
         conditionType: DeviceAttached
         conditionStatus: "True"
         scheduled: true
+        updateDuration: 30s
+        checkDuration: 30s
     - name: fast_AttachmentFailed
       labels: [integration-test, short]
       params:
@@ -561,6 +565,8 @@
         conditionType: AttachmentFailed
         conditionStatus: "True"
         scheduled: false
+        updateDuration: 30s
+        checkDuration: 30s
     - name: multiple_pods_AttachmentSuccess
       labels: [integration-test, short]
       params:
@@ -570,6 +576,8 @@
         conditionType: DeviceAttached
         conditionStatus: "True"
         scheduled: true
+        updateDuration: 30s
+        checkDuration: 30s
     - name: multiple_pods_AttachmentFailed
       labels: [integration-test, short]
       params:
@@ -579,3 +587,5 @@
         conditionType: AttachmentFailed
         conditionStatus: "True"
         scheduled: false
+        updateDuration: 30s
+        checkDuration: 30s
