@@ -301,6 +301,8 @@ func TestValidateForDeclarative(t *testing.T) {
 			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
 			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
+
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil)
 		})
 	}
 }
@@ -415,6 +417,8 @@ func TestValidateUpdateForDeclarative(t *testing.T) {
 				}
 			}
 			equivalenceMatcher.Test(t, dedupedImperativeErrs, declarativeTakeoverErrs)
+
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
 		})
 	}
 }
