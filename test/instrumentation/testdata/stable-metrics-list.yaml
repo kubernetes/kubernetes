@@ -122,6 +122,19 @@
   - error_type
   - policy
   - policy_binding
+- name: declarative_validation_mismatch_total
+  subsystem: validation
+  namespace: apiserver
+  help: Number of times declarative validation results differed from handwritten validation
+    results for core types.
+  type: Counter
+  stabilityLevel: BETA
+- name: declarative_validation_panic_total
+  subsystem: validation
+  namespace: apiserver
+  help: Number of times declarative validation has panicked during validation.
+  type: Counter
+  stabilityLevel: BETA
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
