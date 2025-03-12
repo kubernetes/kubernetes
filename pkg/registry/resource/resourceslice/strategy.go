@@ -28,10 +28,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // resourceSliceStrategy implements behavior for ResourceSlice objects
@@ -49,6 +51,8 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	slice := obj.(*resource.ResourceSlice)
 	slice.Generation = 1
+
+	dropDisabledFields(slice, nil)
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -75,6 +79,8 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	if !apiequality.Semantic.DeepEqual(oldSlice.Spec, slice.Spec) {
 		slice.Generation = oldSlice.Generation + 1
 	}
+
+	dropDisabledFields(slice, oldSlice)
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -146,4 +152,59 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
+}
+
+func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
+	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+}
+
+func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices) || draPartitionableDevicesFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.SharedCounters = nil
+	newSlice.Spec.PerDeviceNodeSelection = false
+	for _, device := range newSlice.Spec.Devices {
+		if device.Basic != nil {
+			device.Basic.ConsumesCounter = nil
+			device.Basic.NodeName = ""
+			device.Basic.NodeSelector = nil
+			device.Basic.AllNodes = false
+		}
+
+	}
+}
+
+func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	if len(spec.SharedCounters) > 0 {
+		return true
+	}
+	if spec.PerDeviceNodeSelection {
+		return true
+	}
+
+	for _, device := range spec.Devices {
+		if device.Basic != nil {
+			if len(device.Basic.ConsumesCounter) > 0 {
+				return true
+			}
+			if device.Basic.NodeName == "" {
+				return true
+			}
+			if device.Basic.NodeSelector != nil {
+				return true
+			}
+			if device.Basic.AllNodes {
+				return true
+			}
+		}
+
+	}
+	return false
 }
