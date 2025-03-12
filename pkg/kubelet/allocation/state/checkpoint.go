@@ -20,16 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
 
 var _ checkpointmanager.Checkpoint = &Checkpoint{}
 
-type PodResourceAllocationInfo struct {
-	AllocationEntries map[types.UID]map[string]v1.ResourceRequirements `json:"allocationEntries,omitempty"`
+type PodResourceCheckpointInfo struct {
+	Entries PodResourceInfoMap `json:"entries,omitempty"`
 }
 
 // Checkpoint represents a structure to store pod resource allocation checkpoint data
@@ -41,7 +39,7 @@ type Checkpoint struct {
 }
 
 // NewCheckpoint creates a new checkpoint from a list of claim info states
-func NewCheckpoint(allocations *PodResourceAllocationInfo) (*Checkpoint, error) {
+func NewCheckpoint(allocations *PodResourceCheckpointInfo) (*Checkpoint, error) {
 
 	serializedAllocations, err := json.Marshal(allocations)
 	if err != nil {
@@ -70,9 +68,9 @@ func (cp *Checkpoint) VerifyChecksum() error {
 	return cp.Checksum.Verify(cp.Data)
 }
 
-// GetPodResourceAllocationInfo returns Pod Resource Allocation info states from checkpoint
-func (cp *Checkpoint) GetPodResourceAllocationInfo() (*PodResourceAllocationInfo, error) {
-	var data PodResourceAllocationInfo
+// GetPodResourceCheckpointInfo returns Pod Resource Allocation info states from checkpoint
+func (cp *Checkpoint) GetPodResourceCheckpointInfo() (*PodResourceCheckpointInfo, error) {
+	var data PodResourceCheckpointInfo
 	if err := json.Unmarshal([]byte(cp.Data), &data); err != nil {
 		return nil, err
 	}
