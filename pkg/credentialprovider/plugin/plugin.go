@@ -73,6 +73,12 @@ var (
 	}
 )
 
+// GetServiceAccountFunc is a function type that returns a service account token for the given namespace and name.
+type GetServiceAccountFunc func(namespace, name string) (*v1.ServiceAccount, error)
+
+// getServiceAccountTokenFunc is a function type that returns a service account token for the given namespace and name.
+type getServiceAccountTokenFunc func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+
 func init() {
 	install.Install(scheme)
 	kubeletconfig.AddToScheme(scheme)
@@ -84,8 +90,8 @@ func init() {
 // RegisterCredentialProviderPlugins is called from kubelet to register external credential provider
 // plugins according to the CredentialProviderConfig config file.
 func RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir string,
-	getServiceAccountToken func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error),
-	getServiceAccount func(namespace, name string) (*v1.ServiceAccount, error),
+	getServiceAccountToken getServiceAccountTokenFunc,
+	getServiceAccount GetServiceAccountFunc,
 ) error {
 	if _, err := os.Stat(pluginBinDir); err != nil {
 		if os.IsNotExist(err) {
@@ -133,8 +139,8 @@ func RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir string,
 
 // newPluginProvider returns a new pluginProvider based on the credential provider config.
 func newPluginProvider(pluginBinDir string, provider kubeletconfig.CredentialProvider,
-	getServiceAccountToken func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error),
-	getServiceAccount func(namespace, name string) (*v1.ServiceAccount, error),
+	getServiceAccountToken getServiceAccountTokenFunc,
+	getServiceAccount GetServiceAccountFunc,
 ) (*pluginProvider, error) {
 	mediaType := "application/json"
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
@@ -200,16 +206,16 @@ type pluginProvider struct {
 type serviceAccountProvider struct {
 	audience                             string
 	requireServiceAccount                bool
-	getServiceAccountFunc                func(namespace, name string) (*v1.ServiceAccount, error)
-	getServiceAccountTokenFunc           func(podNamespace, serviceAccountName string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	getServiceAccountFunc                GetServiceAccountFunc
+	getServiceAccountTokenFunc           getServiceAccountTokenFunc
 	requiredServiceAccountAnnotationKeys []string
 	optionalServiceAccountAnnotationKeys []string
 }
 
 func newServiceAccountProvider(
 	provider kubeletconfig.CredentialProvider,
-	getServiceAccount func(namespace, name string) (*v1.ServiceAccount, error),
-	getServiceAccountToken func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error),
+	getServiceAccount GetServiceAccountFunc,
+	getServiceAccountToken getServiceAccountTokenFunc,
 ) *serviceAccountProvider {
 	featureGateEnabled := utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders)
 	serviceAccountTokenAudienceSet := provider.TokenAttributes != nil && len(provider.TokenAttributes.ServiceAccountTokenAudience) > 0
