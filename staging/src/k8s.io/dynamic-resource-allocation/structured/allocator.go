@@ -1156,7 +1156,7 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(result []internalDeviceResult, nodename string) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult, nodeName string) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	ns := &v1.NodeSelector{
@@ -1196,7 +1196,7 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult, nodena
 						MatchFields: []v1.NodeSelectorRequirement{{
 							Key:      "metadata.name",
 							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{nodename},
+							Values:   []string{nodeName},
 						}},
 					}},
 				}, nil
