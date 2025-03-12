@@ -2825,14 +2825,23 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 	}
 }
 
-func TestSetDefaultLimitRangeItem(t *testing.T) {
+func TestSetDefaultLimitRangeContainer(t *testing.T) {
+	testSetDefaultLimitRange(t, v1.LimitTypeContainer)
+}
+
+func TestSetDefaultLimitRangePod(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	testSetDefaultLimitRange(t, v1.LimitTypePod)
+}
+
+func testSetDefaultLimitRange(t *testing.T, limitType v1.LimitType) {
 	limitRange := &v1.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-defaults",
 		},
 		Spec: v1.LimitRangeSpec{
 			Limits: []v1.LimitRangeItem{{
-				Type: v1.LimitTypeContainer,
+				Type: limitType,
 				Max: v1.ResourceList{
 					v1.ResourceCPU: resource.MustParse("100m"),
 				},

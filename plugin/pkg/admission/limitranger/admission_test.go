@@ -104,7 +104,7 @@ func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRe
 	return externalLimitRange
 }
 
-func validLimitRange() corev1.LimitRange {
+func validLimitRange(addPodDefaults bool) corev1.LimitRange {
 	internalLimitRange := api.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
@@ -112,11 +112,6 @@ func validLimitRange() corev1.LimitRange {
 		},
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
-				{
-					Type: api.LimitTypePod,
-					Max:  getComputeResourceList("200m", "4Gi"),
-					Min:  getComputeResourceList("50m", "2Mi"),
-				},
 				{
 					Type:           api.LimitTypeContainer,
 					Max:            getComputeResourceList("100m", "2Gi"),
@@ -127,6 +122,20 @@ func validLimitRange() corev1.LimitRange {
 			},
 		},
 	}
+
+	podLimitRange := api.LimitRangeItem{
+		Type: api.LimitTypePod,
+		Max:  getComputeResourceList("200m", "4Gi"),
+		Min:  getComputeResourceList("50m", "2Mi"),
+	}
+
+	if addPodDefaults {
+		podLimitRange.Default = getComputeResourceList("180m", "3Gi")
+		podLimitRange.DefaultRequest = getComputeResourceList("50m", "2Mi")
+	}
+
+	internalLimitRange.Spec.Limits = append(internalLimitRange.Spec.Limits, podLimitRange)
+
 	externalLimitRange := corev1.LimitRange{}
 	v1.Convert_core_LimitRange_To_v1_LimitRange(&internalLimitRange, &externalLimitRange, nil)
 	return externalLimitRange
@@ -170,7 +179,7 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 		Spec:       api.PodSpec{},
 	}
 	pod.Spec.Containers = make([]api.Container, 0, numContainers)
-	for i := 0; i < numContainers; i++ {
+	for i := range numContainers {
 		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
 			Image:     "foo:V" + strconv.Itoa(i),
 			Resources: resources,
@@ -181,7 +190,7 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 }
 
 func validPodInit(pod api.Pod, resources ...api.ResourceRequirements) api.Pod {
-	for i := 0; i < len(resources); i++ {
+	for i := range resources {
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, api.Container{
 			Image:     "foo:V" + strconv.Itoa(i),
 			Resources: resources[i],
@@ -191,8 +200,8 @@ func validPodInit(pod api.Pod, resources ...api.ResourceRequirements) api.Pod {
 	return pod
 }
 
-func TestDefaultContainerResourceRequirements(t *testing.T) {
-	limitRange := validLimitRange()
+func TestDefaultResourceRequirements(t *testing.T) {
+	limitRange := validLimitRange(false)
 	expected := api.ResourceRequirements{
 		Requests: getComputeResourceList("50m", "5Mi"),
 		Limits:   getComputeResourceList("75m", "10Mi"),
@@ -223,24 +232,58 @@ func expectNoAnnotation(t *testing.T, pod *api.Pod) {
 }
 
 func TestMergePodResourceRequirements(t *testing.T) {
-	limitRange := validLimitRange()
+	testMergePodResourceRequirements(t, false)
+}
+
+func TestMergePodResourceRequirementsPodLevelResources(t *testing.T) {
+	testMergePodResourceRequirements(t, true)
+}
+
+func testMergePodResourceRequirements(t *testing.T, podLevelResourcesEnabled bool) {
+	limitRange := validLimitRange(podLevelResourcesEnabled)
 
 	// pod with no resources enumerated should get each resource from default request
 	expected := getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("", ""))
+	expectedPod := getResourceRequirements(getComputeResourceList("50m", "2Mi"), getComputeResourceList("180m", "3Gi"))
+
 	pod := validPod("empty-resources", 1, expected)
-	defaultRequirements := defaultResourceRequirements(&limitRange, false)
-	mergePodResourceRequirements(&pod, defaultRequirements, false)
+
+	if podLevelResourcesEnabled {
+		pod = validPodWithPodLevelResources("empty-resources", 1, expected, getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("", "")))
+	}
+
+	defaultRequirements := defaultResourceRequirements(&limitRange, podLevelResourcesEnabled)
+	mergePodResourceRequirements(&pod, defaultRequirements, podLevelResourcesEnabled)
+	if podLevelResourcesEnabled {
+		actual := *pod.Spec.Resources
+		if !apiequality.Semantic.DeepEqual(expectedPod, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expectedPod, actual)
+		}
+	}
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
-	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu, memory request for container foo-0; cpu, memory limit for container foo-0")
+
+	var expectedMsg string
+	if podLevelResourcesEnabled {
+		expectedMsg = "LimitRanger plugin set: cpu, memory request for pod empty-resources; cpu, memory limit for pod empty-resources; cpu, memory request for container foo-0; cpu, memory limit for container foo-0"
+	} else {
+		expectedMsg = "LimitRanger plugin set: cpu, memory request for container foo-0; cpu, memory limit for container foo-0"
+	}
+	verifyAnnotation(t, &pod, expectedMsg)
 
 	// pod with some resources enumerated should only merge empty
 	input := getResourceRequirements(getComputeResourceList("", "512Mi"), getComputeResourceList("", ""))
+	inputPod := getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("200m", "3Gi"))
+
 	pod = validPodInit(validPod("limit-memory", 1, input), input)
+	if podLevelResourcesEnabled {
+		pod = validPodWithPodLevelResources("limit-memory", 1, input, inputPod)
+	}
+
 	expected = api.ResourceRequirements{
 		Requests: api.ResourceList{
 			api.ResourceCPU:    defaultRequirements.container.Requests[api.ResourceCPU],
@@ -248,7 +291,22 @@ func TestMergePodResourceRequirements(t *testing.T) {
 		},
 		Limits: defaultRequirements.container.Limits,
 	}
-	mergePodResourceRequirements(&pod, defaultRequirements, false)
+	expectedPod = api.ResourceRequirements{
+		Requests: defaultRequirements.pod.Requests,
+		Limits: api.ResourceList{
+			api.ResourceCPU:    resource.MustParse("200m"),
+			api.ResourceMemory: resource.MustParse("3Gi"),
+		},
+	}
+
+	mergePodResourceRequirements(&pod, defaultRequirements, podLevelResourcesEnabled)
+
+	if podLevelResourcesEnabled {
+		actual := *pod.Spec.Resources
+		if !apiequality.Semantic.DeepEqual(expectedPod, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expectedPod, actual)
+		}
+	}
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
@@ -261,18 +319,35 @@ func TestMergePodResourceRequirements(t *testing.T) {
 			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
 		}
 	}
-	verifyAnnotation(t, &pod, "LimitRanger plugin set: cpu request for container foo-0; cpu, memory limit for container foo-0")
+
+	if podLevelResourcesEnabled {
+		expectedMsg = "LimitRanger plugin set: cpu, memory request for pod limit-memory; cpu request for container foo-0; cpu, memory limit for container foo-0"
+	} else {
+		expectedMsg = "LimitRanger plugin set: cpu request for container foo-0; cpu, memory limit for container foo-0"
+	}
+	verifyAnnotation(t, &pod, expectedMsg)
 
 	// pod with all resources enumerated should not merge anything
 	input = getResourceRequirements(getComputeResourceList("100m", "512Mi"), getComputeResourceList("200m", "1G"))
+	inputPod = getResourceRequirements(getComputeResourceList("150m", "1Gi"), getComputeResourceList("200m", "3Gi"))
 	initInputs := []api.ResourceRequirements{getResourceRequirements(getComputeResourceList("200m", "1G"), getComputeResourceList("400m", "2G"))}
+
 	pod = validPodInit(validPod("limit-memory", 1, input), initInputs...)
-	expected = input
-	mergePodResourceRequirements(&pod, defaultRequirements, false)
+	if podLevelResourcesEnabled {
+		pod = validPodWithPodLevelResources("limit-memory", 1, input, inputPod)
+	}
+
+	mergePodResourceRequirements(&pod, defaultRequirements, podLevelResourcesEnabled)
+	if podLevelResourcesEnabled {
+		actual := *pod.Spec.Resources
+		if !apiequality.Semantic.DeepEqual(inputPod, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, inputPod, actual)
+		}
+	}
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
-		if !apiequality.Semantic.DeepEqual(expected, actual) {
-			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
+		if !apiequality.Semantic.DeepEqual(input, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, input, actual)
 		}
 	}
 	for i := range pod.Spec.InitContainers {
@@ -732,53 +807,56 @@ func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {
 }
 
 func TestPodLimitFuncApplyDefault(t *testing.T) {
-	limitRange := validLimitRange()
+	testPodLimitFuncApplyDefault(t, false)
+}
+
+func TestPodLimitFuncApplyDefaultPodLevelResources(t *testing.T) {
+	testPodLimitFuncApplyDefault(t, true)
+}
+
+func testPodLimitFuncApplyDefault(t *testing.T, podLevelResourcesEnabled bool) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, podLevelResourcesEnabled)
+
+	limitRange := validLimitRange(podLevelResourcesEnabled)
 	testPod := validPodInit(validPod("foo", 1, getResourceRequirements(api.ResourceList{}, api.ResourceList{})), getResourceRequirements(api.ResourceList{}, api.ResourceList{}))
 	err := PodMutateLimitFunc(&limitRange, &testPod)
 	if err != nil {
 		t.Errorf("Unexpected error for valid pod: %s, %v", testPod.Name, err)
 	}
 
-	for i := range testPod.Spec.Containers {
-		container := testPod.Spec.Containers[i]
-		limitMemory := container.Resources.Limits.Memory().String()
-		limitCPU := container.Resources.Limits.CPU().String()
-		requestMemory := container.Resources.Requests.Memory().String()
-		requestCPU := container.Resources.Requests.CPU().String()
+	if podLevelResourcesEnabled {
+		resources := testPod.Spec.Resources
+		checkLimits(t, "3Gi", "180m", "2Mi", "50m", *resources)
+	}
 
-		if limitMemory != "10Mi" {
-			t.Errorf("Unexpected limit memory value %s", limitMemory)
-		}
-		if limitCPU != "75m" {
-			t.Errorf("Unexpected limit cpu value %s", limitCPU)
-		}
-		if requestMemory != "5Mi" {
-			t.Errorf("Unexpected request memory value %s", requestMemory)
-		}
-		if requestCPU != "50m" {
-			t.Errorf("Unexpected request cpu value %s", requestCPU)
-		}
+	for i := range testPod.Spec.Containers {
+		resources := testPod.Spec.Containers[i].Resources
+		checkLimits(t, "10Mi", "75m", "5Mi", "50m", resources)
 	}
 
 	for i := range testPod.Spec.InitContainers {
-		container := testPod.Spec.InitContainers[i]
-		limitMemory := container.Resources.Limits.Memory().String()
-		limitCPU := container.Resources.Limits.CPU().String()
-		requestMemory := container.Resources.Requests.Memory().String()
-		requestCPU := container.Resources.Requests.CPU().String()
+		resources := testPod.Spec.InitContainers[i].Resources
+		checkLimits(t, "10Mi", "75m", "5Mi", "50m", resources)
+	}
+}
 
-		if limitMemory != "10Mi" {
-			t.Errorf("Unexpected limit memory value %s", limitMemory)
-		}
-		if limitCPU != "75m" {
-			t.Errorf("Unexpected limit cpu value %s", limitCPU)
-		}
-		if requestMemory != "5Mi" {
-			t.Errorf("Unexpected request memory value %s", requestMemory)
-		}
-		if requestCPU != "50m" {
-			t.Errorf("Unexpected request cpu value %s", requestCPU)
-		}
+func checkLimits(t *testing.T, expectedLimitMemory string, expectedLimitCPU string, expectedRequestMemory string, expectedRequestCPU string, resources api.ResourceRequirements) {
+	limitMemory := resources.Limits.Memory().String()
+	limitCPU := resources.Limits.CPU().String()
+	requestMemory := resources.Requests.Memory().String()
+	requestCPU := resources.Requests.CPU().String()
+
+	if limitMemory != expectedLimitMemory {
+		t.Errorf("Unexpected limit memory value %s", limitMemory)
+	}
+	if limitCPU != expectedLimitCPU {
+		t.Errorf("Unexpected limit cpu value %s", limitCPU)
+	}
+	if requestMemory != expectedRequestMemory {
+		t.Errorf("Unexpected request memory value %s", requestMemory)
+	}
+	if requestCPU != expectedRequestCPU {
+		t.Errorf("Unexpected request cpu value %s", requestCPU)
 	}
 }
 
