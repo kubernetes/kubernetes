@@ -25,8 +25,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/klog/v2"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 
@@ -2328,7 +2326,7 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
+			logger.Info("TestAllocateAndAddPodWithInitContainers", "name", testCase.description)
 			mgr := &manager{
 				policy:       returnPolicyByName(tCtx, testCase),
 				state:        state.NewMemoryState(),

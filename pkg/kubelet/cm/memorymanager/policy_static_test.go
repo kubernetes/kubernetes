@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/klog/v2"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/go-cmp/cmp"
 
@@ -2736,7 +2734,7 @@ func TestStaticPolicyAllocateWithInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestStaticPolicyAllocateWithInitContainers", "name", testCase.description)
+			logger.Info("TestStaticPolicyAllocateWithInitContainers", "name", testCase.description)
 			p, s, err := initTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
@@ -3070,7 +3068,7 @@ func TestStaticPolicyAllocateWithRestartableInitContainers(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			klog.InfoS("TestStaticPolicyAllocateWithRestartableInitContainers", "name", testCase.description)
+			logger.Info("TestStaticPolicyAllocateWithRestartableInitContainers", "name", testCase.description)
 			p, s, err := initTests(t, &testCase, testCase.topologyHint, testCase.initContainersReusableMemory)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
