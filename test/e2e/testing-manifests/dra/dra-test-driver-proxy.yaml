@@ -46,29 +46,21 @@ spec:
             topologyKey: kubernetes.io/hostname
 
       containers:
-        - name: registrar
+        - name: pause
           image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
-          args:
-            - "--v=5"
-            - "--endpoint=/var/lib/kubelet/plugins_registry/test-driver.dra.k8s.io-reg.sock"
-            - "--proxy-endpoint=tcp://:9000"
-          volumeMounts:
-            - mountPath: /var/lib/kubelet/plugins_registry
-              name: registration-dir
-
-        - name: plugin
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
-          args:
-            - "--v=5"
-            - "--endpoint=/var/lib/kubelet/plugins/test-driver.dra.k8s.io/dra.sock"
-            - "--proxy-endpoint=tcp://:9001"
-          securityContext:
-            privileged: true
+          command:
+            - /bin/sh
+            - -c
+            - while true; do sleep 10000; done
           volumeMounts:
             - mountPath: /var/lib/kubelet/plugins/test-driver.dra.k8s.io
               name: socket-dir
+            - mountPath: /var/lib/kubelet/plugins_registry
+              name: registration-dir
             - mountPath: /cdi
               name: cdi-dir
+          securityContext:
+            privileged: true
 
       volumes:
         - hostPath:
@@ -79,10 +71,10 @@ spec:
             type: DirectoryOrCreate
           name: socket-dir
         - hostPath:
-            path: /var/run/cdi
-            type: DirectoryOrCreate
-          name: cdi-dir
-        - hostPath:
             path: /var/lib/kubelet/plugins_registry
             type: DirectoryOrCreate
           name: registration-dir
+        - hostPath:
+            path: /var/run/cdi
+            type: DirectoryOrCreate
+          name: cdi-dir

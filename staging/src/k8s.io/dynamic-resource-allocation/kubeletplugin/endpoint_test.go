@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/klog/v2/ktesting"
 )
 
 func TestEndpointLifecycle(t *testing.T) {
