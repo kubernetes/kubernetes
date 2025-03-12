@@ -113,6 +113,52 @@ message BasicDevice {
   //
   // +optional
   map<string, DeviceCapacity> capacity = 2;
+
+  // consumesCapacity defines a list of references to capacity
+  // pools and the set of capacities that the device will
+  // consume from those pools.
+  //
+  // The capacities can be defined by listing
+  // the capacities directly.
+  //
+  // There can only be a single entry per capacity pool.
+  //
+  // The maximum number of device capacity consumption entries
+  // is 32. This is the same as the maximum number of capacity
+  // pools allowed in a ResourceSlice.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceCapacityConsumption consumesCapacity = 3;
+
+  // NodeName identifies the node where the device is available.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional string nodeName = 4;
+
+  // NodeSelector defines the nodes where the device is available.
+  //
+  // Must use exactly one term.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 5;
+
+  // AllNodes indicates that all nodes have access to the device.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional bool allNodes = 6;
 }
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
@@ -170,6 +216,34 @@ message CELDeviceSelector {
   //
   // +required
   optional string expression = 1;
+}
+
+// CapacityPool defines a named pool of capacities
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The capacities are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the capacity it uses will no longer be available for use
+// by other devices.
+message CapacityPool {
+  // Name defines the name of the capacity pool.
+  // It must be a DNS label.
+  //
+  // +required
+  optional string name = 1;
+
+  // capacity defines the set of capacities for this capacity pool
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // The maximum number of capacities is 32.
+  //
+  // +required
+  map<string, DeviceCapacity> capacity = 2;
 }
 
 // Device represents one individual hardware instance that can be selected based
@@ -266,6 +340,25 @@ message DeviceCapacity {
   //
   // +required
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
+}
+
+// DeviceCapacityConsumption defines a set of capacities that
+// a device will consume from a capacity pool.
+message DeviceCapacityConsumption {
+  // capacityPool defines the capacity pool from which the
+  // capacities defined
+  // will be consumed from.
+  //
+  // +required
+  optional string capacityPool = 1;
+
+  // capacity defines the capacity that will be consumed by
+  // the device.
+  //
+  // The maximum number of capacities is 32.
+  //
+  // +optional
+  map<string, DeviceCapacity> capacity = 2;
 }
 
 // DeviceClaim defines how to request devices with a ResourceClaim.
@@ -1015,5 +1108,28 @@ message ResourceSliceSpec {
   // +optional
   // +listType=atomic
   repeated Device devices = 6;
+
+  // perDeviceNodeSelection defines whether the access from nodes to
+  // resources in the pool is set on the ResourceSlice level or on each
+  // device. If it is set to true, every device defined the ResourceSlice
+  // must specify this individually.
+  //
+  // Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
+  // must be set.
+  //
+  // +optional
+  // +oneOf=NodeSelection
+  optional bool perDeviceNodeSelection = 7;
+
+  // capacityPools defines a list of capacity pools, each of which
+  // has a name and a list of capacities available in the pool.
+  //
+  // The names of the pools must be unique in the ResourceSlice.
+  //
+  // The maximum number of pools is 32.
+  //
+  // +optional
+  // +listType=atomic
+  repeated CapacityPool capacityPools = 8;
 }
 

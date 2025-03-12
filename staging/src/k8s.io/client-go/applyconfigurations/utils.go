@@ -1608,6 +1608,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.AllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("BasicDevice"):
 		return &resourcev1alpha3.BasicDeviceApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("CapacityPool"):
+		return &resourcev1alpha3.CapacityPoolApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &resourcev1alpha3.CELDeviceSelectorApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("Device"):
@@ -1618,6 +1620,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceAllocationResultApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAttribute"):
 		return &resourcev1alpha3.DeviceAttributeApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceCapacity"):
+		return &resourcev1alpha3.DeviceCapacityApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceCapacityConsumption"):
+		return &resourcev1alpha3.DeviceCapacityConsumptionApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaim"):
 		return &resourcev1alpha3.DeviceClaimApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceClaimConfiguration"):
@@ -1670,6 +1676,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.AllocationResultApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("BasicDevice"):
 		return &applyconfigurationsresourcev1beta1.BasicDeviceApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CapacityPool"):
+		return &applyconfigurationsresourcev1beta1.CapacityPoolApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("CELDeviceSelector"):
 		return &applyconfigurationsresourcev1beta1.CELDeviceSelectorApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Device"):
@@ -1682,6 +1690,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceAttributeApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceCapacity"):
 		return &applyconfigurationsresourcev1beta1.DeviceCapacityApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceCapacityConsumption"):
+		return &applyconfigurationsresourcev1beta1.DeviceCapacityConsumptionApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceClaim"):
 		return &applyconfigurationsresourcev1beta1.DeviceClaimApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceClaimConfiguration"):
