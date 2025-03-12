@@ -22,18 +22,14 @@ import (
 	"time"
 
 	v1 "k8s.io/api/storage/v1"
-	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
 
-// csiNodeUpdater is a struct that watches for changes to CSIDriver objects and manages
-// the lifecycle of goroutines that periodically update CSINodeDriver.Allocatable
-// information based on the NodeAllocatableUpdatePeriodSeconds setting.
+// csiNodeUpdater watches for changes to CSIDriver objects and manages the lifecycle
+// of per-driver goroutines that periodically update CSINodeDriver.Allocatable information
+// based on the NodeAllocatableUpdatePeriodSeconds setting.
 type csiNodeUpdater struct {
-	// Lister for CSIDriver objects
-	driverLister storagelisters.CSIDriverLister
-
 	// Informer for CSIDriver objects
 	driverInformer cache.SharedIndexInformer
 
@@ -45,22 +41,17 @@ type csiNodeUpdater struct {
 }
 
 // NewCSINodeUpdater creates a new csiNodeUpdater
-func NewCSINodeUpdater(
-	driverLister storagelisters.CSIDriverLister, driverInformer cache.SharedIndexInformer) (*csiNodeUpdater, error) {
-	if driverLister == nil {
-		return nil, fmt.Errorf("driverLister must not be nil")
-	}
+func NewCSINodeUpdater(driverInformer cache.SharedIndexInformer) (*csiNodeUpdater, error) {
 	if driverInformer == nil {
 		return nil, fmt.Errorf("driverInformer must not be nil")
 	}
 	return &csiNodeUpdater{
-		driverLister:   driverLister,
 		driverInformer: driverInformer,
 		driverUpdaters: sync.Map{},
 	}, nil
 }
 
-// Run starts the CSINodeUpdater
+// Run starts the csiNodeUpdater by registering event handlers.
 func (u *csiNodeUpdater) Run() {
 	u.once.Do(func() {
 		_, err := u.driverInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -72,21 +63,21 @@ func (u *csiNodeUpdater) Run() {
 			klog.ErrorS(err, "Failed to add event handler for CSI driver informer")
 			return
 		}
-
-		klog.InfoS("CSINodeUpdater initialized successfully")
+		klog.InfoS("csiNodeUpdater initialized successfully")
 	})
 }
 
-// onDriverAdd handles the addition of a new CSIDriver object
+// onDriverAdd handles the addition of a new CSIDriver object.
 func (u *csiNodeUpdater) onDriverAdd(obj interface{}) {
 	driver, ok := obj.(*v1.CSIDriver)
 	if !ok {
 		return
 	}
-	u.startOrReconfigureDriverUpdater(driver)
+	klog.V(4).InfoS("onDriverAdd event", "driver", driver.Name)
+	u.syncDriverUpdater(driver.Name)
 }
 
-// onDriverUpdate handles updates to CSIDriver objects
+// onDriverUpdate handles updates to CSIDriver objects.
 func (u *csiNodeUpdater) onDriverUpdate(oldObj, newObj interface{}) {
 	oldDriver, ok := oldObj.(*v1.CSIDriver)
 	if !ok {
@@ -97,66 +88,77 @@ func (u *csiNodeUpdater) onDriverUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	// Check if the relevant field changed
+	// Only reconfigure if the NodeAllocatableUpdatePeriodSeconds field is updated.
 	oldPeriod := getNodeAllocatableUpdatePeriod(oldDriver)
 	newPeriod := getNodeAllocatableUpdatePeriod(newDriver)
-
 	if oldPeriod != newPeriod {
-		klog.InfoS("NodeAllocatableUpdatePeriodSeconds changed", "driver", newDriver.Name, "oldPeriod", oldPeriod, "newPeriod", newPeriod)
-		u.startOrReconfigureDriverUpdater(newDriver)
+		klog.InfoS("NodeAllocatableUpdatePeriodSeconds updated", "driver", newDriver.Name, "oldPeriod", oldPeriod, "newPeriod", newPeriod)
+		u.syncDriverUpdater(newDriver.Name)
 	}
 }
 
-// onDriverDelete handles deletion of CSIDriver objects
+// onDriverDelete handles deletion of CSIDriver objects.
 func (u *csiNodeUpdater) onDriverDelete(obj interface{}) {
 	driver, ok := obj.(*v1.CSIDriver)
 	if !ok {
 		return
 	}
-	u.unregisterDriver(driver.Name)
+	klog.V(4).InfoS("onDriverDelete event", "driver", driver.Name)
+	u.syncDriverUpdater(driver.Name)
 }
 
-// unregisterDriver stops updates for a driver
-func (u *csiNodeUpdater) unregisterDriver(driverName string) {
-	klog.V(4).InfoS("UnregisterDriver called", "driver", driverName)
-
-	if stopCh, exists := u.driverUpdaters.Load(driverName); exists {
-		close(stopCh.(chan struct{}))
-		u.driverUpdaters.Delete(driverName)
-		klog.V(4).InfoS("Stopped updater for driver", "driver", driverName)
-	}
-}
-
-// startOrReconfigureDriverUpdater starts or reconfigures the updater for a driver
-func (u *csiNodeUpdater) startOrReconfigureDriverUpdater(driver *v1.CSIDriver) {
-	period := getNodeAllocatableUpdatePeriod(driver)
-
-	// If the period is 0, disable updates for this driver
-	if period == 0 {
-		klog.InfoS("NodeAllocatableUpdatePeriodSeconds is 0, disabling updates", "driver", driver.Name)
-		u.unregisterDriver(driver.Name)
+// syncDriverUpdater re-evaluates whether the periodic updater for a given driver should run.
+// It is invoked from informer events (Add/Update/Delete) and from plugin registration/deregistration.
+func (u *csiNodeUpdater) syncDriverUpdater(driverName string) {
+	// Check if the CSI plugin is installed on this node.
+	if !isDriverInstalled(driverName) {
+		klog.V(4).InfoS("Driver not installed; stopping csiNodeUpdater", "driver", driverName)
+		u.unregisterDriver(driverName)
 		return
 	}
 
-	// Otherwise, stop any existing updater and start a new one
-	if existingStopCh, exists := u.driverUpdaters.Load(driver.Name); exists {
-		close(existingStopCh.(chan struct{}))
+	// Get the CSIDriver object from the informer cache.
+	obj, exists, err := u.driverInformer.GetStore().GetByKey(driverName)
+	if err != nil {
+		u.unregisterDriver(driverName)
+		klog.ErrorS(err, "Error retrieving CSIDriver from store", "driver", driverName)
+		return
+	}
+	if !exists {
+		klog.InfoS("CSIDriver object not found; stopping csiNodeUpdater", "driver", driverName)
+		u.unregisterDriver(driverName)
+		return
+	}
+	driver, ok := obj.(*v1.CSIDriver)
+	if !ok {
+		return
 	}
 
-	stopCh := make(chan struct{})
-	u.driverUpdaters.Store(driver.Name, stopCh)
+	// Get the update period.
+	period := getNodeAllocatableUpdatePeriod(driver)
+	if period == 0 {
+		klog.InfoS("NodeAllocatableUpdatePeriodSeconds is not configured; disabling updates", "driver", driverName)
+		u.unregisterDriver(driverName)
+		return
+	}
 
-	go u.runPeriodicUpdate(driver.Name, period, stopCh)
-	klog.V(4).InfoS("Started/reconfigured updater for driver", "driver", driver.Name, "period", period)
+	// If an updater is already running, stop it so we can reconfigure.
+	newStopCh := make(chan struct{})
+	prev, loaded := u.driverUpdaters.Swap(driverName, newStopCh)
+	if loaded {
+		close(prev.(chan struct{}))
+	}
+
+	// Start the periodic update goroutine.
+	u.driverUpdaters.Store(driverName, newStopCh)
+	go u.runPeriodicUpdate(driverName, period, newStopCh)
 }
 
-// runPeriodicUpdate runs the periodic update loop for a driver
+// runPeriodicUpdate runs the periodic update loop for a driver.
 func (u *csiNodeUpdater) runPeriodicUpdate(driverName string, period time.Duration, stopCh <-chan struct{}) {
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
-
-	klog.V(4).InfoS("Starting CSINode periodic updates", "driver", driverName, "period", period)
-
+	klog.InfoS("Starting periodic updates for driver", "driver", driverName, "period", period)
 	for {
 		select {
 		case <-ticker.C:
@@ -164,8 +166,31 @@ func (u *csiNodeUpdater) runPeriodicUpdate(driverName string, period time.Durati
 				klog.ErrorS(err, "Failed to update CSIDriver", "driver", driverName)
 			}
 		case <-stopCh:
-			klog.V(4).InfoS("Stopping periodic updates", "driver", driverName)
+			klog.InfoS("Stopping periodic updates for driver", "driver", driverName, "period", period)
 			return
 		}
 	}
+}
+
+// unregisterDriver stops any running periodic update goroutine for the given driver.
+func (u *csiNodeUpdater) unregisterDriver(driverName string) {
+	prev, loaded := u.driverUpdaters.Swap(driverName, nil)
+	if loaded {
+		close(prev.(chan struct{}))
+		u.driverUpdaters.Delete(driverName)
+	}
+}
+
+// isDriverInstalled checks if the CSI driver is installed on the node by checking the global csiDrivers map
+func isDriverInstalled(driverName string) bool {
+	_, ok := csiDrivers.Get(driverName)
+	return ok
+}
+
+// getNodeAllocatableUpdatePeriod returns the NodeAllocatableUpdatePeriodSeconds value from the CSIDriver
+func getNodeAllocatableUpdatePeriod(driver *v1.CSIDriver) time.Duration {
+	if driver == nil || driver.Spec.NodeAllocatableUpdatePeriodSeconds == nil {
+		return 0
+	}
+	return time.Duration(*driver.Spec.NodeAllocatableUpdatePeriodSeconds) * time.Second
 }

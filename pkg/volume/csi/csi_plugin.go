@@ -64,6 +64,7 @@ const (
 
 type csiPlugin struct {
 	host                      volume.VolumeHost
+	csiNodeUpdater            *csiNodeUpdater
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriverInformer         cache.SharedIndexInformer
 	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
@@ -159,14 +160,11 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	return nil
-}
-
-func getNodeAllocatableUpdatePeriod(driver *storage.CSIDriver) time.Duration {
-	if driver == nil || driver.Spec.NodeAllocatableUpdatePeriodSeconds == nil {
-		return 0
+	if h.csiPlugin.csiNodeUpdater != nil {
+		h.csiPlugin.csiNodeUpdater.syncDriverUpdater(pluginName)
 	}
-	return time.Duration(*driver.Spec.NodeAllocatableUpdatePeriodSeconds) * time.Second
+
+	return nil
 }
 
 func updateCSIDriver(pluginName string) error {
@@ -270,6 +268,10 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	if err := unregisterDriver(pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
 	}
+
+	if h.csiPlugin.csiNodeUpdater != nil {
+		h.csiPlugin.csiNodeUpdater.syncDriverUpdater(pluginName)
+	}
 }
 
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
@@ -352,11 +354,12 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 		if p.csiDriverLister != nil && p.csiDriverInformer != nil {
-			csiNodeUpdater, err := NewCSINodeUpdater(p.csiDriverLister, p.csiDriverInformer)
+			csiNodeUpdater, err := NewCSINodeUpdater(p.csiDriverInformer)
 			if err != nil {
 				klog.ErrorS(err, "Failed to create CSINodeUpdater")
 			} else {
-				go csiNodeUpdater.Run()
+				p.csiNodeUpdater = csiNodeUpdater
+				go p.csiNodeUpdater.Run()
 			}
 		}
 	}
