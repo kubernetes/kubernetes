@@ -1388,6 +1388,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: StrictIPCIDRValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: StructuredAuthenticationConfiguration
   versionedSpecs:
   - default: false

@@ -9737,6 +9737,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		dnsConfig     *core.PodDNSConfig
 		dnsPolicy     *core.DNSPolicy
 		opts          PodValidationOptions
+		legacyIPs     bool
 		expectedError bool
 	}{{
 		desc:          "valid: empty DNSConfig",
@@ -9932,6 +9933,19 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		},
 		expectedError: true,
 	}, {
+		desc: "valid legacy IP nameserver with legacy IP validation",
+		dnsConfig: &core.PodDNSConfig{
+			Nameservers: []string{"001.002.003.004"},
+		},
+		legacyIPs:     true,
+		expectedError: false,
+	}, {
+		desc: "invalid legacy IP nameserver with strict IP validation",
+		dnsConfig: &core.PodDNSConfig{
+			Nameservers: []string{"001.002.003.004"},
+		},
+		expectedError: true,
+	}, {
 		desc: "invalid empty option name",
 		dnsConfig: &core.PodDNSConfig{
 			Options: []core.PodDNSConfigOption{
@@ -9950,16 +9964,20 @@ func TestValidatePodDNSConfig(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if tc.dnsPolicy == nil {
-			tc.dnsPolicy = &testDNSClusterFirst
-		}
+		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 
-		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
-		if len(errs) != 0 && !tc.expectedError {
-			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
-		} else if len(errs) == 0 && tc.expectedError {
-			t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
-		}
+			if tc.dnsPolicy == nil {
+				tc.dnsPolicy = &testDNSClusterFirst
+			}
+
+			errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
+			if len(errs) != 0 && !tc.expectedError {
+				t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
+			} else if len(errs) == 0 && tc.expectedError {
+				t.Errorf("%v: validatePodDNSConfig(%v) = nil, want error", tc.desc, tc.dnsConfig)
+			}
+		})
 	}
 }
 
@@ -10189,6 +10207,24 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 	for k, v := range successCases {
 		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			opts := PodValidationOptions{
+				ResourceIsPod: true,
+			}
+			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	legacyValidationCases := map[string]*core.Pod{
+		"populate HostAliases with legacy IP with legacy validation": podtest.MakePod("",
+			podtest.SetHostAliases(core.HostAlias{IP: "012.034.056.078", Hostnames: []string{"host1", "host2"}}),
+		),
+	}
+	for k, v := range legacyValidationCases {
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			opts := PodValidationOptions{
 				ResourceIsPod: true,
 			}
@@ -10233,6 +10269,12 @@ func TestValidatePodSpec(t *testing.T) {
 				HostNetwork: false,
 			}),
 			podtest.SetHostAliases(core.HostAlias{IP: "999.999.999.999", Hostnames: []string{"host1", "host2"}}),
+		),
+		"with hostAliases with invalid legacy IP with strict IP validation": *podtest.MakePod("",
+			podtest.SetSecurityContext(&core.PodSecurityContext{
+				HostNetwork: false,
+			}),
+			podtest.SetHostAliases(core.HostAlias{IP: "001.002.003.004", Hostnames: []string{"host1", "host2"}}),
 		),
 		"with hostAliases with invalid hostname": *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
@@ -10303,12 +10345,15 @@ func TestValidatePodSpec(t *testing.T) {
 		),
 	}
 	for k, v := range failureCases {
-		opts := PodValidationOptions{
-			ResourceIsPod: true,
-		}
-		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
-			t.Errorf("expected failure for %q", k)
-		}
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			opts := PodValidationOptions{
+				ResourceIsPod: true,
+			}
+			if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), opts); len(errs) == 0 {
+				t.Errorf("expected failure")
+			}
+		})
 	}
 }
 
@@ -15113,7 +15158,17 @@ func TestValidateServiceCreate(t *testing.T) {
 		tweakSvc     func(svc *core.Service) // given a basic valid service, each test case can customize it
 		numErrs      int
 		featureGates []featuregate.Feature
+		legacyIPs    bool
 	}{{
+		name:     "default",
+		tweakSvc: func(s *core.Service) {},
+		numErrs:  0,
+	}, {
+		name:      "default, with legacy IP validation",
+		tweakSvc:  func(s *core.Service) {},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
 		name: "missing namespace",
 		tweakSvc: func(s *core.Service) {
 			s.Namespace = ""
@@ -15250,6 +15305,21 @@ func TestValidateServiceCreate(t *testing.T) {
 		},
 		numErrs: 1,
 	}, {
+		name: "valid legacy cluster ip with legacy validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ClusterIP = "001.002.003.004"
+			s.Spec.ClusterIPs = []string{"001.002.003.004"}
+		},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
+		name: "invalid legacy cluster ip with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ClusterIP = "001.002.003.004"
+			s.Spec.ClusterIPs = []string{"001.002.003.004"}
+		},
+		numErrs: 1,
+	}, {
 		name: "missing port",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.Ports[0].Port = 0
@@ -15301,35 +15371,50 @@ func TestValidateServiceCreate(t *testing.T) {
 		// numErrs: 1,
 		numErrs: 0,
 	}, {
-		name: "invalid publicIPs localhost",
+		name: "invalid externalIPs localhost",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs unspecified",
+		name: "invalid externalIPs unspecified",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"0.0.0.0"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs loopback",
+		name: "invalid externalIPs loopback",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"127.0.0.1"}
 		},
 		numErrs: 1,
 	}, {
-		name: "invalid publicIPs host",
+		name: "invalid externalIPs host",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"myhost.mydomain"}
 		},
 		numErrs: 1,
 	}, {
-		name: "valid publicIPs",
+		name: "valid legacy externalIPs with legacy validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.ExternalIPs = []string{"001.002.003.004"}
+		},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
+		name: "invalid legacy externalIPs with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.ExternalIPs = []string{"001.002.003.004"}
+		},
+		numErrs: 1,
+	}, {
+		name: "valid externalIPs",
 		tweakSvc: func(s *core.Service) {
 			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
 			s.Spec.ExternalIPs = []string{"1.2.3.4"}
@@ -15637,6 +15722,34 @@ func TestValidateServiceCreate(t *testing.T) {
 		name: "invalid empty-but-set LoadBalancer source range annotation for non LoadBalancer type service",
 		tweakSvc: func(s *core.Service) {
 			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = ""
+		},
+		numErrs: 1,
+	}, {
+		name: "valid legacy LoadBalancer source range with legacy validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+			s.Spec.LoadBalancerSourceRanges = []string{"001.002.003.000/24"}
+		},
+		legacyIPs: true,
+		numErrs:   0,
+	}, {
+		name: "invalid legacy LoadBalancer source range with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+			s.Spec.LoadBalancerSourceRanges = []string{"001.002.003.000/24"}
+		},
+		numErrs: 1,
+	}, {
+		name: "invalid legacy LoadBalancer source range annotation with strict validation",
+		tweakSvc: func(s *core.Service) {
+			s.Spec.Type = core.ServiceTypeLoadBalancer
+			s.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+			s.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+			s.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "001.002.003.000/24"
 		},
 		numErrs: 1,
 	}, {
@@ -16313,6 +16426,7 @@ func TestValidateServiceCreate(t *testing.T) {
 			for i := range tc.featureGates {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, tc.featureGates[i], true)
 			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
 			errs := ValidateServiceCreate(&svc)
@@ -16988,9 +17102,40 @@ func TestValidateNode(t *testing.T) {
 	},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateNode(&successCase); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
-		}
+		t.Run("", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			if errs := ValidateNode(&successCase); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
+	}
+
+	legacyValidationCases := map[string]core.Node{
+		"valid-legacy-pod-cidr-with-legacy-validation": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "something"},
+				},
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.000.000/16"},
+			},
+		},
+	}
+	for name, legacyCase := range legacyValidationCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
+			if errs := ValidateNode(&legacyCase); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		})
 	}
 
 	errorCases := map[string]core.Node{
@@ -17175,6 +17320,23 @@ func TestValidateNode(t *testing.T) {
 				PodCIDRs: []string{"192.168.0.0"},
 			},
 		},
+		"invalid-legacy-pod-cidr-with-strict-validation": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "something"},
+				},
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.000.000/16"},
+			},
+		},
 		"duplicate-pod-cidr": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "abc",
@@ -17194,30 +17356,34 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateNode(&v)
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		}
-		for i := range errs {
-			field := errs[i].Field
-			expectedFields := map[string]bool{
-				"metadata.name":         true,
-				"metadata.labels":       true,
-				"metadata.annotations":  true,
-				"metadata.namespace":    true,
-				"spec.externalID":       true,
-				"spec.taints[0].key":    true,
-				"spec.taints[0].value":  true,
-				"spec.taints[0].effect": true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
-				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
+		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+
+			errs := ValidateNode(&v)
+			if len(errs) == 0 {
+				t.Errorf("expected failure")
 			}
-			if val, ok := expectedFields[field]; ok {
-				if !val {
-					t.Errorf("%s: missing prefix for: %v", k, errs[i])
+			for i := range errs {
+				field := errs[i].Field
+				expectedFields := map[string]bool{
+					"metadata.name":         true,
+					"metadata.labels":       true,
+					"metadata.annotations":  true,
+					"metadata.namespace":    true,
+					"spec.externalID":       true,
+					"spec.taints[0].key":    true,
+					"spec.taints[0].value":  true,
+					"spec.taints[0].effect": true,
+					"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
+					"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
+				}
+				if val, ok := expectedFields[field]; ok {
+					if !val {
+						t.Errorf("missing prefix for: %v", errs[i])
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -18725,10 +18891,212 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+
+		// IP validation ratcheting tests. Note: this is tested for
+		// LoadBalancerStatus in TestValidateLoadBalancerStatus.
+		{
+			name: "pre-existing invalid clusterIP ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid clusterIP ignored when adding clusterIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				oldSvc.Spec.IPFamilyPolicy = &singleStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04", "2001:db8::4"}
+				newSvc.Spec.IPFamilyPolicy = &requireDualStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid clusterIP ignored when removing clusterIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ClusterIP = "1.2.3.04"
+				oldSvc.Spec.ClusterIPs = []string{"1.2.3.04", "2001:db::4"}
+				oldSvc.Spec.IPFamilyPolicy = &requireDualStack
+				oldSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+
+				newSvc.Spec.ClusterIP = "1.2.3.04"
+				newSvc.Spec.ClusterIPs = []string{"1.2.3.04"}
+				newSvc.Spec.IPFamilyPolicy = &singleStack
+				newSvc.Spec.IPFamilies = []core.IPFamily{core.IPv4Protocol}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored when adding externalIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"5.6.7.8", "1.2.3.04"}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid externalIP ignored when removing externalIPs",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"5.6.7.8", "1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid externalIP",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				oldSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.4"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can't add invalid externalIP",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.ExternalIPs = []string{"1.2.3.04"}
+			},
+			numErrs: 1,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when adding source ranges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "010.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "pre-existing invalid loadBalancerSourceRanges ignored when removing source ranges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"1.2.3.0/24", "010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
+			},
+			numErrs: 0,
+		}, {
+			name: "can't add invalid loadBalancerSourceRanges",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"010.0.0.0/8"}
+			},
+			numErrs: 1,
+		}, {
+			name: "pre-existing invalid source ranges ignored when updating other fields",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
+		}, {
+			name: "can fix invalid source ranges annotation",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "10.0.0.0/8"
+			},
+			numErrs: 0,
+		}, {
+			name: "can't modify pre-existing invalid source ranges annotation without fixing it",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				oldSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8"
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
+			},
+			numErrs: 1,
+		}, {
+			name: "can't add invalid source ranges annotation",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.ExternalTrafficPolicy = core.ServiceExternalTrafficPolicyCluster
+				newSvc.Spec.AllocateLoadBalancerNodePorts = ptr.To(true)
+				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+
 			oldSvc := makeValidService()
 			newSvc := makeValidService()
 			tc.tweakSvc(&oldSvc, &newSvc)
@@ -20581,9 +20949,36 @@ func TestValidateEndpointsCreate(t *testing.T) {
 			},
 		},
 	}
-
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
+			errs := ValidateEndpointsCreate(&tc.endpoints)
+			if len(errs) != 0 {
+				t.Errorf("Expected no validation errors, got %v", errs)
+			}
+
+		})
+	}
+
+	legacyValidationCases := map[string]struct {
+		endpoints core.Endpoints
+	}{
+		"legacy IPs with legacy validation": {
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{{
+					Addresses: []core.EndpointAddress{{IP: "010.010.001.001"}, {IP: "10.10.2.2"}},
+					Ports:     []core.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
+				}, {
+					Addresses: []core.EndpointAddress{{IP: "::ffff:10.10.3.3"}},
+					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}, {Name: "b", Port: 76, Protocol: "TCP"}},
+				}},
+			},
+		},
+	}
+	for name, tc := range legacyValidationCases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, false)
 			errs := ValidateEndpointsCreate(&tc.endpoints)
 			if len(errs) != 0 {
 				t.Errorf("Expected no validation errors, got %v", errs)
@@ -20636,6 +21031,18 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
 				Subsets: []core.EndpointSubset{{
 					Addresses: []core.EndpointAddress{{IP: "[2001:0db8:85a3:0042:1000:8a2e:0370:7334]"}},
+					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
+				}},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=ip-sloppy"),
+			},
+		},
+		"invalid legacy IP with strict validation": {
+			endpoints: core.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []core.EndpointSubset{{
+					Addresses: []core.EndpointAddress{{IP: "001.002.003.004"}},
 					Ports:     []core.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
 				}},
 			},
@@ -20724,7 +21131,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
 			},
 		},
 		"Address is link-local": {
@@ -20736,7 +21143,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
 			},
 		},
 		"Address is link-local multicast": {
@@ -20748,7 +21155,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=non-special-ip"),
+				field.Invalid(field.NewPath("subsets[0].addresses[0].ip"), nil, "").WithOrigin("format=endpoint-ip"),
 			},
 		},
 		"Invalid AppProtocol": {
@@ -20767,6 +21174,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, true)
 			errs := ValidateEndpointsCreate(&v.endpoints)
 			// TODO: set .RequireOriginWhenInvalid() once metadata is done
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
@@ -21882,7 +22290,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
 	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
 	// The same ip will now have a different nodeName.
-	errList := ValidateEndpoints(updatedEndpoint)
+	errList := ValidateEndpoints(updatedEndpoint, oldEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
 	if len(errList) != 0 {
 		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
@@ -21892,7 +22300,7 @@ func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 	// Check NodeName DNS validation
 	endpoint := newNodeNameEndpoint("illegal*.nodename")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, nil)
 	if len(errList) == 0 {
 		t.Error("Endpoint should reject invalid NodeName")
 	}
@@ -21900,7 +22308,7 @@ func TestEndpointAddressNodeNameInvalidDNSSubdomain(t *testing.T) {
 
 func TestEndpointAddressNodeNameCanBeAnIPAddress(t *testing.T) {
 	endpoint := newNodeNameEndpoint("10.10.1.1")
-	errList := ValidateEndpoints(endpoint)
+	errList := ValidateEndpoints(endpoint, nil)
 	if len(errList) != 0 {
 		t.Error("Endpoint should accept a NodeName that is an IP address")
 	}
@@ -22824,32 +23232,48 @@ func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod 
 	}
 }
 func TestPodIPsValidation(t *testing.T) {
+	// We test updating every pod in testCases to every other pod in testCases.
+	// expectError is true if we expect an error when updating *to* that pod.
+	// allowNoOpUpdate is true if we expect a no-op update to succeed.
+
 	testCases := []struct {
-		pod         core.Pod
-		expectError bool
-	}{{
-		expectError: false,
-		pod:         makePod("nil-ips", "ns", nil),
-	}, {
-		expectError: false,
-		pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
-	}, {
-		expectError: false,
-		pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
-	}, {
-		expectError: false,
-		pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
-	},
+		pod             core.Pod
+		legacyIPs       bool
+		expectError     bool
+		allowNoOpUpdate bool
+	}{
+		{
+			expectError: false,
+			pod:         makePod("nil-ips", "ns", nil),
+		}, {
+			expectError: false,
+			pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
+		}, {
+			expectError: false,
+			pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		}, {
+			expectError: false,
+			pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		}, {
+			expectError: false,
+			legacyIPs:   true,
+			pod:         makePod("legacy-pod-ip-with-legacy-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
+		},
 		/* failure cases start here */
 		{
-			expectError: true,
-			pod:         makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "this-is-not-an-ip"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "1.1.1.01"}}),
+		}, {
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePod("legacy-pod-ip-with-strict-validation", "ns", []core.PodIP{{IP: "001.002.003.004"}}),
 		}, {
 			expectError: true,
 			pod:         makePod("dualstack-same-ip-family-6", "ns", []core.PodIP{{IP: "::1"}, {IP: "::2"}}),
@@ -22873,9 +23297,14 @@ func TestPodIPsValidation(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			for _, oldTestCase := range testCases {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
+			for j, oldTestCase := range testCases {
+				if oldTestCase.legacyIPs && !testCase.legacyIPs {
+					continue
+				}
+
 				newPod := testCase.pod.DeepCopy()
 				newPod.ResourceVersion = "1"
 
@@ -22885,11 +23314,15 @@ func TestPodIPsValidation(t *testing.T) {
 
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
-				if len(errs) == 0 && testCase.expectError {
-					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				expectError := testCase.expectError
+				if testCase.allowNoOpUpdate && i == j {
+					expectError = false
+				}
+				if len(errs) == 0 && expectError {
+					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
-					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+					t.Fatalf("expected success updating from %s, but there were errors: %v", oldTestCase.pod.Name, errs)
 				}
 			}
 		})
@@ -22920,9 +23353,15 @@ func makePodWithHostIPs(podName string, podNamespace string, hostIPs []core.Host
 }
 
 func TestHostIPsValidation(t *testing.T) {
+	// We test updating every pod in testCases to every other pod in testCases.
+	// expectError is true if we expect an error when updating *to* that pod.
+	// allowNoOpUpdate is true if we expect a no-op update to succeed.
+
 	testCases := []struct {
-		pod         core.Pod
-		expectError bool
+		pod             core.Pod
+		legacyIPs       bool
+		expectError     bool
+		allowNoOpUpdate bool
 	}{
 		{
 			expectError: false,
@@ -22948,10 +23387,21 @@ func TestHostIPsValidation(t *testing.T) {
 			expectError: false,
 			pod:         makePodWithHostIPs("dual-stack-6-4", "ns", []core.HostIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
 		},
+		{
+			expectError: false,
+			legacyIPs:   true,
+			pod:         makePodWithHostIPs("legacy-host-ip-with-legacy-validation", "ns", []core.HostIP{{IP: "001.002.003.004"}}),
+		},
 		/* failure cases start here */
 		{
-			expectError: true,
-			pod:         makePodWithHostIPs("invalid-pod-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePodWithHostIPs("invalid-host-ip", "ns", []core.HostIP{{IP: "this-is-not-an-ip"}}),
+		},
+		{
+			expectError:     true,
+			allowNoOpUpdate: true,
+			pod:             makePodWithHostIPs("invalid-legacy-host-ip-with-strict-validation", "ns", []core.HostIP{{IP: "001.002.003.004"}}),
 		},
 		{
 			expectError: true,
@@ -22980,9 +23430,14 @@ func TestHostIPsValidation(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
+	for i, testCase := range testCases {
 		t.Run(testCase.pod.Name, func(t *testing.T) {
-			for _, oldTestCase := range testCases {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !testCase.legacyIPs)
+			for j, oldTestCase := range testCases {
+				if oldTestCase.legacyIPs && !testCase.legacyIPs {
+					continue
+				}
+
 				newPod := testCase.pod.DeepCopy()
 				newPod.ResourceVersion = "1"
 
@@ -22992,11 +23447,15 @@ func TestHostIPsValidation(t *testing.T) {
 
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
 
-				if len(errs) == 0 && testCase.expectError {
-					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)
+				expectError := testCase.expectError
+				if testCase.allowNoOpUpdate && i == j {
+					expectError = false
+				}
+				if len(errs) == 0 && expectError {
+					t.Fatalf("expected failure updating from %s, but there were none", oldTestCase.pod.Name)
 				}
 				if len(errs) != 0 && !testCase.expectError {
-					t.Fatalf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+					t.Fatalf("expected success updating from %s, but there were errors: %v", oldTestCase.pod.Name, errs)
 				}
 			}
 		})
@@ -23640,7 +24099,7 @@ func TestValidateResourceRequirements(t *testing.T) {
 	}
 }
 
-func TestValidateNonSpecialIP(t *testing.T) {
+func TestValidateEndpointIP(t *testing.T) {
 	fp := field.NewPath("ip")
 
 	// Valid values.
@@ -23651,11 +24110,15 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv4", "10.1.2.3"},
 		{"ipv4 class E", "244.1.2.3"},
 		{"ipv6", "2000::1"},
+
+		// These probably should not have been allowed, but they are
+		{"ipv4 multicast", "239.255.255.253"},
+		{"ipv6 multicast", "ff05::1:3"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := ValidateNonSpecialIP(tc.ip, fp)
+			errs := ValidateEndpointIP(tc.ip, fp)
 			if len(errs) != 0 {
-				t.Errorf("ValidateNonSpecialIP(%q, ...) = %v; want nil", tc.ip, errs)
+				t.Errorf("ValidateEndpointIP(%q, ...) = %v; want nil", tc.ip, errs)
 			}
 		})
 	}
@@ -23669,13 +24132,15 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv4 localhost", "127.0.0.0"},
 		{"ipv4 localhost", "127.255.255.255"},
 		{"ipv6 localhost", "::1"},
+		{"ipv4 link local", "169.254.169.254"},
 		{"ipv6 link local", "fe80::"},
+		{"ipv4 local multicast", "224.0.0.251"},
 		{"ipv6 local multicast", "ff02::"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := ValidateNonSpecialIP(tc.ip, fp)
+			errs := ValidateEndpointIP(tc.ip, fp)
 			if len(errs) == 0 {
-				t.Errorf("ValidateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+				t.Errorf("ValidateEndpointIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
 			}
 		})
 	}
@@ -24542,12 +25007,14 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 	ipModeDummy := core.LoadBalancerIPMode("dummy")
 
 	testCases := []struct {
-		name          string
-		ipModeEnabled bool
-		nonLBAllowed  bool
-		tweakLBStatus func(s *core.LoadBalancerStatus)
-		tweakSvcSpec  func(s *core.ServiceSpec)
-		numErrs       int
+		name             string
+		ipModeEnabled    bool
+		legacyIPs        bool
+		nonLBAllowed     bool
+		tweakOldLBStatus func(s *core.LoadBalancerStatus)
+		tweakLBStatus    func(s *core.LoadBalancerStatus)
+		tweakSvcSpec     func(s *core.ServiceSpec)
+		numErrs          int
 	}{
 		{
 			name:         "type is not LB",
@@ -24630,22 +25097,99 @@ func TestValidateLoadBalancerStatus(t *testing.T) {
 				}}
 			},
 			numErrs: 1,
+		}, {
+			name:          "legacy IP with legacy validation",
+			ipModeEnabled: true,
+			legacyIPs:     true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "001.002.003.004",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name:          "legacy IP with strict validation",
+			ipModeEnabled: true,
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "001.002.003.004",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 1,
+		}, {
+			name: "invalid ingress IP ignored on update",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid ingress IP ignored when adding IP",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}, {
+					IP:     "5.6.7.8",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid ingress IP can be fixed",
+			tweakOldLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.04",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			tweakLBStatus: func(s *core.LoadBalancerStatus) {
+				s.Ingress = []core.LoadBalancerIngress{{
+					IP:     "1.2.3.4",
+					IPMode: &ipModeVIP,
+				}}
+			},
+			numErrs: 0,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if !tc.ipModeEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
+			} else {
+				// (This feature gate doesn't exist in 1.31 so we can't set it
+				// when testing !ipModeEnabled.)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowServiceLBStatusOnNonLB, tc.nonLBAllowed)
+			oldStatus := core.LoadBalancerStatus{}
+			if tc.tweakOldLBStatus != nil {
+				tc.tweakOldLBStatus(&oldStatus)
+			}
 			status := core.LoadBalancerStatus{}
 			tc.tweakLBStatus(&status)
 			spec := core.ServiceSpec{Type: core.ServiceTypeLoadBalancer}
 			if tc.tweakSvcSpec != nil {
 				tc.tweakSvcSpec(&spec)
 			}
-			errs := ValidateLoadBalancerStatus(&status, field.NewPath("status"), &spec)
+			errs := ValidateLoadBalancerStatus(&status, &oldStatus, field.NewPath("status"), &spec)
 			if len(errs) != tc.numErrs {
 				t.Errorf("Unexpected error list for case %q(expected:%v got %v) - Errors:\n %v", tc.name, tc.numErrs, len(errs), errs.ToAggregate())
 			}

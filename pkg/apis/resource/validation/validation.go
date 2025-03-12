@@ -37,7 +37,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -890,25 +889,7 @@ func validateNetworkDeviceData(networkDeviceData *resource.NetworkDeviceData, fl
 
 	allErrs = append(allErrs, validateSet(networkDeviceData.IPs, resource.NetworkDeviceDataMaxIPs,
 		func(address string, fldPath *field.Path) field.ErrorList {
-			// reformat CIDR to handle different ways IPs can be written
-			// (e.g. 2001:db8::1/64 == 2001:0db8::1/64)
-			ip, ipNet, err := netutils.ParseCIDRSloppy(address)
-			if err != nil {
-				// must fail
-				return validation.IsValidCIDR(fldPath, address)
-			}
-			maskSize, _ := ipNet.Mask.Size()
-			canonical := fmt.Sprintf("%s/%d", ip.String(), maskSize)
-			if address != canonical {
-				return field.ErrorList{
-					field.Invalid(fldPath, address, fmt.Sprintf("must be in canonical form (%s)", canonical)),
-				}
-			}
-			return nil
-		},
-		func(address string) (string, string) {
-			return address, ""
-		},
-		fldPath.Child("ips"))...)
+			return validation.IsValidInterfaceAddress(fldPath, address)
+		}, stringKey, fldPath.Child("ips"))...)
 	return allErrs
 }
