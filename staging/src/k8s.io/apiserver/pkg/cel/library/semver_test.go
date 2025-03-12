@@ -31,9 +31,9 @@ import (
 	library "k8s.io/apiserver/pkg/cel/library"
 )
 
-func testSemver(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string) {
+func testSemver(t *testing.T, expr string, expectResult ref.Val, expectRuntimeErrPattern string, expectCompileErrs []string, version uint32) {
 	env, err := cel.NewEnv(
-		library.SemverLib(),
+		library.SemverLib(library.SemverVersion(version)),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -114,6 +114,7 @@ func TestSemver(t *testing.T) {
 		expectValue        ref.Val
 		expectedCompileErr []string
 		expectedRuntimeErr string
+		version            uint32
 	}{
 		{
 			name:        "parse",
@@ -131,14 +132,103 @@ func TestSemver(t *testing.T) {
 			expectValue: trueVal,
 		},
 		{
-			name:        "isSemver_false",
-			expr:        `isSemver("v1.0")`,
+			name:        "isSemver_empty_false",
+			expr:        `isSemver("")`,
 			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_v_prefix_false",
+			expr:        `isSemver("v1.0.0")`,
+			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_v_leading_whitespace_false",
+			expr:        `isSemver(" 1.0.0")`,
+			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_v_contains_whitespace_false",
+			expr:        `isSemver("1. 0.0")`,
+			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_v_trailing_whitespace_false",
+			expr:        `isSemver("1.0.0 ")`,
+			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_leading_zeros_false",
+			expr:        `isSemver("01.01.01")`,
+			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_major_only_false",
+			expr:        `isSemver("1")`,
+			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_major_minor_only_false",
+			expr:        `isSemver("1.1")`,
+			expectValue: falseVal,
+		},
+		{
+			name:        "isSemver_empty_normalize_false",
+			expr:        `isSemver("", true)`,
+			expectValue: falseVal,
+			version:     1,
+		},
+		{
+			name:        "isSemver_v_leading_whitespace_normalize_false",
+			expr:        `isSemver(" 1.0.0", true)`,
+			expectValue: falseVal,
+			version:     1,
+		},
+		{
+			name:        "isSemver_v_contains_whitespace_normalize_false",
+			expr:        `isSemver("1. 0.0", true)`,
+			expectValue: falseVal,
+			version:     1,
+		},
+		{
+			name:        "isSemver_v_trailing_whitespace_normalize_false",
+			expr:        `isSemver("1.0.0 ", true)`,
+			expectValue: falseVal,
+			version:     1,
+		},
+		{
+			name:        "isSemver_v_prefix_normalize_true",
+			expr:        `isSemver("v1.0.0", true)`,
+			expectValue: trueVal,
+			version:     1,
+		},
+		{
+			name:        "isSemver_leading_zeros_normalize_true",
+			expr:        `isSemver("01.01.01", true)`,
+			expectValue: trueVal,
+			version:     1,
+		},
+		{
+			name:        "isSemver_major_only_normalize_true",
+			expr:        `isSemver("1", true)`,
+			expectValue: trueVal,
+			version:     1,
+		},
+		{
+			name:        "isSemver_major_minor_only_normalize_true",
+			expr:        `isSemver("1.1", true)`,
+			expectValue: trueVal,
+			version:     1,
 		},
 		{
 			name:               "isSemver_noOverload",
 			expr:               `isSemver([1, 2, 3])`,
 			expectedCompileErr: []string{"found no matching overload for 'isSemver' applied to.*"},
+		},
+		{
+			name:        "equality_normalize",
+			expr:        `semver("v01.01", true) == semver("1.1.0")`,
+			expectValue: trueVal,
+			version:     1,
 		},
 		{
 			name:        "equality_reflexivity",
@@ -204,7 +294,7 @@ func TestSemver(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			testSemver(t, c.expr, c.expectValue, c.expectedRuntimeErr, c.expectedCompileErr)
+			testSemver(t, c.expr, c.expectValue, c.expectedRuntimeErr, c.expectedCompileErr, c.version)
 		})
 	}
 }
