@@ -20,11 +20,17 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/utils/ptr"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -53,6 +59,7 @@ func TestControllerStrategy(t *testing.T) {
 		Spec: api.ReplicationControllerSpec{
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
+			Replicas: ptr.To[int32](1),
 		},
 		Status: api.ReplicationControllerStatus{
 			Replicas:           1,
@@ -67,6 +74,7 @@ func TestControllerStrategy(t *testing.T) {
 	if rc.Status.ObservedGeneration != int64(0) {
 		t.Error("ReplicationController should not allow setting status.observedGeneration on create")
 	}
+
 	errs := Strategy.Validate(ctx, rc)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
@@ -109,7 +117,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 	oldController := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 3,
+			Replicas: ptr.To[int32](3),
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
 		},
@@ -121,7 +129,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 	newController := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: ptr.To[int32](1),
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
 		},
@@ -134,7 +142,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 	if newController.Status.Replicas != 3 {
 		t.Errorf("Replication controller status updates should allow change of replicas: %v", newController.Status.Replicas)
 	}
-	if newController.Spec.Replicas != 3 {
+	if *newController.Spec.Replicas != 3 {
 		t.Errorf("PrepareForUpdate should have preferred spec")
 	}
 	errs := StatusStrategy.ValidateUpdate(ctx, newController, oldController)
@@ -166,7 +174,7 @@ func TestValidateUpdate(t *testing.T) {
 	oldController := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10", Annotations: make(map[string]string)},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 3,
+			Replicas: ptr.To[int32](3),
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
 		},
@@ -182,7 +190,7 @@ func TestValidateUpdate(t *testing.T) {
 	newController := oldController.DeepCopy()
 
 	// Irrelevant (to the selector) update for the replication controller.
-	newController.Spec.Replicas = 5
+	newController.Spec.Replicas = ptr.To[int32](5)
 
 	// If they didn't try to update the selector then we should not return any error.
 	errs := Strategy.ValidateUpdate(ctx, newController, oldController)
@@ -203,5 +211,254 @@ func TestValidateUpdate(t *testing.T) {
 	}
 	if !strings.Contains(errs[0].Error(), "selector") {
 		t.Fatalf("expected error related to the selector")
+	}
+}
+
+// Helper function for RC tests.
+func mkValidReplicationController(tweaks ...func(rc *api.ReplicationController)) api.ReplicationController {
+	rc := api.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: ptr.To[int32](1),
+			Selector: map[string]string{"a": "b"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+				Spec: podtest.MakePodSpec(),
+			},
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&rc)
+	}
+	return rc
+}
+
+func TestValidateForDeclarative(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "",
+		APIVersion: "v1",
+	})
+	successCases := []api.ReplicationController{
+		mkValidReplicationController(func(rc *api.ReplicationController) {}),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](1) }),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](100) }),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = 0 }),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = 1 }),
+		mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = 100 }),
+	}
+	for _, tc := range successCases {
+		for _, gateVal := range []bool{true, false} {
+			// We only need to test both gate enabled and disabled together, because
+			// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
+			// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
+			errs := Strategy.Validate(ctx, &tc)
+			if len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		}
+	}
+
+	errorCases := map[string]struct {
+		input        api.ReplicationController
+		expectedErrs field.ErrorList
+	}{
+		"negative replicas": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("tightenedMinimum"),
+			},
+		},
+		"negative minReadySeconds": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.MinReadySeconds = -1 }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"nil replicas": {
+			input: mkValidReplicationController(func(rc *api.ReplicationController) { rc.Spec.Replicas = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+	}
+	for k, tc := range errorCases {
+		t.Run(k, func(t *testing.T) {
+			var declarativeTakeoverErrs field.ErrorList
+			var imperativeErrs field.ErrorList
+			for _, gateVal := range []bool{true, false} {
+				// We only need to test both gate enabled and disabled together, because
+				// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
+				// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
+
+				errs := Strategy.Validate(ctx, &tc.input)
+				if gateVal {
+					declarativeTakeoverErrs = errs
+				} else {
+					imperativeErrs = errs
+				}
+				// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
+				errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+				errOutputMatcher.Test(t, tc.expectedErrs, errs)
+			}
+			// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
+			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
+			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
+
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil)
+		})
+	}
+}
+
+func TestValidateUpdateForDeclarative(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "",
+		APIVersion: "v1",
+	})
+
+	successCases := []struct {
+		old    api.ReplicationController
+		update api.ReplicationController
+	}{{
+		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](1)
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](3)
+		}),
+	}, {
+		// ratcheting allows 0 if the previous value was 0
+		old: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](0)
+		}),
+		update: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](0)
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.MinReadySeconds = 0
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *api.ReplicationController) {
+			rc.Spec.MinReadySeconds = 3
+		}),
+	}}
+	for _, tc := range successCases {
+		tc.old.ObjectMeta.ResourceVersion = "1"
+		tc.update.ObjectMeta.ResourceVersion = "1"
+		for _, gateVal := range []bool{true, false} {
+			// We only need to test both gate enabled and disabled together, because
+			// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
+			// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
+			errs := Strategy.ValidateUpdate(ctx, &tc.update, &tc.old)
+			if len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		}
+	}
+
+	errorCases := map[string]struct {
+		old          api.ReplicationController
+		update       api.ReplicationController
+		expectedErrs field.ErrorList
+	}{
+		"negative replicas": {
+			old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = ptr.To[int32](-1)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("tightenedMinimum"),
+			},
+		},
+		"ratcheted": { // ratcheting does not allow 0 if the previous value was not 0
+			old: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = ptr.To[int32](1)
+			}),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = ptr.To[int32](0)
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("tightenedMinimum"),
+			},
+		},
+		"nil replicas": {
+			old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.Replicas = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+
+		"negative minReadySeconds": {
+			old: mkValidReplicationController(func(rc *api.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *api.ReplicationController) {
+				rc.Spec.MinReadySeconds = -1
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
+	}
+	for k, tc := range errorCases {
+		t.Run(k, func(t *testing.T) {
+			tc.old.ObjectMeta.ResourceVersion = "1"
+			tc.update.ObjectMeta.ResourceVersion = "1"
+			var declarativeTakeoverErrs field.ErrorList
+			var imperativeErrs field.ErrorList
+			for _, gateVal := range []bool{true, false} {
+				// We only need to test both gate enabled and disabled together, because
+				// 1) the DeclarativeValidationTakeover won't take effect if DeclarativeValidation is disabled.
+				// 2) the validation output, when only DeclarativeValidation is enabled, is the same as when both gates are disabled.
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidation, gateVal)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeclarativeValidationTakeover, gateVal)
+				errs := Strategy.ValidateUpdate(ctx, &tc.update, &tc.old)
+				if gateVal {
+					declarativeTakeoverErrs = errs
+				} else {
+					imperativeErrs = errs
+				}
+				// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
+				errOutputMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+				errOutputMatcher.Test(t, tc.expectedErrs, errs)
+			}
+			// The equivalenceMatcher is used to verify the output errors from hand-written imperative validation
+			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
+			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			// TODO: remove this once ErrorMatcher has been extended to handle this form of deduplication.
+			dedupedImperativeErrs := field.ErrorList{}
+			for _, err := range imperativeErrs {
+				found := false
+				for _, existingErr := range dedupedImperativeErrs {
+					if equivalenceMatcher.Matches(existingErr, err) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					dedupedImperativeErrs = append(dedupedImperativeErrs, err)
+				}
+			}
+			equivalenceMatcher.Test(t, dedupedImperativeErrs, declarativeTakeoverErrs)
+
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
+		})
 	}
 }

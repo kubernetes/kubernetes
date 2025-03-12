@@ -35,3 +35,20 @@ func Minimum[T constraints.Integer](_ context.Context, _ operation.Operation, fl
 	}
 	return nil
 }
+
+// TightenedMinimum verifies that the specified value is greater than or equal to min.
+func TightenedMinimum[T constraints.Integer](ctx context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, min T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	if oldValue != nil && *oldValue == *value {
+		// value has not changed, skip tightened validation
+		return nil
+	}
+	
+	if *value < min {
+		return field.ErrorList{field.Invalid(fldPath, *value, content.MinError(min)).WithOrigin("tightenedMinimum")}
+	}
+	return nil
+}

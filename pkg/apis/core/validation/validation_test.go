@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	fldtest "k8s.io/apimachinery/pkg/util/validation/field/testing"
 	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -16556,7 +16555,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 		update: core.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: core.ReplicationControllerSpec{
-				Replicas: 3,
+				Replicas: ptr.To[int32](3),
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -16588,7 +16587,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 			update: core.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: ptr.To[int32](2),
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
@@ -16611,7 +16610,7 @@ func mkValidReplicationController(tweaks ...func(rc *core.ReplicationController)
 	rc := core.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: core.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: ptr.To[int32](1),
 			Selector: map[string]string{"a": "b"},
 			Template: &core.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -16634,17 +16633,27 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	}{{
 		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 0
+			rc.Spec.Replicas = ptr.To[int32](0)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 3
+			rc.Spec.Replicas = ptr.To[int32](3)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 2
+			rc.Spec.MinReadySeconds = 0
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.MinReadySeconds = 3
+		}),
+	}, {
+		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+		update: mkValidReplicationController(func(rc *core.ReplicationController) {
+			rc.Spec.Replicas = ptr.To[int32](2)
 			rc.Spec.Template.Spec = podtest.MakePodSpec(
 				podtest.SetVolumes(
 					core.Volume{
@@ -16702,10 +16711,28 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		"negative replicas": {
 			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 			update: mkValidReplicationController(func(rc *core.ReplicationController) {
-				rc.Spec.Replicas = -1
+				rc.Spec.Replicas = ptr.To[int32](-1)
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"nil replicas": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Replicas = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
+			},
+		},
+		"negative minReadySeconds": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.MinReadySeconds = -1
+			}),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
 			},
 		},
 	}
@@ -16714,7 +16741,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			tc.old.ObjectMeta.ResourceVersion = "1"
 			tc.update.ObjectMeta.ResourceVersion = "1"
 			errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{})
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 			matcher.Test(t, tc.expectedErrs, errs)
 		})
 	}
@@ -16725,7 +16752,7 @@ func TestValidateReplicationController(t *testing.T) {
 		mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Name = "abc-123" }),
 		mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 2
+			rc.Spec.Replicas = ptr.To[int32](2)
 			rc.Spec.Template.Spec = podtest.MakePodSpec(
 				podtest.SetVolumes(
 					core.Volume{
@@ -16746,9 +16773,12 @@ func TestValidateReplicationController(t *testing.T) {
 					}))),
 			)
 		}),
-		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 0 }),
-		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 1 }),
-		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 100 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](0) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](1) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](100) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 0 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 1 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 100 }),
 	}
 	for _, tc := range successCases {
 		if errs := ValidateReplicationController(&tc, PodValidationOptions{}); len(errs) != 0 {
@@ -16791,9 +16821,21 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 		"negative replicas": {
-			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = -1 }),
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"negative minReadySeconds": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = -1 }),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec.minReadySeconds"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"nil replicas": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
 		"invalid label": {
@@ -16864,7 +16906,7 @@ func TestValidateReplicationController(t *testing.T) {
 	for k, tc := range errorCases {
 		t.Run(k, func(t *testing.T) {
 			errs := ValidateReplicationController(&tc.input, PodValidationOptions{})
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 			matcher.Test(t, tc.expectedErrs, errs)
 		})
 	}
@@ -20770,7 +20812,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 		t.Run(k, func(t *testing.T) {
 			errs := ValidateEndpointsCreate(&v.endpoints)
 			// TODO: set .RequireOriginWhenInvalid() once metadata is done
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, v.expectedErrs, errs)
 		})
 	}
@@ -22767,7 +22809,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath, tc.opts)
-			matcher := fldtest.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
 			matcher.Test(t, tc.wantFieldErrors, errs)
 		})
 	}
