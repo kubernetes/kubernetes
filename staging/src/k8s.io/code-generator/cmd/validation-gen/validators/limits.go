@@ -25,11 +25,13 @@ import (
 )
 
 const (
-	minimumTagName = "k8s:minimum"
+	minimumTagName          = "k8s:minimum"
+	tightenedMinimumTagName = "k8s:tightenedMinimum"
 )
 
 func init() {
 	RegisterTagValidator(minimumTagValidator{})
+	RegisterTagValidator(tightenedMinimumTagValidator{})
 }
 
 type minimumTagValidator struct{}
@@ -72,6 +74,53 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 		Tag:         mtv.TagName(),
 		Scopes:      mtv.ValidScopes().UnsortedList(),
 		Description: "Indicates that a numeric field has a minimum value.",
+		Payloads: []TagPayloadDoc{{
+			Description: "<integer>",
+			Docs:        "This field must be greater than or equal to x.",
+		}},
+	}
+}
+
+type tightenedMinimumTagValidator struct{}
+
+func (tightenedMinimumTagValidator) Init(_ Config) {}
+
+func (tightenedMinimumTagValidator) TagName() string {
+	return tightenedMinimumTagName
+}
+
+var tightenedMinimumTagValidScopes = sets.New(
+	ScopeAny,
+)
+
+func (tightenedMinimumTagValidator) ValidScopes() sets.Set[Scope] {
+	return tightenedMinimumTagValidScopes
+}
+
+var (
+	tightenedMinimumValidator = types.Name{Package: libValidationPkg, Name: "TightenedMinimum"}
+)
+
+func (tightenedMinimumTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+	var result Validations
+
+	if t := realType(context.Type); !types.IsInteger(t) {
+		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := strconv.Atoi(payload)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	result.AddFunction(Function(tightenedMinimumTagName, DefaultFlags, tightenedMinimumValidator, intVal))
+	return result, nil
+}
+
+func (mtv tightenedMinimumTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:         mtv.TagName(),
+		Scopes:      mtv.ValidScopes().UnsortedList(),
+		Description: "Indicates that a numeric field has a minimum value that only applies if the old value is valid.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",
