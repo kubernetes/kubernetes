@@ -134,7 +134,7 @@ type testStaticPolicy struct {
 }
 
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint, initContainersReusableMemory reusableMemory) (Policy, state.State, error) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	manager := topologymanager.NewFakeManager()
 	if hint != nil {
 		manager = topologymanager.NewFakeManagerWithHint(hint)
@@ -147,7 +147,7 @@ func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.T
 	if initContainersReusableMemory != nil {
 		p.(*staticPolicy).initContainersReusableMemory = initContainersReusableMemory
 	}
-	s := state.NewMemoryState()
+	s := state.NewMemoryState(logger)
 	s.SetMachineState(testCase.machineState)
 	s.SetMemoryAssignments(testCase.assignments)
 	return p, s, nil
